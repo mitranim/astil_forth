@@ -264,6 +264,13 @@ Assumes `lsl` is already part of the base instruction.
   asm_pattern_load_store_with_register
 ;
 
+: asm_load_byte_off ( Wt Wn imm12 -- instr )
+  0b00_11_1_0_0_1_01_000000000000_00000_00000
+  swap 12 bit_trunc 10 lshift or \ imm12
+  swap               5 lshift or \ Wn
+                              or \ Wt
+;
+
 \ str Xd, [x27], 8
 : asm_push1 ( Xd -- instr ) 27 8 asm_store_post ;
 
@@ -549,10 +556,10 @@ Assumes `lsl` is already part of the base instruction.
 ] ;
 
 : flip ( i1 i2 i3 -- i3 i2 i1 ) [
-    1 27 -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
-   2  27 -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
-   2  27 -24 asm_store_off comp_instr \ str x2, [x27, -24]
-   1  27 -8  asm_store_off comp_instr \ str x1, [x27, -8]
+  1 27 -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
+  2 27 -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
+  2 27 -24 asm_store_off comp_instr \ str x2, [x27, -24]
+  1 27 -8  asm_store_off comp_instr \ str x1, [x27, -8]
 ] ;
 
 : negate ( i1 -- i2 ) [
@@ -567,7 +574,6 @@ Assumes `lsl` is already part of the base instruction.
         asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
-\ From i1 subtract i2.
 : - ( i1 i2 -- i3 ) [
         asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
   1 1 2 asm_sub_reg   comp_instr \ sub x1, x1, x2
@@ -580,7 +586,6 @@ Assumes `lsl` is already part of the base instruction.
         asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
-\ Div i1 by i2.
 : / ( i1 i2 -- i3 ) [
         asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
   1 1 2 asm_sdiv      comp_instr \ sdiv x1, x1, x2
@@ -696,14 +701,22 @@ this is considered a "bad instruction" and blows up.
   27 1 asm_mov_reg comp_instr \ mov x27, x1
 ] ;
 
-: cell ( -- size ) 8 ;
+: cell 8 ;
 : cells ( len -- size ) 3 lshift ;
 : /cells ( size -- len ) 3 arshift ;
 
 \ Stack introspection doesn't need to be optimal.
 : depth ( -- len ) sp sp0 - /cells ;
-: stack_clear ( ... -- ) sp0 sp! ;
-: stack_trunc ( ... len -- ... ) cells sp0 + sp! ;
+: stack_clear ( … -- ) sp0 sp! ;
+: stack_trunc ( … len -- … ) cells sp0 + sp! ;
+
+: head_char ( str len -- byte ) drop [
+        asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
+  1 1 0 asm_load_byte_off comp_instr \ ldrb x1, [x1]
+        asm_push_x1       comp_instr \ str x1, [x27], 8
+] ;
+
+: #char' parse_word head_char comp_push ;
 
 (
 Conditionals work like this:
@@ -750,7 +763,8 @@ Conditionals work like this:
 : #begin ( C: -- adr[beg] ) here ;
 : #again ( C: adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
 
-\ Usage: `#begin ... #leave #again #end`.
+\ Usage: `#begin … #leave #again #end`.
+\ Every `#leave` requires `#end` after the loop.
 : #leave ( C: adr[beg] -- fun[b] adr[b] adr[beg] )
   #' asm_branch here reserve_instr rot
 ;
@@ -771,8 +785,8 @@ Conditionals work like this:
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
 
-\ Renamed from `s"`.
-: " ( -- cstr len ) 34 parse ;
+\ Renamed from standard `s"`.
+: " ( -- cstr len ) #char' " parse ;
 
 \ Same as compile-time semantics of `s"` in standard Forth.
 : #"
@@ -913,12 +927,12 @@ which must be available at compile time. Usage example:
 
   10 20 30 [ 3 ] #f" numbers: %zu %zu %zu" cr
 )
-: #f" ( C: N -- ) ( E: i1 ... iN -- )
+: #f" ( C: N -- ) ( E: i1 … iN -- )
   va- #postpone' #c" #compile' printf -va
 ;
 
 \ Format-prints to stderr.
-: #ef" ( C: N -- ) ( E: i1 ... iN -- )
+: #ef" ( C: N -- ) ( E: i1 … iN -- )
   va- #compile' stderr #postpone' #c" #compile' fprintf -va
 ;
 
@@ -927,7 +941,7 @@ Formats into the provided buffer using `snprintf`. Usage example:
 
   SOME_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu" cr
 )
-: #sf" ( C: N -- ) ( E: buf size i1 ... iN -- )
+: #sf" ( C: N -- ) ( E: buf size i1 … iN -- )
   va- #postpone' #c" #compile' snprintf -va
 ;
 
@@ -961,13 +975,13 @@ Usage example:
 
 Also see `#throwf"` which comes with its own buffer.
 )
-: #sthrowf" ( C: len -- ) ( E: buf size i1 ... iN -- )
+: #sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
-  #compile'   dup2
-  #postpone'  #c"
-  #compile'   snprintf
+  #compile'  dup2
+  #postpone' #c"
+  #compile'  snprintf
   -va
-  #compile'   throw
+  #compile'  throw
 ;
 
 : print_int ( num -- ) [ 1 ] #f" %zd"  ;
@@ -1027,9 +1041,8 @@ variables also take an initial value.
 The "tmp" variants are backed by calloc and are only valid within the runtime
 of the current process. The non-tmp variants will be eventually placed within
 the executable space of a compiled program when we implement AOT compilation.
-For now, there's no practical difference. The "tmp" variants will probably be
-removed; they're provided for demonstration purposes: how easily this system
-lets you implement global variables with no compiler support.
+For now, there's no practical difference. The "tmp" variants demonstrate how
+easily you can implement global variables with no compiler support.
 )
 
 \ Same as standard `constant`.
@@ -1073,7 +1086,7 @@ Like `#sthrowf"` but easier to use. Example:
 
   10 20 30 [ 20 ] #throwf" error codes: %zu %zu %zu"
 )
-: #throwf" ( C: len -- ) ( E: i1 ... iN -- )
+: #throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
   #compile'  ERR_BUF
   #postpone' #c"
@@ -1099,6 +1112,7 @@ Like `#sthrowf"` but easier to use. Example:
 
 \ Allocates fully-protected, inaccessible memory.
 \ Middle area needs to be enabled with `mem_unprot`.
+\ Low and high regions become "guards".
 : mem_map ( pflag size -- addr )
   0 flip
   MAP_ANON MAP_PRIVATE or
