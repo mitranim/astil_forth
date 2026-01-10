@@ -25,9 +25,9 @@ DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc 
 WATCH ?= watchexec $(and $(CLEAR),-c) -i=$(GEN) -r -d=1ms -n -q
 # WATCH ?= watchexec $(and $(CLEAR),-c) -i=$(GEN) -r -d=1ms -n -q --no-vcs-ignore
 WATCH_COMP ?= $(WATCH) -e=c,h,s
-WATCH_PROG ?= $(WATCH) -e=ft
-WATCH_ALL ?= $(WATCH) -e=c,h,s,ft
-WATCH_IMM ?= $(WATCH) -e=ft,exe --no-vcs-ignore
+WATCH_PROG ?= $(WATCH) -e=f
+WATCH_ALL ?= $(WATCH) -e=c,h,s,f
+WATCH_IMM ?= $(WATCH) -e=f,exe --no-vcs-ignore
 
 ARTIF ?= *.o *.exe *.dSYM *.plist *.elf *.dbg \
 	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg
@@ -54,7 +54,7 @@ run:
 
 # Usage example:
 #
-#   make run_w args='f_init.ft f_test.ft -'
+#   make run_w args='f_init.f f_test.f -'
 .PHONY: run_w
 run_w:
 	$(WATCH_IMM) -- $(MAKE) run

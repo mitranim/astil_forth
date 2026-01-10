@@ -903,10 +903,8 @@ extern_ptr: __stderrp
 : #." #postpone' #c" #compile' puts ;
 : #e" #postpone' #c" #compile' eputs ;
 
-\ Core support for locals.
-: to: ( C: "name" -- ) ( E: val -- )
-  parse_word comp_local_ind comp_local_pop
-;
+\ Core primitive for locals.
+: to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
 
 : } ( ind_min ind_max -- )
   #begin

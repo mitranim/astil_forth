@@ -1,5 +1,5 @@
-include" ./f_init.ft"
-include" ./f_testing.ft"
+include" ./f_init.f"
+include" ./f_testing.f"
 
 : test_conditionals
   T{ false #if  10          #end <T>    }T

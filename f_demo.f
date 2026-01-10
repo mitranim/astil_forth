@@ -1,5 +1,4 @@
-include" ./f_init.ft"
-\ include" ./f_test.ft"
+include" ./f_init.f"
 
 " hello world" type cr
 
@@ -10,8 +9,8 @@ Can just call into the kernel.
 x8 = 64 -> Linux write syscall.
 x16 = 4 -> XNU write syscall.
 
-The multi-OS approach is inspired by Cosmopolitan Libc:
-https://justine.lol/cosmopolitan.
+Inspired by Cosmopolitan Libc: https://justine.lol/cosmopolitan.
+However, our system relies on some XNU-specific stuff elsewhere.
 )
 : sys_write ( fd str len -- ) [
   0   27 -24 asm_load_pre      comp_instr \ ldr x0, [x27, -24]!
