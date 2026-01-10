@@ -1193,30 +1193,6 @@ aka underflow or overflow, triggers a segfault.
   addr  size2
 ;
 
-: init_buf_var ( var_addr size -- buf_addr size )
-  over @ #if swap @ swap #ret #end
-  dup mem_alloc drop ( var_addr size buf_addr )
-  2 pick ! swap @ swap
-;
-
-(
-Exactly like `:buf`, but created inside the Forth program without any support
-from the interpreter / compiler. Unlike `:buf`, this isn't limited to the
-storage preallocated by the interpreter, and may request any amount supported
-by the OS and hardware. Also unlike `:buf`, this is initialized lazily the
-first time the variable is accessed, and has slightly more overhead for each
-subsequent access.
-)
-: :buf_var ( C: size "name" -- ) ( E: -- addr size2 )
-  PAGE_SIZE align_up
-  #word_beg
-  cell 1      comp_static drop \ `adrp x1, <addr@page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr       \ str <addr>, [x27], 8
-              comp_push        \ str <size>, [x27], 8
-  #compile' init_buf_var
-  #word_end
-;
-
 (
 FIXME new plan for static memory:
 
