@@ -739,58 +739,85 @@ Conditionals work like this:
 )
 
 : reserve_instr ASM_PLACEHOLDER comp_instr ;
+: pc_off ( adr -- adr off ) here over - ; \ For forward jumps.
 
-: if_branch ( pc_off -- instr ) 1 asm_cmp_branch_zero ;
+\ cbz x1, <else|end>
+: patch_if ( adr -- ) pc_off 1 asm_cmp_branch_zero swap !32 ;
 
 : #if ( C: -- fun adr ) ( E: pred -- )
-  asm_pop_x1 comp_instr #' if_branch here reserve_instr
+  asm_pop_x1 comp_instr here reserve_instr #' patch_if
 ;
 
-: ifn_branch ( pc_off -- instr ) 1 asm_cmp_branch_not_zero ;
+\ cbnz x1, <else|end>
+: patch_ifn ( adr -- ) pc_off 1 asm_cmp_branch_not_zero swap !32 ;
 
 : #ifn ( C: -- fun adr ) ( E: pred -- )
-  asm_pop_x1 comp_instr #' ifn_branch here reserve_instr
+  asm_pop_x1 comp_instr here reserve_instr #' patch_ifn
 ;
 
-: #end ( C: fun adr -- )
-  here over - ( fun adr pc_off )
-  rot execute ( adr instr )
-  swap !32    \ Retropatch instruction.
-;
+: #end ( C: adr fun -- ) execute ;
 
-: uncond_branch ( adr pc_off -- ) asm_branch swap !32 ;
+\ b <pc_off>
+: patch_uncond_forward ( adr -- ) pc_off asm_branch swap !32 ;
+
+\ b -<pc_off>
+: patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
 : #else ( C: fun[if] adr[if] -- fun[else] adr[else] )
-  #' asm_branch here reserve_instr swap2 #postpone' #end
+  here reserve_instr #' patch_uncond_forward swap2 #postpone' #end
 ;
 
 : #begin ( C: -- adr[beg] ) here ;
 : #again ( C: adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
 
 (
-Usage: `#begin … #leave #again #end`.
-Every `#leave` requires `#end` after the loop.
-
-Caution: can't be interleaved with conditionals
-because loops and conditionals use the same stack
-for control information.
+Currently unusable because we don't support mixing loop-related words
+with conditionals. Both groups use the regular stack for control info.
+Inside a conditional, `#leave` gets unjustly terminated by the nearest
+`#else` or `#end`. Also, loop words keep `adr[beg]` at the top.
 )
 : #leave ( C: adr[beg] -- fun[b] adr[b] adr[beg] )
-  #' asm_branch here reserve_instr rot
+  here #' patch_uncond_forward reserve_instr rot
 ;
 
-: #while ( C: -- adr[cbz] ) ( E: pred -- )
-  asm_pop_x1 comp_instr here reserve_instr
+(
+The topmost `#while` is terminated with `#repeat`.
+Each additional `#while` can be terminated with `#end`.
+
+  #begin
+    cond #while
+    cond #while
+    cond #while
+  #repeat #end #end
+)
+: #while ( C: adr[beg] -- fun[cbz] adr[cbz] fun[beg] ) ( E: pred -- )
+  #postpone' #if rot
 ;
 
-: #repeat ( C: adr[beg] adr[cbz] -- )
-  swap here -   asm_branch          comp_instr \ Go back to #begin.
-  here over - 1 asm_cmp_branch_zero swap   !32 \ Retropatch #while.
+\ For use with `#while`; potentially more general.
+: #repeat ( C: fun[any] fun[any] adr[beg] -- )
+  #postpone' #again #postpone' #end
 ;
 
 : #until ( C: adr[beg] -- ) ( E: pred -- )
   asm_pop_x1                       comp_instr \ Load predicate.
   here - 1 asm_cmp_branch_not_zero comp_instr \ cbz 1, <begin>
+;
+
+(
+Similar to the standard `?do … loop`, with clearer naming.
+Keeps the provided ceiling and floor on the regular stack.
+Does NOT discard them when done. There's no magic `i`.
+
+  8 0 #do> dup . #loop+ drop2
+  \ 0 1 2 3 4 5 6 7
+)
+: #do> ( C: -- fun[cbz] adr[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
+  here #compile' dup2 #compile' > #postpone' #if rot
+;
+
+: #loop+ ( C: fun[any] fun[any] adr[beg] -- )
+  #compile' inc #postpone' #repeat
 ;
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
@@ -1169,8 +1196,9 @@ extern_ptr: __error
 2     let: MAP_PRIVATE
 4096  let: MAP_ANON
 
-: mem_map ( size pflag -- addr )
-  0 -rot MAP_ANON MAP_PRIVATE or -1 0 mmap
+: mem_map { size pflag -- addr }
+  MAP_ANON MAP_PRIVATE or to: mflag
+  0 size pflag mflag -1 0 mmap
   dup -1 = #if drop #throw" unable to mmap" #end
 ;
 
