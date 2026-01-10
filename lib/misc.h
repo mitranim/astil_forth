@@ -20,17 +20,26 @@ typedef void(Void_fun)(void);
 Usage:
 
   defer(type_deinit) type name = {};
+
+Variables used with `defer` must always be initialized.
+Typically this means zero-initialization, but sometimes
+the sentinel value is type-specific, like `-1`.
+
+The type-specific cleanup functions rely on initial
+sentinel values to avoid attempting to free resources
+which weren't actually allocated.
 */
 #define defer(fun) __attribute__((cleanup(fun)))
 
 // For use in `X_deinit` functions used with `defer`.
-#define var_deinit(name, fun) \
-  {                           \
-    if (!name) return;        \
-    void *tmp = *name;        \
-    if (!tmp) return;         \
-    *name = nullptr;          \
-    fun(tmp);                 \
+#define var_deinit(name, fun)           \
+  {                                     \
+    const auto deinit_tmp_ptr = name;   \
+    if (!deinit_tmp_ptr) return;        \
+    void *deinit_tmp = *deinit_tmp_ptr; \
+    if (!deinit_tmp) return;            \
+    *deinit_tmp_ptr = nullptr;          \
+    fun(deinit_tmp);                    \
   }
 
 #ifndef unreachable

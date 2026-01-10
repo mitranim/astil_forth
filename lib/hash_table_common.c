@@ -30,6 +30,14 @@ static void hash_table_deinit(void *tab) {
   *tar = (Hash_table){};
 }
 
+/*
+How many chunks of bits correspond to this capacity.
+Round-up divide; cap 0 = len 0, otherwise min 1.
+*/
+static Ind hash_table_bits_arr_len(Ind cap) {
+  return (cap + HASH_TABLE_BITS_CAP - 1) / HASH_TABLE_BITS_CAP;
+}
+
 static void hash_table_init(
   Hash_table *out, Ind cap, Uint key_size, Uint val_size
 ) {
@@ -41,8 +49,7 @@ static void hash_table_init(
   // Power of 2, or 0. Assumed by `hash_table_loaded` and `hash_table_probe_ind`.
   IF_DEBUG(aver(!(cap & (cap - 1))));
 
-  // Round-up divide; also min 1 unless cap is 0.
-  auto bits_len = (cap + HASH_TABLE_BITS_CAP - 1) / HASH_TABLE_BITS_CAP;
+  auto bits_len = hash_table_bits_arr_len(cap);
 
   *out = (Hash_table){
     .cap  = cap,
@@ -82,6 +89,15 @@ static bool hash_table_valid(const Hash_table *tab) {
 
 // clang-format on
 
+// Truncates the whole table while preserving the allocated capacity.
+static void hash_table_trunc(Hash_table *tab) {
+  auto bits_len = hash_table_bits_arr_len(tab->cap);
+  for (Ind ind = 0; ind < bits_len; ind++) {
+    tab->bits[ind] = 0;
+  }
+  tab->len = 0;
+}
+
 static bool hash_table_bits_get_at(const Uint *bits, Ind ind) {
   return bits[ind / HASH_TABLE_BITS_CAP] &
     ((Uint)1 << (ind % HASH_TABLE_BITS_CAP));
@@ -104,12 +120,12 @@ static Ind hash_table_head(const Hash_table *tab) {
   return hash_table_next(tab, 0);
 }
 
-// Load factor 50%.
+// Load factor 50%. Assumes `cap` is power of 2.
 static bool hash_table_loaded(const Hash_table *tab) {
   return (tab->len << 1) > tab->cap;
 }
 
-// Quadratic probing.
+// Quadratic probing. Assumes `cap` is power of 2.
 static Ind hash_table_probe(Ind iter) { return (iter * iter + iter) / 2; }
 
 static Ind hash_table_probe_ind(const Hash_table *tab, Hash hash, Ind iter) {

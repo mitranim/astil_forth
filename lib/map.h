@@ -67,4 +67,13 @@ typedef Hash_table Map;
 #define map_key_size(map) sizeof((map)->keys[0])
 #define map_val_type(map) typeof((map)->vals[0])
 #define map_val_size(map) sizeof((map)->vals[0])
+
+/*
+Usage:
+
+  for (map_range(Ind, ind, map)) {
+    const auto key = map->keys[ind];
+    const auto val = map->vals[ind];
+  }
+*/
 #define map_range hash_table_range

@@ -8,6 +8,28 @@
 // Used only for pointer arithmetic; ignored by hashing and equality.
 static constexpr Uint DICT_KEY_SIZE = sizeof(char *);
 
+// For dicts where keys are borrowed.
+static void dict_deinit(void *dict) { hash_table_deinit(dict); }
+
+// For dicts where keys are owned.
+static void dict_deinit_with_keys(Dict *dict) {
+  for (dict_range(Ind, ind, dict)) free(dict->keys[ind]);
+  dict_deinit(dict);
+}
+
+static bool dict_valid(const Dict *dict) {
+  return hash_table_valid((const Hash_table *)dict);
+}
+
+// For dicts where keys are borrowed.
+static void dict_trunc(Dict *dict) { hash_table_trunc((Hash_table *)dict); }
+
+// For dicts where keys are owned.
+static void dict_trunc_with_keys(Dict *dict) {
+  for (dict_range(Ind, ind, dict)) free(dict->keys[ind]);
+  hash_table_trunc((Hash_table *)dict);
+}
+
 // Conforms to `Hash_fun`.
 static Hash dict_key_hash(const void *key, Uint len) {
   (void)len;
@@ -18,12 +40,6 @@ static Hash dict_key_hash(const void *key, Uint len) {
 static bool dict_key_eq(const void *one, const void *two, Uint len) {
   (void)len;
   return !strcmp(*(const char *const *)one, *(const char *const *)two);
-}
-
-static void dict_deinit(void *dict) { hash_table_deinit(dict); }
-
-static bool dict_valid(const Dict *dict) {
-  return hash_table_valid((const Hash_table *)dict);
 }
 
 static Ind dict_ind_impl(const Dict *dict, const char *key) {

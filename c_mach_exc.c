@@ -320,7 +320,7 @@ kern_return_t catch_mach_exception_raise_state(
   if (state_prev_len != state_len) return MIG_BAD_ARGUMENTS;
 
   const auto state  = (Thread_state *)state_prev_ptr;
-  const auto interp = (Interp *)state->x[ASM_INTERP_REG];
+  const auto interp = (Interp *)state->x[ASM_REG_INTERP];
 
   IF_DEBUG({
     eprintf(SYS_REC_FMT "bad thread state: ");
@@ -337,7 +337,7 @@ kern_return_t catch_mach_exception_raise_state(
         SYS_REC_FMT
         "address %p recovered from register %d does not appear to reference valid interpreter state\n",
         interp,
-        ASM_INTERP_REG
+        ASM_REG_INTERP
       );
       fflush(stderr);
     });

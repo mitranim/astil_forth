@@ -25,9 +25,11 @@ typedef Sint(Extern_fun)(Sint, Sint, Sint, Sint, Sint, Sint, Sint, Sint);
 Book-keeping for instructions which we can't correctly encode during the first
 pass. During the first pass, we reserve space in form of invalid instructions,
 and rewrite them when finalizing a word.
+
+Procedure prologue also implicitly undergoes fixup.
 */
 typedef struct {
-  enum { ASM_FIXUP_RET = 1, ASM_FIXUP_LOAD = 2, ASM_FIXUP_TRY = 3 } type;
+  enum { ASM_FIXUP_RET = 1, ASM_FIXUP_TRY = 2, ASM_FIXUP_LOAD = 3 } type;
 
   struct {
     Instr *instr; // b <epilogue>
@@ -79,18 +81,23 @@ typedef struct {
   Ind_dict           inds;
 } Asm_got;
 
+// Positions of "locals"; the dict owns the keys.
+typedef Ind_dict Asm_locs;
+
 typedef struct {
   Asm_heap       write; // Writable code heap.
   Asm_heap       exec;  // Executable code heap.
   Asm_fixup_list fixup; // Used as scratch in word compilation.
   Asm_got        got;   // Mapping of intrin/extern symbols to GOT entries.
+  Asm_locs       locs;  // Used as scratch for "locals".
 } Asm;
 
 // All fields are offsets from `&Asm.write.page->instrs`.
 typedef struct {
-  Ind prologue; // Setup instructions; skipped in leaf procedures.
+  Ind prologue; // Setup instructions; some may be skipped.
+  Ind begin;    // Actual start; somewhere in `[prologue,inner]`.
   Ind inner;    // First useful instruction.
-  Ind epilogue; // `== .ret` in leaf procedures.
+  Ind epilogue; // Cleanup instructions; may be `== .ret`.
   Ind ret;      // Always `ret`.
   Ind data;     // Local immediate values.
   Ind next;     // Start of next symbol's instructions.
@@ -127,26 +134,27 @@ static constexpr U8 ASM_SCRATCH_REG_15 = 15;
 static constexpr U8 ASM_ERR_REG = ASM_PARAM_REG_0;
 
 // Pointer to `Interp.ints.top`; hardcoded in a few places.
-static constexpr U8 ASM_INT_FLOOR_REG = 26;
+static constexpr U8 ASM_REG_INT_FLOOR = 26;
 
 // Pointer to `Interp.ints.top`; hardcoded in a few places.
-static constexpr U8 ASM_INT_TOP_REG = 27;
+static constexpr U8 ASM_REG_INT_TOP = 27;
 
 // Pointer to `Interp`; hardcoded in a few places.
-static constexpr U8 ASM_INTERP_REG = 28;
+static constexpr U8 ASM_REG_INTERP = 28;
 
-static constexpr U8 ASM_FP_REG = 29;
+static constexpr U8 ASM_REG_FP = 29;
 
 // Updated by `bl`/`blr` and used by `ret`.
-static constexpr U8 ASM_LINK_REG = 30;
+static constexpr U8 ASM_REG_LINK = 30;
 
 // System SP / ZR.
-static constexpr U8 ASM_SP_REG = 31;
+static constexpr U8 ASM_REG_SP = 31;
 
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {
   ASM_CODE_PROC_DELIM = 1,
-  ASM_CODE_RET_EPI    = 2,
-  ASM_CODE_LOAD       = 3,
-  ASM_CODE_TRY        = 4,
+  ASM_CODE_PROLOGUE   = 2,
+  ASM_CODE_RET_EPI    = 3,
+  ASM_CODE_LOAD       = 4,
+  ASM_CODE_TRY        = 5,
 } Asm_code;

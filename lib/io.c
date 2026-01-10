@@ -8,6 +8,13 @@
 #include <string.h>
 #include <sys/stat.h>
 
+/*
+Usage:
+
+  defer(fd_deinit) int file = -1;
+
+The variable MUST be initialized to -1.
+*/
 static void fd_deinit(int *file) {
   if (!file) return;
   const auto val = *file;
@@ -60,7 +67,13 @@ static Err err_file_read_mismatch(const char *path, Uint file_len, Uint read_len
   );
 }
 
-// Usage: `defer(file_deinit) FILE *file = ...`.
+/*
+Usage:
+
+  defer(file_deinit) FILE *file = nullptr;
+
+The variable MUST be zero-initialized.
+*/
 static void file_deinit(FILE **var) { var_deinit(var, fclose); }
 
 static Err file_open_fuzzy(const char *path, const char **resolved, FILE **out) {
@@ -100,7 +113,7 @@ static Err file_open(const char *path, FILE **out) {
 }
 
 static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
-  defer(fd_deinit) int file;
+  defer(fd_deinit) int file = -1;
   try(fd_open(path, O_RDONLY, &file));
 
   struct stat info;
@@ -153,7 +166,7 @@ int main(void) {
   }
 
   {
-    defer(str_deinit) char *body;
+    defer(str_deinit) char *body = nullptr;
     Uint                    len;
 
     try_main(file_read_text("./io.c", &body, &len));

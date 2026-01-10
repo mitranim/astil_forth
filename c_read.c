@@ -182,9 +182,11 @@ static Err read_num(Reader *read, U8 head, Sint sign, Sint *out) {
 
       default: {
         if (dig >= radix) return err_digit_radix(dig, head, radix);
-        const auto next = (num * radix) + (dig * sign);
-        if (num < 0 ? next > num : next < num) return err_overflow(radix);
-        num = next;
+        Sint next;
+        if (__builtin_mul_overflow(num, radix, &next)) {
+          return err_overflow(radix);
+        }
+        num = next + (dig * sign);
         continue;
       }
     }

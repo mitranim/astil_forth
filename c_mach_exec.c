@@ -69,7 +69,7 @@ static Err compile_mach_executable(Interp *interp) {
   defer(set_deinit) Sym_set visited = {};
   try(validate_callees_can_compile(&visited, main));
 
-  defer(bytes_deinit) U8 *buf;
+  defer(bytes_deinit) U8 *buf = nullptr;
   Uint                    len;
   const auto              str = open_memstream((char **)&buf, &len);
 

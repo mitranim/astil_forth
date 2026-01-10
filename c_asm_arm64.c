@@ -26,7 +26,7 @@
 - Condition codes' encoding: see documentation of `B.cond`.
 - Condition codes' explanation: https://developer.arm.com/documentation/dui0801/l/Condition-Codes/Condition-code-suffixes-and-related-flags
   - Interchangeable: "CS" = "HS", "CC" = "LO".
-- LLVM's arm64 codegen is defined in `.td` files here: https://github.com/llvm/llvm-project/tree/main/llvm/lib/Target/AArch64
+- LLVM's Arm64 codegen is defined in `.td` files here: https://github.com/llvm/llvm-project/tree/main/llvm/lib/Target/AArch64
   - Base instructions are in `AArch64InstrFormats.td`.
 - Apple ABI: https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms
 - System V ABI: https://github.com/ARM-software/abi-aa/blob/c51addc3dc03e73a016a1e4edf25440bcac76431/sysvabi64/sysvabi64.rst
@@ -200,14 +200,25 @@ static Err asm_heap_sync(Asm *asm) {
   return nullptr;
 }
 
+static void asm_locals_deinit(Asm_locs *locs) {
+  dict_deinit_with_keys((Dict *)locs);
+}
+
+static void asm_locals_trunc(Asm_locs *locs) {
+  dict_trunc_with_keys((Dict *)locs);
+}
+
 static Err asm_deinit(Asm *asm) {
   list_deinit(&asm->fixup);
   dict_deinit(&asm->got.inds);
+  asm_locals_deinit(&asm->locs);
+
   Err err = nullptr;
   err     = either(err, asm_page_deinit(asm->write.page));
   err     = either(err, asm_page_deinit(asm->exec.page));
   err     = either(err, stack_deinit(&asm->got.names));
   *asm    = (Asm){};
+
   return err;
 }
 
@@ -410,53 +421,35 @@ static Err asm_call_extern_proc(Sint_stack *stack, const Sym *sym) {
   return nullptr;
 }
 
+static Instr *asm_append_instr(Asm *asm, Instr val) {
+  return list_push(&asm->write.instrs, val);
+}
+
 /*
-Variants:
+Base pattern used by:
 
-  opc 00 = str
-  opc 01 = ldr
-
-  str <val_reg>, [<addr_reg>, <off>]
-  ldr <val_reg>, [<addr_reg>, <off>]
+  ldur
+  stur
+  ldr Xt, [Xn, <imm>]!
+  ldr Xt, [Xn], <imm>
 */
-static void asm_append_load_store_offset(
-  Asm *asm, bool is_load, U8 val_reg, U8 addr_reg, Uint off
-) {
-  aver(divisible_by(off, 8));
-  off /= 8;
-
-  averr(imm_unsigned(off, 12));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
-
-  list_push(
-    &asm->write.instrs,
-    (Instr)0b11'111'0'01'00'000000000000'00000'00000 | ((Instr)is_load << 22) |
-      ((Instr)off << 10) | ((Instr)addr_reg << 5) | val_reg
-  );
-}
-
-static void asm_append_store_offset(Asm *asm, U8 src_reg, U8 addr_reg, Uint off) {
-  asm_append_load_store_offset(asm, false, src_reg, addr_reg, off);
-}
-
-static void asm_append_load_offset(Asm *asm, U8 out_reg, U8 addr_reg, Uint off) {
-  asm_append_load_store_offset(asm, true, out_reg, addr_reg, off);
-}
+static Instr ASM_BASE_LOAD_STORE = 0b11'111'0'00'00'0'000000000'00'00000'00000;
 
 /*
 Variants:
 
   opc 00 = str
   opc 01 = ldr
+
+Pre/post depends on the sign:
 
   str val_reg, [addr_reg, -pre_mod]! // full descending
-  str val_reg, [addr_reg], +post_mod // empty ascending
-
   ldr val_reg, [addr_reg], +post_mod // full descending
+
+  str val_reg, [addr_reg], +post_mod // empty ascending
   ldr val_reg, [addr_reg, -pre_mod]! // empty ascending
 */
-static void asm_append_load_store_modified(
+static void asm_append_load_store_pre_post(
   Asm *asm, bool is_load, U8 val_reg, U8 addr_reg, Sint mod
 ) {
   Instr order = mod < 0 ? 0b11 : 0b01;
@@ -466,23 +459,90 @@ static void asm_append_load_store_modified(
   averr(asm_validate_reg(val_reg));
   averr(asm_validate_reg(addr_reg));
 
-  list_push(
-    &asm->write.instrs,
-    (Instr)0b11'111'0'00'00'0'000000000'00'00000'00000 | ((Instr)is_load << 22) |
-      (mod_val << 12) | (order << 10) | ((Instr)addr_reg << 5) | val_reg
+  asm_append_instr(
+    asm,
+    (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) | (mod_val << 12) |
+      (order << 10) | ((Instr)addr_reg << 5) | val_reg
   );
 }
 
-static void asm_append_store_modified(
+static void asm_append_store_pre_post(
   Asm *asm, U8 src_reg, U8 addr_reg, Sint mod_val
 ) {
-  asm_append_load_store_modified(asm, false, src_reg, addr_reg, mod_val);
+  asm_append_load_store_pre_post(asm, false, src_reg, addr_reg, mod_val);
 }
 
-static void asm_append_load_modified(
+static void asm_append_load_pre_post(
   Asm *asm, U8 out_reg, U8 addr_reg, Sint mod_val
 ) {
-  asm_append_load_store_modified(asm, true, out_reg, addr_reg, mod_val);
+  asm_append_load_store_pre_post(asm, true, out_reg, addr_reg, mod_val);
+}
+
+/*
+Variants:
+
+  opc 00 = str
+  opc 01 = ldr
+
+  str <val_reg>, [<addr_reg>, <off>]
+  ldr <val_reg>, [<addr_reg>, <off>]
+*/
+static void asm_append_load_store_scaled_offset(
+  Asm *asm, bool is_load, U8 val_reg, U8 addr_reg, Uint off
+) {
+  aver(divisible_by(off, 8));
+  off /= 8;
+
+  averr(imm_unsigned(off, 12));
+  averr(asm_validate_reg(val_reg));
+  averr(asm_validate_reg(addr_reg));
+
+  asm_append_instr(
+    asm,
+    (Instr)0b11'111'0'01'00'000000000000'00000'00000 | ((Instr)is_load << 22) |
+      ((Instr)off << 10) | ((Instr)addr_reg << 5) | val_reg
+  );
+}
+
+static void asm_append_store_scaled_offset(
+  Asm *asm, U8 src_reg, U8 addr_reg, Uint off
+) {
+  asm_append_load_store_scaled_offset(asm, false, src_reg, addr_reg, off);
+}
+
+static void asm_append_load_scaled_offset(
+  Asm *asm, U8 out_reg, U8 addr_reg, Uint off
+) {
+  asm_append_load_store_scaled_offset(asm, true, out_reg, addr_reg, off);
+}
+
+static void asm_append_load_store_unscaled_offset(
+  Asm *asm, bool is_load, U8 val_reg, U8 addr_reg, Sint off
+) {
+  Instr imm;
+  averr(imm_signed(off, 9, &imm));
+  averr(asm_validate_reg(val_reg));
+  averr(asm_validate_reg(addr_reg));
+
+  asm_append_instr(
+    asm,
+    (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) | ((Instr)imm << 12) |
+      ((Instr)addr_reg << 5) | val_reg
+  );
+}
+
+// stur <val_reg>, [<addr_reg>, <off>]
+static void asm_append_store_unscaled_offset(
+  Asm *asm, U8 src_reg, U8 addr_reg, Sint off
+) {
+  asm_append_load_store_unscaled_offset(asm, false, src_reg, addr_reg, off);
+}
+
+// ldur <val_reg>, [<addr_reg>, <off>]
+static void asm_append_load_unscaled_offset(
+  Asm *asm, U8 out_reg, U8 addr_reg, Sint off
+) {
+  asm_append_load_store_unscaled_offset(asm, true, out_reg, addr_reg, off);
 }
 
 static void asm_append_load_literal_offset(Asm *asm, U8 reg, Sint off) {
@@ -491,8 +551,8 @@ static void asm_append_load_literal_offset(Asm *asm, U8 reg, Sint off) {
   Instr imm;
   averr(imm_signed(off, 19, &imm));
 
-  list_push(
-    &asm->write.instrs,
+  asm_append_instr(
+    asm,
     // ldr <reg>, <off>
     (Instr)0b01'011'0'00'0000000000000000000'00000 | (imm << 5) | reg
   );
@@ -530,8 +590,8 @@ static U16 asm_append_adrp(Asm *asm, U8 reg, Uint addr) {
   const Instr high = (Instr)page_diff >> 2;
   const Instr low  = (Instr)page_diff & 0b11;
 
-  list_push(
-    &asm->write.instrs,
+  asm_append_instr(
+    asm,
     // adrp <reg>, <imm>
     (Instr)0b1'00'100'00'0000000000000000000'00000 | (low << 29) | (high << 5) |
       reg
@@ -554,7 +614,7 @@ Variants:
 Unlike in `str` and `ldr`, the offset in `stp` and `ldp`
 is implicitly a multiple of the register width in bytes.
 */
-static Instr asm_instr_load_store_pair_modified(
+static Instr asm_instr_load_store_pair_pre_post(
   bool is_load, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
 ) {
   aver(divisible_by(mod, 8));
@@ -573,25 +633,24 @@ static Instr asm_instr_load_store_pair_modified(
     ((Instr)addr_reg << 5) | reg0;
 }
 
-static void asm_append_load_store_pair_modified(
-  Asm *asm, bool is_load, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
-) {
-  list_push(
-    &asm->write.instrs,
-    asm_instr_load_store_pair_modified(is_load, reg0, reg1, addr_reg, mod);
-  );
+static Instr asm_instr_store_pair_pre_post(U8 reg0, U8 reg1, U8 addr_reg, S8 mod) {
+  return asm_instr_load_store_pair_pre_post(0b0, reg0, reg1, addr_reg, mod);
 }
 
-static void asm_append_store_pair_modified(
-  Asm *asm, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
-) {
-  asm_append_load_store_pair_modified(asm, 0b0, reg0, reg1, addr_reg, mod);
+static Instr asm_instr_load_pair_pre_post(U8 reg0, U8 reg1, U8 addr_reg, S8 mod) {
+  return asm_instr_load_store_pair_pre_post(0b1, reg0, reg1, addr_reg, mod);
 }
 
-static void asm_append_load_pair_modified(
+static void asm_append_store_pair_pre_post(
   Asm *asm, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
 ) {
-  asm_append_load_store_pair_modified(asm, 0b1, reg0, reg1, addr_reg, mod);
+  asm_append_instr(asm, asm_instr_store_pair_pre_post(reg0, reg1, addr_reg, mod));
+}
+
+static void asm_append_load_pair_pre_post(
+  Asm *asm, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
+) {
+  asm_append_instr(asm, asm_instr_load_pair_pre_post(reg0, reg1, addr_reg, mod));
 }
 
 // The offset is PC-relative and implicitly times 4.
@@ -602,15 +661,13 @@ static Instr asm_instr_branch_to_offset(Sint off) {
 }
 
 static void asm_append_branch_to_offset(Asm *asm, Sint off) {
-  list_push(&asm->write.instrs, asm_instr_branch_to_offset(off));
+  asm_append_instr(asm, asm_instr_branch_to_offset(off));
 }
 
 static void asm_append_branch_with_link_to_offset(Asm *asm, Sint off) {
   Instr imm;
   averr(imm_signed(off, 26, &imm));
-  list_push(
-    &asm->write.instrs, (Instr)0b1'00'101'00000000000000000000000000 | imm
-  );
+  asm_append_instr(asm, (Instr)0b1'00'101'00000000000000000000000000 | imm);
 }
 
 static Instr asm_compare_branch(U8 reg, Sint off, bool non_zero) {
@@ -636,15 +693,15 @@ static Instr asm_compare_branch_non_zero(U8 reg, Sint off) {
 }
 
 static void asm_append_compare_branch(Asm *asm, U8 reg, Sint off, bool non_zero) {
-  list_push(&asm->write.instrs, asm_compare_branch(reg, off, non_zero));
+  asm_append_instr(asm, asm_compare_branch(reg, off, non_zero));
 }
 
 static void asm_append_compare_branch_zero(Asm *asm, U8 reg, Sint off) {
-  list_push(&asm->write.instrs, asm_compare_branch_zero(reg, off));
+  asm_append_instr(asm, asm_compare_branch_zero(reg, off));
 }
 
 static void asm_append_compare_branch_non_zero(Asm *asm, U8 reg, Sint off) {
-  list_push(&asm->write.instrs, asm_compare_branch_non_zero(reg, off));
+  asm_append_instr(asm, asm_compare_branch_non_zero(reg, off));
 }
 
 static const Instr *asm_sym_epilogue_writable(const Asm *asm, const Sym *sym) {
@@ -667,7 +724,7 @@ static void asm_fixup_ret(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
   *tar = asm_instr_branch_to_offset(off);
 }
 
-static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup) {
+static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
   aver(fixup->type == ASM_FIXUP_LOAD);
 
   const auto write = &asm->write;
@@ -680,7 +737,7 @@ static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup) {
   Instr opc;
   if ((Uint)imm32 == imm) {
     opc = 0b00; // ldr <Wt>, <off>
-    list_push(&write->instrs, imm32);
+    asm_append_instr(asm, imm32);
   }
   else {
     opc = 0b01; // ldr <Xt>, <off>
@@ -692,6 +749,7 @@ static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup) {
 
   *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30) |
     (imm19 << 5) | load->reg;
+  sym->norm.has_loads = true;
 }
 
 static void asm_fixup_try(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
@@ -703,7 +761,7 @@ static void asm_fixup_try(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
   *fixup->try = asm_compare_branch_non_zero(ASM_ERR_REG, off);
 }
 
-static void asm_fixup(Asm *asm, const Sym *sym) {
+static void asm_fixup(Asm *asm, Sym *sym) {
   const auto src = &asm->fixup;
 
   for (Ind ind = 0; ind < src->len; ind++) {
@@ -715,7 +773,7 @@ static void asm_fixup(Asm *asm, const Sym *sym) {
         continue;
       }
       case ASM_FIXUP_LOAD: {
-        asm_fixup_load(asm, fixup);
+        asm_fixup_load(asm, fixup, sym);
         continue;
       }
       case ASM_FIXUP_TRY: {
@@ -729,64 +787,239 @@ static void asm_fixup(Asm *asm, const Sym *sym) {
   src->len = 0;
 }
 
-static void asm_append_add_imm(Asm *asm, U8 tar_reg, U8 src_reg, Sint imm) {
-  Instr imm_val;
-  averr(imm_signed(imm, 12, &imm_val));
-  averr(asm_validate_reg(tar_reg));
+static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
+  averr(imm_unsigned(imm12, 12));
   averr(asm_validate_reg(src_reg));
+  averr(asm_validate_reg(tar_reg));
+  return ((Instr)imm12 << 10) | ((Instr)src_reg << 5) | tar_reg;
+}
 
-  list_push(
-    &asm->write.instrs,
-    (Instr)0b1'0'0'100010'0'000000000000'00000'00000 | (imm_val << 10) |
-      ((Instr)src_reg << 5) | tar_reg
-  );
+static Instr asm_instr_add_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
+  return (Instr)0b1'0'0'100010'0'000000000000'00000'00000 |
+    asm_pattern_arith_imm(tar_reg, src_reg, imm12);
+}
+
+static Instr asm_instr_sub_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
+  return (Instr)0b1'1'0'100010'0'000000000000'00000'00000 |
+    asm_pattern_arith_imm(tar_reg, src_reg, imm12);
+}
+
+static void asm_append_add_imm(Asm *asm, U8 tar_reg, U8 src_reg, Uint imm12) {
+  asm_append_instr(asm, asm_instr_add_imm(tar_reg, src_reg, imm12));
+}
+
+static void asm_append_sub_imm(Asm *asm, U8 tar_reg, U8 src_reg, Uint imm12) {
+  asm_append_instr(asm, asm_instr_sub_imm(tar_reg, src_reg, imm12));
+}
+
+/*
+We use breakpoint instructions with various magic codes
+when reserving space for later fixups.
+*/
+static Instr asm_instr_breakpoint(Instr imm) {
+  averr(imm_unsigned(imm, 16));
+  // brk <imm>
+  return (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5);
 }
 
 static Instr *asm_append_breakpoint(Asm *asm, Instr imm) {
-  averr(imm_unsigned(imm, 16));
-  return list_push(
-    &asm->write.instrs,
-    // brk <imm>
-    (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5)
+  return asm_append_instr(asm, asm_instr_breakpoint(imm));
+}
+
+static Err err_inline_not_norm(const Sym *sym) {
+  return errf(
+    "unable to inline " FMT_QUOTED ": not a regular Forth word", sym->name.buf
   );
 }
 
-// Creates a frame record in accordance with arm64 ABI.
-static void asm_append_sym_prologue(Asm *asm) {
-  asm_append_store_pair_modified(asm, ASM_FP_REG, ASM_LINK_REG, ASM_SP_REG, -16);
-  asm_append_add_imm(asm, ASM_FP_REG, ASM_SP_REG, 0);
+static Err err_inline_pc_rel(const Sym *sym) {
+  return errf(
+    "unable to inline word " FMT_QUOTED
+    ": contains operations relative to the program counter (instruction address)",
+    sym->name.buf
+  );
 }
 
-static void asm_append_sym_epilogue(Asm *asm) {
-  asm_append_load_pair_modified(asm, ASM_FP_REG, ASM_LINK_REG, ASM_SP_REG, 16);
+static Err err_inline_early_ret(const Sym *sym) {
+  return errf(
+    "unable to inline word " FMT_QUOTED ": contains early returns", sym->name.buf
+  );
 }
 
-static void asm_sym_beg(Asm *asm, Sym *sym) {
-  asm->fixup.len = 0;
+static Err err_inline_not_leaf(const Sym *sym) {
+  return errf(
+    "unable to inline word " FMT_QUOTED ": not a leaf procedure", sym->name.buf
+  );
+}
 
-  const auto write = &asm->write;
+static Err err_inline_has_data(const Sym *sym) {
+  return errf(
+    "unable to inline word " FMT_QUOTED ": loads local immediate values",
+    sym->name.buf
+  );
+}
+
+static Err err_sym_not_inlinable(const Sym *sym) {
+  if (sym->type != SYM_NORM) return err_inline_not_norm(sym);
+  if (sym->norm.has_loads) return err_inline_pc_rel(sym);
+  if (sym->norm.has_rets) return err_inline_early_ret(sym);
+  if (!is_sym_leaf(sym)) return err_inline_not_leaf(sym);
+
+  // Same as `err_inline_pc_rel`. Redundant check for safety.
   const auto spans = &sym->norm.spans;
-  spans->prologue  = write->instrs.len;
+  IF_DEBUG(aver(sym->norm.has_loads == (spans->data < spans->next)));
+  if (spans->data < spans->next) return err_inline_has_data(sym);
 
-  asm_append_sym_prologue(asm);
-  spans->inner = write->instrs.len;
+  return nullptr;
+}
+
+// A bit wasteful.
+static bool asm_sym_can_inline(const Sym *sym) {
+  return !err_sym_not_inlinable(sym);
 }
 
 static void asm_sym_auto_inlinable(Sym *sym) {
-  if (!is_sym_leaf(sym)) return;
-  if (sym->throws) return;
+  if (!asm_sym_can_inline(sym)) return;
 
   const auto spans = &sym->norm.spans;
-  if (spans->data < spans->next) return;
-
-  const auto len = spans->epilogue - spans->inner;
+  const auto len   = spans->epilogue - spans->inner;
   if (len > 1) return;
 
-  sym->inlined = true;
+  sym->norm.inlinable = true;
 
   IF_DEBUG(
     eprintf("[system] symbol " FMT_QUOTED " is auto-inlinable\n", sym->name.buf)
   );
+}
+
+static void asm_append_stack_push_from(Asm *asm, U8 reg) {
+  asm_append_store_pre_post(asm, reg, ASM_REG_INT_TOP, 8);
+}
+
+static void asm_append_stack_pop_into(Asm *asm, U8 reg) {
+  asm_append_load_pre_post(asm, reg, ASM_REG_INT_TOP, -8);
+}
+
+// On Arm64, SP must be aligned to 16 bytes.
+static Ind asm_locals_sp_off(const Asm_locs *locs) {
+  return __builtin_align_up((locs->len * (Ind)sizeof(Sint)), 16);
+}
+
+static Sint asm_local_fp_off(Ind ind) {
+  return -(((Sint)ind + 1) * (Sint)sizeof(Sint));
+}
+
+/*
+Returns an ordinal index: 0 1 2 and so on.
+If the local is allocated for the first time,
+its memory is garbage. Locals must always be
+initialized with `asm_append_local_store`.
+*/
+static Ind asm_local_get_or_make(Asm *asm, const char *name, Ind name_len) {
+  const auto locs = &asm->locs;
+  if (dict_has(locs, name)) return dict_get(locs, name);
+
+  const auto ind = locs->len;
+  dict_set(locs, str_alloc_copy(name, name_len), ind);
+  return ind;
+}
+
+static Err err_unrec_local_ind(Sint ind) {
+  return errf("unrecognized local index: " FMT_SINT, ind);
+}
+
+static Err asm_append_local_pop(Asm *asm, Sint ind) {
+  const auto locs = &asm->locs;
+  if (!(ind >= 0 && ind < locs->len)) return err_unrec_local_ind(ind);
+
+  const auto off = asm_local_fp_off((Ind)ind);
+  asm_append_stack_pop_into(asm, ASM_SCRATCH_REG_8);
+  asm_append_store_unscaled_offset(asm, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
+  return nullptr;
+}
+
+static bool asm_appended_local_push(Asm *asm, const char *name) {
+  const auto locs = &asm->locs;
+  if (!dict_has(locs, name)) return false;
+
+  const auto ind = dict_get(locs, name);
+  const auto off = asm_local_fp_off(ind);
+  asm_append_load_unscaled_offset(asm, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
+  asm_append_stack_push_from(asm, ASM_SCRATCH_REG_8);
+  return true;
+}
+
+/*
+In the prologue, we may need to create a frame record, and/or adjust the SP
+to reserve space for locals. Since the locals aren't known upfront, and the
+SP adjustment may or may not be needed, we fixup the prologue when appending
+the epilogue, at which point everything is known.
+
+SYNC[asm_prologue].
+*/
+static void asm_reserve_sym_prologue(Asm *asm) {
+  asm_append_breakpoint(asm, ASM_CODE_PROLOGUE);
+  asm_append_breakpoint(asm, ASM_CODE_PROLOGUE);
+  asm_append_breakpoint(asm, ASM_CODE_PROLOGUE);
+}
+
+// SYNC[asm_prologue].
+static void asm_fixup_sym_prologue(Asm *asm, Sym *sym, Ind *instr_floor) {
+  const auto instrs = &asm->write.instrs;
+  const auto sp_off = asm_locals_sp_off(&asm->locs);
+  const auto leaf   = is_sym_leaf(sym);
+  const auto spans  = &sym->norm.spans;
+  const auto inner  = &instrs->dat[spans->inner];
+  auto       floor  = inner;
+
+  IF_DEBUG({
+    const auto brk = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
+    const auto pro = &instrs->dat[spans->prologue];
+
+    aver((inner - pro) == 3);
+    aver(pro[0] == brk);
+    aver(pro[1] == brk);
+    aver(pro[2] == brk);
+  });
+
+  if (sp_off) {
+    floor -= 1;
+    floor[0] = asm_instr_sub_imm(ASM_REG_SP, ASM_REG_SP, sp_off);
+  }
+
+  if (!leaf) {
+    floor -= 2;
+    floor[0] = asm_instr_store_pair_pre_post(
+      ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, -16
+    );
+    floor[1] = asm_instr_add_imm(ASM_REG_FP, ASM_REG_SP, 0);
+  }
+
+  *instr_floor = (Ind)(floor - instrs->dat);
+}
+
+static void asm_append_sym_epilogue(Asm *asm, Sym *sym) {
+  const auto sp_off = asm_locals_sp_off(&asm->locs);
+  const auto leaf   = is_sym_leaf(sym);
+
+  if (sp_off) {
+    asm_append_add_imm(asm, ASM_REG_SP, ASM_REG_SP, sp_off);
+  }
+  if (!leaf) {
+    asm_append_load_pair_pre_post(asm, ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, 16);
+  }
+}
+
+static void asm_sym_beg(Asm *asm, Sym *sym) {
+  asm_locals_trunc(&asm->locs);
+  asm->fixup.len = 0;
+
+  const auto instrs = &asm->write.instrs;
+  const auto spans  = &sym->norm.spans;
+
+  spans->prologue = instrs->len;
+  asm_reserve_sym_prologue(asm);
+  spans->inner = instrs->len;
 }
 
 // ret x30
@@ -797,14 +1030,12 @@ static Err asm_sym_end(Asm *asm, Sym *sym) {
   const auto write = &asm->write;
   const auto exec  = &asm->exec;
   const auto spans = &sym->norm.spans;
-  const auto code  = &sym->norm.exec;
-  const auto leaf  = is_sym_leaf(sym);
 
+  asm_fixup_sym_prologue(asm, sym, &spans->begin);
   spans->epilogue = write->instrs.len;
-  if (!leaf) asm_append_sym_epilogue(asm);
-
+  asm_append_sym_epilogue(asm, sym);
   spans->ret = write->instrs.len;
-  list_push(&write->instrs, ASM_INSTR_RET);
+  asm_append_instr(asm, ASM_INSTR_RET);
   spans->data = write->instrs.len;
   asm_fixup(asm, sym);
   spans->next = write->instrs.len;
@@ -813,13 +1044,12 @@ static Err asm_sym_end(Asm *asm, Sym *sym) {
   if (DEBUG) asm_append_breakpoint(asm, ASM_CODE_PROC_DELIM);
 
   try(asm_heap_sync(asm));
-  code->ceil = list_next_ptr(&exec->instrs);
-  code->top  = list_next_ptr(&exec->instrs);
 
-  // See above; free to skip LR stash/restore for non-leaf procs.
-  code->floor = list_elem_ptr(
-    &exec->instrs, leaf ? spans->inner : spans->prologue
-  );
+  sym->norm.exec = (Instr_span){
+    .floor = list_elem_ptr(&exec->instrs, spans->begin),
+    .ceil  = list_next_ptr(&exec->instrs),
+    .top   = list_next_ptr(&exec->instrs),
+  };
 
   asm_sym_auto_inlinable(sym);
   return nullptr;
@@ -860,8 +1090,8 @@ static void asm_append_mov_reg_to_reg(Asm *asm, U8 tar_reg, U8 src_reg) {
   averr(asm_validate_reg(tar_reg));
   averr(asm_validate_reg(src_reg));
 
-  list_push(
-    &asm->write.instrs,
+  asm_append_instr(
+    asm,
     (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 | ((Instr)src_reg << 16) |
       (Instr)tar_reg
   );
@@ -887,11 +1117,11 @@ static Instr asm_maybe_mov_imm_to_reg(
   return base | (hw << 21) | (Instr)(scaled << 5) | reg;
 }
 
-static void asm_append_imm_to_reg(Asm *asm, U8 reg, Sint src) {
+static void asm_append_imm_to_reg(Asm *asm, U8 reg, Sint src, bool *has_load) {
   averr(imm_unsigned(reg, 5));
+  if (has_load) *has_load = true;
 
-  const auto instrs = &asm->write.instrs;
-  const auto imm    = src < 0 ? ~(Uint)src : (Uint)src;
+  const auto imm = src < 0 ? ~(Uint)src : (Uint)src;
 
   // movn = 0b00
   // movz = 0b10
@@ -904,21 +1134,25 @@ static void asm_append_imm_to_reg(Asm *asm, U8 reg, Sint src) {
     (opc << 29) | reg;
 
   if (imm <= imm_max) {
-    list_push(instrs, base | (Instr)((imm) << 5));
+    asm_append_instr(asm, base | (Instr)((imm) << 5));
+    if (has_load) *has_load = false;
     return;
   }
 
   Instr out = 0;
   if ((out = asm_maybe_mov_imm_to_reg(base, 0b01, imm, imm_max, reg))) {
-    list_push(instrs, out);
+    asm_append_instr(asm, out);
+    if (has_load) *has_load = false;
     return;
   }
   if ((out = asm_maybe_mov_imm_to_reg(base, 0b10, imm, imm_max, reg))) {
-    list_push(instrs, out);
+    asm_append_instr(asm, out);
+    if (has_load) *has_load = false;
     return;
   }
   if ((out = asm_maybe_mov_imm_to_reg(base, 0b11, imm, imm_max, reg))) {
-    list_push(instrs, out);
+    asm_append_instr(asm, out);
+    if (has_load) *has_load = false;
     return;
   }
 
@@ -933,20 +1167,12 @@ static void asm_append_imm_to_reg(Asm *asm, U8 reg, Sint src) {
   );
 }
 
-static void asm_append_stack_push_from(Asm *asm, U8 reg) {
-  asm_append_store_modified(asm, reg, ASM_INT_TOP_REG, 8);
-}
-
-static void asm_append_stack_pop_into(Asm *asm, U8 reg) {
-  asm_append_load_modified(asm, reg, ASM_INT_TOP_REG, -8);
-}
-
 static void asm_append_stack_push_imm(Asm *asm, Sint imm) {
   /*
   mov <reg>, <imm>
   str <reg>, [x27], 8
   */
-  asm_append_imm_to_reg(asm, ASM_SCRATCH_REG_8, imm);
+  asm_append_imm_to_reg(asm, ASM_SCRATCH_REG_8, imm, nullptr);
   asm_append_stack_push_from(asm, ASM_SCRATCH_REG_8);
 }
 
@@ -955,7 +1181,7 @@ static void asm_append_zero_reg(Asm *asm, U8 reg) {
   const auto ireg  = (Instr)reg;
   const auto base  = (Instr)0b1'10'01010'00'0'00000'000000'00000'00000;
   const auto instr = base | (ireg << 16) | (ireg << 5) | ireg;
-  list_push(&asm->write.instrs, instr);
+  asm_append_instr(asm, instr);
 }
 
 static void asm_append_try(Asm *asm) {
@@ -974,7 +1200,7 @@ going to "call". "PC" stands for "program counter": memory address of the
 instruction we're about to encode.
 
 Different CPU architectures have different notions of PC.
-On arm64, it's the instruction currently executing.
+On Arm64, it's the instruction currently executing.
 
 The offset is implicitly times 4 at the CPU level.
 */
@@ -983,7 +1209,7 @@ static void asm_append_branch_link(Asm *asm, Sint pc_off) {
   averr(imm_signed(pc_off, 26, &imm26));
 
   // bl <imm>
-  list_push(&asm->write.instrs, ((Instr)0b1'00'101 << 26) | imm26);
+  asm_append_instr(asm, ((Instr)0b1'00'101 << 26) | imm26);
 }
 
 static void asm_append_call_norm(Asm *asm, Sym *caller, const Sym *callee) {
@@ -1011,15 +1237,19 @@ static void asm_append_call_norm(Asm *asm, Sym *caller, const Sym *callee) {
 static void asm_append_branch_with_link_to_reg(Asm *asm, U8 reg) {
   averr(asm_validate_reg(reg));
   const auto base = (Instr)0b110'101'1'0'0'01'11111'0000'0'0'00000'00000;
-  list_push(&asm->write.instrs, base | ((Instr)reg << 5));
+  asm_append_instr(asm, base | ((Instr)reg << 5));
 }
 
 static void asm_append_call_intrin_before(Asm *asm, Uint ints_top_off) {
-  asm_append_store_offset(asm, ASM_INT_TOP_REG, ASM_INTERP_REG, ints_top_off);
+  asm_append_store_scaled_offset(
+    asm, ASM_REG_INT_TOP, ASM_REG_INTERP, ints_top_off
+  );
 }
 
 static void asm_append_call_intrin_after(Asm *asm, Uint ints_top_off) {
-  asm_append_load_offset(asm, ASM_INT_TOP_REG, ASM_INTERP_REG, ints_top_off);
+  asm_append_load_scaled_offset(
+    asm, ASM_REG_INT_TOP, ASM_REG_INTERP, ints_top_off
+  );
 }
 
 /*
@@ -1057,7 +1287,7 @@ static void asm_append_dysym_load(Asm *asm, const char *name, U8 reg) {
 
   const auto got_addr = asm->exec.page->got + got_ind;
   const auto pageoff  = asm_append_adrp(asm, reg, (Uint)got_addr);
-  asm_append_load_offset(asm, reg, reg, pageoff);
+  asm_append_load_scaled_offset(asm, reg, reg, pageoff);
 }
 
 /*
@@ -1072,7 +1302,7 @@ static void asm_append_call_intrin(
   constexpr auto reg = ASM_SCRATCH_REG_8;
 
   asm_append_call_intrin_before(asm, ints_top_off);
-  asm_append_mov_reg_to_reg(asm, ASM_PARAM_REG_0, ASM_INTERP_REG);
+  asm_append_mov_reg_to_reg(asm, ASM_PARAM_REG_0, ASM_REG_INTERP);
   asm_append_dysym_load(asm, callee->name.buf, reg);
   asm_append_branch_with_link_to_reg(asm, reg);
   asm_register_call(asm, caller);
@@ -1118,7 +1348,7 @@ static void asm_append_call_extern_proc(Asm *asm, Sym *caller, const Sym *callee
 
 static Err asm_append_instr_from_int(Asm *asm, Sint val) {
   try(imm_unsigned((Uint)val, sizeof(Instr) * CHAR_BIT));
-  list_push(&asm->write.instrs, (Instr)val);
+  asm_append_instr(asm, (Instr)val);
   return nullptr;
 }
 
@@ -1155,24 +1385,14 @@ static Err asm_alloc_data_append_load(Asm *asm, Uint len, U8 reg, U8 **out_addr)
   return nullptr;
 }
 
-static Err err_inline_has_data(const Sym *sym) {
-  return errf(
-    "unable to inline word " FMT_QUOTED ": loads local immediate values",
-    sym->name.buf
-  );
-}
-
 /*
 Simple, naive inlining without support for relocation.
 Used manually in Forth code via an intrinsic.
 */
 static Err asm_inline_sym(Asm *asm, const Sym *sym) {
-  aver(sym->type == SYM_NORM);
-  aver(is_sym_leaf(sym));
+  try(err_sym_not_inlinable(sym));
 
-  const auto spans = &sym->norm.spans;
-  if (spans->data < spans->next) return err_inline_has_data(sym);
-
+  const auto spans  = &sym->norm.spans;
   const auto instrs = &asm->write.instrs;
   const auto floor  = spans->inner;
   const auto ceil   = spans->ret;
@@ -1180,6 +1400,7 @@ static Err asm_inline_sym(Asm *asm, const Sym *sym) {
   for (Ind ind = floor; ind < ceil; ind++) {
     list_push(instrs, instrs->dat[ind]);
   }
+  if (sym->throws) asm_append_try(asm);
 
   IF_DEBUG({
     if (floor == ceil) {

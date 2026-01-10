@@ -9,12 +9,11 @@ Example tests:
   T{ 10 20 30 <T> 10 20 30 40 } \ Fail
 )
 
-0    :var T_LEN_0 \ Length before `T{`.
-0    :var T_LEN_1 \ Length at `<T>`.
-0    :var T_LEN_2 \ Length at `}T`.
-0    :var T_LEN_3 \ Relative length before `<T>`.
-0    :var T_LEN_4 \ Relative length after `<T>`.
-4096 :buf T_ERR
+0 :var T_LEN_0 \ Length before `T{`.
+0 :var T_LEN_1 \ Length at `<T>`.
+0 :var T_LEN_2 \ Length at `}T`.
+0 :var T_LEN_3 \ Relative length before `<T>`.
+0 :var T_LEN_4 \ Relative length after `<T>`.
 
 : T_equal ( max ind -- bool )
   #begin

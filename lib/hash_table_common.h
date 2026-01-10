@@ -24,6 +24,14 @@ typedef struct {
 typedef Hash(Hash_fun)(const void *val, Uint len);
 typedef bool(Eq_fun)(const void *one, const void *two, Uint len);
 
+/*
+Usage:
+
+  for (hash_table_range(Ind, ind, tab)) {
+    const auto key = tab->keys[ind];
+    const auto val = tab->vals[ind];
+  }
+*/
 #define hash_table_range(type, name, tab)                 \
   type name = hash_table_head((const Hash_table *)(tab)); \
   name < (tab)->cap;                                      \

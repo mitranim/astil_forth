@@ -8,10 +8,7 @@ static void sym_deinit(Sym *sym) {
 }
 
 static bool is_name_immediate(const Word_str *name) {
-  return name && name->len &&
-    (name->buf[0] == '#' || !strcmp(name->buf, "\\") ||
-     !strcmp(name->buf, "(") || name->buf[name->len - 1] == '[' ||
-     name->buf[0] == ']' || !strcmp(name->buf, ";"));
+  return name && name->len && (name->buf[0] == '#');
 }
 
 static bool is_sym_leaf(const Sym *sym) { return !sym->callees.len; }

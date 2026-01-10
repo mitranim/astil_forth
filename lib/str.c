@@ -21,3 +21,12 @@ static Err str_copy_impl(char *out, const char *src, Ind cap, Ind *out_len) {
   *out_len = (Ind)len;
   return nullptr;
 }
+
+static char *str_alloc_copy(const char *src, Ind src_len) {
+  if (!src || !src_len) return nullptr;
+  const auto buf_len = src_len + 1;
+  const auto out     = malloc(buf_len);
+  const auto out_len = strlcpy(out, src, buf_len);
+  aver(out_len == src_len);
+  return out;
+}

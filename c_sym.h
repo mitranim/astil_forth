@@ -21,8 +21,11 @@ typedef struct Sym {
 
   union {
     struct {
-      Sym_instrs spans; // Created and used by the assembler.
-      Instr_span exec;  // Executable code range.
+      Sym_instrs spans;     // Created and used by the assembler.
+      Instr_span exec;      // Executable code range.
+      bool       inlinable; // Manual toggle only.
+      bool       has_loads; // Has PC-relative data access.
+      bool       has_rets;  // Has explicit early returns.
     } norm;
 
     struct {
@@ -43,7 +46,6 @@ typedef struct Sym {
   Sym_set callees;         // Dependencies.
   Sym_set callers;         // Dependents.
   bool    throws      : 1; // Requires error handling.
-  bool    inlined     : 1; // Inline instead of compiling a call.
   bool    immediate   : 1; // Interpret immediately even in compilation mode.
   bool    comp_only   : 1; // Can only be used between `:` and `;`.
   bool    interp_only : 1; // Forbidden in final executables.

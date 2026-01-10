@@ -275,7 +275,7 @@ Err compile_call_sym(Interp *interp, Sym *callee) {
   sym_auto_comp_only(caller, callee);
   sym_auto_interp_only(caller, callee);
 
-  if (callee->inlined) return interp_inline_sym(interp, callee);
+  if (callee->norm.inlinable) return interp_inline_sym(interp, callee);
 
   set_add(&caller->callees, callee);
   set_add(&callee->callers, caller);
@@ -317,6 +317,10 @@ static Err interp_word(Interp *interp, U8 head) {
 
   const auto word = read->word;
   IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", word.buf));
+
+  if (interp->compiling && asm_appended_local_push(&interp->asm, word.buf)) {
+    return nullptr;
+  }
 
   const auto sym = dict_get(&interp->dict, word.buf);
   if (!sym) return err_undefined_word(word.buf);
@@ -379,7 +383,7 @@ static Err interp_include_inner(Interp *interp, const char *path) {
   const auto read = interp->reader;
   try(str_copy(&read->file_path, path));
 
-  defer(file_deinit) FILE *file;
+  defer(file_deinit) FILE *file = nullptr;
   try(file_open_fuzzy(path, &path, &read->file));
   reader_init(read);
 

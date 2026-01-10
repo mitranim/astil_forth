@@ -13,22 +13,27 @@ See `./map.h`, `./map.c`.
 #include <assert.h>
 #include <limits.h>
 
-// Opaque dict header. Must be binary-compatible with `Hash_table`.
+/*
+Opaque dict header. Must be binary-compatible with `Hash_table`.
+
+The implementation makes no assumption if the keys are owned or borrowed.
+Consumer code decides this. See `dict_deinit` vs `dict_deinit_with_keys`.
+*/
 typedef struct {
-  Ind          len;
-  Ind          cap;
-  Uint        *bits;
-  const char **keys;
-  void        *vals;
+  Ind    len;
+  Ind    cap;
+  Uint  *bits;
+  char **keys;
+  void  *vals;
 } Dict;
 
-#define dict_of(Elem)  \
-  struct {             \
-    Ind          len;  \
-    Ind          cap;  \
-    Uint        *bits; \
-    char const **keys; \
-    Elem        *vals; \
+#define dict_of(Elem) \
+  struct {            \
+    Ind    len;       \
+    Ind    cap;       \
+    Uint  *bits;      \
+    char **keys;      \
+    Elem  *vals;      \
   }
 
 typedef dict_of(Uint) Uint_dict;
@@ -75,4 +80,13 @@ typedef dict_of(F64)  F64_dict;
 
 #define dict_val_type(dict) typeof((dict)->vals[0])
 #define dict_val_size(dict) sizeof((dict)->vals[0])
+
+/*
+Usage:
+
+  for (dict_range(Ind, ind, dict)) {
+    const auto key = dict->keys[ind];
+    const auto val = dict->vals[ind];
+  }
+*/
 #define dict_range hash_table_range

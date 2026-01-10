@@ -27,7 +27,6 @@
 -Wno-documentation-html
 -Wno-gnu-empty-struct
 -Wno-cast-align
--Wno-format-nonliteral
 -Wno-reserved-identifier
 -Wno-reserved-macro-identifier
 -Wno-newline-eof

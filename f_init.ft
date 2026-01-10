@@ -1,6 +1,6 @@
 : drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] ;
-: \ 10 parse drop2 ;
-: ( 41 parse drop2 ;
+: \ [ immediate ] 10 parse drop2 ;
+: ( [ immediate ] 41 parse drop2 ;
 
 (
 Can use comments now!
@@ -69,13 +69,13 @@ Currently only the Arm64 CPU architecture is supported.
   asm_push_x1                                comp_instr \ str x1, [x27], 8
 ] ;
 
-: lshift ( i1 bits -- i2 ) [
+: lsl ( i1 bits -- i2 ) [
   asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_0_0_11010110_00010_0010_00_00001_00001 comp_instr \ lsl x1, x1, x2
   asm_push_x1                                comp_instr \ str x1, [x27], 8
 ] ;
 
-: rshift ( i1 bits -- i2 ) [
+: lsr ( i1 bits -- i2 ) [
   asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_0_0_11010110_00010_0010_01_00001_00001 comp_instr \ lsr x1, x1, x2
   asm_push_x1                                comp_instr \ str x1, [x27], 8
@@ -89,7 +89,7 @@ Currently only the Arm64 CPU architecture is supported.
 
 \ cmp Xn, 0
 : asm_cmp_zero ( Xn -- instr )
-  5 lshift
+  5 lsl
   0b1_1_1_100010_0_000000000000_00000_11111
   or
 ;
@@ -113,14 +113,14 @@ Currently only the Arm64 CPU architecture is supported.
   0b10_101_0_001_0_0000010_00001_11011_00010 comp_instr \ stp x2, x1, [x27], 16
 ] ;
 
-: low_bits ( bit_len -- bits ) 1 swap lshift dec ;
+: low_bits ( bit_len -- bits ) 1 swap lsl dec ;
 : bit_trunc ( imm bit_len -- imm ) low_bits and ;
 
 \ cset Xd, <cond>
 : asm_cset ( Xd cond -- )
   0b1_0_0_11010100_11111_0000_0_1_11111_00000
-  swap 1 xor 12 lshift or \ cond
-                       or \ Xd
+  swap 1 xor 12 lsl or \ cond
+                    or \ Xd
 ;
 
 : <>0 ( int -- bool ) [
@@ -139,10 +139,10 @@ Currently only the Arm64 CPU architecture is supported.
 
 \ Shared by a lot of load and store instructions. 64-bit only.
 : asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 base_instr -- instr )
-  swap 3 rshift 7 bit_trunc 15 lshift or \ imm7
-  swap                      5  lshift or \ Xn
-  swap                      10 lshift or \ Xt2
-                                      or \ Xt1
+  swap 3 lsr 7 bit_trunc 15 lsl or \ imm7
+  swap                   5  lsl or \ Xn
+  swap                   10 lsl or \ Xt2
+                                or \ Xt1
 ;
 
 \ ldp Xt1, Xt2, [Xn, <imm>]!
@@ -187,9 +187,9 @@ Patches these bits:
   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
 )
 : asm_pattern_load_store ( Xt Xn imm9 base_instr -- instr )
-  swap 9 bit_trunc 12 lshift or \ imm9
-  swap             5  lshift or \ Xn
-                             or \ Xt
+  swap 9 bit_trunc 12 lsl or \ imm9
+  swap             5  lsl or \ Xn
+                          or \ Xt
 ;
 
 \ ldr Xt, [Xn, <imm>]!
@@ -246,10 +246,10 @@ Shared by register-offset load and store instructions.
 Assumes `lsl` is already part of the base instruction.
 )
 : asm_pattern_load_store_with_register ( Xt Xn Xm scale base_instr -- instr )
-  swap <>0 12 lshift or \ lsl 3
-  swap     16 lshift or \ Xm
-  swap     5  lshift or \ Xn
-                     or \ Xt
+  swap <>0 12 lsl or \ lsl 3
+  swap     16 lsl or \ Xm
+  swap     5  lsl or \ Xn
+                  or \ Xt
 ;
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
@@ -266,9 +266,9 @@ Assumes `lsl` is already part of the base instruction.
 
 : asm_load_byte_off ( Wt Wn imm12 -- instr )
   0b00_11_1_0_0_1_01_000000000000_00000_00000
-  swap 12 bit_trunc 10 lshift or \ imm12
-  swap               5 lshift or \ Wn
-                              or \ Wt
+  swap 12 bit_trunc 10 lsl or \ imm12
+  swap               5 lsl or \ Wn
+                           or \ Wt
 ;
 
 \ str Xd, [x27], 8
@@ -284,16 +284,16 @@ Assumes `lsl` is already part of the base instruction.
 : asm_pop2 ( Xt1 Xt2 -- instr ) 27 -16 asm_load_pair_pre ;
 
 \ Shared by some integer arithmetic instructions.
-: asm_pattern_arith_reg ( Xd Xn Xm base_instr -- instr )
-  swap 16 lshift or \ Xm
-  swap 5  lshift or \ Xn
-                 or \ Xd
+: asm_pattern_arith_reg ( Xd Xn Xm -- instr_mask )
+       16 lsl    \ Xm
+  swap 5  lsl or \ Xn
+              or \ Xd
 ;
 
-: asm_pattern_arith_imm ( Xd Xn imm12 base_instr -- instr )
-  swap 12 bit_trunc 10 lshift or \ imm12
-  swap              5  lshift or \ Xn
-                              or \ Xd
+: asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
+  12 bit_trunc 10 lsl    \ imm12
+  swap          5 lsl or \ Xn
+                      or \ Xd
 ;
 
 : asm_neg ( reg -- instr )
@@ -302,89 +302,93 @@ Assumes `lsl` is already part of the base instruction.
 
 \ add Xd, Xn, <imm12>
 : asm_add_imm ( Xd Xn imm12 -- instr )
-  0b1_0_0_100010_0_000000000000_00000_00000
   asm_pattern_arith_imm
+  0b1_0_0_100010_0_000000000000_00000_00000 or
 ;
 
 \ add Xd, Xn, Xm
 : asm_add_reg ( Xd Xn Xm -- instr )
-  0b1_0_0_01011_00_0_00000_000000_00000_00000
   asm_pattern_arith_reg
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 or
 ;
 
 \ sub Xd, Xn, <imm12>
 : asm_sub_imm ( Xd Xn Xm -- instr )
-  0b1_1_0_100010_0_000000000000_00000_00000
   asm_pattern_arith_imm
+  0b1_1_0_100010_0_000000000000_00000_00000 or
 ;
 
 \ sub Xd, Xn, Xm
 : asm_sub_reg ( Xd Xn Xm -- instr )
-  0b1_1_0_01011_00_0_00000_000000_00000_00000
   asm_pattern_arith_reg
+  0b1_1_0_01011_00_0_00000_000000_00000_00000 or
 ;
 
 \ mul Xd, Xn, Xm
 : asm_mul ( Xd Xn Xm -- instr )
-  0b1_00_11011_000_00000_0_11111_00000_00000
   asm_pattern_arith_reg
+  0b1_00_11011_000_00000_0_11111_00000_00000 or
 ;
 
 \ sdiv Xd, Xn, Xm
 : asm_sdiv ( Xd Xn Xm -- instr )
-  0b1_0_0_11010110_00000_00001_1_00000_00000
   asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_00001_1_00000_00000 or
 ;
 
 \ msub Xd, Xn, Xm, Xa
 : asm_msub ( Xd Xn Xm Xa -- instr )
   0b1_00_11011_000_00000_1_00000_00000_00000
-  swap 10 lshift or \ Xa
-  swap 16 lshift or \ Xm
-  swap 5  lshift or \ Xn
-                 or \ Xd
+  swap 10 lsl or \ Xa
+  swap 16 lsl or \ Xm
+  swap 5  lsl or \ Xn
+              or \ Xd
 ;
 
 : asm_csneg ( Xd Xn Xm cond -- instr )
-  0b1_1_0_11010100_00000_0000_0_1_00000_00000
-  swap 12 lshift or     \ cond
-  asm_pattern_arith_reg \ Xd Xm Xn
+  [ 3 asm_pop1 comp_instr ]  \ Stash `cond`.
+  asm_pattern_arith_reg      \ Xd Xm Xn
+  [ 3 asm_push1 comp_instr ] \ Pop `cond`.
+  12 lsl or                  \ cond
+  0b1_1_0_11010100_00000_0000_0_1_00000_00000 or
 ;
 
 \ asr Xd, Xn, imm6
 : asm_asr_imm ( Xd Xn imm6 -- instr )
-  0b1_00_100110_1_000000_111111_00000_00000
   asm_pattern_arith_reg
+  0b1_00_100110_1_000000_111111_00000_00000 or
 ;
 
 \ asr Xd, Xn, Xm
 : asm_asr_reg ( Xd Xn Xm -- instr )
-  0b1_0_0_11010110_00000_0010_10_00000_00000
   asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_0010_10_00000_00000 or
 ;
 
 \ eor Xd, Xn, Xm
 : asm_eor_reg ( Xd Xn Xm -- instr )
-  0b1_10_01010_00_0_00000_000000_00000_00000
   asm_pattern_arith_reg
+  0b1_10_01010_00_0_00000_000000_00000_00000 or
 ;
 
 : asm_csel ( Xd Xn Xm cond -- instr )
-  0b1_0_0_11010100_00000_0000_0_0_00000_00000
-  swap 12 lshift or     \ cond
-  asm_pattern_arith_reg \ Xd Xn Xm
+  [ 3 asm_pop1 comp_instr ]  \ Stash `cond`.
+  asm_pattern_arith_reg      \ Xd Xm Xn
+  [ 3 asm_push1 comp_instr ] \ Pop `cond`.
+  12 lsl or                  \ cond
+  0b1_0_0_11010100_00000_0000_0_0_00000_00000 or
 ;
 
 \ cmp Xn, Xm
 : asm_cmp_reg ( Xm Xn -- instr )
   0b1_1_1_01011_00_0_00000_000_000_00000_11111
-  swap 5  lshift or \ Xn
-  swap 16 lshift or \ Xm
+  swap 5  lsl or \ Xn
+  swap 16 lsl or \ Xm
 ;
 
 \ b <off>
 : asm_branch ( imm26 -- instr )
-  2  rshift    \ Offset is implicitly times 4.
+  2  lsr       \ Offset is implicitly times 4.
   26 bit_trunc \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 or
 ;
@@ -392,9 +396,9 @@ Assumes `lsl` is already part of the base instruction.
 : asm_pattern_compare_branch ( imm19 Xt base_instr -- instr )
   or           \ Xt
   swap
-  2  rshift    \ Offset is times 4 implicitly.
+  2  lsr       \ Offset is times 4 implicitly.
   19 bit_trunc \ Offset may be negative.
-  5  lshift
+  5  lsl
   or           \ imm19
 ;
 
@@ -411,7 +415,7 @@ Assumes `lsl` is already part of the base instruction.
 ;
 
 \ Arithmetic (sign-preserving) right shift.
-: arshift ( i1 bits -- i2 ) [
+: asr ( i1 bits -- i2 ) [
         asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
   1 1 2 asm_asr_reg   comp_instr \ asr x1, x1, x2
         asm_push_x1   comp_instr \ str x1, [x27], 8
@@ -428,8 +432,8 @@ Assumes `lsl` is already part of the base instruction.
 
 : asm_mov_reg ( Xd Xm -- instr )
   0b1_01_01010_00_0_00000_000000_11111_00000
-  swap 16 lshift or \ Xm
-                 or \ Xd
+  swap 16 lsl or \ Xm
+              or \ Xd
 ;
 
 \ svc 666
@@ -702,8 +706,8 @@ this is considered a "bad instruction" and blows up.
 ] ;
 
 : cell 8 ;
-: cells ( len -- size ) 3 lshift ;
-: /cells ( size -- len ) 3 arshift ;
+: cells ( len -- size ) 3 lsl ;
+: /cells ( size -- len ) 3 asr ;
 
 \ Stack introspection doesn't need to be optimal.
 : depth ( -- len ) sp sp0 - /cells ;
@@ -763,8 +767,14 @@ Conditionals work like this:
 : #begin ( C: -- adr[beg] ) here ;
 : #again ( C: adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
 
-\ Usage: `#begin … #leave #again #end`.
-\ Every `#leave` requires `#end` after the loop.
+(
+Usage: `#begin … #leave #again #end`.
+Every `#leave` requires `#end` after the loop.
+
+Caution: can't be interleaved with conditionals
+because loops and conditionals use the same stack
+for control information.
+)
 : #leave ( C: adr[beg] -- fun[b] adr[b] adr[beg] )
   #' asm_branch here reserve_instr rot
 ;
@@ -1018,7 +1028,7 @@ Also see `#throwf"` which comes with its own buffer.
 1 0 :extern free    ( addr -- )
 3 0 :extern memset  ( buf char len -- )
 1 1 :extern strlen  ( cstr -- len )
-3 0 :extern strncmp ( str0 str1 len -- )
+3 1 :extern strncmp ( str0 str1 len -- )
 3 0 :extern strncpy ( buf[tar] buf[src] len -- )
 3 0 :extern strlcpy ( buf[tar] buf[src] buf_len -- )
 
@@ -1029,6 +1039,7 @@ Also see `#throwf"` which comes with its own buffer.
 : compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
 : str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
 : str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
+: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
 
 \ For words which define words. Kinda like `create`.
 : #word_beg #compile' : ;
@@ -1096,6 +1107,54 @@ Like `#sthrowf"` but easier to use. Example:
   #compile' throw
 ;
 
+\ Core support for locals.
+: :to ( C: "name" -- ) ( E: val -- ) [ immediate ]
+  parse_word comp_local_ind comp_local_pop
+;
+
+: } ( ind_min ind_max -- )
+  #begin
+    dup2 <= #while
+    dup comp_local_pop
+    dec
+  #repeat
+  drop2
+;
+
+(
+Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
+Capture order matches stack push order and the parens notation,
+like in Gforth and VfxForth. Types are not supported.
+)
+: {
+  [ immediate ]
+  0x7FFFFFFFFFFFFFFF :to ind_min \ Lowest local index.
+  -1                 :to ind_max \ Highest local index.
+
+  #begin
+    parse_word :to len :to str
+
+    #" }" str len str= #if
+      ind_min ind_max }
+      #ret
+    #end
+
+    #" --" str len str<> #while
+
+    str len comp_local_ind
+    dup ind_min min :to ind_min
+        ind_max max :to ind_max
+  #repeat
+
+  \ After `--`: skip all words which aren't `}`.
+  #begin
+    parse_word
+    #" }" str<>
+  #until
+
+  ind_min ind_max }
+;
+
 1 1 :extern strerror
 :extern_ptr __error
 : errno __error @ ;
@@ -1110,19 +1169,13 @@ Like `#sthrowf"` but easier to use. Example:
 2     :let MAP_PRIVATE
 4096  :let MAP_ANON
 
-\ Allocates fully-protected, inaccessible memory.
-\ Middle area needs to be enabled with `mem_unprot`.
-\ Low and high regions become "guards".
-: mem_map ( pflag size -- addr )
-  0 flip
-  MAP_ANON MAP_PRIVATE or
-  -1 0 mmap
+: mem_map ( size pflag -- addr )
+  0 -rot MAP_ANON MAP_PRIVATE or -1 0 mmap
   dup -1 = #if drop #throw" unable to mmap" #end
 ;
 
 : mem_unprot ( addr size -- )
-  PROT_READ PROT_WRITE or
-  mprotect
+  PROT_READ PROT_WRITE or mprotect
   -1 = #if #throw" unable to mprotect" #end
 ;
 
@@ -1132,13 +1185,12 @@ Attempting to read or write inside the guards,
 aka underflow or overflow, triggers a segfault.
 )
 : mem_alloc ( size1 -- addr size2 )
-  PAGE_SIZE align_up dup
-  PAGE_SIZE + \ low guard
-  PAGE_SIZE + \ high guard
-  PROT_NONE swap
-  mem_map     ( size2 addr[base] )
-  PAGE_SIZE + ( size2 addr[data] )
-  swap dup2 mem_unprot
+        PAGE_SIZE align_up :to size2
+  size2 PAGE_SIZE 1 lsl +  :to size
+  size  PROT_NONE mem_map  :to addr
+  addr  PAGE_SIZE +        :to addr
+  addr  size2 mem_unprot
+  addr  size2
 ;
 
 : init_buf_var ( var_addr size -- buf_addr size )

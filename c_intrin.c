@@ -10,6 +10,7 @@
 #include "./lib/misc.h"
 #include "./lib/stack.h"
 #include "./lib/str.c"
+#include "lib/stack.c"
 #include <dlfcn.h>
 #include <string.h>
 
@@ -169,12 +170,12 @@ static void intrin_bracket_beg(Interp *interp) { interp->compiling = false; }
 
 static void intrin_bracket_end(Interp *interp) { interp->compiling = true; }
 
-// static Err intrin_immediate(Interp *interp) {
-//   Sym *sym;
-//   try(current_sym(interp, &sym));
-//   sym->immediate = true;
-//   return nullptr;
-// }
+static Err intrin_immediate(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->immediate = true;
+  return nullptr;
+}
 
 static Err intrin_comp_only(Interp *interp) {
   Sym *sym;
@@ -193,7 +194,7 @@ static Err intrin_not_comp_only(Interp *interp) {
 static Err intrin_inline(Interp *interp) {
   Sym *sym;
   try(current_sym(interp, &sym));
-  sym->inlined = true;
+  sym->norm.inlinable = true;
   return nullptr;
 }
 
@@ -230,18 +231,61 @@ static Err intrin_comp_instr(Interp *interp) {
 }
 
 static Err intrin_comp_load(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+
   Sint imm;
   Sint reg;
   try(int_stack_pop(&interp->ints, &imm));
   try(int_stack_pop(&interp->ints, &reg));
 
   aver(reg >= 0 && reg < ASM_REG_LEN);
-  asm_append_imm_to_reg(&interp->asm, (U8)reg, imm);
+
+  bool has_load = true;
+  asm_append_imm_to_reg(&interp->asm, (U8)reg, imm, &has_load);
+  if (has_load) sym->norm.has_loads = true;
   return nullptr;
 }
 
-static Err err_invalid_data_len(Sint len) {
+static Err interp_validate_buf_len(Sint len, Ind *out) {
+  if (len > 0 && len < (Sint)IND_MAX) {
+    *out = (Ind)len;
+    return nullptr;
+  }
   return errf("invalid data length: " FMT_SINT, len);
+}
+
+static Err interp_validate_buf_ptr(Sint ptr, const U8 **out) {
+  /*
+  Some systems deliberately ensure that virtual memory addresses
+  are just out of range of `int32`. Would be nice to check if the
+  pointer is somewhere in that range, but the assumption would be
+  really non-portable.
+
+  In a Forth implementation for OS-free microchips with a very small
+  amount of real memory, valid data pointers could begin close to 0,
+  depending on how data is organized. Since our implementation only
+  supports 64-bit machines and requires an OS, we can at least assume
+  addresses which are "decently large".
+  */
+  if (ptr > (1 << 14)) {
+    *out = (U8 *)ptr;
+    return nullptr;
+  }
+  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)ptr);
+}
+
+// In Forth, like in C, data buffers are passed around as `(ptr, len)`.
+static Err interp_pop_buf(Interp *interp, const U8 **out_buf, Ind *out_len) {
+  const auto ints = &interp->ints;
+  Sint       len_src;
+  Sint       buf_src;
+
+  try(int_stack_pop(ints, &len_src));
+  try(int_stack_pop(ints, &buf_src));
+  try(interp_validate_buf_len(len_src, out_len));
+  try(interp_validate_buf_ptr(buf_src, out_buf));
+  return nullptr;
 }
 
 /*
@@ -251,23 +295,23 @@ into the constant region, and compiles `( -- addr size )`.
 static Err intrin_comp_const(Interp *interp) {
   const auto ints = &interp->ints;
 
-  Sint reg;
-  Sint len;
-  Sint buf;
+  Sint      reg;
+  const U8 *buf;
+  Ind       len;
   try(int_stack_pop(ints, &reg));
-  try(int_stack_pop(ints, &len));
-  try(int_stack_pop(ints, &buf));
-
   try(asm_validate_reg(reg));
-  if (!(len > 0)) return err_invalid_data_len(len);
-
-  try(asm_alloc_const_append_load(&interp->asm, (U8 *)buf, (Uint)len, (U8)reg));
+  try(interp_pop_buf(interp, &buf, &len));
+  try(asm_alloc_const_append_load(&interp->asm, buf, len, (U8)reg));
 
   IF_DEBUG(eprintf(
     "[system] appended constant with address %p and length " FMT_UINT "\n",
-    (void *)buf,
+    buf,
     (Uint)len
   ));
+
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->norm.has_loads = true;
   return nullptr;
 }
 
@@ -276,16 +320,20 @@ static Err intrin_comp_static(Interp *interp) {
   const auto ints = &interp->ints;
 
   Sint reg;
-  Sint len;
+  Sint len_src;
+  Ind  len;
   try(int_stack_pop(ints, &reg));
-  try(int_stack_pop(ints, &len));
+  try(int_stack_pop(ints, &len_src));
   try(asm_validate_reg(reg));
-
-  if (!(len > 0)) return err_invalid_data_len(len);
+  try(interp_validate_buf_len(len_src, &len));
 
   U8 *addr;
-  try(asm_alloc_data_append_load(&interp->asm, (Uint)len, (U8)reg, &addr));
+  try(asm_alloc_data_append_load(&interp->asm, len, (U8)reg, &addr));
   try(int_stack_push(&interp->ints, (Sint)addr));
+
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->norm.has_loads = true;
   return nullptr;
 }
 
@@ -341,7 +389,15 @@ static Err intrin_quit(Interp *interp) {
   return ERR_QUIT;
 }
 
-static void intrin_ret(Interp *interp) { asm_append_ret(&interp->asm); }
+static Err intrin_ret(Interp *interp) {
+  asm_append_ret(&interp->asm);
+
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->norm.has_rets = true;
+
+  return nullptr;
+}
 
 static Err err_char_eof() {
   return err_str("EOF where a character was expected");
@@ -534,46 +590,7 @@ static Err err_inline_not_defining() {
   return err_str("unsupported use of \"inline\" outside a colon definition");
 }
 
-static Err err_inline_not_norm(const Sym *sym) {
-  switch (sym->type) {
-    case SYM_INTRIN: {
-      return errf(
-        "unable to inline word " FMT_QUOTED " which is an interpreter intrinsic",
-        sym->name.buf
-      );
-    }
-    case SYM_EXT_PTR: {
-      return errf(
-        "unable to inline word " FMT_QUOTED " which is an external symbol",
-        sym->name.buf
-      );
-    }
-    case SYM_EXT_PROC: {
-      return errf(
-        "unable to inline word " FMT_QUOTED " which is an external procedure",
-        sym->name.buf
-      );
-    }
-    case SYM_NORM: unreachable();
-    default:       unreachable();
-  }
-}
-
-static Err err_inline_not_leaf(const Sym *sym) {
-  return errf(
-    "unable to inline word " FMT_QUOTED ": not a leaf procedure", sym->name.buf
-  );
-}
-
-// Edge case which doesn't matter, but throwing words could be inlined.
-static Err err_inline_throws(const Sym *sym) {
-  return errf("unable to inline word " FMT_QUOTED " which throws", sym->name.buf);
-}
-
 static Err interp_inline_sym(Interp *interp, Sym *sym) {
-  if (sym->type != SYM_NORM) return err_inline_not_norm(sym);
-  if (!is_sym_leaf(sym)) return err_inline_not_leaf(sym);
-  if (sym->throws) return err_inline_throws(sym);
   return asm_inline_sym(&interp->asm, sym);
 }
 
@@ -588,6 +605,22 @@ static Err intrin_execute(Interp *interp) {
   Sym *sym;
   try(interp_sym_by_ptr(interp, &sym));
   return interp_call_sym(interp, sym);
+}
+
+static Err intrin_comp_local_ind(Interp *interp) {
+  const U8 *buf;
+  Ind       len;
+  try(interp_pop_buf(interp, &buf, &len));
+  const auto ind = asm_local_get_or_make(&interp->asm, (const char *)buf, len);
+  try(int_stack_push(&interp->ints, ind));
+  return nullptr;
+}
+
+static Err intrin_comp_local_pop(Interp *interp) {
+  Sint ind;
+  try(int_stack_pop(&interp->ints, &ind));
+  try(asm_append_local_pop(&interp->asm, ind));
+  return nullptr;
 }
 
 // TODO figure out how to get a hold of stream pointers in Forth.
@@ -761,14 +794,14 @@ static constexpr Sym USED INTRIN[] = {
     .comp_only   = true,
     .interp_only = true,
   },
-  // (Sym){
-  //   .type        = SYM_INTRIN,
-  //   .name.buf    = "immediate",
-  //   .intrin.fun  = (void *)intrin_immediate,
-  //   .throws      = true,
-  //   .comp_only   = true,
-  //   .interp_only = true,
-  // },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "immediate",
+    .intrin.fun  = (void *)intrin_immediate,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
   (Sym){
     .type        = SYM_INTRIN,
     .name.buf    = "comp_only",
@@ -940,6 +973,22 @@ static constexpr Sym USED INTRIN[] = {
     .name.buf    = "execute",
     .intrin.fun  = (void *)intrin_execute,
     .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_local_ind",
+    .intrin.fun  = (void *)intrin_comp_local_ind,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_local_pop",
+    .intrin.fun  = (void *)intrin_comp_local_pop,
+    .throws      = true,
+    .comp_only   = true,
     .interp_only = true,
   },
   (Sym){
