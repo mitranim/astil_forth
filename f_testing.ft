@@ -5,25 +5,19 @@ Vaguely similar to regular Forth testing words:
 
 Example tests:
 
-  T{ 10 20 30 <T> 10 20 30 }    \ OK
-  T{ 10 20 30 <T> 10 20 30 40 } \ Fail
+  T{ 10 20    <T> 10 20    } \ OK
+  T{ 10 20    <T> 10 20 30 } \ Fail
+  T{ 10 20 30 <T> 10 20    } \ Fail
 )
 
-0 :var T_LEN_0 \ Length before `T{`.
-0 :var T_LEN_1 \ Length at `<T>`.
-0 :var T_LEN_2 \ Length at `}T`.
-0 :var T_LEN_3 \ Relative length before `<T>`.
-0 :var T_LEN_4 \ Relative length after `<T>`.
+0 :var T_LEN_0 \ Stack length at `T{`.
+0 :var T_LEN_1 \ Stack length at `<T>`.
 
-: T_equal ( max ind -- bool )
-  #begin
-    dup2 > #while
-    dup  T_LEN_0 @ + pick0
-    over T_LEN_1 @ + pick0
-    <> #if drop2 0 #ret #end
-    inc
-  #repeat
-  drop2 1
+: T_reset
+  \ Reset to initial stack depth.
+  T_LEN_0 @ stack_trunc
+  T_LEN_0 off!
+  T_LEN_1 off!
 ;
 
 : T{ depth T_LEN_0 ! ;
@@ -31,49 +25,56 @@ Example tests:
 : <T> depth T_LEN_1 ! ;
 
 : }T
-  depth T_LEN_2 !
-  T_LEN_1 @ T_LEN_0 @ - T_LEN_3 !
-  T_LEN_2 @ T_LEN_1 @ - T_LEN_4 !
-
-  T_LEN_3 @
-  T_LEN_4 @
+  depth       :to len2 \ Length at `}T`.
+  T_LEN_1 @   :to len1 \ Stack length at `<T>`.
+  T_LEN_0 @   :to len0 \ Stack length at `T{`.
+  len1 len0 - :to rel0 \ Relative length before `<T>`.
+  len2 len1 - :to rel1 \ Relative length after `<T>`.
 
   \ Does the depth match?
-  = #if
+  rel0 rel1 = #if
     \ Does the content match?
-    T_LEN_4 @ 0 T_equal
-    #if
-      \ Reset to initial stack depth.
-      T_LEN_0 @ stack_trunc
-      #ret
-    #end
+
+    len0 :to ind0
+    len1 :to ind1
+    0    :to ind
+    true :to equal
+
+    #begin
+      ind rel1 < #while
+      ind len0 + pick0
+      ind len1 + pick0
+      <> #if false :to equal #end
+      ind inc :to ind
+    #repeat
+
+    equal #if T_reset #ret #end
   #else
-    T_LEN_3 @
-    T_LEN_4 @
-    [ 2 ] #ef" stack depth mismatch: (%zd) <T> (%zd)" cr
+    rel0 rel1 [ 2 ] #ef" stack length mismatch: (%zd) <T> (%zd)" cr
   #end
 
   #e" stack content mismatch: T{ "
 
-  T_LEN_0 @
+  \ Print cells before `<T>`.
+  len0
   #begin
-    dup T_LEN_1 @ < #while
+    dup len1 < #while
     dup pick0 [ 1 ] #ef" %zd "
     inc
   #repeat
 
   #e" <T> "
 
+  \ Print cells after `<T>`.
   #begin
-    dup T_LEN_2 @ < #while
+    dup len2 < #while
     dup pick0 [ 1 ] #ef" %zd "
     inc
   #repeat drop
 
   #e" }T" cr
 
-  \ Reset to initial stack depth.
-  T_LEN_0 @ stack_trunc
+  T_reset
   #throw" test failure"
   unreachable
 ;
