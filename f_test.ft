@@ -13,21 +13,26 @@ include" ./f_testing.ft"
 ;
 test_conditionals
 
-1 0 :extern sleep
+1 0 extern: sleep
+
 : sleep_loop #begin #." sleeping" cr 1 sleep #again ;
 : test_again sleep_loop ;
+\ test_again
 
 : countdown_repeat ( val -- )
   #begin
     debug_top_int
     dup #while
+    dup #while
+    dup #while
     dec
-  #repeat
+  #repeat #end #end
   debug_top_int
   drop
 ;
 
 : test_repeat 12 countdown_repeat ;
+\ test_repeat
 
 : countdown_until ( val -- )
   #begin
@@ -102,14 +107,14 @@ T{ 10 20 30 swap_over <T> 20 10 30 }T
 T{ 123 0 ?dup <T> 123     }T
 T{ 234 1 ?dup <T> 234 234 }T
 
-123 :var_tmp VAR_TMP
+123 var_tmp: VAR_TMP
 T{ VAR_TMP @     <T> 123 }T
 T{ 234 VAR_TMP ! <T>     }T
 T{ VAR_TMP @     <T> 234 }T
 T{ 345 VAR_TMP ! <T>     }T
 T{ VAR_TMP @     <T> 345 }T
 
-123 :var VAR
+123 var: VAR
 T{ VAR @     <T> 123 }T
 T{ 234 VAR ! <T>     }T
 T{ VAR @     <T> 234 }T
@@ -176,7 +181,7 @@ T{  234 -123 max <T>  234 }T
   10 20 30 [ 3 ] #ef" numbers: %zu %zu %zu" cr
 ;
 
-4096 :buf_tmp STR_BUF
+4096 buf_tmp: STR_BUF
 
 : test_#sf"
   STR_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu"
@@ -192,55 +197,53 @@ T{  234 -123 max <T>  234 }T
 ;
 
 : test_to
-  T{ 10 :to one <T> }T
-  T{ one <T> 10 }T
-  T{ one one <T> 10 10 }T
-
-  T{ 20 :to one <T> }T
-  T{ one <T> 20 }T
-  T{ one one <T> 20 20 }T
-
-  T{ 30 :to two <T> }T
-  T{ two <T> 30 }T
-  T{ one <T> 20 }T
-  T{ one two <T> 20 30 }T
-  T{ two one <T> 30 20 }T
+  T{ 10 to: one <T>       }T
+  T{ one        <T> 10    }T
+  T{ one one    <T> 10 10 }T
+  T{ 20 to: one <T>       }T
+  T{ one        <T> 20    }T
+  T{ one one    <T> 20 20 }T
+  T{ 30 to: two <T>       }T
+  T{ two        <T> 30    }T
+  T{ one        <T> 20    }T
+  T{ one two    <T> 20 30 }T
+  T{ two one    <T> 30 20 }T
 ;
 test_to
 
 : test_locals
-  T{ { } <T> }T
-  T{ { -- } <T> }T
-  T{ 10 { } <T> 10 }T
-  T{ 10 20 { } <T> 10 20 }T
-  T{ 10 { } 20 <T> 10 20 }T
-  T{ { } 10 20 <T> 10 20 }T
-  T{ 10 { one } <T> }T
-  T{ 10 { one } one <T> 10 }T
-  T{ 10 { one } one one <T> 10 10 }T
-  T{ 10 { one -- } one one <T> 10 10 }T
-  T{ 10 { -- one } <T> 10 }T
-  T{ 10 20 { one } <T> 10 }T
-  T{ 10 20 { one } one <T> 10 20 }T
-  T{ 10 20 { one } one one <T> 10 20 20 }T
-  T{ 10 20 { one -- } one one <T> 10 20 20 }T
-  T{ 10 20 { one two } <T> }T
-  T{ 10 20 { one two } one <T> 10 }T
-  T{ 10 20 { one two } two <T> 20 }T
-  T{ 10 20 { one two } one two <T> 10 20 }T
-  T{ 10 20 { one two } two one <T> 20 10 }T
-  T{ 10 20 { one two } two one one <T> 20 10 10 }T
-  T{ 10 20 { one two } two one two <T> 20 10 20 }T
-  T{ 10 20 { one two } one two one <T> 10 20 10 }T
-  T{ 10 20 { one two } one one two <T> 10 10 20 }T
-  T{ 10 20 { one two -- } one one two <T> 10 10 20 }T
-  T{ 10 20 { one -- two } one one <T> 10 20 20 }T
-  T{ 10 20 { one -- two } one one <T> 10 20 20 }T
-  T{ 10 20 { -- one two } <T> 10 20 }T
-  T{ 10 20 { one two -- three } one one two <T> 10 10 20 }T
-  T{ 10 20 30 { one two three } one two three <T> 10 20 30 }T
-  T{ 10 20 30 { one two three } three one two <T> 30 10 20 }T
-  T{ 10 20 30 { one two three } two three one <T> 20 30 10 }T
-  T{ 10 20 30 { -- one two three } <T> 10 20 30 }T
+  T{          { }                                <T>          }T
+  T{          { -- }                             <T>          }T
+  T{ 10       { }                                <T> 10       }T
+  T{ 10 20    { }                                <T> 10 20    }T
+  T{ 10       { }                  20            <T> 10 20    }T
+  T{          { }                  10 20         <T> 10 20    }T
+  T{ 10       { one }                            <T>          }T
+  T{ 10       { one }              one           <T> 10       }T
+  T{ 10       { one }              one one       <T> 10 10    }T
+  T{ 10       { one -- }           one one       <T> 10 10    }T
+  T{ 10       { -- one }                         <T> 10       }T
+  T{ 10 20    { one }                            <T> 10       }T
+  T{ 10 20    { one }              one           <T> 10 20    }T
+  T{ 10 20    { one }              one one       <T> 10 20 20 }T
+  T{ 10 20    { one -- }           one one       <T> 10 20 20 }T
+  T{ 10 20    { one two }                        <T>          }T
+  T{ 10 20    { one two }          one           <T> 10       }T
+  T{ 10 20    { one two }          two           <T> 20       }T
+  T{ 10 20    { one two }          one two       <T> 10 20    }T
+  T{ 10 20    { one two }          two one       <T> 20 10    }T
+  T{ 10 20    { one two }          two one one   <T> 20 10 10 }T
+  T{ 10 20    { one two }          two one two   <T> 20 10 20 }T
+  T{ 10 20    { one two }          one two one   <T> 10 20 10 }T
+  T{ 10 20    { one two }          one one two   <T> 10 10 20 }T
+  T{ 10 20    { one two -- }       one one two   <T> 10 10 20 }T
+  T{ 10 20    { one -- two }       one one       <T> 10 20 20 }T
+  T{ 10 20    { one -- two }       one one       <T> 10 20 20 }T
+  T{ 10 20    { -- one two }                     <T> 10 20    }T
+  T{ 10 20    { one two -- three } one one two   <T> 10 10 20 }T
+  T{ 10 20 30 { one two three }    one two three <T> 10 20 30 }T
+  T{ 10 20 30 { one two three }    three one two <T> 30 10 20 }T
+  T{ 10 20 30 { one two three }    two three one <T> 20 30 10 }T
+  T{ 10 20 30 { -- one two three }               <T> 10 20 30 }T
 ;
 test_locals

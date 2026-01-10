@@ -824,22 +824,22 @@ C variables like `stdout` are a bit trickier,
 but also optional; we could `fdopen` instead.
 )
 
-:extern_ptr __stdinp
-:extern_ptr __stdoutp
-:extern_ptr __stderrp
+extern_ptr: __stdinp
+extern_ptr: __stdoutp
+extern_ptr: __stderrp
 
 : stdin  __stdinp  @ ;
 : stdout __stdoutp @ ;
 : stderr __stderrp @ ;
 
-4 0 :extern fwrite
-1 0 :extern putchar
-2 0 :extern fputc
-2 0 :extern fputs
-1 0 :extern printf
-2 0 :extern fprintf
-3 0 :extern snprintf
-1 0 :extern fflush
+4 0 extern: fwrite
+1 0 extern: putchar
+2 0 extern: fputc
+2 0 extern: fputs
+1 0 extern: printf
+2 0 extern: fprintf
+3 0 extern: snprintf
+1 0 extern: fflush
 
 : eputchar ( code -- ) stderr fputc ;
 : puts ( cstr -- ) stdout fputs ;
@@ -977,10 +977,10 @@ Also see `#sthrowf"` for formatted errors.
 (
 Formats an error message into the provided buffer using `snprintf`,
 then throws the buffer as the error value. The buffer must be zero
-terminated; `:buf` and `:buf_tmp` ensure this automatically.
+terminated; `buf:` and `buf_tmp:` ensure this automatically.
 Usage example:
 
-  4096 :buf SOME_BUF
+  4096 buf: SOME_BUF
   SOME_BUF 10 20 30 [ 20 ] #sthrowf" error codes: %zu %zu %zu"
 
 Also see `#throwf"` which comes with its own buffer.
@@ -1023,14 +1023,14 @@ Also see `#throwf"` which comes with its own buffer.
 
 : .sc .s stack_clear ;
 
-2 1 :extern calloc  ( len size -- addr )
-1 1 :extern malloc  ( size -- addr )
-1 0 :extern free    ( addr -- )
-3 0 :extern memset  ( buf char len -- )
-1 1 :extern strlen  ( cstr -- len )
-3 1 :extern strncmp ( str0 str1 len -- )
-3 0 :extern strncpy ( buf[tar] buf[src] len -- )
-3 0 :extern strlcpy ( buf[tar] buf[src] buf_len -- )
+2 1 extern: calloc  ( len size -- addr )
+1 1 extern: malloc  ( size -- addr )
+1 0 extern: free    ( addr -- )
+3 0 extern: memset  ( buf char len -- )
+1 1 extern: strlen  ( cstr -- len )
+3 1 extern: strncmp ( str0 str1 len -- )
+3 0 extern: strncpy ( buf[tar] buf[src] len -- )
+3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
 
 : move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
 : fill    ( buf len char -- ) swap memset ;
@@ -1057,10 +1057,10 @@ easily you can implement global variables with no compiler support.
 )
 
 \ Same as standard `constant`.
-: :let ( C: val -- ) ( E: -- val ) #word_beg comp_push inline #word_end ;
+: let: ( C: val -- ) ( E: -- val ) #word_beg comp_push inline #word_end ;
 
 \ Similar to standard `variable`.
-: :var ( C: init "name" -- ) ( E: -- addr )
+: var: ( C: init "name" -- ) ( E: -- addr )
   #word_beg
   cell 1      comp_static \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1 comp_instr  \ str x1, [x27], 8
@@ -1068,7 +1068,7 @@ easily you can implement global variables with no compiler support.
   !
 ;
 
-: :var_tmp #word_beg cell 1 calloc dup comp_push #word_end ! ;
+: var_tmp: #word_beg cell 1 calloc dup comp_push #word_end ! ;
 
 (
 Creates a global variable which refers to a buffer of at least
@@ -1077,7 +1077,7 @@ the given size in bytes, rounded up to page size.
 Serves the same role as the standard idiom `create <name> N allot`
 which we don't have because we segregate code and data.
 )
-: :buf ( C: size "name" -- ) ( E: -- addr size )
+: buf: ( C: size "name" -- ) ( E: -- addr size )
   #word_beg
   dup 1       comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1 comp_instr       \ str x1, [x27], 8
@@ -1085,12 +1085,12 @@ which we don't have because we segregate code and data.
   #word_end
 ;
 
-: :buf_tmp #word_beg dup 1 calloc comp_push comp_push #word_end ;
+: buf_tmp: #word_beg dup 1 calloc comp_push comp_push #word_end ;
 
-0 :let false
-1 :let true
+0 let: false
+1 let: true
 
-4096 :buf ERR_BUF
+4096 buf: ERR_BUF
 
 (
 Like `#sthrowf"` but easier to use. Example:
@@ -1108,7 +1108,7 @@ Like `#sthrowf"` but easier to use. Example:
 ;
 
 \ Core support for locals.
-: :to ( C: "name" -- ) ( E: val -- ) [ immediate ]
+: to: ( C: "name" -- ) ( E: val -- )
   parse_word comp_local_ind comp_local_pop
 ;
 
@@ -1128,11 +1128,11 @@ like in Gforth and VfxForth. Types are not supported.
 )
 : {
   [ immediate ]
-  0x7FFFFFFFFFFFFFFF :to ind_min \ Lowest local index.
-  -1                 :to ind_max \ Highest local index.
+  0x7FFFFFFFFFFFFFFF to: ind_min \ Lowest local index.
+  -1                 to: ind_max \ Highest local index.
 
   #begin
-    parse_word :to len :to str
+    parse_word to: len to: str
 
     #" }" str len str= #if
       ind_min ind_max }
@@ -1142,8 +1142,8 @@ like in Gforth and VfxForth. Types are not supported.
     #" --" str len str<> #while
 
     str len comp_local_ind
-    dup ind_min min :to ind_min
-        ind_max max :to ind_max
+    dup ind_min min to: ind_min
+        ind_max max to: ind_max
   #repeat
 
   \ After `--`: skip all words which aren't `}`.
@@ -1155,19 +1155,19 @@ like in Gforth and VfxForth. Types are not supported.
   ind_min ind_max }
 ;
 
-1 1 :extern strerror
-:extern_ptr __error
+1 1 extern: strerror
+extern_ptr: __error
 : errno __error @ ;
 
-6 1 :extern mmap
-3 1 :extern mprotect
+6 1 extern: mmap
+3 1 extern: mprotect
 
-16384 :let PAGE_SIZE
-0     :let PROT_NONE
-1     :let PROT_READ
-2     :let PROT_WRITE
-2     :let MAP_PRIVATE
-4096  :let MAP_ANON
+16384 let: PAGE_SIZE
+0     let: PROT_NONE
+1     let: PROT_READ
+2     let: PROT_WRITE
+2     let: MAP_PRIVATE
+4096  let: MAP_ANON
 
 : mem_map ( size pflag -- addr )
   0 -rot MAP_ANON MAP_PRIVATE or -1 0 mmap
@@ -1185,10 +1185,10 @@ Attempting to read or write inside the guards,
 aka underflow or overflow, triggers a segfault.
 )
 : mem_alloc ( size1 -- addr size2 )
-        PAGE_SIZE align_up :to size2
-  size2 PAGE_SIZE 1 lsl +  :to size
-  size  PROT_NONE mem_map  :to addr
-  addr  PAGE_SIZE +        :to addr
+        PAGE_SIZE align_up to: size2
+  size2 PAGE_SIZE 1 lsl +  to: size
+  size  PROT_NONE mem_map  to: addr
+  addr  PAGE_SIZE +        to: addr
   addr  size2 mem_unprot
   addr  size2
 ;
@@ -1205,6 +1205,7 @@ FIXME new plan for static memory:
 - When building the Mach-O executable:
   - Compactify by eliding unused regions. No need to bloat the executable!
   - Guards are automatic; just leave unmapped holes.
+  - Forth stack is also there.
 - Drop "tmp" variants; really don't need them.
   - Education purposes are fine, but this confuses readers.
 - Also: interp-only words could be written in a separate sector,

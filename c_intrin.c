@@ -941,14 +941,14 @@ static constexpr Sym USED INTRIN[] = {
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = ":extern_ptr",
+    .name.buf    = "extern_ptr:",
     .intrin.fun  = (void *)intrin_extern_ptr,
     .throws      = true,
     .interp_only = true,
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = ":extern",
+    .name.buf    = "extern:",
     .intrin.fun  = (void *)intrin_extern_proc,
     .throws      = true,
     .interp_only = true,

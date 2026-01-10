@@ -82,17 +82,15 @@ A bunch of unclear words are replaced with clear ones.
 
 Word-modifying words like `comp_only` are used inside definitions, between `:` and `;`.
 
-Words which begin with `#` are automatically immediate, and _most_ immediate words begin with `#`. Special dispensations are made for `\ ( ; [ :to`. Code editors are encouraged to syntax-highlight the `#` prefix at callsites, as well as `[ ]` in word names.
+Immediacy tends to be explicit. Words which `#` or end with `:` are _automatically_ immediate. Nearly all immediate words use this mnemonic. An exception was made for `\ ( ; [`. Code editors are encouraged to syntax-highlight the `#` prefix and `:` suffix, as well as `[ ]` in names.
 
-By convention, parsing words which declare other words begin with `:`: `:let`, `:var`. This includes `:to`, which can declare a local on the fly. Editors are encouraged to syntax-highlight the next word like a declaration.
+By convention, the suffix `:` denotes parsing words which declare other words. Examples include `:`, `let:`, `var:`, `to:`. Editors are encouraged to syntax-highlight the next word like a declaration.
 
-By convention, the names of parsing words (which don't declare words) end with `'`. Editors are encouraged to syntax-highlight the next word like a string when the parsing word is immediate (begins with `#`), and avoid doing so when it's not.
+By convention, the names of parsing words which _don't_ declare words end with `'`. Editors are encouraged to syntax-highlight the next word like a string when the parsing word is immediate, and avoid doing so when it's not.
 
-There is no `state`, `does>`, or any form of state-smartness. (Anton Ertl would probably [approve](https://www.complang.tuwien.ac.at/papers/ertl01state.pdf).) Many words come in separate "execution time" and "compile time" variants, such as `.` and `#.`. Immediacy is explicit.
+There is no `state`, `does>`, or any form of state-smartness. (Anton Ertl would probably [approve](https://www.complang.tuwien.ac.at/papers/ertl01state.pdf).) Many words come in separate "execution time" and "compile time" variants, such as `.` vs `#.`.
 
 Exceptions are strings (error messages) rather than numeric codes.
-
-`literal` is replaced with `comp_push` which is not immediate.
 
 Booleans are `0 1` rather than `0 -1`.
 
