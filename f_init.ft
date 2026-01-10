@@ -851,6 +851,24 @@ C variables like `stdout` are a bit trickier,
 but also optional; we could `fdopen` instead.
 )
 
+2 1 extern: calloc  ( len size -- addr )
+1 1 extern: malloc  ( size -- addr )
+1 0 extern: free    ( addr -- )
+3 0 extern: memset  ( buf char len -- )
+1 1 extern: strlen  ( cstr -- len )
+3 1 extern: strncmp ( str0 str1 len -- )
+3 0 extern: strncpy ( buf[tar] buf[src] len -- )
+3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
+
+: move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
+: fill    ( buf len char -- ) swap memset ;
+: erase   ( buf len -- ) 0 fill ;
+: blank   ( buf len -- ) 32 fill ;
+: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
+: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
+: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
+: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
+
 extern_ptr: __stdinp
 extern_ptr: __stdoutp
 extern_ptr: __stderrp
@@ -885,8 +903,56 @@ extern_ptr: __stderrp
 : #." #postpone' #c" #compile' puts ;
 : #e" #postpone' #c" #compile' eputs ;
 
-: align_down ( size alignment -- size ) negate and ;
-: align_up   ( size alignment -- size ) tuck dec + swap align_down ;
+\ Core support for locals.
+: to: ( C: "name" -- ) ( E: val -- )
+  parse_word comp_local_ind comp_local_pop
+;
+
+: } ( ind_min ind_max -- )
+  #begin
+    dup2 <= #while
+    dup comp_local_pop
+    dec
+  #repeat
+  drop2
+;
+
+(
+Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
+Capture order matches stack push order and the parens notation,
+like in Gforth and VfxForth. Types are not supported.
+)
+: {
+  [ immediate ]
+  0x7FFFFFFFFFFFFFFF to: ind_min \ Lowest local index.
+  -1                 to: ind_max \ Highest local index.
+
+  #begin
+    parse_word to: len to: str
+
+    #" }" str len str= #if
+      ind_min ind_max }
+      #ret
+    #end
+
+    #" --" str len str<> #while
+
+    str len comp_local_ind
+    dup ind_min min to: ind_min
+        ind_max max to: ind_max
+  #repeat
+
+  \ After `--`: skip all words which aren't `}`.
+  #begin
+    parse_word
+    #" }" str<>
+  #until
+
+  ind_min ind_max }
+;
+
+: align_down ( size width -- size ) negate and ;
+: align_up   { size width -- size } width dec size + width align_down ;
 
 (
 On Arm64, we can't modify `sp` by 8 bytes and leave it like that.
@@ -1026,47 +1092,32 @@ Also see `#throwf"` which comes with its own buffer.
 : . ( num -- ) depth dec print_cell cr ;
 
 : .s
-  depth #ifn
+  depth to: len
+
+  len #ifn
     #." stack is empty" cr
     #ret
   #end
 
-  depth <0 #if
-    #." stack length is negative: " depth print_int cr
+  len <0 #if
+    #." stack length is negative: " len print_int cr
     #ret
   #end
 
-  depth [ 1 ] #f" stack <%zd>:" cr
-  depth 0 ( len ind )
+  len [ 1 ] #f" stack <%zd>:" cr
 
+  0
   #begin
-    dup2 > #while
+    dup to: ind
+    ind len < #while
     space space
-    dup pick0 over print_cell cr
+    ind pick0 ind print_cell cr
     inc
   #repeat
-  drop2
+  drop
 ;
 
 : .sc .s stack_clear ;
-
-2 1 extern: calloc  ( len size -- addr )
-1 1 extern: malloc  ( size -- addr )
-1 0 extern: free    ( addr -- )
-3 0 extern: memset  ( buf char len -- )
-1 1 extern: strlen  ( cstr -- len )
-3 1 extern: strncmp ( str0 str1 len -- )
-3 0 extern: strncpy ( buf[tar] buf[src] len -- )
-3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
-
-: move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
-: fill    ( buf len char -- ) swap memset ;
-: erase   ( buf len -- ) 0 fill ;
-: blank   ( buf len -- ) 32 fill ;
-: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
-: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
-: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
-: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
 
 \ For words which define words. Kinda like `create`.
 : #word_beg #compile' : ;
@@ -1132,54 +1183,6 @@ Like `#sthrowf"` but easier to use. Example:
   -va
   #compile' ERR_BUF
   #compile' throw
-;
-
-\ Core support for locals.
-: to: ( C: "name" -- ) ( E: val -- )
-  parse_word comp_local_ind comp_local_pop
-;
-
-: } ( ind_min ind_max -- )
-  #begin
-    dup2 <= #while
-    dup comp_local_pop
-    dec
-  #repeat
-  drop2
-;
-
-(
-Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
-Capture order matches stack push order and the parens notation,
-like in Gforth and VfxForth. Types are not supported.
-)
-: {
-  [ immediate ]
-  0x7FFFFFFFFFFFFFFF to: ind_min \ Lowest local index.
-  -1                 to: ind_max \ Highest local index.
-
-  #begin
-    parse_word to: len to: str
-
-    #" }" str len str= #if
-      ind_min ind_max }
-      #ret
-    #end
-
-    #" --" str len str<> #while
-
-    str len comp_local_ind
-    dup ind_min min to: ind_min
-        ind_max max to: ind_max
-  #repeat
-
-  \ After `--`: skip all words which aren't `}`.
-  #begin
-    parse_word
-    #" }" str<>
-  #until
-
-  ind_min ind_max }
 ;
 
 1 1 extern: strerror

@@ -34,7 +34,6 @@ Example tests:
   \ Does the depth match?
   rel0 rel1 = #if
     \ Does the content match?
-
     len0 to: ind0
     len1 to: ind1
     0    to: ind
