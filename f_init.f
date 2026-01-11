@@ -447,11 +447,11 @@ Assumes `lsl` is already part of the base instruction.
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
-: ' ( -- word_ptr ) parse_word find_word ;
-: #' ( -- word_ptr ) ' comp_push ;
-: #inline' ' inline_word ;
-: #postpone' ' comp_call ;
-: #compile' ' comp_push #' comp_call comp_call ;
+: next_word ( -- word_ptr ) parse_word find_word ;
+: '         ( -- word_ptr ) next_word  comp_push ;
+: inline'   next_word inline_word ;
+: postpone' next_word comp_call ;
+: compile'  next_word comp_push ' comp_call comp_call ;
 
 : drop ( val -- ) [
   27 27 8 asm_sub_imm comp_instr \ sub x27, x27, 8
@@ -516,7 +516,7 @@ Assumes `lsl` is already part of the base instruction.
 ] ;
 
 : tuck2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 i3 i4 ) [
-  #inline' swap2
+  inline' swap2
   3 4 asm_push2 comp_instr \ stp x3, x4, [x27], 16
 ] ;
 
@@ -745,14 +745,14 @@ Conditionals work like this:
 : patch_if ( adr -- ) pc_off 1 asm_cmp_branch_zero swap !32 ;
 
 : #if ( C: -- fun adr ) ( E: pred -- )
-  asm_pop_x1 comp_instr here reserve_instr #' patch_if
+  asm_pop_x1 comp_instr here reserve_instr ' patch_if
 ;
 
 \ cbnz x1, <else|end>
 : patch_ifn ( adr -- ) pc_off 1 asm_cmp_branch_not_zero swap !32 ;
 
 : #ifn ( C: -- fun adr ) ( E: pred -- )
-  asm_pop_x1 comp_instr here reserve_instr #' patch_ifn
+  asm_pop_x1 comp_instr here reserve_instr ' patch_ifn
 ;
 
 : #end ( C: adr fun -- ) execute ;
@@ -764,7 +764,7 @@ Conditionals work like this:
 : patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
 : #else ( C: fun[if] adr[if] -- fun[else] adr[else] )
-  here reserve_instr #' patch_uncond_forward swap2 #postpone' #end
+  here reserve_instr ' patch_uncond_forward swap2 postpone' #end
 ;
 
 : #begin ( C: -- adr[beg] ) here ;
@@ -777,7 +777,7 @@ Inside a conditional, `#leave` gets unjustly terminated by the nearest
 `#else` or `#end`. Also, loop words keep `adr[beg]` at the top.
 )
 : #leave ( C: adr[beg] -- fun[b] adr[b] adr[beg] )
-  here #' patch_uncond_forward reserve_instr rot
+  here ' patch_uncond_forward reserve_instr rot
 ;
 
 (
@@ -791,12 +791,12 @@ Each additional `#while` can be terminated with `#end`.
   #repeat #end #end
 )
 : #while ( C: adr[beg] -- fun[cbz] adr[cbz] fun[beg] ) ( E: pred -- )
-  #postpone' #if rot
+  postpone' #if rot
 ;
 
 \ For use with `#while`; potentially more general.
 : #repeat ( C: fun[any] fun[any] adr[beg] -- )
-  #postpone' #again #postpone' #end
+  postpone' #again postpone' #end
 ;
 
 : #until ( C: adr[beg] -- ) ( E: pred -- )
@@ -813,11 +813,11 @@ Does NOT discard them when done. There's no magic `i`.
   \ 0 1 2 3 4 5 6 7
 )
 : #do> ( C: -- fun[cbz] adr[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
-  here #compile' dup2 #compile' > #postpone' #if rot
+  here compile' dup2 compile' > postpone' #if rot
 ;
 
 : #loop+ ( C: fun[any] fun[any] adr[beg] -- )
-  #compile' inc #postpone' #repeat
+  compile' inc postpone' #repeat
 ;
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
@@ -900,8 +900,8 @@ extern_ptr: __stderrp
 
 : ." " type ;
 : e" " etype ;
-: #." #postpone' #c" #compile' puts ;
-: #e" #postpone' #c" #compile' eputs ;
+: #." postpone' #c" compile' puts ;
+: #e" postpone' #c" compile' eputs ;
 
 \ Core primitive for locals.
 : to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
@@ -986,7 +986,7 @@ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
   dup <=0 #if drop #ret #end
 
   dup odd #if
-    #' dup>systack inline_word
+    ' dup>systack inline_word
     dec
   #end
 
@@ -994,7 +994,7 @@ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
 
   #begin
     dup #while
-    #' pair>systack inline_word
+    ' pair>systack inline_word
     2 -
   #repeat
   drop
@@ -1029,12 +1029,12 @@ which must be available at compile time. Usage example:
   10 20 30 [ 3 ] #f" numbers: %zu %zu %zu" cr
 )
 : #f" ( C: N -- ) ( E: i1 … iN -- )
-  va- #postpone' #c" #compile' printf -va
+  va- postpone' #c" compile' printf -va
 ;
 
 \ Format-prints to stderr.
 : #ef" ( C: N -- ) ( E: i1 … iN -- )
-  va- #compile' stderr #postpone' #c" #compile' fprintf -va
+  va- compile' stderr postpone' #c" compile' fprintf -va
 ;
 
 (
@@ -1043,7 +1043,7 @@ Formats into the provided buffer using `snprintf`. Usage example:
   SOME_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu" cr
 )
 : #sf" ( C: N -- ) ( E: buf size i1 … iN -- )
-  va- #postpone' #c" #compile' snprintf -va
+  va- postpone' #c" compile' snprintf -va
 ;
 
 (
@@ -1063,7 +1063,7 @@ Usage: `#throw" some_error_msg"`.
 
 Also see `#sthrowf"` for formatted errors.
 )
-: #throw" #postpone' #" #compile' throw ;
+: #throw" postpone' #" compile' throw ;
 
 (
 Formats an error message into the provided buffer using `snprintf`,
@@ -1078,11 +1078,11 @@ Also see `#throwf"` which comes with its own buffer.
 )
 : #sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
-  #compile'  dup2
-  #postpone' #c"
-  #compile'  snprintf
+  compile'  dup2
+  postpone' #c"
+  compile'  snprintf
   -va
-  #compile'  throw
+  compile'  throw
 ;
 
 : print_int ( num -- ) [ 1 ] #f" %zd"  ;
@@ -1118,8 +1118,8 @@ Also see `#throwf"` which comes with its own buffer.
 : .sc .s stack_clear ;
 
 \ For words which define words. Kinda like `create`.
-: #word_beg #compile' : ;
-: #word_end #compile' ; not_comp_only ;
+: #word_beg compile' : ;
+: #word_end compile' ; not_comp_only ;
 
 (
 Words for declaring constants and variables. Unlike in standard Forth,
@@ -1175,12 +1175,12 @@ Like `#sthrowf"` but easier to use. Example:
 )
 : #throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
-  #compile'  ERR_BUF
-  #postpone' #c"
-  #compile'  snprintf
+  compile'  ERR_BUF
+  postpone' #c"
+  compile'  snprintf
   -va
-  #compile' ERR_BUF
-  #compile' throw
+  compile' ERR_BUF
+  compile' throw
 ;
 
 1 1 extern: strerror

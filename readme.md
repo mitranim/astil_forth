@@ -80,13 +80,25 @@ Non-decimal numeric literals are denoted with `0b 0o 0x`. Radix prefixes are cas
 
 A bunch of unclear words are replaced with clear ones.
 
-Word-modifying words like `comp_only` are used inside definitions, between `:` and `;`.
+Special _semantic_ roles get special _syntactic_ roles. Other Forths already follow some rules, which we replicate:
+- String-parsing words end with `"` and terminate with `"`.
+- String-parsing words end with `(` and terminate with `)`.
 
-Immediacy tends to be explicit. Words which `#` or end with `:` are _automatically_ immediate. Nearly all immediate words use this mnemonic. An exception was made for `\ ( ; [`. Code editors are encouraged to syntax-highlight the `#` prefix and `:` suffix, as well as `[ ]` in names.
+...but not enough. There are more semantic roles which need syntactic distinction. Rules we add:
+- Word-parsing words which declare → end with `:`.
+- Word-parsing words which don't declare → end with `'`.
+- Other immediate words begin with `#`.
+- Any of the above _automatically_ makes a word immediate.
 
-By convention, the suffix `:` denotes parsing words which declare other words. Examples include `:`, `let:`, `var:`, `to:`. Editors are encouraged to syntax-highlight the next word like a declaration.
+Code editors are encouraged to syntax-highlight these prefixes and suffixes to clarify the semantic roles syntactically. Exceptions were made for `\ ( ; [` which are also immediate; special syntax highlighting is recommended for those.
 
-By convention, the names of parsing words which _don't_ declare words end with `'`. Editors are encouraged to syntax-highlight the next word like a string when the parsing word is immediate, and avoid doing so when it's not.
+Related: special syntax highlighting is recommended for `( ) [ ] { }` in word names, which are commonly used as delimiters with case-by-case functionality.
+
+Word-modifying words like `immediate` and `comp_only` are used immediately inside colon definitions.
+
+By convention, the suffix `:` denotes parsing words which declare other words. Examples include `:`, `let:`, `var:`, `to:`. Code editors are encouraged to syntax-highlight the next word like a declaration.
+
+By convention, the names of parsing words which _don't_ declare words end with `'`. Code editors are encouraged to syntax-highlight the next word like a string.
 
 There is no `state`, `does>`, or any form of state-smartness. (Anton Ertl would probably [approve](https://www.complang.tuwien.ac.at/papers/ertl01state.pdf).) Many words come in separate "execution time" and "compile time" variants, such as `.` vs `#.`.
 
