@@ -132,13 +132,6 @@ T{ 10 20 30 swap_over <T> 20 10 30 }T
 T{ 123 0 ?dup <T> 123     }T
 T{ 234 1 ?dup <T> 234 234 }T
 
-123 var_tmp: VAR_TMP
-T{ VAR_TMP @     <T> 123 }T
-T{ 234 VAR_TMP ! <T>     }T
-T{ VAR_TMP @     <T> 234 }T
-T{ 345 VAR_TMP ! <T>     }T
-T{ VAR_TMP @     <T> 345 }T
-
 123 var: VAR
 T{ VAR @     <T> 123 }T
 T{ 234 VAR ! <T>     }T
@@ -206,7 +199,7 @@ T{  234 -123 max <T>  234 }T
   10 20 30 [ 3 ] ef" numbers: %zu %zu %zu" cr
 ;
 
-4096 buf_tmp: STR_BUF
+4096 buf: STR_BUF
 
 : test_str_fmt
   STR_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu"

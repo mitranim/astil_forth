@@ -1124,8 +1124,7 @@ Also see `sthrowf"` for formatted errors.
 (
 Formats an error message into the provided buffer using `snprintf`,
 then throws the buffer as the error value. The buffer must be zero
-terminated; `buf:` and `buf_tmp:` ensure this automatically.
-Usage example:
+terminated; `buf:` ensures this automatically. Usage example:
 
   4096 buf: SOME_BUF
   SOME_BUF 10 20 30 [ 20 ] sthrowf" error codes: %zu %zu %zu"
@@ -1180,12 +1179,6 @@ Also see `throwf"` which comes with its own buffer.
 (
 Words for declaring constants and variables. Unlike in standard Forth,
 variables also take an initial value.
-
-The "tmp" variants are backed by calloc and are only valid within the runtime
-of the current process. The non-tmp variants will be eventually placed within
-the executable space of a compiled program when we implement AOT compilation.
-For now, there's no practical difference. The "tmp" variants demonstrate how
-easily you can implement global variables with no compiler support.
 )
 
 \ Same as standard `constant`.
@@ -1199,8 +1192,6 @@ easily you can implement global variables with no compiler support.
   #word_end
   !
 ;
-
-: var_tmp: #word_beg cell 1 calloc dup comp_push #word_end ! ;
 
 (
 Creates a global variable which refers to a buffer of at least
@@ -1216,8 +1207,6 @@ which we don't have because we segregate code and data.
               comp_push        \ str <len>, [x27], 8
   #word_end
 ;
-
-: buf_tmp: #word_beg dup 1 calloc comp_push comp_push #word_end ;
 
 0 let: false
 1 let: true
@@ -1277,12 +1266,3 @@ aka underflow or overflow, triggers a segfault.
   addr  size2 mem_unprot
   addr  size2
 ;
-
-(
-FIXME:
-- Drop "tmp" variants; really don't need them.
-  - Education purposes are fine, but this confuses readers.
-- Also: interp-only words could be written in a separate sector,
-  allowing us to elide them from the executable. This is an optimization
-  for later. We should be able to enforce this pretty easily.
-)
