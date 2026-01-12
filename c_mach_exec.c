@@ -23,12 +23,13 @@ Links:
 
 /*
 FIXME:
-- Dump executable code as-is when possible.
-- Otherwise dump with relocation info.
-- Add to symbol table if needed.
-- Handle external symbols.
-- Forbid internal symbols.
-- Adjust internal call offsets; may require asm fixup lists.
+- Convert `Asm_heap` to segments and sections.
+  - Compactify by eliding unused regions. No need to bloat the executable!
+  - Guards are automatic; just leave unmapped holes.
+- Build symbol table:
+  - Our symbols.
+  - Extern symbols.
+- Add a section for the Forth stack.
 */
 // static Err compile_exec_sym(FILE *out, Sym const *sym) {}
 

@@ -47,9 +47,9 @@ static Err interp_init_syms(Interp *interp) {
     aver(dict_has(syms, ":"));
     aver(dict_has(syms, ";"));
 
-    const auto got = &asm->got;
-    aver(got->inds.len == arr_cap(INTRIN));
-    aver(stack_len(&got->names) == arr_cap(INTRIN));
+    const auto gots = &asm->gots;
+    aver(gots->inds.len == arr_cap(INTRIN));
+    aver(stack_len(&gots->names) == arr_cap(INTRIN));
   });
   return nullptr;
 }
@@ -70,11 +70,10 @@ static Err interp_init(Interp *interp) {
     eprintf("[system] interpreter: %p\n", interp);
     eprintf("[system] integer stack floor: %p\n", interp->ints.floor);
     eprintf(
-      "[system] instruction floor (writable): %p\n", interp->asm.write.instrs.dat
+      "[system] instruction floor (writable): %p\n", interp->asm.code_write.dat
     );
     eprintf(
-      "[system] instruction floor (executable): %p\n",
-      interp->asm.exec.instrs.dat
+      "[system] instruction floor (executable): %p\n", interp->asm.code_exec.dat
     );
   });
   return nullptr;
@@ -185,7 +184,7 @@ Err interp_call_sym(Interp *interp, const Sym *sym) {
 
   switch (sym->type) {
     case SYM_NORM: {
-      return asm_call_norm(interp->reader, sym, interp);
+      return asm_call_norm(&interp->asm, interp->reader, sym, interp);
     }
 
     case SYM_INTRIN: {

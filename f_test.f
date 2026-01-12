@@ -279,4 +279,4 @@ test_locals
 ;
 T{ 123 test_recursion <T> 13 }T
 
-str" [test] ok" type cr
+str" [test] ok" type cr flush eflush

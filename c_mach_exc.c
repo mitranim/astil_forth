@@ -360,13 +360,13 @@ kern_return_t catch_mach_exception_raise_state(
     );
     eprintf(
       SYS_REC_FMT "  writable   instructions: [%p,%p)\n",
-      asm->write.instrs.dat,
-      list_ceil(&asm->write.instrs)
+      asm->code_write.dat,
+      list_ceil(&asm->code_write)
     );
     eprintf(
       SYS_REC_FMT "  executable instructions: [%p,%p)\n",
-      asm->exec.instrs.dat,
-      list_ceil(&asm->exec.instrs)
+      asm->code_exec.dat,
+      list_ceil(&asm->code_exec)
     );
     fflush(stderr);
     return KERN_FAILURE;

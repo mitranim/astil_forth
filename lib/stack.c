@@ -37,7 +37,7 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Uint val_size) {
   if (!len) return err_stack_no_len();
 
   const auto page_size = (Uint)sysconf(_SC_PAGESIZE);
-  assert(page_size != (Uint)-1);
+  aver(page_size != (Uint)-1);
 
   const auto guard_size = page_size;
   const auto data_size  = val_size * len;

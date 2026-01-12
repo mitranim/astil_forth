@@ -1,6 +1,7 @@
 #pragma once
 #include "./lib/dict.h"
 #include "./lib/list.h"
+#include "./lib/mem.h"
 #include "./lib/num.h"
 #include "./lib/stack.h"
 #include "./lib/str.h"
@@ -49,36 +50,37 @@ typedef struct {
 
 typedef list_of(Asm_fixup) Asm_fixup_list;
 
-/*
-Stupid, simple, not scalable.
+// 4 MiB
+static constexpr unsigned int INSTR_LEN = (1 << 22) / sizeof(Instr);
 
-Reasons for a fixed-size heap:
-- Simplicity.
-- Stable addresses.
+/*
+Fixed size = stupid, simple solution.
 
 Instruction addresses need to be stable because they're referenced in multiple
 places in C structures and used in Forth during compilation, by various control
 flow words such as conditionals and loops.
 
-Sections are accessed and modified via lists in `Asm_heap`, with bounds checks.
+TODO: consider writing interp-only words to a separate sector,
+allowing us to elide them from the executable.
 */
 typedef struct {
-  U8    guard_low[1 << 14];                // 16 KiB
-  Instr instrs[(1 << 20) / sizeof(Instr)]; // 1 MiB
-  U8    consts[1 << 18];                   // 256 KiB
-  U8    datas[1 << 18];                    // 256 KiB
-  U64   got[(1 << 14) / sizeof(U64)];      // 16 KiB; "global offset table"
-  U8    guard_high[1 << 14];               // 16 KiB
-} Asm_page;
+  U8    guard_0[MEM_PAGE]; // PROT_NONE
+  Instr instrs[INSTR_LEN]; // Executable instructions.
+  U8    guard_1[MEM_PAGE]; // PROT_NONE
+} Asm_code;
 
+// Sections are accessed and modified via lists in `Asm`.
 typedef struct {
-  Asm_page  *page;
-  Instr_list instrs; // References `.page.instrs`.
-  U8_list    consts; // References `.page.consts`.
-  U8_list    datas;  // References `.page.datas`.
-  U64_list   got;    // References `.page.got`.
+  Asm_code code;
+  U8       consts[1 << 18];             // 256 KiB; constant values.
+  U8       guard_0[MEM_PAGE];           // PROT_NONE
+  U8       data[1 << 18];               // 256 KiB; mutable values.
+  U8       guard_1[MEM_PAGE];           // PROT_NONE
+  U64      got[MEM_PAGE / sizeof(U64)]; // Global offset table.
+  U8       guard_2[MEM_PAGE];           // PROT_NONE
 } Asm_heap;
 
+// "GOT" = global offset table.
 typedef struct {
   stack_of(Word_str) names;
   Ind_dict           inds;
@@ -88,14 +90,20 @@ typedef struct {
 typedef Ind_dict Asm_locs;
 
 typedef struct {
-  Asm_heap       write; // Writable code heap.
-  Asm_heap       exec;  // Executable code heap.
-  Asm_fixup_list fixup; // Used as scratch in word compilation.
-  Asm_got        got;   // Mapping of intrin/extern symbols to GOT entries.
-  Asm_locs       locs;  // Used as scratch for "locals".
+  Asm_code      *code;            // Writable non-executable instructions.
+  Asm_heap      *heap;            // Executable code and data.
+  Instr_list     code_write;      // References `.code.instrs`.
+  Instr_list     code_exec;       // References `.heap.code.instrs`.
+  U8_list        consts;          // References `.heap.consts`.
+  U8_list        data;            // References `.heap.datas`.
+  U64_list       got;             // References `.heap.got`.
+  Asm_fixup_list fixup;           // Used as scratch in word compilation.
+  Asm_got        gots;            // Offsets of intrin/extern symbols in GOT.
+  Asm_locs       locs;            // Used as scratch for "locals".
+  Ind            valid_instr_len; // `instrs` after this often need patching.
 } Asm;
 
-// All fields are offsets from `&Asm.write.page->instrs`.
+// All fields are offsets in the instruction heaps.
 typedef struct {
   Ind prologue; // Setup instructions; some may be skipped.
   Ind begin;    // Actual start; somewhere in `[prologue,inner]`.
@@ -161,4 +169,4 @@ typedef enum : Instr {
   ASM_CODE_RECUR      = 4,
   ASM_CODE_LOAD       = 5,
   ASM_CODE_TRY        = 6,
-} Asm_code;
+} Asm_magic;

@@ -35,7 +35,7 @@ so the above might be unnecessary.
 */
 
 #include "./err.c"
-#include <sys/mman.h>
+#include <sys/types.h>
 
 static Err mprotect_jit(void *addr, Uint len) {
   return err_errno(mprotect(addr, len, PROT_READ | PROT_EXEC));

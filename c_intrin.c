@@ -204,10 +204,6 @@ static Err intrin_throws(Interp *interp) {
   return nullptr;
 }
 
-static Err err_redefine_not_defining() {
-  return err_str("unsupported use of \"redefine\" outside a colon definition");
-}
-
 static Err intrin_redefine(Interp *interp) {
   try(current_sym(interp, nullptr));
   interp->redefining = true;
@@ -497,10 +493,6 @@ static Err intrin_include_tick(Interp *interp) {
   return nullptr;
 }
 
-static Err err_extern_redefinition(const char *name) {
-  return errf("unexpected attempt to redefine extern word " FMT_QUOTED, name);
-}
-
 static Err intrin_read_extern(Interp *interp, void **out_addr) {
   try(interp_read_word(interp));
   const auto name = interp->reader->word.buf;
@@ -723,28 +715,22 @@ static Err debug_word(Interp *interp) {
   Sym *sym;
   try(interp_read_sym(interp, &sym));
 
+  const auto asm  = &interp->asm;
   const auto name = sym->name.buf;
 
   switch (sym->type) {
     case SYM_NORM: {
-      const auto exec = &sym->norm.exec;
       eprintf(
         "[debug] word:\n"
         "[debug]   name: %s\n"
         "[debug]   type: normal\n"
-        "[debug]   execution token: %p\n"
-        "[debug]   executable address: %p\n"
-        "[debug]   instructions (" FMT_SINT "): ",
+        "[debug]   execution token: %p\n",
         name,
-        sym,
-        exec->floor,
-        stack_len(exec)
+        sym
       );
-      eprint_byte_range_hex((U8 *)exec->floor, (U8 *)exec->top);
-      fputc('\n', stderr);
-
+      asm_debug_print_sym_instrs(asm, sym, "[debug]   ");
       IF_DEBUG({
-        eprintf("[debug] symbol: ");
+        eprintf("[debug]   symbol: ");
         repr_struct(sym);
       });
       return nullptr;
@@ -792,6 +778,12 @@ static Err debug_word(Interp *interp) {
 
     default: unreachable();
   }
+}
+
+static Err debug_sync_code(Interp *interp) {
+  try(asm_code_sync(&interp->asm));
+  eprintf("[debug] synced code heaps\n");
+  return nullptr;
 }
 
 // The field `.name.len` must be set separately (CBA to maintain here).
@@ -1106,6 +1098,13 @@ static constexpr Sym USED INTRIN[] = {
     .intrin.fun  = (void *)debug_word,
     .throws      = true,
     .immediate   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_sync_code",
+    .intrin.fun  = (void *)debug_sync_code,
+    .throws      = true,
     .interp_only = true,
   },
 };

@@ -1278,18 +1278,7 @@ aka underflow or overflow, triggers a segfault.
 ;
 
 (
-FIXME new plan for static memory:
-
-- Allocate one huge arena for executable code,
-  const data, readwrite data, and Forth stack.
-- Writable heap is _only_ for code. Doesn't have other sections.
-- Intersperse all sections with guards.
-- Allocate only from these regions, without using `mmap` in Forth.
-- `comp_static` adds guards between all buffers that it allocates.
-- When building the Mach-O executable:
-  - Compactify by eliding unused regions. No need to bloat the executable!
-  - Guards are automatic; just leave unmapped holes.
-  - Forth stack is also there.
+FIXME:
 - Drop "tmp" variants; really don't need them.
   - Education purposes are fine, but this confuses readers.
 - Also: interp-only words could be written in a separate sector,

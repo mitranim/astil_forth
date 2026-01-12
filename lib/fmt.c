@@ -44,6 +44,10 @@ static const char *uint32_to_bit_str(U32 num) {
   return FMT_64_BUF;
 }
 
+static void print_byte_range_hex(const U8 *beg, const U8 *end) {
+  while (beg && beg < end) printf("%0.2x", *beg++);
+}
+
 static void eprint_byte_range_hex(const U8 *beg, const U8 *end) {
   while (beg && beg < end) eprintf("%0.2x", *beg++);
 }

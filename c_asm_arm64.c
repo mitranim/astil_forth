@@ -97,107 +97,99 @@ Possible semantics combinations per word:
 
 __asm__(".include \"./c_asm_arm64.s\"");
 
-static Err asm_page_init_write(Asm_page **out) {
-  const auto ptr = mem_map(sizeof(Asm_page), 0);
-  if (ptr == MAP_FAILED) return err_mmap();
-
-  const auto page = (Asm_page *)ptr;
-  *out            = page;
-
-  constexpr auto low  = sizeof(page->guard_low);
-  constexpr auto high = offsetof(Asm_page, guard_high);
-  static_assert(high > low);
-
-  const auto beg = (U8 *)page + low;
-  const auto len = high - low;
-  return mprotect_mutable(beg, len);
-}
-
-static Err asm_page_init_exec(Asm_page **out) {
-  const auto ptr = mem_map(sizeof(Asm_page), MAP_JIT);
-  if (ptr == MAP_FAILED) return err_mmap();
-
-  const auto page = (Asm_page *)ptr;
-  *out            = page;
-
-  try(mprotect_jit(page->instrs, sizeof(page->instrs)));
-  try(mprotect_mutable(page->consts, sizeof(page->consts)));
-  try(mprotect_mutable(page->datas, sizeof(page->datas)));
-  try(mprotect_mutable(page->got, sizeof(page->got)));
-  return nullptr;
-}
-
-static Err asm_page_deinit(Asm_page *val) {
-  return !val ? nullptr : err_errno(munmap(val, sizeof(*val)));
-}
-
-static void asm_heap_init_lists(Asm_heap *heap) {
-  const auto page = heap->page;
-
-  heap->instrs.dat = page->instrs;
-  heap->instrs.len = 0;
-  heap->instrs.cap = sizeof(page->instrs);
-
-  heap->consts.dat = page->consts;
-  heap->consts.len = 0;
-  heap->consts.cap = sizeof(page->consts);
-
-  heap->datas.dat = page->datas;
-  heap->datas.len = 0;
-  heap->datas.cap = sizeof(page->datas);
-
-  heap->got.dat = page->got;
-  heap->got.len = 0;
-  heap->got.cap = sizeof(page->got);
-}
-
 // clang-format off
+
+static bool asm_code_valid(const Asm_code *val) {
+  return val && is_aligned(val) && is_aligned(&val->instrs);
+}
 
 // Sanity check used in segfault recovery.
 static bool asm_heap_valid(const Asm_heap *val) {
   return (
     val &&
     is_aligned(val) &&
-    is_aligned(&val->page) &&
-    is_aligned(&val->instrs) &&
-    is_aligned(&val->consts) &&
-    is_aligned(&val->datas) &&
-    is_aligned(&val->got) &&
-    ((U64)val->page > (U64)UINT32_MAX + 1) &&
-    list_valid((const List *)&val->instrs) &&
-    list_valid((const List *)&val->consts) &&
-    list_valid((const List *)&val->datas) &&
-    list_valid((const List *)&val->got)
+    is_aligned(&val->code) && asm_code_valid(&val->code) &&
+    is_aligned(&val->got)
+  );
+}
+
+// Sanity check used in segfault recovery.
+static bool asm_valid(const Asm *asm) {
+  return (
+    asm &&
+    is_aligned(asm) &&
+    is_aligned(&asm->code) && asm_code_valid(asm->code) &&
+    is_aligned(&asm->heap) && asm_heap_valid(asm->heap) &&
+    is_aligned(&asm->code_write) && list_valid((const List *)&asm->code_write) &&
+    is_aligned(&asm->code_exec) && list_valid((const List *)&asm->code_exec) &&
+    is_aligned(&asm->consts) && list_valid((const List *)&asm->consts) &&
+    is_aligned(&asm->data) && list_valid((const List *)&asm->data) &&
+    is_aligned(&asm->got) && list_valid((const List *)&asm->got) &&
+    is_aligned(&asm->valid_instr_len) &&
+    is_aligned(&asm->fixup) && list_valid((const List *)&asm->fixup) &&
+    is_aligned(&asm->gots) && (
+      stack_valid((const Stack *)&asm->gots.names) &&
+      dict_valid((const Dict *)&asm->gots.inds)
+    ) &&
+    is_aligned(&asm->locs) && dict_valid((const Dict *)&asm->locs)
   );
 }
 
 // clang-format on
 
-static Err asm_heap_sync(Asm *asm) {
-  const auto exec  = &asm->exec;
-  const auto write = &asm->write;
-  const auto beg   = exec->instrs.dat;
-  const auto len   = exec->instrs.cap;
+static Err asm_code_init(Asm_code **out) {
+  const auto ptr = mem_map(sizeof(Asm_code), 0);
+  if (ptr == MAP_FAILED) return err_mmap();
 
-  try(jit_before_write(beg, len));
+  const auto base = (Asm_code *)ptr;
+  *out            = base;
+  return mprotect_mutable(base->instrs, sizeof(base->instrs));
+}
 
-  /*
-  For the mutable data, the executable heap is the source of truth.
-  This allows programs to update the values before final compilation.
-  For everything else, the writable heap is the source of truth.
-  */
-  arr_copy(exec->page->instrs, write->page->instrs);
-  arr_copy(exec->page->consts, write->page->consts);
-  arr_copy(write->page->datas, exec->page->datas);
-  arr_copy(exec->page->got, write->page->got);
+static Err asm_heap_init(Asm_heap **out) {
+  const auto ptr = mem_map(sizeof(Asm_heap), MAP_JIT);
+  if (ptr == MAP_FAILED) return err_mmap();
 
-  exec->instrs.len = write->instrs.len;
-  exec->consts.len = write->consts.len;
-  exec->datas.len  = write->datas.len;
-  exec->got.len    = write->got.len;
+  const auto heap = (Asm_heap *)ptr;
+  *out            = heap;
 
-  try(jit_after_write(beg, len));
+  try(mprotect_jit(heap->code.instrs, sizeof(heap->code.instrs)));
+  try(mprotect_mutable(heap->consts, sizeof(heap->consts)));
+  try(mprotect_mutable(heap->data, sizeof(heap->data)));
+  try(mprotect_mutable(heap->got, sizeof(heap->got)));
   return nullptr;
+}
+
+static void asm_init_lists(Asm *asm) {
+  asm->code_write = (typeof(asm->code_write)){
+    .dat = asm->code->instrs,
+    .len = 0,
+    .cap = arr_cap(asm->code->instrs),
+  };
+
+  asm->code_exec = (typeof(asm->code_exec)){
+    .dat = asm->heap->code.instrs,
+    .len = 0,
+    .cap = arr_cap(asm->heap->code.instrs),
+  };
+
+  asm->consts = (typeof(asm->consts)){
+    .dat = asm->heap->consts,
+    .len = 0,
+    .cap = arr_cap(asm->heap->consts),
+  };
+
+  asm->data = (typeof(asm->data)){
+    .dat = asm->heap->data,
+    .len = 0,
+    .cap = arr_cap(asm->heap->data),
+  };
+
+  asm->got = (typeof(asm->got)){
+    .dat = asm->heap->got,
+    .len = 0,
+    .cap = arr_cap(asm->heap->got),
+  };
 }
 
 static void asm_locals_deinit(Asm_locs *locs) {
@@ -209,49 +201,70 @@ static void asm_locals_trunc(Asm_locs *locs) {
 }
 
 static Err asm_deinit(Asm *asm) {
-  list_deinit(&asm->fixup);
-  dict_deinit(&asm->got.inds);
   asm_locals_deinit(&asm->locs);
+  list_deinit(&asm->fixup);
+  dict_deinit(&asm->gots.inds);
+  Err err = stack_deinit(&asm->gots.names);
 
-  Err err = nullptr;
-  err     = either(err, asm_page_deinit(asm->write.page));
-  err     = either(err, asm_page_deinit(asm->exec.page));
-  err     = either(err, stack_deinit(&asm->got.names));
-  *asm    = (Asm){};
+  if (asm->code) {
+    err       = either(err, err_errno(munmap(asm->code, sizeof(*asm->code))));
+    asm->code = nullptr;
+  }
 
+  if (asm->heap) {
+    err       = either(err, err_errno(munmap(asm->heap, sizeof(*asm->heap))));
+    asm->heap = nullptr;
+  }
+
+  *asm = (Asm){};
   return err;
 }
 
 static Err asm_init(Asm *asm) {
-  Stack_opt opt = {.len = arr_cap(asm->write.page->got)};
-  try(stack_init(&asm->got.names, &opt));
-  try(asm_page_init_write(&asm->write.page));
-  try(asm_page_init_exec(&asm->exec.page));
-  asm_heap_init_lists(&asm->write);
-  asm_heap_init_lists(&asm->exec);
-  return asm_heap_sync(asm);
+  *asm = (Asm){};
+
+  try(asm_code_init(&asm->code));
+  try(asm_heap_init(&asm->heap));
+  asm_init_lists(asm);
+
+  Stack_opt opt = {.len = arr_cap(asm->heap->got)};
+  try(stack_init(&asm->gots.names, &opt));
+  return nullptr;
 }
 
-// clang-format off
+static Err asm_code_sync(Asm *asm) {
+  const auto valid_len = asm->valid_instr_len;
+  const auto write     = &asm->code_write;
+  const auto exec      = &asm->code_exec;
+  const auto exec_len  = exec->len;
+  const auto diff      = valid_len - exec_len;
 
-// Sanity check used in segfault recovery.
-static bool asm_valid(const Asm *asm) {
-  return (
-    asm &&
-    is_aligned(asm) &&
-    is_aligned(&asm->write) &&
-    is_aligned(&asm->exec) &&
-    is_aligned(&asm->fixup) &&
-    is_aligned(&asm->got) &&
-    asm_heap_valid(&asm->write) &&
-    asm_heap_valid(&asm->exec) &&
-    list_valid((const List *)&asm->fixup) &&
-    stack_valid((const Stack *)&asm->got.names) &&
-    dict_valid((const Dict *)&asm->got.inds)
-  );
+  if (diff <= 0) return nullptr;
+
+  const auto beg = &exec->dat[exec_len];
+  const auto end = beg + diff;
+  const auto len = (U8 *)end - (U8 *)beg;
+
+  // This alignment is only needed when `./lib/jit.c` uses `mprotect`.
+  const auto page_beg = __builtin_align_down(beg, MEM_PAGE);
+  const auto page_end = __builtin_align_up(end, MEM_PAGE);
+  const auto page_len = (U8 *)page_end - (U8 *)page_beg;
+
+  IF_DEBUG({
+    aver(page_beg >= exec->dat);
+    aver(page_end <= exec->dat + exec->cap);
+    aver(page_len > 0);
+    aver(page_beg <= beg);
+    aver(end <= page_end);
+  });
+
+  try(jit_before_write(page_beg, (Uint)page_len));
+  memcpy(beg, &write->dat[exec_len], (Uint)len);
+  try(jit_after_write(page_beg, (Uint)page_len));
+
+  exec->len = valid_len;
+  return nullptr;
 }
-
-// clang-format on
 
 /*
 Prog counter is the next instruction in `Asm.exec`.
@@ -259,19 +272,17 @@ The executable heap is outdated while assembling,
 so we have to adjust it against the writable heap.
 */
 static Instr *asm_next_prog_counter(const Asm *asm) {
-  return list_spare_ptr(&asm->exec.instrs, asm->write.instrs.len);
+  return list_spare_ptr(&asm->code_exec, asm->code_write.len);
 }
 
 static U8 *asm_next_const(const Asm *asm) {
-  return list_spare_ptr(&asm->exec.consts, asm->write.consts.len);
+  return list_next_ptr(&asm->consts);
 }
 
-static U8 *asm_next_data(const Asm *asm) {
-  return list_spare_ptr(&asm->exec.datas, asm->write.datas.len);
-}
+static U8 *asm_next_data(const Asm *asm) { return list_next_ptr(&asm->data); }
 
 static Instr *asm_next_writable_instr(const Asm *asm) {
-  return list_next_ptr(&asm->write.instrs);
+  return list_next_ptr(&asm->code_write);
 }
 
 static Err err_imm_range_signed(Sint imm, Uint wid, Sint min, Sint max) {
@@ -345,12 +356,35 @@ static Err asm_validate_reg(Sint reg) {
   return errf("invalid register value " FMT_SINT, reg);
 }
 
+static bool asm_is_sym_ready(const Asm *asm, const Sym *sym) {
+  IF_DEBUG(aver(sym->type == SYM_NORM));
+  return asm->code_exec.len >= sym->norm.spans.next;
+}
+
+static Err err_sym_not_ready(const char *name) {
+  return errf(
+    "internal error: unable to call " FMT_QUOTED
+    ": instructions are not synced up",
+    name
+  );
+}
+
+static Err asm_ensure_sym_ready(Asm *asm, const Sym *sym) {
+  if (asm_is_sym_ready(asm, sym)) return nullptr;
+  try(asm_code_sync(asm));
+  if (asm_is_sym_ready(asm, sym)) return nullptr;
+  return err_sym_not_ready(sym->name.buf);
+}
+
 // Defined in `./c_asm_arm64.s`.
 extern Err asm_call_forth(Err err, void *fun, void *interp) __asm__(
   "asm_call_forth"
 );
 
-static Err asm_call_norm(const Reader *read, const Sym *sym, void *interp) {
+static Err asm_call_norm(
+  Asm *asm, const Reader *read, const Sym *sym, void *interp
+) {
+  try(asm_ensure_sym_ready(asm, sym));
   IF_DEBUG(eprintf(
     "[system] calling word " FMT_QUOTED
     " at instruction address %p (" READ_POS_FMT ")\n",
@@ -422,7 +456,7 @@ static Err asm_call_extern_proc(Sint_stack *stack, const Sym *sym) {
 }
 
 static Instr *asm_append_instr(Asm *asm, Instr val) {
-  return list_push(&asm->write.instrs, val);
+  return list_push(&asm->code_write, val);
 }
 
 /*
@@ -722,22 +756,24 @@ static void asm_append_compare_branch_non_zero(Asm *asm, U8 reg, Sint off) {
 
 static const Instr *asm_sym_epilogue_writable(const Asm *asm, const Sym *sym) {
   aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&asm->write.instrs, sym->norm.spans.epilogue);
+  return list_elem_ptr(&asm->code_write, sym->norm.spans.epilogue);
 }
 
 static const Instr *asm_sym_epilogue_executable(const Asm *asm, const Sym *sym) {
   aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&asm->exec.instrs, sym->norm.spans.epilogue);
+  return list_elem_ptr(&asm->code_exec, sym->norm.spans.epilogue);
 }
 
 static Instr *asm_sym_begin_writable(const Asm *asm, const Sym *sym) {
   aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&asm->write.instrs, sym->norm.spans.begin);
+  return list_elem_ptr(&asm->code_write, sym->norm.spans.begin);
 }
 
 static Instr *asm_sym_begin_executable(const Asm *asm, const Sym *sym) {
   aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&asm->exec.instrs, sym->norm.spans.begin);
+  const auto list = &asm->code_exec;
+  aver(sym->norm.spans.begin < list->cap);
+  return &list->dat[sym->norm.spans.begin];
 }
 
 /*
@@ -789,12 +825,12 @@ static void asm_fixup_recur(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
 static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
   aver(fixup->type == ASM_FIXUP_LOAD);
 
-  const auto write = &asm->write;
+  const auto write = &asm->code_write;
   const auto load  = &fixup->load;
   const auto pci   = load->instr;
   const auto imm   = load->imm;
   const auto imm32 = (U32)imm;
-  const auto top   = list_next_ptr(&write->instrs);
+  const auto top   = list_next_ptr(write);
 
   IF_DEBUG(aver(*pci == asm_instr_breakpoint(ASM_CODE_LOAD)));
 
@@ -805,7 +841,7 @@ static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
   }
   else {
     opc = 0b01; // ldr <Xt>, <off>
-    list_push_raw_val(&write->instrs, imm);
+    list_push_raw_val(write, imm);
   }
 
   Instr imm19;
@@ -904,6 +940,7 @@ static Err err_inline_has_data(const Sym *sym) {
   );
 }
 
+// SYNC[sym_inlinable].
 static Err err_sym_not_inlinable(const Sym *sym) {
   if (sym->type != SYM_NORM) return err_inline_not_norm(sym);
   if (sym->norm.has_loads) return err_inline_pc_rel(sym);
@@ -918,9 +955,14 @@ static Err err_sym_not_inlinable(const Sym *sym) {
   return nullptr;
 }
 
-// A bit wasteful.
+// SYNC[sym_inlinable].
 static bool asm_sym_can_inline(const Sym *sym) {
-  return !err_sym_not_inlinable(sym);
+  if (sym->type != SYM_NORM) return false;
+  if (sym->norm.has_loads) return false;
+  if (sym->norm.has_rets) return false;
+  if (!is_sym_leaf(sym)) return false;
+  const auto spans = &sym->norm.spans;
+  return !(spans->data < spans->next);
 }
 
 static void asm_sym_auto_inlinable(Sym *sym) {
@@ -1005,6 +1047,11 @@ static bool asm_appended_local_push(Asm *asm, const char *name) {
   return true;
 }
 
+static void asm_reset_scratch(Asm *asm) {
+  asm_locals_trunc(&asm->locs);
+  asm->fixup.len = 0;
+}
+
 /*
 In the prologue, we may need to create a frame record, and/or adjust the SP
 to reserve space for locals. Since the locals aren't known upfront, and the
@@ -1021,7 +1068,7 @@ static void asm_reserve_sym_prologue(Asm *asm) {
 
 // SYNC[asm_prologue].
 static void asm_fixup_sym_prologue(Asm *asm, Sym *sym, Ind *instr_floor) {
-  const auto instrs = &asm->write.instrs;
+  const auto instrs = &asm->code_write;
   const auto sp_off = asm_locals_sp_off(&asm->locs);
   const auto leaf   = is_sym_leaf(sym);
   const auto spans  = &sym->norm.spans;
@@ -1067,10 +1114,9 @@ static void asm_append_sym_epilogue(Asm *asm, Sym *sym) {
 }
 
 static void asm_sym_beg(Asm *asm, Sym *sym) {
-  asm_locals_trunc(&asm->locs);
-  asm->fixup.len = 0;
+  asm_reset_scratch(asm);
 
-  const auto instrs = &asm->write.instrs;
+  const auto instrs = &asm->code_write;
   const auto spans  = &sym->norm.spans;
 
   spans->prologue = instrs->len;
@@ -1083,31 +1129,31 @@ static constexpr Instr
   ASM_INSTR_RET = 0b110'101'1'0'0'10'11111'0000'0'0'11110'00000;
 
 static Err asm_sym_end(Asm *asm, Sym *sym) {
-  const auto write = &asm->write;
-  const auto exec  = &asm->exec;
+  const auto write = &asm->code_write;
   const auto spans = &sym->norm.spans;
 
   asm_fixup_sym_prologue(asm, sym, &spans->begin);
-  spans->epilogue = write->instrs.len;
+  spans->epilogue = write->len;
   asm_append_sym_epilogue(asm, sym);
-  spans->ret = write->instrs.len;
+  spans->ret = write->len;
   asm_append_instr(asm, ASM_INSTR_RET);
-  spans->data = write->instrs.len;
+  spans->data = write->len;
   asm_fixup(asm, sym);
-  spans->next = write->instrs.len;
+  spans->next = write->len;
 
   // Execution never reaches this. Makes it easier to tell words apart.
   if (DEBUG) asm_append_breakpoint(asm, ASM_CODE_PROC_DELIM);
 
-  try(asm_heap_sync(asm));
+  asm->valid_instr_len = write->len;
 
   sym->norm.exec = (Instr_span){
     .floor = asm_sym_begin_executable(asm, sym),
-    .ceil  = list_next_ptr(&exec->instrs),
-    .top   = list_next_ptr(&exec->instrs),
+    .ceil  = asm_next_prog_counter(asm),
+    .top   = asm_next_prog_counter(asm),
   };
 
   asm_sym_auto_inlinable(sym);
+  asm_reset_scratch(asm);
   return nullptr;
 }
 
@@ -1149,7 +1195,44 @@ which words are being called.
 */
 
 static bool asm_is_instr_ours(const Asm *asm, const Instr *addr) {
-  return is_list_elem(&asm->exec.instrs, addr);
+  return is_list_elem(&asm->code_exec, addr);
+}
+
+static void asm_debug_print_sym_instrs(
+  const Asm *asm, const Sym *sym, const char *prefix
+) {
+  const auto write     = &asm->code_write;
+  const auto spans     = &sym->norm.spans;
+  const auto write_beg = &write->dat[spans->begin];
+  const auto write_end = &write->dat[spans->next];
+
+  eprintf(
+    "%swritable code address: %p\n"
+    "%sinstructions in writable code heap (" FMT_SINT "):\n",
+    prefix,
+    write_beg,
+    prefix,
+    write_end - write_beg
+  );
+  fputs(prefix, stderr);
+  eprint_byte_range_hex((U8 *)write_beg, (U8 *)write_end);
+  fputc('\n', stderr);
+
+  const auto exec     = &sym->norm.exec;
+  const auto exec_beg = exec->floor;
+  const auto exec_end = exec->top;
+
+  eprintf(
+    "%sexecutable code address: %p\n"
+    "%sinstructions in executable code heap (" FMT_SINT "):\n",
+    prefix,
+    exec_beg,
+    prefix,
+    exec_end - exec_beg
+  );
+  fputs(prefix, stderr);
+  eprint_byte_range_hex((U8 *)exec_beg, (U8 *)exec_end);
+  fputc('\n', stderr);
 }
 
 static void asm_append_mov_reg_to_reg(Asm *asm, U8 tar_reg, U8 src_reg) {
@@ -1307,13 +1390,13 @@ The provided address should be used only in interpretation. When we implement
 AOT compilation, GOT addresses should be pre-zeroed and patched by the linker.
 */
 static Ind asm_register_dysym(Asm *asm, const char *name, U64 addr) {
-  const auto names   = &asm->got.names;
-  const auto inds    = &asm->got.inds;
+  const auto names   = &asm->gots.names;
+  const auto inds    = &asm->gots.inds;
   const auto val_ind = dict_ind(inds, name);
 
   if (ind_valid(val_ind)) return inds->vals[val_ind];
 
-  const auto got     = &asm->write.got;
+  const auto got     = &asm->got;
   const auto got_ind = got->len;
 
   list_push(got, addr);
@@ -1327,13 +1410,13 @@ static Ind asm_register_dysym(Asm *asm, const char *name, U64 addr) {
 }
 
 static void asm_append_dysym_load(Asm *asm, const char *name, U8 reg) {
-  const auto inds = &asm->got.inds;
+  const auto inds = &asm->gots.inds;
   aver(dict_has(inds, name));
 
-  const auto got_ind = dict_get(&asm->got.inds, name);
+  const auto got_ind = dict_get(&asm->gots.inds, name);
   aver(ind_valid(got_ind));
 
-  const auto got_addr = asm->exec.page->got + got_ind;
+  const auto got_addr = asm->heap->got + got_ind;
   const auto pageoff  = asm_append_adrp(asm, reg, (Uint)got_addr);
   asm_append_load_scaled_offset(asm, reg, reg, pageoff);
 }
@@ -1405,7 +1488,7 @@ static Err err_out_of_space_const() {
 }
 
 static Err asm_alloc_const_append_load(Asm *asm, U8 const *src, Uint len, U8 reg) {
-  const auto tar = &asm->write.consts;
+  const auto tar = &asm->consts;
   if (len > list_rem_bytes(tar)) return err_out_of_space_const();
 
   const auto addr = asm_next_const(asm);
@@ -1421,7 +1504,7 @@ static Err err_out_of_space_data() {
 }
 
 static Err asm_alloc_data_append_load(Asm *asm, Uint len, U8 reg, U8 **out_addr) {
-  const auto tar = &asm->write.datas;
+  const auto tar = &asm->data;
   if (len > list_rem_bytes(tar)) return err_out_of_space_data();
 
   const auto addr = asm_next_data(asm);
@@ -1441,7 +1524,7 @@ static Err asm_inline_sym(Asm *asm, const Sym *sym) {
   try(err_sym_not_inlinable(sym));
 
   const auto spans  = &sym->norm.spans;
-  const auto instrs = &asm->write.instrs;
+  const auto instrs = &asm->code_write;
   const auto floor  = spans->inner;
   const auto ceil   = spans->ret;
 
