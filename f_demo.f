@@ -1,4 +1,4 @@
-include" ./f_init.f"
+include" ./f_lang.f"
 
 str" hello world! (top level)" type cr
 

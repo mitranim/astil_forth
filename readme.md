@@ -22,14 +22,14 @@ This is possible because of direct access to compilation. Outside the Forth worl
 
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR.
 
-Basic language features are implemented in `f_init.f`, "bootstrapping" core words via inline assembly.
+Basic language features are implemented in `f_lang.f`, "bootstrapping" core words via inline assembly.
 
 ## Usage
 
 ```sh
 make
-./forth.exe f_init.f -            # REPL mode.
-./forth.exe f_init.f f_demo.f     # One-shot run.
+./forth.exe f_lang.f -            # REPL mode.
+./forth.exe f_lang.f f_demo.f     # One-shot run.
 ```
 
 Rebuild continuously while hacking:

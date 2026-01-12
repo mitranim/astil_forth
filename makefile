@@ -54,7 +54,7 @@ run:
 
 # Usage example:
 #
-#   make run_w args='f_init.f f_test.f -'
+#   make run_w args='f_lang.f f_test.f -'
 .PHONY: run_w
 run_w:
 	$(WATCH_IMM) -- $(MAKE) run

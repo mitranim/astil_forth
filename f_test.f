@@ -1,4 +1,4 @@
-include" ./f_init.f"
+include" ./f_lang.f"
 include" ./f_testing.f"
 
 : test_conditionals
