@@ -131,7 +131,6 @@ static Err intrin_semicolon(Interp *interp) {
   */
   IF_DEBUG({
     const auto exec = &sym->norm.exec;
-
     eprintf(
       "[system] compiled symbol " FMT_QUOTED
       " with executable address %p; instructions (" FMT_SINT "): ",
@@ -390,12 +389,19 @@ static Err intrin_quit(Interp *interp) {
 }
 
 static Err intrin_ret(Interp *interp) {
-  asm_append_ret(&interp->asm);
-
   Sym *sym;
   try(current_sym(interp, &sym));
   sym->norm.has_rets = true;
+  asm_append_ret(&interp->asm);
+  return nullptr;
+}
 
+static Err intrin_recur(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  set_add(&sym->callees, sym);
+  set_add(&sym->callers, sym);
+  asm_append_recur(&interp->asm);
   return nullptr;
 }
 
@@ -480,6 +486,14 @@ static Err intrin_include_quote(Interp *interp) {
   try(read_skip_whitespace(read));
   try(read_until(read, '"'));
   try(interp_include(interp, (const char *)read->buf.buf));
+  return nullptr;
+}
+
+static Err intrin_include_tick(Interp *interp) {
+  const auto read = interp->reader;
+  try(read_skip_whitespace(read));
+  try(read_word(read));
+  try(interp_include(interp, (const char *)read->word.buf));
   return nullptr;
 }
 
@@ -607,6 +621,12 @@ static Err intrin_execute(Interp *interp) {
   return interp_call_sym(interp, sym);
 }
 
+/*
+Allocates a slot on the system stack for a local variable.
+Does not append any instructions; the caller is expected
+to follow this up with `intrin_comp_local_pop` and / or
+`intrin_comp_local_push`.
+*/
 static Err intrin_comp_local_ind(Interp *interp) {
   const U8 *buf;
   Ind       len;
@@ -616,6 +636,7 @@ static Err intrin_comp_local_ind(Interp *interp) {
   return nullptr;
 }
 
+// Appends instructions for moving a value from the Forth stack to the local.
 static Err intrin_comp_local_pop(Interp *interp) {
   Sint ind;
   try(int_stack_pop(&interp->ints, &ind));
@@ -623,7 +644,14 @@ static Err intrin_comp_local_pop(Interp *interp) {
   return nullptr;
 }
 
-// TODO figure out how to get a hold of stream pointers in Forth.
+// Appends instructions for copying a value from the local to the Forth stack.
+static Err intrin_comp_local_push(Interp *interp) {
+  Sint ind;
+  try(int_stack_pop(&interp->ints, &ind));
+  try(asm_append_local_push(&interp->asm, ind));
+  return nullptr;
+}
+
 static void debug_flush(void *) {
   fflush(stdout);
   fflush(stderr);
@@ -704,9 +732,11 @@ static Err debug_word(Interp *interp) {
         "[debug] word:\n"
         "[debug]   name: %s\n"
         "[debug]   type: normal\n"
-        "[debug]   address: %p\n"
+        "[debug]   execution token: %p\n"
+        "[debug]   executable address: %p\n"
         "[debug]   instructions (" FMT_SINT "): ",
         name,
+        sym,
         exec->floor,
         stack_len(exec)
       );
@@ -725,8 +755,10 @@ static Err debug_word(Interp *interp) {
         "[debug] word:\n"
         "[debug]   name: %s\n"
         "[debug]   type: intrinsic\n"
+        "[debug]   execution token: %p\n"
         "[debug]   address: %p\n",
         name,
+        sym,
         sym->intrin.fun
       );
       return nullptr;
@@ -737,8 +769,10 @@ static Err debug_word(Interp *interp) {
         "[debug] word:\n"
         "[debug]   name: %s\n"
         "[debug]   type: external symbol\n"
+        "[debug]   execution token: %p\n"
         "[debug]   address: %p\n",
         name,
+        sym,
         sym->ext_ptr.addr
       );
       return nullptr;
@@ -900,6 +934,16 @@ static constexpr Sym USED INTRIN[] = {
     .type        = SYM_INTRIN,
     .name.buf    = "#ret",
     .intrin.fun  = (void *)intrin_ret,
+    .throws      = true,
+    .immediate   = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "#recur",
+    .intrin.fun  = (void *)intrin_recur,
+    .throws      = true,
     .immediate   = true,
     .comp_only   = true,
     .interp_only = true,
@@ -936,6 +980,13 @@ static constexpr Sym USED INTRIN[] = {
     .type        = SYM_INTRIN,
     .name.buf    = "include\"",
     .intrin.fun  = (void *)intrin_include_quote,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "include'",
+    .intrin.fun  = (void *)intrin_include_tick,
     .throws      = true,
     .interp_only = true,
   },
@@ -993,6 +1044,14 @@ static constexpr Sym USED INTRIN[] = {
   },
   (Sym){
     .type        = SYM_INTRIN,
+    .name.buf    = "comp_local_push",
+    .intrin.fun  = (void *)intrin_comp_local_push,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
     .name.buf    = "debug_flush",
     .intrin.fun  = (void *)debug_flush,
     .interp_only = true,
@@ -1043,7 +1102,7 @@ static constexpr Sym USED INTRIN[] = {
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = "#debug'",
+    .name.buf    = "debug'",
     .intrin.fun  = (void *)debug_word,
     .throws      = true,
     .immediate   = true,

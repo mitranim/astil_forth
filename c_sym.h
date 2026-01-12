@@ -43,12 +43,12 @@ typedef struct Sym {
     } ext_proc;
   };
 
-  Sym_set callees;         // Dependencies.
-  Sym_set callers;         // Dependents.
-  bool    throws      : 1; // Requires error handling.
-  bool    immediate   : 1; // Interpret immediately even in compilation mode.
-  bool    comp_only   : 1; // Can only be used between `:` and `;`.
-  bool    interp_only : 1; // Forbidden in final executables.
+  Sym_set callees;     // Dependencies.
+  Sym_set callers;     // Dependents.
+  bool    throws;      // Requires error handling.
+  bool    immediate;   // Interpret immediately even in compilation mode.
+  bool    comp_only;   // Can only be used between `:` and `;`.
+  bool    interp_only; // Forbidden in final executables.
 } Sym;
 
 typedef stack_of(Sym)  Sym_stack;

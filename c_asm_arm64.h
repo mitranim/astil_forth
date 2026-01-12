@@ -29,19 +29,22 @@ and rewrite them when finalizing a word.
 Procedure prologue also implicitly undergoes fixup.
 */
 typedef struct {
-  enum { ASM_FIXUP_RET = 1, ASM_FIXUP_TRY = 2, ASM_FIXUP_LOAD = 3 } type;
+  enum {
+    ASM_FIXUP_RET   = 1,
+    ASM_FIXUP_TRY   = 2,
+    ASM_FIXUP_RECUR = 3,
+    ASM_FIXUP_LOAD  = 4
+  } type;
 
-  struct {
-    Instr *instr; // b <epilogue>
-  } ret;
+  Instr *ret;   // b <epilogue>
+  Instr *try;   // cbnz <epilogue>
+  Instr *recur; // b <begin>
 
   struct {
     Instr *instr; // Instruction to patch.
     Uint   imm;   // Immediate value to load.
     U8     reg;   // Register to load into.
   } load;
-
-  Instr *try; // Instruction to patch.
 } Asm_fixup;
 
 typedef list_of(Asm_fixup) Asm_fixup_list;
@@ -155,6 +158,7 @@ typedef enum : Instr {
   ASM_CODE_PROC_DELIM = 1,
   ASM_CODE_PROLOGUE   = 2,
   ASM_CODE_RET_EPI    = 3,
-  ASM_CODE_LOAD       = 4,
-  ASM_CODE_TRY        = 5,
+  ASM_CODE_RECUR      = 4,
+  ASM_CODE_LOAD       = 5,
+  ASM_CODE_TRY        = 6,
 } Asm_code;

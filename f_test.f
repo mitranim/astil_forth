@@ -15,7 +15,7 @@ test_conditionals
 
 1 0 extern: sleep
 
-: sleep_loop #begin #." sleeping" cr 1 sleep #again ;
+: sleep_loop #begin log" sleeping" cr 1 sleep #again ;
 : test_again sleep_loop ;
 \ test_again
 
@@ -194,31 +194,31 @@ T{ -123  234 max <T>  234 }T
 T{  234 -123 max <T>  234 }T
 
 : test_varargs
-  #c" numbers (should be 10 20 30): %zd %zd %zd"
+  c" numbers (should be 10 20 30): %zd %zd %zd"
   10 20 30 [ 3 va- ] debug_stack printf [ -va ] cr
 ;
 
-: test_#f"
-  10 20 30 [ 3 ] #f" numbers: %zu %zu %zu" cr
+: test_fmt
+  10 20 30 [ 3 ] f" numbers: %zu %zu %zu" cr
 ;
 
-: test_#ef"
-  10 20 30 [ 3 ] #ef" numbers: %zu %zu %zu" cr
+: test_efmt
+  10 20 30 [ 3 ] ef" numbers: %zu %zu %zu" cr
 ;
 
 4096 buf_tmp: STR_BUF
 
-: test_#sf"
-  STR_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu"
+: test_str_fmt
+  STR_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu"
   STR_BUF drop puts
 ;
 
 : test_sthrowf
-  STR_BUF 10 20 30 [ 3 ] #sthrowf" codes: %zu %zu %zu"
+  STR_BUF 10 20 30 [ 3 ] sthrowf" codes: %zu %zu %zu"
 ;
 
 : test_throwf
-  10 20 30 [ 3 ] #throwf" codes: %zu %zu %zu"
+  10 20 30 [ 3 ] throwf" codes: %zu %zu %zu"
 ;
 
 : test_to
@@ -272,3 +272,11 @@ test_to
   T{ 10 20 30 { -- one two three }               <T> 10 20 30 }T
 ;
 test_locals
+
+: test_recursion ( val -- )
+  dup 13 <= #if #ret #end
+  dec #recur
+;
+T{ 123 test_recursion <T> 13 }T
+
+str" [test] ok" type cr

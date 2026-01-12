@@ -14,22 +14,22 @@ Currently only the Arm64 CPU architecture is supported.
 : abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;
 : unreachable abort ;
 
-: ASM_COND_EQ 0b0000 ;
-: ASM_COND_NE 0b0001 ;
-: ASM_COND_CS 0b0010 ;
-: ASM_COND_CC 0b0011 ;
-: ASM_COND_MI 0b0100 ;
-: ASM_COND_PL 0b0101 ;
-: ASM_COND_VS 0b0110 ;
-: ASM_COND_VC 0b0111 ;
-: ASM_COND_HI 0b1000 ;
-: ASM_COND_LS 0b1001 ;
-: ASM_COND_GE 0b1010 ;
-: ASM_COND_LT 0b1011 ;
-: ASM_COND_GT 0b1100 ;
-: ASM_COND_LE 0b1101 ;
-: ASM_COND_AL 0b1110 ;
-: ASM_COND_NV 0b1111 ;
+: ASM_EQ 0b0000 ;
+: ASM_NE 0b0001 ;
+: ASM_CS 0b0010 ;
+: ASM_CC 0b0011 ;
+: ASM_MI 0b0100 ;
+: ASM_PL 0b0101 ;
+: ASM_VS 0b0110 ;
+: ASM_VC 0b0111 ;
+: ASM_HI 0b1000 ;
+: ASM_LS 0b1001 ;
+: ASM_GE 0b1010 ;
+: ASM_LT 0b1011 ;
+: ASM_GT 0b1100 ;
+: ASM_LE 0b1101 ;
+: ASM_AL 0b1110 ;
+: ASM_NV 0b1111 ;
 
 : asm_pop_x1_x2
   \ ldp x1, x2, [x27, -16]!
@@ -87,13 +87,6 @@ Currently only the Arm64 CPU architecture is supported.
   asm_push_x1                                comp_instr \ str x1, [x27], 8
 ] ;
 
-\ cmp Xn, 0
-: asm_cmp_zero ( Xn -- instr )
-  5 lsl
-  0b1_1_1_100010_0_000000000000_00000_11111
-  or
-;
-
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
 : inc ( i1 -- i2 ) [
   asm_pop_x1                                comp_instr \ ldr x1, [x27, -8]!
@@ -116,6 +109,19 @@ Currently only the Arm64 CPU architecture is supported.
 : low_bits ( bit_len -- bits ) 1 swap lsl dec ;
 : bit_trunc ( imm bit_len -- imm ) low_bits and ;
 
+\ cmp Xn, 0
+: asm_cmp_zero ( Xn -- instr )
+  5 lsl
+  0b1_1_1_100010_0_000000000000_00000_11111
+  or
+;
+
+: asm_cmp_imm ( Xn imm -- instr )
+       10 lsl    \ imm
+  swap 5  lsl or \ Xn
+  0b1_1_1_100010_0_000000000000_00000_11111 or
+;
+
 \ cset Xd, <cond>
 : asm_cset ( Xd cond -- )
   0b1_0_0_11010100_11111_0000_0_1_11111_00000
@@ -124,17 +130,17 @@ Currently only the Arm64 CPU architecture is supported.
 ;
 
 : <>0 ( int -- bool ) [
-                asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-              1 asm_cmp_zero comp_instr \ cmp x1, 0
-  1 ASM_COND_NE asm_cset     comp_instr \ cset x1, ne
-                asm_push_x1  comp_instr \ str x1, [x27], 8
+           asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+         1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 ASM_NE asm_cset     comp_instr \ cset x1, ne
+           asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 : =0 ( int -- bool ) [
-                asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-              1 asm_cmp_zero comp_instr \ cmp x1, 0
-  1 ASM_COND_EQ asm_cset     comp_instr \ cset x1, eq
-                asm_push_x1  comp_instr \ str x1, [x27], 8
+           asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+         1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 ASM_EQ asm_cset     comp_instr \ cset x1, eq
+           asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 \ Shared by a lot of load and store instructions. 64-bit only.
@@ -365,6 +371,13 @@ Assumes `lsl` is already part of the base instruction.
   0b1_0_0_11010110_00000_0010_10_00000_00000 or
 ;
 
+\ Arithmetic (sign-preserving) right shift.
+: asr ( i1 bits -- i2 ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 asm_asr_reg   comp_instr \ asr x1, x1, x2
+        asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
 \ eor Xd, Xn, Xm
 : asm_eor_reg ( Xd Xn Xm -- instr )
   asm_pattern_arith_reg
@@ -393,6 +406,13 @@ Assumes `lsl` is already part of the base instruction.
   0b0_00_101_00000000000000000000000000 or
 ;
 
+\ b.cond <off>
+: asm_branch_cond ( cond off -- instr )
+  2 asr 19 bit_trunc 5 lsl \ `off`; implicitly times 4.
+  or                       \ cond
+  0b010_101_00_0000000000000000000_0_0000 or
+;
+
 : asm_pattern_compare_branch ( imm19 Xt base_instr -- instr )
   or           \ Xt
   swap
@@ -414,13 +434,6 @@ Assumes `lsl` is already part of the base instruction.
   asm_pattern_compare_branch
 ;
 
-\ Arithmetic (sign-preserving) right shift.
-: asr ( i1 bits -- i2 ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 1 2 asm_asr_reg   comp_instr \ asr x1, x1, x2
-        asm_push_x1   comp_instr \ str x1, [x27], 8
-] ;
-
 \ Same as `0 pick`.
 : dup ( i1 -- i1 i1 ) [
   1 27 -8 asm_load_off comp_instr \ ldur x1, [x27, -8]
@@ -436,10 +449,21 @@ Assumes `lsl` is already part of the base instruction.
               or \ Xd
 ;
 
+\ Immediate must be unsigned.
+: asm_mov_imm ( Xd imm -- instr )
+  0b1_10_100101_00_0000000000000000_00000
+  swap 5 lsl or \ imm
+             or \ Xd
+;
+
+\ `ret x30`; requires caution with SP / FP.
+: asm_ret 0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 ;
+
 \ svc 666
 : asm_svc 0b110_101_00_000_0000001010011010_000_01 ;
 
-: ASM_PLACEHOLDER 666 ; \ Instruction `udf 666` used for retropatching.
+\ Instruction `udf 666` used for retropatching.
+: ASM_PLACEHOLDER 666 ;
 
 \ Non-immediate replacement for `literal`.
 : comp_push ( C: num -- ) ( E: -- num )
@@ -447,8 +471,8 @@ Assumes `lsl` is already part of the base instruction.
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
-: next_word ( -- word_ptr ) parse_word find_word ;
-: '         ( -- word_ptr ) next_word  comp_push ;
+: next_word ( "name" -- exec_tok ) parse_word find_word ;
+: '         ( "name" -- exec_tok ) next_word  comp_push ;
 : inline'   next_word inline_word ;
 : postpone' next_word comp_call ;
 : compile'  next_word comp_push ' comp_call comp_call ;
@@ -611,24 +635,24 @@ Assumes `lsl` is already part of the base instruction.
 ] ;
 
 : abs ( ±int -- +int ) [
-                    asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-                  1 asm_cmp_zero comp_instr \ cmp x1, 0
-  1 1 1 ASM_COND_PL asm_csneg    comp_instr \ cneg x1, x1, mi
-                    asm_push_x1  comp_instr \ str x1, [x27], 8
+               asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+             1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 1 1 ASM_PL asm_csneg    comp_instr \ cneg x1, x1, mi
+               asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 : min ( i1 i2 -- i1|i2 ) [
-                    asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-                2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
-  1 1 2 ASM_COND_LT asm_csel      comp_instr \ csel x1, x1, x2, lt
-                    asm_push_x1   comp_instr \ str x1, [x27], 8
+               asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+           2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+  1 1 2 ASM_LT asm_csel      comp_instr \ csel x1, x1, x2, lt
+               asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
 : max ( i1 i2 -- i1|i2 ) [
-                    asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-                2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
-  1 1 2 ASM_COND_GT asm_csel      comp_instr \ csel x1, x1, x2, gt
-                    asm_push_x1   comp_instr \ str x1, [x27], 8
+               asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+           2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+  1 1 2 ASM_GT asm_csel      comp_instr \ csel x1, x1, x2, gt
+               asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
 : asm_comp_cmp_cond ( cond -- )
@@ -646,16 +670,16 @@ Assumes `lsl` is already part of the base instruction.
 ;
 
 \ https://gforth.org/manual/Numeric-comparison.html
-: =   ( i1 i2 -- bool ) [ ASM_COND_EQ asm_comp_cmp_cond ] ;
-: <>  ( i1 i2 -- bool ) [ ASM_COND_NE asm_comp_cmp_cond ] ;
-: >   ( i1 i2 -- bool ) [ ASM_COND_GT asm_comp_cmp_cond ] ;
-: <   ( i1 i2 -- bool ) [ ASM_COND_LT asm_comp_cmp_cond ] ;
-: <=  ( i1 i2 -- bool ) [ ASM_COND_LE asm_comp_cmp_cond ] ;
-: >=  ( i1 i2 -- bool ) [ ASM_COND_GE asm_comp_cmp_cond ] ;
-: <0  ( num   -- bool ) [ ASM_COND_LT asm_comp_cmp_zero ] ; \ Or `MI`.
-: >0  ( num   -- bool ) [ ASM_COND_GT asm_comp_cmp_zero ] ;
-: <=0 ( num   -- bool ) [ ASM_COND_LE asm_comp_cmp_zero ] ;
-: >=0 ( num   -- bool ) [ ASM_COND_GE asm_comp_cmp_zero ] ; \ Or `PL`.
+: =   ( i1 i2 -- bool ) [ ASM_EQ asm_comp_cmp_cond ] ;
+: <>  ( i1 i2 -- bool ) [ ASM_NE asm_comp_cmp_cond ] ;
+: >   ( i1 i2 -- bool ) [ ASM_GT asm_comp_cmp_cond ] ;
+: <   ( i1 i2 -- bool ) [ ASM_LT asm_comp_cmp_cond ] ;
+: <=  ( i1 i2 -- bool ) [ ASM_LE asm_comp_cmp_cond ] ;
+: >=  ( i1 i2 -- bool ) [ ASM_GE asm_comp_cmp_cond ] ;
+: <0  ( num   -- bool ) [ ASM_LT asm_comp_cmp_zero ] ; \ Or `MI`.
+: >0  ( num   -- bool ) [ ASM_GT asm_comp_cmp_zero ] ;
+: <=0 ( num   -- bool ) [ ASM_LE asm_comp_cmp_zero ] ;
+: >=0 ( num   -- bool ) [ ASM_GE asm_comp_cmp_zero ] ; \ Or `PL`.
 
 : odd ( i1 -- bool ) 1 and ;
 
@@ -720,7 +744,7 @@ this is considered a "bad instruction" and blows up.
         asm_push_x1       comp_instr \ str x1, [x27], 8
 ] ;
 
-: #char' parse_word head_char comp_push ;
+: char' parse_word head_char comp_push ;
 
 (
 Conditionals work like this:
@@ -822,27 +846,41 @@ Does NOT discard them when done. There's no magic `i`.
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
 
-\ Renamed from standard `s"`.
-: " ( -- cstr len ) #char' " parse ;
+\ Same as standard `s"` in interpretation mode.
+\ The parser ensures a trailing null byte.
+\ All our strings are zero-terminated.
+: parse_str ( -- cstr len ) char' " parse ;
+: parse_cstr ( -- cstr ) parse_str drop ;
 
-\ Same as compile-time semantics of `s"` in standard Forth.
-: #"
-  " tuck                    ( len str len )
+\ Same as standard `s"` in interpretation mode.
+\ For top-level code in scripts.
+\ Inside words, use `"`.
+: str" ( -- cstr len ) parse_str ;
+
+: comp_str ( C: <str> -- ) ( E: -- cstr len )
+  parse_str tuck            ( len str len )
   inc                       \ Reserve 1 more for null byte.
   1              comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   2 swap         comp_load  \ ldr x2, <len>
   asm_push_x1_x2 comp_instr \ stp x1, x2, [x27], 16
 ;
 
-\ Short for "C string". The parser ensures a trailing null byte.
-: c" ( -- cstr ) " drop ;
+\ Same as standard `s"` in compilation mode.
+\ Words ending with a quote are automatically immediate.
+: " comp_str ;
 
-\ Like `#"` but doesn't load length so we don't have to drop it.
-: #c"
-  " inc                  \ Reserve 1 more for null byte.
+\ For top-level code in scripts.
+: cstr" ( C: <str> -- ) ( E: -- cstr ) parse_str drop ;
+
+: comp_cstr ( C: <str> -- ) ( E: -- cstr )
+  parse_str   inc        \ Reserve 1 more for null byte.
   1           comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1 comp_instr \ stp x1, x2, [x27], 16
 ;
+
+\ For use inside words.
+\ Words ending with a quote are automatically immediate.
+: c" comp_cstr ;
 
 (
 The program is implicitly linked with `libc`.
@@ -898,10 +936,8 @@ extern_ptr: __stderrp
 : ecr 10 putchar ;
 : space 32 putchar ;
 
-: ." " type ;
-: e" " etype ;
-: #." postpone' #c" compile' puts ;
-: #e" postpone' #c" compile' eputs ;
+: log" comp_cstr compile' puts ;
+: elog" comp_cstr compile' eputs ;
 
 \ Core primitive for locals.
 : to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
@@ -928,12 +964,12 @@ like in Gforth and VfxForth. Types are not supported.
   #begin
     parse_word to: len to: str
 
-    #" }" str len str= #if
+    " }" str len str= #if
       ind_min ind_max }
       #ret
     #end
 
-    #" --" str len str<> #while
+    " --" str len str<> #while
 
     str len comp_local_ind
     dup ind_min min to: ind_min
@@ -943,11 +979,30 @@ like in Gforth and VfxForth. Types are not supported.
   \ After `--`: skip all words which aren't `}`.
   #begin
     parse_word
-    #" }" str<>
+    " }" str<>
   #until
 
   ind_min ind_max }
 ;
+
+\ For compiling words which modify a local by applying the given function.
+: mut_local ( C: fun "name" -- ) ( E: -- )
+  parse_word
+  comp_local_ind dup
+  comp_local_push
+  swap comp_call
+  comp_local_pop
+;
+
+\ For compiling words which modify a local by applying the given function.
+: mut_local' ( C: "name" fun -- ) ( E: -- )
+  postpone' '
+  compile' mut_local
+;
+
+\ Usage: `++: some_local`.
+: ++: ( C: "name" -- ) ( E: -- ) mut_local' inc ;
+: --: ( C: "name" -- ) ( E: -- ) mut_local' dec ;
 
 : align_down ( size width -- size ) negate and ;
 : align_up   { size width -- size } width dec size + width align_down ;
@@ -1026,24 +1081,24 @@ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
 Format-prints to stdout using `printf`. `N` is the variadic arg count,
 which must be available at compile time. Usage example:
 
-  10 20 30 [ 3 ] #f" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] f" numbers: %zu %zu %zu" cr
 )
-: #f" ( C: N -- ) ( E: i1 … iN -- )
-  va- postpone' #c" compile' printf -va
+: f" ( C: N -- ) ( E: i1 … iN -- )
+  va- postpone' c" compile' printf -va
 ;
 
 \ Format-prints to stderr.
-: #ef" ( C: N -- ) ( E: i1 … iN -- )
-  va- compile' stderr postpone' #c" compile' fprintf -va
+: ef" ( C: N -- ) ( E: i1 … iN -- )
+  va- compile' stderr postpone' c" compile' fprintf -va
 ;
 
 (
 Formats into the provided buffer using `snprintf`. Usage example:
 
-  SOME_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu" cr
+  SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" cr
 )
-: #sf" ( C: N -- ) ( E: buf size i1 … iN -- )
-  va- postpone' #c" compile' snprintf -va
+: sf" ( C: N -- ) ( E: buf size i1 … iN -- )
+  va- comp_cstr compile' snprintf -va
 ;
 
 (
@@ -1059,11 +1114,11 @@ The `len` parameter is here because buffer variables return it.
 ;
 
 (
-Usage: `#throw" some_error_msg"`.
+Usage: `throw" some_error_msg"`.
 
-Also see `#sthrowf"` for formatted errors.
+Also see `sthrowf"` for formatted errors.
 )
-: #throw" postpone' #" compile' throw ;
+: throw" comp_str compile' throw ;
 
 (
 Formats an error message into the provided buffer using `snprintf`,
@@ -1072,44 +1127,44 @@ terminated; `buf:` and `buf_tmp:` ensure this automatically.
 Usage example:
 
   4096 buf: SOME_BUF
-  SOME_BUF 10 20 30 [ 20 ] #sthrowf" error codes: %zu %zu %zu"
+  SOME_BUF 10 20 30 [ 20 ] sthrowf" error codes: %zu %zu %zu"
 
-Also see `#throwf"` which comes with its own buffer.
+Also see `throwf"` which comes with its own buffer.
 )
-: #sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
+: sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
   compile'  dup2
-  postpone' #c"
+  comp_cstr
   compile'  snprintf
   -va
   compile'  throw
 ;
 
-: print_int ( num -- ) [ 1 ] #f" %zd"  ;
-: print_cell ( num ind -- ) dup_over [ 3 ] #f" %zd 0x%zx <%zd>" ;
-: . ( num -- ) depth dec print_cell cr ;
+: log_int ( num -- ) [ 1 ] f" %zd"  ;
+: log_cell ( num ind -- ) dup_over [ 3 ] f" %zd 0x%zx <%zd>" ;
+: . ( num -- ) depth dec log_cell cr ;
 
 : .s
   depth to: len
 
   len #ifn
-    #." stack is empty" cr
+    log" stack is empty" cr
     #ret
   #end
 
   len <0 #if
-    #." stack length is negative: " len print_int cr
+    log" stack length is negative: " len log_int cr
     #ret
   #end
 
-  len [ 1 ] #f" stack <%zd>:" cr
+  len [ 1 ] f" stack <%zd>:" cr
 
   0
   #begin
     dup to: ind
     ind len < #while
     space space
-    ind pick0 ind print_cell cr
+    ind pick0 ind log_cell cr
     inc
   #repeat
   drop
@@ -1169,14 +1224,14 @@ which we don't have because we segregate code and data.
 4096 buf: ERR_BUF
 
 (
-Like `#sthrowf"` but easier to use. Example:
+Like `sthrowf"` but easier to use. Example:
 
-  10 20 30 [ 20 ] #throwf" error codes: %zu %zu %zu"
+  10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
 )
-: #throwf" ( C: len -- ) ( E: i1 … iN -- )
+: throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
   compile'  ERR_BUF
-  postpone' #c"
+  comp_cstr
   compile'  snprintf
   -va
   compile' ERR_BUF
@@ -1200,12 +1255,12 @@ extern_ptr: __error
 : mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or to: mflag
   0 size pflag mflag -1 0 mmap
-  dup -1 = #if drop #throw" unable to mmap" #end
+  dup -1 = #if drop throw" unable to mmap" #end
 ;
 
 : mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE or mprotect
-  -1 = #if #throw" unable to mprotect" #end
+  -1 = #if throw" unable to mprotect" #end
 ;
 
 (

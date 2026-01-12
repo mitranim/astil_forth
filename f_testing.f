@@ -49,31 +49,31 @@ Example tests:
 
     equal #if T_reset #ret #end
   #else
-    rel0 rel1 [ 2 ] #ef" stack length mismatch: (%zd) <T> (%zd)" cr
+    rel0 rel1 [ 2 ] ef" stack length mismatch: (%zd) <T> (%zd)" cr
   #end
 
-  #e" stack content mismatch: T{ "
+  elog" stack content mismatch: T{ "
 
   \ Print cells before `<T>`.
   len0
   #begin
     dup len1 < #while
-    dup pick0 [ 1 ] #ef" %zd "
+    dup pick0 [ 1 ] ef" %zd "
     inc
   #repeat
 
-  #e" <T> "
+  elog" <T> "
 
   \ Print cells after `<T>`.
   #begin
     dup len2 < #while
-    dup pick0 [ 1 ] #ef" %zd "
+    dup pick0 [ 1 ] ef" %zd "
     inc
   #repeat drop
 
-  #e" }T" cr
+  elog" }T" cr
 
   T_reset
-  #throw" test failure"
+  throw" test failure"
   unreachable
 ;

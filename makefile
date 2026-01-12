@@ -71,12 +71,14 @@ run_file: $(FILE_EXE) $(ALL_SRC)
 run_file_w:
 	$(WATCH_COMP) -- $(MAKE) run_file
 
-# For arbitrary files.
+# For executables from arbitrary C files. This is possible because our C files
+# specify all their dependencies with `#include`, without needing the build
+# system to describe the dependencies.
 %.exe: %.c $(ALL_SRC)
 	$(CC) $(CFLAGS) -x c $< -o $@
 
-# **/%.exe: %.c $(ALL_SRC)
-#   $(CC) $(CFLAGS) -x c $< -o $@
+**/%.exe: %.c $(ALL_SRC)
+	$(CC) $(CFLAGS) -x c $< -o $@
 
 $(ASM_GEN_OUT): $(ASM_GEN_SRC) $(ALL_SRC)
 	mkdir -p $(GEN)

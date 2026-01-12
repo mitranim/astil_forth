@@ -664,10 +664,26 @@ static void asm_append_branch_to_offset(Asm *asm, Sint off) {
   asm_append_instr(asm, asm_instr_branch_to_offset(off));
 }
 
-static void asm_append_branch_with_link_to_offset(Asm *asm, Sint off) {
-  Instr imm;
-  averr(imm_signed(off, 26, &imm));
-  asm_append_instr(asm, (Instr)0b1'00'101'00000000000000000000000000 | imm);
+/*
+The instruction will contain a PC-relative offset of the instruction it's
+going to "call". "PC" stands for "program counter": memory address of the
+instruction we're about to encode.
+
+Different CPU architectures have different notions of PC.
+On Arm64, it's the instruction currently executing.
+
+The offset is implicitly times 4 at the CPU level.
+
+`bl <imm>`
+*/
+static Instr asm_instr_branch_link_to_offset(Sint pc_off) {
+  Instr imm26;
+  averr(imm_signed(pc_off, 26, &imm26));
+  return (Instr)0b1'00'101'00000000000000000000000000 | imm26;
+}
+
+static void asm_append_branch_link_to_offset(Asm *asm, Sint pc_off) {
+  asm_append_instr(asm, asm_instr_branch_link_to_offset(pc_off));
 }
 
 static Instr asm_compare_branch(U8 reg, Sint off, bool non_zero) {
@@ -714,14 +730,60 @@ static const Instr *asm_sym_epilogue_executable(const Asm *asm, const Sym *sym) 
   return list_elem_ptr(&asm->exec.instrs, sym->norm.spans.epilogue);
 }
 
+static Instr *asm_sym_begin_writable(const Asm *asm, const Sym *sym) {
+  aver(sym->type == SYM_NORM);
+  return list_elem_ptr(&asm->write.instrs, sym->norm.spans.begin);
+}
+
+static Instr *asm_sym_begin_executable(const Asm *asm, const Sym *sym) {
+  aver(sym->type == SYM_NORM);
+  return list_elem_ptr(&asm->exec.instrs, sym->norm.spans.begin);
+}
+
+/*
+We use breakpoint instructions with various magic codes
+when reserving space for later fixups.
+*/
+static Instr asm_instr_breakpoint(Instr imm) {
+  averr(imm_unsigned(imm, 16));
+  // brk <imm>
+  return (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5);
+}
+
+static Instr *asm_append_breakpoint(Asm *asm, Instr imm) {
+  return asm_append_instr(asm, asm_instr_breakpoint(imm));
+}
+
 static void asm_fixup_ret(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
   aver(fixup->type == ASM_FIXUP_RET);
 
   const auto epi = asm_sym_epilogue_writable(asm, sym);
-  const auto tar = fixup->ret.instr;
+  const auto tar = fixup->ret;
   const auto off = epi - tar;
 
+  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET_EPI)));
   *tar = asm_instr_branch_to_offset(off);
+}
+
+static void asm_fixup_try(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
+  aver(fixup->type == ASM_FIXUP_TRY);
+
+  const auto epi = asm_sym_epilogue_writable(asm, sym);
+  const auto tar = fixup->try;
+  const auto off = epi - tar;
+
+  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_TRY)));
+  *tar = asm_compare_branch_non_zero(ASM_ERR_REG, off);
+}
+
+static void asm_fixup_recur(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
+  aver(fixup->type == ASM_FIXUP_RECUR);
+
+  const auto tar = fixup->recur;
+  const auto off = asm_sym_begin_writable(asm, sym) - tar;
+
+  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RECUR)));
+  *tar = asm_instr_branch_link_to_offset(off);
 }
 
 static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
@@ -733,6 +795,8 @@ static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
   const auto imm   = load->imm;
   const auto imm32 = (U32)imm;
   const auto top   = list_next_ptr(&write->instrs);
+
+  IF_DEBUG(aver(*pci == asm_instr_breakpoint(ASM_CODE_LOAD)));
 
   Instr opc;
   if ((Uint)imm32 == imm) {
@@ -752,15 +816,6 @@ static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
   sym->norm.has_loads = true;
 }
 
-static void asm_fixup_try(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
-  aver(fixup->type == ASM_FIXUP_TRY);
-
-  const auto epi = asm_sym_epilogue_writable(asm, sym);
-  const auto off = epi - fixup->try;
-
-  *fixup->try = asm_compare_branch_non_zero(ASM_ERR_REG, off);
-}
-
 static void asm_fixup(Asm *asm, Sym *sym) {
   const auto src = &asm->fixup;
 
@@ -772,12 +827,16 @@ static void asm_fixup(Asm *asm, Sym *sym) {
         asm_fixup_ret(asm, fixup, sym);
         continue;
       }
-      case ASM_FIXUP_LOAD: {
-        asm_fixup_load(asm, fixup, sym);
-        continue;
-      }
       case ASM_FIXUP_TRY: {
         asm_fixup_try(asm, fixup, sym);
+        continue;
+      }
+      case ASM_FIXUP_RECUR: {
+        asm_fixup_recur(asm, fixup, sym);
+        continue;
+      }
+      case ASM_FIXUP_LOAD: {
+        asm_fixup_load(asm, fixup, sym);
         continue;
       }
       default: unreachable();
@@ -810,20 +869,6 @@ static void asm_append_add_imm(Asm *asm, U8 tar_reg, U8 src_reg, Uint imm12) {
 
 static void asm_append_sub_imm(Asm *asm, U8 tar_reg, U8 src_reg, Uint imm12) {
   asm_append_instr(asm, asm_instr_sub_imm(tar_reg, src_reg, imm12));
-}
-
-/*
-We use breakpoint instructions with various magic codes
-when reserving space for later fixups.
-*/
-static Instr asm_instr_breakpoint(Instr imm) {
-  averr(imm_unsigned(imm, 16));
-  // brk <imm>
-  return (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5);
-}
-
-static Instr *asm_append_breakpoint(Asm *asm, Instr imm) {
-  return asm_append_instr(asm, asm_instr_breakpoint(imm));
 }
 
 static Err err_inline_not_norm(const Sym *sym) {
@@ -928,9 +973,14 @@ static Err err_unrec_local_ind(Sint ind) {
   return errf("unrecognized local index: " FMT_SINT, ind);
 }
 
+static Err asm_validate_local_ind(const Asm_locs *locs, Sint ind) {
+  if (ind >= 0 && ind < locs->len) return nullptr;
+  return err_unrec_local_ind(ind);
+}
+
 static Err asm_append_local_pop(Asm *asm, Sint ind) {
   const auto locs = &asm->locs;
-  if (!(ind >= 0 && ind < locs->len)) return err_unrec_local_ind(ind);
+  try(asm_validate_local_ind(locs, ind));
 
   const auto off = asm_local_fp_off((Ind)ind);
   asm_append_stack_pop_into(asm, ASM_SCRATCH_REG_8);
@@ -938,14 +988,20 @@ static Err asm_append_local_pop(Asm *asm, Sint ind) {
   return nullptr;
 }
 
+static Err asm_append_local_push(Asm *asm, Sint ind) {
+  const auto locs = &asm->locs;
+  try(asm_validate_local_ind(locs, ind));
+
+  const auto off = asm_local_fp_off((Ind)ind);
+  asm_append_load_unscaled_offset(asm, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
+  asm_append_stack_push_from(asm, ASM_SCRATCH_REG_8);
+  return nullptr;
+}
+
 static bool asm_appended_local_push(Asm *asm, const char *name) {
   const auto locs = &asm->locs;
   if (!dict_has(locs, name)) return false;
-
-  const auto ind = dict_get(locs, name);
-  const auto off = asm_local_fp_off(ind);
-  asm_append_load_unscaled_offset(asm, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
-  asm_append_stack_push_from(asm, ASM_SCRATCH_REG_8);
+  averr(asm_append_local_push(asm, dict_get(locs, name)));
   return true;
 }
 
@@ -1046,7 +1102,7 @@ static Err asm_sym_end(Asm *asm, Sym *sym) {
   try(asm_heap_sync(asm));
 
   sym->norm.exec = (Instr_span){
-    .floor = list_elem_ptr(&exec->instrs, spans->begin),
+    .floor = asm_sym_begin_executable(asm, sym),
     .ceil  = list_next_ptr(&exec->instrs),
     .top   = list_next_ptr(&exec->instrs),
   };
@@ -1059,8 +1115,18 @@ static void asm_append_ret(Asm *asm) {
   list_append(
     &asm->fixup,
     (Asm_fixup){
-      .type      = ASM_FIXUP_RET,
-      .ret.instr = asm_append_breakpoint(asm, ASM_CODE_RET_EPI),
+      .type = ASM_FIXUP_RET,
+      .ret  = asm_append_breakpoint(asm, ASM_CODE_RET_EPI),
+    }
+  );
+}
+
+static void asm_append_recur(Asm *asm) {
+  list_append(
+    &asm->fixup,
+    (Asm_fixup){
+      .type  = ASM_FIXUP_RECUR,
+      .recur = asm_append_breakpoint(asm, ASM_CODE_RECUR),
     }
   );
 }
@@ -1194,30 +1260,12 @@ static void asm_append_try(Asm *asm) {
   );
 }
 
-/*
-The instruction will contain a PC-relative offset of the instruction it's
-going to "call". "PC" stands for "program counter": memory address of the
-instruction we're about to encode.
-
-Different CPU architectures have different notions of PC.
-On Arm64, it's the instruction currently executing.
-
-The offset is implicitly times 4 at the CPU level.
-*/
-static void asm_append_branch_link(Asm *asm, Sint pc_off) {
-  Instr imm26;
-  averr(imm_signed(pc_off, 26, &imm26));
-
-  // bl <imm>
-  asm_append_instr(asm, ((Instr)0b1'00'101 << 26) | imm26);
-}
-
 static void asm_append_call_norm(Asm *asm, Sym *caller, const Sym *callee) {
   const auto fun    = (Instr *)callee->norm.exec.floor;
   const auto pc_off = fun - asm_next_prog_counter(asm);
 
   aver(asm_is_instr_ours(asm, fun));
-  asm_append_branch_link(asm, pc_off);
+  asm_append_branch_link_to_offset(asm, pc_off);
   asm_register_call(asm, caller);
   if (callee->throws) asm_append_try(asm);
 
