@@ -50,6 +50,13 @@ typedef dict_of(S64)  S64_dict;
 typedef dict_of(F32)  F32_dict;
 typedef dict_of(F64)  F64_dict;
 
+// TODO fix `clang-format`.
+typedef struct {
+} Empty;
+
+// Bit of a hack; `./lib/set.(c|h)` doesn't support `char*` keys.
+typedef dict_of(Empty) Str_set;
+
 #define dict_init(dict, cap) \
   hash_table_init((Hash_table *)dict, cap, DICT_KEY_SIZE, dict_val_size(dict));
 

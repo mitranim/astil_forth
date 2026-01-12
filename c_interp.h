@@ -2,6 +2,7 @@
 #include "./c_asm.h"
 #include "./c_read.h"
 #include "./c_sym.h"
+#include "./lib/dict.h"
 #include "./lib/stack.h"
 
 /*
@@ -12,9 +13,10 @@ Would be nice to have a name reflecting both.
 typedef struct {
   Sint_stack ints;        // Forth integer stack.
   Sym_stack  syms;        // Defined symbols.
-  Sym_dict   dict;        // Symbols by name.
+  Sym_dict   words;       // Symbols by name.
   Asm asm;                // Assembler; one arch for now.
   Asm     asm_snap;       // Snapshot for rewinding.
+  Str_set imports;        // Realpaths of already-imported files.
   Reader *reader;         // Text parser.
   Sym    *defining;       // Symbol being defined between `:` and `;`.
   bool    compiling  : 1; // Turned on by `:`, can be turned off.

@@ -5,9 +5,10 @@
 (
 Can use comments now!
 
-This file boostraps the Forth system by self-assembling.
-We define basic words in terms of machine instructions.
-Currently only the Arm64 CPU architecture is supported.
+This file boostraps the Forth language. The outer interpreter / compiler
+provides only the most fundamental intrinsics; enough for self-assembly.
+We define basic words in terms of machine instructions, building up from
+there. Currently only the Arm64 CPU architecture is supported.
 )
 
 \ brk 666

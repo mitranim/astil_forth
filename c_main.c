@@ -34,7 +34,7 @@ static Err run(int argc, const char **argv) {
   if (recovery) try(init_exception_handling());
 
   for (int ind = 1; ind < argc; ind++) {
-    try(interp_include(&interp, argv[ind]));
+    try(interp_import(&interp, argv[ind]));
   }
 
   // try(compile_mach_executable(&interp));

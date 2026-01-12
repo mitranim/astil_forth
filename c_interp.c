@@ -20,7 +20,8 @@ static Err interp_deinit(Interp *interp) {
 
   for (stack_range(auto, sym, syms)) sym_deinit(sym);
   list_deinit(&interp->syms);
-  dict_deinit(&interp->dict);
+  dict_deinit(&interp->words);
+  dict_deinit_with_keys((Dict *)&interp->imports);
 
   Err err = nullptr;
   err     = either(err, asm_deinit(&interp->asm));
@@ -38,12 +39,12 @@ static Err interp_init_syms(Interp *interp) {
   for (auto intrin = INTRIN; intrin < arr_ceil(INTRIN); intrin++) {
     const auto sym = stack_push(syms, *intrin);
     sym->name.len  = (Ind)strlen(sym->name.buf);
-    dict_set(&interp->dict, sym->name.buf, sym);
+    dict_set(&interp->words, sym->name.buf, sym);
     asm_register_dysym(asm, sym->name.buf, (U64)sym->intrin.fun);
   }
 
   IF_DEBUG({
-    const auto syms = &interp->dict;
+    const auto syms = &interp->words;
     aver(dict_has(syms, ":"));
     aver(dict_has(syms, ";"));
 
@@ -102,14 +103,14 @@ static bool interp_valid(const Interp *interp) {
     is_aligned(&interp->asm_snap) &&
     is_aligned(&interp->ints) &&
     is_aligned(&interp->syms) &&
-    is_aligned(&interp->dict) &&
+    is_aligned(&interp->words) &&
     is_aligned(&interp->reader) &&
     is_aligned(&interp->defining) &&
     asm_valid(&interp->asm) &&
     reader_valid(interp->reader) &&
     stack_valid((const Stack *)&interp->ints) &&
     stack_valid((const Stack *)&interp->syms) &&
-    dict_valid((const Dict *)&interp->dict)
+    dict_valid((const Dict *)&interp->words)
   );
 }
 
@@ -321,7 +322,7 @@ static Err interp_word(Interp *interp, U8 head) {
     return nullptr;
   }
 
-  const auto sym = dict_get(&interp->dict, word.buf);
+  const auto sym = dict_get(&interp->words, word.buf);
   if (!sym) return err_undefined_word(word.buf);
 
   if (!interp->compiling || sym->immediate) {
@@ -378,15 +379,43 @@ static Err interp_loop(Interp *interp) {
   return nullptr;
 }
 
-static Err interp_include_inner(Interp *interp, const char *path) {
-  const auto read = interp->reader;
-  try(str_copy(&read->file_path, path));
+static Err interp_import_inner(
+  Interp *interp, const char *prev, const char *next
+) {
+  if (prev) next = path_join(prev, next);
+  const auto real = realpath(next, nullptr);
 
+  if (!real) {
+    const auto code = errno;
+    return errf(
+      "unable to realpath %s; code: %d; msg: %s", next, code, strerror(code)
+    );
+  }
+
+  const auto imports = &interp->imports;
+
+  if (dict_has(imports, real)) {
+    IF_DEBUG(eprintf(
+      "[debug] skipping import of already-imported file; path: " FMT_QUOTED
+      "; realpath: " FMT_QUOTED "\n",
+      next,
+      real
+    ));
+    free(real);
+    return nullptr;
+  }
+
+  dict_set(imports, real, (Empty){});
+
+  const auto read = interp->reader;
+  try(str_copy(&read->file_path, real));
+
+  const char              *path = nullptr; // Only logging, no allocation.
   defer(file_deinit) FILE *file = nullptr;
-  try(file_open_fuzzy(path, &path, &read->file));
+  try(file_open_fuzzy(real, &path, &read->file));
   reader_init(read);
 
-  IF_DEBUG(eprintf("[system] including file: " FMT_QUOTED "\n", path));
+  IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
 
   for (;;) {
     auto err = interp_loop(interp);
@@ -399,11 +428,12 @@ static Err interp_include_inner(Interp *interp, const char *path) {
 }
 
 // There better not be a `longjmp` over this.
-Err interp_include(Interp *interp, const char *path) {
-  const auto prev = interp->reader;
-  Reader     next = {};
-  interp->reader  = &next;
-  const auto err  = interp_include_inner(interp, path);
-  interp->reader  = prev;
+Err interp_import(Interp *interp, const char *path) {
+  const auto prev      = interp->reader;
+  const auto prev_path = prev ? prev->file_path.buf : nullptr;
+  Reader     next      = {};
+  interp->reader       = &next;
+  const auto err       = interp_import_inner(interp, prev_path, path);
+  interp->reader       = prev;
   return err;
 }

@@ -23,7 +23,7 @@ Intrinsics don't even provide conditionals or arithmetic.
 */
 
 // TODO: avoid forward declarations.
-Err interp_include(Interp *, const char *);
+Err interp_import(Interp *, const char *);
 Err interp_call_sym(Interp *, const Sym *);
 Err compile_call_sym(Interp *, Sym *);
 
@@ -43,7 +43,7 @@ static Err interp_read_sym(Interp *interp, Sym **out) {
   try(interp_read_word(interp));
 
   const auto name = interp->reader->word.buf;
-  const auto sym  = dict_get(&interp->dict, name);
+  const auto sym  = dict_get(&interp->words, name);
 
   if (!sym) return err_undefined_word(name);
   if (out) *out = sym;
@@ -117,7 +117,7 @@ static Err intrin_semicolon(Interp *interp) {
   if (!interp->compiling) return err_semi_not_compiling();
   try(asm_sym_end(asm, sym));
 
-  const auto dict = &interp->dict;
+  const auto dict = &interp->words;
   if (dict_has(dict, sym->name.buf) && !interp->redefining) {
     eprintf("[system] redefined word " FMT_QUOTED "\n", sym->name.buf);
   }
@@ -467,29 +467,29 @@ static Err intrin_parse_word(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_include(Interp *interp) {
+static Err intrin_import(Interp *interp) {
   const auto ints = &interp->ints;
   Sint       path;
 
   try(int_stack_pop(ints, nullptr)); // discard length
   try(int_stack_pop(ints, &path));
-  try(interp_include(interp, (const char *)path));
+  try(interp_import(interp, (const char *)path));
   return nullptr;
 }
 
-static Err intrin_include_quote(Interp *interp) {
+static Err intrin_import_quote(Interp *interp) {
   const auto read = interp->reader;
   try(read_skip_whitespace(read));
   try(read_until(read, '"'));
-  try(interp_include(interp, (const char *)read->buf.buf));
+  try(interp_import(interp, (const char *)read->buf.buf));
   return nullptr;
 }
 
-static Err intrin_include_tick(Interp *interp) {
+static Err intrin_import_tick(Interp *interp) {
   const auto read = interp->reader;
   try(read_skip_whitespace(read));
   try(read_word(read));
-  try(interp_include(interp, (const char *)read->word.buf));
+  try(interp_import(interp, (const char *)read->word.buf));
   return nullptr;
 }
 
@@ -530,7 +530,7 @@ static Err intrin_extern_ptr(Interp *interp) {
     }
   );
 
-  dict_set(&interp->dict, sym->name.buf, sym);
+  dict_set(&interp->words, sym->name.buf, sym);
   asm_register_dysym(&interp->asm, sym->name.buf, (U64)addr);
   return nullptr;
 }
@@ -561,7 +561,7 @@ static Err intrin_extern_proc(Interp *interp) {
     }
   );
 
-  dict_set(&interp->dict, sym->name.buf, sym);
+  dict_set(&interp->words, sym->name.buf, sym);
   asm_register_dysym(&interp->asm, sym->name.buf, (U64)addr);
   return nullptr;
 }
@@ -575,7 +575,7 @@ static Err interp_find_word(Interp *interp, Sym **out) {
   const auto name = (const char *)buf;
   if (DEBUG) aver((Sint)strlen(name) == len);
 
-  const auto sym = dict_get(&interp->dict, name);
+  const auto sym = dict_get(&interp->words, name);
   if (!sym) return err_undefined_word(name);
 
   IF_DEBUG(
@@ -963,22 +963,22 @@ static constexpr Sym USED INTRIN[] = {
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = "include",
-    .intrin.fun  = (void *)intrin_include,
+    .name.buf    = "import",
+    .intrin.fun  = (void *)intrin_import,
     .throws      = true,
     .interp_only = true,
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = "include\"",
-    .intrin.fun  = (void *)intrin_include_quote,
+    .name.buf    = "import\"",
+    .intrin.fun  = (void *)intrin_import_quote,
     .throws      = true,
     .interp_only = true,
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = "include'",
-    .intrin.fun  = (void *)intrin_include_tick,
+    .name.buf    = "import'",
+    .intrin.fun  = (void *)intrin_import_tick,
     .throws      = true,
     .interp_only = true,
   },

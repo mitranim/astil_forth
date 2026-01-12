@@ -1,6 +1,6 @@
 #pragma once
 #include "./err.c" // IWYU pragma: export
-#include "./fmt.h"
+#include "./fmt.c"
 #include "./misc.h"
 #include "./num.h"
 #include <fcntl.h>
@@ -156,6 +156,39 @@ static Err file_stream_write(
   return err_file_write(vals_len, out);
 }
 
+// ultra lazy ass code
+static char *path_join(const char *one, const char *two) {
+  static constexpr auto    LEN = 4096;
+  static thread_local char BUF[LEN];
+
+  int  rem = LEN;
+  auto ptr = BUF;
+
+  auto len = strlcpy(ptr, one, rem);
+  ptr += len;
+  rem -= len;
+
+  len = strlcpy(ptr, "/../", rem);
+  ptr += len;
+  rem -= len;
+
+  len = strlcpy(ptr, two, rem);
+  ptr += len;
+  rem -= len;
+
+  if (rem <= 0) {
+    eprintf(
+      "out of buffer space when joining paths " FMT_QUOTED " and " FMT_QUOTED
+      "\n",
+      one,
+      two
+    );
+    abort();
+  }
+
+  return BUF;
+}
+
 /*
 #include "./mem.c"
 
@@ -174,5 +207,15 @@ int main(void) {
     printf("read " FMT_UINT " bytes\n", len);
     puts(body);
   }
+}
+*/
+
+/*
+int main(void) {
+  printf("%s\n", path_join("io.c", "blah.c"));
+  printf("%s\n", realpath(path_join("io.c", "num.h"), nullptr));
+  printf(
+    "%s\n", realpath("/Users/m/code/m/forth/f_test.f/.././f_lang.f", nullptr)
+  );
 }
 */

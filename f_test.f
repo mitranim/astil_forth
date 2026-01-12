@@ -1,5 +1,5 @@
-include" ./f_lang.f"
-include" ./f_testing.f"
+import' ./f_lang.f
+import' ./f_testing.f
 
 : test_conditionals
   T{ false #if  10          #end <T>    }T

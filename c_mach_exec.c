@@ -56,7 +56,7 @@ static Err validate_callees_can_compile(Sym_set *visited, Sym *sym) {
 }
 
 static Err compile_mach_executable(Interp *interp) {
-  const auto dict = &interp->dict;
+  const auto dict = &interp->words;
   const auto main = dict_get(dict, "main");
 
   if (!main) {

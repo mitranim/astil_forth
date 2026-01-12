@@ -1,4 +1,4 @@
-include" ./f_lang.f"
+import' ./f_lang.f
 
 str" hello world! (top level)" type cr
 
