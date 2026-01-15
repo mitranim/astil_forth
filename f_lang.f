@@ -271,11 +271,28 @@ Assumes `lsl` is already part of the base instruction.
   asm_pattern_load_store_with_register
 ;
 
+\ Shared by some integer arithmetic instructions.
+: asm_pattern_arith_reg ( Xd Xn Xm -- instr_mask )
+       16 lsl    \ Xm
+  swap 5  lsl or \ Xn
+              or \ Xd
+;
+
+\ Shared by some integer arithmetic and load/store instructions.
+: asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
+  12 bit_trunc 10 lsl    \ imm12
+  swap          5 lsl or \ Xn
+                      or \ Xd
+;
+
 : asm_load_byte_off ( Wt Wn imm12 -- instr )
-  0b00_11_1_0_0_1_01_000000000000_00000_00000
-  swap 12 bit_trunc 10 lsl or \ imm12
-  swap               5 lsl or \ Wn
-                           or \ Wt
+  asm_pattern_arith_imm
+  0b00_11_1_0_0_1_01_000000000000_00000_00000 or
+;
+
+: asm_store_byte_off ( Wt Wn imm12 -- instr )
+  asm_pattern_arith_imm
+  0b00_11_1_0_0_1_00_000000000000_00000_00000 or
 ;
 
 \ str Xd, [x27], 8
@@ -289,19 +306,6 @@ Assumes `lsl` is already part of the base instruction.
 
 \ ldp Xt1, Xt2, [x27, -16]!
 : asm_pop2 ( Xt1 Xt2 -- instr ) 27 -16 asm_load_pair_pre ;
-
-\ Shared by some integer arithmetic instructions.
-: asm_pattern_arith_reg ( Xd Xn Xm -- instr_mask )
-       16 lsl    \ Xm
-  swap 5  lsl or \ Xn
-              or \ Xd
-;
-
-: asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
-  12 bit_trunc 10 lsl    \ imm12
-  swap          5 lsl or \ Xn
-                      or \ Xd
-;
 
 : asm_neg ( reg -- instr )
   0b1_1_0_01011_00_0_00001_000000_11111_00000 or
@@ -414,23 +418,21 @@ Assumes `lsl` is already part of the base instruction.
   0b010_101_00_0000000000000000000_0_0000 or
 ;
 
-: asm_pattern_compare_branch ( imm19 Xt base_instr -- instr )
-  or           \ Xt
-  swap
-  2  lsr       \ Offset is times 4 implicitly.
-  19 bit_trunc \ Offset may be negative.
-  5  lsl
-  or           \ imm19
+\ `imm19` offset is implicitly times 4 and can be negative.
+: asm_pattern_compare_branch ( Xt imm19 base_instr -- instr )
+  swap 2 lsr 19 bit_trunc 5 lsl \ imm19
+                             or \ instr
+                             or \ Xt
 ;
 
 \ cbz x1, <off>
-: asm_cmp_branch_zero ( imm19 Xt -- instr )
+: asm_cmp_branch_zero ( Xt imm19 -- instr )
   0b1_011010_0_0000000000000000000_00000
   asm_pattern_compare_branch
 ;
 
 \ cbnz x1, <off>
-: asm_cmp_branch_not_zero ( imm19 Xt -- instr )
+: asm_cmp_branch_not_zero ( Xt imm19 -- instr )
   0b1_011010_1_0000000000000000000_00000
   asm_pattern_compare_branch
 ;
@@ -457,8 +459,17 @@ Assumes `lsl` is already part of the base instruction.
              or \ Xd
 ;
 
+\ mvn Xd, Xm
+: asm_mvn ( Xd Xm -- instr )
+  16 lsl \ Xm
+      or \ Xd
+  0b1_01_01010_00_1_00000_000000_11111_00000 or
+;
+
 \ `ret x30`; requires caution with SP / FP.
 : asm_ret 0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 ;
+
+: asm_nop 0b110_101_01000000110010_0000_000_11111 ;
 
 \ svc 666
 : asm_svc 0b110_101_00_000_0000001010011010_000_01 ;
@@ -571,17 +582,17 @@ Assumes `lsl` is already part of the base instruction.
 
 \ Pushes the stack item found at the given index, duplicating it.
 : pick ( … ind -- … [ind] ) [
-  asm_pop_x1                                 comp_instr \ ldr x1, [x27, -8]!
-  0b1_01_01010_00_1_00001_000000_11111_00001 comp_instr \ mvn x1, x1
-  1 27 1 1 asm_load_with_register            comp_instr \ ldr x1, [x27, x1, lsl 3]
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+           asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
+  1 1      asm_mvn                comp_instr \ mvn x1, x1
+  1 27 1 1 asm_load_with_register comp_instr \ ldr x1, [x27, x1, lsl 3]
+           asm_push_x1            comp_instr \ str x1, [x27], 8
 ] ;
 
 \ FIFO version of `pick`: starts from stack bottom.
 : pick0 ( … ind -- … [ind] ) [
-  asm_pop_x1                      comp_instr \ ldr x1, [x27, -8]!
+           asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
   1 26 1 1 asm_load_with_register comp_instr \ ldr x1, [x26, x1, lsl 3]
-  asm_push_x1                     comp_instr \ str x1, [x27], 8
+           asm_push_x1            comp_instr \ str x1, [x27], 8
 ] ;
 
 : flip ( i1 i2 i3 -- i3 i2 i1 ) [
@@ -644,26 +655,26 @@ Assumes `lsl` is already part of the base instruction.
 
 : min ( i1 i2 -- i1|i2 ) [
                asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-           2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+           1 2 asm_cmp_reg   comp_instr \ cmp x1, x2
   1 1 2 ASM_LT asm_csel      comp_instr \ csel x1, x1, x2, lt
                asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
 : max ( i1 i2 -- i1|i2 ) [
                asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-           2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+           1 2 asm_cmp_reg   comp_instr \ cmp x1, x2
   1 1 2 ASM_GT asm_csel      comp_instr \ csel x1, x1, x2, gt
                asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
-: asm_comp_cmp_cond ( cond -- )
+: asm_comp_cset_cond ( cond -- )
          asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-     2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+     1 2 asm_cmp_reg   comp_instr \ cmp x1, x2
   1 swap asm_cset      comp_instr \ cset x1, <cond>
          asm_push_x1   comp_instr \ str x1, [x27], 8
 ;
 
-: asm_comp_cmp_zero ( cond -- )
+: asm_comp_cset_zero ( cond -- )
          asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
        1 asm_cmp_zero comp_instr \ cmp x1, 0
   1 swap asm_cset     comp_instr \ cset x1, <cond>
@@ -671,16 +682,16 @@ Assumes `lsl` is already part of the base instruction.
 ;
 
 \ https://gforth.org/manual/Numeric-comparison.html
-: =   ( i1 i2 -- bool ) [ ASM_EQ asm_comp_cmp_cond ] ;
-: <>  ( i1 i2 -- bool ) [ ASM_NE asm_comp_cmp_cond ] ;
-: >   ( i1 i2 -- bool ) [ ASM_GT asm_comp_cmp_cond ] ;
-: <   ( i1 i2 -- bool ) [ ASM_LT asm_comp_cmp_cond ] ;
-: <=  ( i1 i2 -- bool ) [ ASM_LE asm_comp_cmp_cond ] ;
-: >=  ( i1 i2 -- bool ) [ ASM_GE asm_comp_cmp_cond ] ;
-: <0  ( num   -- bool ) [ ASM_LT asm_comp_cmp_zero ] ; \ Or `MI`.
-: >0  ( num   -- bool ) [ ASM_GT asm_comp_cmp_zero ] ;
-: <=0 ( num   -- bool ) [ ASM_LE asm_comp_cmp_zero ] ;
-: >=0 ( num   -- bool ) [ ASM_GE asm_comp_cmp_zero ] ; \ Or `PL`.
+: =   ( i1 i2 -- bool ) [ ASM_EQ asm_comp_cset_cond ] ;
+: <>  ( i1 i2 -- bool ) [ ASM_NE asm_comp_cset_cond ] ;
+: >   ( i1 i2 -- bool ) [ ASM_GT asm_comp_cset_cond ] ;
+: <   ( i1 i2 -- bool ) [ ASM_LT asm_comp_cset_cond ] ;
+: <=  ( i1 i2 -- bool ) [ ASM_LE asm_comp_cset_cond ] ;
+: >=  ( i1 i2 -- bool ) [ ASM_GE asm_comp_cset_cond ] ;
+: <0  ( num   -- bool ) [ ASM_LT asm_comp_cset_zero ] ; \ Or `MI`.
+: >0  ( num   -- bool ) [ ASM_GT asm_comp_cset_zero ] ;
+: <=0 ( num   -- bool ) [ ASM_LE asm_comp_cset_zero ] ;
+: >=0 ( num   -- bool ) [ ASM_GE asm_comp_cset_zero ] ; \ Or `PL`.
 
 : odd ( i1 -- bool ) 1 and ;
 
@@ -764,23 +775,20 @@ Conditionals work like this:
 )
 
 : reserve_instr ASM_PLACEHOLDER comp_instr ;
+: reserve_cond asm_pop_x1 comp_instr here reserve_instr ;
 : pc_off ( adr -- adr off ) here over - ; \ For forward jumps.
 
 \ cbz x1, <else|end>
-: patch_if ( adr -- ) pc_off 1 asm_cmp_branch_zero swap !32 ;
+: if_patch ( adr -- ) pc_off 1 swap asm_cmp_branch_zero swap !32 ;
 
-: #if ( C: -- fun adr ) ( E: pred -- )
-  asm_pop_x1 comp_instr here reserve_instr ' patch_if
-;
+: #if ( C: -- adr fun ) ( E: pred -- ) reserve_cond ' if_patch ;
 
 \ cbnz x1, <else|end>
-: patch_ifn ( adr -- ) pc_off 1 asm_cmp_branch_not_zero swap !32 ;
+: ifn_patch ( adr -- ) pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
 
-: #ifn ( C: -- fun adr ) ( E: pred -- )
-  asm_pop_x1 comp_instr here reserve_instr ' patch_ifn
-;
+: #ifn ( C: -- fun adr ) ( E: pred -- ) reserve_cond ' ifn_patch ;
 
-: #end ( C: adr fun -- ) execute ;
+: #end ( C: fun adr -- ) execute ;
 
 \ b <pc_off>
 : patch_uncond_forward ( adr -- ) pc_off asm_branch swap !32 ;
@@ -788,8 +796,8 @@ Conditionals work like this:
 \ b -<pc_off>
 : patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
-: #else ( C: fun[if] adr[if] -- fun[else] adr[else] )
-  here reserve_instr ' patch_uncond_forward swap2 postpone' #end
+: #else ( C: adr[if] fun[if] -- adr[else] fun[else] )
+  here reserve_instr ' patch_uncond_forward swap2 execute
 ;
 
 : #begin ( C: -- adr[beg] ) here ;
@@ -801,7 +809,7 @@ with conditionals. Both groups use the regular stack for control info.
 Inside a conditional, `#leave` gets unjustly terminated by the nearest
 `#else` or `#end`. Also, loop words keep `adr[beg]` at the top.
 )
-: #leave ( C: adr[beg] -- fun[b] adr[b] adr[beg] )
+: #leave ( C: adr[beg] -- adr[b] fun[b] adr[beg] )
   here ' patch_uncond_forward reserve_instr rot
 ;
 
@@ -815,18 +823,18 @@ Each additional `#while` can be terminated with `#end`.
     cond #while
   #repeat #end #end
 )
-: #while ( C: adr[beg] -- fun[cbz] adr[cbz] fun[beg] ) ( E: pred -- )
+: #while ( C: adr[beg] -- adr[cbz] fun[cbz] fun[beg] ) ( E: pred -- )
   postpone' #if rot
 ;
 
 \ For use with `#while`; potentially more general.
-: #repeat ( C: fun[any] fun[any] adr[beg] -- )
-  postpone' #again postpone' #end
+: #repeat ( C: adr[any] fun[any] adr[beg] -- )
+  postpone' #again execute
 ;
 
 : #until ( C: adr[beg] -- ) ( E: pred -- )
-  asm_pop_x1                       comp_instr \ Load predicate.
-  here - 1 asm_cmp_branch_not_zero comp_instr \ cbz 1, <begin>
+  asm_pop_x1                            comp_instr \ Load predicate.
+  here - 1 swap asm_cmp_branch_not_zero comp_instr \ cbz 1, <begin>
 ;
 
 (
@@ -837,7 +845,7 @@ Does NOT discard them when done. There's no magic `i`.
   8 0 #do> dup . #loop+ drop2
   \ 0 1 2 3 4 5 6 7
 )
-: #do> ( C: -- fun[cbz] adr[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
+: #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
   here compile' dup2 compile' > postpone' #if rot
 ;
 
