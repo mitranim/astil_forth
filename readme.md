@@ -80,6 +80,8 @@ Non-decimal numeric literals are denoted with `0b 0o 0x`. Radix prefixes are cas
 
 A bunch of unclear words are replaced with clear ones.
 
+Better conditionals: any amount of `else if` is popped with one `end`, without having to repeat it.
+
 Special _semantic_ roles get special _syntactic_ roles. Other Forths already follow some rules, which we replicate:
 - String-parsing words end with `"` and terminate with `"`.
 - String-parsing words end with `(` and terminate with `)`.

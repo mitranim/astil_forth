@@ -2,14 +2,30 @@ import' ./f_lang.f
 import' ./f_testing.f
 
 : test_conditionals
-  T{ false #if  10          #end <T>    }T
-  T{ true  #if  10          #end <T> 10 }T
-  T{ false #if  10 #else 20 #end <T> 20 }T
-  T{ true  #if  10 #else 20 #end <T> 10 }T
-  T{ false #ifn 10          #end <T> 10 }T
-  T{ true  #ifn 10          #end <T>    }T
-  T{ false #ifn 10 #else 20 #end <T> 10 }T
-  T{ true  #ifn 10 #else 20 #end <T> 20 }T
+  T{ false #if  10 #end                                                      <T>    }T
+  T{ true  #if  10 #end                                                      <T> 10 }T
+  T{ false #if  10 #else 20 #end                                             <T> 20 }T
+  T{ true  #if  10 #else 20 #end                                             <T> 10 }T
+  T{ false #ifn 10 #end                                                      <T> 10 }T
+  T{ true  #ifn 10 #end                                                      <T>    }T
+  T{ false #ifn 10 #else 20    #end                                          <T> 10 }T
+  T{ true  #ifn 10 #else 20    #end                                          <T> 20 }T
+  T{ true  #if  10 #else true  #elif  20 #end                                <T> 10 }T
+  T{ false #if  10 #else true  #elif  20 #end                                <T> 20 }T
+  T{ false #if  10 #else true  #elif  20 #else 30    #end                    <T> 20 }T
+  T{ false #if  10 #else false #elif  20 #else 30    #end                    <T> 30 }T
+  T{ true  #if  10 #else true  #elif  20 #else true  #elif  30 #end          <T> 10 }T
+  T{ false #if  10 #else true  #elif  20 #else false #elif  30 #end          <T> 20 }T
+  T{ false #if  10 #else false #elif  20 #else true  #elif  30 #end          <T> 30 }T
+  T{ false #if  10 #else false #elif  20 #else false #elif  30 #end          <T>    }T
+  T{ true  #if  10 #else true  #elif  20 #else true  #elif  30 #else 40 #end <T> 10 }T
+  T{ false #if  10 #else true  #elif  20 #else false #elif  30 #else 40 #end <T> 20 }T
+  T{ false #if  10 #else false #elif  20 #else true  #elif  30 #else 40 #end <T> 30 }T
+  T{ false #if  10 #else false #elif  20 #else false #elif  30 #else 40 #end <T> 40 }T
+  T{ false #ifn 10 #else false #elifn 20 #else false #elifn 30 #else 40 #end <T> 10 }T
+  T{ true  #ifn 10 #else false #elifn 20 #else false #elifn 30 #else 40 #end <T> 20 }T
+  T{ true  #ifn 10 #else true  #elifn 20 #else false #elifn 30 #else 40 #end <T> 30 }T
+  T{ true  #ifn 10 #else true  #elifn 20 #else true  #elifn 30 #else 40 #end <T> 40 }T
 ;
 test_conditionals
 

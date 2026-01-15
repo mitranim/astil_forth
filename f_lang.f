@@ -595,6 +595,13 @@ Assumes `lsl` is already part of the base instruction.
            asm_push_x1            comp_instr \ str x1, [x27], 8
 ] ;
 
+\ Overwrite the cell at the given index with the given value.
+: bury ( … val ind -- … ) [
+           asm_pop_x1_x2           comp_instr \ ldp x1, x2, [x27, -16]!
+  2 2      asm_mvn                 comp_instr \ mvn x2, x2
+  1 27 2 1 asm_store_with_register comp_instr \ str x1, [x27, x2, lsl 3]
+] ;
+
 : flip ( i1 i2 i3 -- i3 i2 i1 ) [
   1 27 -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
   2 27 -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
@@ -763,6 +770,14 @@ this is considered a "bad instruction" and blows up.
 
 : char' parse_word drop c@ comp_push ;
 
+\ Core primitive for locals.
+: to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
+
+: nop ;
+: pc_off ( adr -- adr off ) here over - ; \ For forward jumps.
+: reserve_instr ASM_PLACEHOLDER comp_instr ;
+: reserve_cond asm_pop_x1 comp_instr here reserve_instr ;
+
 (
 Conditionals work like this:
 
@@ -777,23 +792,10 @@ Conditionals work like this:
     if_false
   #end
   outside
+
+Unlike other Forth systems, we also support chains
+of "elif" terminated with a single "end".
 )
-
-: reserve_instr ASM_PLACEHOLDER comp_instr ;
-: reserve_cond asm_pop_x1 comp_instr here reserve_instr ;
-: pc_off ( adr -- adr off ) here over - ; \ For forward jumps.
-
-\ cbz x1, <else|end>
-: if_patch ( adr -- ) pc_off 1 swap asm_cmp_branch_zero swap !32 ;
-
-: #if ( C: -- adr fun ) ( E: pred -- ) reserve_cond ' if_patch ;
-
-\ cbnz x1, <else|end>
-: ifn_patch ( adr -- ) pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
-
-: #ifn ( C: -- fun adr ) ( E: pred -- ) reserve_cond ' ifn_patch ;
-
-: #end ( C: fun adr -- ) execute ;
 
 \ b <pc_off>
 : patch_uncond_forward ( adr -- ) pc_off asm_branch swap !32 ;
@@ -801,9 +803,52 @@ Conditionals work like this:
 \ b -<pc_off>
 : patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
-: #else ( C: adr[if] fun[if] -- adr[else] fun[else] )
-  here reserve_instr ' patch_uncond_forward swap2 execute
+\ cbz x1, <else|end>
+: if_patch ( adr[if] -- ) pc_off 1 swap asm_cmp_branch_zero swap !32 ;
+
+\ cbnz x1, <else|end>
+: ifn_patch ( adr[ifn] -- ) pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
+
+: if_pop ( fun[prev] adr[if]  -- ) if_patch execute ;
+: ifn_pop ( fun[prev] adr[ifn]  -- ) ifn_patch execute ;
+
+\ This strange setup allows `#end` to chain-call `#else`,
+\ and terminate the chain at the topmost `#if` or `#ifn`.
+: cond_init ( -- fun[nop] fun[exec] adr[cond] )
+  ' nop ' execute reserve_cond
 ;
+
+: #if ( C: -- fun[nop] fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  cond_init ' if_pop
+;
+
+: #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
+  cond_init ' ifn_pop
+;
+
+\ Unlike "if", "elif" doesn't terminate the call chain with a nop.
+: #elif ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
+  ' execute reserve_cond ' if_pop
+;
+
+: #elifn ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
+  ' execute reserve_cond ' ifn_pop
+;
+
+: else_pop ( fun[prev] adr[else] -- ) patch_uncond_forward execute ;
+
+: #else
+  ( C: fun[exec] adr[if] fun[if] -- adr[else] fun[else] )
+  here to: adr reserve_instr
+
+  \ Turn `fun[exec]` into `fun[nop]` to prevent "if" from chaining.
+  ' nop 2 bury
+
+  execute
+  adr ' else_pop
+;
+
+: #end execute ;
 
 : #begin ( C: -- adr[beg] ) here ;
 : #again ( C: adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
@@ -829,7 +874,7 @@ Each additional `#while` can be terminated with `#end`.
   #repeat #end #end
 )
 : #while ( C: adr[beg] -- adr[cbz] fun[cbz] fun[beg] ) ( E: pred -- )
-  postpone' #if rot
+  reserve_cond ' if_patch rot
 ;
 
 \ For use with `#while`; potentially more general.
@@ -851,7 +896,7 @@ Does NOT discard them when done. There's no magic `i`.
   \ 0 1 2 3 4 5 6 7
 )
 : #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
-  here compile' dup2 compile' > postpone' #if rot
+  here compile' dup2 compile' > postpone' #while
 ;
 
 : #loop+ ( C: fun[any] fun[any] adr[beg] -- )
@@ -953,9 +998,6 @@ extern_ptr: __stderrp
 : log" comp_cstr compile' puts ;
 : elog" comp_cstr compile' eputs ;
 
-\ Core primitive for locals.
-: to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
-
 : } ( … len -- )
   #begin
     dup >0 #while
@@ -976,8 +1018,8 @@ like in Gforth and VfxForth. Types are not supported.
 
   #begin
     parse_word to: len to: str
-    " }" str len str= #if loc_len } #ret
-    #end
+    " }" str len str=
+    #if loc_len } #ret #end
 
     " --" str len str<> #while \ `--` to `}` is a comment.
 
