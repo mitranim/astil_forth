@@ -943,13 +943,13 @@ extern_ptr: __stderrp
 \ Core primitive for locals.
 : to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
 
-: } ( ind_min ind_max -- )
+: } ( … len -- )
   #begin
-    dup2 <= #while
-    dup comp_local_pop
+    dup >0 #while
+    swap comp_local_pop
     dec
   #repeat
-  drop2
+  drop
 ;
 
 (
@@ -959,31 +959,23 @@ like in Gforth and VfxForth. Types are not supported.
 )
 : {
   [ immediate ]
-  0x7FFFFFFFFFFFFFFF to: ind_min \ Lowest local index.
-  -1                 to: ind_max \ Highest local index.
+  0 to: loc_len
 
   #begin
     parse_word to: len to: str
-
-    " }" str len str= #if
-      ind_min ind_max }
-      #ret
+    " }" str len str= #if loc_len } #ret
     #end
 
-    " --" str len str<> #while
+    " --" str len str<> #while \ `--` to `}` is a comment.
 
-    str len comp_local_ind
-    dup ind_min min to: ind_min
-        ind_max max to: ind_max
+    str len comp_local_ind \ Pushes new local index.
+    loc_len inc to: loc_len
   #repeat
 
   \ After `--`: skip all words which aren't `}`.
-  #begin
-    parse_word
-    " }" str<>
-  #until
+  #begin parse_word " }" str<> #until
 
-  ind_min ind_max }
+  loc_len }
 ;
 
 \ For compiling words which modify a local by applying the given function.

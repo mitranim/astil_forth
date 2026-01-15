@@ -222,39 +222,42 @@ T{  234 -123 max <T>  234 }T
 test_to
 
 : test_locals
-  T{          { }                                <T>          }T
-  T{          { -- }                             <T>          }T
-  T{ 10       { }                                <T> 10       }T
-  T{ 10 20    { }                                <T> 10 20    }T
-  T{ 10       { }                  20            <T> 10 20    }T
-  T{          { }                  10 20         <T> 10 20    }T
-  T{ 10       { one }                            <T>          }T
-  T{ 10       { one }              one           <T> 10       }T
-  T{ 10       { one }              one one       <T> 10 10    }T
-  T{ 10       { one -- }           one one       <T> 10 10    }T
-  T{ 10       { -- one }                         <T> 10       }T
-  T{ 10 20    { one }                            <T> 10       }T
-  T{ 10 20    { one }              one           <T> 10 20    }T
-  T{ 10 20    { one }              one one       <T> 10 20 20 }T
-  T{ 10 20    { one -- }           one one       <T> 10 20 20 }T
-  T{ 10 20    { one two }                        <T>          }T
-  T{ 10 20    { one two }          one           <T> 10       }T
-  T{ 10 20    { one two }          two           <T> 20       }T
-  T{ 10 20    { one two }          one two       <T> 10 20    }T
-  T{ 10 20    { one two }          two one       <T> 20 10    }T
-  T{ 10 20    { one two }          two one one   <T> 20 10 10 }T
-  T{ 10 20    { one two }          two one two   <T> 20 10 20 }T
-  T{ 10 20    { one two }          one two one   <T> 10 20 10 }T
-  T{ 10 20    { one two }          one one two   <T> 10 10 20 }T
-  T{ 10 20    { one two -- }       one one two   <T> 10 10 20 }T
-  T{ 10 20    { one -- two }       one one       <T> 10 20 20 }T
-  T{ 10 20    { one -- two }       one one       <T> 10 20 20 }T
-  T{ 10 20    { -- one two }                     <T> 10 20    }T
-  T{ 10 20    { one two -- three } one one two   <T> 10 10 20 }T
-  T{ 10 20 30 { one two three }    one two three <T> 10 20 30 }T
-  T{ 10 20 30 { one two three }    three one two <T> 30 10 20 }T
-  T{ 10 20 30 { one two three }    two three one <T> 20 30 10 }T
-  T{ 10 20 30 { -- one two three }               <T> 10 20 30 }T
+  T{          { }                                     <T>          }T
+  T{          { -- }                                  <T>          }T
+  T{ 10       { }                                     <T> 10       }T
+  T{ 10 20    { }                                     <T> 10 20    }T
+  T{ 10       { }                  20                 <T> 10 20    }T
+  T{          { }                  10 20              <T> 10 20    }T
+  T{ 10       { one }                                 <T>          }T
+  T{ 10       { one }              one                <T> 10       }T
+  T{ 10       { one }              one one            <T> 10 10    }T
+  T{ 10       { one -- }           one one            <T> 10 10    }T
+  T{ 10       { -- one }                              <T> 10       }T
+  T{ 10 20    { one }                                 <T> 10       }T
+  T{ 10 20    { one }              one                <T> 10 20    }T
+  T{ 10 20    { one }              one one            <T> 10 20 20 }T
+  T{ 10 20    { one -- }           one one            <T> 10 20 20 }T
+  T{ 10 20    { one two }                             <T>          }T
+  T{ 10 20    { one two }          one                <T> 10       }T
+  T{ 10 20    { one two }          two                <T> 20       }T
+  T{ 10 20    { one two }          one two            <T> 10 20    }T
+  T{ 10 20    { one two }          two one            <T> 20 10    }T
+  T{ 10 20    { one two }          two one one        <T> 20 10 10 }T
+  T{ 10 20    { one two }          two one two        <T> 20 10 20 }T
+  T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
+  T{ 10 20    { one two }          one one two        <T> 10 10 20 }T
+  T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
+  T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
+  T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
+  T{ 10 20    { -- one two }                          <T> 10 20    }T
+  T{ 10 20    { one two -- three } one one two        <T> 10 10 20 }T
+  T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
+  T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
+  T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
+  T{ 10 20 30 { -- one two three }                    <T> 10 20 30 }T
+  T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
+  T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
+  T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
 ;
 test_locals
 
