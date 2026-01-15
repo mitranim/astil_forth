@@ -750,13 +750,18 @@ this is considered a "bad instruction" and blows up.
 : stack_clear ( … -- ) sp0 sp! ;
 : stack_trunc ( … len -- … ) cells sp0 + sp! ;
 
-: head_char ( str len -- byte ) drop [
+: c@ ( str -- char ) [
         asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
   1 1 0 asm_load_byte_off comp_instr \ ldrb x1, [x1]
         asm_push_x1       comp_instr \ str x1, [x27], 8
 ] ;
 
-: char' parse_word head_char comp_push ;
+: c! ( char adr -- ) [
+        asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
+] ;
+
+: char' parse_word drop c@ comp_push ;
 
 (
 Conditionals work like this:
@@ -1004,6 +1009,12 @@ like in Gforth and VfxForth. Types are not supported.
 \ Usage: `++: some_local`.
 : ++: ( C: "name" -- ) ( E: -- ) mut_local' inc ;
 : --: ( C: "name" -- ) ( E: -- ) mut_local' dec ;
+
+: within { num one two -- bool }
+  one num >
+  num two <=
+  =0 or =0
+;
 
 : align_down ( size width -- size ) negate and ;
 : align_up   { size width -- size } width dec size + width align_down ;
