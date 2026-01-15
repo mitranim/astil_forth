@@ -164,9 +164,9 @@ static constexpr U8 ASM_REG_SP = 31;
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {
   ASM_CODE_PROC_DELIM = 1,
-  ASM_CODE_PROLOGUE   = 2,
-  ASM_CODE_RET_EPI    = 3,
-  ASM_CODE_RECUR      = 4,
-  ASM_CODE_LOAD       = 5,
-  ASM_CODE_TRY        = 6,
+  ASM_CODE_PROLOGUE,
+  ASM_CODE_RET_EPI,
+  ASM_CODE_RECUR,
+  ASM_CODE_LOAD,
+  ASM_CODE_TRY,
 } Asm_magic;

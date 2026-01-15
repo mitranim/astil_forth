@@ -1,3 +1,4 @@
+// Only works if the CWD matches this file's directory 😔.
 .include "./generated/c_asm.s"
 
 /*

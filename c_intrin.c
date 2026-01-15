@@ -51,7 +51,7 @@ static Err interp_read_sym(Interp *interp, Sym **out) {
 }
 
 static Err err_current_sym_not_defining() {
-  return err_str("unable to find current symbol: not inside a colon definition");
+  return err_str("unable to find current word: not inside a colon definition");
 }
 
 static Err current_sym(const Interp *interp, Sym **out) {
@@ -130,16 +130,8 @@ static Err intrin_semicolon(Interp *interp) {
     echo <hex> | llvm-mc --disassemble --hex
   */
   IF_DEBUG({
-    const auto exec = &sym->norm.exec;
-    eprintf(
-      "[system] compiled symbol " FMT_QUOTED
-      " with executable address %p; instructions (" FMT_SINT "): ",
-      sym->name.buf,
-      exec->floor,
-      stack_len(exec)
-    );
-    eprint_byte_range_hex((U8 *)exec->floor, (U8 *)exec->top);
-    fputc('\n', stderr);
+    eprintf("[system] compiled word: " FMT_QUOTED "\n", sym->name.buf);
+    asm_debug_print_sym_instrs(asm, sym, "[system]   ");
 
     // const auto read = interp->reader;
     // eprintf(

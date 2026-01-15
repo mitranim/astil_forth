@@ -320,7 +320,7 @@ Assumes `lsl` is already part of the base instruction.
 ;
 
 \ sub Xd, Xn, <imm12>
-: asm_sub_imm ( Xd Xn Xm -- instr )
+: asm_sub_imm ( Xd Xn imm12 -- instr )
   asm_pattern_arith_imm
   0b1_1_0_100010_0_000000000000_00000_00000 or
 ;
@@ -394,10 +394,10 @@ Assumes `lsl` is already part of the base instruction.
 ;
 
 \ cmp Xn, Xm
-: asm_cmp_reg ( Xm Xn -- instr )
-  0b1_1_1_01011_00_0_00000_000_000_00000_11111
+: asm_cmp_reg ( Xn Xm -- instr )
+       16 lsl    \ Xm
   swap 5  lsl or \ Xn
-  swap 16 lsl or \ Xm
+  0b1_1_1_01011_00_0_00000_000_000_00000_11111 or
 ;
 
 \ b <off>
@@ -1082,14 +1082,14 @@ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
 Format-prints to stdout using `printf`. `N` is the variadic arg count,
 which must be available at compile time. Usage example:
 
-  10 20 30 [ 3 ] f" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" cr
 )
-: f" ( C: N -- ) ( E: i1 … iN -- )
+: logf" ( C: N -- ) ( E: i1 … iN -- )
   va- postpone' c" compile' printf -va
 ;
 
 \ Format-prints to stderr.
-: ef" ( C: N -- ) ( E: i1 … iN -- )
+: elogf" ( C: N -- ) ( E: i1 … iN -- )
   va- compile' stderr postpone' c" compile' fprintf -va
 ;
 
@@ -1140,8 +1140,8 @@ Also see `throwf"` which comes with its own buffer.
   compile'  throw
 ;
 
-: log_int ( num -- ) [ 1 ] f" %zd"  ;
-: log_cell ( num ind -- ) dup_over [ 3 ] f" %zd 0x%zx <%zd>" ;
+: log_int ( num -- ) [ 1 ] logf" %zd"  ;
+: log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
 : . ( num -- ) depth dec log_cell cr ;
 
 : .s
@@ -1157,7 +1157,7 @@ Also see `throwf"` which comes with its own buffer.
     #ret
   #end
 
-  len [ 1 ] f" stack <%zd>:" cr
+  len [ 1 ] logf" stack <%zd>:" cr
 
   0
   #begin

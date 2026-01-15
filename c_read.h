@@ -30,7 +30,7 @@ typedef struct {
     (read)->word_pos.col
 
 typedef enum : U8 {
-  CHAR_EOF,
+  CHAR_EOF = 1,
   CHAR_UNPRINTABLE,
   CHAR_WHITESPACE,
   CHAR_DECIMAL,

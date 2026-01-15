@@ -44,5 +44,11 @@
     tmp_str->len >= tmp_ceil;                   \
   })
 
+#define str_eq(str, tar)                             \
+  ({                                                 \
+    const auto str_eq_tmp = str;                     \
+    !strncmp(tar, str_eq_tmp->buf, str_eq_tmp->len); \
+  })
+
 typedef str_buf(128) Word_str;
 typedef str_buf(256) Path_str;

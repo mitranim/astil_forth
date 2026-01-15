@@ -158,25 +158,28 @@ static Err file_stream_write(
 
 // ultra lazy ass code
 static char *path_join(const char *one, const char *two) {
-  static constexpr auto    LEN = 4096;
+  static constexpr Uint    LEN = 4096;
   static thread_local char BUF[LEN];
 
-  int  rem = LEN;
+  Uint rem = LEN;
   auto ptr = BUF;
 
   auto len = strlcpy(ptr, one, rem);
   ptr += len;
+  aver(rem >= len);
   rem -= len;
 
   len = strlcpy(ptr, "/../", rem);
   ptr += len;
+  aver(rem >= len);
   rem -= len;
 
   len = strlcpy(ptr, two, rem);
   ptr += len;
+  aver(rem >= len);
   rem -= len;
 
-  if (rem <= 0) {
+  if (!rem) {
     eprintf(
       "out of buffer space when joining paths " FMT_QUOTED " and " FMT_QUOTED
       "\n",

@@ -56,6 +56,7 @@ typedef struct {
 
 // Bit of a hack; `./lib/set.(c|h)` doesn't support `char*` keys.
 typedef dict_of(Empty) Str_set;
+static constexpr auto  EMPTY = (Empty){};
 
 #define dict_init(dict, cap) \
   hash_table_init((Hash_table *)dict, cap, DICT_KEY_SIZE, dict_val_size(dict));

@@ -95,6 +95,7 @@ Possible semantics combinations per word:
   <code>    | forbidden              | weird, use cases may not exist
 */
 
+// Only works if the CWD matches this file's directory 😔.
 __asm__(".include \"./c_asm_arm64.s\"");
 
 // clang-format off
@@ -207,13 +208,10 @@ static Err asm_deinit(Asm *asm) {
   Err err = stack_deinit(&asm->gots.names);
 
   if (asm->code) {
-    err       = either(err, err_errno(munmap(asm->code, sizeof(*asm->code))));
-    asm->code = nullptr;
+    err = either(err, err_errno(munmap(asm->code, sizeof(*asm->code))));
   }
-
   if (asm->heap) {
-    err       = either(err, err_errno(munmap(asm->heap, sizeof(*asm->heap))));
-    asm->heap = nullptr;
+    err = either(err, err_errno(munmap(asm->heap, sizeof(*asm->heap))));
   }
 
   *asm = (Asm){};
@@ -385,6 +383,7 @@ static Err asm_call_norm(
   Asm *asm, const Reader *read, const Sym *sym, void *interp
 ) {
   try(asm_ensure_sym_ready(asm, sym));
+
   IF_DEBUG(eprintf(
     "[system] calling word " FMT_QUOTED
     " at instruction address %p (" READ_POS_FMT ")\n",
@@ -392,6 +391,7 @@ static Err asm_call_norm(
     sym->norm.exec.floor,
     READ_POS_ARGS(read)
   ));
+
   const auto err = asm_call_forth(nullptr, sym->norm.exec.floor, interp);
   IF_DEBUG(eprintf(
     "[system] done called word " FMT_QUOTED "; error: %p\n", sym->name.buf, err
@@ -970,6 +970,8 @@ static void asm_sym_auto_inlinable(Sym *sym) {
 
   const auto spans = &sym->norm.spans;
   const auto len   = spans->epilogue - spans->inner;
+
+  // Inlining more than 1 instruction can be situationally worse.
   if (len > 1) return;
 
   sym->norm.inlinable = true;
@@ -1195,6 +1197,10 @@ which words are being called.
 */
 
 static bool asm_is_instr_ours(const Asm *asm, const Instr *addr) {
+  // TODO remember why I thought I needed this change.
+  // const auto exec = &asm->code_exec;
+  // return addr >= exec->dat && addr < list_ceil(exec);
+
   return is_list_elem(&asm->code_exec, addr);
 }
 

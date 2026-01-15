@@ -15,11 +15,10 @@ test_conditionals
 
 1 0 extern: sleep
 
-: sleep_loop #begin log" sleeping" cr 1 sleep #again ;
-: test_again sleep_loop ;
-\ test_again
+: test_sleep_loop #begin log" sleeping" cr 1 sleep #again ;
+\ test_sleep_loop
 
-: countdown_repeat ( val -- )
+: test_repeat ( val -- )
   #begin
     debug_top_int
     dup #while
@@ -30,11 +29,9 @@ test_conditionals
   debug_top_int
   drop
 ;
+\ 12 test_repeat
 
-: test_repeat 12 countdown_repeat ;
-\ test_repeat
-
-: countdown_until ( val -- )
+: test_until ( val -- )
   #begin
     debug_top_int
     dec
@@ -43,23 +40,19 @@ test_conditionals
   debug_top_int
   drop
 ;
+\ 12 test_until
 
-: test_until 12 countdown_until ;
-\ test_until
-
-: countup_do_loop ( max -- )
+: test_do_loop ( max -- )
   0 #do>
     debug_top_int
   #loop+
   debug_stack
   drop2
 ;
-
-: test_do_loop 12 countup_do_loop ;
-\ test_do_loop
+\ 12 test_do_loop
 
 \ `#loop+` patches `#while`; `#end` patches `#do>`.
-: countup_do_loop_while ( max -- )
+: test_do_loop_while ( max -- )
   0 #do>
     dup 6 < #while
     debug_top_int
@@ -67,9 +60,8 @@ test_conditionals
   debug_stack
   drop2
 ;
+\ 12 test_do_loop_while
 
-: test_do_loop_while 12 countup_do_loop_while ;
-\ test_do_loop_while
 
 : test_sc 10 20 30 depth .sc ;
 
@@ -192,11 +184,11 @@ T{  234 -123 max <T>  234 }T
 ;
 
 : test_fmt
-  10 20 30 [ 3 ] f" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" cr
 ;
 
 : test_efmt
-  10 20 30 [ 3 ] ef" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] elogf" numbers: %zu %zu %zu" cr
 ;
 
 4096 buf: STR_BUF

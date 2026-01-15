@@ -3,6 +3,7 @@
 #include "./lib/cli.c"
 #include "./lib/err.h"
 #include "./lib/mach_exc.c"
+#include "./lib/time.c"
 #include <stdio.h>
 #include <string.h>
 
@@ -25,8 +26,10 @@ static Err init_exception_handling() {
 
 static Err run(int argc, const char **argv) {
   bool recovery = true;
+  bool timing   = false;
   try(env_bool("DEBUG", &DEBUG));
   try(env_bool("RECOVERY", &recovery));
+  try(env_bool("TIMING", &timing));
 
   Interp interp = {};
 
@@ -34,7 +37,12 @@ static Err run(int argc, const char **argv) {
   if (recovery) try(init_exception_handling());
 
   for (int ind = 1; ind < argc; ind++) {
+    Timing time = {.prefix = "[import] "};
+    if (timing) timing_beg(&time);
+
     try(interp_import(&interp, argv[ind]));
+
+    if (timing) timing_end(&time);
   }
 
   // try(compile_mach_executable(&interp));

@@ -122,6 +122,8 @@ typedef span_of(F64)  F64_span;
     }                                                              \
   })
 
+// Index of given stack element, by pointer.
+// Providing an invalid pointer is UB.
 #define stack_ind(stack, val) ((val) - (stack)->floor)
 
 #define stack_range(type, name, stack) \

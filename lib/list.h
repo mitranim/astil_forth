@@ -193,10 +193,16 @@ Does not initialize memory at location.
   })
 
 // Pointer just outside the allocated capacity.
-#define list_ceil(list) \
-  (typeof((list)->dat))(list_ceil_impl((List *)(list), list_val_size(list)))
+#define list_ceil(list)                       \
+  (typeof((list)->dat))(list_ceil_impl(       \
+    (const List *)(list), list_val_size(list) \
+  ))
 
 #define list_val_type(list) typeof((list)->dat[0])
 #define list_val_size(list) sizeof((list)->dat[0])
+
+// Index of given list element, by pointer.
+// Providing an invalid pointer is UB.
+#define list_ind(list, val) ((Ind)((val) - (list)->dat))
 
 static constexpr Uint LIST_INIT_CAP = 4;
