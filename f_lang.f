@@ -719,9 +719,21 @@ Assumes `lsl` is already part of the base instruction.
         asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
+: @2 ( adr -- val0 val1 ) [
+          asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
+  1 2 1 0 asm_load_pair_off comp_instr \ ldp x1, x2, [x1]
+          asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
+] ;
+
 : ! ( val adr -- ) [
         asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
   1 2 0 asm_store_off comp_instr \ str x1, [x2]
+] ;
+
+: !2 ( val0 val1 adr -- val0 val1 ) [
+  3       asm_pop1           comp_instr \ ldr x3, [x27, -8]!
+          asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 3 0 asm_store_pair_off comp_instr \ stp x1, x2, [x3]
 ] ;
 
 \ 32-bit version of `!`. Used for patching instructions.
@@ -829,8 +841,8 @@ this is considered a "bad instruction" and blows up.
 : #word_beg compile' : ;
 : #word_end compile' ; not_comp_only ;
 
-\ Same as standard `constant`.
-: let: ( C: val -- ) ( E: -- val ) #word_beg comp_push inline #word_end ;
+\ Similar to standard `constant`.
+: let: ( C: val -- ) ( E: -- val ) #word_beg comp_push #word_end ;
 
 \ Similar to standard `variable`.
 : var: ( C: init "name" -- ) ( E: -- addr )
@@ -850,7 +862,15 @@ this is considered a "bad instruction" and blows up.
   #word_beg
   dup 1       comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1 comp_instr       \ str x1, [x27], 8
-              comp_push        \ str <len>, [x27], 8
+              comp_push        \ str <size>, [x27], 8
+  #word_end
+;
+
+\ Shortcut for the standard idiom `create <name> N cells allot`.
+: cells: ( C: len "name" -- ) ( E: -- addr )
+  #word_beg
+  cells 1     comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr       \ str x1, [x27], 8
   #word_end
 ;
 
@@ -908,7 +928,7 @@ this is considered a "bad instruction" and blows up.
 \ Usage: `throw" some_error_msg"`.
 \
 \ Also see `sthrowf"` for formatted errors.
-: throw" comp_str compile' throw ;
+: throw" ( C: "str" -- ) comp_str compile' throw ;
 
 \ ## Memory
 \
@@ -1109,23 +1129,24 @@ this is considered a "bad instruction" and blows up.
   ( C: local_ind -- frame fun[frame!] … adr[cond] adr[beg] fun[for] )
   ( E: limit -- )
 
-  to: limit
+  to: index
   loop_frame_beg
-  limit comp_local_pop
+  index comp_local_pop \ Reuse limit as index.
 
   here to: adr_beg
-  1 limit asm_local_load  comp_instr    \ ldur x1, [FP, <loc_off>]
+  1 index asm_local_load  comp_instr    \ ldur x1, [FP, <loc_off>]
   here to: adr_cond       reserve_instr \ cbz x1, <end>
   1 1 1   asm_sub_imm     comp_instr    \ sub x1, x1, 1
-  1 limit asm_local_store comp_instr    \ stur x1, [FP, <loc_off>]
+  1 index asm_local_store comp_instr    \ stur x1, [FP, <loc_off>]
 
   adr_cond adr_beg ' for_loop_pop
 ;
 
-\ A count-down loop. Analogue of the non-standard but
-\ common `for` loop. Usage; limit must be positive:
+\ A count-down-by-one loop. Analogue of the non-standard
+\ `for … next` loop. Usage; ceiling must be positive:
 \
-\   123 #for
+\   123
+\   #for
 \     log" looping"
 \   #end
 \
@@ -1135,95 +1156,142 @@ this is considered a "bad instruction" and blows up.
 \   who are too lazy to optimize `?do` loops properly.
 : #for
   ( C: -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
-  ( E: limit -- )
+  ( E: ceil -- )
   anon_local_ind for_loop_init
 ;
 
 \ Like `#for` but requires a local name to make the index
-\ accessible. Usage; index must be positive:
+\ accessible. Usage; ceiling must be positive:
 \
-\   123 #for: ind
+\   123
+\   -for: ind
 \     ind .
 \   #end
-: #for:
+: -for:
   ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
-  ( E: limit -- )
+  ( E: ceil -- )
   parse_word get_local_ind for_loop_init
 ;
 
-\ Not used by `#for` and `#for:` because they get away
+\ Not used by `#for` and `-for:` because they get away
 \ with storing just one local instead of two.
-: counted_loop_beg ( loc_ind loc_lim -- adr[cond] adr[beg] loc_ind )
+\
+\ The meaning of "cursor" and "limit" may differ between loop words.
+\ The cursor is often a pointer.
+: comp_count_loop_beg ( loc_cur loc_lim -- adr[cond] adr[beg] loc_cur )
   to: limit
-  to: index
-
-  index comp_local_pop
-  limit comp_local_pop
+  to: cursor
 
   here to: adr_beg
-  index limit comp_load_locals_x1_x2
-  1 2         asm_cmp_reg comp_instr \ cmp x1, x2
-  here to: adr_cond    reserve_instr \ b.cond <end>
+  cursor limit comp_load_locals_x1_x2
+  1 2 asm_cmp_reg comp_instr \ cmp x1, x2
 
-  adr_cond adr_beg index
+  here to: adr_cond
+  reserve_instr \ b.cond <end>
+
+  adr_cond adr_beg cursor
 ;
 
-: plus_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] )
+: count_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] asm_cond -- )
+  to: asm_cond
   loop_end \ b <begin>
   to: adr_cond
-  ASM_GE adr_cond pc_off asm_branch_cond adr_cond !32 \ b.ge <end>
+  asm_cond adr_cond pc_off asm_branch_cond adr_cond !32 \ b.cond <end>
   execute \ Pop auxiliaries; restore previous loop frame.
 ;
 
-: for_plus_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_ind )
-  to: index
-  1 index asm_local_load  comp_instr \ ldur x1, [FP, <index_off>]
-  1 1 1   asm_add_imm     comp_instr \ add x1, x1, 1
-  1 index asm_local_store comp_instr \ stur x1, [FP, <index_off>]
-  plus_loop_pop
+: count_up_loop_pop ASM_GE count_loop_pop ;
+: count_down_loop_pop ASM_LT count_loop_pop ;
+
+: plus_for_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_cur )
+  to: cursor
+  1 cursor asm_local_load  comp_instr \ ldur x1, [FP, <index_off>]
+  1 1 1    asm_add_imm     comp_instr \ add x1, x1, 1
+  1 cursor asm_local_store comp_instr \ stur x1, [FP, <index_off>]
+  count_up_loop_pop
 ;
 
-\ A count-up loop. Analogue of the standard `?do` loop.
+\ A count-up-by-one loop. Analogue of the standard `?do … loop` idiom.
 \ Requires a name to make the index accessible. Usage:
 \
-\   123 34 #for+: ind
+\   123 34
+\   +for: ind
 \     ind .
 \   #end
-: #for+:
-  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] loc_ind fun[pop] )
-  ( E: limit start -- )
+: +for:
+  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] loc_cur fun[pop] )
+  ( E: ceil floor -- )
   loop_frame_beg
-  parse_word get_local_ind  to: index
-             anon_local_ind to: limit
-  index limit counted_loop_beg
-  ' for_plus_loop_pop
+  parse_word
+
+  anon_local_ind to: ceil
+  get_local_ind  to: floor \ Reuse as cursor / index.
+
+  floor      comp_local_pop
+  ceil       comp_local_pop
+  floor ceil comp_count_loop_beg
+  ' plus_for_loop_pop
 ;
 
-: loop_plus_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_ind loc_step )
-  to: step to: index
-  index step comp_load_locals_x1_x2
-  1 1 2      asm_add_reg comp_instr \ add x1, x1, x2
-  index         comp_store_local_x1
-  plus_loop_pop
+: plus_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_cur loc_step )
+  to: step to: cursor
+  cursor step comp_load_locals_x1_x2
+  1 1 2  asm_add_reg comp_instr \ add x1, x1, x2
+  cursor comp_store_local_x1
+  count_up_loop_pop
 ;
 
 \ Similar to the standard `?do ... +loop`, but terminated with `#end`
 \ like other loops. Takes a name to make the index accessible. Usage:
 \
-\   limit start step #+loop: ind ind . #end
-\   123   23    3    #+loop: ind ind . #end
-: #+loop:
-  ( C: "name" -- frame fun[frame!] … adr[beg] adr[cond] loc_ind loc_step fun[pop] )
-  ( E: limit start step -- )
+\   ceil floor step +loop: ind ind . #end
+\   123  23    3    +loop: ind ind . #end
+: +loop:
+  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] loc_cur loc_step fun[pop] )
+  ( E: ceil floor step -- )
   loop_frame_beg
 
-  parse_word get_local_ind to: index
-  anon_local_ind           to: limit
-  anon_local_ind           to: step
+  parse_word
+  anon_local_ind to: ceil
+  get_local_ind  to: floor \ Reuse as cursor.
+  anon_local_ind to: step
 
-  step comp_local_pop
-  index limit counted_loop_beg
-  step ' loop_plus_pop
+  step       comp_local_pop
+  floor      comp_local_pop
+  ceil       comp_local_pop
+  floor ceil comp_count_loop_beg
+  step ' plus_loop_pop
+;
+
+\ Like in `+loop:`, the range is `[floor,ceil)`.
+: -loop:
+  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
+  ( E: ceil floor step -- )
+  loop_frame_beg
+
+  parse_word
+  get_local_ind  to: ceil \ Reuse as cursor.
+  anon_local_ind to: floor
+  anon_local_ind to: step
+
+  step       comp_local_pop
+  floor      comp_local_pop
+  ceil       comp_local_pop
+
+  here to: adr_beg
+
+  \ We can almost use `comp_count_loop_beg` here,
+  \ but this loop wants subtraction at the start.
+  \ TODO use `ldp` for adjacent offsets.
+  1 ceil  asm_local_load comp_instr \ ldur x1, [FP, <ceil_off>]
+  2 floor asm_local_load comp_instr \ ldur x2, [FP, <floor_off>]
+  3 step  asm_local_load comp_instr \ ldur x3, [FP, <step_off>]
+  1 1 3   asm_sub_reg    comp_instr \ sub x1, x1, x3
+  1 2     asm_cmp_reg    comp_instr \ cmp x1, x2
+  here to: adr_cond   reserve_instr \ b.cond <end>
+  1 ceil asm_local_store comp_instr \ stur x1, [FP, <ceil_off>]
+
+  adr_cond adr_beg ' count_down_loop_pop
 ;
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
@@ -1458,6 +1526,14 @@ Like `sthrowf"` but easier to use. Example:
   compile' throw
 ;
 
+\ Similar to standard `abort"`, with clearer naming.
+: throw_if" ( C: "str" -- ) ( E: pred -- )
+  postpone' #if
+  comp_str
+  compile' throw
+  postpone' #end
+;
+
 : log_int ( num -- ) [ 1 ] logf" %zd"  ;
 : log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
 : . ( num -- ) stack_len dec log_cell cr ;
@@ -1527,4 +1603,18 @@ aka underflow or overflow, triggers a segfault.
   addr  PAGE_SIZE +        to: addr
   addr  size2 mem_unprot
   addr  size2
+;
+
+\ Calling this "guarded" is an overstatement. The size gets page-aligned,
+\ which often means there's an unguarded upper region which is writable
+\ and readable and allows overflows. However, underflows into the lower
+\ guard are successfully prevented.
+\
+\ TODO consider compiling lazy-init; dig up the old code.
+: cells_guarded: ( C: len "name" -- ) ( E: -- addr )
+  #word_beg
+    cells mem_alloc drop
+    1 swap      comp_load  \ ldr x1, <addr>
+    1 asm_push1 comp_instr \ str x2, [x27], 8
+  #word_end
 ;

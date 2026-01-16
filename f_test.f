@@ -52,6 +52,22 @@ T{ 123 test_recursion <T> 13 }T
 ;
 test_loop_leave
 
+: test_loop_nested
+  T{
+    #loop
+      10
+      #loop
+        20 #leave
+      #end
+      30
+      #leave
+    #end
+    <T>
+    10 20 30
+  }T
+;
+test_loop_nested
+
 : test_loop_while
   T{ #loop    false #while 10              #end <T>       }T
   T{ #loop 10 false #while 20              #end <T> 10    }T
@@ -191,12 +207,12 @@ test_loop_until
 ;
 test_loop_for_anon
 
-: test_loop_for_named
-  T{ 12 #for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
-  T{ 12 #for: ind ind #leave #end <T> 11                        }T
+: test_loop_for_minus
+  T{ 12 -for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
+  T{ 12 -for: ind ind #leave #end <T> 11                        }T
 
   T{
-    12 #for: ind
+    12 -for: ind
       ind 5 <= #if #leave #end
       ind
     #end
@@ -205,7 +221,7 @@ test_loop_for_anon
   }T
 
   T{
-    12 #for: ind
+    12 -for: ind
       ind 5 > #while
       ind
     #end
@@ -214,7 +230,7 @@ test_loop_for_anon
   }T
 
   T{
-    12 #for: ind
+    12 -for: ind
       ind 7 > #while
       ind 5 > #while
       ind
@@ -224,7 +240,7 @@ test_loop_for_anon
   }T
 
   T{
-    12 #for: ind
+    12 -for: ind
       ind 5 > #while
       ind 7 > #while
       ind
@@ -233,21 +249,21 @@ test_loop_for_anon
     11 10 9 8
   }T
 ;
-test_loop_for_named
+test_loop_for_minus
 
 : test_loop_for_plus
-  T{ 12 -1  #for+: ind ind        #end <T> -1 0 1 2 3 4 5 6 7 8 9 10 11 }T
-  T{ 12 0   #for+: ind ind        #end <T>    0 1 2 3 4 5 6 7 8 9 10 11 }T
-  T{ 12 1   #for+: ind ind        #end <T>      1 2 3 4 5 6 7 8 9 10 11 }T
-  T{ 12 -1  #for+: ind ind #leave #end <T> -1                           }T
-  T{ 12 0   #for+: ind ind #leave #end <T> 0                            }T
-  T{ 12 1   #for+: ind ind #leave #end <T> 1                            }T
+  T{ 12 -1  +for: ind ind        #end <T> -1 0 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 0   +for: ind ind        #end <T>    0 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 1   +for: ind ind        #end <T>      1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 -1  +for: ind ind #leave #end <T> -1                           }T
+  T{ 12 0   +for: ind ind #leave #end <T> 0                            }T
+  T{ 12 1   +for: ind ind #leave #end <T> 1                            }T
 
-  T{ 12 1 #for+: ind true #while ind #leave #end <T> 1 }T
-  T{ 12 1 #for+: ind #leave true #while ind #end <T>   }T
+  T{ 12 1 +for: ind true #while ind #leave #end <T> 1 }T
+  T{ 12 1 +for: ind #leave true #while ind #end <T>   }T
 
   T{
-    12 0 #for+: ind
+    12 0 +for: ind
       ind 5 > #if #leave #end
       ind
     #end
@@ -256,7 +272,7 @@ test_loop_for_named
   }T
 
   T{
-    12 0 #for+: ind
+    12 0 +for: ind
       ind 6 < #while
       ind
     #end
@@ -265,7 +281,7 @@ test_loop_for_named
   }T
 
   T{
-    12 0 #for+: ind
+    12 0 +for: ind
       ind 8 < #while
       ind 6 < #while
       ind
@@ -275,7 +291,7 @@ test_loop_for_named
   }T
 
   T{
-    12 0 #for+: ind
+    12 0 +for: ind
       ind 6 < #while
       ind 8 < #while
       ind
@@ -285,6 +301,41 @@ test_loop_for_named
   }T
 ;
 test_loop_for_plus
+
+: test_plus_loop
+  T{ 8 0 1 +loop: ind ind #end <T> 0 1 2 3 4 5 6 7 }T
+  T{ 8 0 2 +loop: ind ind #end <T> 0 2 4 6         }T
+  T{ 8 0 3 +loop: ind ind #end <T> 0 3 6           }T
+;
+test_plus_loop
+
+: test_plus_loop_nested
+  T{
+    4 0 1
+    +loop: one
+      one
+      6 one 1
+      +loop: two
+        two
+      #end
+    #end
+
+    <T>
+
+    0 0 1 2 3 4 5
+      1 1 2 3 4 5
+        2 2 3 4 5
+          3 3 4 5
+  }T
+;
+test_plus_loop_nested
+
+: test_minus_loop
+  T{ 8 0 1 -loop: ind ind #end <T> 7 6 5 4 3 2 1 0 }T
+  T{ 8 0 2 -loop: ind ind #end <T> 6 4 2 0         }T
+  T{ 8 0 3 -loop: ind ind #end <T> 5 2             }T
+;
+test_minus_loop
 
 : test_sc 10 20 30 stack_len .sc ;
 \ test_sc

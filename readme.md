@@ -38,7 +38,7 @@ Most language features are implemented in `f_lang.f`, bootstrapping the language
     log" branch 2" cr
   #end
 
-  12 #for: ind
+  12 for: ind
     ind [ 1 ] logf" current number: %zd" cr
   #end
 ;
@@ -61,27 +61,19 @@ make build_w
 
 Unix users will scoff at `*.exe`, but it's convenient in development for hiding binary files from code editors 😛. Drop the extension when adding the executable to your `$PATH`.
 
+When debugging weird crashes, the following are useful:
+
+```sh
+make debug_run '<file>'
+make debug_run '<file>' RECOVERY=false
+make debug_run '<file>' DEBUG=true
+```
+
 ## Library
 
 Should be usable as a library in another C/C++ program. The "main" file is only a tiny adapter over the top-level library API. See `./c_main.c`.
 
 The C code uses a "unity build" where files directly include other files, with `#pragma once`. A program could simply `#include` the key files in its own "main" or whatever, and be good to go, without having to configure the build system. Some "include" paths might need tiny tweaks.
-
-## Tradeoffs
-
-This system uses naive single-pass assembly, with a tiny post-pass to fix PC offsets.
-
-This approach is incompatible with many optimizations. It requires every operation to be self-contained, bloating the instruction count. For example, simple addition, even if inlined, becomes 6 instructions instead of 1, and most of them are memory ops to boot:
-
-```forth
-push push pop2 add push pop
-```
-
-Optimizing Forth compilers, such as VfxForth and Gforth, allocate registers and fictionalize many stack operations. Inevitably, this makes the compiler complex. It's not possible to allocate registers in the first pass through source text. You end up with an IR and more passes. This interferes with self-bootstrapping in library code; simply vomiting instructions into the procedure body no longer suffices, as the program must become IR-aware or negotiate register slots with the compiler.
-
-I had a go, and bounced off the complexity. How to keep an optimizing compiler simple?
-
-Such tradeoffs might be irrelevant when your CPU/ISA is designed for stack languages. Notable example: [GreenArrays chips](https://www.greenarraychips.com) designed or co-designed by Forth's inventor Chuck Moore. Looking at this architecture is enlightening in how much _simpler_ an ISA, efficient compilation, and the hardware/software stack can be.
 
 ## Easy C interop
 
@@ -99,6 +91,30 @@ It's trivial to declare and call extern procedures. Examples can be found in the
 main
 ```
 
+## Limitations
+
+### Simplicity vs optimization
+
+This system uses naive single-pass assembly, with a tiny post-pass to fix PC offsets.
+
+This approach is incompatible with many optimizations. It requires every operation to be self-contained, bloating the instruction count. For example, simple addition, even if inlined, becomes 6 instructions instead of 1, and most of them are memory ops to boot:
+
+```forth
+push push pop2 add push pop
+```
+
+Optimizing Forth compilers, such as VfxForth and Gforth, allocate registers and fictionalize many stack operations. Inevitably, this makes the compiler complex. It's not possible to allocate registers in the first pass through source text. You end up with an IR and more passes. This interferes with self-bootstrapping in library code; simply vomiting instructions into the procedure body no longer suffices, as the program must become IR-aware or negotiate register slots with the compiler.
+
+I had a go, and bounced off the complexity. How to keep an optimizing compiler simple?
+
+Such tradeoffs might be irrelevant when your CPU/ISA is designed for stack languages. Notable example: [GreenArrays chips](https://www.greenarraychips.com) designed or co-designed by Forth's inventor Chuck Moore. Looking at this architecture is enlightening in how much _simpler_ an ISA, efficient compilation, and the hardware/software stack can be.
+
+### Other limitations
+
+- Currently only Arm64 and MacOS.
+- Vocabulary is still a work in progress.
+- Exceptions print only C traces, not Forth traces.
+
 ## Non-standard
 
 For the sake of my sanity and ergonomics, this system does _not_ follow the ANS Forth standard. It improves upon it.
@@ -111,10 +127,11 @@ Non-decimal numeric literals are denoted with `0b 0o 0x`. Radix prefixes are cas
 
 Many unclear words are replaced with clear ones.
 
-Better control flow structures:
+More ergonomic control flow structures:
 - `elif` is supported.
 - Any amount of `else elif` is popped with a single `end`.
-- Most loops are terminated with `end`. No need to remember other terminators!
+- Most loops are terminated with `end`. No need to remember other terminators.
+  - Arguably sometimes less flexible.
 - Loop controls like `leave` and `while` are terminated by the same `end` as the loop.
 
 Because the system uses native procedure calls, there is no return stack; see below.
