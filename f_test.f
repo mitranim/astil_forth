@@ -34,50 +34,61 @@ test_conditionals
 : test_sleep_loop #begin log" sleeping" cr 1 sleep #again ;
 \ test_sleep_loop
 
-: test_repeat ( val -- )
-  #begin
-    debug_top_int
-    dup #while
-    dup #while
-    dup #while
-    dec
-  #repeat #end #end
-  debug_top_int
-  drop
+: test_repeat
+  T{
+    12 #begin
+      dec
+      dup #while
+      dup #while
+      dup #while
+      dup
+    #repeat #end #end
+    <T>
+    11 10 9 8 7 6 5 4 3 2 1 0
+  }T
 ;
-\ 12 test_repeat
+test_repeat
 
-: test_until ( val -- )
-  #begin
-    debug_top_int
-    dec
-    dup
-  #until
-  debug_top_int
-  drop
+: test_until
+  T{
+    12 #begin dup dec dup #until
+    <T>
+    12 11 10 9 8 7 6 5 4 3 2 1 0
+  }T
 ;
-\ 12 test_until
+test_until
 
-: test_do_loop ( max -- )
-  0 #do>
-    debug_top_int
-  #loop+
-  debug_stack
-  drop2
+: test_do_loop
+  T{
+    12 0
+    #do> i #loop+
+    <T>
+    0 1 2 3 4 5 6 7 8 9 10 11
+  }T
 ;
-\ 12 test_do_loop
+test_do_loop
 
 \ `#loop+` patches `#while`; `#end` patches `#do>`.
-: test_do_loop_while ( max -- )
-  0 #do>
-    dup 6 < #while
-    debug_top_int
-  #loop+ #end
-  debug_stack
-  drop2
+: test_do_loop_while
+  T{
+    12 0 #do>
+      i 6 < #while
+      i
+    #loop+ #end
+    <T>
+    0 1 2 3 4 5
+  }T
 ;
-\ 12 test_do_loop_while
+test_do_loop_while
 
+: test_for_loop
+  T{
+    12 #for i #repeat
+    <T>
+    11 10 9 8 7 6 5 4 3 2 1 0
+  }T
+;
+test_for_loop
 
 : test_sc 10 20 30 depth .sc ;
 

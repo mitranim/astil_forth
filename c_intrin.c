@@ -643,6 +643,16 @@ static void debug_flush(void *) {
 
 static Err debug_throw() { return "debug_throw"; }
 
+static void debug_stack_len(Interp *interp) {
+  const auto ints = &interp->ints;
+  const auto len  = stack_len(ints);
+  if (!len) {
+    eprintf("[debug] stack is empty (%p)\n", ints->floor);
+    return;
+  }
+  eprintf("[debug] stack length (%p): " FMT_SINT "\n", ints->floor, len);
+}
+
 static void debug_stack(Interp *interp) {
   const auto ints = &interp->ints;
   const auto len  = stack_len(ints);
@@ -1045,6 +1055,12 @@ static constexpr Sym USED INTRIN[] = {
     .name.buf    = "debug_throw",
     .intrin.fun  = (void *)debug_throw,
     .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_stack_len",
+    .intrin.fun  = (void *)debug_stack_len,
     .interp_only = true,
   },
   (Sym){

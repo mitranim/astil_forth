@@ -770,6 +770,42 @@ this is considered a "bad instruction" and blows up.
 
 : char' parse_word drop c@ comp_push ;
 
+\ Same as standard `s"` in interpretation mode.
+\ The parser ensures a trailing null byte.
+\ All our strings are zero-terminated.
+: parse_str ( -- cstr len ) char' " parse ;
+: parse_cstr ( -- cstr ) parse_str drop ;
+
+\ Same as standard `s"` in interpretation mode.
+\ For top-level code in scripts.
+\ Inside words, use `"`.
+: str" ( -- cstr len ) parse_str ;
+
+: comp_str ( C: <str> -- ) ( E: -- cstr len )
+  parse_str tuck            ( len str len )
+  inc                       \ Reserve 1 more for null byte.
+  1              comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  2 swap         comp_load  \ ldr x2, <len>
+  asm_push_x1_x2 comp_instr \ stp x1, x2, [x27], 16
+;
+
+\ Same as standard `s"` in compilation mode.
+\ Words ending with a quote are automatically immediate.
+: " comp_str ;
+
+\ For top-level code in scripts.
+: cstr" ( C: <str> -- ) ( E: -- cstr ) parse_str drop ;
+
+: comp_cstr ( C: <str> -- ) ( E: -- cstr )
+  parse_str   inc        \ Reserve 1 more for null byte.
+  1           comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr \ stp x1, x2, [x27], 16
+;
+
+\ For use inside words.
+\ Words ending with a quote are automatically immediate.
+: c" comp_cstr ;
+
 \ Core primitive for locals.
 : to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
 
@@ -887,59 +923,66 @@ Each additional `#while` can be terminated with `#end`.
   here - 1 swap asm_cmp_branch_not_zero comp_instr \ cbz 1, <begin>
 ;
 
-(
-Similar to the standard `?do … loop`, with clearer naming.
-Keeps the provided ceiling and floor on the regular stack.
-Does NOT discard them when done. There's no magic `i`.
+\ Similar to the standard `?do`, renamed for clarity.
+\ Usage: `lim ind #do> i . #loop+`.
+: #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: lim ind -- )
+  " i" comp_local_ind to: ind
+  " l" comp_local_ind to: lim
 
-  8 0 #do> dup . #loop+ drop2
-  \ 0 1 2 3 4 5 6 7
-)
-: #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
-  here compile' dup2 compile' > postpone' #while
+  ind comp_local_pop  lim comp_local_pop
+  here
+  lim comp_local_push ind comp_local_push
+  compile' > postpone' #while
 ;
 
-: #loop+ ( C: fun[any] fun[any] adr[beg] -- )
-  compile' inc postpone' #repeat
+: #loop+ ( C: adr[any] fun[any] adr[beg] -- )
+  " i" comp_local_ind to: ind
+  ind comp_local_push
+  compile' inc
+  ind comp_local_pop
+  postpone' #repeat
+;
+
+\ An error-prone alternative.
+\
+\ (
+\ Similar to the standard `?do … loop`, with clearer naming.
+\ Keeps the provided ceiling and floor on the regular stack.
+\ Does NOT discard them when done. There's no magic `i`.
+\
+\   8 0 #do> dup . #loop+ drop2
+\   \ 0 1 2 3 4 5 6 7
+\ )
+\ : #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
+\   here compile' dup2 compile' > postpone' #while
+\ ;
+\
+\ : #loop+ ( C: fun[any] fun[any] adr[beg] -- )
+\   compile' inc postpone' #repeat
+\ ;
+
+\ Usage:
+\
+\   123 #for i . #repeat
+\
+\ Anton Ertl circa 1994:
+\
+\ > This is the preferred loop of native code compiler writers
+\   who are too lazy to optimize `?do` loops properly.
+\
+\ TODO optimize properly. Also TODO support anonymous locals.
+: #for ( C: -- adr[beg] ) ( E: max -- )
+  " i" comp_local_ind to: ind
+  ind inc cells negate to: fp_off
+  ind comp_local_pop                   \ Forth stack -> system stack.
+  here                                 \ adr[beg]
+  1 29 fp_off asm_load_off  comp_instr \ ldur x1, [<fp>, <off>]
+  here reserve_instr ' if_patch rot    \ cbz <repeat>
+  1 1 1       asm_sub_imm   comp_instr \ sub x1, x1, 1
+  1 29 fp_off asm_store_off comp_instr \ str x1, [<fp>, <off>]
 ;
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
-
-\ Same as standard `s"` in interpretation mode.
-\ The parser ensures a trailing null byte.
-\ All our strings are zero-terminated.
-: parse_str ( -- cstr len ) char' " parse ;
-: parse_cstr ( -- cstr ) parse_str drop ;
-
-\ Same as standard `s"` in interpretation mode.
-\ For top-level code in scripts.
-\ Inside words, use `"`.
-: str" ( -- cstr len ) parse_str ;
-
-: comp_str ( C: <str> -- ) ( E: -- cstr len )
-  parse_str tuck            ( len str len )
-  inc                       \ Reserve 1 more for null byte.
-  1              comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  2 swap         comp_load  \ ldr x2, <len>
-  asm_push_x1_x2 comp_instr \ stp x1, x2, [x27], 16
-;
-
-\ Same as standard `s"` in compilation mode.
-\ Words ending with a quote are automatically immediate.
-: " comp_str ;
-
-\ For top-level code in scripts.
-: cstr" ( C: <str> -- ) ( E: -- cstr ) parse_str drop ;
-
-: comp_cstr ( C: <str> -- ) ( E: -- cstr )
-  parse_str   inc        \ Reserve 1 more for null byte.
-  1           comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr \ stp x1, x2, [x27], 16
-;
-
-\ For use inside words.
-\ Words ending with a quote are automatically immediate.
-: c" comp_cstr ;
 
 (
 The program is implicitly linked with `libc`.
