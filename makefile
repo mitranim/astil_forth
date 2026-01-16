@@ -1,4 +1,4 @@
-# MAKEFLAGS := --silent
+MAKEFLAGS := --silent
 CLEAR ?= $(if $(filter false,$(clear)),, )
 CC ?= clang
 PROD ?=
@@ -98,15 +98,26 @@ debug_run:
 	lldb --batch \
 		--source-quietly \
 		--one-line "settings set show-statusline false" \
-		--one-line "process handle SIGSEGV --notify true --pass true --stop false" \
-		--one-line "process handle SIGBUS  --notify true --pass true --stop false" \
-		--one-line "process handle SIGILL  --notify true --pass true --stop false" \
-		--one-line "process handle SIGABRT --notify true --pass true --stop false" \
 		--one-line "settings set target.disable-aslr true" \
 		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
 		--one-line "run" \
 		--one-line "quit" \
 		--file $(MAIN_EXE) -- $(args)
+
+# .PHONY: debug_run
+# debug_run:
+# 	lldb --batch \
+# 		--source-quietly \
+# 		--one-line "settings set show-statusline false" \
+# 		--one-line "process handle SIGSEGV --notify true --pass true --stop false" \
+# 		--one-line "process handle SIGBUS  --notify true --pass true --stop false" \
+# 		--one-line "process handle SIGILL  --notify true --pass true --stop false" \
+# 		--one-line "process handle SIGABRT --notify true --pass true --stop false" \
+# 		--one-line "settings set target.disable-aslr true" \
+# 		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
+# 		--one-line "run" \
+# 		--one-line "quit" \
+# 		--file $(MAIN_EXE) -- $(args)
 
 .PHONY: debug_run_w
 debug_run_w:

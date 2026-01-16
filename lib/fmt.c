@@ -11,7 +11,7 @@ static char              FMT_64_BUF[65] = {};
 Integer bits high to low. To represent a signed number, simply cast it.
 The returned buffer is only valid until the next call.
 
-Clang explodes this 4-liner into more than a kilobyte of arm64
+Clang explodes this 4-liner into more than a kilobyte of Arm64
 vector instructions and lookup tables (combined) 🤯. Wild.
 */
 static const char *uint64_to_bit_str(U64 num) {

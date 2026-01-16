@@ -55,6 +55,10 @@ static Err mprotect_mutable(void *addr, Uint len) {
   return err_errno(mprotect(addr, len, PROT_READ | PROT_WRITE));
 }
 
+static void *ptr_align(void *val) {
+  return __builtin_align_up(val, sizeof(val));
+}
+
 /*
 #include "./misc.h"
 

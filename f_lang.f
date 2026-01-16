@@ -14,7 +14,12 @@ there. Currently only the Arm64 CPU architecture is supported.
 \ brk 666
 : abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;
 : unreachable abort ;
+: nop ;
 
+: ASM_INSTR_SIZE 4 ;
+: ASM_REG_DAT_SP 27 ;
+: ASM_REG_SYS_FP 29 ;
+: ASM_REG_SYS_SP 31 ;
 : ASM_EQ 0b0000 ;
 : ASM_NE 0b0001 ;
 : ASM_CS 0b0010 ;
@@ -333,6 +338,12 @@ Assumes `lsl` is already part of the base instruction.
 : asm_sub_reg ( Xd Xn Xm -- instr )
   asm_pattern_arith_reg
   0b1_1_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ sub Xd, Xn, Xm, lsl 3
+: asm_sub_reg_words ( Xd Xn Xm -- instr )
+  asm_sub_reg
+  0b0_0_0_00000_00_0_00000_000011_00000_00000 or
 ;
 
 \ mul Xd, Xn, Xm
@@ -753,9 +764,12 @@ this is considered a "bad instruction" and blows up.
 : /cells ( size -- len ) 3 asr ;
 
 \ Stack introspection doesn't need to be optimal.
-: depth ( -- len ) sp sp0 - /cells ;
-: stack_clear ( … -- ) sp0 sp! ;
-: stack_trunc ( … len -- … ) cells sp0 + sp! ;
+: sp_at       ( ind    -- ptr ) cells sp0 + ;
+: stack_len   (        -- len ) sp sp0 - /cells ;
+: stack_clear ( …      -- )     sp0 sp! ;
+: stack_trunc ( … len  -- … )   sp_at sp! ;
+: stack+      ( … diff -- … )   sp swap dec cells + sp! ;
+: stack-      ( … diff -- … )   sp swap inc cells - sp! ;
 
 : c@ ( str -- char ) [
         asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
@@ -806,69 +820,163 @@ this is considered a "bad instruction" and blows up.
 \ Words ending with a quote are automatically immediate.
 : c" comp_cstr ;
 
-\ Core primitive for locals.
-: to: ( C: "name" -- ) ( E: val -- ) parse_word comp_local_ind comp_local_pop ;
+\ ## Variables and locals
+\
+\ Words for declaring constants, variables, and locals.
+\ Unlike in ANS Forth, variables take an initial value.
 
-: nop ;
-: pc_off ( adr -- adr off ) here over - ; \ For forward jumps.
+\ For words which define words. Kinda like `create`.
+: #word_beg compile' : ;
+: #word_end compile' ; not_comp_only ;
+
+\ Same as standard `constant`.
+: let: ( C: val -- ) ( E: -- val ) #word_beg comp_push inline #word_end ;
+
+\ Similar to standard `variable`.
+: var: ( C: init "name" -- ) ( E: -- addr )
+  #word_beg
+  cell 1      comp_static \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr  \ str x1, [x27], 8
+  #word_end
+  !
+;
+
+\ Creates a global variable which refers to a buffer of at least
+\ the given size in bytes, rounded up to page size.
+\
+\ Serves the same role as the standard idiom `create <name> N allot`
+\ which we don't have because we segregate code and data.
+: buf: ( C: size "name" -- ) ( E: -- addr size )
+  #word_beg
+  dup 1       comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr       \ str x1, [x27], 8
+              comp_push        \ str <len>, [x27], 8
+  #word_end
+;
+
+\ Core primitive for locals.
+: to: ( C: "name" -- ) ( E: val -- ) parse_word get_local_ind comp_local_pop ;
+
+\ SYNC[local_fp_off].
+: local_fp_off ( ind -- fp_off ) inc cells negate ;
+
+\ ldur Xd, [FP, <off>]
+: asm_local_load ( Xd local_ind -- instr )
+  ASM_REG_SYS_FP swap local_fp_off asm_load_off
+;
+
+\ stur Xd, [FP, <off>]
+: asm_local_store ( Xd local_ind -- instr )
+  ASM_REG_SYS_FP swap local_fp_off asm_store_off
+;
+
+0 let: false
+1 let: true
+
+\ ## Exceptions
+\
+\ Exception definitions are split. See additional words below
+\ with support for msg formatting using the C "printf" family.
+
+\ `x0` is our error register. The annotation `throws` makes the compiler
+\ insert an error check after each call to this procedure and any other
+\ procedure which calls this one, turning the error into an exception.
+\ The `len` parameter is here because buffer variables return it.
+: throw ( cstr len -- )
+  [ throws ]
+  drop
+  [ 0 asm_pop1 comp_instr ] \ ldr x0, [x27, -8]!
+;
+
+\ Usage: `throw" some_error_msg"`.
+\
+\ Also see `sthrowf"` for formatted errors.
+: throw" comp_str compile' throw ;
+
+\ ## Memory
+\
+\ The program is implicitly linked with `libc`.
+\ We're free to use Posix-standard C functions.
+\ C variables like `stdout` are a bit trickier,
+\ but also optional; we could `fdopen` instead.
+
+2 1 extern: calloc  ( len size -- addr )
+1 1 extern: malloc  ( size -- addr )
+1 0 extern: free    ( addr -- )
+3 0 extern: memset  ( buf char len -- )
+3 0 extern: memcpy  ( dst src len -- )
+3 0 extern: memmove ( dst src len -- )
+
+1 1 extern: strlen  ( cstr -- len )
+3 1 extern: strncmp ( str0 str1 len -- )
+3 0 extern: strncpy ( buf[tar] buf[src] len -- )
+3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
+
+: move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
+: fill    ( buf len char -- ) swap memset ;
+: erase   ( buf len -- ) 0 fill ;
+: blank   ( buf len -- ) 32 fill ;
+: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
+: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
+: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
+: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
+
+\ ## Conditionals
+\
+\ General idea:
+\
+\   #if        \ cbz <outside>
+\     if_true
+\   #end
+\   outside
+\
+\   #if        \ cbz <if_false>
+\     if_true
+\   #else      \ b <outside>
+\     if_false
+\   #end
+\   outside
+\
+\ Unlike other Forth systems, we also support chains
+\ of "elif" terminated with a single "end".
+
+: pc_off ( adr -- off ) here swap - ; \ For forward jumps.
 : reserve_instr ASM_PLACEHOLDER comp_instr ;
 : reserve_cond asm_pop_x1 comp_instr here reserve_instr ;
 
-(
-Conditionals work like this:
-
-  #if        \ cbz <outside>
-    if_true
-  #end
-  outside
-
-  #if        \ cbz <if_false>
-    if_true
-  #else      \ b <outside>
-    if_false
-  #end
-  outside
-
-Unlike other Forth systems, we also support chains
-of "elif" terminated with a single "end".
-)
-
 \ b <pc_off>
-: patch_uncond_forward ( adr -- ) pc_off asm_branch swap !32 ;
+: patch_uncond_forward ( adr -- ) dup pc_off asm_branch swap !32 ;
 
 \ b -<pc_off>
 : patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
 \ cbz x1, <else|end>
-: if_patch ( adr[if] -- ) pc_off 1 swap asm_cmp_branch_zero swap !32 ;
+: if_patch ( adr[if] -- ) dup pc_off 1 swap asm_cmp_branch_zero swap !32 ;
 
 \ cbnz x1, <else|end>
-: ifn_patch ( adr[ifn] -- ) pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
+: ifn_patch ( adr[ifn] -- ) dup pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
 
 : if_pop ( fun[prev] adr[if]  -- ) if_patch execute ;
 : ifn_pop ( fun[prev] adr[ifn]  -- ) ifn_patch execute ;
 
-\ This strange setup allows `#end` to chain-call `#else`,
-\ and terminate the chain at the topmost `#if` or `#ifn`.
-: cond_init ( -- fun[nop] fun[exec] adr[cond] )
-  ' nop ' execute reserve_cond
-;
-
-: #if ( C: -- fun[nop] fun[exec] adr[if] fun[if] ) ( E: pred -- )
-  cond_init ' if_pop
-;
-
-: #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
-  cond_init ' ifn_pop
-;
-
-\ Unlike "if", "elif" doesn't terminate the call chain with a nop.
 : #elif ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
   ' execute reserve_cond ' if_pop
 ;
 
 : #elifn ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
   ' execute reserve_cond ' ifn_pop
+;
+
+\ With this strange setup, `#end` pops the top control frame,
+\ which pops the next control frame, and so on. This allows us
+\ to pop any amount of control constructs with a single `#end`.
+\ Prepending a nop terminates this chain.
+: #if ( C: -- fun[nop] fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  ' nop postpone' #elif
+;
+
+: #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
+  ' nop postpone' #elifn
 ;
 
 : else_pop ( fun[prev] adr[else] -- ) patch_uncond_forward execute ;
@@ -884,130 +992,192 @@ of "elif" terminated with a single "end".
   adr ' else_pop
 ;
 
-: #end execute ;
+: #end ( C: fun -- ) execute ;
 
-: #begin ( C: -- adr[beg] ) here ;
-: #again ( C: adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
-
-(
-Currently unusable because we don't support mixing loop-related words
-with conditionals. Both groups use the regular stack for control info.
-Inside a conditional, `#leave` gets unjustly terminated by the nearest
-`#else` or `#end`. Also, loop words keep `adr[beg]` at the top.
-)
-: #leave ( C: adr[beg] -- adr[b] fun[b] adr[beg] )
-  here ' patch_uncond_forward reserve_instr rot
-;
-
-(
-The topmost `#while` is terminated with `#repeat`.
-Each additional `#while` can be terminated with `#end`.
-
-  #begin
-    cond #while
-    cond #while
-    cond #while
-  #repeat #end #end
-)
-: #while ( C: adr[beg] -- adr[cbz] fun[cbz] fun[beg] ) ( E: pred -- )
-  reserve_cond ' if_patch rot
-;
-
-\ For use with `#while`; potentially more general.
-: #repeat ( C: adr[any] fun[any] adr[beg] -- )
-  postpone' #again execute
-;
-
-: #until ( C: adr[beg] -- ) ( E: pred -- )
-  asm_pop_x1                            comp_instr \ Load predicate.
-  here - 1 swap asm_cmp_branch_not_zero comp_instr \ cbz 1, <begin>
-;
-
-\ Similar to the standard `?do`, renamed for clarity.
-\ Usage: `lim ind #do> i . #loop+`.
-: #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: lim ind -- )
-  " i" comp_local_ind to: ind
-  " l" comp_local_ind to: lim
-
-  ind comp_local_pop  lim comp_local_pop
-  here
-  lim comp_local_push ind comp_local_push
-  compile' > postpone' #while
-;
-
-: #loop+ ( C: adr[any] fun[any] adr[beg] -- )
-  " i" comp_local_ind to: ind
-  ind comp_local_push
-  compile' inc
-  ind comp_local_pop
-  postpone' #repeat
-;
-
-\ An error-prone alternative.
+\ ## Loops
 \
-\ (
-\ Similar to the standard `?do … loop`, with clearer naming.
-\ Keeps the provided ceiling and floor on the regular stack.
-\ Does NOT discard them when done. There's no magic `i`.
-\
-\   8 0 #do> dup . #loop+ drop2
-\   \ 0 1 2 3 4 5 6 7
-\ )
-\ : #do> ( C: -- adr[cbz] fun[cbz] adr[beg] ) ( E: ceil floor -- ceil floor )
-\   here compile' dup2 compile' > postpone' #while
-\ ;
-\
-\ : #loop+ ( C: fun[any] fun[any] adr[beg] -- )
-\   compile' inc postpone' #repeat
-\ ;
+\ Unlike other Forth systems, we implement termination of arbitrary
+\ control structures with a generic `#end`. This works for all loops
+\ and eliminates the need to remember many different terminators.
+\ The added internal complexity is manageable.
 
-\ Usage:
+\ Stack position of a special location in the top loop frame on the control
+\ stack. This is where auxiliary structures such as `#leave` place their own
+\ control frames.
+0 var: LOOP_FRAME
+
+: loop_frame! ( frame_ind -- ) LOOP_FRAME ! ;
+
+: loop_frame_beg ( -- frame_ind fun )
+  LOOP_FRAME @ ' loop_frame! stack_len LOOP_FRAME !
+;
+
+\ Used by auxiliary loop constructs such as "leave" and "while"
+\ to insert their control frame before a loop control frame.
+\ This allows to pop the control frames in the right order
+\ with a single "end" word.
+: loop_aux
+  ( prev… <loop> …rest… <frame> stack_len -- prev… <frame> <loop> …rest )
+
+            to: stack_len_0
+  stack_len to: stack_len_1
+
+  LOOP_FRAME @
+  #ifn
+    throw" auxiliary loop constructs require an ancestor loop frame"
+  #end
+
+  stack_len_1  stack_len_0 - to: frame_len
+  frame_len    cells         to: frame_size
+  stack_len_0  sp_at         to: frame_sp_prev
+  stack_len_1  sp_at         to: frame_sp_temp
+  LOOP_FRAME @ sp_at         to: loop_sp_prev
+  loop_sp_prev frame_size  + to: loop_sp_next
+
+  \ Need a backup copy of the frame we're moving,
+  \ because we're about to overwrite that data.
+  frame_len stack+
+  frame_sp_temp frame_sp_prev frame_size memmove
+
+  \ Move everything starting with the loop frame,
+  \ making space for the aux frame we're inserting.
+  frame_sp_temp loop_sp_next - to: rest_size
+  loop_sp_next loop_sp_prev rest_size memmove
+
+  \ The aux frame is now behind the moved loop frame.
+  loop_sp_prev frame_sp_temp frame_size memmove
+  frame_len stack-
+
+  \ Subsequent aux constructs will be inserted after the new frame.
+  LOOP_FRAME @ frame_len + LOOP_FRAME !
+;
+
+: loop_end ( adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
+: loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end postpone' #end ;
+
+: #loop
+  ( C: -- frame fun[frame!] … adr[beg] fun[loop] )
+  \ Control frame is split: ↑ auxiliary constructs like "leave" go here.
+  loop_frame_beg here ' loop_pop
+;
+
+\ Can be used in any loop.
+: #leave
+  ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
+  stack_len to: len
+  here reserve_instr ' else_pop len loop_aux
+;
+
+\ Can be used in any loop.
+: #while
+  ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
+  stack_len to: len
+  reserve_cond ' if_pop len loop_aux
+;
+
+\ Assumes that the top control frame is from `#loop`.
+: #until ( C: prev… <loop> -- )
+      asm_pop_x1          comp_instr \ ldr x1, [x27, -8]!
+  1 8 asm_cmp_branch_zero comp_instr \ cbnz x1, 8
+  execute
+;
+
+: for_loop_pop ( fun[prev] …aux… adr[beg] adr[if] )
+  swap loop_end \ b <begin>
+  if_patch      \ Retropatch loop condition.
+  execute       \ Pop auxiliaries; restore previous loop frame.
+;
+
+: for_loop_init
+  ( C: local_ind -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( E: limit -- )
+
+  to: limit
+  loop_frame_beg
+  limit comp_local_pop
+
+  here to: adr_beg
+  1 limit asm_local_load  comp_instr    \ ldur x1, [FP, <loc_off>]
+  here to: adr_if         reserve_instr \ cbz x1, <end>
+  1 1 1   asm_sub_imm     comp_instr    \ sub x1, x1, 1
+  1 limit asm_local_store comp_instr    \ stur x1, [FP, <loc_off>]
+
+  adr_beg adr_if ' for_loop_pop
+;
+
+\ A count-down loop. Analogue of the non-standard but
+\ common `for` loop. Usage; limit must be positive:
 \
-\   123 #for i . #repeat
+\   123 #for
+\     log" looping"
+\   #end
 \
 \ Anton Ertl circa 1994:
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
+: #for
+  ( C: -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( E: limit -- )
+  anon_local_ind for_loop_init
+;
+
+\ Like `#for` but requires a local name to make the index
+\ accessible. Usage; index must be positive:
 \
-\ TODO optimize properly. Also TODO support anonymous locals.
-: #for ( C: -- adr[beg] ) ( E: max -- )
-  " i" comp_local_ind to: ind
-  ind inc cells negate to: fp_off
-  ind comp_local_pop                   \ Forth stack -> system stack.
-  here                                 \ adr[beg]
-  1 29 fp_off asm_load_off  comp_instr \ ldur x1, [<fp>, <off>]
-  here reserve_instr ' if_patch rot    \ cbz <repeat>
-  1 1 1       asm_sub_imm   comp_instr \ sub x1, x1, 1
-  1 29 fp_off asm_store_off comp_instr \ str x1, [<fp>, <off>]
+\   123 #for: ind
+\     ind .
+\   #end
+: #for:
+  ( C: "name" -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( E: limit -- )
+  parse_word get_local_ind for_loop_init
+;
+
+\ TODO optimize properly.
+: for_plus_loop_pop ( fun[prev] …aux… loc_ind adr[beg] adr[br.cond] )
+  to: adr_br to: adr_beg to: index
+
+  1 index asm_local_load  comp_instr    \ ldur x1, [FP, <index_off>]
+  1 1 1   asm_add_imm     comp_instr    \ add x1, x1, 1
+  1 index asm_local_store comp_instr    \ stur x1, [FP, <index_off>]
+
+  adr_beg loop_end                     \ b <begin>
+  ASM_GE adr_br pc_off asm_branch_cond \ b.ge <end>
+  adr_br !32                           \ Retropatch.
+  execute \ Pop auxiliaries; restore previous loop frame.
+;
+
+\ A count-up loop. Analogue of the standard `?do` loop.
+\ Requires a name to make the index accessible. Usage:
+\
+\   123 34 #for+: ind
+\     ind .
+\   #end
+: #for+:
+  ( C: "name" -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( E: limit index -- )
+  loop_frame_beg
+
+  parse_word get_local_ind to: index
+  anon_local_ind           to: limit
+
+  index comp_local_pop
+  limit comp_local_pop
+
+  here to: adr_beg
+
+  \ Could use `ldp x1, x2` when offsets are adjacent.
+  \ Adds so much code; maybe later.
+  1 index asm_local_load  comp_instr    \ ldur x1, [FP, <index_off>]
+  2 limit asm_local_load  comp_instr    \ ldur x2, [FP, <limit_off>]
+  1 2     asm_cmp_reg     comp_instr    \ cmp x1, x2
+  here to: adr_br         reserve_instr \ b.ge <end>
+
+  index adr_beg adr_br ' for_plus_loop_pop
 ;
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
-
-(
-The program is implicitly linked with `libc`.
-We're free to use Posix-standard C functions.
-C variables like `stdout` are a bit trickier,
-but also optional; we could `fdopen` instead.
-)
-
-2 1 extern: calloc  ( len size -- addr )
-1 1 extern: malloc  ( size -- addr )
-1 0 extern: free    ( addr -- )
-3 0 extern: memset  ( buf char len -- )
-1 1 extern: strlen  ( cstr -- len )
-3 1 extern: strncmp ( str0 str1 len -- )
-3 0 extern: strncpy ( buf[tar] buf[src] len -- )
-3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
-
-: move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
-: fill    ( buf len char -- ) swap memset ;
-: erase   ( buf len -- ) 0 fill ;
-: blank   ( buf len -- ) 32 fill ;
-: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
-: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
-: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
-: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
 
 extern_ptr: __stdinp
 extern_ptr: __stdoutp
@@ -1041,12 +1211,14 @@ extern_ptr: __stderrp
 : log" comp_cstr compile' puts ;
 : elog" comp_cstr compile' eputs ;
 
-: } ( … len -- )
-  #begin
+\ Compiles movement of values from the data stack
+\ to the locals in the intuitive "reverse" order.
+: } ( local_inds… len -- )
+  #loop
     dup >0 #while
     swap comp_local_pop
     dec
-  #repeat
+  #end
   drop
 ;
 
@@ -1059,19 +1231,21 @@ like in Gforth and VfxForth. Types are not supported.
   [ immediate ]
   0 to: loc_len
 
-  #begin
+  #loop
     parse_word to: len to: str
     " }" str len str=
     #if loc_len } #ret #end
 
     " --" str len str<> #while \ `--` to `}` is a comment.
 
-    str len comp_local_ind \ Pushes new local index.
+    \ Popped / used by `}` which we're about to call.
+    str len get_local_ind
+
     loc_len inc to: loc_len
-  #repeat
+  #end
 
   \ After `--`: skip all words which aren't `}`.
-  #begin parse_word " }" str<> #until
+  #loop parse_word " }" str<> #until
 
   loc_len }
 ;
@@ -1079,7 +1253,7 @@ like in Gforth and VfxForth. Types are not supported.
 \ For compiling words which modify a local by applying the given function.
 : mut_local ( C: fun "name" -- ) ( E: -- )
   parse_word
-  comp_local_ind dup
+  get_local_ind dup
   comp_local_push
   swap comp_call
   comp_local_pop
@@ -1144,11 +1318,11 @@ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
 
   dup #ifn drop #ret #end
 
-  #begin
+  #loop
     dup #while
     ' pair>systack inline_word
     2 -
-  #repeat
+  #end
   drop
 ;
 
@@ -1199,25 +1373,6 @@ Formats into the provided buffer using `snprintf`. Usage example:
 ;
 
 (
-`x0` is our error register. The annotation `throws` makes the compiler
-insert an error check after each call to this procedure and any other
-procedure which calls this one, turning the error into an exception.
-The `len` parameter is here because buffer variables return it.
-)
-: throw ( cstr len -- )
-  [ throws ]
-  drop
-  [ 0 asm_pop1 comp_instr ] \ ldr x0, [x27, -8]!
-;
-
-(
-Usage: `throw" some_error_msg"`.
-
-Also see `sthrowf"` for formatted errors.
-)
-: throw" comp_str compile' throw ;
-
-(
 Formats an error message into the provided buffer using `snprintf`,
 then throws the buffer as the error value. The buffer must be zero
 terminated; `buf:` ensures this automatically. Usage example:
@@ -1236,77 +1391,6 @@ Also see `throwf"` which comes with its own buffer.
   compile'  throw
 ;
 
-: log_int ( num -- ) [ 1 ] logf" %zd"  ;
-: log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
-: . ( num -- ) depth dec log_cell cr ;
-
-: .s
-  depth to: len
-
-  len #ifn
-    log" stack is empty" cr
-    #ret
-  #end
-
-  len <0 #if
-    log" stack length is negative: " len log_int cr
-    #ret
-  #end
-
-  len [ 1 ] logf" stack <%zd>:" cr
-
-  0
-  #begin
-    dup to: ind
-    ind len < #while
-    space space
-    ind pick0 ind log_cell cr
-    inc
-  #repeat
-  drop
-;
-
-: .sc .s stack_clear ;
-
-\ For words which define words. Kinda like `create`.
-: #word_beg compile' : ;
-: #word_end compile' ; not_comp_only ;
-
-(
-Words for declaring constants and variables. Unlike in standard Forth,
-variables also take an initial value.
-)
-
-\ Same as standard `constant`.
-: let: ( C: val -- ) ( E: -- val ) #word_beg comp_push inline #word_end ;
-
-\ Similar to standard `variable`.
-: var: ( C: init "name" -- ) ( E: -- addr )
-  #word_beg
-  cell 1      comp_static \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr  \ str x1, [x27], 8
-  #word_end
-  !
-;
-
-(
-Creates a global variable which refers to a buffer of at least
-the given size in bytes, rounded up to page size.
-
-Serves the same role as the standard idiom `create <name> N allot`
-which we don't have because we segregate code and data.
-)
-: buf: ( C: size "name" -- ) ( E: -- addr size )
-  #word_beg
-  dup 1       comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr       \ str x1, [x27], 8
-              comp_push        \ str <len>, [x27], 8
-  #word_end
-;
-
-0 let: false
-1 let: true
-
 4096 buf: ERR_BUF
 
 (
@@ -1323,6 +1407,38 @@ Like `sthrowf"` but easier to use. Example:
   compile' ERR_BUF
   compile' throw
 ;
+
+: log_int ( num -- ) [ 1 ] logf" %zd"  ;
+: log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
+: . ( num -- ) stack_len dec log_cell cr ;
+
+: .s
+  stack_len to: len
+
+  len #ifn
+    log" stack is empty" cr
+    #ret
+  #end
+
+  len <0 #if
+    log" stack length is negative: " len log_int cr
+    #ret
+  #end
+
+  len [ 1 ] logf" stack <%zd>:" cr
+
+  0
+  #loop
+    dup to: ind
+    ind len < #while
+    space space
+    ind pick0 ind log_cell cr
+    inc
+  #end
+  drop
+;
+
+: .sc .s stack_clear ;
 
 1 1 extern: strerror
 extern_ptr: __error

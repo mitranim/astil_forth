@@ -278,6 +278,8 @@ static Err interp_pop_buf(Interp *interp, const U8 **out_buf, Ind *out_len) {
 /*
 Stores constant data of arbitrary length, namely a string,
 into the constant region, and compiles `( -- addr size )`.
+
+TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
 */
 static Err intrin_comp_const(Interp *interp) {
   const auto ints = &interp->ints;
@@ -302,7 +304,11 @@ static Err intrin_comp_const(Interp *interp) {
   return nullptr;
 }
 
-// ( C: size register -- addr )
+/*
+( C: size register -- addr )
+
+TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
+*/
 static Err intrin_comp_static(Interp *interp) {
   const auto ints = &interp->ints;
 
@@ -611,13 +617,18 @@ Does not append any instructions; the caller is expected
 to follow this up with `intrin_comp_local_pop` and / or
 `intrin_comp_local_push`.
 */
-static Err intrin_comp_local_ind(Interp *interp) {
+static Err intrin_get_local_ind(Interp *interp) {
   const U8 *buf;
   Ind       len;
   try(interp_pop_buf(interp, &buf, &len));
   const auto ind = asm_local_get_or_make(&interp->asm, (const char *)buf, len);
   try(int_stack_push(&interp->ints, ind));
   return nullptr;
+}
+
+static Err intrin_anon_local_ind(Interp *interp) {
+  const auto ind = asm_local_alloc(&interp->asm);
+  return int_stack_push(&interp->ints, ind);
 }
 
 // Appends instructions for moving a value from the Forth stack to the local.
@@ -1022,8 +1033,16 @@ static constexpr Sym USED INTRIN[] = {
   },
   (Sym){
     .type        = SYM_INTRIN,
-    .name.buf    = "comp_local_ind",
-    .intrin.fun  = (void *)intrin_comp_local_ind,
+    .name.buf    = "get_local_ind",
+    .intrin.fun  = (void *)intrin_get_local_ind,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "anon_local_ind",
+    .intrin.fun  = (void *)intrin_anon_local_ind,
     .throws      = true,
     .comp_only   = true,
     .interp_only = true,

@@ -17,7 +17,7 @@ static_assert(sizeof(void *) == sizeof(Uint));
 static_assert(sizeof(void *) == sizeof(Sint));
 
 /*
-Maximum register-only input/output count allowed by C under arm64 ABI.
+Maximum register-only input/output count allowed by C under Arm64 ABI.
 Calling procedures with fewer actual inputs or outputs is harmless.
 */
 typedef Sint(Extern_fun)(Sint, Sint, Sint, Sint, Sint, Sint, Sint, Sint);
@@ -86,8 +86,18 @@ typedef struct {
   Ind_dict           inds;
 } Asm_got;
 
-// Positions of "locals"; the dict owns the keys.
-typedef Ind_dict Asm_locs;
+/*
+Used for local variables.
+
+The FP offset could be derived from the indexes dict if all
+locals were named, but we also support anonymous locals.
+
+The dictionary copies and owns the key strings.
+*/
+typedef struct {
+  Ind_dict inds;
+  Ind      next;
+} Asm_locs;
 
 typedef struct {
   Asm_code      *code;            // Writable non-executable instructions.

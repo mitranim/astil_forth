@@ -132,7 +132,9 @@ static bool asm_valid(const Asm *asm) {
       stack_valid((const Stack *)&asm->gots.names) &&
       dict_valid((const Dict *)&asm->gots.inds)
     ) &&
-    is_aligned(&asm->locs) && dict_valid((const Dict *)&asm->locs)
+    is_aligned(&asm->locs) &&
+    is_aligned(&asm->locs.inds) &&
+    dict_valid((const Dict *)&asm->locs.inds)
   );
 }
 
@@ -194,11 +196,13 @@ static void asm_init_lists(Asm *asm) {
 }
 
 static void asm_locals_deinit(Asm_locs *locs) {
-  dict_deinit_with_keys((Dict *)locs);
+  dict_deinit_with_keys((Dict *)&locs->inds);
+  locs->next = 0;
 }
 
 static void asm_locals_trunc(Asm_locs *locs) {
-  dict_trunc_with_keys((Dict *)locs);
+  locs->next = 0;
+  dict_trunc_with_keys((Dict *)&locs->inds);
 }
 
 static Err asm_deinit(Asm *asm) {
@@ -991,9 +995,10 @@ static void asm_append_stack_pop_into(Asm *asm, U8 reg) {
 
 // On Arm64, SP must be aligned to 16 bytes.
 static Ind asm_locals_sp_off(const Asm_locs *locs) {
-  return __builtin_align_up((locs->len * (Ind)sizeof(Sint)), 16);
+  return __builtin_align_up((locs->next * (Ind)sizeof(Sint)), 16);
 }
 
+// SYNC[local_fp_off].
 static Sint asm_local_fp_off(Ind ind) {
   return -(((Sint)ind + 1) * (Sint)sizeof(Sint));
 }
@@ -1006,19 +1011,22 @@ initialized with `asm_append_local_store`.
 */
 static Ind asm_local_get_or_make(Asm *asm, const char *name, Ind name_len) {
   const auto locs = &asm->locs;
-  if (dict_has(locs, name)) return dict_get(locs, name);
+  const auto inds = &locs->inds;
+  if (dict_has(inds, name)) return dict_get(inds, name);
 
-  const auto ind = locs->len;
-  dict_set(locs, str_alloc_copy(name, name_len), ind);
+  const auto ind = locs->next++;
+  dict_set(inds, str_alloc_copy(name, name_len), ind);
   return ind;
 }
+
+static Ind asm_local_alloc(Asm *asm) { return asm->locs.next++; }
 
 static Err err_unrec_local_ind(Sint ind) {
   return errf("unrecognized local index: " FMT_SINT, ind);
 }
 
 static Err asm_validate_local_ind(const Asm_locs *locs, Sint ind) {
-  if (ind >= 0 && ind < locs->len) return nullptr;
+  if (ind >= 0 && ind < locs->next) return nullptr;
   return err_unrec_local_ind(ind);
 }
 
@@ -1044,8 +1052,9 @@ static Err asm_append_local_push(Asm *asm, Sint ind) {
 
 static bool asm_appended_local_push(Asm *asm, const char *name) {
   const auto locs = &asm->locs;
-  if (!dict_has(locs, name)) return false;
-  averr(asm_append_local_push(asm, dict_get(locs, name)));
+  const auto inds = &locs->inds;
+  if (!dict_has(inds, name)) return false;
+  averr(asm_append_local_push(asm, dict_get(inds, name)));
   return true;
 }
 

@@ -29,68 +29,273 @@ import' ./f_testing.f
 ;
 test_conditionals
 
+: test_recursion ( val -- )
+  dup 13 <= #if #ret #end
+  dec #recur
+;
+T{ 123 test_recursion <T> 13 }T
+
 1 0 extern: sleep
 
-: test_sleep_loop #begin log" sleeping" cr 1 sleep #again ;
+: test_sleep_loop #loop log" sleeping" cr 1 sleep #end ;
 \ test_sleep_loop
 
-: test_repeat
+: test_loop_leave
+  T{ #loop    #leave                        #end <T>    }T
+  T{ #loop 10 #leave                        #end <T> 10 }T
+  T{ #loop 10 #leave                        #end <T> 10 }T
+  T{ #loop 10 #leave    #leave              #end <T> 10 }T
+  T{ #loop 10 #leave    #leave    #leave    #end <T> 10 }T
+  T{ #loop 10 #leave 20 #leave    #leave    #end <T> 10 }T
+  T{ #loop 10 #leave 20 #leave 30 #leave    #end <T> 10 }T
+  T{ #loop 10 #leave 20 #leave 30 #leave 40 #end <T> 10 }T
+;
+test_loop_leave
+
+: test_loop_while
+  T{ #loop    false #while 10              #end <T>       }T
+  T{ #loop 10 false #while 20              #end <T> 10    }T
+  T{ #loop 10 false #while 20 true  #while #end <T> 10    }T
+  T{ #loop 10 true  #while 20 false #while #end <T> 10 20 }T
+
   T{
-    12 #begin
+    11
+    #loop
+      dup 5 > #while dup dec
+    #end
+    drop
+    <T>
+    11 10 9 8 7 6
+  }T
+
+  T{
+    11
+    #loop
+      dup 5 > #while
+      dup 7 > #while
+      dup dec
+    #end
+    drop
+    <T>
+    11 10 9 8
+  }T
+
+  T{
+    12 #loop
       dec
       dup #while
       dup #while
       dup #while
       dup
-    #repeat #end #end
+    #end
     <T>
     11 10 9 8 7 6 5 4 3 2 1 0
   }T
 ;
-test_repeat
+test_loop_while
 
-: test_until
+: test_loop_while_leave
+  T{ #loop    false #while 10 #leave    #end <T>       }T
+  T{ #loop    true  #while 10 #leave    #end <T> 10    }T
+  T{ #loop 10 false #while 20 #leave    #end <T> 10    }T
+  T{ #loop 10 true  #while 20 #leave    #end <T> 10 20 }T
+  T{ #loop 10 true  #while    #leave 20 #end <T> 10    }T
+  T{ #loop #leave 10 true #while 20     #end <T>       }T
+;
+test_loop_while_leave
+
+: test_loop_until
+  T{ #loop                         false  #until <T>    }T
+  T{ #loop 10                      false  #until <T> 10 }T
+  T{ #loop 10 #leave               true   #until <T> 10 }T
+  T{ #loop 10 #leave #leave        true   #until <T> 10 }T
+  T{ #loop 10 #leave #leave #leave true   #until <T> 10 }T
+  T{ #loop 10 #leave #leave #leave #leave #until <T> 10 }T
+
   T{
-    12 #begin dup dec dup #until
+    12
+    #loop dec dup dup 6 > #until
+    drop
+    <T>
+    11 10 9 8 7 6
+  }T
+
+  T{
+    12
+    #loop
+      dec dup
+      dup 8 > #while
+      dup 6 >
+    #until
+    drop
+    <T>
+    11 10 9 8
+  }T
+
+  T{
+    12 #loop dup dec dup #until
     <T>
     12 11 10 9 8 7 6 5 4 3 2 1 0
   }T
 ;
-test_until
+test_loop_until
 
-: test_do_loop
+: test_loop_for_anon
+  T{ 4 #for 10        #end <T> 10 10 10 10 }T
+  T{ 4 #for 10 #leave #end <T> 10          }T
+  T{ 4 #for #leave 10 #end <T>             }T
+
   T{
-    12 0
-    #do> i #loop+
+    0
+    12 #for
+      dup 5 > #if #leave #end
+      dup inc
+    #end
+    drop
     <T>
-    0 1 2 3 4 5 6 7 8 9 10 11
+    0 1 2 3 4 5
   }T
-;
-test_do_loop
 
-\ `#loop+` patches `#while`; `#end` patches `#do>`.
-: test_do_loop_while
   T{
-    12 0 #do>
-      i 6 < #while
-      i
-    #loop+ #end
+    0
+    12 #for
+      dup 6 < #while
+      dup inc
+    #end
+    drop
+    <T>
+    0 1 2 3 4 5
+  }T
+
+  T{
+    0
+    12 #for
+      dup 5 < #while
+      dup 8 < #while
+      dup inc
+    #end
+    <T>
+    0 1 2 3 4 5
+  }T
+
+  T{
+    0
+    12 #for
+      dup 8 < #while
+      dup 5 < #while
+      dup inc
+    #end
     <T>
     0 1 2 3 4 5
   }T
 ;
-test_do_loop_while
+test_loop_for_anon
 
-: test_for_loop
+: test_loop_for_named
+  T{ 12 #for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
+  T{ 12 #for: ind ind #leave #end <T> 11                        }T
+
   T{
-    12 #for i #repeat
+    12 #for: ind
+      ind 5 <= #if #leave #end
+      ind
+    #end
     <T>
-    11 10 9 8 7 6 5 4 3 2 1 0
+    11 10 9 8 7 6
+  }T
+
+  T{
+    12 #for: ind
+      ind 5 > #while
+      ind
+    #end
+    <T>
+    11 10 9 8 7 6
+  }T
+
+  T{
+    12 #for: ind
+      ind 7 > #while
+      ind 5 > #while
+      ind
+    #end
+    <T>
+    11 10 9 8
+  }T
+
+  T{
+    12 #for: ind
+      ind 5 > #while
+      ind 7 > #while
+      ind
+    #end
+    <T>
+    11 10 9 8
   }T
 ;
-test_for_loop
+test_loop_for_named
 
-: test_sc 10 20 30 depth .sc ;
+: test_loop_for_plus
+  T{ 12 -1  #for+: ind ind        #end <T> -1 0 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 0   #for+: ind ind        #end <T>    0 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 1   #for+: ind ind        #end <T>      1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 -1  #for+: ind ind #leave #end <T> -1                           }T
+  T{ 12 0   #for+: ind ind #leave #end <T> 0                            }T
+  T{ 12 1   #for+: ind ind #leave #end <T> 1                            }T
+
+  T{ 12 1 #for+: ind true #while ind #leave #end <T> 1 }T
+  T{ 12 1 #for+: ind #leave true #while ind #end <T>   }T
+
+  T{
+    12 0 #for+: ind
+      ind 5 > #if #leave #end
+      ind
+    #end
+    <T>
+    0 1 2 3 4 5
+  }T
+
+  T{
+    12 0 #for+: ind
+      ind 6 < #while
+      ind
+    #end
+    <T>
+    0 1 2 3 4 5
+  }T
+
+  T{
+    12 0 #for+: ind
+      ind 8 < #while
+      ind 6 < #while
+      ind
+    #end
+    <T>
+    0 1 2 3 4 5
+  }T
+
+  T{
+    12 0 #for+: ind
+      ind 6 < #while
+      ind 8 < #while
+      ind
+    #end
+    <T>
+    0 1 2 3 4 5
+  }T
+;
+test_loop_for_plus
+
+: test_sc 10 20 30 stack_len .sc ;
+\ test_sc
+
+\ Used internally by testing utils. The test is kinda cyclic.
+123 var: VAR
+T{ VAR @     <T> 123 }T
+T{ 234 VAR ! <T>     }T
+T{ VAR @     <T> 234 }T
+T{ 345 VAR ! <T>     }T
+T{ VAR @     <T> 345 }T
 
 T{  0    0   = <T> 1 }T
 T{  0    123 = <T> 0 }T
@@ -146,18 +351,6 @@ T{  123 -123  >= <T> 1 }T
 T{ -123 -123  >= <T> 1 }T
 T{  123  123  >= <T> 1 }T
 
-T{ 10 20 30 swap_over <T> 20 10 30 }T
-
-T{ 123 0 ?dup <T> 123     }T
-T{ 234 1 ?dup <T> 234 234 }T
-
-123 var: VAR
-T{ VAR @     <T> 123 }T
-T{ 234 VAR ! <T>     }T
-T{ VAR @     <T> 234 }T
-T{ 345 VAR ! <T>     }T
-T{ VAR @     <T> 345 }T
-
 T{ 234 123 - <T> 111   }T
 T{ 234 123 + <T> 357   }T
 T{ 234 123 * <T> 28782 }T
@@ -205,18 +398,26 @@ T{ -123  0   max <T>  0   }T
 T{ -123  234 max <T>  234 }T
 T{  234 -123 max <T>  234 }T
 
+T{ 10 20 30 swap_over <T> 20 10 30 }T
+
+T{ 123 0 ?dup <T> 123     }T
+T{ 234 1 ?dup <T> 234 234 }T
+
 : test_varargs
   c" numbers (should be 10 20 30): %zd %zd %zd"
   10 20 30 [ 3 va- ] debug_stack printf [ -va ] cr
 ;
+\ test_varargs
 
 : test_fmt
   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" cr
 ;
+\ test_fmt
 
 : test_efmt
   10 20 30 [ 3 ] elogf" numbers: %zu %zu %zu" cr
 ;
+\ test_efmt
 
 4096 buf: STR_BUF
 
@@ -224,14 +425,17 @@ T{  234 -123 max <T>  234 }T
   STR_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu"
   STR_BUF drop puts
 ;
+\ test_str_fmt
 
 : test_sthrowf
   STR_BUF 10 20 30 [ 3 ] sthrowf" codes: %zu %zu %zu"
 ;
+\ test_sthrowf
 
 : test_throwf
   10 20 30 [ 3 ] throwf" codes: %zu %zu %zu"
 ;
+\ test_throwf
 
 : test_to
   T{ 10 to: one <T>       }T
@@ -288,10 +492,4 @@ test_to
 ;
 test_locals
 
-: test_recursion ( val -- )
-  dup 13 <= #if #ret #end
-  dec #recur
-;
-T{ 123 test_recursion <T> 13 }T
-
-str" [test] ok" type cr flush eflush
+str" [test] ok" etype ecr eflush
