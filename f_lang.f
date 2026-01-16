@@ -860,6 +860,11 @@ this is considered a "bad instruction" and blows up.
 \ SYNC[local_fp_off].
 : local_fp_off ( ind -- fp_off ) inc cells negate ;
 
+0 let: false
+1 let: true
+
+\ ## Misc utils for local ops
+
 \ ldur Xd, [FP, <off>]
 : asm_local_load ( Xd local_ind -- instr )
   ASM_REG_SYS_FP swap local_fp_off asm_load_off
@@ -870,8 +875,20 @@ this is considered a "bad instruction" and blows up.
   ASM_REG_SYS_FP swap local_fp_off asm_store_off
 ;
 
-0 let: false
-1 let: true
+: comp_load_local_x1  ( Xd ind -- ) 1 swap asm_local_load  comp_instr ;
+: comp_store_local_x1 ( Xd ind -- ) 1 swap asm_local_store comp_instr ;
+
+\ TODO: use `ldp` when offsets are adjacent.
+: comp_load_locals_x1_x2 ( ind1 ind2 -- )
+  2 swap asm_local_load comp_instr \ ldur x2, [FP, <loc2_off>]
+  1 swap asm_local_load comp_instr \ ldur x1, [FP, <loc1_off>]
+;
+
+\ TODO: use `ldp` when offsets are adjacent.
+: comp_store_locals_x1_x2 ( ind1 ind2 -- )
+  2 swap asm_local_store comp_instr \ stur x2, [FP, <loc2_off>]
+  1 swap asm_local_store comp_instr \ stur x1, [FP, <loc1_off>]
+;
 
 \ ## Exceptions
 \
@@ -1082,14 +1099,14 @@ this is considered a "bad instruction" and blows up.
   execute
 ;
 
-: for_loop_pop ( fun[prev] …aux… adr[beg] adr[if] )
-  swap loop_end \ b <begin>
-  if_patch      \ Retropatch loop condition.
-  execute       \ Pop auxiliaries; restore previous loop frame.
+: for_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] )
+  loop_end \ b <begin>
+  if_patch \ Retropatch loop condition.
+  execute  \ Pop auxiliaries; restore previous loop frame.
 ;
 
 : for_loop_init
-  ( C: local_ind -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( C: local_ind -- frame fun[frame!] … adr[cond] adr[beg] fun[for] )
   ( E: limit -- )
 
   to: limit
@@ -1098,11 +1115,11 @@ this is considered a "bad instruction" and blows up.
 
   here to: adr_beg
   1 limit asm_local_load  comp_instr    \ ldur x1, [FP, <loc_off>]
-  here to: adr_if         reserve_instr \ cbz x1, <end>
+  here to: adr_cond       reserve_instr \ cbz x1, <end>
   1 1 1   asm_sub_imm     comp_instr    \ sub x1, x1, 1
   1 limit asm_local_store comp_instr    \ stur x1, [FP, <loc_off>]
 
-  adr_beg adr_if ' for_loop_pop
+  adr_cond adr_beg ' for_loop_pop
 ;
 
 \ A count-down loop. Analogue of the non-standard but
@@ -1117,7 +1134,7 @@ this is considered a "bad instruction" and blows up.
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
 : #for
-  ( C: -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( C: -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: limit -- )
   anon_local_ind for_loop_init
 ;
@@ -1129,23 +1146,41 @@ this is considered a "bad instruction" and blows up.
 \     ind .
 \   #end
 : #for:
-  ( C: "name" -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
+  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: limit -- )
   parse_word get_local_ind for_loop_init
 ;
 
-\ TODO optimize properly.
-: for_plus_loop_pop ( fun[prev] …aux… loc_ind adr[beg] adr[br.cond] )
-  to: adr_br to: adr_beg to: index
+\ Not used by `#for` and `#for:` because they get away
+\ with storing just one local instead of two.
+: counted_loop_beg ( loc_ind loc_lim -- adr[cond] adr[beg] loc_ind )
+  to: limit
+  to: index
 
-  1 index asm_local_load  comp_instr    \ ldur x1, [FP, <index_off>]
-  1 1 1   asm_add_imm     comp_instr    \ add x1, x1, 1
-  1 index asm_local_store comp_instr    \ stur x1, [FP, <index_off>]
+  index comp_local_pop
+  limit comp_local_pop
 
-  adr_beg loop_end                     \ b <begin>
-  ASM_GE adr_br pc_off asm_branch_cond \ b.ge <end>
-  adr_br !32                           \ Retropatch.
+  here to: adr_beg
+  index limit comp_load_locals_x1_x2
+  1 2         asm_cmp_reg comp_instr \ cmp x1, x2
+  here to: adr_cond    reserve_instr \ b.cond <end>
+
+  adr_cond adr_beg index
+;
+
+: plus_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] )
+  loop_end \ b <begin>
+  to: adr_cond
+  ASM_GE adr_cond pc_off asm_branch_cond adr_cond !32 \ b.ge <end>
   execute \ Pop auxiliaries; restore previous loop frame.
+;
+
+: for_plus_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_ind )
+  to: index
+  1 index asm_local_load  comp_instr \ ldur x1, [FP, <index_off>]
+  1 1 1   asm_add_imm     comp_instr \ add x1, x1, 1
+  1 index asm_local_store comp_instr \ stur x1, [FP, <index_off>]
+  plus_loop_pop
 ;
 
 \ A count-up loop. Analogue of the standard `?do` loop.
@@ -1155,26 +1190,40 @@ this is considered a "bad instruction" and blows up.
 \     ind .
 \   #end
 : #for+:
-  ( C: "name" -- frame fun[frame!] … adr[beg] adr[if] fun[for] )
-  ( E: limit index -- )
+  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] loc_ind fun[pop] )
+  ( E: limit start -- )
+  loop_frame_beg
+  parse_word get_local_ind  to: index
+             anon_local_ind to: limit
+  index limit counted_loop_beg
+  ' for_plus_loop_pop
+;
+
+: loop_plus_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_ind loc_step )
+  to: step to: index
+  index step comp_load_locals_x1_x2
+  1 1 2      asm_add_reg comp_instr \ add x1, x1, x2
+  index         comp_store_local_x1
+  plus_loop_pop
+;
+
+\ Similar to the standard `?do ... +loop`, but terminated with `#end`
+\ like other loops. Takes a name to make the index accessible. Usage:
+\
+\   limit start step #+loop: ind ind . #end
+\   123   23    3    #+loop: ind ind . #end
+: #+loop:
+  ( C: "name" -- frame fun[frame!] … adr[beg] adr[cond] loc_ind loc_step fun[pop] )
+  ( E: limit start step -- )
   loop_frame_beg
 
   parse_word get_local_ind to: index
   anon_local_ind           to: limit
+  anon_local_ind           to: step
 
-  index comp_local_pop
-  limit comp_local_pop
-
-  here to: adr_beg
-
-  \ Could use `ldp x1, x2` when offsets are adjacent.
-  \ Adds so much code; maybe later.
-  1 index asm_local_load  comp_instr    \ ldur x1, [FP, <index_off>]
-  2 limit asm_local_load  comp_instr    \ ldur x2, [FP, <limit_off>]
-  1 2     asm_cmp_reg     comp_instr    \ cmp x1, x2
-  here to: adr_br         reserve_instr \ b.ge <end>
-
-  index adr_beg adr_br ' for_plus_loop_pop
+  step comp_local_pop
+  index limit counted_loop_beg
+  step ' loop_plus_pop
 ;
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
