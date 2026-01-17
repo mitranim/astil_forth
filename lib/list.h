@@ -205,4 +205,6 @@ Does not initialize memory at location.
 // Providing an invalid pointer is UB.
 #define list_ind(list, val) ((Ind)((val) - (list)->dat))
 
+#define list_trunc(list) ((list)->len = 0)
+
 static constexpr Uint LIST_INIT_CAP = 4;

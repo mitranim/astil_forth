@@ -3,7 +3,8 @@
 /*
 TODO:
 - x64 assembler (core in C, the rest in Forth)
-- ability to use multiple assemblers at once
+- Ability to use multiple assemblers at once.
+- Cross-compilation.
 */
 #ifdef __aarch64__
 #include "./c_asm_arm64.h" // IWYU pragma: export

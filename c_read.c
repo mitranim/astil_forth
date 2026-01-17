@@ -29,16 +29,24 @@ static Err reader_err(Reader *read, Err err) {
   );
 }
 
-static void read_char(Reader *read, char *out) {
-  char next = read->next;
+static void reader_backtrack(Reader *read, U8 val) {
+  str_push(&read->back, val);
+}
 
-  if (next) {
-    read->next = 0;
-    *out       = next;
-    return;
-  }
+// TODO clearer name.
+static U8 reader_unpeek(Reader *read) {
+  const auto buf = &read->back;
+  return buf->len ? buf->buf[buf->len-- - 1] : (U8)0;
+}
 
-  next = (char)fgetc(read->file);
+// 254 = Ctrl+D
+// 255 = EOF
+static U8 normalize_char(U8 val) { return val == 254 || val == 255 ? 0 : val; }
+
+// For internal use by the reader. External code should
+// use `read_ascii_printable` or `read_char`.
+static U8 read_next_char(Reader *read) {
+  const auto next = normalize_char((U8)fgetc(read->file));
 
   // IF_DEBUG(eprintf("[system] read char code: %d\n", next));
   // IF_DEBUG(eprintf("[system] read char: %c\n", next));
@@ -51,7 +59,7 @@ static void read_char(Reader *read, char *out) {
   Assumes pure ASCII. TODO support UTF-8.
   */
 
-  const char last = read->last;
+  const auto last = read->last;
   auto       pos  = read->pos;
 
   if (!pos.row) pos.row = 1;
@@ -69,17 +77,26 @@ static void read_char(Reader *read, char *out) {
   if (WORD_CHAR_KIND[next] == CHAR_WORD) read->word_pos = pos;
   read->pos  = pos;
   read->last = next;
-  *out       = next;
+  return next;
 }
 
-static void reader_backtrack(Reader *read, char val) {
-  aver(!read->next);
-  read->next = val;
+static U8 read_char(Reader *read) {
+  const auto next = reader_unpeek(read);
+  if (next) return next;
+  return read_next_char(read);
 }
 
 static Err err_unsupported_char(Sint code) {
   return errf("unsupported character code " FMT_SINT, code);
 }
+
+/*
+static U8 reader_peek(Reader *read) {
+  const auto buf = &read->back;
+  if (!buf->len) reader_backtrack(read, read_next_char(read));
+  return buf->buf[buf->len - 1];
+}
+*/
 
 static Err validate_char_ascii_printable(Sint code) {
   if (!(code >= 0 && code < 256)) return err_unsupported_char(code);
@@ -88,34 +105,45 @@ static Err validate_char_ascii_printable(Sint code) {
     case CHAR_DECIMAL:     [[fallthrough]];
     case CHAR_ARITH:       [[fallthrough]];
     case CHAR_WORD:        return nullptr;
-    case CHAR_EOF:         [[fallthrough]];
+    case CHAR_EOF:         return nullptr;
     case CHAR_UNPRINTABLE: [[fallthrough]];
     default:               return err_unsupported_char(code);
   }
 }
 
+// Output is 0 on EOF.
 static Err read_ascii_printable(Reader *read, U8 *out) {
-  char next;
-  read_char(read, &next);
-  if (next == 255) next = 0; // Ctrl+D = EOF.
+  auto next = read_char(read);
+  try(validate_char_ascii_printable(next));
   *out = next;
   return nullptr;
 }
 
-// static Err err_num_sign(Read *read, Sint radix) {
-//   return errf(
-//     "syntax error: unexpected negative numeric literal in radix " FMT_SINT "; only decimal literals may be negative; other radixes are treated as unsigned",
-//     radix
-//   );
-// }
+/*
+static Err reader_peek_ascii_printable(Reader *read, U8 *out) {
+  const auto next = reader_peek(read);
+  try(validate_char_ascii_printable(next));
+  *out = next;
+  return nullptr;
+}
+*/
 
-static Err err_not_digit(char val) {
+/*
+static Err err_num_sign(Read *read, Sint radix) {
+  return errf(
+    "syntax error: unexpected negative numeric literal in radix " FMT_SINT "; only decimal literals may be negative; other radixes are treated as unsigned",
+    radix
+  );
+}
+*/
+
+static Err err_not_digit(U8 val) {
   return errf(
     "unexpected non-digit character " FMT_CHAR " after numeric literal", val
   );
 }
 
-static Err err_digit_radix(U8 dig, char val, Sint radix) {
+static Err err_digit_radix(U8 dig, U8 val, Sint radix) {
   return errf(
     "malformed numeric literal: digit %d from character " FMT_CHAR
     " is outside radix " FMT_SINT,
@@ -133,13 +161,25 @@ static Err err_overflow(Sint radix) {
   );
 }
 
-/*
-Assumes `head` is a decimal digit.
-Supports only integers and doesn't check overflow.
-*/
-static Err read_num(Reader *read, U8 head, Sint sign, Sint *out) {
+static Err read_num(Reader *read, Sint *out) {
+  Sint sign = 1;
+  Sint num  = 0;
+  U8   head;
+
+  try(read_ascii_printable(read, &head));
+
+  if (head == '-') {
+    sign = -1;
+    try(read_ascii_printable(read, &head));
+  }
+  else if (head == '+') {
+    try(read_ascii_printable(read, &head));
+  }
+
+  if (HEAD_CHAR_KIND[head] != CHAR_DECIMAL) return err_not_digit(head);
+
+  num        = sign * (Sint)CHAR_TO_DIGIT[head];
   Sint radix = 10;
-  Sint num   = sign * (Sint)CHAR_TO_DIGIT[head];
 
   if (num == 0) {
     try(read_ascii_printable(read, &head));
@@ -167,13 +207,18 @@ static Err read_num(Reader *read, U8 head, Sint sign, Sint *out) {
   for (;;) {
     try(read_ascii_printable(read, &head));
 
-    // Cosmetic digit group separator.
+    // Cosmetic group separator.
     if (head == '_') continue;
 
     const auto dig = CHAR_TO_DIGIT[head];
 
     switch (dig) {
-      case DIGIT_INVALID: return err_not_digit(head);
+      // Unlike other Forths, we don't allow numeric literals to be immediately
+      // followed by non-digit printable characters. Anything that begins with
+      // a digit or `+`/`-` and a digit must be a number, not a word.
+      case DIGIT_INVALID: {
+        return err_not_digit(head);
+      }
 
       case DIGIT_BREAK: {
         reader_backtrack(read, head);
@@ -181,7 +226,9 @@ static Err read_num(Reader *read, U8 head, Sint sign, Sint *out) {
       }
 
       default: {
-        if (dig >= radix) return err_digit_radix(dig, head, radix);
+        if (dig >= radix) {
+          return err_digit_radix(dig, head, radix);
+        }
         Sint next;
         if (__builtin_mul_overflow(num, radix, &next)) {
           return err_overflow(radix);
@@ -203,22 +250,21 @@ static Err err_word_len(const Reader *read, U8 len) {
   );
 }
 
-static Err read_skip_whitespace(Reader *read) {
-  U8 next;
-
+static void read_skip_whitespace(Reader *read) {
   for (;;) {
-    try(read_ascii_printable(read, &next));
+    const auto next = read_char(read);
     if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) continue;
     reader_backtrack(read, next);
-    return nullptr;
+    break;
   }
 }
 
 // Invalidates the earlier state of `read->word`.
-static Err read_word_after(Reader *read, U8 head) {
+static Err read_word(Reader *read) {
+  read_skip_whitespace(read);
+
   const auto word = &read->word;
   str_trunc(word);
-  if (head) word->buf[word->len++] = head;
 
   for (;;) {
     U8 byte;
@@ -234,14 +280,9 @@ static Err read_word_after(Reader *read, U8 head) {
     }
   }
 
+  if (!word->len) return err_str("failed to read a word");
   str_terminate(word);
   return nullptr;
-}
-
-static Err read_word(Reader *read) {
-  try(read_word_after(read, 0));
-  if (read->word.len) return nullptr;
-  return err_str("failed to read a word");
 }
 
 static Err err_read_eof(U8 delim) {
@@ -259,8 +300,7 @@ static Err read_until(Reader *read, U8 delim) {
   str_trunc(buf);
 
   for (;;) {
-    char next;
-    read_char(read, &next);
+    auto next = read_char(read);
 
     if (next == delim) {
       str_terminate(buf);

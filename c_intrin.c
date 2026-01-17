@@ -31,9 +31,15 @@ static Err err_undefined_word(const char *name) {
   return errf("undefined word " FMT_QUOTED, name);
 }
 
+static Err interp_require_sym(Interp *interp, const char *name, Sym **out) {
+  const auto sym = dict_get(&interp->words, name);
+  if (!sym) return err_undefined_word(name);
+  if (out) *out = sym;
+  return nullptr;
+}
+
 static Err interp_read_word(Interp *interp) {
   const auto read = interp->reader;
-  try(read_skip_whitespace(read));
   try(read_word(read));
   IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", read->word.buf));
   return nullptr;
@@ -41,20 +47,14 @@ static Err interp_read_word(Interp *interp) {
 
 static Err interp_read_sym(Interp *interp, Sym **out) {
   try(interp_read_word(interp));
-
-  const auto name = interp->reader->word.buf;
-  const auto sym  = dict_get(&interp->words, name);
-
-  if (!sym) return err_undefined_word(name);
-  if (out) *out = sym;
-  return nullptr;
+  return interp_require_sym(interp, interp->reader->word.buf, out);
 }
 
 static Err err_current_sym_not_defining() {
   return err_str("unable to find current word: not inside a colon definition");
 }
 
-static Err current_sym(const Interp *interp, Sym **out) {
+static Err require_current_sym(const Interp *interp, Sym **out) {
   const auto sym = interp->defining;
   if (!sym) return err_current_sym_not_defining();
   if (out) *out = sym;
@@ -63,7 +63,7 @@ static Err current_sym(const Interp *interp, Sym **out) {
 
 static Err err_nested_definition(const Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   return errf("unexpected \":\" in definition of " FMT_QUOTED, sym->name.buf);
 }
 
@@ -75,9 +75,6 @@ static Err intrin_colon(Interp *interp) {
   if (interp->defining) return err_nested_definition(interp);
 
   const auto read = interp->reader;
-  const auto asm  = &interp->asm;
-
-  try(read_skip_whitespace(read));
   try(read_word(read));
 
   const auto name = read->word;
@@ -98,6 +95,8 @@ static Err intrin_colon(Interp *interp) {
       .immediate = is_name_immediate(&name),
     }
   );
+
+  const auto asm = &interp->asm;
   asm_sym_beg(asm, sym);
 
   interp->defining  = sym;
@@ -113,7 +112,7 @@ static Err intrin_semicolon(Interp *interp) {
   const auto asm = &interp->asm;
 
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   if (!interp->compiling) return err_semi_not_compiling();
   try(asm_sym_end(asm, sym));
 
@@ -163,41 +162,41 @@ static void intrin_bracket_end(Interp *interp) { interp->compiling = true; }
 
 static Err intrin_immediate(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->immediate = true;
   return nullptr;
 }
 
 static Err intrin_comp_only(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->comp_only = true;
   return nullptr;
 }
 
 static Err intrin_not_comp_only(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->comp_only = false;
   return nullptr;
 }
 
 static Err intrin_inline(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->norm.inlinable = true;
   return nullptr;
 }
 
 static Err intrin_throws(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->throws = true;
   return nullptr;
 }
 
 static Err intrin_redefine(Interp *interp) {
-  try(current_sym(interp, nullptr));
+  try(require_current_sym(interp, nullptr));
   interp->redefining = true;
   return nullptr;
 }
@@ -219,7 +218,7 @@ static Err intrin_comp_instr(Interp *interp) {
 
 static Err intrin_comp_load(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
 
   Sint imm;
   Sint reg;
@@ -299,7 +298,7 @@ static Err intrin_comp_const(Interp *interp) {
   ));
 
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->norm.has_loads = true;
   return nullptr;
 }
@@ -325,7 +324,7 @@ static Err intrin_comp_static(Interp *interp) {
   try(int_stack_push(&interp->ints, (Sint)addr));
 
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->norm.has_loads = true;
   return nullptr;
 }
@@ -384,7 +383,7 @@ static Err intrin_quit(Interp *interp) {
 
 static Err intrin_ret(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   sym->norm.has_rets = true;
   asm_append_ret(&interp->asm);
   return nullptr;
@@ -392,7 +391,7 @@ static Err intrin_ret(Interp *interp) {
 
 static Err intrin_recur(Interp *interp) {
   Sym *sym;
-  try(current_sym(interp, &sym));
+  try(require_current_sym(interp, &sym));
   set_add(&sym->callees, sym);
   set_add(&sym->callers, sym);
   asm_append_recur(&interp->asm);
@@ -414,16 +413,13 @@ static Err intrin_char(Interp *interp) {
 }
 
 /*
-Technically we could provide a lower-level intrinsic for reading char-by-char
-and implement this in Forth. But this requires a loop. Our bootstrap sequence
-needs this immediately for comments; meanwhile, loops are not available until
-way, WAY later in the code. We could use an inline assembly loop, which would
-have to be pre-assembled and hardcoded in binary, since the self-assembler is
-also not available initially.
+Technically not fundamental and possible to write in Forth with `intrin_char`,
+but requires conditionals, character comparison, and a loop, none of which are
+available early in the bootstrap process. Neither is the self-assembler, which
+means we'd have to hardcode instructions in binary.
 
-TODO: provide a higher-level version which uses a string rather than a char
-as a delimiter. We still need this one, because string literals only become
-available WAY later in the program.
+TODO: use `intrin_char` in Forth to implement a more powerful version
+which uses a string rather than a char as a delimiter.
 */
 static Err intrin_parse(Interp *interp) {
   const auto read = interp->reader;
@@ -441,7 +437,7 @@ static Err intrin_parse(Interp *interp) {
   // ));
 
   try(validate_char_ascii_printable(delim));
-  try(read_skip_whitespace(read));
+  read_skip_whitespace(read);
   try(read_until(read, (U8)delim));
 
   // IF_DEBUG(eprintf(
@@ -488,7 +484,7 @@ static Err intrin_import(Interp *interp) {
 
 static Err intrin_import_quote(Interp *interp) {
   const auto read = interp->reader;
-  try(read_skip_whitespace(read));
+  read_skip_whitespace(read);
   try(read_until(read, '"'));
   try(interp_import(interp, (const char *)read->buf.buf));
   return nullptr;
@@ -496,7 +492,6 @@ static Err intrin_import_quote(Interp *interp) {
 
 static Err intrin_import_tick(Interp *interp) {
   const auto read = interp->reader;
-  try(read_skip_whitespace(read));
   try(read_word(read));
   try(interp_import(interp, (const char *)read->word.buf));
   return nullptr;

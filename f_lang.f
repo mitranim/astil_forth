@@ -2,40 +2,38 @@
 : \ [ immediate ] 10 parse drop2 ;
 : ( [ immediate ] 41 parse drop2 ;
 
-(
-Can use comments now!
-
-This file boostraps the Forth language. The outer interpreter / compiler
-provides only the most fundamental intrinsics; enough for self-assembly.
-We define basic words in terms of machine instructions, building up from
-there. Currently only the Arm64 CPU architecture is supported.
-)
+\ Can use comments now!
+\
+\ This file boostraps the Forth language. The outer interpreter / compiler
+\ provides only the most fundamental intrinsics; enough for self-assembly.
+\ We define basic words in terms of machine instructions, building up from
+\ there. Currently only the Arm64 CPU architecture is supported.
 
 \ brk 666
 : abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;
 : unreachable abort ;
 : nop ;
 
-: ASM_INSTR_SIZE 4 ;
-: ASM_REG_DAT_SP 27 ;
-: ASM_REG_SYS_FP 29 ;
-: ASM_REG_SYS_SP 31 ;
-: ASM_EQ 0b0000 ;
-: ASM_NE 0b0001 ;
-: ASM_CS 0b0010 ;
-: ASM_CC 0b0011 ;
-: ASM_MI 0b0100 ;
-: ASM_PL 0b0101 ;
-: ASM_VS 0b0110 ;
-: ASM_VC 0b0111 ;
-: ASM_HI 0b1000 ;
-: ASM_LS 0b1001 ;
-: ASM_GE 0b1010 ;
-: ASM_LT 0b1011 ;
-: ASM_GT 0b1100 ;
-: ASM_LE 0b1101 ;
-: ASM_AL 0b1110 ;
-: ASM_NV 0b1111 ;
+: ASM_INSTR_SIZE 4      ;
+: ASM_REG_DAT_SP 27     ;
+: ASM_REG_SYS_FP 29     ;
+: ASM_REG_SYS_SP 31     ;
+: ASM_EQ         0b0000 ;
+: ASM_NE         0b0001 ;
+: ASM_CS         0b0010 ;
+: ASM_CC         0b0011 ;
+: ASM_MI         0b0100 ;
+: ASM_PL         0b0101 ;
+: ASM_VS         0b0110 ;
+: ASM_VC         0b0111 ;
+: ASM_HI         0b1000 ;
+: ASM_LS         0b1001 ;
+: ASM_GE         0b1010 ;
+: ASM_LT         0b1011 ;
+: ASM_GT         0b1100 ;
+: ASM_LE         0b1101 ;
+: ASM_AL         0b1110 ;
+: ASM_NV         0b1111 ;
 
 : asm_pop_x1_x2
   \ ldp x1, x2, [x27, -16]!
@@ -193,11 +191,9 @@ there. Currently only the Arm64 CPU architecture is supported.
   asm_pattern_load_store_pair
 ;
 
-(
-Shared by a lot of load and store instructions.
-Patches these bits:
-  0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
-)
+\ Shared by a lot of load and store instructions.
+\ Patches these bits:
+\   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
 : asm_pattern_load_store ( Xt Xn imm9 base_instr -- instr )
   swap 9 bit_trunc 12 lsl or \ imm9
   swap             5  lsl or \ Xn
@@ -252,11 +248,9 @@ Patches these bits:
   asm_pattern_load_store
 ;
 
-(
-Shared by register-offset load and store instructions.
-`scale` must be 0 or 1; if 1, offset is multiplied by 8.
-Assumes `lsl` is already part of the base instruction.
-)
+\ Shared by register-offset load and store instructions.
+\ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
+\ Assumes `lsl` is already part of the base instruction.
 : asm_pattern_load_store_with_register ( Xt Xn Xm scale base_instr -- instr )
   swap <>0 12 lsl or \ lsl 3
   swap     16 lsl or \ Xm
@@ -748,17 +742,15 @@ Assumes `lsl` is already part of the base instruction.
 \ Floor of data stack.
 : sp0 ( -- adr ) [ 26 asm_push1 comp_instr ] ; \ str x26, [x27], 8
 
-(
-Pushes the address of the next writable stack cell.
-Like `sp@` in Gforth but renamed to make sense.
-Note: our integer stack is empty-ascending.
-
-Should have been `str x27, [x27], 8`, but Arm64 has a quirk where an
-address-modifying load or store which also uses the address register
-in the value position is considered to be "unpredictable". Different
-CPUs are allowed to handle this differently; on Apple Silicon chips,
-this is considered a "bad instruction" and blows up.
-)
+\ Pushes the address of the next writable stack cell.
+\ Like `sp@` in Gforth but renamed to make sense.
+\ Note: our integer stack is empty-ascending.
+\
+\ Should have been `str x27, [x27], 8`, but Arm64 has a quirk where an
+\ address-modifying load or store which also uses the address register
+\ in the value position is considered to be "unpredictable". Different
+\ CPUs are allowed to handle this differently; on Apple Silicon chips,
+\ this is considered a "bad instruction" and blows up.
 : sp ( -- adr ) [
   ASM_REG_DAT_SP ASM_REG_DAT_SP 0 asm_store_off comp_instr \ stur x27, [x27]
   ASM_REG_DAT_SP ASM_REG_DAT_SP 8 asm_add_imm   comp_instr \ add x27, x27, 8
@@ -1345,11 +1337,9 @@ extern_ptr: __stderrp
   drop
 ;
 
-(
-Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
-Capture order matches stack push order and the parens notation,
-like in Gforth and VfxForth. Types are not supported.
-)
+\ Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
+\ Capture order matches stack push order in the parens notation
+\ like in Gforth and VfxForth. Types are not supported.
 : {
   [ immediate ]
   0 to: loc_len
@@ -1401,14 +1391,12 @@ like in Gforth and VfxForth. Types are not supported.
 : align_down ( size width -- size ) negate and ;
 : align_up   { size width -- size } width dec size + width align_down ;
 
-(
-On Arm64, we can't modify `sp` by 8 bytes and leave it like that.
-The ABI requires it to be aligned to 16 bytes when loading or storing.
-We store a pair to have a predictable value in the upper 8 bytes,
-instead of leaving random stack garbage there.
-
-TODO better name: this pops one stack item, but `dup` implies otherwise.
-)
+\ On Arm64, we can't just modify `sp` by 8 bytes and leave it like that.
+\ The ABI requires it to be aligned to 16 bytes when loading or storing.
+\ We duplicate-store to have a predictable value in the upper 8 bytes,
+\ instead of leaving random stack garbage there.
+\
+\ TODO better name: this pops one stack item, but `dup` implies otherwise.
 : dup>systack [
   inline
                          asm_pop_x1         comp_instr \ ldr x1, [x27, -8]!
@@ -1421,10 +1409,8 @@ TODO better name: this pops one stack item, but `dup` implies otherwise.
   1 2 ASM_REG_SYS_SP -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
 ] ;
 
-(
-Note: `add` is one of the few instructions which treat `x31` as `sp`
-rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
-)
+\ Note: `add` is one of the few instructions which treat `x31` as `sp`
+\ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
 : systack_ptr ( -- sp ) [
   inline
   1 ASM_REG_SYS_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
@@ -1456,28 +1442,24 @@ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
   ASM_REG_SYS_SP ASM_REG_SYS_SP rot asm_add_imm comp_instr
 ;
 
-(
-Short for "varargs". Sets up arguments for a variadic call.
-Assumes the Apple Arm64 ABI where varargs use the systack.
-Usage:
-
-  : some_word
-    #c" numbers: %zd %zd %zd"
-    10 20 30 [ 3 va- ] printf [ -va ] lf
-  ;
-
-Caution: varargs can only be used in direct calls to variadic procedures.
-Indirect calls DO NOT WORK because the stack pointer is changed by calls.
-)
+\ Short for "varargs". Sets up arguments for a variadic call.
+\ Assumes the Apple Arm64 ABI where varargs use the systack.
+\ Usage:
+\
+\   : some_word
+\     #c" numbers: %zd %zd %zd"
+\     10 20 30 [ 3 va- ] printf [ -va ] lf
+\   ;
+\
+\ Caution: varargs can only be used in direct calls to variadic procedures.
+\ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
 : va- ( C: len -- len ) ( E: <systack_push> ) dup asm_comp_systack_push ;
 : -va ( C: len -- )     ( E: <systack_pop> )      asm_comp_systack_pop ;
 
-(
-Format-prints to stdout using `printf`. `N` is the variadic arg count,
-which must be available at compile time. Usage example:
-
-  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
-)
+\ Format-prints to stdout using `printf`. `N` is the variadic arg count,
+\ which must be available at compile time. Usage example:
+\
+\   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
 : logf" ( C: N -- ) ( E: i1 … iN -- )
   va- postpone' c" compile' printf -va
 ;
@@ -1487,25 +1469,21 @@ which must be available at compile time. Usage example:
   va- compile' stderr postpone' c" compile' fprintf -va
 ;
 
-(
-Formats into the provided buffer using `snprintf`. Usage example:
-
-  SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
-)
+\ Formats into the provided buffer using `snprintf`. Usage example:
+\
+\   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
 : sf" ( C: N -- ) ( E: buf size i1 … iN -- )
   va- comp_cstr compile' snprintf -va
 ;
 
-(
-Formats an error message into the provided buffer using `snprintf`,
-then throws the buffer as the error value. The buffer must be zero
-terminated; `buf:` ensures this automatically. Usage example:
-
-  4096 buf: SOME_BUF
-  SOME_BUF 10 20 30 [ 20 ] sthrowf" error codes: %zu %zu %zu"
-
-Also see `throwf"` which comes with its own buffer.
-)
+\ Formats an error message into the provided buffer using `snprintf`,
+\ then throws the buffer as the error value. The buffer must be zero
+\ terminated; `buf:` ensures this automatically. Usage example:
+\
+\   4096 buf: SOME_BUF
+\   SOME_BUF 10 20 30 [ 20 ] sthrowf" error codes: %zu %zu %zu"
+\
+\ Also see `throwf"` which comes with its own buffer.
 : sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
   compile'  dup2
@@ -1517,11 +1495,9 @@ Also see `throwf"` which comes with its own buffer.
 
 4096 buf: ERR_BUF
 
-(
-Like `sthrowf"` but easier to use. Example:
-
-  10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
-)
+\ Like `sthrowf"` but easier to use. Example:
+\
+\   10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
 : throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
   compile'  ERR_BUF
@@ -1586,10 +1562,20 @@ extern_ptr: __error
 2     let: MAP_PRIVATE
 4096  let: MAP_ANON
 
+: mem_map_err ( -- )
+  errno dup strerror
+  [ 2 ] throwf" unable to map memory; code: %d; message: %s"
+;
+
 : mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or to: mflag
   0 size pflag mflag -1 0 mmap
-  dup -1 = #if drop throw" unable to mmap" #end
+  dup -1 = #if drop mem_map_err #end
+;
+
+: mem_unprot_err ( -- )
+  errno dup strerror
+  [ 2 ] throwf" unable to unprotect memory; code: %d; message: %s"
 ;
 
 : mem_unprot ( addr size -- )
@@ -1597,11 +1583,10 @@ extern_ptr: __error
   -1 = #if throw" unable to mprotect" #end
 ;
 
-(
-Allocates a guarded buffer: `guard|data|guard`.
-Attempting to read or write inside the guards,
-aka underflow or overflow, triggers a segfault.
-)
+\ Allocates a guarded buffer: `guard|data|guard`.
+\ Attempting to read or write inside the guards,
+\ aka underflow or overflow, triggers a segfault.
+\ The given size is rounded up to the page size.
 : mem_alloc ( size1 -- addr size2 )
         PAGE_SIZE align_up to: size2
   size2 PAGE_SIZE 1 lsl +  to: size
@@ -1616,7 +1601,7 @@ aka underflow or overflow, triggers a segfault.
 \ and readable and allows overflows. However, underflows into the lower
 \ guard are successfully prevented.
 \
-\ TODO consider compiling lazy-init; dig up the old code.
+\ TODO consider compiling with lazy-init; dig up the old code.
 : cells_guarded: ( C: len "name" -- ) ( E: -- addr )
   #word_beg
     cells mem_alloc drop

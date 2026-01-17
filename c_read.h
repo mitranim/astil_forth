@@ -18,9 +18,9 @@ typedef struct {
   Read_pos word_pos; // Last non-whitespace.
   Word_str word;     // Used for word names.
   Read_buf buf;      // Used for arbitrary text.
-  char     last : 8; // Last read char.
-  char     next : 8; // Pushbacked char; may be `== last`.
-  bool     tty  : 1; // True if file is interactive teletype.
+  Read_buf back;     // Backtrack buffer.
+  U8       last;     // Last read char.
+  bool     tty;      // True if file is interactive teletype.
 } Reader;
 
 #define READ_POS_FMT "position " FMT_IND "; %s:" FMT_IND ":" FMT_IND

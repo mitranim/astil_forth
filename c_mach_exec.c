@@ -1,3 +1,19 @@
+/*
+Unfinished sketch for building a Mach-O executable
+from a running (JIT-compiled) program.
+
+TODO:
+- Map `Asm_heap` to Mach-O segments and sections.
+  - Compactify by eliding all unused memory.
+    Virtual memory addressing lets us do that.
+  - Guards are automatic; just leave unmapped holes.
+- Build symbol table:
+  - Our symbols.
+  - Extern symbols.
+- Add a section for the Forth stack.
+  - Prepend a prologue which sets up the stack registers.
+*/
+
 #pragma once
 #include "./c_interp.h"
 #include "./lib/dict.c"
@@ -21,16 +37,6 @@ Links:
 - https://en.wikipedia.org/wiki/Mach-O
 */
 
-/*
-FIXME:
-- Convert `Asm_heap` to segments and sections.
-  - Compactify by eliding unused regions. No need to bloat the executable!
-  - Guards are automatic; just leave unmapped holes.
-- Build symbol table:
-  - Our symbols.
-  - Extern symbols.
-- Add a section for the Forth stack.
-*/
 // static Err compile_exec_sym(FILE *out, Sym const *sym) {}
 
 static Err err_sym_interp_only(const Sym *sym, const Sym *dep) {

@@ -148,9 +148,9 @@ static void interp_handle_err(Interp *interp, Err err) {
   interp_rewind(interp);
 }
 
-static Err interp_num(Interp *interp, U8 head, Sint sign) {
+static Err interp_num(Interp *interp) {
   Sint num;
-  try(read_num(interp->reader, head, sign, &num));
+  try(read_num(interp->reader, &num));
 
   IF_DEBUG(eprintf("[system] read number: " FMT_SINT "\n", num));
 
@@ -271,7 +271,7 @@ static void sym_auto_throws(Sym *caller, const Sym *callee) {
 
 Err compile_call_sym(Interp *interp, Sym *callee) {
   Sym *caller;
-  try(current_sym(interp, &caller));
+  try(require_current_sym(interp, &caller));
   sym_auto_comp_only(caller, callee);
   sym_auto_interp_only(caller, callee);
 
@@ -311,13 +311,7 @@ Err compile_call_sym(Interp *interp, Sym *callee) {
   return nullptr;
 }
 
-static Err interp_word(Interp *interp, U8 head) {
-  const auto read = interp->reader;
-  try(read_word_after(read, head));
-
-  const auto word = read->word;
-  IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", word.buf));
-
+static Err interp_word(Interp *interp, Word_str word) {
   if (interp->compiling && asm_appended_local_push(&interp->asm, word.buf)) {
     return nullptr;
   }
@@ -331,19 +325,14 @@ static Err interp_word(Interp *interp, U8 head) {
   return compile_call_sym(interp, sym);
 }
 
-// Head byte is `-` or `+`, the rest is either a numeric literal or a word.
-static Err interp_arith(Interp *interp, U8 head) {
+static Err read_interp_word(Interp *interp) {
   const auto read = interp->reader;
+  try(read_word(read));
 
-  U8 next;
-  try(read_ascii_printable(read, &next));
+  const auto word = read->word;
+  IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", word.buf));
 
-  if (HEAD_CHAR_KIND[next] == CHAR_DECIMAL) {
-    return interp_num(interp, next, (head == '-' ? -1 : 1));
-  }
-
-  reader_backtrack(read, next);
-  return interp_word(interp, head);
+  return interp_word(interp, word);
 }
 
 static Err interp_err(Reader *read, const Err err) {
@@ -352,26 +341,44 @@ static Err interp_err(Reader *read, const Err err) {
 }
 
 static Err interp_loop(Interp *interp) {
+  const auto read = interp->reader;
+
   for (;;) {
     U8 next;
-    try(read_ascii_printable(interp->reader, &next));
+    try(read_ascii_printable(read, &next));
 
-    // SYNC[interp_loop].
     switch (HEAD_CHAR_KIND[next]) {
+      case CHAR_EOF:        return nullptr;
       case CHAR_WHITESPACE: continue;
-      case CHAR_DECIMAL:    {
-        try(interp_num(interp, next, 1));
+
+      case CHAR_DECIMAL: {
+        reader_backtrack(read, next);
+        try(interp_num(interp));
         continue;
       }
+
+      // `+` and `-` are ambiguous: may begin a number or a word.
       case CHAR_ARITH: {
-        try(interp_arith(interp, next));
+        U8 next_next;
+        try(read_ascii_printable(read, &next_next));
+        reader_backtrack(read, next_next);
+        reader_backtrack(read, next);
+
+        if (HEAD_CHAR_KIND[next_next] == CHAR_DECIMAL) {
+          try(interp_num(interp));
+          continue;
+        }
+
+        try(read_interp_word(interp));
         continue;
       }
+
       case CHAR_WORD: {
-        try(interp_word(interp, next));
+        reader_backtrack(read, next);
+        try(read_interp_word(interp));
         continue;
       }
-      case CHAR_EOF:         return nullptr;
+
       case CHAR_UNPRINTABLE: [[fallthrough]];
       default:               return err_unsupported_char(next);
     }

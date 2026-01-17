@@ -2,6 +2,15 @@
 .include "./generated/c_asm.s"
 
 /*
+TODO find out if we can move this to `c_asm_gen.c` and share the number
+between C and asm without duplication. Adding this directive to the gen
+file doesn't seem to do anything; Clang ignores it.
+
+SYNC[asm_magic].
+*/
+ASM_MAGIC: .8byte 0xabcdFEEDabcdFACE
+
+/*
 See the C prototype for the procedure signature.
 
 See `./c_asm_arm64.c` for docs on special registers.
@@ -57,12 +66,3 @@ asm_call_forth_trace:
   ldr x0, [sp], 16
   b asm_call_forth_epilogue
   brk 666
-
-/*
-TODO find out if we can move this to `c_asm_gen.c` and share the number
-between C and asm without duplication. Adding this directive to the gen
-file doesn't seem to do anything; Clang ignores it.
-
-SYNC[asm_magic].
-*/
-ASM_MAGIC: .8byte 0xabcdFEEDabcdFACE

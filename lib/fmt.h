@@ -1,7 +1,8 @@
 #pragma once
 #include "./arr.h"
 
-#define FMT_QUOTED "\"%s\""
+// #define FMT_QUOTED "\"%s\""
+#define FMT_QUOTED "`%s`"
 #define FMT_CHAR "\"%c\""
 
 #define repr_struct(val) __builtin_dump_struct(val, fprintf, stderr)

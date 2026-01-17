@@ -127,3 +127,11 @@ value may be either useful, or the -1 sentinel.
   static_assert(                                                         \
     __builtin_types_compatible_p(typeof_unqual(val), typeof_unqual(typ)) \
   )
+
+// For error messages.
+static char thread_local ERR_BUF_0[4096];
+static char thread_local ERR_BUF_1[4096];
+
+// For backtraces.
+static thread_local void *BT_BUF[256] = {};
+static thread_local int   BT_BUF_LEN  = 0;

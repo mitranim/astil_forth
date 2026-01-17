@@ -1,20 +1,22 @@
-(
-Vaguely similar to regular Forth testing words:
-
-  https://forth-standard.org/standard/testsuite
-
-Example tests:
-
-  T{ 10 20    <T> 10 20    } \ OK
-  T{ 10 20    <T> 10 20 30 } \ Fail
-  T{ 10 20 30 <T> 10 20    } \ Fail
-)
+\ Similar to the common Forth testing words:
+\
+\   https://forth-standard.org/standard/testsuite
+\
+\ Example tests:
+\
+\   T{ 10 20    <T> 10 20    } \ OK
+\   T{ 10 20    <T> 10 20 30 } \ Fail
+\   T{ 10 20 30 <T> 10 20    } \ Fail
+\
+\ This file expects the language core to be already imported.
+\ It can also be substituted with a different implementation.
+\
+\   import' ./f_lang.f
 
 0 var: T_LEN_0 \ Stack length at `T{`.
 0 var: T_LEN_1 \ Stack length at `<T>`.
 
 : T_reset
-  \ Reset to initial stack length.
   T_LEN_0 @ stack_trunc
   T_LEN_0 off!
   T_LEN_1 off!

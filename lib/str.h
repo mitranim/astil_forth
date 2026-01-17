@@ -34,7 +34,7 @@
     tmp_err;                                                                  \
   })
 
-// Returns true if about to overflow.
+// Checks bounds, returns true if about to overflow, panics on overflow.
 #define str_push(str, byte)                     \
   ({                                            \
     const auto     tmp_str  = str;              \
@@ -43,6 +43,13 @@
     tmp_str->buf[tmp_str->len++] = byte;        \
     tmp_str->len >= tmp_ceil;                   \
   })
+
+// // Returns 0 when out of length.
+// #define str_pop(str)                                          \
+//   ({                                                          \
+//     const auto tmp_str = str;                                 \
+//     tmp_str->len ? tmp_str->buf[tmp_str->len-- - (Ind)1] : 0; \
+//   })
 
 #define str_eq(str, tar)                             \
   ({                                                 \

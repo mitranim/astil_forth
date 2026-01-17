@@ -7,14 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 
-// For error messages.
-static char thread_local ERR_BUF_0[4096];
-static char thread_local ERR_BUF_1[4096];
-
-// For backtraces.
-static thread_local void *BT_BUF[256] = {};
-static thread_local int   BT_BUF_LEN  = 0;
-
 static void backtrace_capture() {
   BT_BUF_LEN = backtrace(BT_BUF, arr_cap(BT_BUF));
 }
