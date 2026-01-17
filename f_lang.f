@@ -1029,6 +1029,11 @@ this is considered a "bad instruction" and blows up.
   adr ' else_pop
 ;
 
+\ TODO: replace `'` in control structures with raw native code pointers,
+\ and replace `execute` with a new word, let's say `call`, which invokes
+\ an instruction address and checks the error register. That's about 3-5
+\ lines in Forth, 3 instructions total. This should reduce or remove the
+\ overhead of calling compiler intrinsics in control chains.
 : #end ( C: fun -- ) execute ;
 
 \ ## Loops
@@ -1321,9 +1326,10 @@ extern_ptr: __stderrp
 
 : type ( str len -- ) 1 swap stdout fwrite ;
 : etype ( str len -- ) 1 swap stderr fwrite ;
-: cr 10 putchar ;
-: ecr 10 putchar ;
+: lf 10 putchar ; \ Renamed from `cr` which would be a misnomer.
+: elf 10 eputchar ;
 : space 32 putchar ;
+: espace 32 eputchar ;
 
 : log" comp_cstr compile' puts ;
 : elog" comp_cstr compile' eputs ;
@@ -1457,7 +1463,7 @@ Usage:
 
   : some_word
     #c" numbers: %zd %zd %zd"
-    10 20 30 [ 3 va- ] printf [ -va ] cr
+    10 20 30 [ 3 va- ] printf [ -va ] lf
   ;
 
 Caution: varargs can only be used in direct calls to variadic procedures.
@@ -1470,7 +1476,7 @@ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
 Format-prints to stdout using `printf`. `N` is the variadic arg count,
 which must be available at compile time. Usage example:
 
-  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
 )
 : logf" ( C: N -- ) ( E: i1 … iN -- )
   va- postpone' c" compile' printf -va
@@ -1484,7 +1490,7 @@ which must be available at compile time. Usage example:
 (
 Formats into the provided buffer using `snprintf`. Usage example:
 
-  SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" cr
+  SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
 )
 : sf" ( C: N -- ) ( E: buf size i1 … iN -- )
   va- comp_cstr compile' snprintf -va
@@ -1536,29 +1542,29 @@ Like `sthrowf"` but easier to use. Example:
 
 : log_int ( num -- ) [ 1 ] logf" %zd"  ;
 : log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
-: . ( num -- ) stack_len dec log_cell cr ;
+: . ( num -- ) stack_len dec log_cell lf ;
 
 : .s
   stack_len to: len
 
   len #ifn
-    log" stack is empty" cr
+    log" stack is empty" lf
     #ret
   #end
 
   len <0 #if
-    log" stack length is negative: " len log_int cr
+    log" stack length is negative: " len log_int lf
     #ret
   #end
 
-  len [ 1 ] logf" stack <%zd>:" cr
+  len [ 1 ] logf" stack <%zd>:" lf
 
   0
   #loop
     dup to: ind
     ind len < #while
     space space
-    ind pick0 ind log_cell cr
+    ind pick0 ind log_cell lf
     inc
   #end
   drop

@@ -31,10 +31,10 @@ Procedure prologue also implicitly undergoes fixup.
 */
 typedef struct {
   enum {
-    ASM_FIXUP_RET   = 1,
-    ASM_FIXUP_TRY   = 2,
-    ASM_FIXUP_RECUR = 3,
-    ASM_FIXUP_LOAD  = 4
+    ASM_FIXUP_RET = 1,
+    ASM_FIXUP_TRY,
+    ASM_FIXUP_IMM,
+    ASM_FIXUP_RECUR,
   } type;
 
   Instr *ret;   // b <epilogue>
@@ -43,9 +43,9 @@ typedef struct {
 
   struct {
     Instr *instr; // Instruction to patch.
-    Uint   imm;   // Immediate value to load.
+    Uint   num;   // Immediate value to load.
     U8     reg;   // Register to load into.
-  } load;
+  } imm;
 } Asm_fixup;
 
 typedef list_of(Asm_fixup) Asm_fixup_list;
@@ -175,8 +175,8 @@ static constexpr U8 ASM_REG_SP = 31;
 typedef enum : Instr {
   ASM_CODE_PROC_DELIM = 1,
   ASM_CODE_PROLOGUE,
-  ASM_CODE_RET_EPI,
   ASM_CODE_RECUR,
-  ASM_CODE_LOAD,
   ASM_CODE_TRY,
+  ASM_CODE_RET,
+  ASM_CODE_IMM,
 } Asm_magic;

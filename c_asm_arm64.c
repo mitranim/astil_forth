@@ -795,18 +795,18 @@ static Instr *asm_append_breakpoint(Asm *asm, Instr imm) {
 }
 
 static void asm_fixup_ret(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
-  aver(fixup->type == ASM_FIXUP_RET);
+  IF_DEBUG(aver(fixup->type == ASM_FIXUP_RET));
 
   const auto epi = asm_sym_epilogue_writable(asm, sym);
   const auto tar = fixup->ret;
   const auto off = epi - tar;
 
-  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET_EPI)));
+  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET)));
   *tar = asm_instr_branch_to_offset(off);
 }
 
 static void asm_fixup_try(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
-  aver(fixup->type == ASM_FIXUP_TRY);
+  IF_DEBUG(aver(fixup->type == ASM_FIXUP_TRY));
 
   const auto epi = asm_sym_epilogue_writable(asm, sym);
   const auto tar = fixup->try;
@@ -817,7 +817,7 @@ static void asm_fixup_try(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
 }
 
 static void asm_fixup_recur(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
-  aver(fixup->type == ASM_FIXUP_RECUR);
+  IF_DEBUG(aver(fixup->type == ASM_FIXUP_RECUR));
 
   const auto tar = fixup->recur;
   const auto off = asm_sym_begin_writable(asm, sym) - tar;
@@ -827,32 +827,32 @@ static void asm_fixup_recur(Asm *asm, const Asm_fixup *fixup, const Sym *sym) {
 }
 
 static void asm_fixup_load(Asm *asm, const Asm_fixup *fixup, Sym *sym) {
-  aver(fixup->type == ASM_FIXUP_LOAD);
+  IF_DEBUG(aver(fixup->type == ASM_FIXUP_IMM));
 
   const auto write = &asm->code_write;
-  const auto load  = &fixup->load;
-  const auto pci   = load->instr;
-  const auto imm   = load->imm;
-  const auto imm32 = (U32)imm;
+  const auto imm   = &fixup->imm;
+  const auto pci   = imm->instr;
+  const auto num   = imm->num;
+  const auto imm32 = (U32)num;
   const auto top   = list_next_ptr(write);
 
-  IF_DEBUG(aver(*pci == asm_instr_breakpoint(ASM_CODE_LOAD)));
+  IF_DEBUG(aver(*pci == asm_instr_breakpoint(ASM_CODE_IMM)));
 
   Instr opc;
-  if ((Uint)imm32 == imm) {
+  if ((Uint)imm32 == num) {
     opc = 0b00; // ldr <Wt>, <off>
     asm_append_instr(asm, imm32);
   }
   else {
     opc = 0b01; // ldr <Xt>, <off>
-    list_push_raw_val(write, imm);
+    list_push_raw_val(write, num);
   }
 
   Instr imm19;
   averr(imm_signed((top - pci), 19, &imm19));
 
   *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30) |
-    (imm19 << 5) | load->reg;
+    (imm19 << 5) | imm->reg;
   sym->norm.has_loads = true;
 }
 
@@ -875,7 +875,7 @@ static void asm_fixup(Asm *asm, Sym *sym) {
         asm_fixup_recur(asm, fixup, sym);
         continue;
       }
-      case ASM_FIXUP_LOAD: {
+      case ASM_FIXUP_IMM: {
         asm_fixup_load(asm, fixup, sym);
         continue;
       }
@@ -1173,7 +1173,7 @@ static void asm_append_ret(Asm *asm) {
     &asm->fixup,
     (Asm_fixup){
       .type = ASM_FIXUP_RET,
-      .ret  = asm_append_breakpoint(asm, ASM_CODE_RET_EPI),
+      .ret  = asm_append_breakpoint(asm, ASM_CODE_RET),
     }
   );
 }
@@ -1323,10 +1323,10 @@ static void asm_append_imm_to_reg(Asm *asm, U8 reg, Sint src, bool *has_load) {
   list_append(
     &asm->fixup,
     (Asm_fixup){
-      .type       = ASM_FIXUP_LOAD,
-      .load.instr = asm_append_breakpoint(asm, ASM_CODE_LOAD),
-      .load.imm   = (Uint)src,
-      .load.reg   = reg,
+      .type      = ASM_FIXUP_IMM,
+      .imm.instr = asm_append_breakpoint(asm, ASM_CODE_IMM),
+      .imm.num   = (Uint)src,
+      .imm.reg   = reg,
     }
   );
 }
@@ -1504,6 +1504,10 @@ static Err err_out_of_space_const() {
 
 static Err asm_alloc_const_append_load(Asm *asm, U8 const *src, Uint len, U8 reg) {
   const auto tar = &asm->consts;
+
+  // TODO find if this is ever needed.
+  // tar->len = __builtin_align_up(tar->len, sizeof(void *));
+
   if (len > list_rem_bytes(tar)) return err_out_of_space_const();
 
   const auto addr = asm_next_const(asm);
@@ -1520,6 +1524,10 @@ static Err err_out_of_space_data() {
 
 static Err asm_alloc_data_append_load(Asm *asm, Uint len, U8 reg, U8 **out_addr) {
   const auto tar = &asm->data;
+
+  // TODO find if this is ever needed.
+  // tar->len = __builtin_align_up(tar->len, sizeof(void *));
+
   if (len > list_rem_bytes(tar)) return err_out_of_space_data();
 
   const auto addr = asm_next_data(asm);

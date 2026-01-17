@@ -53,3 +53,9 @@ For weird macros.
 
 #define to_ptr_or_arr(val) \
   __builtin_choose_expr(is_ptr_or_arr(val), val, nullptr)
+
+// For fixed-size arrays only.
+#define arr_range(type, name, arr) \
+  type name = 0;                   \
+  name < arr_cap(arr);             \
+  name++

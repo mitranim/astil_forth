@@ -413,7 +413,18 @@ static Err intrin_char(Interp *interp) {
   return nullptr;
 }
 
-// TODO: not fundamental, implement in Forth via intrinsic `char`.
+/*
+Technically we could provide a lower-level intrinsic for reading char-by-char
+and implement this in Forth. But this requires a loop. Our bootstrap sequence
+needs this immediately for comments; meanwhile, loops are not available until
+way, WAY later in the code. We could use an inline assembly loop, which would
+have to be pre-assembled and hardcoded in binary, since the self-assembler is
+also not available initially.
+
+TODO: provide a higher-level version which uses a string rather than a char
+as a delimiter. We still need this one, because string literals only become
+available WAY later in the program.
+*/
 static Err intrin_parse(Interp *interp) {
   const auto read = interp->reader;
   const auto ints = &interp->ints;

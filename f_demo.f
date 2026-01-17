@@ -1,8 +1,8 @@
 import' ./f_lang.f
 
-str" hello world! (top level)" type cr
+str" hello world! (top level)" type lf
 
-: hello log" hello world! (deferred)" cr ;
+: hello log" hello world! (deferred)" lf ;
 hello
 
 (
@@ -24,10 +24,10 @@ However, our system relies on some XNU-specific stuff elsewhere.
   0          asm_zero_reg      comp_instr \ eor x0, x0, x0
 ] ;
 
-: hello0 1 " hello world! (using syscall)" sys_write cr ;
+: hello0 1 " hello world! (using syscall)" sys_write lf ;
 hello0
 
-64 putchar 65 putchar 66 putchar 67 putchar cr \ @ABC
+64 putchar 65 putchar 66 putchar 67 putchar lf \ @ABC
 
 1234567890 .
 
@@ -36,5 +36,5 @@ hello0
 1 truth_num .
 
 : truth_str #if " true!" #else " false!" #end ;
-0 truth_str type cr
-1 truth_str type cr
+0 truth_str type lf
+1 truth_str type lf

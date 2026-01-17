@@ -49,7 +49,7 @@ Example tests:
 
     equal #if T_reset #ret #end
   #else
-    rel0 rel1 [ 2 ] elogf" stack length mismatch: (%zd) <T> (%zd)" cr
+    rel0 rel1 [ 2 ] elogf" stack length mismatch: (%zd) <T> (%zd)" lf
   #end
 
   elog" stack content mismatch: T{ "
@@ -71,7 +71,7 @@ Example tests:
     inc
   #end drop
 
-  elog" }T" cr
+  elog" }T" lf
 
   T_reset
   throw" test failure"

@@ -37,7 +37,7 @@ T{ 123 test_recursion <T> 13 }T
 
 1 0 extern: sleep
 
-: test_sleep_loop #loop log" sleeping" cr 1 sleep #end ;
+: test_sleep_loop #loop log" sleeping" lf 1 sleep #end ;
 \ test_sleep_loop
 
 : test_loop_leave
@@ -456,17 +456,17 @@ T{ 234 1 ?dup <T> 234 234 }T
 
 : test_varargs
   c" numbers (should be 10 20 30): %zd %zd %zd"
-  10 20 30 [ 3 va- ] debug_stack printf [ -va ] cr
+  10 20 30 [ 3 va- ] debug_stack printf [ -va ] lf
 ;
 \ test_varargs
 
 : test_fmt
-  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
 ;
 \ test_fmt
 
 : test_efmt
-  10 20 30 [ 3 ] elogf" numbers: %zu %zu %zu" cr
+  10 20 30 [ 3 ] elogf" numbers: %zu %zu %zu" lf
 ;
 \ test_efmt
 
@@ -543,4 +543,4 @@ test_to
 ;
 test_locals
 
-str" [test] ok" etype ecr eflush
+str" [test] ok" etype elf eflush
