@@ -1,9 +1,8 @@
 #pragma once
-#include "./c_asm.h"
+#include "./c_arch.h"
 #include "./c_interp.c"
 #include "./lib/fmt.c"
 #include "./lib/misc.h"
-#include "c_asm_arm64.h"
 #include <mach/mach.h>
 #include <stdio.h>
 
@@ -156,6 +155,7 @@ We get to "cheat" by making a few simplifying assumptions:
 static Err mach_unwind_thread(
   const Interp *interp, const char *msg, Thread_state *state
 ) {
+  const auto code   = &interp->comp.code;
   auto       frame  = (Frame_record *)state->fp;
   const auto pc_old = (const Instr *)state->pc;
   auto       pc_new = pc_old;
@@ -163,11 +163,10 @@ static Err mach_unwind_thread(
   if (!frame) return err_unwind_no_frame();
   if (!frame->parent && !frame->caller) return err_unwind_empty_frame(frame);
 
-  const auto asm     = &interp->asm;
   const auto leaf_lr = (const Instr *)state->lr;
 
   // Leaf procedure without its own frame record.
-  if (asm_is_instr_ours(asm, pc_new) && frame->caller != leaf_lr) {
+  if (comp_code_is_instr_ours(code, pc_new) && frame->caller != leaf_lr) {
     IF_DEBUG(eprintf(
       "[system] [unwind] frame -1: leaf procedure without a frame; PC: %p -> %p; LR: %p -> %p\n",
       pc_new,
@@ -186,7 +185,7 @@ static Err mach_unwind_thread(
 
   Uint frame_ind = 0;
 
-  while (asm_is_instr_ours(asm, pc_new)) {
+  while (comp_code_is_instr_ours(code, pc_new)) {
     if (!frame->parent) {
       return err_unwind_internal_no_parent(frame, frame_ind, pc_new);
     }
@@ -346,8 +345,8 @@ kern_return_t catch_mach_exception_raise_state(
 
   if (exception != EXC_BAD_ACCESS) return KERN_FAILURE;
 
-  const auto bad_addr   = (void *)code[1]; // undocumented
-  const auto asm        = &interp->asm;
+  const auto  comp      = &interp->comp;
+  const auto  bad_addr  = (void *)code[1]; // undocumented
   const auto  ints      = &interp->ints;
   const void *ints_low  = ints->cellar;
   const void *ints_high = (U8 const *)ints_low + ints->bytelen;
@@ -360,13 +359,13 @@ kern_return_t catch_mach_exception_raise_state(
     );
     eprintf(
       SYS_REC_FMT "  writable   instructions: [%p,%p)\n",
-      asm->code_write.dat,
-      list_ceil(&asm->code_write)
+      comp->code.code_write.dat,
+      list_len_ceil(&comp->code.code_write)
     );
     eprintf(
       SYS_REC_FMT "  executable instructions: [%p,%p)\n",
-      asm->code_exec.dat,
-      list_ceil(&asm->code_exec)
+      comp->code.code_exec.dat,
+      list_len_ceil(&comp->code.code_exec)
     );
     fflush(stderr);
     return KERN_FAILURE;

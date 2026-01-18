@@ -11,7 +11,7 @@ Goals:
 - [x] Keep the code clear and educational for other compiler amateurs.
 - [ ] AOT compilation.
 
-Most languages ship with a smart, powerful, all-knowing compiler with intrinsic knowledge of the entire language. I feel this approach is too inflexible. It makes the compiler a closed system. Modifying and improving the language requires changing the compiler's source code.
+Most languages ship with a smart, powerful, all-knowing compiler with intrinsic knowledge of the entire language. I feel this approach is too inflexible. It makes the compiler a closed system. Modifying and improving the language requires changing the compiler's source code, which is usually over-complicated.
 
 On top of that, most languages isolate you from the CPU, or even from the OS, from the get-go. Instead of giving you access to the foundations, and providing a convenient pre-built ramp to the high clouds, _all you get_ is high clouds.
 
@@ -23,9 +23,15 @@ Unlike the system linked above, and mature systems such as Gforth, our implement
 
 Most language features are implemented in `f_lang.f`, bootstrapping the language on the fly, often via inline assembly.
 
+Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
+
 ## Show me the code!
 
+Note: in this system, Forth is defined _in Forth_ on the fly via the `f_lang.f` file. Other files have to import it first.
+
 ```forth
+import' ./f_lang.f
+
 : main
   log" hello world!" cr
 
@@ -42,6 +48,7 @@ Most language features are implemented in `f_lang.f`, bootstrapping the language
     ind [ 1 ] logf" current number: %zd" cr
   #end
 ;
+
 main
 ```
 
@@ -73,7 +80,7 @@ make debug_run '<file>' DEBUG=true
 
 Should be usable as a library in another C/C++ program. The "main" file is only a tiny adapter over the top-level library API. See `./c_main.c`.
 
-The C code uses a "unity build" where files directly include other files, with `#pragma once`. A program could simply `#include` the key files in its own "main" or whatever, and be good to go, without having to configure the build system. Some "include" paths might need tiny tweaks.
+In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to use this as a library by simply cloning the repo into a subfolder and including `./c_interp.c` which provides the top-level API, and includes all other files it needs.
 
 ## Easy C interop
 

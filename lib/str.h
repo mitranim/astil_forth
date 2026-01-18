@@ -8,6 +8,9 @@
     char buf[buf_len];   \
   }
 
+typedef str_buf(128) Word_str;
+typedef str_buf(256) Path_str;
+
 #define str_cap(str) ((Ind)(sizeof((str)->buf) / sizeof((str)->buf[0])))
 
 #define str_trunc(str)              \
@@ -23,7 +26,6 @@
     str_term_tmp->buf[str_term_tmp->len] = '\0'; \
   })
 
-// `out` must be `char[N]`.
 #define str_copy(out, src)                                                    \
   ({                                                                          \
     const auto tmp_str = out;                                                 \
@@ -56,6 +58,3 @@
     const auto str_eq_tmp = str;                     \
     !strncmp(tar, str_eq_tmp->buf, str_eq_tmp->len); \
   })
-
-typedef str_buf(128) Word_str;
-typedef str_buf(256) Path_str;

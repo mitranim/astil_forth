@@ -16,8 +16,8 @@
 
 : ASM_INSTR_SIZE 4      ;
 : ASM_REG_DAT_SP 27     ;
-: ASM_REG_SYS_FP 29     ;
-: ASM_REG_SYS_SP 31     ;
+: ASM_REG_FP     29     ;
+: ASM_REG_SP     31     ;
 : ASM_EQ         0b0000 ;
 : ASM_NE         0b0001 ;
 : ASM_CS         0b0010 ;
@@ -492,7 +492,7 @@
 : '         ( "name" -- exec_tok ) next_word  comp_push ;
 : inline'   next_word inline_word ;
 : postpone' next_word comp_call ;
-: compile'  next_word comp_push ' comp_call comp_call ;
+: postpone_compile'  next_word comp_push ' comp_call comp_call ;
 
 : drop ( val -- ) [
   ASM_REG_DAT_SP ASM_REG_DAT_SP 8 asm_sub_imm comp_instr \ sub x27, x27, 8
@@ -851,14 +851,18 @@
 \ Words ending with a quote are automatically immediate.
 : c" comp_cstr ;
 
-\ ## Variables and locals
+\ ## Variables
 \
-\ Words for declaring constants, variables, and locals.
 \ Unlike in ANS Forth, variables take an initial value.
+\
+\ We could easily define variables without compiler support,
+\ allocating memory via libc. The reason for special support
+\ such as `comp_static` is compatibility with AOT compilation,
+\ which is planned for later.
 
 \ For words which define words. Kinda like `create`.
-: #word_beg compile' : ;
-: #word_end compile' ; not_comp_only ;
+: #word_beg postpone_compile' : ;
+: #word_end postpone_compile' ; not_comp_only ;
 
 \ Similar to standard `constant`.
 : let: ( C: val -- ) ( E: -- val ) #word_beg comp_push #word_end ;
@@ -893,46 +897,40 @@
   #word_end
 ;
 
-\ Core primitive for locals.
-: to: ( C: "name" -- ) ( E: val -- ) parse_word get_local_ind comp_local_pop ;
-
-\ SYNC[local_fp_off].
-: local_fp_off ( ind -- fp_off ) inc cells negate ;
-
 0 let: false
 1 let: true
 
-\ ## Misc utils for local ops
+\ ## Locals
+\
+\ When we ask for a local, the compiler returns an FP offset.
+\ We can compile load/store and push/pop as we like.
 
-\ ldur Xd, [FP, <off>]
-: asm_local_load ( Xd local_ind -- instr )
-  ASM_REG_SYS_FP swap local_fp_off asm_load_off
+: asm_local_get ( reg fp_off -- instr ) ASM_REG_FP swap asm_load_off ;
+: asm_local_set ( reg fp_off -- instr ) ASM_REG_FP swap asm_store_off ;
+
+\ : asm_local_get ( fp_off reg -- instr ) ASM_REG_FP rot asm_load_off ;
+\ : asm_local_set ( fp_off reg -- instr ) ASM_REG_FP rot asm_store_off ;
+
+\ SYNC[asm_local_read].
+: comp_local_get_push ( fp_off -- )
+  1 swap asm_local_get comp_instr \ ldr x1, [FP, <loc>]
+  1      asm_push1     comp_instr \ str x1, [x27], 8
 ;
 
-\ stur Xd, [FP, <off>]
-: asm_local_store ( Xd local_ind -- instr )
-  ASM_REG_SYS_FP swap local_fp_off asm_store_off
+\ SYNC[asm_local_write].
+: comp_pop_local_set ( fp_off -- )
+  1      asm_pop1      comp_instr \ ldr x1, [x27, -8]!
+  1 swap asm_local_set comp_instr \ str x1, [FP, <loc>]
 ;
 
-: comp_load_local_x1  ( Xd ind -- ) 1 swap asm_local_load  comp_instr ;
-: comp_store_local_x1 ( Xd ind -- ) 1 swap asm_local_store comp_instr ;
-
-\ TODO: use `ldp` when offsets are adjacent.
-: comp_load_locals_x1_x2 ( ind1 ind2 -- )
-  2 swap asm_local_load comp_instr \ ldur x2, [FP, <loc2_off>]
-  1 swap asm_local_load comp_instr \ ldur x1, [FP, <loc1_off>]
-;
-
-\ TODO: use `ldp` when offsets are adjacent.
-: comp_store_locals_x1_x2 ( ind1 ind2 -- )
-  2 swap asm_local_store comp_instr \ stur x2, [FP, <loc2_off>]
-  1 swap asm_local_store comp_instr \ stur x1, [FP, <loc1_off>]
+: to: ( C: "name" -- ) ( E: val -- )
+  parse_word get_local comp_pop_local_set
 ;
 
 \ ## Exceptions
 \
 \ Exception definitions are split. See additional words below
-\ with support for msg formatting using the C "printf" family.
+\ which support message formatting via the C "printf" family.
 
 \ `x0` is our error register. The annotation `throws` makes the compiler
 \ insert an error check after each call to this procedure and any other
@@ -947,7 +945,7 @@
 \ Usage: `throw" some_error_msg"`.
 \
 \ Also see `sthrowf"` for formatted errors.
-: throw" ( C: "str" -- ) comp_str compile' throw ;
+: throw" ( C: "str" -- ) comp_str postpone_compile' throw ;
 
 \ ## Memory
 \
@@ -1081,9 +1079,7 @@
 \ to insert their control frame before a loop control frame.
 \ This allows to pop the control frames in the right order
 \ with a single "end" word.
-: loop_aux
-  ( prev… <loop> …rest… <frame> stack_len -- prev… <frame> <loop> …rest )
-
+: loop_aux ( prev… <loop> …rest… <frame> stack_len -- prev… <frame> <loop> …rest )
             to: stack_len_0
   stack_len to: stack_len_1
 
@@ -1159,13 +1155,13 @@
 
   to: index
   loop_frame_beg
-  index comp_local_pop \ Reuse limit as index.
+  index comp_pop_local_set \ Reuse limit as index.
 
   here to: adr_beg
-  1 index asm_local_load  comp_instr    \ ldur x1, [FP, <loc_off>]
-  here to: adr_cond       reserve_instr \ cbz x1, <end>
-  1 1 1   asm_sub_imm     comp_instr    \ sub x1, x1, 1
-  1 index asm_local_store comp_instr    \ stur x1, [FP, <loc_off>]
+  1 index asm_local_get comp_instr    \ ldur x1, [FP, <loc_off>]
+  here to: adr_cond     reserve_instr \ cbz x1, <end>
+  1 1 1   asm_sub_imm   comp_instr    \ sub x1, x1, 1
+  1 index asm_local_set comp_instr    \ stur x1, [FP, <loc_off>]
 
   adr_cond adr_beg ' for_loop_pop
 ;
@@ -1185,7 +1181,7 @@
 : #for
   ( C: -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: ceil -- )
-  anon_local_ind for_loop_init
+  anon_local for_loop_init
 ;
 
 \ Like `#for` but requires a local name to make the index
@@ -1198,7 +1194,7 @@
 : -for:
   ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: ceil -- )
-  parse_word get_local_ind for_loop_init
+  parse_word get_local for_loop_init
 ;
 
 \ Not used by `#for` and `-for:` because they get away
@@ -1211,8 +1207,9 @@
   to: cursor
 
   here to: adr_beg
-  cursor limit comp_load_locals_x1_x2
-  1 2 asm_cmp_reg comp_instr \ cmp x1, x2
+  1 cursor asm_local_get comp_instr \ ldr x1, [FP, <loc>]
+  2 limit  asm_local_get comp_instr \ ldr x2, [FP, <loc>]
+  1 2      asm_cmp_reg   comp_instr \ cmp x1, x2
 
   here to: adr_cond
   reserve_instr \ b.cond <end>
@@ -1233,9 +1230,9 @@
 
 : plus_for_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_cur )
   to: cursor
-  1 cursor asm_local_load  comp_instr \ ldur x1, [FP, <index_off>]
-  1 1 1    asm_add_imm     comp_instr \ add x1, x1, 1
-  1 cursor asm_local_store comp_instr \ stur x1, [FP, <index_off>]
+  1 cursor asm_local_get comp_instr \ ldur x1, [FP, <loc>]
+  1 1 1    asm_add_imm   comp_instr \ add x1, x1, 1
+  1 cursor asm_local_set comp_instr \ stur x1, [FP, <loc>]
   count_up_loop_pop
 ;
 
@@ -1252,20 +1249,22 @@
   loop_frame_beg
   parse_word
 
-  anon_local_ind to: ceil
-  get_local_ind  to: floor \ Reuse as cursor / index.
+  anon_local to: ceil
+  get_local  to: floor \ Reuse as cursor / index.
 
-  floor      comp_local_pop
-  ceil       comp_local_pop
+  floor      comp_pop_local_set
+  ceil       comp_pop_local_set
   floor ceil comp_count_loop_beg
   ' plus_for_loop_pop
 ;
 
 : plus_loop_pop ( fun[prev] …aux… adr[cond] adr[beg] loc_cur loc_step )
   to: step to: cursor
-  cursor step comp_load_locals_x1_x2
-  1 1 2  asm_add_reg comp_instr \ add x1, x1, x2
-  cursor comp_store_local_x1
+
+  1 cursor asm_local_get comp_instr \ ldr x1, [FP, <loc>]
+  2 step   asm_local_get comp_instr \ ldr x2, [FP, <loc>]
+  1 1 2    asm_add_reg   comp_instr \ add x1, x1, x2
+  1 cursor asm_local_set comp_instr \ str x1, [FP, <off>]
   count_up_loop_pop
 ;
 
@@ -1280,13 +1279,13 @@
   loop_frame_beg
 
   parse_word
-  anon_local_ind to: ceil
-  get_local_ind  to: floor \ Reuse as cursor.
-  anon_local_ind to: step
+  anon_local to: ceil
+  get_local  to: floor \ Reuse as cursor.
+  anon_local to: step
 
-  step       comp_local_pop
-  floor      comp_local_pop
-  ceil       comp_local_pop
+  step       comp_pop_local_set
+  floor      comp_pop_local_set
+  ceil       comp_pop_local_set
   floor ceil comp_count_loop_beg
   step ' plus_loop_pop
 ;
@@ -1298,26 +1297,26 @@
   loop_frame_beg
 
   parse_word
-  get_local_ind  to: ceil \ Reuse as cursor.
-  anon_local_ind to: floor
-  anon_local_ind to: step
+  get_local  to: ceil \ Reuse as cursor.
+  anon_local to: floor
+  anon_local to: step
 
-  step       comp_local_pop
-  floor      comp_local_pop
-  ceil       comp_local_pop
+  step  comp_pop_local_set
+  floor comp_pop_local_set
+  ceil  comp_pop_local_set
 
   here to: adr_beg
 
   \ We can almost use `comp_count_loop_beg` here,
   \ but this loop wants subtraction at the start.
   \ TODO use `ldp` for adjacent offsets.
-  1 ceil  asm_local_load comp_instr \ ldur x1, [FP, <ceil_off>]
-  2 floor asm_local_load comp_instr \ ldur x2, [FP, <floor_off>]
-  3 step  asm_local_load comp_instr \ ldur x3, [FP, <step_off>]
-  1 1 3   asm_sub_reg    comp_instr \ sub x1, x1, x3
-  1 2     asm_cmp_reg    comp_instr \ cmp x1, x2
-  here to: adr_cond   reserve_instr \ b.cond <end>
-  1 ceil asm_local_store comp_instr \ stur x1, [FP, <ceil_off>]
+  1 ceil  asm_local_get comp_instr \ ldur x1, [FP, <ceil_off>]
+  2 floor asm_local_get comp_instr \ ldur x2, [FP, <floor_off>]
+  3 step  asm_local_get comp_instr \ ldur x3, [FP, <step_off>]
+  1 1 3   asm_sub_reg   comp_instr \ sub x1, x1, x3
+  1 2     asm_cmp_reg   comp_instr \ cmp x1, x2
+  here to: adr_cond  reserve_instr \ b.cond <end>
+  1 ceil  asm_local_set comp_instr \ stur x1, [FP, <ceil_off>]
 
   adr_cond adr_beg ' count_down_loop_pop
 ;
@@ -1354,19 +1353,12 @@ extern_ptr: __stderrp
 : space 32 putchar ;
 : espace 32 eputchar ;
 
-: log" comp_cstr compile' puts ;
-: elog" comp_cstr compile' eputs ;
+: log" comp_cstr postpone_compile' puts ;
+: elog" comp_cstr postpone_compile' eputs ;
 
 \ Compiles movement of values from the data stack
 \ to the locals in the intuitive "reverse" order.
-: } ( local_inds… len -- )
-  #loop
-    dup >0 #while
-    swap comp_local_pop
-    dec
-  #end
-  drop
-;
+: } ( locals… len -- ) #for comp_pop_local_set #end ;
 
 \ Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
 \ Capture order matches stack push order in the parens notation
@@ -1383,7 +1375,7 @@ extern_ptr: __stderrp
     " --" str len str<> #while \ `--` to `}` is a comment.
 
     \ Popped / used by `}` which we're about to call.
-    str len get_local_ind
+    str len get_local
 
     loc_len inc to: loc_len
   #end
@@ -1396,17 +1388,17 @@ extern_ptr: __stderrp
 
 \ For compiling words which modify a local by applying the given function.
 : mut_local ( C: fun "name" -- ) ( E: -- )
-  parse_word
-  get_local_ind dup
-  comp_local_push
-  swap comp_call
-  comp_local_pop
+  parse_word get_local
+  { fun loc }
+  loc comp_local_get_push
+  fun comp_call
+  loc comp_pop_local_set
 ;
 
 \ For compiling words which modify a local by applying the given function.
 : mut_local' ( C: "name" fun -- ) ( E: -- )
   postpone' '
-  compile' mut_local
+  postpone_compile' mut_local
 ;
 
 \ Usage: `++: some_local`.
@@ -1430,22 +1422,22 @@ extern_ptr: __stderrp
 \ TODO better name: this pops one stack item, but `dup` implies otherwise.
 : dup>systack [
   inline
-                         asm_pop_x1         comp_instr \ ldr x1, [x27, -8]!
-  1 1 ASM_REG_SYS_SP -16 asm_store_pair_pre comp_instr \ stp x1, x1, [sp, -16]!
+                     asm_pop_x1         comp_instr \ ldr x1, [x27, -8]!
+  1 1 ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x1, [sp, -16]!
 ] ;
 
 : pair>systack ( Forth: i1 i2 -- | System: -- i1 i2 ) [
   inline
-                         asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 ASM_REG_SYS_SP -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
+                     asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
 ] ;
 
 \ Note: `add` is one of the few instructions which treat `x31` as `sp`
 \ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
 : systack_ptr ( -- sp ) [
   inline
-  1 ASM_REG_SYS_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
-                     asm_push_x1 comp_instr \ str x1, [x27], 8
+  1 ASM_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
+                 asm_push_x1 comp_instr \ str x1, [x27], 8
 ] ;
 
 : asm_comp_systack_push ( len -- )
@@ -1470,7 +1462,7 @@ extern_ptr: __stderrp
   dup <=0 #if #ret #end
   cells 16 align_up
   \ add sp, sp, <size>
-  ASM_REG_SYS_SP ASM_REG_SYS_SP rot asm_add_imm comp_instr
+  ASM_REG_SP ASM_REG_SP rot asm_add_imm comp_instr
 ;
 
 \ Short for "varargs". Sets up arguments for a variadic call.
@@ -1492,19 +1484,19 @@ extern_ptr: __stderrp
 \
 \   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
 : logf" ( C: N -- ) ( E: i1 … iN -- )
-  va- postpone' c" compile' printf -va
+  va- postpone' c" postpone_compile' printf -va
 ;
 
 \ Format-prints to stderr.
 : elogf" ( C: N -- ) ( E: i1 … iN -- )
-  va- compile' stderr postpone' c" compile' fprintf -va
+  va- postpone_compile' stderr postpone' c" postpone_compile' fprintf -va
 ;
 
 \ Formats into the provided buffer using `snprintf`. Usage example:
 \
 \   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
 : sf" ( C: N -- ) ( E: buf size i1 … iN -- )
-  va- comp_cstr compile' snprintf -va
+  va- comp_cstr postpone_compile' snprintf -va
 ;
 
 \ Formats an error message into the provided buffer using `snprintf`,
@@ -1517,11 +1509,11 @@ extern_ptr: __stderrp
 \ Also see `throwf"` which comes with its own buffer.
 : sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
-  compile'  dup2
+  postpone_compile'  dup2
   comp_cstr
-  compile'  snprintf
+  postpone_compile'  snprintf
   -va
-  compile'  throw
+  postpone_compile'  throw
 ;
 
 4096 buf: ERR_BUF
@@ -1531,19 +1523,19 @@ extern_ptr: __stderrp
 \   10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
 : throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
-  compile'  ERR_BUF
+  postpone_compile'  ERR_BUF
   comp_cstr
-  compile'  snprintf
+  postpone_compile'  snprintf
   -va
-  compile' ERR_BUF
-  compile' throw
+  postpone_compile' ERR_BUF
+  postpone_compile' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
 : throw_if" ( C: "str" -- ) ( E: pred -- )
   postpone' #if
   comp_str
-  compile' throw
+  postpone_compile' throw
   postpone' #end
 ;
 
@@ -1635,8 +1627,8 @@ extern_ptr: __error
 \ TODO consider compiling with lazy-init; dig up the old code.
 : cells_guarded: ( C: len "name" -- ) ( E: -- addr )
   #word_beg
-    cells mem_alloc drop
-    1 swap      comp_load  \ ldr x1, <addr>
-    1 asm_push1 comp_instr \ str x2, [x27], 8
+  cells mem_alloc drop
+  1 swap      comp_load  \ ldr x1, <addr>
+  1 asm_push1 comp_instr \ str x2, [x27], 8
   #word_end
 ;

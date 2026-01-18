@@ -72,10 +72,12 @@ static void *list_ceil_impl(const List *list, Ind size) {
   return (U8 *)list->dat + (list->cap * size);
 }
 
-static bool is_list_elem_impl(const List *list, Ind size, const void *val) {
+static bool is_list_elem_impl(
+  const List *list, Ind size, const void *ptr, Uint align
+) {
   return (
-    list && list->len && (val >= list->dat) &&
-    (val < list_ceil_impl(list, size)) && divisible_by((Uint)val, size)
+    list && list->len && __builtin_is_aligned(ptr, align) &&
+    (ptr >= list->dat) && (ptr < list_ceil_impl(list, size))
   );
 }
 

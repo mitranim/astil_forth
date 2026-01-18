@@ -6,8 +6,9 @@ TODO:
 - Ability to use multiple assemblers at once.
 - Cross-compilation.
 */
+
 #ifdef __aarch64__
-#include "./c_asm_arm64.h" // IWYU pragma: export
+#include "./c_arch_arm64.h" // IWYU pragma: export
 #else
 #error "unsupported CPU architecture (Arm64 only)"
 #endif

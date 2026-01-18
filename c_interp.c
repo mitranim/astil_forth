@@ -1,5 +1,5 @@
 #pragma once
-#include "./c_asm.c"
+#include "./c_comp.c"
 #include "./c_interp.h"
 #include "./c_intrin.c"
 #include "./c_read.c"
@@ -10,7 +10,6 @@
 #include "./lib/io.c"
 #include "./lib/list.c"
 #include "./lib/misc.h"
-#include "./lib/set.c"
 #include "./lib/stack.c"
 #include <string.h>
 #include <unistd.h>
@@ -24,7 +23,7 @@ static Err interp_deinit(Interp *interp) {
   dict_deinit_with_keys((Dict *)&interp->imports);
 
   Err err = nullptr;
-  err     = either(err, asm_deinit(&interp->asm));
+  err     = either(err, comp_deinit(&interp->comp));
   err     = either(err, stack_deinit(&interp->ints));
   err     = either(err, stack_deinit(&interp->syms));
 
@@ -34,13 +33,13 @@ static Err interp_deinit(Interp *interp) {
 
 static Err interp_init_syms(Interp *interp) {
   const auto syms = &interp->syms;
-  const auto asm  = &interp->asm;
+  const auto comp = &interp->comp;
 
   for (auto intrin = INTRIN; intrin < arr_ceil(INTRIN); intrin++) {
     const auto sym = stack_push(syms, *intrin);
     sym->name.len  = (Ind)strlen(sym->name.buf);
     dict_set(&interp->words, sym->name.buf, sym);
-    asm_register_dysym(asm, sym->name.buf, (U64)sym->intrin.fun);
+    comp_register_dysym(comp, sym->name.buf, (U64)sym->intrin);
   }
 
   IF_DEBUG({
@@ -48,7 +47,7 @@ static Err interp_init_syms(Interp *interp) {
     aver(dict_has(syms, ":"));
     aver(dict_has(syms, ";"));
 
-    const auto gots = &asm->gots;
+    const auto gots = &comp->code.gots;
     aver(gots->inds.len == arr_cap(INTRIN));
     aver(stack_len(&gots->names) == arr_cap(INTRIN));
   });
@@ -61,20 +60,22 @@ static Err interp_init(Interp *interp) {
 
   try(stack_init(&interp->syms, &opt));
   try(stack_init(&interp->ints, &opt));
-  try(asm_init(&interp->asm));
-  try(interp_init_syms(interp)); // Requires `asm_init` first.
+  try(comp_init(&interp->comp));
+  try(interp_init_syms(interp)); // Requires `comp_init` first.
 
-  // Snapshot for recovery from exceptions in interactive mode.
-  interp->asm_snap = interp->asm;
+  // Snapshot for rewinding on exception recovery.
+  interp->comp_snap = interp->comp;
 
   IF_DEBUG({
     eprintf("[system] interpreter: %p\n", interp);
     eprintf("[system] integer stack floor: %p\n", interp->ints.floor);
     eprintf(
-      "[system] instruction floor (writable): %p\n", interp->asm.code_write.dat
+      "[system] instruction floor (writable): %p\n",
+      interp->comp.code.code_write.dat
     );
     eprintf(
-      "[system] instruction floor (executable): %p\n", interp->asm.code_exec.dat
+      "[system] instruction floor (executable): %p\n",
+      interp->comp.code.code_exec.dat
     );
   });
   return nullptr;
@@ -85,7 +86,7 @@ Restores the interpreter to a consistent state.
 Should be used when handling errors in REPL mode.
 */
 static void interp_rewind(Interp *interp) {
-  interp->asm = interp->asm_snap;
+  interp->comp = comp_rewind(interp->comp_snap, interp->comp);
   stack_trunc(&interp->ints);
 }
 
@@ -99,14 +100,13 @@ static bool interp_valid(const Interp *interp) {
   return (
     interp &&
     is_aligned(interp) &&
-    is_aligned(&interp->asm) &&
-    is_aligned(&interp->asm_snap) &&
+    is_aligned(&interp->comp) &&
+    is_aligned(&interp->comp_snap) &&
     is_aligned(&interp->ints) &&
     is_aligned(&interp->syms) &&
     is_aligned(&interp->words) &&
     is_aligned(&interp->reader) &&
-    is_aligned(&interp->defining) &&
-    asm_valid(&interp->asm) &&
+    comp_valid(&interp->comp) &&
     reader_valid(interp->reader) &&
     stack_valid((const Stack *)&interp->ints) &&
     stack_valid((const Stack *)&interp->syms) &&
@@ -140,7 +140,7 @@ Chuck circa June 1970 (PPOL): "type the offending word"; "reset all stacks".
 > the stack: type the word and "STACK!". He tries to access a field
 > beyond the limit of his memory: type the word and "LIMIT!".
 
-We can now afford slightly more informative error messages.
+We can afford slightly more informative error messages.
 */
 static void interp_handle_err(Interp *interp, Err err) {
   eprintf(TTY_RED_BEG "error:" TTY_RED_END " %s\n", err);
@@ -148,17 +148,14 @@ static void interp_handle_err(Interp *interp, Err err) {
   interp_rewind(interp);
 }
 
-static Err interp_num(Interp *interp) {
+static Err read_interp_num(Interp *interp) {
   Sint num;
   try(read_num(interp->reader, &num));
 
   IF_DEBUG(eprintf("[system] read number: " FMT_SINT "\n", num));
 
-  if (interp->compiling) {
-    asm_append_stack_push_imm(&interp->asm, num);
-    IF_DEBUG(eprintf("[system] compiled push of number " FMT_SINT "\n", num));
-    return nullptr;
-  }
+  const auto comp = &interp->comp;
+  if (comp->ctx.compiling) return comp_append_push_imm(comp, num);
 
   stack_push(&interp->ints, num);
 
@@ -178,52 +175,58 @@ static Err err_sym_comp_only(const char *name) {
   );
 }
 
+static Err interp_call_intrin(Interp *interp, const Sym *sym) {
+  IF_DEBUG(eprintf(
+    "[system] calling intrinsic word " FMT_QUOTED
+    " at address %p; stack pointer before call: %p\n",
+    sym->name.buf,
+    sym->intrin,
+    interp->ints.top
+  ));
+
+  const auto err = comp_call_intrin(interp, sym);
+
+  IF_DEBUG(eprintf(
+    "[system] done called intrinsic word " FMT_QUOTED
+    "; stack pointer after call: %p; err after call: %s\n",
+    sym->name.buf,
+    interp->ints.top,
+    err
+  ));
+  return err;
+}
+
 Err interp_call_sym(Interp *interp, const Sym *sym) {
-  if (sym->comp_only && !interp->defining) {
+  const auto comp = &interp->comp;
+
+  if (sym->comp_only && !comp->ctx.sym) {
     return err_sym_comp_only(sym->name.buf);
   }
 
   switch (sym->type) {
     case SYM_NORM: {
-      return asm_call_norm(&interp->asm, interp->reader, sym, interp);
-    }
+      IF_DEBUG(eprintf(
+        "[system] calling word " FMT_QUOTED
+        " at instruction address %p (" READ_POS_FMT ")\n",
+        sym->name.buf,
+        sym->norm.exec.floor,
+        READ_POS_ARGS(interp->reader)
+      ));
 
-    case SYM_INTRIN: {
-      IF_DEBUG({
-        eprintf(
-          "[system] calling intrinsic word " FMT_QUOTED
-          " at address %p; stack pointer before call: %p\n",
-          sym->name.buf,
-          sym->intrin.fun,
-          interp->ints.top
-        );
-      });
-
-      Err err = nullptr;
-
-      if (sym->throws) {
-        typedef Err(Fun)(Interp *);
-        const auto fun = (Fun *)sym->intrin.fun;
-        err            = fun(interp);
-      }
-      else {
-        typedef void(Fun)(Interp *);
-        const auto fun = (Fun *)sym->intrin.fun;
-        fun(interp);
-      }
+      const auto err = interp_call_norm(interp, sym);
 
       IF_DEBUG(eprintf(
-        "[system] done called intrinsic word " FMT_QUOTED
-        "; stack pointer after call: %p; err after call: %s\n",
-        sym->name.buf,
-        interp->ints.top,
-        err
+        "[system] done called word " FMT_QUOTED "; error: %p\n", sym->name.buf, err
       ));
       return err;
     }
 
+    case SYM_INTRIN: {
+      return interp_call_intrin(interp, sym);
+    }
+
     case SYM_EXT_PTR: {
-      stack_push(&interp->ints, (Sint)sym->ext_ptr.addr);
+      stack_push(&interp->ints, (Sint)sym->ext_ptr);
       return nullptr;
     }
 
@@ -236,93 +239,22 @@ Err interp_call_sym(Interp *interp, const Sym *sym) {
   }
 }
 
-static void sym_auto_comp_only(Sym *caller, const Sym *callee) {
-  if (caller->comp_only) return;
-  if (!callee->comp_only) return;
-
-  caller->comp_only = true;
-
-  IF_DEBUG(eprintf(
-    "[system] word " FMT_QUOTED " uses compile-only word " FMT_QUOTED
-    ", marking as compily-only\n",
-    caller->name.buf,
-    callee->name.buf
-  ));
-}
-
-// Redundant with the caller-callee graph. TODO consider deduping.
-static void sym_auto_interp_only(Sym *caller, const Sym *callee) {
-  if (caller->interp_only) return;
-  if (!callee->interp_only) return;
-
-  caller->interp_only = true;
-
-  IF_DEBUG(eprintf(
-    "[system] word " FMT_QUOTED " uses interpreter-only word " FMT_QUOTED
-    ", marking as interpreter-only\n",
-    caller->name.buf,
-    callee->name.buf
-  ));
-}
-
-static void sym_auto_throws(Sym *caller, const Sym *callee) {
-  if (callee->throws) caller->throws = true;
-}
-
-Err compile_call_sym(Interp *interp, Sym *callee) {
-  Sym *caller;
-  try(require_current_sym(interp, &caller));
-  sym_auto_comp_only(caller, callee);
-  sym_auto_interp_only(caller, callee);
-
-  if (callee->norm.inlinable) return interp_inline_sym(interp, callee);
-
-  set_add(&caller->callees, callee);
-  set_add(&callee->callers, caller);
-  sym_auto_throws(caller, callee);
-
-  const auto asm = &interp->asm;
-
-  switch (callee->type) {
-    case SYM_NORM: {
-      asm_append_call_norm(asm, caller, callee);
-      break;
-    }
-    case SYM_INTRIN: {
-      asm_append_call_intrin(asm, caller, callee, INTERP_INTS_TOP);
-      break;
-    }
-    case SYM_EXT_PTR: {
-      asm_append_load_extern_ptr(asm, callee->name.buf);
-      break;
-    }
-    case SYM_EXT_PROC: {
-      asm_append_call_extern_proc(asm, caller, callee);
-      break;
-    }
-    default: unreachable();
-  }
-
-  IF_DEBUG({
-    eprintf(
-      "[system] compiled call of symbol " FMT_QUOTED "\n", callee->name.buf
-    );
-  });
-  return nullptr;
-}
-
 static Err interp_word(Interp *interp, Word_str word) {
-  if (interp->compiling && asm_appended_local_push(&interp->asm, word.buf)) {
-    return nullptr;
+  const auto comp = &interp->comp;
+  const auto name = word.buf;
+
+  if (comp->ctx.compiling) {
+    const auto loc = comp_local_get(comp, name);
+    if (loc) return comp_append_local_get(comp, loc);
   }
 
-  const auto sym = dict_get(&interp->words, word.buf);
+  const auto sym = dict_get(&interp->words, name);
   if (!sym) return err_undefined_word(word.buf);
 
-  if (!interp->compiling || sym->immediate) {
-    return interp_call_sym(interp, sym);
+  if (comp->ctx.compiling && !sym->immediate) {
+    return comp_append_call_sym(comp, sym);
   }
-  return compile_call_sym(interp, sym);
+  return interp_call_sym(interp, sym);
 }
 
 static Err read_interp_word(Interp *interp) {
@@ -353,7 +285,7 @@ static Err interp_loop(Interp *interp) {
 
       case CHAR_DECIMAL: {
         reader_backtrack(read, next);
-        try(interp_num(interp));
+        try(read_interp_num(interp));
         continue;
       }
 
@@ -365,7 +297,7 @@ static Err interp_loop(Interp *interp) {
         reader_backtrack(read, next);
 
         if (HEAD_CHAR_KIND[next_next] == CHAR_DECIMAL) {
-          try(interp_num(interp));
+          try(read_interp_num(interp));
           continue;
         }
 
@@ -417,7 +349,7 @@ static Err interp_import_inner(
   const auto read = interp->reader;
   try(str_copy(&read->file_path, real));
 
-  const char              *path = nullptr; // Only logging, no allocation.
+  const char              *path = nullptr; // Don't have to `free` this.
   defer(file_deinit) FILE *file = nullptr;
   try(file_open_fuzzy(real, &path, &read->file));
   reader_init(read);

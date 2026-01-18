@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 /*
+Lets us pass C struct offets to assembly code.
 Similar tricks are used in the Linux kernel.
 
   - https://github.com/torvalds/linux/blob/master/include/linux/kbuild.h

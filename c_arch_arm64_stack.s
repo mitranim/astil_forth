@@ -13,7 +13,7 @@ ASM_MAGIC: .8byte 0xabcdFEEDabcdFACE
 /*
 See the C prototype for the procedure signature.
 
-See `./c_asm_arm64.c` for docs on special registers.
+See `./c_arch_arm64.c` for docs on special registers.
 
 If the word "throws", the error is returned in `x0`. This register is set to
 `nullptr` in C before the call. For calls of procedures which may "throw" by

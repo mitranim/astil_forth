@@ -57,7 +57,7 @@ regular compiler: (C/C++ & full intrinsic knowledge) + program text ->
   compiler thinks hard -> machine code
 
 regular interpreter: (C/C++ & full intrinsic knowledge) + program text ->
-  compiler thinks little -> VM bytecode -> interpreter loop -> interpret bytecode
+  compiler thinks little -> VM code -> interpreter loop -> interpret VM code
 
 regular JIT compiler: (C/C++ & full intrinsic knowledge) + program text ->
   compiler thinks hard -> machine code -> runs

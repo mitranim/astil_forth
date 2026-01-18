@@ -1,5 +1,6 @@
 #pragma once
-#include "./c_asm.h"
+#include "./c_arch.h"
+#include "./lib/bits.h"
 #include "./lib/dict.h"
 #include "./lib/set.h"
 #include "./lib/stack.h"
@@ -12,43 +13,39 @@ typedef set_of(struct Sym *) Sym_set;
 Metadata for a word in a Forth dictionary / wordset.
 - "Norm" words are defined in Forth code.
 - "Intrin" words are provided by the interpreter / compiler.
-- "Extern" words are declared in Forth code and located in dylibs.
+- "Extern" words are dynamically located in linked libraries.
 */
 typedef struct Sym {
   Word_str name;
 
-  enum { SYM_NORM = 1, SYM_INTRIN = 2, SYM_EXT_PTR = 3, SYM_EXT_PROC = 4 } type;
+  enum { SYM_NORM = 1, SYM_INTRIN, SYM_EXT_PTR, SYM_EXT_PROC } type;
 
   union {
     struct {
       Sym_instrs spans;     // Created and used by the assembler.
       Instr_span exec;      // Executable code range.
-      bool       inlinable; // Manual toggle only.
+      bool       inlinable; // Inner code is safe to copy-paste.
       bool       has_loads; // Has PC-relative data access.
       bool       has_rets;  // Has explicit early returns.
     } norm;
 
-    struct {
-      void *fun; // Interpreter intrinsic; implies `interp_only`.
-    } intrin;
-
-    struct {
-      void *addr; // Obtained from `dlsym`.
-    } ext_ptr;
-
-    struct {
-      void *fun; // Obtained from `dlsym`.
-      U8    inp_len;
-      U8    out_len;
-    } ext_proc;
+    void *intrin;   // Interpreter intrinsic; implies `interp_only`.
+    void *ext_ptr;  // Pointer to extern variable; obtained from `dlsym`.
+    void *ext_proc; // Pointer to extern procedure; obtained from `dlsym`.
   };
+
+#ifdef NATIVE_CALL_ABI
+  Bits clobber; // Clobbers these registers; must include inps and outs.
+#endif
 
   Sym_set callees;     // Dependencies.
   Sym_set callers;     // Dependents.
+  U8      inp_len;     // Input parameter count.
+  U8      out_len;     // Output parameter count.
   bool    throws;      // Requires error handling.
   bool    immediate;   // Interpret immediately even in compilation mode.
   bool    comp_only;   // Can only be used between `:` and `;`.
-  bool    interp_only; // Forbidden in final executables.
+  bool    interp_only; // Forbidden in AOT executables.
 } Sym;
 
 typedef stack_of(Sym)  Sym_stack;

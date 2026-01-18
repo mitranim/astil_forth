@@ -97,14 +97,14 @@ static void Stack_repr(Stack *val) {
 // Placed here when I was too tired to properly organize.
 // TODO consider where this should be moved.
 static Err int_stack_pop(Sint_stack *src, Sint *out) {
-  if (!stack_len(src)) return err_str("underflow of integer stack");
+  if (stack_len(src) <= 0) return err_str("underflow of integer stack");
   const auto val = stack_pop(src);
   if (out) *out = val;
   return nullptr;
 }
 
 static Err int_stack_push(Sint_stack *tar, Sint val) {
-  if (!stack_has_cap(tar)) return err_str("overflow of integer stack");
+  if (stack_rem(tar) <= 0) return err_str("overflow of integer stack");
   stack_push(tar, val);
   return nullptr;
 }

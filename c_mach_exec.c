@@ -1,9 +1,8 @@
 /*
-Unfinished sketch for building a Mach-O executable
-from a running (JIT-compiled) program.
+Unfinished sketch for building a Mach-O executable.
 
 TODO:
-- Map `Asm_heap` to Mach-O segments and sections.
+- Map `Comp_heap` to Mach-O segments and sections.
   - Compactify by eliding all unused memory.
     Virtual memory addressing lets us do that.
   - Guards are automatic; just leave unmapped holes.

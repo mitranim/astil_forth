@@ -107,22 +107,24 @@ Returns a pointer to the next element.
 Crashes if capacity is insufficient.
 Does not initialize memory at location.
 */
-#define list_next_ptr(list)                                 \
-  ({                                                        \
-    const auto tmp_list = list;                             \
-    list_ptr_below(tmp_list, tmp_list->len, tmp_list->cap); \
+#define list_next_ptr(list)                                             \
+  ({                                                                    \
+    const auto next_ptr_tmp_list = list;                                \
+    list_ptr_below(                                                     \
+      next_ptr_tmp_list, next_ptr_tmp_list->len, next_ptr_tmp_list->cap \
+    );                                                                  \
   })
 
-#define list_spare_ptr(list, ind)                 \
-  ({                                              \
-    const auto tmp_list = list;                   \
-    list_ptr_below(tmp_list, ind, tmp_list->cap); \
+#define list_spare_ptr(list, ind)                                     \
+  ({                                                                  \
+    const auto spare_ptr_tmp_list = list;                             \
+    list_ptr_below(spare_ptr_tmp_list, ind, spare_ptr_tmp_list->cap); \
   })
 
-#define list_elem_ptr(list, ind)                  \
-  ({                                              \
-    const auto tmp_list = list;                   \
-    list_ptr_below(tmp_list, ind, tmp_list->len); \
+#define list_elem_ptr(list, ind)                                    \
+  ({                                                                \
+    const auto elem_ptr_tmp_list = list;                            \
+    list_ptr_below(elem_ptr_tmp_list, ind, elem_ptr_tmp_list->len); \
   })
 
 // Returns element at index. Crashes if out of bounds.
@@ -132,22 +134,22 @@ Does not initialize memory at location.
 #define list_put(list, ind, val) (*list_elem_ptr(list, ind) = val)
 
 // Returns pointer to first element. Crashes if list is empty.
-#define list_head_ptr(list)                   \
-  ({                                          \
-    const auto tmp_list = list;               \
-    aver(tmp_list->dat && tmp_list->len > 0); \
-    tmp_list->dat;                            \
+#define list_head_ptr(list)                                     \
+  ({                                                            \
+    const auto head_ptr_tmp_list = list;                        \
+    aver(head_ptr_tmp_list->dat && head_ptr_tmp_list->len > 0); \
+    head_ptr_tmp_list->dat;                                     \
   })
 
 // Returns first element. Crashes if out of bounds.
 #define list_head(list) (*list_head_ptr(list))
 
 // Returns pointer to last element. Crashes if list is empty.
-#define list_last_ptr(list)                   \
-  ({                                          \
-    const auto tmp_list = list;               \
-    aver(tmp_list->dat && tmp_list->len > 0); \
-    &tmp_list->dat[tmp_list->len - 1];        \
+#define list_last_ptr(list)                                     \
+  ({                                                            \
+    const auto last_ptr_tmp_list = list;                        \
+    aver(last_ptr_tmp_list->dat && last_ptr_tmp_list->len > 0); \
+    &last_ptr_tmp_list->dat[last_ptr_tmp_list->len - 1];        \
   })
 
 // Returns last element. Crashes if out of bounds.
@@ -186,14 +188,24 @@ Does not initialize memory at location.
     list_push_raw(list, &tmp_val, sizeof(tmp_val)); \
   })
 
-#define is_list_elem(list, ptr)                                        \
-  ({                                                                   \
-    static_assert(sizeof(*ptr) == list_val_size(list));                \
-    is_list_elem_impl((const List *)(list), list_val_size(list), ptr); \
+#define is_list_elem(list, ptr)                                             \
+  ({                                                                        \
+    static_assert(sizeof(*ptr) == list_val_size(list));                     \
+    is_list_elem_impl(                                                      \
+      (const List *)(list), list_val_size(list), ptr, alignof(typeof(*ptr)) \
+    );                                                                      \
+  })
+
+// Pointer just outside the current length.
+// Writing to this address is UB.
+#define list_len_ceil(list)                          \
+  ({                                                 \
+    const auto len_ceil_tmp_list = list;             \
+    len_ceil_tmp_list->dat + len_ceil_tmp_list->len; \
   })
 
 // Pointer just outside the allocated capacity.
-#define list_ceil(list)                       \
+#define list_cap_ceil(list)                   \
   (typeof((list)->dat))(list_ceil_impl(       \
     (const List *)(list), list_val_size(list) \
   ))
@@ -202,9 +214,27 @@ Does not initialize memory at location.
 #define list_val_size(list) sizeof((list)->dat[0])
 
 // Index of given list element, by pointer.
-// Providing an invalid pointer is UB.
-#define list_ind(list, val) ((Ind)((val) - (list)->dat))
+// If the element isn't in the list, index is -1.
+#define list_ind(list, val)                         \
+  ({                                                \
+    const auto tmp_list  = list;                    \
+    const auto tmp_floor = tmp_list->dat;           \
+    const auto tmp_ceil  = list_len_ceil(tmp_list); \
+    const auto tmp_val   = val;                     \
+    (tmp_val >= tmp_floor) && (tmp_val < tmp_ceil)  \
+      ? (Ind)(tmp_val - tmp_floor)                  \
+      : INVALID_IND;                                \
+  })
 
 #define list_trunc(list) ((list)->len = 0)
+
+#define list_rewind(next, prev)                                                 \
+  ({                                                                            \
+    const auto tmp_next = next;                                                 \
+    const auto tmp_prev = prev;                                                 \
+    aver(tmp_next->cap >= tmp_prev->cap);                                       \
+    memmove(tmp_next->dat, tmp_prev->dat, tmp_prev->len * list_val_size(prev)); \
+    tmp_next->len = tmp_prev->len;                                              \
+  })
 
 static constexpr Uint LIST_INIT_CAP = 4;

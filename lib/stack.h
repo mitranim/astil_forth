@@ -64,9 +64,9 @@ typedef span_of(F64)  F64_span;
 #define stack_init(stack, opt) \
   stack_init_impl(stack, opt, stack_val_size(stack))
 
-#define stack_cap(stack) ((stack)->ceil - (stack)->floor)
-#define stack_len(stack) ((stack)->top - (stack)->floor)
-#define stack_rem(stack) ((stack)->ceil - (stack)->top)
+#define stack_cap(stack) ((Sint)((stack)->ceil - (stack)->floor))
+#define stack_len(stack) ((Sint)((stack)->top - (stack)->floor))
+#define stack_rem(stack) ((Sint)((stack)->ceil - (stack)->top))
 
 #define stack_val_type(stack) typeof((stack)->floor[0])
 #define stack_val_size(stack) sizeof((stack)->floor[0])
@@ -95,8 +95,6 @@ typedef span_of(F64)  F64_span;
     *(--(stack)->top);                    \
   })
 
-#define stack_has_cap(stack) ((stack)->top < (stack)->ceil)
-
 // Pushes the raw memory representation of the given value.
 #define stack_push_raw(stack, ...)                                             \
   ({                                                                           \
@@ -124,7 +122,24 @@ typedef span_of(F64)  F64_span;
 
 // Index of given stack element, by pointer.
 // Providing an invalid pointer is UB.
-#define stack_ind(stack, val) ((val) - (stack)->floor)
+#define stack_ind(stack, val) ((Ind)((val) - (stack)->floor))
+
+#define stack_rewind(next, prev)              \
+  ({                                          \
+    const auto tmp_next = next;               \
+    const auto tmp_prev = prev;               \
+    aver(tmp_next->floor == tmp_prev->floor); \
+    tmp_next->top = tmp_prev->top;            \
+  })
+
+#define is_stack_elem(stack, ptr)                             \
+  ({                                                          \
+    static_assert(sizeof(*ptr) == stack_val_size(stack));     \
+    const auto tmp_stack = stack;                             \
+    const auto tmp_ptr   = ptr;                               \
+    is_aligned(tmp_ptr) &&                                    \
+      tmp_ptr >= tmp_stack->floor &&tmp_ptr < tmp_stack->top; \
+  })
 
 #define stack_range(type, name, stack) \
   type name = (stack)->floor;          \
