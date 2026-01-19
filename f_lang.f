@@ -679,6 +679,33 @@
                asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
+\ lsl Xd, Xn, <imm>
+: asm_lsl_imm ( Xd Xn imm6 -- instr )
+  dup negate 64 mod 6 bit_trunc 16 lsl    \ immr
+  63 rot -          6 bit_trunc 10 lsl or \ imms
+  swap                           5 lsl or \ Xn
+                                       or \ Xd
+  0b1_10_100110_1_000000_000000_00000_00000 or
+;
+
+\ tbz Xt, <bit>, <imm>
+: asm_test_bit_branch_zero ( Xt bit imm14 -- instr )
+  2 lsr 14 bit_trunc 5 lsl    \ imm14
+  over        5 lsr 31 lsl or \ b5
+  swap  5 bit_trunc 19 lsl or \ b40
+                           or \ Xt
+  0b0_01_101_1_0_00000_00000000000000_00000 or
+;
+
+\ orr Xd, Xn, #(1 << bit)
+\ TODO add general-purpose `orr`.
+: asm_orr_bit ( Xd Xn bit -- )
+  64 swap - 16 lsl    \ immr
+  swap      5  lsl or \ Xn
+                   or \ Xd
+  0b1_01_100100_1_000000_000000_00000_00000 or
+;
+
 : asm_comp_cset_cond ( cond -- )
          asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
      1 2 asm_cmp_reg   comp_instr \ cmp x1, x2
@@ -979,14 +1006,18 @@
 \ b -<pc_off>
 : patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
+0 var: COND_EXISTS
+
 \ cbz x1, <else|end>
 : if_patch ( adr[if] -- ) dup pc_off 1 swap asm_cmp_branch_zero swap !32 ;
 
 \ cbnz x1, <else|end>
 : ifn_patch ( adr[ifn] -- ) dup pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
 
+: if_done ( cond_prev -- ) COND_EXISTS ! ;
 : if_pop ( fun[prev] adr[if]  -- ) if_patch execute ;
 : ifn_pop ( fun[prev] adr[ifn]  -- ) ifn_patch execute ;
+: if_init COND_EXISTS @ COND_EXISTS on! ' if_done ;
 
 : #elif ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
   ' execute reserve_cond ' if_pop
@@ -1000,12 +1031,12 @@
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `#end`.
 \ Prepending a nop terminates this chain.
-: #if ( C: -- fun[nop] fun[exec] adr[if] fun[if] ) ( E: pred -- )
-  ' nop postpone' #elif
+: #if ( C: -- prev fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  if_init postpone' #elif
 ;
 
 : #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
-  ' nop postpone' #elifn
+  if_init postpone' #elifn
 ;
 
 : else_pop ( fun[prev] adr[else] -- ) patch_uncond_forward execute ;

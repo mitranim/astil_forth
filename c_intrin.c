@@ -627,6 +627,7 @@ static Err intrin_get_local_ind(Interp *interp) {
   const U8 *buf;
   Ind       len;
   try(interp_pop_buf(interp, &buf, &len));
+
   const auto ind = asm_local_get_or_make(&interp->asm, (const char *)buf, len);
   try(int_stack_push(&interp->ints, ind));
   return nullptr;
@@ -693,7 +694,13 @@ static void debug_depth(Interp *interp) {
 }
 
 static void debug_top_int(Interp *interp) {
-  eprintf("[debug] stack top int: " FMT_SINT "\n", stack_head(&interp->ints));
+  const auto val = stack_head(&interp->ints);
+  eprintf(
+    "[debug] stack top int: " FMT_SINT " " FMT_UINT_HEX " %s\n",
+    val,
+    (Uint)val,
+    uint64_to_bit_str((Uint)val)
+  );
 }
 
 static void debug_top_ptr(Interp *interp) {

@@ -37,15 +37,18 @@ typedef struct {
     ASM_FIXUP_RECUR,
   } type;
 
-  Instr *ret;   // b <epilogue>
-  Instr *try;   // cbnz <epilogue>
-  Instr *recur; // b <begin>
+  union {
+    Instr *ret;     // b <epilogue>
+    Instr *try;     // cbnz <epilogue>
+    Instr *recur;   // b <begin>
+    Instr *cleanup; // b <epilogue>
 
-  struct {
-    Instr *instr; // Instruction to patch.
-    Uint   num;   // Immediate value to load.
-    U8     reg;   // Register to load into.
-  } imm;
+    struct {
+      Instr *instr; // Instruction to patch.
+      Uint   num;   // Immediate value to load.
+      U8     reg;   // Register to load into.
+    } imm;
+  };
 } Asm_fixup;
 
 typedef list_of(Asm_fixup) Asm_fixup_list;
