@@ -2,13 +2,13 @@
 This file defines assembly procedures for Arm64 for the variant of our Forth
 system which uses the native procedure call ABI.
 
-Compare `./c_arch_arm64_stack.c` which uses stack-based conventions.
+Compare `./c_arch_arm64_cc_stack.c` which uses stack-based conventions.
 
 Special registers:
 - `x28` = error string pointer.
 - `x27` = interpreter pointer.
 
-The special registers must be kept in sync with `f_lang_native.f`.
+The special registers must be kept in sync with `f_lang_cc_reg.f`.
 */
 #pragma once
 #include "./c_arch_arm64.c"

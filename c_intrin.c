@@ -1,57 +1,16 @@
-#pragma once
-#include "./c_comp.c"
-#include "./c_interp.h"
-#include "./c_read.c"
-#include "./c_read.h"
-#include "./c_sym.c"
-#include "./lib/dict.c"
-#include "./lib/err.h"
-#include "./lib/fmt.c"
-#include "./lib/misc.h"
-#include "./lib/stack.h"
-#include "./lib/str.c"
-#include "lib/stack.c"
-#include <dlfcn.h>
-#include <string.h>
-
 /*
 Intrinsic procedures necessary for "bootstrapping" the Forth system.
 Should be kept to a minimum. Non-fundamental words should be written
 in Forth; where regular language is insufficient, we use inline asm.
 
 Intrinsics don't even provide conditionals or arithmetic.
+
+This file contains "generic" intrinsics which don't care about the calling
+convention. Intrinsics which do are located in dedicated files.
 */
-
-// TODO: avoid having to use forward declarations.
-Err interp_import(Interp *, const char *);
-Err interp_call_sym(Interp *, const Sym *);
-
-static Err err_undefined_word(const char *name) {
-  return errf("undefined word " FMT_QUOTED, name);
-}
-
-static Err interp_require_sym(Interp *interp, const char *name, Sym **out) {
-  const auto sym = dict_get(&interp->words, name);
-  if (!sym) return err_undefined_word(name);
-  if (out) *out = sym;
-  return nullptr;
-}
-
-static Err interp_read_word(Interp *interp) {
-  const auto read = interp->reader;
-  try(read_word(read));
-  IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", read->word.buf));
-  return nullptr;
-}
-
-static Err interp_read_sym(Interp *interp, Sym **out) {
-  try(interp_read_word(interp));
-  return interp_require_sym(interp, interp->reader->word.buf, out);
-}
-
-static Err interp_require_current_sym(const Interp *interp, Sym **out) {
-  return comp_require_current_sym(&interp->comp, out);
-}
+#pragma once
+#include "./c_comp.c"
+#include "./c_interp_internal.c"
 
 static Err err_nested_definition(const Interp *interp) {
   Sym *sym;
@@ -106,7 +65,7 @@ static Err intrin_semicolon(Interp *interp) {
   if (!comp->ctx.compiling) return err_semi_not_compiling();
 
   comp_sym_end(comp, sym);
-  interp->comp_snap = interp->comp;
+  interp_snapshot(interp);
 
   const auto words = &interp->words;
   if (dict_has(words, sym->name.buf) && !interp->comp.ctx.redefining) {
@@ -202,171 +161,6 @@ static void intrin_here(Interp *interp) {
   );
 }
 
-static Err intrin_comp_instr(Interp *interp) {
-  Sint val;
-  try(int_stack_pop(&interp->ints, &val));
-  try(asm_append_instr_from_int(&interp->comp, val));
-  return nullptr;
-}
-
-static Err intrin_comp_load(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-
-  Sint imm;
-  Sint reg;
-  try(int_stack_pop(&interp->ints, &imm));
-  try(int_stack_pop(&interp->ints, &reg));
-
-  aver(reg >= 0 && reg < ASM_REG_LEN);
-
-  bool has_load = true;
-  asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
-  if (has_load) sym->norm.has_loads = true;
-  return nullptr;
-}
-
-static Err interp_validate_buf_len(Sint len, Ind *out) {
-  if (len > 0 && len < (Sint)IND_MAX) {
-    *out = (Ind)len;
-    return nullptr;
-  }
-  return errf("invalid data length: " FMT_SINT, len);
-}
-
-static Err interp_validate_buf_ptr(Sint ptr, const U8 **out) {
-  /*
-  Some systems deliberately ensure that virtual memory addresses
-  are just out of range of `int32`. Would be nice to check if the
-  pointer is somewhere in that range, but the assumption would be
-  really non-portable.
-
-  In a Forth implementation for OS-free microchips with a very small
-  amount of real memory, valid data pointers could begin close to 0,
-  depending on how data is organized. Since our implementation only
-  supports 64-bit machines and requires an OS, we can at least assume
-  addresses which are "decently large".
-  */
-  if (ptr > (1 << 14)) {
-    *out = (U8 *)ptr;
-    return nullptr;
-  }
-  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)ptr);
-}
-
-// In Forth, like in C, data buffers are passed around as `(ptr, len)`.
-static Err interp_pop_buf(Interp *interp, const U8 **out_buf, Ind *out_len) {
-  const auto ints = &interp->ints;
-  Sint       len_src;
-  Sint       buf_src;
-
-  try(int_stack_pop(ints, &len_src));
-  try(int_stack_pop(ints, &buf_src));
-  try(interp_validate_buf_len(len_src, out_len));
-  try(interp_validate_buf_ptr(buf_src, out_buf));
-  return nullptr;
-}
-
-/*
-Stores constant data of arbitrary length, namely a string,
-into the constant region, and compiles `( -- addr size )`.
-
-TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
-*/
-static Err intrin_comp_const(Interp *interp) {
-  const auto ints = &interp->ints;
-
-  Sint      reg;
-  const U8 *buf;
-  Ind       len;
-  try(int_stack_pop(ints, &reg));
-  try(asm_validate_reg(reg));
-  try(interp_pop_buf(interp, &buf, &len));
-  try(asm_alloc_const_append_load(&interp->comp, buf, len, (U8)reg));
-
-  IF_DEBUG(eprintf(
-    "[system] appended constant with address %p and length " FMT_UINT "\n",
-    buf,
-    (Uint)len
-  ));
-
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->norm.has_loads = true;
-  return nullptr;
-}
-
-/*
-( C: size register -- addr )
-
-TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
-*/
-static Err intrin_comp_static(Interp *interp) {
-  const auto ints = &interp->ints;
-
-  Sint reg;
-  Sint len_src;
-  Ind  len;
-  try(int_stack_pop(ints, &reg));
-  try(int_stack_pop(ints, &len_src));
-  try(asm_validate_reg(reg));
-  try(interp_validate_buf_len(len_src, &len));
-
-  U8 *addr;
-  try(asm_alloc_data_append_load(&interp->comp, len, (U8)reg, &addr));
-  try(int_stack_push(&interp->ints, (Sint)addr));
-
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->norm.has_loads = true;
-  return nullptr;
-}
-
-static Err err_sym_out_bounds(const Sym *floor, const Sym *ceil, const Sym *val) {
-  return errf(
-    "expected a word address between %p and %p; got an out of bounds value: %p",
-    floor,
-    ceil,
-    val
-  );
-}
-
-static Err interp_validate_sym_ptr(Interp *interp, Sym *sym) {
-  const auto syms = &interp->syms;
-  if (sym >= syms->floor && sym < syms->ceil) return nullptr;
-  return err_sym_out_bounds(syms->floor, syms->ceil, sym);
-}
-
-static Err interp_sym_by_ptr(Interp *interp, Sym **out) {
-  Sint val;
-  try(int_stack_pop(&interp->ints, &val));
-
-  const auto sym = (Sym *)val;
-  try(interp_validate_sym_ptr(interp, sym));
-
-  IF_DEBUG(eprintf(
-    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
-  ));
-
-  if (out) *out = sym;
-  return nullptr;
-}
-
-static Err intrin_comp_call(Interp *interp) {
-  Sint val;
-  try(int_stack_pop(&interp->ints, &val));
-
-  const auto sym = (Sym *)val;
-  try(interp_validate_sym_ptr(interp, sym));
-
-  IF_DEBUG(eprintf(
-    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
-  ));
-  return comp_append_call_sym(&interp->comp, sym);
-}
-
-static const Err ERR_QUIT = "quit";
-
 static Err intrin_quit(Interp *interp) {
   const auto comp = &interp->comp;
   if (comp->ctx.sym) {
@@ -406,54 +200,6 @@ static Err intrin_char(Interp *interp) {
   return nullptr;
 }
 
-/*
-Technically not fundamental and possible to write in Forth with `intrin_char`,
-but requires conditionals, character comparison, and a loop, none of which are
-available early in the bootstrap process. Neither is the self-assembler, which
-means we'd have to hardcode instructions in binary.
-
-TODO: use `intrin_char` in Forth to implement a more powerful version
-which uses a string rather than a char as a delimiter.
-*/
-static Err intrin_parse(Interp *interp) {
-  const auto read = interp->reader;
-  const auto ints = &interp->ints;
-
-  // IF_DEBUG(eprintf(
-  //   "[system] stack length before pop delim: " FMT_UINT "\n", stack_len(ints)
-  // ));
-
-  Sint delim;
-  try(int_stack_pop(ints, &delim));
-
-  // IF_DEBUG(eprintf(
-  //   "[system] stack_len(ints) before parsing: " FMT_SINT "\n", stack_len(ints)
-  // ));
-
-  try(validate_char_ascii_printable(delim));
-  read_skip_whitespace(read);
-  try(read_until(read, (U8)delim));
-
-  // IF_DEBUG(eprintf(
-  //   "[system] parsed until delim " FMT_CHAR "; length: " FMT_UINT
-  //   "; string: %s\n",
-  //   (int)delim,
-  //   read->buf.len,
-  //   read->buf.buf
-  // ));
-
-  try(int_stack_push(ints, (Sint)read->buf.buf));
-  try(int_stack_push(ints, (Sint)read->buf.len));
-
-  // IF_DEBUG({
-  //   eprintf(
-  //     "[system] stack_len(ints) after parsing: " FMT_SINT "\n", stack_len(ints)
-  //   );
-  //   eprintf("[system] stack pointer after parsing: %p\n", ints->top);
-  // });
-  return nullptr;
-}
-
 // Technically not fundamental. TODO implement in Forth via intrinsic `char`.
 static Err intrin_parse_word(Interp *interp) {
   try(interp_read_word(interp));
@@ -463,16 +209,6 @@ static Err intrin_parse_word(Interp *interp) {
 
   try(int_stack_push(ints, (Sint)word->buf));
   try(int_stack_push(ints, (Sint)word->len));
-  return nullptr;
-}
-
-static Err intrin_import(Interp *interp) {
-  const auto ints = &interp->ints;
-  Sint       path;
-
-  try(int_stack_pop(ints, nullptr)); // discard length
-  try(int_stack_pop(ints, &path));
-  try(interp_import(interp, (const char *)path));
   return nullptr;
 }
 
@@ -491,33 +227,9 @@ static Err intrin_import_tick(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_read_extern(Interp *interp, void **out_addr) {
-  try(interp_read_word(interp));
-  const auto name = interp->reader->word.buf;
-
-  IF_DEBUG(
-    eprintf("[system] read name of extern symbol: " FMT_QUOTED "\n", name)
-  );
-
-  const auto addr = dlsym(RTLD_DEFAULT, name);
-
-  if (!addr) {
-    return errf(
-      "unable to find extern symbol " FMT_QUOTED "; error: %s", name, dlerror()
-    );
-  }
-
-  IF_DEBUG(eprintf(
-    "[system] found address of extern symbol " FMT_QUOTED ": %p\n", name, addr
-  ));
-
-  if (out_addr) *out_addr = addr;
-  return nullptr;
-}
-
 static Err intrin_extern_ptr(Interp *interp) {
   void *addr;
-  try(intrin_read_extern(interp, &addr));
+  try(interp_read_extern(interp, &addr));
 
   const auto sym = stack_push(
     &interp->syms,
@@ -533,109 +245,6 @@ static Err intrin_extern_ptr(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_extern_proc(Interp *interp) {
-  void *addr;
-  try(intrin_read_extern(interp, &addr));
-
-  const auto ints = &interp->ints;
-  Sint       out_len;
-  Sint       inp_len;
-  try(int_stack_pop(ints, &out_len));
-  try(int_stack_pop(ints, &inp_len));
-
-  if (inp_len < 0) return err_str("negative input parameter count");
-  if (inp_len > ASM_PARAM_REG_LEN) return err_str("too many input parameters");
-  if (out_len < 0) return err_str("negative output parameter count");
-  if (out_len > 1) return err_str("too many output parameters");
-
-  const auto sym = stack_push(
-    &interp->syms,
-    (Sym){
-      .type     = SYM_EXT_PROC,
-      .name     = interp->reader->word,
-      .ext_proc = addr,
-      .inp_len  = (U8)inp_len,
-      .out_len  = (U8)out_len,
-    }
-  );
-
-  dict_set(&interp->words, sym->name.buf, sym);
-  comp_register_dysym(&interp->comp, sym->name.buf, (U64)addr);
-  return nullptr;
-}
-
-static Err interp_find_word(Interp *interp, Sym **out) {
-  Sint len;
-  Sint buf;
-  try(int_stack_pop(&interp->ints, &len));
-  try(int_stack_pop(&interp->ints, &buf));
-
-  const auto name = (const char *)buf;
-  if (DEBUG) aver((Sint)strlen(name) == len);
-
-  const auto sym = dict_get(&interp->words, name);
-  if (!sym) return err_undefined_word(name);
-
-  IF_DEBUG(
-    eprintf("[system] found symbol " FMT_QUOTED " at address %p\n", name, sym)
-  );
-
-  *out = sym;
-  return nullptr;
-}
-
-static Err intrin_find_word(Interp *interp) {
-  Sym *sym;
-  try(interp_find_word(interp, &sym));
-  return int_stack_push(&interp->ints, (Sint)sym);
-}
-
-static Err err_inline_not_defining() {
-  return err_str("unsupported use of \"inline\" outside a colon definition");
-}
-
-static Err intrin_inline_word(Interp *interp) {
-  const auto comp = &interp->comp;
-  if (!comp->ctx.sym) return err_inline_not_defining();
-
-  Sym *sym;
-  try(interp_sym_by_ptr(interp, &sym));
-  return comp_inline_sym(comp, sym);
-}
-
-static Err intrin_execute(Interp *interp) {
-  Sym *sym;
-  try(interp_sym_by_ptr(interp, &sym));
-  return interp_call_sym(interp, sym);
-}
-
-static Err err_word_len_mismatch(Word_str word, Ind len) {
-  return errf(
-    "length mismatch for " FMT_QUOTED ": " FMT_IND " vs " FMT_IND,
-    word.buf,
-    word.len,
-    len
-  );
-}
-
-static Err intrin_get_local(Interp *interp) {
-  const U8 *buf;
-  Ind       len;
-  try(interp_pop_buf(interp, &buf, &len));
-
-  Word_str name = {};
-  try(str_copy(&name, (const char *)buf));
-  if (name.len != len) return err_word_len_mismatch(name, len);
-
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(comp_local_get_or_make(comp, name, &loc));
-
-  const auto off = local_fp_off(comp_local_ind(comp, loc));
-  try(int_stack_push(&interp->ints, off));
-  return nullptr;
-}
-
 static Err intrin_anon_local(Interp *interp) {
   const auto comp = &interp->comp;
   const auto loc  = comp_local_anon(comp);
@@ -643,71 +252,6 @@ static Err intrin_anon_local(Interp *interp) {
   try(int_stack_push(&interp->ints, off));
   return nullptr;
 }
-
-/*
-Not needed in the stack-based approach.
-Left as a draft for the native port.
-
-static Err intrin_get_local(Interp *interp) {
-  const U8 *buf;
-  Ind       len;
-  try(interp_pop_buf(interp, &buf, &len));
-
-  Word_str name = {};
-  try(str_copy(&name, (const char *)buf));
-  if (name.len != len) return err_word_len_mismatch(name, len);
-
-  Local *loc;
-  try(comp_local_get_or_make(&interp->comp, name, &loc));
-  try(int_stack_push(&interp->ints, (Sint)loc));
-  return nullptr;
-}
-
-static Err intrin_anon_local(Interp *interp) {
-  const auto loc = comp_local_anon(&interp->comp);
-  return int_stack_push(&interp->ints, (Sint)loc);
-}
-
-static Err intrin_comp_local_fp_off(Interp *interp) {
-  const auto ints = &interp->ints;
-
-  Sint num;
-  try(int_stack_pop(ints, &num));
-
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(comp_validate_local(comp, num, &loc));
-
-  const auto off = local_fp_off(comp_local_ind(comp, loc));
-  try(int_stack_push(ints, (Sint)loc));
-  return nullptr;
-}
-
-static Err intrin_comp_local_get(Interp *interp) {
-  Sint num;
-  try(int_stack_pop(&interp->ints, &num));
-
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(comp_validate_local(comp, num, &loc));
-  try(comp_append_local_get(comp, loc));
-  return nullptr;
-}
-
-static Err intrin_comp_local_set(Interp *interp) {
-  Sint num;
-  try(int_stack_pop(&interp->ints, &num));
-
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(comp_validate_local(comp, num, &loc));
-  try(comp_append_local_set(comp, loc));
-
-  IF_DEBUG(aver(dict_has(&comp->ctx.local_dict, loc->name.buf)));
-  IF_DEBUG(aver(dict_get(&comp->ctx.local_dict, loc->name.buf) == loc));
-  return nullptr;
-}
-*/
 
 static void debug_flush(void *) {
   fflush(stdout);
@@ -866,337 +410,372 @@ static Err debug_sync_code(Interp *interp) {
   return nullptr;
 }
 
-// The field `.name.len` must be set separately (CBA to maintain here).
-static constexpr Sym USED INTRIN[] = {
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = ":",
-    .intrin      = (void *)intrin_colon,
-    .throws      = true,
-    .immediate   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = ";",
-    .intrin      = (void *)intrin_semicolon,
-    .throws      = true,
-    .immediate   = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "[",
-    .intrin      = (void *)intrin_bracket_beg,
-    .immediate   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "]",
-    .intrin      = (void *)intrin_bracket_end,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "immediate",
-    .intrin      = (void *)intrin_immediate,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "comp_only",
-    .intrin      = (void *)intrin_comp_only,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "not_comp_only",
-    .intrin      = (void *)intrin_not_comp_only,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "inline",
-    .intrin      = (void *)intrin_inline,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "throws",
-    .intrin      = (void *)intrin_throws,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "redefine",
-    .intrin      = (void *)intrin_redefine,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "here",
-    .intrin      = (void *)intrin_here,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "comp_instr",
-    .intrin      = (void *)intrin_comp_instr,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "comp_load",
-    .intrin      = (void *)intrin_comp_load,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "comp_const",
-    .intrin      = (void *)intrin_comp_const,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "comp_static",
-    .intrin      = (void *)intrin_comp_static,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "comp_call",
-    .intrin      = (void *)intrin_comp_call,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "quit",
-    .intrin      = (void *)intrin_quit,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "#ret",
-    .intrin      = (void *)intrin_ret,
-    .throws      = true,
-    .immediate   = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "#recur",
-    .intrin      = (void *)intrin_recur,
-    .throws      = true,
-    .immediate   = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "char",
-    .intrin      = (void *)intrin_char,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "parse",
-    .intrin      = (void *)intrin_parse,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "parse_word",
-    .intrin      = (void *)intrin_parse_word,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "import",
-    .intrin      = (void *)intrin_import,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "import\"",
-    .intrin      = (void *)intrin_import_quote,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "import'",
-    .intrin      = (void *)intrin_import_tick,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "extern_ptr:",
-    .intrin      = (void *)intrin_extern_ptr,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "extern:",
-    .intrin      = (void *)intrin_extern_proc,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "find_word",
-    .intrin      = (void *)intrin_find_word,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "inline_word",
-    .intrin      = (void *)intrin_inline_word,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "execute",
-    .intrin      = (void *)intrin_execute,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "get_local",
-    .intrin      = (void *)intrin_get_local,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "anon_local",
-    .intrin      = (void *)intrin_anon_local,
-    .throws      = true,
-    .comp_only   = true,
-    .interp_only = true,
-  },
-  // (Sym){
-  //   .type        = SYM_INTRIN,
-  //   .name.buf    = "comp_local_get",
-  //   .intrin      = (void *)intrin_comp_local_get,
-  //   .throws      = true,
-  //   .comp_only   = true,
-  //   .interp_only = true,
-  // },
-  // (Sym){
-  //   .type        = SYM_INTRIN,
-  //   .name.buf    = "comp_local_set",
-  //   .intrin      = (void *)intrin_comp_local_set,
-  //   .throws      = true,
-  //   .comp_only   = true,
-  //   .interp_only = true,
-  // },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_flush",
-    .intrin      = (void *)debug_flush,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_throw",
-    .intrin      = (void *)debug_throw,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_stack_len",
-    .intrin      = (void *)debug_stack_len,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_stack",
-    .intrin      = (void *)debug_stack,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_depth",
-    .intrin      = (void *)debug_depth,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_top_int",
-    .intrin      = (void *)debug_top_int,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_top_ptr",
-    .intrin      = (void *)debug_top_ptr,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_top_str",
-    .intrin      = (void *)debug_top_str,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_mem",
-    .intrin      = (void *)debug_mem,
-    .throws      = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug'",
-    .intrin      = (void *)debug_word,
-    .throws      = true,
-    .immediate   = true,
-    .interp_only = true,
-  },
-  (Sym){
-    .type        = SYM_INTRIN,
-    .name.buf    = "debug_sync_code",
-    .intrin      = (void *)debug_sync_code,
-    .throws      = true,
-    .interp_only = true,
-  },
+#ifdef NATIVE_CALL_ABI
+#include "./c_intrin_cc_reg.c"
+#else // NATIVE_CALL_ABI
+#include "./c_intrin_cc_stack.c"
+#endif // NATIVE_CALL_ABI
+
+static constexpr auto INTRIN_COLON = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = ":",
+  .intrin      = (void *)intrin_colon,
+  .throws      = true,
+  .immediate   = true,
+  .interp_only = true,
 };
+
+static constexpr auto INTRIN_SEMICOLON = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = ";",
+  .intrin      = (void *)intrin_semicolon,
+  .throws      = true,
+  .immediate   = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_BRACKET_BEG = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "[",
+  .intrin      = (void *)intrin_bracket_beg,
+  .immediate   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_BRACKET_END = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "]",
+  .intrin      = (void *)intrin_bracket_end,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_IMMEDIATE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "immediate",
+  .intrin      = (void *)intrin_immediate,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_ONLY = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "comp_only",
+  .intrin      = (void *)intrin_comp_only,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_NOT_COMP_ONLY = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "not_comp_only",
+  .intrin      = (void *)intrin_not_comp_only,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_INLINE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "inline",
+  .intrin      = (void *)intrin_inline,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_THROWS = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "throws",
+  .intrin      = (void *)intrin_throws,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_REDEFINE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "redefine",
+  .intrin      = (void *)intrin_redefine,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_HERE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "here",
+  .intrin      = (void *)intrin_here,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_INSTR = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "comp_instr",
+  .intrin      = (void *)intrin_comp_instr,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_LOAD = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "comp_load",
+  .intrin      = (void *)intrin_comp_load,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_CONST = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "comp_const",
+  .intrin      = (void *)intrin_comp_const,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_STATIC = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "comp_static",
+  .intrin      = (void *)intrin_comp_static,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_CALL = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "comp_call",
+  .intrin      = (void *)intrin_comp_call,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_QUIT = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "quit",
+  .intrin      = (void *)intrin_quit,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_RET = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "#ret",
+  .intrin      = (void *)intrin_ret,
+  .throws      = true,
+  .immediate   = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_RECUR = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "#recur",
+  .intrin      = (void *)intrin_recur,
+  .throws      = true,
+  .immediate   = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_CHAR = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "char",
+  .intrin      = (void *)intrin_char,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_PARSE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "parse",
+  .intrin      = (void *)intrin_parse,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_PARSE_WORD = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "parse_word",
+  .intrin      = (void *)intrin_parse_word,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_IMPORT = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "import",
+  .intrin      = (void *)intrin_import,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_IMPORT_QUOTE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "import\"",
+  .intrin      = (void *)intrin_import_quote,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_IMPORT_TICK = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "import'",
+  .intrin      = (void *)intrin_import_tick,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_EXTERN_PTR = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "extern_ptr:",
+  .intrin      = (void *)intrin_extern_ptr,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_EXTERN_PROC = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "extern:",
+  .intrin      = (void *)intrin_extern_proc,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_FIND_WORD = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "find_word",
+  .intrin      = (void *)intrin_find_word,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_INLINE_WORD = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "inline_word",
+  .intrin      = (void *)intrin_inline_word,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_EXECUTE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "execute",
+  .intrin      = (void *)intrin_execute,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_GET_LOCAL = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "get_local",
+  .intrin      = (void *)intrin_get_local,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_ANON_LOCAL = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "anon_local",
+  .intrin      = (void *)intrin_anon_local,
+  .throws      = true,
+  .comp_only   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_FLUSH = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_flush",
+  .intrin      = (void *)debug_flush,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_THROW = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_throw",
+  .intrin      = (void *)debug_throw,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_STACK_LEN = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_stack_len",
+  .intrin      = (void *)debug_stack_len,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_STACK = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_stack",
+  .intrin      = (void *)debug_stack,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_DEPTH = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_depth",
+  .intrin      = (void *)debug_depth,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_TOP_INT = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_top_int",
+  .intrin      = (void *)debug_top_int,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_TOP_PTR = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_top_ptr",
+  .intrin      = (void *)debug_top_ptr,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_TOP_STR = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_top_str",
+  .intrin      = (void *)debug_top_str,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_MEM = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_mem",
+  .intrin      = (void *)debug_mem,
+  .throws      = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_WORD = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug'",
+  .intrin      = (void *)debug_word,
+  .throws      = true,
+  .immediate   = true,
+  .interp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_SYNC_CODE = (Sym){
+  .type        = SYM_INTRIN,
+  .name.buf    = "debug_sync_code",
+  .intrin      = (void *)debug_sync_code,
+  .throws      = true,
+  .interp_only = true,
+};
+
+#ifdef NATIVE_CALL_ABI
+#include "./c_intrin_list_cc_reg.c"   // IWYU pragma: export
+#else                                 // NATIVE_CALL_ABI
+#include "./c_intrin_list_cc_stack.c" // IWYU pragma: export
+#endif                                // NATIVE_CALL_ABI

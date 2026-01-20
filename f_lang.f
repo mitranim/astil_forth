@@ -873,6 +873,9 @@
   cell 1      comp_static \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1 comp_instr  \ str x1, [x27], 8
   #word_end
+
+  \ Store the initial value to the given address,
+  \ which is located in compiler-managed memory.
   !
 ;
 

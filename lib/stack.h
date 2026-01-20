@@ -77,8 +77,9 @@ typedef span_of(F64)  F64_span;
 #define stack_len_bytes(stack) \
   ((Uint)((U8 *)(stack)->top - (U8 *)(stack)->floor))
 
-#define stack_head(stack) (stack)->top[-1]
-#define stack_trunc(stack) (stack)->top = (stack)->floor
+#define stack_head(stack) ((stack)->top[-1])
+#define stack_trunc(stack) ((stack)->top = (stack)->floor)
+#define stack_trunc_to(stack, len) ((stack)->top = (stack)->floor + len)
 
 #define stack_push(stack, ...)         \
   ({                                   \

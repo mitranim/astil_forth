@@ -2,7 +2,7 @@
 This file defines assembly procedures for Arm64 for the variant of our Forth
 system which uses the Forth data stack for its default calling convention.
 
-Compare `./c_arch_arm64_native.c` which follows the native call convention.
+Compare `./c_arch_arm64_cc_reg.c` which follows the native call convention.
 
 Special registers:
 - `x28` = interpreter pointer
@@ -18,9 +18,9 @@ The special registers are also hardcoded in `f_lang.f`.
 #include "./lib/num.h"
 
 // Only works if the CWD matches this file's directory 😔.
-__asm__(".include \"./c_arch_arm64_stack.s\"");
+__asm__(".include \"./c_arch_arm64_cc_stack.s\"");
 
-// Defined in `./c_arch_arm64_stack.s`.
+// Defined in `./c_arch_arm64_cc_stack.s`.
 extern Err asm_call_forth(Err err, void *fun, void *interp) __asm__(
   "asm_call_forth"
 );
@@ -28,6 +28,12 @@ extern Err asm_call_forth(Err err, void *fun, void *interp) __asm__(
 static Err interp_call_norm(Interp *interp, const Sym *sym) {
   try(comp_code_ensure_sym_ready(&interp->comp.code, sym));
   try(asm_call_forth(nullptr, sym->norm.exec.floor, interp));
+  return nullptr;
+}
+
+static Err asm_append_instr_from_int(Comp *comp, Sint val) {
+  try(imm_unsigned((Uint)val, sizeof(Instr) * CHAR_BIT));
+  asm_append_instr(comp, (Instr)val);
   return nullptr;
 }
 

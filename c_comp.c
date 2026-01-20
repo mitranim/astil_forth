@@ -7,9 +7,9 @@
 #include "./lib/str.c"
 
 #ifdef NATIVE_CALL_ABI
-#include "./c_comp_native.c"
+#include "./c_comp_cc_reg.c"
 #else
-#include "./c_comp_stack.c"
+#include "./c_comp_cc_stack.c"
 #endif
 
 static bool instr_heap_valid(const Instr_heap *val) {
@@ -267,7 +267,12 @@ static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
   return nullptr;
 }
 
+static Err err_inline_not_defining() {
+  return err_str("unsupported use of \"inline\" outside a colon definition");
+}
+
 static Err comp_inline_sym(Comp *comp, Sym *sym) {
+  if (!comp->ctx.sym) return err_inline_not_defining();
   return asm_inline_sym(comp, sym);
 }
 

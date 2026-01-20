@@ -1,3 +1,4 @@
-# TODO move to personal directory.
 Completion:
   ArgumentLists: None
+CompileFlags:
+  Add: [-DCLANGD=]

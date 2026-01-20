@@ -983,12 +983,6 @@ static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
   asm_append_load_scaled_offset(comp, reg, reg, pageoff);
 }
 
-static Err asm_append_instr_from_int(Comp *comp, Sint val) {
-  try(imm_unsigned((Uint)val, sizeof(Instr) * CHAR_BIT));
-  asm_append_instr(comp, (Instr)val);
-  return nullptr;
-}
-
 static Err err_out_of_space_const() {
   return err_str("unable to allocate a constant: out of space");
 }

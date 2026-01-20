@@ -6,9 +6,9 @@
 #include "./lib/str.h"
 
 #ifdef NATIVE_CALL_ABI
-#include "./c_comp_native.h"
+#include "./c_comp_cc_reg.h"
 #else
-#include "./c_comp_stack.h"
+#include "./c_comp_cc_stack.h"
 #endif
 
 // 4 MiB
