@@ -23,7 +23,7 @@ static Err intrin_comp_load(Interp *interp) {
   try(int_stack_pop(&interp->ints, &imm));
   try(int_stack_pop(&interp->ints, &reg));
 
-  aver(reg >= 0 && reg < ASM_REG_LEN);
+  aver(reg >= 0 && reg < ARCH_REG_LEN);
 
   bool has_load = true;
   asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
@@ -184,14 +184,28 @@ static Err intrin_execute(Interp *interp) {
 }
 
 static Err intrin_get_local(Interp *interp) {
-  const U8 *buf;
-  Ind       len;
-  Local    *loc;
+  const auto comp = &interp->comp;
+  const U8  *buf;
+  Ind        len;
+  Local     *loc;
   try(interp_pop_len(interp, &len));
   try(interp_pop_buf(interp, &buf));
   try(interp_get_local(interp, (const char *)buf, len, &loc));
 
+  if (!loc->mem) comp_local_alloc_mem(comp, loc);
+
   const auto tok = local_token(loc);
   try(int_stack_push(&interp->ints, tok));
+  return nullptr;
+}
+
+static Err intrin_anon_local(Interp *interp) {
+  const auto comp = &interp->comp;
+  const auto loc  = comp_local_anon(comp);
+
+  comp_local_alloc_mem(comp, loc);
+
+  const auto tok = local_token(loc);
+  try(int_stack_push(&interp->ints, (Sint)tok));
   return nullptr;
 }

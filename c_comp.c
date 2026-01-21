@@ -22,20 +22,12 @@ static Err err_internal_dup_local(const char *name) {
   return errf("internal error: duplicate local name " FMT_QUOTED, name);
 }
 
-static Local *comp_local_push(Comp *comp, Local val) {
-// SYNC[local_mem_alloc].
-#ifndef NATIVE_CALL_ABI
-  val.mem = ++comp->ctx.loc_mem_len;
-#endif
-  return stack_push(&comp->ctx.locals, val);
-}
-
 static Err comp_local_add(Comp *comp, Word_str word, Local **out) {
   const auto dict = &comp->ctx.local_dict;
   const auto name = word.buf;
   if (dict_has(dict, name)) return err_internal_dup_local(name);
 
-  const auto loc = comp_local_push(comp, (Local){.name = word});
+  const auto loc = stack_push(&comp->ctx.locals, (Local){.name = word});
   dict_set(dict, loc->name.buf, loc);
   if (out) *out = loc;
   return nullptr;
@@ -55,7 +47,7 @@ static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
 }
 
 static Local *comp_local_anon(Comp *comp) {
-  return comp_local_push(comp, (Local){});
+  return stack_push(&comp->ctx.locals, (Local){});
 }
 
 static Err err_local_invalid(Local *ptr) {
@@ -384,9 +376,9 @@ static Err comp_append_ret(Comp *comp) {
   sym->norm.has_rets = true;
 
   stack_push(
-    &comp->ctx.fixup,
-    (Comp_fixup){
-      .type = COMP_FIX_RET,
+    &comp->ctx.asm_fix,
+    (Asm_fixup){
+      .type = ASM_FIX_RET,
       .ret  = asm_append_breakpoint(comp, ASM_CODE_RET),
     }
   );
@@ -401,11 +393,38 @@ static Err comp_append_recur(Comp *comp) {
   set_add(&sym->callers, sym);
 
   stack_push(
-    &comp->ctx.fixup,
-    (Comp_fixup){
-      .type  = COMP_FIX_RECUR,
+    &comp->ctx.asm_fix,
+    (Asm_fixup){
+      .type  = ASM_FIX_RECUR,
       .recur = asm_append_breakpoint(comp, ASM_CODE_RECUR),
     }
   );
   return nullptr;
+}
+
+static const char *asm_fixup_fmt(Asm_fixup *fix) {
+  static thread_local char BUF[4096];
+
+  switch (fix->type) {
+    case ASM_FIX_RET: {
+      return sprintbuf(BUF, "{type = ret, instr = %p}", fix->ret);
+    }
+    case ASM_FIX_TRY: {
+      return sprintbuf(BUF, "{type = try, instr = %p}", fix->try);
+    }
+    case ASM_FIX_RECUR: {
+      return sprintbuf(BUF, "{type = recur, instr = %p}", fix->recur);
+    }
+    case ASM_FIX_IMM: {
+      const auto val = &fix->imm;
+      return sprintbuf(
+        BUF,
+        "{type = imm, instr = %p, reg = %d, num = " FMT_SINT "}",
+        val->instr,
+        val->reg,
+        val->num
+      );
+    }
+    default: unreachable();
+  }
 }

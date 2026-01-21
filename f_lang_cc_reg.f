@@ -89,6 +89,41 @@
   imm7 or
 ;
 
+\ Shared by some integer arithmetic and load/store instructions.
+: asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
+  imm12 12 bit_trunc 10 lsl { imm12 }
+  Xn                  5 lsl
+  imm12 or
+  Xd    or
+;
+
+: asm_load_byte_off { Wt Wn imm12 -- instr }
+  Wt Wn imm12 asm_pattern_arith_imm
+  0b00_11_1_0_0_1_01_000000000000_00000_00000 or
+;
+
+: asm_store_byte_off { Wt Wn imm12 -- instr }
+  Wt Wn imm12 asm_pattern_arith_imm
+  0b00_11_1_0_0_1_00_000000000000_00000_00000 or
+;
+
+: c@ { str -- char } [
+  0 0 0 asm_load_byte_off comp_instr \ ldrb x0, [x0]
+] str ;
+
+: char' ( C: "str" -- ) ( E: -- char )
+  parse_word        { buf -- }
+  buf c@            { char }
+  comp_next_inp_reg { reg }
+  reg char comp_load
+;
+
+\ : mock [ redefine ] \ { -- char }
+\   char' A
+\   #debug_ctx
+\ ;
+\ mock
+
 \ 6 1 extern: mmap
 \ 3 1 extern: mprotect
 

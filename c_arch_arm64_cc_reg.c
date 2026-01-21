@@ -21,20 +21,20 @@ The special registers must be kept in sync with `f_lang_cc_reg.f`.
 #endif
 
 static Err arch_validate_input_param_reg(U8 reg) {
-  if (reg <= ASM_INP_PARAM_REG_LEN) return nullptr;
+  if (reg <= ARCH_INP_PARAM_REG_LEN) return nullptr;
   return errf(
     "too many input parameters: %d registers available, %d parameters requested",
     reg,
-    ASM_INP_PARAM_REG_LEN
+    ARCH_INP_PARAM_REG_LEN
   );
 }
 
 static Err arch_validate_output_param_reg(U8 reg) {
-  if (reg <= ASM_OUT_PARAM_REG_LEN) return nullptr;
+  if (reg <= ARCH_OUT_PARAM_REG_LEN) return nullptr;
   return errf(
     "too many output parameters: %d registers available, %d parameters requested",
     reg,
-    ASM_OUT_PARAM_REG_LEN
+    ARCH_OUT_PARAM_REG_LEN
   );
 }
 
@@ -53,8 +53,8 @@ static Err arch_call_norm(Interp *interp, const Sym *sym) {
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
-  aver(out_len <= ASM_OUT_PARAM_REG_LEN);
+  aver(inp_len <= ARCH_INP_PARAM_REG_LEN);
+  aver(out_len <= ARCH_OUT_PARAM_REG_LEN);
 
   const auto ints     = &interp->ints;
   const auto ints_len = stack_len(ints);
@@ -117,10 +117,10 @@ static Err arch_call_intrin(Interp *interp, const Sym *sym) {
 
   const auto ints = &interp->ints;
   auto       ind  = sym->inp_len;
-  aver(ind < ASM_INP_PARAM_REG_LEN);
+  aver(ind < ARCH_INP_PARAM_REG_LEN);
 
-  Sint args[ASM_INP_PARAM_REG_LEN] = {};
-  args[ind]                        = (Sint)interp;
+  Sint args[ARCH_INP_PARAM_REG_LEN] = {};
+  args[ind]                         = (Sint)interp;
 
   while (ind) {
     ind--;
@@ -152,7 +152,7 @@ static void asm_append_call_intrin_after(Comp *comp, const Sym *callee) {
   if (callee->throws) {
     // Our C procedures return errors in `x0`, while in Forth,
     // we dedicate a callee-saved register to errors.
-    asm_append_mov_reg(comp, ASM_ERR_REG, ASM_PARAM_REG_0);
+    asm_append_mov_reg(comp, ARCH_REG_ERR, ARCH_PARAM_REG_0);
     asm_append_try(comp);
   }
 
@@ -171,19 +171,19 @@ static void asm_append_call_intrin_after(Comp *comp, const Sym *callee) {
     str x8, [x27, INTERP_INTS_TOP]
   */
 
-  constexpr auto stack_reg = ASM_SCRATCH_REG_8;
+  constexpr auto stack_reg = ARCH_SCRATCH_REG_8;
   auto           out_reg   = len;
-  aver(out_reg < ASM_OUT_PARAM_REG_LEN);
+  aver(out_reg < ARCH_OUT_PARAM_REG_LEN);
 
   asm_append_load_unscaled_offset(
-    comp, stack_reg, ASM_REG_INTERP, INTERP_INTS_TOP
+    comp, stack_reg, ARCH_REG_INTERP, INTERP_INTS_TOP
   );
   while (out_reg) {
     out_reg--;
     asm_append_load_pre_post(comp, out_reg, stack_reg, -8);
   }
   asm_append_store_unscaled_offset(
-    comp, stack_reg, ASM_REG_INTERP, INTERP_INTS_TOP
+    comp, stack_reg, ARCH_REG_INTERP, INTERP_INTS_TOP
   );
 }
 
@@ -191,12 +191,12 @@ static void asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
   aver(callee->type == SYM_INTRIN);
 
   // Free to use because intrin calls clobber everything anyway.
-  constexpr auto reg = ASM_SCRATCH_REG_8;
+  constexpr auto reg = ARCH_SCRATCH_REG_8;
 
   // Under this callvention, our intrinsics always take `Interp*`
   // as an additional "secret" parameter following immediately
   // after the "official" parameters.
-  asm_append_mov_reg(comp, callee->inp_len, ASM_REG_INTERP);
+  asm_append_mov_reg(comp, callee->inp_len, ARCH_REG_INTERP);
   asm_append_dysym_load(comp, callee->name.buf, reg);
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
@@ -207,7 +207,7 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
   aver(callee->type == SYM_EXT_PROC);
 
   // Free to use because extern calls clobber everything anyway.
-  constexpr auto reg = ASM_SCRATCH_REG_8;
+  constexpr auto reg = ARCH_SCRATCH_REG_8;
 
   asm_append_dysym_load(comp, callee->name.buf, reg);
   asm_append_branch_link_to_reg(comp, reg);
@@ -223,7 +223,7 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
     }
     case LOC_MEM: {
       const auto off = local_fp_off(loc);
-      return asm_instr_load_unscaled_offset(tar_reg, ASM_REG_FP, off);
+      return asm_instr_load_unscaled_offset(tar_reg, ARCH_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
     default:          unreachable();
@@ -239,7 +239,7 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
     }
     case LOC_MEM: {
       const auto off = local_fp_off(loc);
-      return asm_instr_store_unscaled_offset(src_reg, ASM_REG_FP, off);
+      return asm_instr_store_unscaled_offset(src_reg, ARCH_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
     default:          unreachable();
@@ -250,39 +250,38 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
 We accumulate volatile clobbers from ALL sources across the entire procedure
 and always treat these registers as temporary, meaning that no locals across
 the procedure receive them as their locations, even when their lifetimes do
-not overlap with clobbers. This is a dirty but ultra simple way of avoiding
-IR and data flow analysis.
+not overlap with clobbers. Dirty but simple way of avoiding an additional IR
+and data flow analysis.
 */
 static void arch_resolve_local_location(Comp *comp, Local *loc) {
   if (loc->location != LOC_UNKNOWN) return;
 
   const auto reg = bits_pop_low(&comp->ctx.vol_regs);
 
-  if (bits_has(ASM_VOLATILE_REGS, reg)) {
+  if (bits_has(ARCH_VOLATILE_REGS, reg)) {
     loc->location = LOC_REG;
     loc->reg      = reg;
     return;
   }
 
-  // SYNC[local_mem_alloc].
-  loc->mem      = ++comp->ctx.loc_mem_len;
+  comp_local_alloc_mem(comp, loc);
   loc->location = LOC_MEM;
 }
 
-static void asm_fixup_loc_read(Comp *comp, Comp_fixup *fix) {
-  IF_DEBUG(aver(fix->type == COMP_FIX_LOC_READ));
+static void asm_fixup_loc_read(Comp *comp, Loc_fixup *fix) {
+  IF_DEBUG(aver(fix->type == LOC_FIX_READ));
 
-  const auto read = &fix->loc_read;
+  const auto read = &fix->read;
   const auto loc  = read->loc;
 
   arch_resolve_local_location(comp, loc);
   *read->instr = asm_instr_local_read(loc, read->reg);
 }
 
-static void asm_fixup_loc_write(Comp *comp, Comp_fixup *fix, Sym *sym) {
-  IF_DEBUG(aver(fix->type == COMP_FIX_LOC_WRITE));
+static void asm_fixup_loc_write(Comp *comp, Loc_fixup *fix, Sym *sym) {
+  IF_DEBUG(aver(fix->type == LOC_FIX_WRITE));
 
-  const auto write = &fix->loc_write;
+  const auto write = &fix->write;
 
   // This VERY dirty hack allows us to preserve the simplicity of forward-only
   // single-pass assembly, without having to invent an IR and have the library
@@ -300,37 +299,20 @@ static void asm_fixup_loc_write(Comp *comp, Comp_fixup *fix, Sym *sym) {
   *write->instr = asm_instr_local_write(loc, write->reg);
 }
 
-static void asm_fixup(Comp *comp, Sym *sym) {
-  const auto ctx   = &comp->ctx;
-  const auto fixup = &ctx->fixup;
+static void asm_fixup_locals(Comp *comp, Sym *sym) {
+  const auto ctx = &comp->ctx;
 
   // Remaining volatile registers available for locals.
   aver(ctx->vol_regs == BITS_ALL);
-  ctx->vol_regs = bits_del_all(ASM_VOLATILE_REGS, sym->clobber);
+  ctx->vol_regs = bits_del_all(ARCH_VOLATILE_REGS, sym->clobber);
 
-  for (stack_range(auto, fix, fixup)) {
+  for (stack_range(auto, fix, &ctx->loc_fix)) {
     switch (fix->type) {
-      case COMP_FIX_RET: {
-        asm_fixup_ret(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_TRY: {
-        asm_fixup_try(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_RECUR: {
-        asm_fixup_recur(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_IMM: {
-        asm_fixup_load(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_LOC_READ: {
+      case LOC_FIX_READ: {
         asm_fixup_loc_read(comp, fix);
         continue;
       }
-      case COMP_FIX_LOC_WRITE: {
+      case LOC_FIX_WRITE: {
         asm_fixup_loc_write(comp, fix, sym);
         continue;
       }

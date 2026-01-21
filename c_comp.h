@@ -5,6 +5,40 @@
 #include "./lib/num.h"
 #include "./lib/str.h"
 
+/*
+Book-keeping for instructions which we can't properly encode
+on the fly when interpreting a colon definition. We reserve
+space in form of invalid instructions, and rewrite them when
+finalizing a word.
+
+TODO more precise name since we also have `Loc_fixup`, which
+is used in the register callvention; see `./c_comp_cc_reg.h`.
+
+Procedure prologue also implicitly undergoes fixup.
+*/
+typedef struct {
+  enum {
+    ASM_FIX_RET = 1,
+    ASM_FIX_TRY,
+    ASM_FIX_IMM,
+    ASM_FIX_RECUR,
+  } type;
+
+  union {
+    Instr *ret;   // b <epilogue>
+    Instr *try;   // cbnz <epilogue>
+    Instr *recur; // b <begin>
+
+    struct {
+      Instr *instr; // Instruction to patch.
+      Sint   num;   // Immediate value to load.
+      U8     reg;   // Register to load into.
+    } imm;
+  };
+} Asm_fixup;
+
+typedef stack_of(Asm_fixup) Asm_fixups;
+
 #ifdef NATIVE_CALL_ABI
 #include "./c_comp_cc_reg.h"
 #else

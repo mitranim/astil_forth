@@ -75,7 +75,7 @@ static void bits_del_span_from(Bits *set, U8 ceil) {
 Returns index of lowest non-zero bit while zeroing it.
 If set is empty, the returned index is out of bounds.
 */
-static U8 bits_pop_low(Bits *tar) {
+ALLOW_OVERFLOW static U8 bits_pop_low(Bits *tar) {
   const auto set = *tar;
   const auto ind = (U8)__builtin_ctzg(set, BITS_CEIL);
   *tar           = set & (set - 1);
@@ -88,7 +88,7 @@ If set is full, the returned index is out of bounds.
 
 GCC has `__builtin_stdc_first_trailing_zero`, Clang doesn't.
 */
-static U8 bits_push_low(Bits *tar) {
+ALLOW_OVERFLOW static U8 bits_push_low(Bits *tar) {
   const auto set = *tar;
   const auto ind = (U8)__builtin_ctzg(~set, BITS_CEIL);
   *tar           = set | (set + 1);

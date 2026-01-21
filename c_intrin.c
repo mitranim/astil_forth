@@ -225,14 +225,6 @@ static Err intrin_extern_ptr(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_anon_local(Interp *interp) {
-  const auto comp = &interp->comp;
-  const auto loc  = comp_local_anon(comp);
-  const auto tok  = local_token(loc);
-  try(int_stack_push(&interp->ints, (Sint)tok));
-  return nullptr;
-}
-
 static void debug_flush(void *) {
   fflush(stdout);
   fflush(stderr);
@@ -401,7 +393,7 @@ Note: ALL intrinsics must have certain fields set the same way:
 
   .type        = SYM_INTRIN
   .name.len    = strlen(.name.buf)
-  .clobber     = ASM_VOLATILE_REGS
+  .clobber     = ARCH_VOLATILE_REGS
   .interp_only = true
 
 Repetition is error-prone, so we set these fields in `sym_init_intrin`.

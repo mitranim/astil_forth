@@ -15,9 +15,9 @@
 : nop ;
 
 : ASM_INSTR_SIZE  4      ;
-: ASM_REG_DAT_SP  27     ;
-: ASM_REG_FP      29     ;
-: ASM_REG_SP      31     ;
+: ARCH_REG_DAT_SP  27     ;
+: ARCH_REG_FP      29     ;
+: ARCH_REG_SP      31     ;
 : ASM_EQ          0b0000 ;
 : ASM_NE          0b0001 ;
 : ASM_CS          0b0010 ;
@@ -296,16 +296,16 @@
 ;
 
 \ str Xd, [x27], 8
-: asm_push1 ( Xd -- instr ) ASM_REG_DAT_SP 8 asm_store_post ;
+: asm_push1 ( Xd -- instr ) ARCH_REG_DAT_SP 8 asm_store_post ;
 
 \ ldr Xd, [x27, -8]!
-: asm_pop1 ( Xd -- instr ) ASM_REG_DAT_SP -8 asm_load_pre ;
+: asm_pop1 ( Xd -- instr ) ARCH_REG_DAT_SP -8 asm_load_pre ;
 
 \ stp Xt1, Xt2, [x27], 16
-: asm_push2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP 16 asm_store_pair_post ;
+: asm_push2 ( Xt1 Xt2 -- instr ) ARCH_REG_DAT_SP 16 asm_store_pair_post ;
 
 \ ldp Xt1, Xt2, [x27, -16]!
-: asm_pop2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP -16 asm_load_pair_pre ;
+: asm_pop2 ( Xt1 Xt2 -- instr ) ARCH_REG_DAT_SP -16 asm_load_pair_pre ;
 
 : asm_neg ( reg -- instr )
   0b1_1_0_01011_00_0_00001_000000_11111_00000 or
@@ -445,7 +445,7 @@
 
 \ Same as `0 pick`.
 : dup ( i1 -- i1 i1 ) [
-  1 ASM_REG_DAT_SP -8 asm_load_off comp_instr \ ldur x1, [x27, -8]
+  1 ARCH_REG_DAT_SP -8 asm_load_off comp_instr \ ldur x1, [x27, -8]
                       asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
@@ -493,64 +493,64 @@
 : postpone_compile'  next_word comp_push ' comp_call comp_call ;
 
 : drop ( val -- ) [
-  ASM_REG_DAT_SP ASM_REG_DAT_SP 8 asm_sub_imm comp_instr \ sub x27, x27, 8
+  ARCH_REG_DAT_SP ARCH_REG_DAT_SP 8 asm_sub_imm comp_instr \ sub x27, x27, 8
 ] ;
 
 \ Same as `1 pick 1 pick`.
 : dup2 ( i1 i2 -- i1 i2 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -16 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -16]
+  1 2 ARCH_REG_DAT_SP -16 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -16]
       1               2  asm_push2         comp_instr \ stp x1, x2, [x27], 16
 ] ;
 
 \ Same as `swap drop`.
 : nip ( i1 i2 -- i2 ) [
                       asm_pop_x1    comp_instr \ ldr x1, [x27, -8]!
-  1 ASM_REG_DAT_SP -8 asm_store_off comp_instr \ stur x1, [x27, -8]
+  1 ARCH_REG_DAT_SP -8 asm_store_off comp_instr \ stur x1, [x27, -8]
 ] ;
 
 \ Same as `swap2 drop2`.
 : nip2 ( i1 i2 i3 i4 -- i3 i4 ) [
                          asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+  1 2 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
 ] ;
 
 \ Same as `1 pick`.
 : over ( i1 i2 -- i1 i2 i1 ) [
-  1 ASM_REG_DAT_SP -16 asm_load_off comp_instr \ ldur x1, [x27, -16]
+  1 ARCH_REG_DAT_SP -16 asm_load_off comp_instr \ ldur x1, [x27, -16]
                        asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 \ Same as `3 pick 3 pick`.
 : over2 ( i1 i2 i3 i4 -- i1 i2 i3 i4 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -32 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -32]
+  1 2 ARCH_REG_DAT_SP -32 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -32]
                          asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
 ] ;
 
 \ Same as `3 roll 3 roll`.
 : swap2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -32 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -32]
-  3 4 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -16]
-  3 4 ASM_REG_DAT_SP -32 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -32]
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+  1 2 ARCH_REG_DAT_SP -32 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -32]
+  3 4 ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -16]
+  3 4 ARCH_REG_DAT_SP -32 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -32]
+  1 2 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
 ] ;
 
 \ Same as `-rot swap rot`.
 : swap_over ( i1 i2 i3 -- i2 i1 i3 ) [
-  1 2 ASM_REG_DAT_SP -24 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -24]
-  2 1 ASM_REG_DAT_SP -24 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -24]
+  1 2 ARCH_REG_DAT_SP -24 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -24]
+  2 1 ARCH_REG_DAT_SP -24 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -24]
 ] ;
 
 \ Same as `over -rot`.
 : dup_over ( i1 i2 -- i1 i1 i2 ) [
-  1 2              ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
-  1 2              ASM_REG_DAT_SP -8  asm_store_pair_off comp_instr \ stp x1, x2, [x27, -8]
-    ASM_REG_DAT_SP ASM_REG_DAT_SP  8  asm_add_imm        comp_instr \ add x27, x27, 8
+  1 2              ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
+  1 2              ARCH_REG_DAT_SP -8  asm_store_pair_off comp_instr \ stp x1, x2, [x27, -8]
+    ARCH_REG_DAT_SP ARCH_REG_DAT_SP  8  asm_add_imm        comp_instr \ add x27, x27, 8
 ] ;
 
 \ Same as `dup rot`.
 : tuck ( i1 i2 -- i2 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
-  2 1 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -16]
+  1 2 ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
+  2 1 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -16]
                        2 asm_push1          comp_instr \ str x2, [x27], 8
 ] ;
 
@@ -561,33 +561,33 @@
 
 \ Same as `2 roll`.
 : rot ( i1 i2 i3 -- i2 i3 i1 ) [
-    1 ASM_REG_DAT_SP -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
-  2 3 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
-  2 3 ASM_REG_DAT_SP -24 asm_store_pair_off comp_instr \ stp x2, x3, [x27, -24]
-    1 ASM_REG_DAT_SP  -8 asm_store_off      comp_instr \ stur x1, [x27, -8]
+    1 ARCH_REG_DAT_SP -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
+  2 3 ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
+  2 3 ARCH_REG_DAT_SP -24 asm_store_pair_off comp_instr \ stp x2, x3, [x27, -24]
+    1 ARCH_REG_DAT_SP  -8 asm_store_off      comp_instr \ stur x1, [x27, -8]
 ] ;
 
 : -rot ( i1 i2 i3 -- i3 i1 i2 ) [
-    1 ASM_REG_DAT_SP -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
-  2 3 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
-    3 ASM_REG_DAT_SP -24 asm_store_off      comp_instr \ stur x3, [x27, -24]
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+    1 ARCH_REG_DAT_SP -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
+  2 3 ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
+    3 ARCH_REG_DAT_SP -24 asm_store_off      comp_instr \ stur x3, [x27, -24]
+  1 2 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
 ] ;
 
 : rot2 ( i1 i2 i3 i4 i5 i6 -- i3 i4 i5 i6 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -48 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -48]
-  3 4 ASM_REG_DAT_SP -32 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -32]
-  5 6 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x5, x6, [x27, -16]
-  3 4 ASM_REG_DAT_SP -48 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -48]
-  5 6 ASM_REG_DAT_SP -32 asm_store_pair_off comp_instr \ stp x5, x6, [x27, -32]
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+  1 2 ARCH_REG_DAT_SP -48 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -48]
+  3 4 ARCH_REG_DAT_SP -32 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -32]
+  5 6 ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x5, x6, [x27, -16]
+  3 4 ARCH_REG_DAT_SP -48 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -48]
+  5 6 ARCH_REG_DAT_SP -32 asm_store_pair_off comp_instr \ stp x5, x6, [x27, -32]
+  1 2 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
 ] ;
 
 \ Pushes the stack item found at the given index, duplicating it.
 : pick ( … ind -- … [ind] ) [
                        asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
   1 1                  asm_mvn                comp_instr \ mvn x1, x1
-  1 ASM_REG_DAT_SP 1 1 asm_load_with_register comp_instr \ ldr x1, [x27, x1, lsl 3]
+  1 ARCH_REG_DAT_SP 1 1 asm_load_with_register comp_instr \ ldr x1, [x27, x1, lsl 3]
                        asm_push_x1            comp_instr \ str x1, [x27], 8
 ] ;
 
@@ -602,14 +602,14 @@
 : bury ( … val ind -- … ) [
                        asm_pop_x1_x2           comp_instr \ ldp x1, x2, [x27, -16]!
   2 2                  asm_mvn                 comp_instr \ mvn x2, x2
-  1 ASM_REG_DAT_SP 2 1 asm_store_with_register comp_instr \ str x1, [x27, x2, lsl 3]
+  1 ARCH_REG_DAT_SP 2 1 asm_store_with_register comp_instr \ str x1, [x27, x2, lsl 3]
 ] ;
 
 : flip ( i1 i2 i3 -- i3 i2 i1 ) [
-  1 ASM_REG_DAT_SP -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
-  2 ASM_REG_DAT_SP -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
-  2 ASM_REG_DAT_SP -24 asm_store_off comp_instr \ str x2, [x27, -24]
-  1 ASM_REG_DAT_SP -8  asm_store_off comp_instr \ str x1, [x27, -8]
+  1 ARCH_REG_DAT_SP -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
+  2 ARCH_REG_DAT_SP -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
+  2 ARCH_REG_DAT_SP -24 asm_store_off comp_instr \ str x2, [x27, -24]
+  1 ARCH_REG_DAT_SP -8  asm_store_off comp_instr \ str x1, [x27, -8]
 ] ;
 
 : negate ( i1 -- i2 ) [
@@ -777,15 +777,15 @@
 \ CPUs are allowed to handle this differently; on Apple Silicon chips,
 \ this is considered a "bad instruction" and blows up.
 : sp ( -- adr ) [
-  ASM_REG_DAT_SP ASM_REG_DAT_SP 0 asm_store_off comp_instr \ stur x27, [x27]
-  ASM_REG_DAT_SP ASM_REG_DAT_SP 8 asm_add_imm   comp_instr \ add x27, x27, 8
+  ARCH_REG_DAT_SP ARCH_REG_DAT_SP 0 asm_store_off comp_instr \ stur x27, [x27]
+  ARCH_REG_DAT_SP ARCH_REG_DAT_SP 8 asm_add_imm   comp_instr \ add x27, x27, 8
 ] ;
 
 \ Sets the stack pointer register to the given address.
 \ Uses two instructions for the same reason as the above.
 : sp! ( adr -- ) [
                    asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
-  ASM_REG_DAT_SP 1 asm_mov_reg comp_instr \ mov x27, x1
+  ARCH_REG_DAT_SP 1 asm_mov_reg comp_instr \ mov x27, x1
 ] ;
 
 : cell 8 ;
@@ -906,11 +906,11 @@
 \ When we ask for a local, the compiler returns an FP offset.
 \ We can compile load/store and push/pop as we like.
 
-: asm_local_get ( reg fp_off -- instr ) ASM_REG_FP swap asm_load_off ;
-: asm_local_set ( reg fp_off -- instr ) ASM_REG_FP swap asm_store_off ;
+: asm_local_get ( reg fp_off -- instr ) ARCH_REG_FP swap asm_load_off ;
+: asm_local_set ( reg fp_off -- instr ) ARCH_REG_FP swap asm_store_off ;
 
-\ : asm_local_get ( fp_off reg -- instr ) ASM_REG_FP rot asm_load_off ;
-\ : asm_local_set ( fp_off reg -- instr ) ASM_REG_FP rot asm_store_off ;
+\ : asm_local_get ( fp_off reg -- instr ) ARCH_REG_FP rot asm_load_off ;
+\ : asm_local_set ( fp_off reg -- instr ) ARCH_REG_FP rot asm_store_off ;
 
 \ SYNC[asm_local_read].
 : comp_local_get_push ( fp_off -- )
@@ -1424,20 +1424,20 @@ extern_ptr: __stderrp
 : dup>systack [
   inline
                      asm_pop_x1         comp_instr \ ldr x1, [x27, -8]!
-  1 1 ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x1, [sp, -16]!
+  1 1 ARCH_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x1, [sp, -16]!
 ] ;
 
 : pair>systack ( Forth: i1 i2 -- | System: -- i1 i2 ) [
   inline
                      asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
+  1 2 ARCH_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
 ] ;
 
 \ Note: `add` is one of the few instructions which treat `x31` as `sp`
 \ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
 : systack_ptr ( -- sp ) [
   inline
-  1 ASM_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
+  1 ARCH_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
                  asm_push_x1 comp_instr \ str x1, [x27], 8
 ] ;
 
@@ -1463,7 +1463,7 @@ extern_ptr: __stderrp
   dup <=0 #if #ret #end
   cells 16 align_up
   \ add sp, sp, <size>
-  ASM_REG_SP ASM_REG_SP rot asm_add_imm comp_instr
+  ARCH_REG_SP ARCH_REG_SP rot asm_add_imm comp_instr
 ;
 
 \ Short for "varargs". Sets up arguments for a variadic call.

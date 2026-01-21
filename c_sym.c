@@ -28,7 +28,7 @@ static void sym_deinit(Sym *sym) {
 static void sym_init_intrin(Sym *sym) {
   sym->type        = SYM_INTRIN;
   sym->name.len    = (Ind)strlen(sym->name.buf);
-  sym->clobber     = ASM_VOLATILE_REGS;
+  sym->clobber     = ARCH_VOLATILE_REGS;
   sym->interp_only = true;
 }
 
@@ -142,7 +142,7 @@ static void sym_auto_inlinable(Sym *sym) {
   if (spans->data < spans->ceil) return;
 
   const auto len = spans->epilogue - spans->inner;
-  if (len > ASM_INLINABLE_INSTR_LEN) return;
+  if (len > ARCH_INLINABLE_INSTR_LEN) return;
 
   sym->norm.inlinable = true;
 

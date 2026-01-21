@@ -55,14 +55,16 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     ctx &&
     is_aligned(ctx) &&
     is_aligned(&ctx->sym) &&
-    is_aligned(&ctx->fixup) &&
+    is_aligned(&ctx->asm_fix) &&
+    is_aligned(&ctx->loc_fix) &&
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
     is_aligned(&ctx->loc_regs) &&
     is_aligned(&ctx->vol_regs) &&
     is_aligned(ctx->sym) &&
     (!ctx->sym || sym_valid(ctx->sym)) &&
-    stack_valid((const Stack *)&ctx->fixup) &&
+    stack_valid((const Stack *)&ctx->asm_fix) &&
+    stack_valid((const Stack *)&ctx->loc_fix) &&
     stack_valid((const Stack *)&ctx->locals) &&
     dict_valid((const Dict *)&ctx->local_dict)
   );
@@ -71,8 +73,9 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
 // clang-format on
 
 static Err comp_ctx_deinit(Comp_ctx *ctx) {
+  try(stack_deinit(&ctx->loc_fix));
+  try(stack_deinit(&ctx->asm_fix));
   try(stack_deinit(&ctx->locals));
-  try(stack_deinit(&ctx->fixup));
   dict_deinit(&ctx->local_dict);
   ptr_clear(ctx);
   return nullptr;
@@ -81,19 +84,22 @@ static Err comp_ctx_deinit(Comp_ctx *ctx) {
 static Err comp_ctx_init(Comp_ctx *ctx) {
   ptr_clear(ctx);
   Stack_opt opt = {.len = 1024};
-  try(stack_init(&ctx->fixup, &opt));
   try(stack_init(&ctx->locals, &opt));
+  try(stack_init(&ctx->asm_fix, &opt));
+  try(stack_init(&ctx->loc_fix, &opt));
   return nullptr;
 }
 
 static void comp_ctx_trunc(Comp_ctx *ctx) {
-  stack_trunc(&ctx->fixup);
+  stack_trunc(&ctx->loc_fix);
+  stack_trunc(&ctx->asm_fix);
   stack_trunc(&ctx->locals);
   dict_trunc((Dict *)&ctx->local_dict);
   arr_clear(ctx->loc_regs);
   ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
   ptr_clear(&ctx->sym);
+  ptr_clear(&ctx->mem_locs);
   ptr_clear(&ctx->arg_low);
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->proc_body);
@@ -106,14 +112,14 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
 static Local *local_token(Local *loc) { return loc; }
 
 static void validate_volatile_reg(U8 reg) {
-  aver(bits_has(ASM_VOLATILE_REGS, reg));
+  aver(bits_has(ARCH_VOLATILE_REGS, reg));
 }
 
 static void validate_param_reg(U8 reg) {
-  aver(bits_has(ASM_ALL_PARAM_REGS, reg));
+  aver(bits_has(ARCH_ALL_PARAM_REGS, reg));
 }
 
-static bool is_param_reg(U8 reg) { return bits_has(ASM_ALL_PARAM_REGS, reg); }
+static bool is_param_reg(U8 reg) { return bits_has(ARCH_ALL_PARAM_REGS, reg); }
 
 static Local *comp_local_get_for_reg(Comp *comp, U8 reg) {
   validate_param_reg(reg);
@@ -214,7 +220,7 @@ static Err comp_validate_call_args(Comp *comp, U8 inp_len) {
 static Err comp_validate_ret_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, "ret", sym->out_len);
+  return comp_validate_args(comp, "return", sym->out_len);
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
@@ -231,10 +237,10 @@ static Err err_assign_no_args(const char *name) {
 
 static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
   const auto fix = stack_push(
-    &comp->ctx.fixup,
-    (Comp_fixup){
-      .type      = COMP_FIX_LOC_WRITE,
-      .loc_write = (Local_write){
+    &comp->ctx.loc_fix,
+    (Loc_fixup){
+      .type  = LOC_FIX_WRITE,
+      .write = (Local_write){
         .instr = asm_append_breakpoint(comp, ASM_CODE_LOC_WRITE),
         .prev  = loc->write,
         .loc   = loc,
@@ -242,7 +248,7 @@ static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
       }
     }
   );
-  loc->write = &fix->loc_write;
+  loc->write = &fix->write;
 }
 
 /*
@@ -350,10 +356,10 @@ static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   }
 
   stack_push(
-    &comp->ctx.fixup,
-    (Comp_fixup){
-      .type     = COMP_FIX_LOC_READ,
-      .loc_read = (Local_read){
+    &comp->ctx.loc_fix,
+    (Loc_fixup){
+      .type = LOC_FIX_READ,
+      .read = (Local_read){
         .instr = asm_append_breakpoint(comp, ASM_CODE_LOC_READ),
         .loc   = loc,
         .reg   = reg,
@@ -509,45 +515,26 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-static const char *comp_fixup_fmt(Comp_fixup *fix) {
+static const char *loc_fixup_fmt(Loc_fixup *fix) {
   static thread_local char BUF[4096];
 
   switch (fix->type) {
-    case COMP_FIX_RET: {
-      return sprintbuf(BUF, "{type = ret, instr = %p}", fix->ret);
-    }
-    case COMP_FIX_TRY: {
-      return sprintbuf(BUF, "{type = try, instr = %p}", fix->try);
-    }
-    case COMP_FIX_RECUR: {
-      return sprintbuf(BUF, "{type = recur, instr = %p}", fix->recur);
-    }
-    case COMP_FIX_IMM: {
-      const auto val = &fix->imm;
+    case LOC_FIX_READ: {
+      const auto val = &fix->read;
       return sprintbuf(
         BUF,
-        "{type = imm, instr = %p, reg = %d, num = " FMT_SINT "}",
-        val->instr,
-        val->reg,
-        val->num
-      );
-    }
-    case COMP_FIX_LOC_READ: {
-      const auto val = &fix->loc_read;
-      return sprintbuf(
-        BUF,
-        "{type = loc_read, loc = %s (%p), instr = %p, reg = %d}",
+        "{type = read, loc = %s (%p), instr = %p, reg = %d}",
         val->loc->name.buf,
         val->loc,
         val->instr,
         val->reg
       );
     }
-    case COMP_FIX_LOC_WRITE: {
-      const auto val = &fix->loc_write;
+    case LOC_FIX_WRITE: {
+      const auto val = &fix->write;
       return sprintbuf(
         BUF,
-        "{type = loc_write, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %d}",
+        "{type = write, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %d}",
         val->loc->name.buf,
         val->loc,
         val->instr,

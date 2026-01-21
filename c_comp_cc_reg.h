@@ -100,41 +100,17 @@ typedef struct Local_write {
   bool                confirmed; // If not, turn this into a nop.
 } Local_write;
 
-/*
-Book-keeping for instructions which we can't properly encode
-on the fly when interpreting a colon definition. We reserve
-space in form of invalid instructions, and rewrite them when
-finalizing a word.
-
-Procedure prologue also implicitly undergoes fixup.
-*/
 typedef struct {
   enum {
-    COMP_FIX_RET = 1,
-    COMP_FIX_TRY,
-    COMP_FIX_IMM,
-    COMP_FIX_RECUR,
-    COMP_FIX_LOC_READ,
-    COMP_FIX_LOC_WRITE,
+    LOC_FIX_READ = 1,
+    LOC_FIX_WRITE,
   } type;
 
-  union {
-    Instr *ret;   // b <epilogue>
-    Instr *try;   // cbnz <epilogue>
-    Instr *recur; // b <begin>
+  Local_read  read;
+  Local_write write;
+} Loc_fixup;
 
-    struct {
-      Instr *instr; // Instruction to patch.
-      Sint   num;   // Immediate value to load.
-      U8     reg;   // Register to load into.
-    } imm;
-
-    Local_read  loc_read;
-    Local_write loc_write;
-  };
-} Comp_fixup;
-
-typedef stack_of(Comp_fixup) Comp_fixups;
+typedef stack_of(Loc_fixup) Loc_fixups;
 
 /*
 Transient context used in compilation of a single word.
@@ -152,15 +128,16 @@ compiler imperatively rather than declaratively, by invoking intrinsics.
 They also communicate "out of band" through the data stack.
 */
 typedef struct {
-  Sym        *sym;         // What we're currently compiling.
-  Local_stack locals;      // Includes current word's input params.
-  Local_dict  local_dict;  // So we can find locals by name.
-  Ind         loc_mem_len; // How many locals need stack memory.
-  Local      *loc_regs[ASM_ALL_PARAM_REG_LEN]; // Temp reg-local associations.
+  Sym        *sym;        // What we're currently compiling.
+  Local_stack locals;     // Includes current word's input params.
+  Local_dict  local_dict; // So we can find locals by name.
+  Ind         mem_locs;   // How many locals need stack memory.
+  Local      *loc_regs[ARCH_ALL_PARAM_REG_LEN]; // Temp reg-local associations.
   Bits        vol_regs;   // Volatile registers available for locals.
   U8          arg_low;    // How many args got consumed by assignments.
   U8          arg_len;    // Available args for the next call or assignment.
-  Comp_fixups fixup;      // Used for patching instructions in a post-pass.
+  Asm_fixups  asm_fix;    // Used for patching instructions in a post-pass.
+  Loc_fixups  loc_fix;    // Used for resolving stable locations for locals.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
   bool        proc_body;  // Found a non-immediate word or brace params.

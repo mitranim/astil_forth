@@ -15,10 +15,10 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     ctx &&
     is_aligned(ctx) &&
     is_aligned(&ctx->sym) &&
-    is_aligned(&ctx->fixup) &&
+    is_aligned(&ctx->asm_fix) &&
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
-    stack_valid((const Stack *)&ctx->fixup) &&
+    stack_valid((const Stack *)&ctx->asm_fix) &&
     stack_valid((const Stack *)&ctx->locals) &&
     dict_valid((const Dict *)&ctx->local_dict)
   );
@@ -27,26 +27,28 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
 // clang-format on
 
 static Err comp_ctx_deinit(Comp_ctx *ctx) {
-  try(stack_deinit(&ctx->locals));
-  try(stack_deinit(&ctx->fixup));
+  try(stack_deinit(&ctx->asm_fix));
+  try(stack_deinit(&ctx->asm_fix));
   dict_deinit(&ctx->local_dict);
   ptr_clear(ctx);
   return nullptr;
 }
 
 static Err comp_ctx_init(Comp_ctx *ctx) {
+  ptr_clear(ctx);
   Stack_opt opt = {.len = 1024};
-  try(stack_init(&ctx->fixup, &opt));
+  try(stack_init(&ctx->asm_fix, &opt));
   try(stack_init(&ctx->locals, &opt));
   return nullptr;
 }
 
 static void comp_ctx_trunc(Comp_ctx *ctx) {
-  stack_trunc(&ctx->fixup);
+  stack_trunc(&ctx->asm_fix);
   stack_trunc(&ctx->locals);
   dict_trunc((Dict *)&ctx->local_dict);
 
   ptr_clear(&ctx->sym);
+  ptr_clear(&ctx->mem_locs);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
 }

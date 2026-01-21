@@ -449,7 +449,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
   if (inp_len < 0) {
     return err_str("negative input parameter count");
   }
-  if (inp_len > ASM_INP_PARAM_REG_LEN) {
+  if (inp_len > ARCH_INP_PARAM_REG_LEN) {
     return err_str("too many input parameters");
   }
   if (out_len < 0) {
@@ -467,7 +467,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
       .ext_proc = addr,
       .inp_len  = (U8)inp_len,
       .out_len  = (U8)out_len,
-      .clobber  = ASM_VOLATILE_REGS, // Only used in reg-based call-conv.
+      .clobber  = ARCH_VOLATILE_REGS, // Only used in reg-based call-conv.
     }
   );
 

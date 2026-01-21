@@ -211,6 +211,14 @@ static Err intrin_get_local(Sint buf, Sint len, Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_anon_local(Interp *interp) {
+  const auto comp = &interp->comp;
+  const auto loc  = comp_local_anon(comp);
+  const auto tok  = local_token(loc);
+  try(int_stack_push(&interp->ints, (Sint)tok));
+  return nullptr;
+}
+
 // FIXME use in `f_lang_cc_reg.f` instead of custom asm.
 static Err intrin_comp_local_get(Sint ptr, Interp *interp) {
   const auto comp = &interp->comp;
@@ -283,12 +291,23 @@ static void intrin_debug_ctx(Interp *interp) {
   }
 
   {
-    const auto fixup = &ctx->fixup;
-    const auto len   = stack_len(fixup);
+    const auto coll = &ctx->asm_fix;
+    const auto len  = stack_len(coll);
     if (len) {
-      eprintf("[debug]   fixups (" FMT_SINT "):\n", len);
-      for (stack_range(auto, fix, fixup)) {
-        eprintf("[debug]     %s\n", comp_fixup_fmt(fix));
+      eprintf("[debug]   asm fixups (" FMT_SINT "):\n", len);
+      for (stack_range(auto, val, coll)) {
+        eprintf("[debug]     %s\n", asm_fixup_fmt(val));
+      }
+    }
+  }
+
+  {
+    const auto coll = &ctx->loc_fix;
+    const auto len  = stack_len(coll);
+    if (len) {
+      eprintf("[debug]   local fixups (" FMT_SINT "):\n", len);
+      for (stack_range(auto, val, coll)) {
+        eprintf("[debug]     %s\n", loc_fixup_fmt(val));
       }
     }
   }
