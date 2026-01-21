@@ -82,6 +82,9 @@ static constexpr U8 ASM_REG_LINK = 30;
 // System stack pointer; also treated as a null register by many instructions.
 static constexpr U8 ASM_REG_SP = 31;
 
+// Extremely primitive heuristic.
+static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
+
 #ifdef NATIVE_CALL_ABI
 
 static constexpr U8 ASM_ERR_REG    = 28;

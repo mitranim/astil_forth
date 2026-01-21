@@ -91,6 +91,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->locals);
   dict_trunc((Dict *)&ctx->local_dict);
   arr_clear(ctx->loc_regs);
+  ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
   ptr_clear(&ctx->sym);
   ptr_clear(&ctx->arg_low);
@@ -98,8 +99,6 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->proc_body);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
-
-  ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 }
 
 // Returns a token representing a local which can be given to Forth code.
@@ -168,7 +167,9 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
     if (comp_local_get_for_reg(comp, ind) != loc) continue;
     ctx->loc_regs[ind] = nullptr;
   }
+
   ctx->loc_regs[reg] = loc;
+  loc->stable        = false;
 }
 
 static Err err_arity_mismatch(const char *action, U8 req, U8 ava) {
@@ -283,8 +284,9 @@ static Err comp_clobber_reg(Comp *comp, U8 reg) {
   const auto loc = comp_local_get_for_reg(comp, reg);
   comp_local_reg_del(comp, loc, reg);
 
-  if (!loc || comp_local_has_regs(comp, loc)) return nullptr;
+  if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return nullptr;
   comp_append_local_write(comp, loc, reg);
+  loc->stable = true;
   return nullptr;
 }
 
@@ -453,20 +455,32 @@ static Err comp_after_append_call(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-static Err comp_append_call_norm(Comp *comp, const Sym *callee) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
+static Err comp_append_call_norm(Comp *comp, const Sym *callee, bool *inlined) {
+  IF_DEBUG(aver(callee->type == SYM_NORM));
+
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  asm_append_call_norm(comp, sym, callee);
+
+  if (callee->norm.inlinable) {
+    try(asm_inline_sym(comp, callee));
+    if (inlined) *inlined = true;
+  }
+  else {
+    try(asm_append_call_norm(comp, caller, callee));
+    if (inlined) *inlined = false;
+  }
+
   try(comp_after_append_call(comp, callee));
   return nullptr;
 }
 
 static Err comp_append_call_intrin(Comp *comp, const Sym *callee) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
+  IF_DEBUG(aver(callee->type == SYM_INTRIN));
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  asm_append_call_intrin(comp, sym, callee);
+  asm_append_call_intrin(comp, caller, callee);
   try(comp_after_append_call(comp, callee));
   return nullptr;
 }
@@ -480,10 +494,62 @@ static Err comp_append_load_extern_ptr(Comp *comp, const char *name) {
 }
 
 static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
+  IF_DEBUG(aver(callee->type == SYM_EXT_PROC));
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  asm_append_call_extern(comp, sym, callee);
+  asm_append_call_extern(comp, caller, callee);
   try(comp_after_append_call(comp, callee));
   return nullptr;
+}
+
+static const char *comp_fixup_fmt(Comp_fixup *fix) {
+  static thread_local char BUF[4096];
+
+  switch (fix->type) {
+    case COMP_FIX_RET: {
+      return sprintbuf(BUF, "{type = ret, instr = %p}", fix->ret);
+    }
+    case COMP_FIX_TRY: {
+      return sprintbuf(BUF, "{type = try, instr = %p}", fix->try);
+    }
+    case COMP_FIX_RECUR: {
+      return sprintbuf(BUF, "{type = recur, instr = %p}", fix->recur);
+    }
+    case COMP_FIX_IMM: {
+      const auto val = &fix->imm;
+      return sprintbuf(
+        BUF,
+        "{type = imm, instr = %p, reg = %d, num = " FMT_SINT "}",
+        val->instr,
+        val->reg,
+        val->num
+      );
+    }
+    case COMP_FIX_LOC_READ: {
+      const auto val = &fix->loc_read;
+      return sprintbuf(
+        BUF,
+        "{type = loc_read, loc = %s (%p), instr = %p, reg = %d}",
+        val->loc->name.buf,
+        val->loc,
+        val->instr,
+        val->reg
+      );
+    }
+    case COMP_FIX_LOC_WRITE: {
+      const auto val = &fix->loc_write;
+      return sprintbuf(
+        BUF,
+        "{type = loc_write, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %d}",
+        val->loc->name.buf,
+        val->loc,
+        val->instr,
+        val->reg,
+        val->prev,
+        val->confirmed
+      );
+    }
+    default: unreachable();
+  }
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "./c_arch.c"
 #include "./c_comp.h"
 #include "./c_sym.c"
 #include "./lib/dict.c"
@@ -66,6 +67,12 @@ static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
   const auto ptr  = (Local *)num;
   if (!is_stack_elem(locs, ptr)) return err_local_invalid(ptr);
   if (out) *out = ptr;
+  return nullptr;
+}
+
+static Err comp_inline_sym(Comp *comp, const Sym *callee) {
+  try(comp_require_current_sym(comp, nullptr));
+  try(asm_inline_sym(comp, callee));
   return nullptr;
 }
 
@@ -274,30 +281,18 @@ static Ind comp_register_dysym(Comp *comp, const char *name, U64 addr) {
   return got_ind;
 }
 
-static Err err_inline_not_defining() {
-  return err_str("unsupported use of \"inline\" outside a colon definition");
-}
-
-static Err comp_inline_sym(Comp *comp, Sym *sym) {
-  if (!comp->ctx.sym) return err_inline_not_defining();
-  return asm_inline_sym(comp, sym);
-}
-
 static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   sym_auto_comp_only(caller, callee);
   sym_auto_interp_only(caller, callee);
-
-  if (callee->norm.inlinable) return comp_inline_sym(comp, callee);
-
-  set_add(&caller->callees, callee);
-  set_add(&callee->callers, caller);
   sym_auto_throws(caller, callee);
+
+  bool inlined = false;
 
   switch (callee->type) {
     case SYM_NORM: {
-      try(comp_append_call_norm(comp, callee));
+      try(comp_append_call_norm(comp, callee, &inlined));
       break;
     }
     case SYM_INTRIN: {
@@ -313,6 +308,11 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
       break;
     }
     default: unreachable();
+  }
+
+  if (!inlined) {
+    set_add(&caller->callees, callee);
+    set_add(&callee->callers, caller);
   }
 
   IF_DEBUG(eprintf(

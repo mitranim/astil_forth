@@ -12,6 +12,7 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_COMP_CLOBBER_BARRIER, // comp_clobber_barrier
   INTRIN_COMP_LOCAL_GET,       // comp_local_get
   INTRIN_COMP_LOCAL_SET,       // comp_local_set
+  INTRIN_DEBUG_CTX,            // debug_ctx
 
   // Shared.
   INTRIN_COLON,           // :

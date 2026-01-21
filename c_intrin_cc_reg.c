@@ -1,5 +1,6 @@
 #pragma once
 #include "./c_interp_internal.c"
+#include "lib/fmt.h"
 
 static Err interp_brace_assignment(Interp *interp) {
   const auto read = interp->reader;
@@ -228,6 +229,73 @@ static Err intrin_comp_local_set(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
+static void intrin_debug_ctx(Interp *interp) {
+  const auto ctx     = &interp->comp.ctx;
+  const auto locs    = &ctx->locals;
+  const auto sym     = ctx->sym;
+  const auto name    = sym ? sym->name.buf : nullptr;
+  const auto inp_len = sym ? sym->inp_len : 0;
+  const auto out_len = sym ? sym->out_len : 0;
+  const auto loc_len = stack_len(locs);
+
+  eprintf(
+    "[debug] compilation context:\n"
+    "[debug]   current word:      " FMT_QUOTED
+    " at %p\n"
+    "[debug]   input param count:  %d\n"
+    "[debug]   output param count: %d\n"
+    "[debug]   arguments total:    %d\n"
+    "[debug]   arguments consumed: %d\n",
+    name,
+    sym,
+    inp_len,
+    out_len,
+    ctx->arg_len,
+    ctx->arg_low
+  );
+
+  if (loc_len) {
+    eprintf("[debug]   locals (" FMT_SINT "):", loc_len);
+    for (stack_range(auto, loc, locs)) {
+      eprintf(" %s", loc->name.buf);
+    }
+    fputc('\n', stderr);
+  }
+
+  {
+    const auto arr = ctx->loc_regs;
+    const auto cap = arr_cap(ctx->loc_regs);
+    U8         len = 0;
+
+    for (U8 ind = 0; ind < cap; ind++) {
+      if (arr[ind]) len++;
+    }
+
+    if (len) {
+      eprintf("[debug]   locals in param registers (%d):\n", len);
+
+      for (U8 ind = 0; ind < cap; ind++) {
+        const auto loc = arr[ind];
+        if (!loc) continue;
+        eprintf("[debug]     %d -- %s\n", ind, loc->name.buf);
+      }
+    }
+  }
+
+  {
+    const auto fixup = &ctx->fixup;
+    const auto len   = stack_len(fixup);
+    if (len) {
+      eprintf("[debug]   fixups (" FMT_SINT "):\n", len);
+      for (stack_range(auto, fix, fixup)) {
+        eprintf("[debug]     %s\n", comp_fixup_fmt(fix));
+      }
+    }
+  }
+
+  IF_DEBUG(repr_struct(ctx));
+}
+
 /*
 Control constructs such as counted loops must use this to emit a barrier AFTER
 initializing their own locals or otherwise using the available arguments.
@@ -296,5 +364,12 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
   .name.buf  = "comp_local_set",
   .intrin    = (void *)intrin_comp_local_set,
   .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_DEBUG_CTX = (Sym){
+  .name.buf  = "#debug_ctx",
+  .intrin    = (void *)intrin_debug_ctx,
+  .immediate = true,
   .comp_only = true,
 };

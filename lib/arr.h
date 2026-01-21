@@ -32,7 +32,7 @@ and `src` may be any value that fits within the capacity.
   })
 
 // Examples: https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2299.htm
-#define arr_clear(arr) memcpy(arr, (typeof(arr)){}, arr_cap(arr));
+#define arr_clear(arr) memcpy(arr, (typeof(arr)){}, sizeof(arr));
 
 #define is_ptr_or_arr(val) (__builtin_classify_type(val) == 5)
 

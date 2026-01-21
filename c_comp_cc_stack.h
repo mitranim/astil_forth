@@ -35,7 +35,7 @@ typedef struct {
 
     struct {
       Instr *instr; // Instruction to patch.
-      Uint   num;   // Immediate value to load.
+      Sint   num;   // Immediate value to load.
       U8     reg;   // Register to load into.
     } imm;
   };

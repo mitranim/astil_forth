@@ -57,12 +57,17 @@ need for IR and multiple passes. The next "read" operation for this
 local confirms every preceding unconfirmed "write". Every confirmed
 "write" is later rewritten with a `mov` or `str` instruction.
 
-Locals evicted to memory are stored at unique FP offsets.
-The offset is derived from each local's index in the list.
+When a local runs out of temp registers and we emit a "write" operation,
+the local is considered "stable" until the next "set". Its location now
+holds an up-to-date value, and can be repeatedly "read" from. The local
+may now be repeatedly associated and disassociated with temp registers,
+without "running out" and creating new "write" operations. However, the
+next "set" operation invalidates this state.
 */
 typedef struct {
   Word_str     name;
-  Local_write *write; // Latest unconfirmed "write"; confirmed by "reads".
+  Local_write *write;  // Latest unconfirmed "write"; confirmed by "reads".
+  bool         stable; // Has up-to-date value in assigned stable location.
 
   // Final stable location used for writes and reads.
   // Locals which are never "read" are not considered.
@@ -120,7 +125,7 @@ typedef struct {
 
     struct {
       Instr *instr; // Instruction to patch.
-      Uint   num;   // Immediate value to load.
+      Sint   num;   // Immediate value to load.
       U8     reg;   // Register to load into.
     } imm;
 

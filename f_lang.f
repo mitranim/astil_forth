@@ -14,26 +14,27 @@
 : unreachable abort ;
 : nop ;
 
-: ASM_INSTR_SIZE 4      ;
-: ASM_REG_DAT_SP 27     ;
-: ASM_REG_FP     29     ;
-: ASM_REG_SP     31     ;
-: ASM_EQ         0b0000 ;
-: ASM_NE         0b0001 ;
-: ASM_CS         0b0010 ;
-: ASM_CC         0b0011 ;
-: ASM_MI         0b0100 ;
-: ASM_PL         0b0101 ;
-: ASM_VS         0b0110 ;
-: ASM_VC         0b0111 ;
-: ASM_HI         0b1000 ;
-: ASM_LS         0b1001 ;
-: ASM_GE         0b1010 ;
-: ASM_LT         0b1011 ;
-: ASM_GT         0b1100 ;
-: ASM_LE         0b1101 ;
-: ASM_AL         0b1110 ;
-: ASM_NV         0b1111 ;
+: ASM_INSTR_SIZE  4      ;
+: ASM_REG_DAT_SP  27     ;
+: ASM_REG_FP      29     ;
+: ASM_REG_SP      31     ;
+: ASM_EQ          0b0000 ;
+: ASM_NE          0b0001 ;
+: ASM_CS          0b0010 ;
+: ASM_CC          0b0011 ;
+: ASM_MI          0b0100 ;
+: ASM_PL          0b0101 ;
+: ASM_VS          0b0110 ;
+: ASM_VC          0b0111 ;
+: ASM_HI          0b1000 ;
+: ASM_LS          0b1001 ;
+: ASM_GE          0b1010 ;
+: ASM_LT          0b1011 ;
+: ASM_GT          0b1100 ;
+: ASM_LE          0b1101 ;
+: ASM_AL          0b1110 ;
+: ASM_NV          0b1111 ;
+: ASM_PLACEHOLDER 666    ; \ udf 666; used in retropatching.
 
 : asm_pop_x1_x2
   \ ldp x1, x2, [x27, -16]!
@@ -478,9 +479,6 @@
 
 \ svc 666
 : asm_svc 0b110_101_00_000_0000001010011010_000_01 ;
-
-\ Instruction `udf 666` used for retropatching.
-: ASM_PLACEHOLDER 666 ;
 
 \ Non-immediate replacement for `literal`.
 : comp_push ( C: num -- ) ( E: -- num )

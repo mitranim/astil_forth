@@ -659,7 +659,7 @@ static void asm_fixup_load(Comp *comp, const Comp_fixup *fix, Sym *sym) {
   IF_DEBUG(aver(*pci == asm_instr_breakpoint(ASM_CODE_IMM)));
 
   Instr opc;
-  if ((Uint)imm32 == num) {
+  if ((Uint)imm32 == (Uint)num) {
     opc = 0b00; // ldr <Wt>, <off>
     asm_append_instr(comp, imm32);
   }
@@ -883,7 +883,7 @@ static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) 
     (Comp_fixup){
       .type      = COMP_FIX_IMM,
       .imm.instr = asm_append_breakpoint(comp, ASM_CODE_IMM),
-      .imm.num   = (Uint)src,
+      .imm.num   = src,
       .imm.reg   = reg,
     }
   );
@@ -907,7 +907,9 @@ static void asm_append_try(Comp *comp) {
   );
 }
 
-static void asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
+static Err asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
+  try(comp_code_ensure_sym_ready(&comp->code, callee));
+
   const auto code   = &comp->code;
   const auto fun    = comp_sym_exec_instr(comp, callee);
   const auto pc_off = fun - comp_code_next_prog_counter(code);
@@ -926,6 +928,7 @@ static void asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
     fun,
     pc_off
   ));
+  return nullptr;
 }
 
 static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {

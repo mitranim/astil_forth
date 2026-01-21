@@ -142,10 +142,7 @@ static void sym_auto_inlinable(Sym *sym) {
   if (spans->data < spans->ceil) return;
 
   const auto len = spans->epilogue - spans->inner;
-
-  // Inlining more than 1 instruction can be situationally worse.
-  // TODO: this is arch-specific; move to assembler file.
-  if (len > 1) return;
+  if (len > ASM_INLINABLE_INSTR_LEN) return;
 
   sym->norm.inlinable = true;
 

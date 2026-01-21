@@ -71,25 +71,36 @@ static Err comp_append_local_set(Comp *comp, Local *loc) {
   return nullptr;
 }
 
-static Err comp_call_intrin(Interp *interp, const Sym *sym) {
-  aver(sym->type == SYM_INTRIN);
+static Err comp_call_intrin(Interp *interp, const Sym *callee) {
+  IF_DEBUG(aver(callee->type == SYM_INTRIN));
   typedef Err(Fun)(Interp *);
-  const auto fun = (Fun *)sym->intrin;
+  const auto fun = (Fun *)callee->intrin;
   const auto err = fun(interp);
-  return sym->throws ? err : nullptr;
+  return callee->throws ? err : nullptr;
 }
 
-static Err comp_append_call_norm(Comp *comp, const Sym *callee) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
-  asm_append_call_norm(comp, sym, callee);
+static Err comp_append_call_norm(Comp *comp, const Sym *callee, bool *inlined) {
+  IF_DEBUG(aver(callee->type == SYM_NORM));
+
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
+
+  if (callee->norm.inlinable) {
+    try(comp_inline_sym(comp, callee));
+    if (inlined) *inlined = true;
+  }
+  else {
+    try(asm_append_call_norm(comp, caller, callee));
+    if (inlined) *inlined = false;
+  }
   return nullptr;
 }
 
 static Err comp_append_call_intrin(Comp *comp, const Sym *callee) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
-  asm_append_call_intrin(comp, sym, callee);
+  IF_DEBUG(aver(callee->type == SYM_INTRIN));
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
+  asm_append_call_intrin(comp, caller, callee);
   return nullptr;
 }
 
@@ -99,8 +110,9 @@ static Err comp_append_load_extern_ptr(Comp *comp, const char *name) {
 }
 
 static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
-  asm_append_call_extern(comp, sym, callee);
+  IF_DEBUG(aver(callee->type == SYM_EXT_PROC));
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
+  asm_append_call_extern(comp, caller, callee);
   return nullptr;
 }
