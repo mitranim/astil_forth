@@ -170,6 +170,7 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
 
   ctx->loc_regs[reg] = loc;
   loc->stable        = false;
+  if (loc->write && !loc->write->confirmed) loc->write = nullptr;
 }
 
 static Err err_arity_mismatch(const char *action, U8 req, U8 ava) {
@@ -261,6 +262,11 @@ static Err comp_append_local_set(Comp *comp, Local *loc) {
   // Failure in this assertion implies an unhandled clobber.
   aver(!comp_local_has_reg(comp, loc, reg));
   comp_local_reg_reset(comp, loc, reg);
+
+  if (ctx->arg_len == ctx->arg_low) {
+    ctx->arg_len = 0;
+    ctx->arg_low = 0;
+  }
   return nullptr;
 }
 

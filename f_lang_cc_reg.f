@@ -76,18 +76,18 @@
 : low_bits { len -- bits } len 1 lsl dec ;
 : bit_trunc { imm len -- imm } len low_bits imm and ;
 
-\ \ Shared by a lot of load and store instructions. 64-bit only.
-\ : asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 base_instr -- instr }
-\   Xt2                    10 lsl { Xt2 }
-\   Xn                      5 lsl { Xn }
-\   imm7 3 lsr 7 bit_trunc 15 lsl { imm7 }
-\
-\   base_instr
-\   Xt1  or
-\   Xt2  or
-\   Xn   or
-\   imm7 or
-\ ;
+\ Shared by a lot of load and store instructions. 64-bit only.
+: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 base_instr -- instr }
+  Xt2                    10 lsl { Xt2 }
+  Xn                      5 lsl { Xn }
+  imm7 3 lsr 7 bit_trunc 15 lsl { imm7 }
+
+  base_instr
+  Xt1  or
+  Xt2  or
+  Xn   or
+  imm7 or
+;
 
 \ 6 1 extern: mmap
 \ 3 1 extern: mprotect
