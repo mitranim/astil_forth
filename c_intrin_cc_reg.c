@@ -1,11 +1,78 @@
 #pragma once
+#include "./c_interp_internal.c"
 
-#ifdef CLANGD
-#include "./c_intrin.c"
-#endif // CLANGD
+static Err interp_brace_assignment(Interp *interp) {
+  const auto read = interp->reader;
+  const auto comp = &interp->comp;
+
+  for (;;) {
+    try(read_word(read));
+    const auto word = read->word;
+
+    if (str_eq(&word, "}")) return nullptr;
+    if (str_eq(&word, "--")) break;
+
+    Local *loc;
+    try(comp_local_get_or_make(comp, word, &loc));
+    try(comp_append_local_set(comp, loc));
+  }
+
+  // Treat the remaining arguments as consumed, and the remaining words after
+  // `--` as comments. This allows to use `--` to discard unused values, and
+  // makes it syntactically consistent with parameter lists.
+  comp->ctx.arg_low = comp->ctx.arg_len = 0;
+  for (;;) {
+    try(read_word(read));
+    if (str_eq(&read->word, "}")) return nullptr;
+  }
+  return nullptr;
+}
+
+static Err interp_brace_params(Interp *interp) {
+  const auto read     = interp->reader;
+  const auto comp     = &interp->comp;
+  comp->ctx.proc_body = true;
+
+  for (;;) {
+    try(read_word(read));
+    const auto word = read->word;
+    if (str_eq(&word, "}")) return nullptr;
+    if (str_eq(&word, "--")) break;
+    try(comp_add_input_param(comp, word));
+  }
+
+  for (;;) {
+    try(read_word(read));
+    const auto word = read->word;
+    if (str_eq(&word, "}")) return nullptr;
+    try(comp_add_output_param(comp, word));
+  }
+  return nullptr;
+}
+
+static Err intrin_brace(Interp *interp) {
+  const auto comp = &interp->comp;
+  if (!comp->ctx.proc_body) return interp_brace_params(interp);
+  return interp_brace_assignment(interp);
+}
+
+static Err intrin_ret(Interp *interp) {
+  const auto comp = &interp->comp;
+  try(comp_validate_ret_args(comp));
+  try(comp_append_ret(comp));
+  return nullptr;
+}
+
+static Err intrin_recur(Interp *interp) {
+  const auto comp = &interp->comp;
+  try(comp_validate_recur_args(comp));
+  try(comp_append_recur(comp));
+  return nullptr;
+}
 
 static Err intrin_comp_instr(Instr instr, Interp *interp) {
-  return asm_append_instr(&interp->comp, instr);
+  asm_append_instr(&interp->comp, instr);
+  return nullptr;
 }
 
 static Err intrin_comp_load(Sint reg, Sint imm, Interp *interp) {
@@ -33,7 +100,7 @@ static Err interp_validate_buf_ptr(Sint val) {
   addresses which are "decently large".
   */
   if (val > (1 << 14)) return nullptr;
-  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)ptr);
+  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
 }
 
 static Err interp_validate_buf_len(Sint val) {
@@ -116,11 +183,30 @@ static Err intrin_execute(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
-// FIXME: probably need `Local*` instead of FP offset.
+static Err intrin_comp_next_inp_reg(Interp *interp) {
+  U8 reg;
+  try(comp_next_valid_arg_reg(&interp->comp, &reg));
+  try(int_stack_push(&interp->ints, reg));
+  return nullptr;
+}
+
+static Err intrin_comp_next_out_reg(Interp *interp) {
+  // Warning: would need adjustment for the x64 arch.
+  // See the comments in `./c_comp_cc_reg.c`.
+  U8 reg;
+  try(comp_next_valid_arg_reg(&interp->comp, &reg));
+  try(int_stack_push(&interp->ints, reg));
+  return nullptr;
+}
+
 static Err intrin_get_local(Sint buf, Sint len, Interp *interp) {
+  Local *loc;
   try(interp_validate_buf_ptr(buf));
   try(interp_validate_buf_len(len));
-  try(interp_get_local(interp, (const char *)buf, (Ind)len));
+  try(interp_get_local(interp, (const char *)buf, (Ind)len, &loc));
+
+  const auto tok = local_token(loc);
+  try(int_stack_push(&interp->ints, (Sint)tok));
   return nullptr;
 }
 
@@ -134,7 +220,7 @@ static Err intrin_comp_local_get(Sint ptr, Interp *interp) {
 }
 
 // FIXME use in `f_lang_cc_reg.f` instead of custom asm.
-static Err intrin_comp_local_set(Interp *interp) {
+static Err intrin_comp_local_set(Sint ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
   try(comp_validate_local(comp, ptr, &loc));
@@ -142,38 +228,73 @@ static Err intrin_comp_local_set(Interp *interp) {
   return nullptr;
 }
 
-static constexpr auto INTRIN_COMP_LOCAL_GET = (Sym){
-  .type        = SYM_INTRIN,
-  .name.buf    = "comp_local_get",
-  .intrin      = (void *)intrin_comp_local_get,
-  .throws      = true,
-  .comp_only   = true,
-  .interp_only = true,
+/*
+Control constructs such as counted loops must use this to emit a barrier AFTER
+initializing their own locals or otherwise using the available arguments.
+
+  #if ->
+    use x0 for condition check
+    emit clobber barrier
+    <body>
+
+  +loop: ->
+    create locals; use "set" with x0 x1 x2
+    emit clobber barrier
+    begin loop
+    use "get" with locals
+*/
+static Err intrin_comp_clobber_barrier(Interp *interp) {
+  const auto comp = &interp->comp;
+  for (U8 reg = 0; reg < arr_cap(comp->ctx.loc_regs); reg++) {
+    try(comp_clobber_reg(comp, reg));
+  }
+  return nullptr;
+}
+
+// The "missing" fields are set in `sym_init_intrin`.
+
+static constexpr USED auto INTRIN_BRACE = (Sym){
+  .name.buf  = "{",
+  .intrin    = (void *)intrin_brace,
+  .throws    = true,
+  .immediate = true,
+  .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_LOCAL_SET = (Sym){
-  .type        = SYM_INTRIN,
-  .name.buf    = "comp_local_set",
-  .intrin      = (void *)intrin_comp_local_set,
-  .throws      = true,
-  .comp_only   = true,
-  .interp_only = true,
+static constexpr USED auto INTRIN_COMP_NEXT_INP_REG = (Sym){
+  .name.buf  = "comp_next_inp_reg",
+  .intrin    = (void *)intrin_comp_next_inp_reg,
+  .out_len   = 1,
+  .throws    = true,
+  .comp_only = true,
 };
 
-static constexpr Sym USED INTRIN[] = {
-  INTRIN_COLON,           INTRIN_SEMICOLON,     INTRIN_BRACKET_BEG,
-  INTRIN_BRACKET_END,     INTRIN_IMMEDIATE,     INTRIN_COMP_ONLY,
-  INTRIN_NOT_COMP_ONLY,   INTRIN_INLINE,        INTRIN_THROWS,
-  INTRIN_REDEFINE,        INTRIN_HERE,          INTRIN_COMP_INSTR,
-  INTRIN_COMP_LOAD,       INTRIN_COMP_CONST,    INTRIN_COMP_STATIC,
-  INTRIN_COMP_CALL,       INTRIN_QUIT,          INTRIN_RET,
-  INTRIN_RECUR,           INTRIN_CHAR,          INTRIN_PARSE,
-  INTRIN_PARSE_WORD,      INTRIN_IMPORT,        INTRIN_IMPORT_QUOTE,
-  INTRIN_IMPORT_TICK,     INTRIN_EXTERN_PTR,    INTRIN_EXTERN_PROC,
-  INTRIN_FIND_WORD,       INTRIN_INLINE_WORD,   INTRIN_EXECUTE,
-  INTRIN_GET_LOCAL,       INTRIN_ANON_LOCAL,    INTRIN_COMP_LOCAL_GET,
-  INTRIN_COMP_LOCAL_SET,  INTRIN_DEBUG_FLUSH,   INTRIN_DEBUG_THROW,
-  INTRIN_DEBUG_STACK_LEN, INTRIN_DEBUG_STACK,   INTRIN_DEBUG_DEPTH,
-  INTRIN_DEBUG_TOP_INT,   INTRIN_DEBUG_TOP_PTR, INTRIN_DEBUG_TOP_STR,
-  INTRIN_DEBUG_MEM,       INTRIN_DEBUG_WORD,    INTRIN_DEBUG_SYNC_CODE,
+static constexpr USED auto INTRIN_COMP_NEXT_OUT_REG = (Sym){
+  .name.buf  = "comp_next_out_reg",
+  .intrin    = (void *)intrin_comp_next_out_reg,
+  .out_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_CLOBBER_BARRIER = (Sym){
+  .name.buf  = "comp_clobber_barrier",
+  .intrin    = (void *)intrin_comp_clobber_barrier,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_LOCAL_GET = (Sym){
+  .name.buf  = "comp_local_get",
+  .intrin    = (void *)intrin_comp_local_get,
+  .inp_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
+  .name.buf  = "comp_local_set",
+  .intrin    = (void *)intrin_comp_local_set,
+  .throws    = true,
+  .comp_only = true,
 };

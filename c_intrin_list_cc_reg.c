@@ -5,6 +5,15 @@
 #endif
 
 static constexpr USED Sym INTRIN[] = {
+  // Specific to this CC.
+  INTRIN_BRACE,                // {
+  INTRIN_COMP_NEXT_INP_REG,    // comp_next_inp_reg
+  INTRIN_COMP_NEXT_OUT_REG,    // comp_next_out_reg
+  INTRIN_COMP_CLOBBER_BARRIER, // comp_clobber_barrier
+  INTRIN_COMP_LOCAL_GET,       // comp_local_get
+  INTRIN_COMP_LOCAL_SET,       // comp_local_set
+
+  // Shared.
   INTRIN_COLON,           // :
   INTRIN_SEMICOLON,       // ;
   INTRIN_BRACKET_BEG,     // [

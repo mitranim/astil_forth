@@ -3,9 +3,10 @@ CLEAR ?= $(if $(filter false,$(clear)),, )
 CC ?= clang
 PROD ?=
 STRICT ?=
-DEBUG_FLAGS_0 ?= -O0 -g3 -fsanitize=undefined,address,integer,nullability -fstack-protector
-DEBUG_FLAGS_1 ?= -O2 -g3 -Wno-unused-parameter -Wno-unused-variable
-DEBUG_FLAGS ?= $(if $(DEBUG),$(DEBUG_FLAGS_0),$(DEBUG_FLAGS_1))
+DEBUG_FLAGS_0 ?= -g3 -O0 -fsanitize=undefined,address,integer,nullability -fstack-protector
+DEBUG_FLAGS_1 ?= -g3 -Wno-unused-parameter -Wno-unused-variable
+DEBUG_FLAGS_PROD ?= -g3 -O2 -Wno-unused-parameter -Wno-unused-variable
+DEBUG_FLAGS ?= $(if $(DEBUG),$(DEBUG_FLAGS_0),$(if $(PROD),$(DEBUG_FLAGS_PROD),$(DEBUG_FLAGS_1)))
 CRASH_FLAGS ?= $(and $(FAST_CRASH),-DFAST_CRASH)
 STRICT_FLAGS ?= $(and $(STRICT),-Werror)
 COMPILE_FLAGS ?= $(shell printf ' %s' $$(cat compile_flags.txt))

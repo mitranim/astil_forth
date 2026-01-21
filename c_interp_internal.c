@@ -102,6 +102,26 @@ static Err err_sym_comp_only(const char *name) {
   );
 }
 
+static Err interp_call_norm(Interp *interp, const Sym *sym) {
+  try(comp_code_ensure_sym_ready(&interp->comp.code, sym));
+  const auto fun = comp_sym_exec_instr(&interp->comp, sym);
+
+  IF_DEBUG(eprintf(
+    "[system] calling word " FMT_QUOTED
+    " at instruction address %p (" READ_POS_FMT ")\n",
+    sym->name.buf,
+    fun,
+    READ_POS_ARGS(interp->reader)
+  ));
+
+  const auto err = arch_call_norm(interp, sym);
+
+  IF_DEBUG(eprintf(
+    "[system] done called word " FMT_QUOTED "; error: %p\n", sym->name.buf, err
+  ));
+  return err;
+}
+
 static Err interp_call_intrin(Interp *interp, const Sym *sym) {
   IF_DEBUG(eprintf(
     "[system] calling intrinsic word " FMT_QUOTED
@@ -115,7 +135,7 @@ static Err interp_call_intrin(Interp *interp, const Sym *sym) {
 
   IF_DEBUG(eprintf(
     "[system] done called intrinsic word " FMT_QUOTED
-    "; stack pointer after call: %p; err after call: %s\n",
+    "; stack pointer after call: %p; error: %s\n",
     sym->name.buf,
     interp->ints.top,
     err
@@ -123,7 +143,25 @@ static Err interp_call_intrin(Interp *interp, const Sym *sym) {
   return err;
 }
 
-Err interp_call_sym(Interp *interp, const Sym *sym) {
+static Err interp_call_extern(Interp *interp, const Sym *sym) {
+  IF_DEBUG(eprintf(
+    "[system] calling external procedure " FMT_QUOTED
+    " at address %p; inp_len: %d; out_len: %d\n",
+    sym->name.buf,
+    sym->ext_proc,
+    sym->inp_len,
+    sym->out_len
+  ));
+
+  const auto err = arch_call_extern(&interp->ints, sym);
+
+  IF_DEBUG(eprintf(
+    "[system] done called extern procedure " FMT_QUOTED "\n", sym->name.buf
+  ));
+  return err;
+}
+
+static Err interp_call_sym(Interp *interp, const Sym *sym) {
   const auto comp = &interp->comp;
 
   if (sym->comp_only && !comp->ctx.sym) {
@@ -131,39 +169,16 @@ Err interp_call_sym(Interp *interp, const Sym *sym) {
   }
 
   switch (sym->type) {
-    case SYM_NORM: {
-      IF_DEBUG(eprintf(
-        "[system] calling word " FMT_QUOTED
-        " at instruction address %p (" READ_POS_FMT ")\n",
-        sym->name.buf,
-        sym->norm.exec.floor,
-        READ_POS_ARGS(interp->reader)
-      ));
-
-      const auto err = interp_call_norm(interp, sym);
-
-      IF_DEBUG(eprintf(
-        "[system] done called word " FMT_QUOTED "; error: %p\n", sym->name.buf, err
-      ));
-      return err;
-    }
-
-    case SYM_INTRIN: {
-      return interp_call_intrin(interp, sym);
-    }
-
-    case SYM_EXT_PTR: {
-      stack_push(&interp->ints, (Sint)sym->ext_ptr);
-      return nullptr;
-    }
-
-    case SYM_EXT_PROC: {
-      try(asm_call_extern_proc(&interp->ints, sym));
-      return nullptr;
-    }
-
-    default: unreachable();
+    case SYM_NORM:     return interp_call_norm(interp, sym);
+    case SYM_INTRIN:   return interp_call_intrin(interp, sym);
+    case SYM_EXT_PTR:  return int_stack_push(&interp->ints, (Sint)sym->ext_ptr);
+    case SYM_EXT_PROC: return interp_call_extern(interp, sym);
+    default:           unreachable();
   }
+}
+
+static Err interp_require_current_sym(const Interp *interp, Sym **out) {
+  return comp_require_current_sym(&interp->comp, out);
 }
 
 static Err err_undefined_word(const char *name) {
@@ -300,7 +315,7 @@ static Err interp_import_inner(
 }
 
 // There better not be a `longjmp` over this.
-Err interp_import(Interp *interp, const char *path) {
+static Err interp_import(Interp *interp, const char *path) {
   const auto prev      = interp->reader;
   const auto prev_path = prev ? prev->file_path.buf : nullptr;
   Reader     next      = {};
@@ -327,10 +342,6 @@ static Err interp_read_word(Interp *interp) {
 static Err interp_read_sym(Interp *interp, Sym **out) {
   try(interp_read_word(interp));
   return interp_require_sym(interp, interp->reader->word.buf, out);
-}
-
-static Err interp_require_current_sym(const Interp *interp, Sym **out) {
-  return comp_require_current_sym(&interp->comp, out);
 }
 
 /*
@@ -435,10 +446,18 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
   void *addr;
   try(interp_read_extern(interp, &addr));
 
-  if (inp_len < 0) return err_str("negative input parameter count");
-  if (inp_len > ASM_PARAM_REG_LEN) return err_str("too many input parameters");
-  if (out_len < 0) return err_str("negative output parameter count");
-  if (out_len > 1) return err_str("too many output parameters");
+  if (inp_len < 0) {
+    return err_str("negative input parameter count");
+  }
+  if (inp_len > ASM_INP_PARAM_REG_LEN) {
+    return err_str("too many input parameters");
+  }
+  if (out_len < 0) {
+    return err_str("negative output parameter count");
+  }
+  if (out_len > 1) {
+    return err_str("too many output parameters");
+  }
 
   const auto sym = stack_push(
     &interp->syms,
@@ -448,6 +467,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
       .ext_proc = addr,
       .inp_len  = (U8)inp_len,
       .out_len  = (U8)out_len,
+      .clobber  = ASM_VOLATILE_REGS, // Only used in reg-based call-conv.
     }
   );
 
@@ -470,25 +490,15 @@ static Err interp_find_word(Interp *interp, const char *name, Ind len) {
   return nullptr;
 }
 
-static Err err_word_len_mismatch(Word_str word, Ind len) {
-  return errf(
-    "length mismatch for " FMT_QUOTED ": " FMT_IND " vs " FMT_IND,
-    word.buf,
-    word.len,
-    len
-  );
-}
-
-static Err interp_get_local(Interp *interp, const char *buf, Ind len) {
-  Word_str name = {};
-  try(str_copy(&name, buf));
-  if (name.len != len) return err_word_len_mismatch(name, len);
-
+static Err interp_get_local(
+  Interp *interp, const char *buf, Ind len, Local **out
+) {
   const auto comp = &interp->comp;
+  Word_str   name = {};
   Local     *loc;
-  try(comp_local_get_or_make(comp, name, &loc));
 
-  const auto off = local_fp_off(comp_local_ind(comp, loc));
-  try(int_stack_push(&interp->ints, off));
+  try(valid_word(buf, len, &name));
+  try(comp_local_get_or_make(comp, name, &loc));
+  if (out) *out = loc;
   return nullptr;
 }

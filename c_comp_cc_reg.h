@@ -1,9 +1,8 @@
 #pragma once
-#include "./c_asm.h"
+#include "./c_arch.h"
 #include "./c_sym.h"
 #include "./lib/bits.h"
 #include "./lib/dict.h"
-#include "./lib/list.h"
 #include "./lib/num.h"
 #include "./lib/str.h"
 
@@ -13,10 +12,10 @@ typedef struct Local_write Local_write;
 Book-keeping structure describing a local variable.
 
 Operations on locals, synopsis:
-- "get"   -- `mov` from a known temp register; fall back on a "read"
+- "get"   -- mov from a known temp register; fall back on a "read"
 - "set"   -- reset to given temp register
-- "read"  -- `mov` or `ldr` from the stable location; confirm a prior "write"
-- "write" -- `mov` or `str` from temp register to stable location
+- "read"  -- mov or load from the stable location; confirm a prior "write"
+- "write" -- mov or store from temp register to stable location
 
 When locals are "set" or "got", they're associated with "temp" registers.
 The association is invalidated by clobbers, which occur for two reasons:
@@ -64,15 +63,19 @@ The offset is derived from each local's index in the list.
 typedef struct {
   Word_str     name;
   Local_write *write; // Latest unconfirmed "write"; confirmed by "reads".
-  U8           reg;   // For `type == LOC_PL_REG`; otherwise unused.
 
   // Final stable location used for writes and reads.
   // Locals which are never "read" are not considered.
   enum {
-    LOC_PL_UNKNOWN,
-    LOC_PL_REG, // Uses `.reg`.
-    LOC_PL_MEM, // Uses FP offset derived from `.ind`.
+    LOC_UNKNOWN,
+    LOC_REG,
+    LOC_MEM,
   } location;
+
+  union {
+    U8  reg; // For `LOC_REG` only.
+    Ind mem; // For `LOC_MEM` only; 1-indexed position of FP offset.
+  };
 } Local;
 
 typedef stack_of(Local)  Local_stack;
@@ -86,8 +89,8 @@ typedef struct {
 
 typedef struct Local_write {
   Local              *loc;
-  struct Local_write *prev;      // Prior "write" for chain-confirming.
   Instr              *instr;     // Retropatched with mov or store.
+  struct Local_write *prev;      // Prior "write" for chain-confirming.
   U8                  reg;       // Reg is known; location is unknown.
   bool                confirmed; // If not, turn this into a nop.
 } Local_write;
@@ -126,18 +129,12 @@ typedef struct {
   };
 } Comp_fixup;
 
-// Uses a stack for stable pointers between fixups.
 typedef stack_of(Comp_fixup) Comp_fixups;
 
 /*
 Transient context used in compilation of a single word.
 
 Internal notes.
-
-`.clobber` is accumulated across the entire procedure body.
-We can't use these registers as stable locations for locals.
-This is a dirty but ultra simple way of avoiding data flow
-analysis and IR.
 
 `.inited` controls the mode of `{`. When false, `{` declares parameters.
 When true, `{` assigns locals. Set to `true` upon encountering the first
@@ -150,13 +147,14 @@ compiler imperatively rather than declaratively, by invoking intrinsics.
 They also communicate "out of band" through the data stack.
 */
 typedef struct {
-  Sym        *defining;   // What we're currently compiling.
-  Local_stack locals;     // Includes current word's input params.
-  Local_dict  local_dict; // So we can find locals by name.
+  Sym        *sym;         // What we're currently compiling.
+  Local_stack locals;      // Includes current word's input params.
+  Local_dict  local_dict;  // So we can find locals by name.
+  Ind         loc_mem_len; // How many locals need stack memory.
+  Local      *loc_regs[ASM_ALL_PARAM_REG_LEN]; // Temp reg-local associations.
+  Bits        vol_regs;   // Volatile registers available for locals.
   U8          arg_low;    // How many args got consumed by assignments.
   U8          arg_len;    // Available args for the next call or assignment.
-  Bits        clobber;    // Registers which can't be used for locals.
-  Local      *loc_regs[ASM_PARAM_REG_LEN]; // Temp reg-local associations.
   Comp_fixups fixup;      // Used for patching instructions in a post-pass.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.

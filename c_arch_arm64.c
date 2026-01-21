@@ -27,14 +27,9 @@ GPR usage in the procedure call standard:
 - r30     = address of calling code ("link register" or "LR").
 - r31     = reserved: stack pointer ("SP") or zero register ("ZR").
 
-## Extensions
-
-Special registers:
-
-- `x28` = interpreter pointer
-- `x27` = top of integer stack
-- `x26` = floor of integer stack
-- `x0`  = error string pointer
+We also dedicate a few registers to special roles, depending on the
+calling convention: stack vs regs (or "callvention" if you will).
+See `./c_arch_arm64.h` for definitions.
 
 ## Misc
 
@@ -50,10 +45,10 @@ bitfield layout is implementation-defined and non-portable.
 */
 #pragma once
 #include "./c_arch_arm64.h"
-#include "./c_interp.h"
+#include "./c_comp.h"
 #include "./c_sym.c"
 #include "./lib/dict.c"
-#include "./lib/err.c"
+#include "./lib/fmt.h"
 #include "./lib/jit.c"
 #include "./lib/list.c"
 #include "./lib/stack.c"
@@ -81,6 +76,11 @@ static U8 *comp_code_next_data(const Comp_code *code) {
 
 static Instr *comp_code_next_writable_instr(const Comp_code *code) {
   return list_next_ptr(&code->code_write);
+}
+
+static const Instr *comp_sym_exec_instr(const Comp *comp, const Sym *sym) {
+  IF_DEBUG(aver(sym->type == SYM_NORM));
+  return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.prologue);
 }
 
 static Err comp_code_sync(Comp_code *code) {
@@ -119,7 +119,7 @@ static Err comp_code_sync(Comp_code *code) {
 
 static bool comp_code_is_sym_ready(const Comp_code *code, const Sym *sym) {
   IF_DEBUG(aver(sym->type == SYM_NORM));
-  return code->code_exec.len >= sym->norm.spans.next;
+  return code->code_exec.len >= sym->norm.spans.ceil;
 }
 
 static Err err_sym_not_ready(const char *name) {
@@ -214,15 +214,17 @@ which limits us to just 1 output, despite more supported by Arm64.
 We could get around that by using an inline asm call and listing a
 giant clobber list, but there's no point since `libc` doesn't have
 any procedures with multiple outputs.
+
+Note: this works identically for both of our callventions.
 */
-static Err asm_call_extern_proc(Sint_stack *stack, const Sym *sym) {
+static Err arch_call_extern(Sint_stack *stack, const Sym *sym) {
   aver(sym->type == SYM_EXT_PROC);
 
   const auto fun     = (Extern_fun *)sym->ext_proc;
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  aver(inp_len <= ASM_PARAM_REG_LEN);
+  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
   aver(out_len <= 1);
 
   Sint x0 = 0;
@@ -242,25 +244,8 @@ static Err asm_call_extern_proc(Sint_stack *stack, const Sym *sym) {
   if (inp_len > 1) try(int_stack_pop(stack, &x1));
   if (inp_len > 0) try(int_stack_pop(stack, &x0));
 
-  IF_DEBUG({
-    eprintf(
-      "[system] calling external procedure " FMT_QUOTED
-      " at address %p; inp_len: %d; out_len: %d\n",
-      sym->name.buf,
-      fun,
-      inp_len,
-      out_len
-    );
-  });
-
   const Sint out = fun(x0, x1, x2, x3, x4, x5, x6, x7);
-  if (out_len) stack_push(stack, out);
-
-  IF_DEBUG({
-    eprintf(
-      "[system] done called extern procedure " FMT_QUOTED "\n", sym->name.buf
-    );
-  });
+  if (out_len) try(int_stack_push(stack, out));
   return nullptr;
 }
 
@@ -330,8 +315,8 @@ Variants:
   str <val_reg>, [<addr_reg>, <off>]
   ldr <val_reg>, [<addr_reg>, <off>]
 */
-static void asm_append_load_store_scaled_offset(
-  Comp *comp, bool is_load, U8 val_reg, U8 addr_reg, Uint off
+static Instr asm_instr_load_store_scaled_offset(
+  bool is_load, U8 val_reg, U8 addr_reg, Uint off
 ) {
   aver(divisible_by(off, 8));
   off /= 8;
@@ -340,52 +325,72 @@ static void asm_append_load_store_scaled_offset(
   averr(asm_validate_reg(val_reg));
   averr(asm_validate_reg(addr_reg));
 
-  asm_append_instr(
-    comp,
-    (Instr)0b11'111'0'01'00'000000000000'00000'00000 | ((Instr)is_load << 22) |
-      ((Instr)off << 10) | ((Instr)addr_reg << 5) | val_reg
-  );
+  return (Instr)0b11'111'0'01'00'000000000000'00000'00000 |
+    ((Instr)is_load << 22) | ((Instr)off << 10) | ((Instr)addr_reg << 5) |
+    val_reg;
 }
 
-static void asm_append_store_scaled_offset(
-  Comp *comp, U8 src_reg, U8 addr_reg, Uint off
-) {
-  asm_append_load_store_scaled_offset(comp, false, src_reg, addr_reg, off);
+static Instr asm_instr_load_scaled_offset(U8 src_reg, U8 addr_reg, Uint off) {
+  return asm_instr_load_store_scaled_offset(true, src_reg, addr_reg, off);
+}
+
+static Instr asm_instr_store_scaled_offset(U8 out_reg, U8 addr_reg, Uint off) {
+  return asm_instr_load_store_scaled_offset(false, out_reg, addr_reg, off);
 }
 
 static void asm_append_load_scaled_offset(
   Comp *comp, U8 out_reg, U8 addr_reg, Uint off
 ) {
-  asm_append_load_store_scaled_offset(comp, true, out_reg, addr_reg, off);
+  asm_append_instr(comp, asm_instr_load_scaled_offset(out_reg, addr_reg, off));
 }
 
-static void asm_append_load_store_unscaled_offset(
-  Comp *comp, bool is_load, U8 val_reg, U8 addr_reg, Sint off
+static void asm_append_store_scaled_offset(
+  Comp *comp, U8 src_reg, U8 addr_reg, Uint off
+) {
+  asm_append_instr(comp, asm_instr_store_scaled_offset(src_reg, addr_reg, off));
+}
+
+/*
+Variants:
+
+  opc 00 = stur
+  opc 01 = ldur
+
+  stur <val_reg>, [<addr_reg>, <off>]
+  ldur <val_reg>, [<addr_reg>, <off>]
+*/
+static Instr asm_instr_load_store_unscaled_offset(
+  bool is_load, U8 val_reg, U8 addr_reg, Sint off
 ) {
   Instr imm;
   averr(imm_signed(off, 9, &imm));
   averr(asm_validate_reg(val_reg));
   averr(asm_validate_reg(addr_reg));
 
-  asm_append_instr(
-    comp,
-    (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) | ((Instr)imm << 12) |
-      ((Instr)addr_reg << 5) | val_reg
-  );
+  return (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) |
+    ((Instr)imm << 12) | ((Instr)addr_reg << 5) | val_reg;
 }
 
-// stur <val_reg>, [<addr_reg>, <off>]
-static void asm_append_store_unscaled_offset(
-  Comp *comp, U8 src_reg, U8 addr_reg, Sint off
-) {
-  asm_append_load_store_unscaled_offset(comp, false, src_reg, addr_reg, off);
+static Instr asm_instr_load_unscaled_offset(U8 src_reg, U8 addr_reg, Sint off) {
+  return asm_instr_load_store_unscaled_offset(true, src_reg, addr_reg, off);
+}
+
+static Instr asm_instr_store_unscaled_offset(U8 out_reg, U8 addr_reg, Sint off) {
+  return asm_instr_load_store_unscaled_offset(false, out_reg, addr_reg, off);
 }
 
 // ldur <val_reg>, [<addr_reg>, <off>]
 static void asm_append_load_unscaled_offset(
   Comp *comp, U8 out_reg, U8 addr_reg, Sint off
 ) {
-  asm_append_load_store_unscaled_offset(comp, true, out_reg, addr_reg, off);
+  asm_append_instr(comp, asm_instr_load_unscaled_offset(out_reg, addr_reg, off));
+}
+
+// stur <val_reg>, [<addr_reg>, <off>]
+static void asm_append_store_unscaled_offset(
+  Comp *comp, U8 src_reg, U8 addr_reg, Sint off
+) {
+  asm_append_instr(comp, asm_instr_store_unscaled_offset(src_reg, addr_reg, off));
 }
 
 static void asm_append_load_literal_offset(Comp *comp, U8 reg, Sint off) {
@@ -583,16 +588,16 @@ static const Instr *asm_sym_epilogue_executable(const Comp *comp, const Sym *sym
   return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.epilogue);
 }
 
-static Instr *asm_sym_begin_writable(const Comp *comp, const Sym *sym) {
+static Instr *asm_sym_prologue_writable(const Comp *comp, const Sym *sym) {
   aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&comp->code.code_write, sym->norm.spans.begin);
+  return list_elem_ptr(&comp->code.code_write, sym->norm.spans.prologue);
 }
 
-static Instr *asm_sym_begin_executable(const Comp *comp, const Sym *sym) {
+static Instr *asm_sym_prologue_executable(const Comp *comp, const Sym *sym) {
   aver(sym->type == SYM_NORM);
   const auto list = &comp->code.code_exec;
-  aver(sym->norm.spans.begin < list->cap);
-  return &list->dat[sym->norm.spans.begin];
+  aver(sym->norm.spans.prologue < list->cap);
+  return &list->dat[sym->norm.spans.prologue];
 }
 
 /*
@@ -609,43 +614,43 @@ static Instr *asm_append_breakpoint(Comp *comp, Instr imm) {
   return asm_append_instr(comp, asm_instr_breakpoint(imm));
 }
 
-static void asm_fixup_ret(Comp *comp, const Comp_fixup *fixup, const Sym *sym) {
-  IF_DEBUG(aver(fixup->type == COMP_FIX_RET));
+static void asm_fixup_ret(Comp *comp, const Comp_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == COMP_FIX_RET));
 
   const auto epi = asm_sym_epilogue_writable(comp, sym);
-  const auto tar = fixup->ret;
+  const auto tar = fix->ret;
   const auto off = epi - tar;
 
   IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET)));
   *tar = asm_instr_branch_to_offset(off);
 }
 
-static void asm_fixup_try(Comp *comp, const Comp_fixup *fixup, const Sym *sym) {
-  IF_DEBUG(aver(fixup->type == COMP_FIX_TRY));
+static void asm_fixup_try(Comp *comp, const Comp_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == COMP_FIX_TRY));
 
   const auto epi = asm_sym_epilogue_writable(comp, sym);
-  const auto tar = fixup->try;
+  const auto tar = fix->try;
   const auto off = epi - tar;
 
   IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_TRY)));
   *tar = asm_compare_branch_non_zero(ASM_ERR_REG, off);
 }
 
-static void asm_fixup_recur(Comp *comp, const Comp_fixup *fixup, const Sym *sym) {
-  IF_DEBUG(aver(fixup->type == COMP_FIX_RECUR));
+static void asm_fixup_recur(Comp *comp, const Comp_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == COMP_FIX_RECUR));
 
-  const auto tar = fixup->recur;
-  const auto off = asm_sym_begin_writable(comp, sym) - tar;
+  const auto tar = fix->recur;
+  const auto off = asm_sym_prologue_writable(comp, sym) - tar;
 
   IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RECUR)));
   *tar = asm_instr_branch_link_to_offset(off);
 }
 
-static void asm_fixup_load(Comp *comp, const Comp_fixup *fixup, Sym *sym) {
-  IF_DEBUG(aver(fixup->type == COMP_FIX_IMM));
+static void asm_fixup_load(Comp *comp, const Comp_fixup *fix, Sym *sym) {
+  IF_DEBUG(aver(fix->type == COMP_FIX_IMM));
 
   const auto write = &comp->code.code_write;
-  const auto imm   = &fixup->imm;
+  const auto imm   = &fix->imm;
   const auto pci   = imm->instr;
   const auto num   = imm->num;
   const auto imm32 = (U32)num;
@@ -669,35 +674,6 @@ static void asm_fixup_load(Comp *comp, const Comp_fixup *fixup, Sym *sym) {
   *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30) |
     (imm19 << 5) | imm->reg;
   sym->norm.has_loads = true;
-}
-
-// FIXME move to stack-only
-static void asm_fixup(Comp *comp, Sym *sym) {
-  const auto fixup = &comp->ctx.fixup;
-
-  for (Ind ind = 0; ind < fixup->len; ind++) {
-    const auto fix = &fixup->dat[ind];
-
-    switch (fix->type) {
-      case COMP_FIX_RET: {
-        asm_fixup_ret(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_TRY: {
-        asm_fixup_try(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_RECUR: {
-        asm_fixup_recur(comp, fix, sym);
-        continue;
-      }
-      case COMP_FIX_IMM: {
-        asm_fixup_load(comp, fix, sym);
-        continue;
-      }
-      default: unreachable();
-    }
-  }
 }
 
 static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
@@ -725,12 +701,14 @@ static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm12) {
   asm_append_instr(comp, asm_instr_sub_imm(tar_reg, src_reg, imm12));
 }
 
-static Ind comp_locals_len(Comp *comp) {
-  return (Ind)stack_len(&comp->ctx.locals);
+static Sint local_fp_off(Local *loc) {
+  return -((Sint)loc->mem * (Sint)sizeof(Sint));
 }
 
-// On Arm64, SP must be aligned to 16 bytes.
-static Ind asm_locals_sp_off(Ind len) {
+static Ind asm_locals_sp_off(Comp *comp) {
+  const auto len = comp->ctx.loc_mem_len;
+
+  // On Arm64, SP must be aligned to 16 bytes.
   return __builtin_align_up((len * (Ind)sizeof(Sint)), 16);
 }
 
@@ -751,7 +729,7 @@ static void asm_reserve_sym_prologue(Comp *comp) {
 // SYNC[asm_prologue].
 static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   const auto instrs = &comp->code.code_write;
-  const auto sp_off = asm_locals_sp_off(comp_locals_len(comp));
+  const auto sp_off = asm_locals_sp_off(comp);
   const auto leaf   = is_sym_leaf(sym);
   const auto spans  = &sym->norm.spans;
   const auto inner  = &instrs->dat[spans->inner];
@@ -759,12 +737,12 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
 
   IF_DEBUG({
     const auto brk = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
-    const auto pro = &instrs->dat[spans->prologue];
+    const auto flo = &instrs->dat[spans->floor];
 
-    aver((inner - pro) == 3);
-    aver(pro[0] == brk);
-    aver(pro[1] == brk);
-    aver(pro[2] == brk);
+    aver((inner - flo) == 3);
+    aver(flo[0] == brk);
+    aver(flo[1] == brk);
+    aver(flo[2] == brk);
   });
 
   if (sp_off) {
@@ -783,8 +761,27 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   *instr_floor = (Ind)(floor - instrs->dat);
 }
 
+/*
+Sometimes we speculatively reserve instructions immediately following the
+already-reserved prologue. When such instructions are deemed unnecessary,
+we can skip them, advancing the prologue, to avoid having to insert nops.
+Speculative unclobbering assignment of params or locals is one such case.
+
+SYNC[asm_prologue].
+*/
+static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
+  const auto spans = &sym->norm.spans;
+  const auto write = &comp->code.code_write;
+  if (&write->dat[spans->inner] != instr) return false;
+
+  IF_DEBUG(*instr = asm_instr_breakpoint(ASM_CODE_PROLOGUE));
+  spans->prologue++;
+  spans->inner++;
+  return true;
+}
+
 static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
-  const auto sp_off = asm_locals_sp_off(comp_locals_len(comp));
+  const auto sp_off = asm_locals_sp_off(comp);
   const auto leaf   = is_sym_leaf(sym);
 
   if (sp_off) {
@@ -793,45 +790,6 @@ static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
   if (!leaf) {
     asm_append_load_pair_pre_post(comp, ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, 16);
   }
-}
-
-static void asm_sym_beg(Comp *comp, Sym *sym) {
-  const auto instrs = &comp->code.code_write;
-  const auto spans  = &sym->norm.spans;
-
-  spans->prologue = instrs->len;
-  asm_reserve_sym_prologue(comp);
-  spans->inner = instrs->len;
-}
-
-// ret x30
-static constexpr Instr
-  ASM_INSTR_RET = 0b110'101'1'0'0'10'11111'0000'0'0'11110'00000;
-
-static void asm_sym_end(Comp *comp, Sym *sym) {
-  const auto write = &comp->code.code_write;
-  const auto spans = &sym->norm.spans;
-
-  asm_fixup_sym_prologue(comp, sym, &spans->begin);
-  spans->epilogue = write->len;
-  asm_append_sym_epilogue(comp, sym);
-  spans->ret = write->len;
-  asm_append_instr(comp, ASM_INSTR_RET);
-  spans->data = write->len;
-  asm_fixup(comp, sym);
-  spans->next = write->len;
-
-  // Execution never reaches this. Makes it easier to tell words apart.
-  if (DEBUG) asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM);
-
-  const auto code       = &comp->code;
-  code->valid_instr_len = write->len;
-
-  sym->norm.exec = (Instr_span){
-    .floor = asm_sym_begin_executable(comp, sym),
-    .ceil  = comp_code_next_prog_counter(code),
-    .top   = comp_code_next_prog_counter(code),
-  };
 }
 
 /*
@@ -849,15 +807,16 @@ metadata for every return address and create backtraces when unwinding.
 
 static void asm_register_call(Comp *, const Sym *) {}
 
-static void asm_append_mov_reg_to_reg(Comp *comp, U8 tar_reg, U8 src_reg) {
+static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
   averr(asm_validate_reg(tar_reg));
   averr(asm_validate_reg(src_reg));
 
-  asm_append_instr(
-    comp,
-    (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 | ((Instr)src_reg << 16) |
-      (Instr)tar_reg
-  );
+  return (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 |
+    ((Instr)src_reg << 16) | (Instr)tar_reg;
+}
+
+static void asm_append_mov_reg(Comp *comp, U8 tar_reg, U8 src_reg) {
+  asm_append_instr(comp, asm_instr_mov_reg(tar_reg, src_reg));
 }
 
 /*
@@ -919,7 +878,7 @@ static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) 
     return;
   }
 
-  list_append(
+  stack_push(
     &comp->ctx.fixup,
     (Comp_fixup){
       .type      = COMP_FIX_IMM,
@@ -939,7 +898,7 @@ static void asm_append_zero_reg(Comp *comp, U8 reg) {
 }
 
 static void asm_append_try(Comp *comp) {
-  list_append(
+  stack_push(
     &comp->ctx.fixup,
     (Comp_fixup){
       .type = COMP_FIX_TRY,
@@ -948,10 +907,9 @@ static void asm_append_try(Comp *comp) {
   );
 }
 
-// TODO consolidate sanity checks and debugging.
 static void asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
   const auto code   = &comp->code;
-  const auto fun    = (Instr *)callee->norm.exec.floor;
+  const auto fun    = comp_sym_exec_instr(comp, callee);
   const auto pc_off = fun - comp_code_next_prog_counter(code);
 
   aver(comp_code_is_instr_ours(code, fun));
@@ -1062,4 +1020,43 @@ static Err asm_inline_sym(Comp *comp, const Sym *sym) {
     }
   });
   return nullptr;
+}
+
+#ifdef NATIVE_CALL_ABI
+#include "./c_arch_arm64_cc_reg.c" // IWYU pragma: export
+#else
+#include "./c_arch_arm64_cc_stack.c" // IWYU pragma: export
+#endif
+
+static void asm_sym_beg(Comp *comp, Sym *sym) {
+  const auto instrs = &comp->code.code_write;
+  const auto spans  = &sym->norm.spans;
+
+  spans->floor    = instrs->len;
+  spans->prologue = instrs->len;
+  asm_reserve_sym_prologue(comp);
+  spans->inner = instrs->len;
+}
+
+static void asm_sym_end(Comp *comp, Sym *sym) {
+  const auto write = &comp->code.code_write;
+  const auto spans = &sym->norm.spans;
+
+  spans->epilogue = write->len;
+  asm_append_sym_epilogue(comp, sym);
+  spans->ret = write->len;
+  asm_append_instr(comp, ASM_INSTR_RET);
+  spans->data = write->len;
+  asm_fixup(comp, sym);
+  spans->ceil = write->len;
+
+  // Delaying this until after the other fixups sometimes allows us
+  // to skip speculative instructions adjacent to the prologue.
+  asm_fixup_sym_prologue(comp, sym, &spans->prologue);
+
+  // Execution never reaches this. Makes it easier to tell words apart.
+  if (DEBUG) asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM);
+
+  const auto code       = &comp->code;
+  code->valid_instr_len = write->len;
 }

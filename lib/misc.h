@@ -3,6 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define NATIVE_CALL_ABI
+
 static bool DEBUG = false;
 
 #ifdef PROD

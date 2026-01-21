@@ -22,8 +22,7 @@ typedef struct Sym {
 
   union {
     struct {
-      Sym_instrs spans;     // Created and used by the assembler.
-      Instr_span exec;      // Executable code range.
+      Sym_instrs spans;     // Instruction ranges; used by the assembler.
       bool       inlinable; // Inner code is safe to copy-paste.
       bool       has_loads; // Has PC-relative data access.
       bool       has_rets;  // Has explicit early returns.
@@ -34,14 +33,11 @@ typedef struct Sym {
     void *ext_proc; // Pointer to extern procedure; obtained from `dlsym`.
   };
 
-#ifdef NATIVE_CALL_ABI
-  Bits clobber; // Clobbers these registers; must include inps and outs.
-#endif
-
   Sym_set callees;     // Dependencies.
   Sym_set callers;     // Dependents.
   U8      inp_len;     // Input parameter count.
   U8      out_len;     // Output parameter count.
+  Bits    clobber;     // Clobbers these registers; must include inps and outs.
   bool    throws;      // Requires error handling.
   bool    immediate;   // Interpret immediately even in compilation mode.
   bool    comp_only;   // Can only be used between `:` and `;`.

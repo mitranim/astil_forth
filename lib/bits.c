@@ -1,14 +1,11 @@
 #pragma once
 #include "./bits.h"
+#include "./err.h"
 #include "./num.h"
-#include <assert.h>
-#include <limits.h>
-
-static constexpr U8 BITS_CEIL = sizeof(Bits) * CHAR_BIT;
 
 // Is there a simpler way?
 static Bits bits_span(U8 ceil) {
-  assert(ceil <= BITS_CEIL);
+  aver(ceil <= BITS_CEIL);
 
   // OK for `0..63`, not OK (and not portable) for `64`.
   const auto shifted = (Bits)1 << (ceil & (BITS_CEIL - 1));
@@ -33,14 +30,14 @@ static bool bits_has(Bits set, U8 bit) {
 }
 
 static Bits bits_add(Bits set, U8 bit) {
-  assert(bit < BITS_CEIL);
+  aver(bit < BITS_CEIL);
   return set | ((Bits)1 << bit);
 }
 
 static void bits_add_to(Bits *set, U8 bit) { *set = bits_add(*set, bit); }
 
 static Bits bits_del(Bits set, U8 bit) {
-  assert(bit < BITS_CEIL);
+  aver(bit < BITS_CEIL);
   return set & ~((Bits)1 << bit);
 }
 

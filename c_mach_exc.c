@@ -2,6 +2,7 @@
 #include "./c_arch.h"
 #include "./c_interp.c"
 #include "./lib/fmt.c"
+#include "./lib/mach_exc.c"
 #include "./lib/misc.h"
 #include <mach/mach.h>
 #include <stdio.h>
@@ -399,4 +400,23 @@ kern_return_t catch_mach_exception_raise_state(
   // });
 
   return KERN_SUCCESS;
+}
+
+static Err init_exception_handling() {
+  bool recovery = true;
+  try(env_bool("RECOVERY", &recovery));
+  if (!recovery) return nullptr;
+
+  const auto err = mach_exception_init(EXC_MASK_BAD_ACCESS | EXC_BAD_INSTRUCTION);
+
+  // Delivering exceptions to Mach ports is optional...
+  if (err) {
+    eprintf("[system] %s\n", err);
+    return nullptr;
+  }
+
+  // ...but if the OS agrees, the handling thread must actually run.
+  try(mach_exception_server_init(nullptr));
+  IF_DEBUG(eputs("[system] inited mach exception handling"));
+  return nullptr;
 }

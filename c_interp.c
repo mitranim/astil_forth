@@ -52,7 +52,8 @@ static Err interp_init_syms(Interp *interp) {
 
   for (auto intrin = INTRIN; intrin < arr_ceil(INTRIN); intrin++) {
     const auto sym = stack_push(syms, *intrin);
-    sym->name.len  = (Ind)strlen(sym->name.buf);
+    sym_init_intrin(sym);
+    IF_DEBUG(aver(!dict_has(&interp->words, sym->name.buf)));
     dict_set(&interp->words, sym->name.buf, sym);
     comp_register_dysym(comp, sym->name.buf, (U64)sym->intrin);
   }

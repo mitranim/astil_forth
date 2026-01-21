@@ -1,8 +1,8 @@
 /*
-This file defines assembly procedures for Arm64 for the variant of our Forth
-system which uses the native procedure call ABI.
+This file defines assembly procedures for Arm64 for the variant
+of our Forth system which uses the native procedure call ABI.
 
-Compare `./c_arch_arm64_cc_stack.c` which uses stack-based conventions.
+Compare `./c_arch_arm64_cc_stack.c` which uses a stack-based callvention.
 
 Special registers:
 - `x28` = error string pointer.
@@ -11,138 +11,330 @@ Special registers:
 The special registers must be kept in sync with `f_lang_cc_reg.f`.
 */
 #pragma once
+#include "./c_interp.h"
+#include "./lib/bits.c"
+#include "c_arch_arm64.h"
+#include "lib/fmt.h"
+
+#ifdef CLANGD
 #include "./c_arch_arm64.c"
+#endif
 
-/*
-FIXME:
-
-Everything below needs translating into the new convention,
-and renaming both here and in the other file to consolidate
-and abstract this for the other files.
-*/
-
-static Err interp_call_norm(Interp *interp, const Sym *sym) {
-  try(comp_code_ensure_sym_ready(&interp->comp.code, sym));
-
-  // transfer args from control stack
-  // put them in registers
-  unreachable();
+static Err arch_validate_input_param_reg(U8 reg) {
+  if (reg <= ASM_INP_PARAM_REG_LEN) return nullptr;
+  return errf(
+    "too many input parameters: %d registers available, %d parameters requested",
+    reg,
+    ASM_INP_PARAM_REG_LEN
+  );
 }
 
-// static void asm_append_stack_pop_into(Comp *comp, U8 reg) {
-//   asm_append_load_pre_post(comp, reg, ASM_REG_INT_TOP, -8);
-// }
+static Err arch_validate_output_param_reg(U8 reg) {
+  if (reg <= ASM_OUT_PARAM_REG_LEN) return nullptr;
+  return errf(
+    "too many output parameters: %d registers available, %d parameters requested",
+    reg,
+    ASM_OUT_PARAM_REG_LEN
+  );
+}
 
-// static Err err_unrec_local_ind(Sint ind) {
-//   return errf("unrecognized local index: " FMT_SINT, ind);
-// }
+static Err err_call_arity_mismatch(const char *name, U8 inp_len, Sint ints_len) {
+  return errf(
+    "unable to call symbol %s: %d input parameters required, but only " FMT_SINT
+    " are available on the data stack\n",
+    name,
+    inp_len,
+    ints_len
+  );
+}
 
-// static Err asm_validate_local_ind(const Asm_locs *locs, Sint ind) {
-//   if (ind >= 0 && ind < locs->next) return nullptr;
-//   return err_unrec_local_ind(ind);
-// }
+static Err arch_call_norm(Interp *interp, const Sym *sym) {
+  const auto fun     = comp_sym_exec_instr(&interp->comp, sym);
+  const auto inp_len = sym->inp_len;
+  const auto out_len = sym->out_len;
 
-// static Err asm_append_local_pop(Comp *comp, Sint ind) {
-//   const auto locs = &comp->locs;
-//   try(asm_validate_local_ind(locs, ind));
+  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
+  aver(out_len <= ASM_OUT_PARAM_REG_LEN);
 
-//   const auto off = asm_local_fp_off((Ind)ind);
-//   asm_append_stack_pop_into(comp, ASM_SCRATCH_REG_8);
-//   asm_append_store_unscaled_offset(comp, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
-//   return nullptr;
-// }
+  const auto ints     = &interp->ints;
+  const auto ints_len = stack_len(ints);
 
-// static Err asm_append_local_push(Comp *comp, Sint ind) {
-//   const auto locs = &comp->locs;
-//   try(asm_validate_local_ind(locs, ind));
+  if (inp_len > ints_len) {
+    return err_call_arity_mismatch(sym->name.buf, inp_len, ints_len);
+  }
 
-//   const auto off = asm_local_fp_off((Ind)ind);
-//   asm_append_load_unscaled_offset(comp, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
-//   asm_append_stack_push_from(comp, ASM_SCRATCH_REG_8);
-//   return nullptr;
-// }
+  Sint register x7 __asm__("x7") = inp_len > 7 ? stack_pop(ints) : 0;
+  Sint register x6 __asm__("x6") = inp_len > 6 ? stack_pop(ints) : 0;
+  Sint register x5 __asm__("x5") = inp_len > 5 ? stack_pop(ints) : 0;
+  Sint register x4 __asm__("x4") = inp_len > 4 ? stack_pop(ints) : 0;
+  Sint register x3 __asm__("x3") = inp_len > 3 ? stack_pop(ints) : 0;
+  Sint register x2 __asm__("x2") = inp_len > 2 ? stack_pop(ints) : 0;
+  Sint register x1 __asm__("x1") = inp_len > 1 ? stack_pop(ints) : 0;
+  Sint register x0 __asm__("x0") = inp_len > 0 ? stack_pop(ints) : 0;
 
-// static bool asm_appended_local_push(Comp *comp, const char *name) {
-//   const auto locs = &comp->locs;
-//   const auto inds = &locs->inds;
-//   if (!dict_has(inds, name)) return false;
-//   averr(asm_append_local_push(comp, dict_get(inds, name)));
-//   return true;
-// }
+  auto register reg_interp __asm__("x27") = interp;
+  Err register reg_err __asm__("x28")     = nullptr;
 
-// static void asm_append_stack_push_imm(Comp *comp, Sint imm) {
-//   /*
-//   mov <reg>, <imm>
-//   str <reg>, [x27], 8
-//   */
-//   asm_append_imm_to_reg(comp, ASM_SCRATCH_REG_8, imm, nullptr);
-//   asm_append_stack_push_from(comp, ASM_SCRATCH_REG_8);
-// }
+  /*
+  This construct lets us support:
+  - Multiple output parameters.
+  - Special interpreter register.
+  - Special error register.
 
-// static void asm_append_call_intrin_before(Comp *comp, Uint ints_top_off) {
-//   asm_append_store_scaled_offset(
-//     heap, ASM_REG_INT_TOP, ASM_REG_INTERP, ints_top_off
-//   );
-// }
+  Our alternative stack-based calling convention uses an additional
+  trampoline written in assembly, but we don't need one here.
 
-// static void asm_append_call_intrin_after(Comp *comp, Uint ints_top_off) {
-//   asm_append_load_scaled_offset(
-//     heap, ASM_REG_INT_TOP, ASM_REG_INTERP, ints_top_off
-//   );
-// }
+  SYNC[arch_arm64_cc_reg_special_regs].
+  */
+  __asm__ volatile(
+    "blr %[fun]\n"
+    : "+r"(x0),
+      "+r"(x1),
+      "+r"(x2),
+      "+r"(x3),
+      "+r"(x4),
+      "+r"(x5),
+      "+r"(x6),
+      "+r"(x7),
+      "+r"(reg_err)
+    : [fun] "r"(fun), "r"(reg_interp)
+    : "x10", "x11", "x12", "x13", "x14", "x15", "x16", "cc", "memory"
+  );
 
-// /*
-// TODO: words which contain such calls may not appear in compiled executables.
-// We detect these calls and set `Sym.interp_only` for later use.
-// */
-// static void asm_append_call_intrin(
-//   Comp *comp, const Sym *caller, const Sym *callee, Uint ints_top_off
-// ) {
-//   aver(callee->type == SYM_INTRIN);
+  if (out_len > 0) try(int_stack_push(ints, x0));
+  if (out_len > 1) try(int_stack_push(ints, x1));
+  if (out_len > 2) try(int_stack_push(ints, x2));
+  if (out_len > 3) try(int_stack_push(ints, x3));
+  if (out_len > 4) try(int_stack_push(ints, x4));
+  if (out_len > 5) try(int_stack_push(ints, x5));
+  if (out_len > 6) try(int_stack_push(ints, x6));
+  if (out_len > 7) try(int_stack_push(ints, x7));
+  return reg_err;
+}
 
-//   constexpr auto reg = ASM_SCRATCH_REG_8;
+static Err arch_call_intrin(Interp *interp, const Sym *sym) {
+  aver(sym->type == SYM_INTRIN);
 
-//   asm_append_call_intrin_before(comp, ints_top_off);
-//   asm_append_mov_reg_to_reg(comp, ASM_PARAM_REG_0, ASM_REG_INTERP);
-//   asm_append_dysym_load(comp, callee->name.buf, reg);
-//   asm_append_branch_link_to_reg(comp, reg);
-//   asm_register_call(comp, caller);
-//   asm_append_call_intrin_after(comp, ints_top_off);
+  const auto ints = &interp->ints;
+  auto       ind  = sym->inp_len;
+  aver(ind < ASM_INP_PARAM_REG_LEN);
 
-//   if (callee->throws) asm_append_try(comp);
-//   else asm_append_zero_reg(comp, ASM_ERR_REG);
-// }
+  Sint args[ASM_INP_PARAM_REG_LEN] = {};
+  args[ind]                        = (Sint)interp;
 
-// static void asm_append_load_extern_ptr(Comp *comp, const char *name) {
-//   constexpr auto reg = ASM_SCRATCH_REG_8;
-//   asm_append_dysym_load(comp, name, reg);
-//   asm_append_stack_push_from(comp, reg);
-// }
+  while (ind) {
+    ind--;
+    try(int_stack_pop(ints, &args[ind]));
+  }
 
-// static void asm_append_call_extern_proc(Comp *comp, Sym *caller, const Sym *callee) {
-//   aver(callee->type == SYM_EXT_PROC);
+  Sint x0 = args[0];
+  Sint x1 = args[1];
+  Sint x2 = args[2];
+  Sint x3 = args[3];
+  Sint x4 = args[4];
+  Sint x5 = args[5];
+  Sint x6 = args[6];
+  Sint x7 = args[7];
 
-//   const auto inp_len = callee->ext_proc.inp_len;
-//   const auto out_len = callee->ext_proc.out_len;
+  /*
+  So we've just prepared the inputs, where are the outputs?
+  For now, intrinsics push outputs into the Forth data stack,
+  just like in the purely stack-based callvention.
+  */
 
-//   aver(inp_len <= ASM_PARAM_REG_LEN);
-//   aver(out_len <= 1);
+  typedef Err(Fun)(Sint, Sint, Sint, Sint, Sint, Sint, Sint, Sint);
+  const auto fun = (Fun *)sym->intrin;
+  const auto err = fun(x0, x1, x2, x3, x4, x5, x6, x7);
+  return sym->throws ? err : nullptr;
+}
 
-//   // TODO use `ldp` for even pairs.
-//   if (inp_len > 7) asm_append_stack_pop_into(comp, ASM_PARAM_REG_7);
-//   if (inp_len > 6) asm_append_stack_pop_into(comp, ASM_PARAM_REG_6);
-//   if (inp_len > 5) asm_append_stack_pop_into(comp, ASM_PARAM_REG_5);
-//   if (inp_len > 4) asm_append_stack_pop_into(comp, ASM_PARAM_REG_4);
-//   if (inp_len > 3) asm_append_stack_pop_into(comp, ASM_PARAM_REG_3);
-//   if (inp_len > 2) asm_append_stack_pop_into(comp, ASM_PARAM_REG_2);
-//   if (inp_len > 1) asm_append_stack_pop_into(comp, ASM_PARAM_REG_1);
-//   if (inp_len > 0) asm_append_stack_pop_into(comp, ASM_PARAM_REG_0);
+static void asm_append_call_intrin_after(Comp *comp, const Sym *callee) {
+  if (callee->throws) {
+    // Our C procedures return errors in `x0`, while in Forth,
+    // we dedicate a callee-saved register to errors.
+    asm_append_mov_reg(comp, ASM_ERR_REG, ASM_PARAM_REG_0);
+    asm_append_try(comp);
+  }
 
-//   constexpr auto reg = ASM_SCRATCH_REG_8;
+  const auto len = callee->out_len;
+  if (!len) return;
 
-//   asm_append_dysym_load(comp, callee->name.buf, reg);
-//   asm_append_branch_link_to_reg(comp, reg);
-//   asm_register_call(comp, caller);
-//   if (out_len) asm_append_stack_push_from(comp, ASM_ERR_REG);
-//   asm_append_zero_reg(comp, ASM_ERR_REG);
-// }
+  /*
+  We have one or two intrinsics which want to return `(val0 val1 err)`.
+  Unfortunately, C does not support ABI-native multi-output parameters.
+  Returning a struct is quirky because the behavior depends on how many
+  fields it has. So for now, intrinsic outputs are just pushed into the
+  Forth data stack. This also makes it easier to reuse them between CC.
+
+    ldr x8, [x27, INTERP_INTS_TOP]
+    ... ldr xN, [x8, -8]! ...
+    str x8, [x27, INTERP_INTS_TOP]
+  */
+
+  constexpr auto stack_reg = ASM_SCRATCH_REG_8;
+  auto           out_reg   = len;
+  aver(out_reg < ASM_OUT_PARAM_REG_LEN);
+
+  asm_append_load_unscaled_offset(
+    comp, stack_reg, ASM_REG_INTERP, INTERP_INTS_TOP
+  );
+  while (out_reg) {
+    out_reg--;
+    asm_append_load_pre_post(comp, out_reg, stack_reg, -8);
+  }
+  asm_append_store_unscaled_offset(
+    comp, stack_reg, ASM_REG_INTERP, INTERP_INTS_TOP
+  );
+}
+
+static void asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
+  aver(callee->type == SYM_INTRIN);
+
+  // Free to use because intrin calls clobber everything anyway.
+  constexpr auto reg = ASM_SCRATCH_REG_8;
+
+  // Under this callvention, our intrinsics always take `Interp*`
+  // as an additional "secret" parameter following immediately
+  // after the "official" parameters.
+  asm_append_mov_reg(comp, callee->inp_len, ASM_REG_INTERP);
+  asm_append_dysym_load(comp, callee->name.buf, reg);
+  asm_append_branch_link_to_reg(comp, reg);
+  asm_register_call(comp, caller);
+  asm_append_call_intrin_after(comp, callee);
+}
+
+static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
+  aver(callee->type == SYM_EXT_PROC);
+
+  // Free to use because extern calls clobber everything anyway.
+  constexpr auto reg = ASM_SCRATCH_REG_8;
+
+  asm_append_dysym_load(comp, callee->name.buf, reg);
+  asm_append_branch_link_to_reg(comp, reg);
+  asm_register_call(comp, caller);
+}
+
+static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
+  IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
+
+  switch (loc->location) {
+    case LOC_REG: {
+      return asm_instr_mov_reg(tar_reg, loc->reg);
+    }
+    case LOC_MEM: {
+      const auto off = local_fp_off(loc);
+      return asm_instr_load_unscaled_offset(tar_reg, ASM_REG_FP, off);
+    }
+    case LOC_UNKNOWN: [[fallthrough]];
+    default:          unreachable();
+  }
+}
+
+static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
+  IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
+
+  switch (loc->location) {
+    case LOC_REG: {
+      return asm_instr_mov_reg(loc->reg, src_reg);
+    }
+    case LOC_MEM: {
+      const auto off = local_fp_off(loc);
+      return asm_instr_store_unscaled_offset(src_reg, ASM_REG_FP, off);
+    }
+    case LOC_UNKNOWN: [[fallthrough]];
+    default:          unreachable();
+  }
+}
+
+/*
+We accumulate volatile clobbers from ALL sources across the entire procedure
+and always treat these registers as temporary, meaning that no locals across
+the procedure receive them as their locations, even when their lifetimes do
+not overlap with clobbers. This is a dirty but ultra simple way of avoiding
+IR and data flow analysis.
+*/
+static void arch_resolve_local_location(Comp *comp, Local *loc) {
+  if (loc->location != LOC_UNKNOWN) return;
+
+  const auto reg = bits_pop_low(&comp->ctx.vol_regs);
+
+  if (bits_has(ASM_VOLATILE_REGS, reg)) {
+    loc->location = LOC_REG;
+    loc->reg      = reg;
+    return;
+  }
+
+  // SYNC[local_mem_alloc].
+  loc->mem      = ++comp->ctx.loc_mem_len;
+  loc->location = LOC_MEM;
+}
+
+static void asm_fixup_loc_read(Comp *comp, Comp_fixup *fix) {
+  IF_DEBUG(aver(fix->type == COMP_FIX_LOC_READ));
+
+  const auto read = &fix->loc_read;
+  const auto loc  = read->loc;
+
+  arch_resolve_local_location(comp, loc);
+  *read->instr = asm_instr_local_read(loc, read->reg);
+}
+
+static void asm_fixup_loc_write(Comp *comp, Comp_fixup *fix, Sym *sym) {
+  IF_DEBUG(aver(fix->type == COMP_FIX_LOC_WRITE));
+
+  const auto write = &fix->loc_write;
+
+  // This VERY dirty hack allows us to preserve the simplicity of forward-only
+  // single-pass assembly, without having to invent an IR and have the library
+  // and program code deal with an extra API. Nops are cheap and significantly
+  // better than memory ops anyway.
+  if (!write->confirmed) {
+    const auto instr = write->instr;
+    if (asm_skipped_prologue_instr(comp, sym, instr)) return;
+    *instr = ASM_INSTR_NOP;
+    return;
+  }
+
+  const auto loc = write->loc;
+  arch_resolve_local_location(comp, loc);
+  *write->instr = asm_instr_local_write(loc, write->reg);
+}
+
+static void asm_fixup(Comp *comp, Sym *sym) {
+  const auto ctx   = &comp->ctx;
+  const auto fixup = &ctx->fixup;
+
+  // Remaining volatile registers available for locals.
+  aver(ctx->vol_regs == BITS_ALL);
+  ctx->vol_regs = bits_del_all(ASM_VOLATILE_REGS, sym->clobber);
+
+  for (stack_range(auto, fix, fixup)) {
+    switch (fix->type) {
+      case COMP_FIX_RET: {
+        asm_fixup_ret(comp, fix, sym);
+        continue;
+      }
+      case COMP_FIX_TRY: {
+        asm_fixup_try(comp, fix, sym);
+        continue;
+      }
+      case COMP_FIX_RECUR: {
+        asm_fixup_recur(comp, fix, sym);
+        continue;
+      }
+      case COMP_FIX_IMM: {
+        asm_fixup_load(comp, fix, sym);
+        continue;
+      }
+      case COMP_FIX_LOC_READ: {
+        asm_fixup_loc_read(comp, fix);
+        continue;
+      }
+      case COMP_FIX_LOC_WRITE: {
+        asm_fixup_loc_write(comp, fix, sym);
+        continue;
+      }
+      default: unreachable();
+    }
+  }
+}

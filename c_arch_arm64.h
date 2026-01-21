@@ -1,4 +1,5 @@
 #pragma once
+#include "./lib/bits.h"
 #include "./lib/list.h"
 #include "./lib/num.h"
 #include "./lib/stack.h"
@@ -19,13 +20,13 @@ typedef span_of(Instr) Instr_span;
 
 // All fields are offsets in the instruction heaps.
 typedef struct {
-  Ind prologue; // Setup instructions; some may be skipped.
-  Ind begin;    // Actual start; somewhere in `[prologue,inner]`.
+  Ind floor;    // Setup instructions; some may be skipped.
+  Ind prologue; // Actual start; somewhere in `[prologue,inner]`.
   Ind inner;    // First useful instruction.
   Ind epilogue; // Cleanup instructions; may be `== .ret`.
   Ind ret;      // Always `ret`.
   Ind data;     // Local immediate values.
-  Ind next;     // Start of next symbol's instructions.
+  Ind ceil;     // Next instruction outside this symbol's range.
 } Sym_instrs;
 
 /*
@@ -40,8 +41,19 @@ In instruction encoding, registers 0-31 are represented with corresponding
 For example, `x31` and `q31` are `0b11111`.
 */
 
-static constexpr U8 ASM_PARAM_REG_LEN = 8;
-static constexpr U8 ASM_REG_LEN       = 32;
+// FIXME rename `ASM_` to `ARCH_`.
+
+// 0x0 ... x15
+static constexpr Bits ASM_VOLATILE_REGS = 0b11111111'11111111;
+
+// x0 ... x7
+static constexpr Bits ASM_ALL_PARAM_REGS = 0b11111111;
+
+static constexpr U8 ASM_REG_LEN           = 32;
+static constexpr U8 ASM_VOLATILE_REG_LEN  = 16;
+static constexpr U8 ASM_INP_PARAM_REG_LEN = 8;
+static constexpr U8 ASM_OUT_PARAM_REG_LEN = 8;
+static constexpr U8 ASM_ALL_PARAM_REG_LEN = 8;
 
 static constexpr U8 ASM_PARAM_REG_0 = 0;
 static constexpr U8 ASM_PARAM_REG_1 = 1;
@@ -81,6 +93,8 @@ static constexpr U8 ASM_REG_INTERP = 27;
 Using `x0` as the error register exactly matches how we return errors in C.
 When calling procs which don't return errors, we nullify the register after
 the call.
+
+SYNC[arch_arm64_cc_stack_special_regs].
 */
 static constexpr U8 ASM_ERR_REG       = ASM_PARAM_REG_0;
 static constexpr U8 ASM_REG_INTERP    = 28; // Interp
@@ -100,3 +114,9 @@ typedef enum : Instr {
   ASM_CODE_LOC_WRITE,
   ASM_CODE_PROC_DELIM,
 } Asm_magic;
+
+// ret x30
+static constexpr Instr
+  ASM_INSTR_RET = 0b110'101'1'0'0'10'11111'0000'0'0'11110'00000;
+
+static constexpr Instr ASM_INSTR_NOP = 0b110'101'01000000110010'0000'000'11111;

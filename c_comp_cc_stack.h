@@ -1,11 +1,12 @@
 #pragma once
 #include "./c_sym.h"
 #include "./lib/dict.h"
-#include "./lib/list.h"
+#include "./lib/stack.h"
 #include "./lib/str.h"
 
 typedef struct {
   Word_str name; // May be empty.
+  Ind      mem;  // 1-indexed position of FP offset.
 } Local;
 
 typedef stack_of(Local)  Local_stack;
@@ -40,7 +41,7 @@ typedef struct {
   };
 } Comp_fixup;
 
-typedef list_of(Comp_fixup) Comp_fixups;
+typedef stack_of(Comp_fixup) Comp_fixups;
 
 // Transient context used in compilation of a single word.
 typedef struct {
@@ -48,6 +49,7 @@ typedef struct {
   Comp_fixups fixup;
   Local_stack locals;
   Local_dict  local_dict;
-  bool        redefining; // Temporarily suppress "redefined" diagnostic.
-  bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
+  Ind         loc_mem_len; // How many locals need stack memory.
+  bool        redefining;  // Temporarily suppress "redefined" diagnostic.
+  bool        compiling;   // Turned on by `:` and `]`, turned off by `[`.
 } Comp_ctx;

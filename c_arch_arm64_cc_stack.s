@@ -13,7 +13,7 @@ ASM_MAGIC: .8byte 0xabcdFEEDabcdFACE
 /*
 See the C prototype for the procedure signature.
 
-See `./c_arch_arm64.c` for docs on special registers.
+See `./c_arch_arm64.h` for definitions of special registers.
 
 If the word "throws", the error is returned in `x0`. This register is set to
 `nullptr` in C before the call. For calls of procedures which may "throw" by
@@ -27,7 +27,7 @@ Registers x19-x28 are callee-saved, which means we can consider them stable
 and allocate them for special values, at the cost of having to store and load
 them when switching between C and Forth.
 
-SYNC[asm_call_forth_stack].
+SYNC[arch_arm64_cc_stack_special_regs].
 */
 asm_call_forth:
   stp x29, x30, [sp, -16]! // Frame record.

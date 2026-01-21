@@ -2,9 +2,34 @@
 #include "./c_sym.h"
 #include "./lib/set.c"
 
+// clang-format off
+
+// Sanity check used in debugging.
+static bool sym_valid(const Sym *sym) {
+  return (
+    sym &&
+    is_aligned(sym) &&
+    is_aligned(&sym->name) &&
+    is_aligned(&sym->callees) &&
+    is_aligned(&sym->callers) &&
+    sym->name.len &&
+    set_valid((const Set *)&sym->callees) &&
+    set_valid((const Set *)&sym->callers)
+  );
+}
+
+// clang-format on
+
 static void sym_deinit(Sym *sym) {
   set_deinit(&sym->callees);
   set_deinit(&sym->callers);
+}
+
+static void sym_init_intrin(Sym *sym) {
+  sym->type        = SYM_INTRIN;
+  sym->name.len    = (Ind)strlen(sym->name.buf);
+  sym->clobber     = ASM_VOLATILE_REGS;
+  sym->interp_only = true;
 }
 
 /*
@@ -100,8 +125,8 @@ static Err validate_sym_inlinable(const Sym *sym) {
 
   // Same as `err_inline_pc_rel`. Redundant check for safety.
   const auto spans = &sym->norm.spans;
-  IF_DEBUG(aver(sym->norm.has_loads == (spans->data < spans->next)));
-  if (spans->data < spans->next) return err_inline_has_data(sym);
+  IF_DEBUG(aver(sym->norm.has_loads == (spans->data < spans->ceil)));
+  if (spans->data < spans->ceil) return err_inline_has_data(sym);
 
   return nullptr;
 }
@@ -114,7 +139,7 @@ static void sym_auto_inlinable(Sym *sym) {
   if (!is_sym_leaf(sym)) return;
 
   const auto spans = &sym->norm.spans;
-  if (spans->data < spans->next) return;
+  if (spans->data < spans->ceil) return;
 
   const auto len = spans->epilogue - spans->inner;
 

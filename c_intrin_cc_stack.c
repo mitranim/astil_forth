@@ -1,8 +1,11 @@
 #pragma once
-
-#ifdef CLANGD
 #include "./c_interp_internal.c"
-#endif // CLANGD
+
+static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }
+
+static Err intrin_recur(Interp *interp) {
+  return comp_append_recur(&interp->comp);
+}
 
 static Err intrin_comp_instr(Interp *interp) {
   Sint val;
@@ -183,7 +186,12 @@ static Err intrin_execute(Interp *interp) {
 static Err intrin_get_local(Interp *interp) {
   const U8 *buf;
   Ind       len;
+  Local    *loc;
   try(interp_pop_len(interp, &len));
   try(interp_pop_buf(interp, &buf));
-  return interp_get_local(interp, (const char *)buf, len);
+  try(interp_get_local(interp, (const char *)buf, len, &loc));
+
+  const auto tok = local_token(loc);
+  try(int_stack_push(&interp->ints, tok));
+  return nullptr;
 }

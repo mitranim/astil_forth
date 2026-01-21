@@ -82,6 +82,8 @@ Should be usable as a library in another C/C++ program. The "main" file is only 
 
 In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to use this as a library by simply cloning the repo into a subfolder and including `./c_interp.c` which provides the top-level API, and includes all other files it needs.
 
+Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Everything here should be `static`.
+
 ## Easy C interop
 
 It's trivial to declare and call extern procedures. Examples can be found in the core file `f_lang.f` which makes extensive use of that. Should work for any linked library, such as libc.

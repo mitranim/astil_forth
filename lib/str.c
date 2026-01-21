@@ -30,3 +30,18 @@ static char *str_alloc_copy(const char *src, Ind src_len) {
   aver(out_len == src_len);
   return out;
 }
+
+static Err err_word_len_mismatch(Word_str *word, Ind len) {
+  return errf(
+    "length mismatch for " FMT_QUOTED ": " FMT_IND " vs " FMT_IND,
+    word->buf,
+    word->len,
+    len
+  );
+}
+
+static Err valid_word(const char *buf, Ind len, Word_str *word) {
+  try(str_copy(word, buf));
+  if (word->len == len) return nullptr;
+  return err_word_len_mismatch(word, len);
+}

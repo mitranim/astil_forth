@@ -6,6 +6,69 @@
 #include "./lib/stack.c"
 #include "./lib/str.c"
 
+static Err err_current_sym_not_defining() {
+  return err_str("unable to find current word: not inside a colon definition");
+}
+
+static Err comp_require_current_sym(const Comp *comp, Sym **out) {
+  const auto sym = comp->ctx.sym;
+  if (!sym) return err_current_sym_not_defining();
+  if (out) *out = sym;
+  return nullptr;
+}
+
+static Err err_internal_dup_local(const char *name) {
+  return errf("internal error: duplicate local name " FMT_QUOTED, name);
+}
+
+static Local *comp_local_push(Comp *comp, Local val) {
+// SYNC[local_mem_alloc].
+#ifndef NATIVE_CALL_ABI
+  val.mem = ++comp->ctx.loc_mem_len;
+#endif
+  return stack_push(&comp->ctx.locals, val);
+}
+
+static Err comp_local_add(Comp *comp, Word_str word, Local **out) {
+  const auto dict = &comp->ctx.local_dict;
+  const auto name = word.buf;
+  if (dict_has(dict, name)) return err_internal_dup_local(name);
+
+  const auto loc = comp_local_push(comp, (Local){.name = word});
+  dict_set(dict, loc->name.buf, loc);
+  if (out) *out = loc;
+  return nullptr;
+}
+
+static Local *comp_local_get(Comp *comp, const char *name) {
+  return dict_get(&comp->ctx.local_dict, name);
+}
+
+static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
+  auto loc = comp_local_get(comp, name.buf);
+  if (loc) {
+    if (out) *out = loc;
+    return nullptr;
+  }
+  return comp_local_add(comp, name, out);
+}
+
+static Local *comp_local_anon(Comp *comp) {
+  return comp_local_push(comp, (Local){});
+}
+
+static Err err_local_invalid(Local *ptr) {
+  return errf("%p is not a valid address of a local", ptr);
+}
+
+static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
+  const auto locs = &comp->ctx.locals;
+  const auto ptr  = (Local *)num;
+  if (!is_stack_elem(locs, ptr)) return err_local_invalid(ptr);
+  if (out) *out = ptr;
+  return nullptr;
+}
+
 #ifdef NATIVE_CALL_ABI
 #include "./c_comp_cc_reg.c"
 #else
@@ -18,7 +81,7 @@ static bool instr_heap_valid(const Instr_heap *val) {
 
 // clang-format off
 
-// Sanity check used in segfault recovery.
+// Sanity check used in debugging.
 static bool comp_heap_valid(const Comp_heap *val) {
   return (
     val &&
@@ -29,7 +92,7 @@ static bool comp_heap_valid(const Comp_heap *val) {
   );
 }
 
-// Sanity check used in segfault recovery.
+// Sanity check used in debugging.
 static bool comp_code_valid(const Comp_code *code) {
   return (
     code &&
@@ -57,7 +120,7 @@ static bool comp_code_valid(const Comp_code *code) {
   );
 }
 
-// Sanity check used in unwinding and debugging.
+// Sanity check used in debugging.
 static bool comp_valid(const Comp *comp) {
   return (
     comp &&
@@ -211,62 +274,6 @@ static Ind comp_register_dysym(Comp *comp, const char *name, U64 addr) {
   return got_ind;
 }
 
-static Err err_current_sym_not_defining() {
-  return err_str("unable to find current word: not inside a colon definition");
-}
-
-static Err comp_require_current_sym(const Comp *comp, Sym **out) {
-  const auto sym = comp->ctx.sym;
-  if (!sym) return err_current_sym_not_defining();
-  if (out) *out = sym;
-  return nullptr;
-}
-
-static Err err_internal_dup_local(const char *name) {
-  return errf("internal error: duplicate local name " FMT_QUOTED, name);
-}
-
-static Err comp_local_add(Comp *comp, Word_str word, Local **out) {
-  const auto stack = &comp->ctx.locals;
-  const auto dict  = &comp->ctx.local_dict;
-  const auto name  = word.buf;
-  if (dict_has(dict, name)) return err_internal_dup_local(name);
-
-  const auto loc = stack_push(stack, (Local){.name = word});
-  dict_set(dict, loc->name.buf, loc);
-  if (out) *out = loc;
-  return nullptr;
-}
-
-static Local *comp_local_get(Comp *comp, const char *name) {
-  return dict_get(&comp->ctx.local_dict, name);
-}
-
-static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
-  auto loc = comp_local_get(comp, name.buf);
-  if (loc) {
-    if (out) *out = loc;
-    return nullptr;
-  }
-  return comp_local_add(comp, name, out);
-}
-
-static Local *comp_local_anon(Comp *comp) {
-  return stack_push(&comp->ctx.locals, (Local){});
-}
-
-static Err err_local_invalid(Local *ptr) {
-  return errf("%p is not a valid address of a local", ptr);
-}
-
-static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
-  const auto locs = &comp->ctx.locals;
-  const auto ptr  = (Local *)num;
-  if (!is_stack_elem(locs, ptr)) return err_local_invalid(ptr);
-  if (out) *out = ptr;
-  return nullptr;
-}
-
 static Err err_inline_not_defining() {
   return err_str("unsupported use of \"inline\" outside a colon definition");
 }
@@ -290,19 +297,19 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
 
   switch (callee->type) {
     case SYM_NORM: {
-      comp_append_call_norm(comp, caller, callee);
+      try(comp_append_call_norm(comp, callee));
       break;
     }
     case SYM_INTRIN: {
-      asm_append_call_intrin(comp, caller, callee, INTERP_INTS_TOP);
+      try(comp_append_call_intrin(comp, callee));
       break;
     }
     case SYM_EXT_PTR: {
-      asm_append_load_extern_ptr(comp, callee->name.buf);
+      try(comp_append_load_extern_ptr(comp, callee->name.buf));
       break;
     }
     case SYM_EXT_PROC: {
-      asm_append_call_extern_proc(comp, caller, callee);
+      try(comp_append_call_extern(comp, callee));
       break;
     }
     default: unreachable();
@@ -330,57 +337,75 @@ static void comp_sym_end(Comp *comp, Sym *sym) {
 static void comp_debug_print_sym_instrs(
   const Comp *comp, const Sym *sym, const char *prefix
 ) {
-  const auto code      = &comp->code;
-  const auto write     = &code->code_write;
-  const auto spans     = &sym->norm.spans;
-  const auto write_beg = &write->dat[spans->begin];
-  const auto write_end = &write->dat[spans->next];
+  const auto spans = &sym->norm.spans;
+  const auto code  = &comp->code;
 
-  eprintf(
-    "%swritable code address: %p\n"
-    "%sinstructions in writable code heap (" FMT_SINT "):\n",
-    prefix,
-    write_beg,
-    prefix,
-    write_end - write_beg
-  );
-  fputs(prefix, stderr);
-  eprint_byte_range_hex((U8 *)write_beg, (U8 *)write_end);
-  fputc('\n', stderr);
+  {
+    const auto instrs = &code->code_write;
+    const auto floor  = &instrs->dat[spans->prologue];
+    const auto ceil   = &instrs->dat[spans->ceil];
 
-  const auto exec     = &sym->norm.exec;
-  const auto exec_beg = exec->floor;
-  const auto exec_end = exec->top;
+    eprintf(
+      "%swritable code address: %p\n"
+      "%sinstructions in writable code heap (" FMT_SINT "):\n",
+      prefix,
+      floor,
+      prefix,
+      ceil - floor
+    );
+    fputs(prefix, stderr);
+    eprint_byte_range_hex((U8 *)floor, (U8 *)ceil);
+    fputc('\n', stderr);
+  }
 
-  eprintf(
-    "%sexecutable code address: %p\n"
-    "%sinstructions in executable code heap (" FMT_SINT "):\n",
-    prefix,
-    exec_beg,
-    prefix,
-    exec_end - exec_beg
-  );
-  fputs(prefix, stderr);
-  eprint_byte_range_hex((U8 *)exec_beg, (U8 *)exec_end);
-  fputc('\n', stderr);
+  {
+    const auto instrs = &code->code_exec;
+    const auto floor  = &instrs->dat[spans->prologue];
+    const auto ceil   = &instrs->dat[spans->ceil];
+
+    eprintf(
+      "%sexecutable code address: %p\n"
+      "%sinstructions in executable code heap (" FMT_SINT "):\n",
+      prefix,
+      floor,
+      prefix,
+      ceil - floor
+    );
+    fputs(prefix, stderr);
+    eprint_byte_range_hex((U8 *)floor, (U8 *)ceil);
+    fputc('\n', stderr);
+  }
 }
 
-static void comp_append_ret(Comp *comp) {
-  list_append(
+static Err comp_append_ret(Comp *comp) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
+  sym->norm.has_rets = true;
+
+  stack_push(
     &comp->ctx.fixup,
     (Comp_fixup){
       .type = COMP_FIX_RET,
       .ret  = asm_append_breakpoint(comp, ASM_CODE_RET),
     }
   );
+  return nullptr;
 }
 
-static void comp_append_recur(Comp *comp) {
-  list_append(
+static Err comp_append_recur(Comp *comp) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
+  set_add(&sym->callees, sym);
+  set_add(&sym->callers, sym);
+
+  stack_push(
     &comp->ctx.fixup,
     (Comp_fixup){
       .type  = COMP_FIX_RECUR,
       .recur = asm_append_breakpoint(comp, ASM_CODE_RECUR),
     }
   );
+  return nullptr;
 }
