@@ -190,7 +190,7 @@ static Err err_arity_mismatch(const char *action, U8 req, U8 ava) {
 
 static Err err_partial_args(const char *action, U8 low, U8 len) {
   return errf(
-    "unable to %s: earlier inputs were partially consumed by assignments: %d of %d; hint: use %d more assignments to clear the inputs",
+    "unable to %s: earlier inputs were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the inputs, or add `--` to assignments to discard unused values",
     action,
     low,
     len,

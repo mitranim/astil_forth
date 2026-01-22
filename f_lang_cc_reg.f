@@ -118,11 +118,28 @@
   reg char comp_load
 ;
 
-\ : mock [ redefine ] \ { -- char }
-\   char' A
-\   #debug_ctx
-\ ;
-\ mock
+\ Same as standard `s"` in interpretation mode.
+\ The parser ensures a trailing null byte.
+\ All our strings are zero-terminated.
+: parse_str { -- cstr len } char' " parse ;
+: parse_cstr { -- cstr } parse_str { cstr -- } cstr ;
+
+\ Same as standard `s"` in interpretation mode.
+\ For top-level code in scripts. Inside words, use `"`.
+: str" { -- cstr len } parse_str ;
+
+: comp_str ( C: <str> -- ) ( E: -- cstr len )
+  comp_next_out_reg { R0 }
+  comp_next_out_reg { R1 }
+  parse_str         { buf len }
+  len inc           { cap } \ Reserve terminating null byte.
+  buf cap R0 comp_const     \ `adrp R0, <page>` & `add R0, R0, <pageoff>`
+  R1 len     comp_load      \ ldr R1, <len>
+;
+
+\ Same as standard `s"` in compilation mode.
+\ Words ending with a quote are automatically immediate.
+: " ( C: <str> -- ) ( E: -- cstr len ) comp_str ;
 
 \ 6 1 extern: mmap
 \ 3 1 extern: mprotect
