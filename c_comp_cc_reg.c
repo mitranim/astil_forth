@@ -179,54 +179,62 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
   if (loc->write && !loc->write->confirmed) loc->write = nullptr;
 }
 
-static Err err_arity_mismatch(const char *action, U8 req, U8 ava) {
+static Err err_arity_mismatch(
+  const char *action, const char *type, U8 req, U8 ava
+) {
   return errf(
-    "unable to %s: arity mismatch: required inputs: %d; available inputs: %d",
+    "unable to %s: arity mismatch: required %s: %d; available %s: %d",
     action,
+    type,
     req,
+    type,
     ava
   );
 }
 
-static Err err_partial_args(const char *action, U8 low, U8 len) {
+static Err err_partial_args(const char *action, const char *type, U8 low, U8 len) {
   return errf(
-    "unable to %s: earlier inputs were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the inputs, or add `--` to assignments to discard unused values",
+    "unable to %s: earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or add `--` to assignments to discard unused values",
     action,
+    type,
     low,
     len,
-    len - low
+    len - low,
+    type
   );
 }
 
-static Err comp_validate_args(Comp *comp, const char *action, U8 req_len) {
+static Err comp_validate_args(
+  Comp *comp, const char *action, const char *type, U8 req_len
+) {
   const auto ctx     = &comp->ctx;
   const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
 
   if (!arg_low) {
     if (arg_len == req_len) return nullptr;
-    return err_arity_mismatch(action, req_len, arg_len);
+    return err_arity_mismatch(action, type, req_len, arg_len);
   }
   if (arg_low >= arg_len) {
-    return err_arity_mismatch(action, req_len, 0);
+    return err_arity_mismatch(action, type, req_len, 0);
   }
-  return err_partial_args(action, arg_low, arg_len);
+  return err_partial_args(action, type, arg_low, arg_len);
 }
 
 static Err comp_validate_call_args(Comp *comp, U8 inp_len) {
-  return comp_validate_args(comp, "call", inp_len);
+  return comp_validate_args(comp, "call", "arguments", inp_len);
 }
 
 static Err comp_validate_ret_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, "return", sym->out_len);
+  return comp_validate_args(comp, "return", "outputs", sym->out_len);
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, "recur", sym->inp_len);
+  return comp_validate_args(comp, "recur", "arguments", sym->inp_len);
 }
 
 static Err err_assign_no_args(const char *name) {
@@ -419,9 +427,9 @@ We don't immediately declare output parameters by name, because they're not
 initialized. To be used, they have to be assigned, which also automatically
 declares them. However, we keep their count, for the call signature.
 */
-static Err comp_add_output_param(Comp *comp, Word_str name) {
+static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
   (void)name;
-  try(comp_next_valid_out_param_reg(comp, nullptr));
+  try(comp_next_valid_out_param_reg(comp, reg));
   return nullptr;
 }
 

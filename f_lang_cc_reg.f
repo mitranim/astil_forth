@@ -13,6 +13,22 @@
 : unreachable abort ;
 : nop ;
 
+: comp_push { val -- }                    comp_next_arg_reg val comp_load ;
+: next_word { -- XT } ( "word" -- XT )    parse_word find_word ;
+: '         ( C: "word" -- ) ( E: -- XT ) next_word comp_push ;
+: inline'   ( C: "word" -- ) ( E: word )  next_word inline_word ;
+: postpone' ( C: "word" -- ) ( E: word )  next_word comp_call ;
+: postpone_compile' next_word comp_push ' comp_call comp_call ;
+
+\ For words which define words. Kinda like `create`.
+: #word_beg postpone_compile' : ;
+: #word_end postpone_compile' ; not_comp_only ;
+
+\ Similar to standard `constant`.
+: let: { val -- } ( E: -- val )
+  #word_beg 0 1 comp_word_sig val comp_push #word_end
+;
+
 \ TODO: consider supporting inference of out-params.
 : ASM_INSTR_SIZE  { -- size  } 4      ;
 : ASM_REG_DAT_SP  { -- reg   } 27     ;
@@ -114,7 +130,7 @@
 : char' ( C: "str" -- ) ( E: -- char )
   parse_word        { buf -- }
   buf c@            { char }
-  comp_next_inp_reg { reg }
+  comp_next_arg_reg { reg }
   reg char comp_load
 ;
 
@@ -129,8 +145,8 @@
 : str" { -- cstr len } parse_str ;
 
 : comp_str ( C: <str> -- ) ( E: -- cstr len )
-  comp_next_out_reg { R0 }
-  comp_next_out_reg { R1 }
+  comp_next_arg_reg { R0 }
+  comp_next_arg_reg { R1 }
   parse_str         { buf len }
   len inc           { cap } \ Reserve terminating null byte.
   buf cap R0 comp_const     \ `adrp R0, <page>` & `add R0, R0, <pageoff>`

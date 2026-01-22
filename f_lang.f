@@ -855,7 +855,7 @@
 \
 \ We could easily define variables without compiler support,
 \ allocating memory via libc. The reason for special support
-\ such as `comp_static` is compatibility with AOT compilation,
+\ such as `comp_static` is compatibility with AOT compilation
 \ which is planned for later.
 
 \ For words which define words. Kinda like `create`.

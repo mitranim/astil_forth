@@ -46,7 +46,7 @@ static Err interp_brace_params(Interp *interp) {
     try(read_word(read));
     const auto word = read->word;
     if (str_eq(&word, "}")) return nullptr;
-    try(comp_add_output_param(comp, word));
+    try(comp_add_output_param(comp, word, nullptr));
   }
   return nullptr;
 }
@@ -158,7 +158,7 @@ static Err intrin_import(Sint buf, Sint len, Interp *interp) {
   try(interp_import(interp, path)) return nullptr;
 }
 
-static Err intrin_extern_proc(Sint out_len, Sint inp_len, Interp *interp) {
+static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
   try(interp_extern_proc(interp, inp_len, out_len));
   return nullptr;
 }
@@ -184,16 +184,29 @@ static Err intrin_execute(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_next_inp_reg(Interp *interp) {
-  U8 reg;
-  try(comp_next_valid_arg_reg(&interp->comp, &reg));
-  try(int_stack_push(&interp->ints, reg));
+/*
+Used by "compiling" words to tell the compiler about the
+input and output parameter counts. The compiler normally
+infers the counts when parsing `{}` signatures which are
+not available when meta-programming.
+*/
+static Err intrin_comp_word_sig(Sint inp_len, Sint out_len, Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  try(arch_validate_input_param_reg(inp_len));
+  try(arch_validate_output_param_reg(inp_len));
+  sym->inp_len = (U8)inp_len;
+  sym->out_len = (U8)out_len;
   return nullptr;
 }
 
-static Err intrin_comp_next_out_reg(Interp *interp) {
-  // Warning: would need adjustment for the x64 arch.
-  // See the comments in `./c_comp_cc_reg.c`.
+/*
+This is slightly abstract: an "arg" may eventually become either an input
+or an output. This assumes that we can decide the reg immediately, which
+holds on _some_ architectures under _some_ assumptions, but does not hold
+in the general case. See the comments in `./c_comp_cc_reg.c`.
+*/
+static Err intrin_comp_next_arg_reg(Interp *interp) {
   U8 reg;
   try(comp_next_valid_arg_reg(&interp->comp, &reg));
   try(int_stack_push(&interp->ints, reg));
@@ -348,18 +361,18 @@ static constexpr USED auto INTRIN_BRACE = (Sym){
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_COMP_NEXT_INP_REG = (Sym){
-  .name.buf  = "comp_next_inp_reg",
-  .intrin    = (void *)intrin_comp_next_inp_reg,
+static constexpr USED auto INTRIN_COMP_NEXT_ARG_REG = (Sym){
+  .name.buf  = "comp_next_arg_reg",
+  .intrin    = (void *)intrin_comp_next_arg_reg,
   .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_COMP_NEXT_OUT_REG = (Sym){
-  .name.buf  = "comp_next_out_reg",
-  .intrin    = (void *)intrin_comp_next_out_reg,
-  .out_len   = 1,
+static constexpr USED auto INTRIN_COMP_WORD_SIG = (Sym){
+  .name.buf  = "comp_word_sig",
+  .intrin    = (void *)intrin_comp_word_sig,
+  .inp_len   = 2,
   .throws    = true,
   .comp_only = true,
 };
@@ -387,6 +400,12 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
 };
 
 static constexpr USED auto INTRIN_DEBUG_CTX = (Sym){
+  .name.buf  = "debug_ctx",
+  .intrin    = (void *)intrin_debug_ctx,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_DEBUG_CTX_IMM = (Sym){
   .name.buf  = "#debug_ctx",
   .intrin    = (void *)intrin_debug_ctx,
   .immediate = true,

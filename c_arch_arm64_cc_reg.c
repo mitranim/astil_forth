@@ -20,21 +20,23 @@ The special registers must be kept in sync with `f_lang_cc_reg.f`.
 #include "./c_arch_arm64.c"
 #endif
 
-static Err arch_validate_input_param_reg(U8 reg) {
-  if (reg <= ARCH_INP_PARAM_REG_LEN) return nullptr;
+static Err arch_validate_input_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ARCH_INP_PARAM_REG_LEN) return nullptr;
   return errf(
-    "too many input parameters: %d registers available, %d parameters requested",
-    reg,
-    ARCH_INP_PARAM_REG_LEN
+    "too many input parameters: %d registers available, " FMT_SINT
+    " parameters requested",
+    ARCH_INP_PARAM_REG_LEN,
+    reg
   );
 }
 
-static Err arch_validate_output_param_reg(U8 reg) {
-  if (reg <= ARCH_OUT_PARAM_REG_LEN) return nullptr;
+static Err arch_validate_output_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ARCH_OUT_PARAM_REG_LEN) return nullptr;
   return errf(
-    "too many output parameters: %d registers available, %d parameters requested",
-    reg,
-    ARCH_OUT_PARAM_REG_LEN
+    "too many output parameters: %d registers available, " FMT_SINT
+    " parameters requested",
+    ARCH_OUT_PARAM_REG_LEN,
+    reg
   );
 }
 
