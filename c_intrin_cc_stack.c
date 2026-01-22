@@ -63,6 +63,41 @@ static Err interp_pop_reg(Interp *interp, U8 *out) {
   return nullptr;
 }
 
+static Err interp_valid_name(Interp *interp, Word_str *out) {
+  const char *buf;
+  Ind         len;
+  try(interp_pop_data_len(interp, &len));
+  try(interp_pop_data_ptr(interp, (const U8 **)&buf));
+  try(valid_word(buf, len, out));
+  return nullptr;
+}
+
+static Err intrin_colon(Interp *interp) {
+  try(interp_begin_definition(interp));
+  try(interp_word_begin(interp, WORDLIST_EXEC, interp->reader->word));
+  return nullptr;
+}
+
+static Err intrin_colon_colon(Interp *interp) {
+  try(interp_begin_definition(interp));
+  try(interp_word_begin(interp, WORDLIST_COMP, interp->reader->word));
+  return nullptr;
+}
+
+static Err intrin_colon_named(Interp *interp) {
+  Word_str name;
+  try(interp_valid_name(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_EXEC, name));
+  return nullptr;
+}
+
+static Err intrin_colon_colon_named(Interp *interp) {
+  Word_str name;
+  try(interp_valid_name(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_COMP, name));
+  return nullptr;
+}
+
 static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }
 
 static Err intrin_recur(Interp *interp) {
@@ -226,7 +261,10 @@ static Err intrin_get_local(Interp *interp) {
   try(interp_pop_data_ptr(interp, &buf));
   try(interp_get_local(interp, (const char *)buf, len, &loc));
 
-  if (!loc->mem) comp_local_alloc_mem(comp, loc);
+  if (!loc->inited) {
+    comp_local_alloc_mem(comp, loc);
+    loc->inited = true;
+  }
 
   const auto tok = local_token(loc);
   try(int_stack_push(&interp->ints, tok));
@@ -243,3 +281,19 @@ static Err intrin_anon_local(Interp *interp) {
   try(int_stack_push(&interp->ints, (Sint)tok));
   return nullptr;
 }
+
+static constexpr USED auto INTRIN_COLON_NAMED = (Sym){
+  .name.buf = "colon",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_colon_named,
+  .inp_len  = 2,
+  .throws   = true,
+};
+
+static constexpr USED auto INTRIN_COLON_COLON_NAMED = (Sym){
+  .name.buf = "colon_colon",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_colon_colon_named,
+  .inp_len  = 2,
+  .throws   = true,
+};

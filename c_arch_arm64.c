@@ -716,7 +716,7 @@ static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm12) {
 
 static void comp_local_alloc_mem(Comp *comp, Local *loc) {
   aver(!loc->mem);
-  loc->mem = ++comp->ctx.mem_locs;
+  loc->mem = comp->ctx.mem_locs++;
 }
 
 // SYNC[local_fp_off].

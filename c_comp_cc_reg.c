@@ -102,7 +102,6 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->mem_locs);
   ptr_clear(&ctx->arg_low);
   ptr_clear(&ctx->arg_len);
-  ptr_clear(&ctx->proc_body);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
 }
@@ -281,13 +280,15 @@ static Err comp_validate_call_args(Comp *comp, const Sym *callee) {
 static Err comp_validate_ret_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, nullptr, "return", "outputs", sym->out_len);
+  try(comp_validate_args(comp, nullptr, "return", "outputs", sym->out_len));
+  return nullptr;
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, nullptr, "recur", "arguments", sym->inp_len);
+  try(comp_validate_args(comp, nullptr, "recur", "arguments", sym->inp_len));
+  return nullptr;
 }
 
 static Err err_assign_no_args(const char *name) {
@@ -437,8 +438,6 @@ which clobbers parameter registers, which may be associated
 with other locals. The clobbers are handled in that logic.
 */
 static Err comp_append_local_get(Comp *comp, Local *loc) {
-  comp->ctx.proc_body = true;
-
   auto reg = comp->ctx.arg_len;
   if (is_param_reg(reg) && comp_local_has_reg(comp, loc, reg)) {
     comp->ctx.arg_len++;
@@ -487,8 +486,6 @@ static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
 }
 
 static Err comp_append_push_imm(Comp *comp, Sint imm) {
-  comp->ctx.proc_body = true;
-
   U8 reg;
   try(comp_next_valid_arg_reg(comp, &reg));
   asm_append_imm_to_reg(comp, reg, imm, nullptr);
@@ -502,24 +499,11 @@ static Err comp_append_push_imm(Comp *comp, Sint imm) {
 }
 
 static Err comp_call_intrin(Interp *interp, const Sym *sym) {
-  /*
-  A bit of "state-smartness" for braces. The end result is that the braces
-  immediately following `: <name>` are used for parameters, and the braces
-  anywhere else are used for assignments. Alternatively, we could instruct
-  `intrin_colon` to immediately parse ahead, and backtrack when `{` is not
-  found. Might do that later. Either approach seems very un-Forth-like.
-  */
-  const auto ctx   = &interp->comp.ctx;
-  const auto first = ctx->sym && !ctx->proc_body;
-
   try(arch_call_intrin(interp, sym));
-
-  if (first && ctx->sym) ctx->proc_body = true;
   return nullptr;
 }
 
 static Err comp_before_append_call(Comp *comp, const Sym *callee) {
-  comp->ctx.proc_body = true;
   try(comp_validate_call_args(comp, callee));
   try(comp_clobber_from_call(comp, callee));
   return nullptr;

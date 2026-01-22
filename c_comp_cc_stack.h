@@ -5,8 +5,9 @@
 #include "./lib/str.h"
 
 typedef struct {
-  Word_str name; // May be empty.
-  Ind      mem;  // 1-indexed position of FP offset.
+  Word_str name;   // May be empty.
+  Ind      mem;    // Index of FP offset.
+  bool     inited; // True if `mem` has been assigned.
 } Local;
 
 typedef stack_of(Local)  Local_stack;

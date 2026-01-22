@@ -29,14 +29,21 @@ static Err reader_err(Reader *read, Err err) {
   );
 }
 
-static void reader_backtrack(Reader *read, U8 val) {
-  str_push(&read->back, val);
-}
-
 // TODO clearer name.
 static U8 reader_unpeek(Reader *read) {
   const auto buf = &read->back;
   return buf->len ? buf->buf[buf->len-- - 1] : (U8)0;
+}
+
+static void reader_backtrack(Reader *read, U8 val) {
+  str_push(&read->back, val);
+}
+
+static void reader_backtrack_word(Reader *read) {
+  const auto word = &read->word;
+  while (word->len) {
+    reader_backtrack(read, word->buf[--word->len]);
+  }
 }
 
 // 254 = Ctrl+D

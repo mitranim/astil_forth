@@ -79,7 +79,7 @@ typedef struct {
 
   union {
     U8  reg; // For `LOC_REG` only.
-    Ind mem; // For `LOC_MEM` only; 1-indexed position of FP offset.
+    Ind mem; // For `LOC_MEM` only; index of FP offset.
   };
 } Local;
 
@@ -140,5 +140,4 @@ typedef struct {
   Loc_fixups  loc_fix;    // Used for resolving stable locations for locals.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
-  bool        proc_body;  // Not looking for brace params anymore.
 } Comp_ctx;

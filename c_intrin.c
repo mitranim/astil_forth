@@ -22,17 +22,10 @@ static Err err_wordlist_at_capacity(const char *name) {
   return errf("unable to create word " FMT_QUOTED ": wordlist at capacity", name);
 }
 
-static Err interp_word_begin(Interp *interp, Wordlist wordlist) {
-  const auto comp = &interp->comp;
-  if (comp->ctx.sym) return err_nested_definition(interp);
-
-  const auto read = interp->reader;
-  try(read_word(read));
-
-  const auto name = read->word;
-
+static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
   IF_DEBUG(eprintf(
-    "[system] read word name: " FMT_QUOTED "; associating with wordlist %d\n",
+    "[system] starting definition of " FMT_QUOTED
+    " associated with wordlist %d\n",
     name.buf,
     wordlist
   ));
@@ -53,16 +46,14 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist) {
     }
   );
 
-  comp_sym_beg(comp, sym);
+  comp_sym_beg(&interp->comp, sym);
   return nullptr;
 }
 
-static Err intrin_colon(Interp *interp) {
-  return interp_word_begin(interp, WORDLIST_EXEC);
-}
-
-static Err intrin_colon_colon(Interp *interp) {
-  return interp_word_begin(interp, WORDLIST_COMP);
+static Err interp_begin_definition(Interp *interp) {
+  if (interp->comp.ctx.sym) return err_nested_definition(interp);
+  try(interp_read_word(interp));
+  return nullptr;
 }
 
 static void interp_repr_sym(const Interp *, const Sym *);

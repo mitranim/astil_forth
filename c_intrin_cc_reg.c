@@ -2,7 +2,41 @@
 #include "./c_interp_internal.c"
 #include "lib/fmt.h"
 
-static Err interp_brace_assignment(Interp *interp) {
+/*
+The braces immediately following `: <name>` are used for parameters,
+while the braces anywhere else are used for assignments.
+*/
+static Err interp_parse_params(Interp *interp) {
+  const auto read = interp->reader;
+
+  try(read_word(read));
+  const auto word = read->word;
+
+  if (!str_eq(&word, "{")) {
+    reader_backtrack_word(read);
+    return nullptr;
+  }
+
+  const auto comp = &interp->comp;
+
+  for (;;) {
+    try(read_word(read));
+    const auto word = read->word;
+    if (str_eq(&word, "}")) return nullptr;
+    if (str_eq(&word, "--")) break;
+    try(comp_add_input_param(comp, word));
+  }
+
+  for (;;) {
+    try(read_word(read));
+    const auto word = read->word;
+    if (str_eq(&word, "}")) return nullptr;
+    try(comp_add_output_param(comp, word, nullptr));
+  }
+  return nullptr;
+}
+
+static Err intrin_brace(Interp *interp) {
   const auto read = interp->reader;
   const auto comp = &interp->comp;
 
@@ -29,32 +63,61 @@ static Err interp_brace_assignment(Interp *interp) {
   return nullptr;
 }
 
-static Err interp_brace_params(Interp *interp) {
-  const auto read     = interp->reader;
-  const auto comp     = &interp->comp;
-  comp->ctx.proc_body = true;
+static Err interp_validate_data_ptr(Sint val) {
+  /*
+  Some systems deliberately ensure that virtual memory addresses
+  are just out of range of `int32`. Would be nice to check if the
+  pointer is somewhere in that range, but the assumption would be
+  really non-portable.
 
-  for (;;) {
-    try(read_word(read));
-    const auto word = read->word;
-    if (str_eq(&word, "}")) return nullptr;
-    if (str_eq(&word, "--")) break;
-    try(comp_add_input_param(comp, word));
-  }
+  In a Forth implementation for OS-free microchips with a very small
+  amount of real memory, valid data pointers could begin close to 0,
+  depending on how data is organized. Since our implementation only
+  supports 64-bit machines and requires an OS, we can at least assume
+  addresses which are "decently large".
+  */
+  if (val > (1 << 14)) return nullptr;
+  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
+}
 
-  for (;;) {
-    try(read_word(read));
-    const auto word = read->word;
-    if (str_eq(&word, "}")) return nullptr;
-    try(comp_add_output_param(comp, word, nullptr));
-  }
+static Err interp_validate_data_len(Sint val) {
+  if (val > 0 && val < (Sint)IND_MAX) return nullptr;
+  return errf("invalid data length: " FMT_SINT, val);
+}
+
+static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
+  try(interp_validate_data_ptr(buf));
+  try(interp_validate_data_len(len));
+  try(valid_word((const char *)buf, (Ind)len, out));
   return nullptr;
 }
 
-static Err intrin_brace(Interp *interp) {
-  const auto comp = &interp->comp;
-  if (!comp->ctx.proc_body) return interp_brace_params(interp);
-  return interp_brace_assignment(interp);
+static Err intrin_colon(Interp *interp) {
+  try(interp_begin_definition(interp));
+  try(interp_word_begin(interp, WORDLIST_EXEC, interp->reader->word));
+  try(interp_parse_params(interp));
+  return nullptr;
+}
+
+static Err intrin_colon_colon(Interp *interp) {
+  try(interp_begin_definition(interp));
+  try(interp_word_begin(interp, WORDLIST_COMP, interp->reader->word));
+  try(interp_parse_params(interp));
+  return nullptr;
+}
+
+static Err intrin_colon_named(Sint buf, Sint len, Interp *interp) {
+  Word_str name;
+  try(interp_valid_name(buf, len, &name));
+  try(interp_word_begin(interp, WORDLIST_EXEC, name));
+  return nullptr;
+}
+
+static Err intrin_colon_colon_named(Sint buf, Sint len, Interp *interp) {
+  Word_str name;
+  try(interp_valid_name(buf, len, &name));
+  try(interp_word_begin(interp, WORDLIST_COMP, name));
+  return nullptr;
 }
 
 static Err intrin_ret(Interp *interp) {
@@ -85,28 +148,6 @@ static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
   if (has_load) sym->norm.has_loads = true;
   return nullptr;
-}
-
-static Err interp_validate_data_ptr(Sint val) {
-  /*
-  Some systems deliberately ensure that virtual memory addresses
-  are just out of range of `int32`. Would be nice to check if the
-  pointer is somewhere in that range, but the assumption would be
-  really non-portable.
-
-  In a Forth implementation for OS-free microchips with a very small
-  amount of real memory, valid data pointers could begin close to 0,
-  depending on how data is organized. Since our implementation only
-  supports 64-bit machines and requires an OS, we can at least assume
-  addresses which are "decently large".
-  */
-  if (val > (1 << 14)) return nullptr;
-  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
-}
-
-static Err interp_validate_data_len(Sint val) {
-  if (val > 0 && val < (Sint)IND_MAX) return nullptr;
-  return errf("invalid data length: " FMT_SINT, val);
 }
 
 static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
@@ -181,7 +222,7 @@ static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_find_word(Sint wordlist, Sint buf, Sint len, Interp *interp) {
+static Err intrin_find_word(Sint buf, Sint len, Sint wordlist, Interp *interp) {
   try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
   try(interp_find_word(interp, (const char *)buf, (Ind)len, (Wordlist)wordlist));
@@ -195,6 +236,13 @@ static Err intrin_inline_word(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
+/*
+TODO: convert to compile-time with the following semantics:
+- Verify that at least one argument is available.
+- Compile `blr <reg>` where `<reg>` is the latest arg.
+- Compile a "try" (check the error reg).
+- Assume no output and reset args to 0.
+*/
 static Err intrin_execute(Sint ptr, Interp *interp) {
   Sym *sym;
   try(interp_sym_by_ptr(interp, ptr, &sym));
@@ -351,6 +399,15 @@ static void intrin_debug_ctx(Interp *interp) {
   IF_DEBUG(repr_struct(ctx));
 }
 
+static void intrin_debug_arg(Sint val, Interp *) {
+  eprintf(
+    "[debug] arg: " FMT_SINT " " FMT_UINT_HEX " %s\n",
+    val,
+    (Uint)val,
+    uint64_to_bit_str((Uint)val)
+  );
+}
+
 /*
 Control constructs such as counted loops must use this to emit a barrier AFTER
 initializing their own locals or otherwise using the available arguments.
@@ -375,6 +432,22 @@ static Err intrin_comp_clobber_barrier(Interp *interp) {
 }
 
 // The "missing" fields are set in `sym_init_intrin`.
+
+static constexpr USED auto INTRIN_COLON_NAMED = (Sym){
+  .name.buf = "colon",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_colon_named,
+  .inp_len  = 2,
+  .throws   = true,
+};
+
+static constexpr USED auto INTRIN_COLON_COLON_NAMED = (Sym){
+  .name.buf = "colon_colon",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_colon_colon_named,
+  .inp_len  = 2,
+  .throws   = true,
+};
 
 static constexpr USED auto INTRIN_BRACE = (Sym){
   .name.buf  = "{",
@@ -447,4 +520,11 @@ static constexpr USED auto INTRIN_DEBUG_CTX_IMM = (Sym){
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_debug_ctx,
   .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_DEBUG_ARG = (Sym){
+  .name.buf = "debug_arg",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_debug_arg,
+  .inp_len  = 1,
 };

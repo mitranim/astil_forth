@@ -1,4 +1,4 @@
-: drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] ;
+:  drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] ;
 :: \ 10 parse drop2 ;
 :: ( 41 parse drop2 ;
 
@@ -8,6 +8,8 @@
 \ provides only the most fundamental intrinsics; enough for self-assembly.
 \ We define basic words in terms of machine instructions, building up from
 \ there. Currently only the Arm64 CPU architecture is supported.
+\
+\ The reason for `::` will become apparent later.
 
 \ brk 666
 : abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;
@@ -15,9 +17,9 @@
 : nop ;
 
 : ASM_INSTR_SIZE  4      ;
-: ARCH_REG_DAT_SP  27     ;
-: ARCH_REG_FP      29     ;
-: ARCH_REG_SP      31     ;
+: ARCH_REG_DAT_SP 27     ;
+: ARCH_REG_FP     29     ;
+: ARCH_REG_SP     31     ;
 : ASM_EQ          0b0000 ;
 : ASM_NE          0b0001 ;
 : ASM_CS          0b0010 ;
@@ -114,21 +116,18 @@
 : low_bits ( bit_len -- bits ) 1 swap lsl dec ;
 : bit_trunc ( imm bit_len -- imm ) low_bits and ;
 
-\ cmp Xn, 0
-: asm_cmp_zero ( Xn -- instr )
-  5 lsl
-  0b1_1_1_100010_0_000000000000_00000_11111
-  or
-;
-
+\ cmp Xn, <imm>
 : asm_cmp_imm ( Xn imm -- instr )
        10 lsl    \ imm
   swap 5  lsl or \ Xn
   0b1_1_1_100010_0_000000000000_00000_11111 or
 ;
 
+\ cmp Xn, 0
+: asm_cmp_zero ( Xn -- instr ) 0 asm_cmp_imm ;
+
 \ cset Xd, <cond>
-: asm_cset ( Xd cond -- )
+: asm_cset ( Xd cond -- instr )
   0b1_0_0_11010100_11111_0000_0_1_11111_00000
   swap 1 xor 12 lsl or \ cond
                     or \ Xd
@@ -136,20 +135,20 @@
 
 : <>0 ( int -- bool ) [
            asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-         1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1        asm_cmp_zero comp_instr \ cmp x1, 0
   1 ASM_NE asm_cset     comp_instr \ cset x1, ne
            asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 : =0 ( int -- bool ) [
            asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-         1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1        asm_cmp_zero comp_instr \ cmp x1, 0
   1 ASM_EQ asm_cset     comp_instr \ cset x1, eq
            asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 \ Shared by a lot of load and store instructions. 64-bit only.
-: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr )
+: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr_mask )
   3 lsr 7 bit_trunc 15 lsl    \ imm7
   swap              5  lsl or \ Xn
   swap              10 lsl or \ Xt2
@@ -195,7 +194,7 @@
 \ Shared by a lot of load and store instructions.
 \ Patches these bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
-: asm_pattern_load_store ( Xt Xn imm9 -- instr )
+: asm_pattern_load_store ( Xt Xn imm9 -- instr_mask )
   9 bit_trunc 12 lsl    \ imm9
   swap        5  lsl or \ Xn
                      or \ Xt
@@ -251,8 +250,7 @@
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
-\ Assumes `lsl` is already part of the base instruction.
-: asm_pattern_load_store_with_register ( Xt Xn Xm scale -- instr )
+: asm_pattern_load_store_with_register ( Xt Xn Xm scale -- instr_mask )
   <>0  12 lsl    \ lsl 3
   swap 16 lsl or \ Xm
   swap 5  lsl or \ Xn
@@ -439,7 +437,7 @@
 ;
 
 \ `imm19` offset is implicitly times 4 and can be negative.
-: asm_pattern_compare_branch ( Xt imm19 -- instr )
+: asm_pattern_compare_branch ( Xt imm19 -- instr_mask )
   2 lsr 19 bit_trunc 5 lsl \ imm19
                         or \ Xt
 ;
@@ -505,7 +503,7 @@
 
 : next_word ( wordlist "word" -- exec_tok ) parse_word find_word ;
 
-: tick_next ( C: wordlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
+:  tick_next ( C: wordlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
 :: '  WORDLIST_EXEC tick_next ;
 :: '' WORDLIST_COMP tick_next ;
 
@@ -513,8 +511,8 @@
 :: inline'  WORDLIST_EXEC inline_next ;
 :: inline'' WORDLIST_COMP inline_next ;
 
-\ Note: `execute` is renamed from `postpone`.
-: execute_next ( wordlist "word" -- ) ( E: <word> ) next_word comp_call ;
+\ "execute" is renamed from standard "postpone".
+:  execute_next ( wordlist "word" -- ) ( E: <word> ) next_word comp_call ;
 :: execute'  WORDLIST_EXEC execute_next ;
 :: execute'' WORDLIST_COMP execute_next ;
 
@@ -841,7 +839,10 @@
   1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
 ] ;
 
-:: char' parse_word drop c@ comp_push ;
+: parse_char ( "str" -- char ) parse_word drop c@ ;
+
+:  char' ( E: "str" -- char )           parse_char ;
+:: char' ( C: "str" -- ) ( E: -- char ) parse_char comp_push ;
 
 \ Interpretation semantics of standard `s"`.
 \ The parser ensures null-termination.
@@ -895,11 +896,9 @@
   #word_end
 ;
 
-\ Creates a global variable which refers to a buffer of at least
-\ the given size in bytes, rounded up to page size.
-\
-\ Serves the same role as the standard idiom `create <name> N allot`
-\ which we don't have because we segregate code and data.
+\ Similar to the standard idiom `create <name> N allot`.
+\ Creates a global variable which refers to a buffer of
+\ at least the given size in bytes.
 : buf: ( C: size "name" -- ) ( E: -- addr size )
   #word_beg
   dup 0 swap  alloc_data     ( -- addr )
@@ -968,10 +967,8 @@
 
 \ ## Memory
 \
-\ The program is implicitly linked with `libc`.
-\ We're free to use Posix-standard C functions.
-\ C variables like `stdout` are a bit trickier,
-\ but also optional; we could `fdopen` instead.
+\ The program is implicitly linked with `libc`,
+\ so we get to use C stdlib procedures.
 
 2 1 extern: calloc  ( len size -- addr )
 1 1 extern: malloc  ( size -- addr )
@@ -1344,7 +1341,7 @@
 
 \ Finds an extern symbol by name and creates a new word which loads the address
 \ of that symbol. The extern symbol can be either a variable or a procedure.
-: extern_ptr: ( C: "name" str len -- ) ( E: -- ptr )
+: extern_ptr: ( C: "ours" "extern" -- ) ( E: -- ptr )
   #word_beg
   parse_word extern_got to: adr \ Addr of GOT entry holding extern addr.
   adr 1       comp_page_load    \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
@@ -1354,7 +1351,7 @@
 
 \ Like `extern_ptr:` but with an additional load instruction.
 \ Analogous to extern vars in C. Lets us access stdio files.
-: extern_val: ( C: "name" str len -- ) ( E: -- val )
+: extern_val: ( C: "ours" "extern" -- ) ( E: -- val )
   #word_beg
   parse_word extern_got to: adr     \ Addr of GOT entry holding extern addr.
   adr 1              comp_page_load \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
@@ -1363,20 +1360,26 @@
   #word_end
 ;
 
+\ ## IO
+\
+\ Having access to `libc` spares us from having
+\ to implement these procedures or provide them
+\ as intrinsics.
+
 extern_val: stdin  __stdinp
 extern_val: stdout __stdoutp
 extern_val: stderr __stderrp
 
-4 0 extern: fwrite
-1 0 extern: putchar
-2 0 extern: fputc
-2 0 extern: fputs
-1 0 extern: printf
-2 0 extern: fprintf
-3 0 extern: snprintf
-1 0 extern: fflush
+4 0 extern: fwrite   ( src size len file -- )
+1 0 extern: putchar  ( char -- )
+2 0 extern: fputc    ( char file -- )
+2 0 extern: fputs    ( cstr file -- )
+1 0 extern: printf   ( … fmt -- )
+2 0 extern: fprintf  ( … file fmt -- )
+3 0 extern: snprintf ( … buf cap fmt -- )
+1 0 extern: fflush   ( file -- )
 
-: eputchar ( code -- ) stderr fputc ;
+: eputchar ( char -- ) stderr fputc ;
 : puts ( cstr -- ) stdout fputs ;
 : eputs ( cstr -- ) stderr fputs ;
 : flush stdout fflush ;
@@ -1610,8 +1613,9 @@ extern_val: stderr __stderrp
 
 extern_val: errno __error
 1 1 extern: strerror
-6 1 extern: mmap
-3 1 extern: mprotect
+
+6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
+3 1 extern: mprotect ( adr len pflag -- err )
 
 16384 let: PAGE_SIZE
 0     let: PROT_NONE

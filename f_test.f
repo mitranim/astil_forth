@@ -547,4 +547,4 @@ test_to
 ;
 test_locals
 
-elog" [test] ok" elf
+log" [test] ok" lf
