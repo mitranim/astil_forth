@@ -13,12 +13,15 @@
 : unreachable abort ;
 : nop ;
 
+
+
+
 : comp_push { val -- } comp_next_arg_reg { reg } val reg comp_load ;
 : next_word { -- XT } ( "word" -- XT ) parse_word find_word ;
 : word'     { -- XT } next_word ;
 : '         ( C: "word" -- ) ( E: -- XT ) next_word comp_push ;
 : inline'   ( C: "word" -- ) ( E: word ) next_word inline_word ;
-: postpone' ( C: "word" -- ) ( E: word ) next_word comp_call ;
+: execute'  ( C: "word" -- ) ( E: word ) next_word comp_call ;
 : compile' next_word comp_push ' comp_call comp_call ;
 
 : @ { adr -- val } [

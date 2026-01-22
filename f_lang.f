@@ -486,10 +486,11 @@
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
+\ Note: `execute'` is renamed from `postpone`.
 : next_word ( "word" -- exec_tok ) parse_word find_word ;
 : '         ( C: "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
 : inline'   ( C: "word" -- ) ( E: <word> ) next_word inline_word ;
-: postpone' ( C: "word" -- ) ( E: <word> ) next_word comp_call ;
+: execute'  ( C: "word" -- ) ( E: <word> ) next_word comp_call ;
 : compile'  ( C: "word" -- ) next_word comp_push ' comp_call comp_call ;
 
 : drop ( val -- ) [
@@ -1031,11 +1032,11 @@
 \ to pop any amount of control constructs with a single `#end`.
 \ Prepending a nop terminates this chain.
 : #if ( C: -- prev fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
-  if_init postpone' #elif
+  if_init execute' #elif
 ;
 
 : #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
-  if_init postpone' #elifn
+  if_init execute' #elifn
 ;
 
 : else_pop ( fun[prev] adr[else] -- ) patch_uncond_forward execute ;
@@ -1115,7 +1116,7 @@
 ;
 
 : loop_end ( adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
-: loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end postpone' #end ;
+: loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end execute' #end ;
 
 : #loop
   ( C: -- frame fun[frame!] … adr[beg] fun[loop] )
@@ -1311,13 +1312,13 @@
   \ We can almost use `comp_count_loop_beg` here,
   \ but this loop wants subtraction at the start.
   \ TODO use `ldp` for adjacent offsets.
-  1 ceil  asm_local_get comp_instr \ ldur x1, [FP, <ceil_off>]
-  2 floor asm_local_get comp_instr \ ldur x2, [FP, <floor_off>]
-  3 step  asm_local_get comp_instr \ ldur x3, [FP, <step_off>]
-  1 1 3   asm_sub_reg   comp_instr \ sub x1, x1, x3
-  1 2     asm_cmp_reg   comp_instr \ cmp x1, x2
-  here to: adr_cond  reserve_instr \ b.cond <end>
-  1 ceil  asm_local_set comp_instr \ stur x1, [FP, <ceil_off>]
+  1 ceil  asm_local_get comp_instr    \ ldur x1, [FP, <ceil_off>]
+  2 floor asm_local_get comp_instr    \ ldur x2, [FP, <floor_off>]
+  3 step  asm_local_get comp_instr    \ ldur x3, [FP, <step_off>]
+  1 1 3   asm_sub_reg   comp_instr    \ sub x1, x1, x3
+  1 2     asm_cmp_reg   comp_instr    \ cmp x1, x2
+  here to: adr_cond     reserve_instr \ b.cond <end>
+  1 ceil  asm_local_set comp_instr    \ stur x1, [FP, <ceil_off>]
 
   adr_cond adr_beg ' count_down_loop_pop
 ;
@@ -1414,7 +1415,7 @@ extern_val: stderr __stderrp
 
 \ For compiling words which modify a local by applying the given function.
 : mut_local' ( C: "name" fun -- ) ( E: -- )
-  postpone' '
+  execute' '
   compile' mut_local
 ;
 
@@ -1501,12 +1502,12 @@ extern_val: stderr __stderrp
 \
 \   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
 : logf" ( C: N -- ) ( E: i1 … iN -- )
-  va- postpone' c" compile' printf -va
+  va- execute' c" compile' printf -va
 ;
 
 \ Format-prints to stderr.
 : elogf" ( C: N -- ) ( E: i1 … iN -- )
-  va- compile' stderr postpone' c" compile' fprintf -va
+  va- compile' stderr execute' c" compile' fprintf -va
 ;
 
 \ Formats into the provided buffer using `snprintf`. Usage example:
@@ -1550,10 +1551,10 @@ extern_val: stderr __stderrp
 
 \ Similar to standard `abort"`, with clearer naming.
 : throw_if" ( C: "str" -- ) ( E: pred -- )
-  postpone' #if
+  execute' #if
   comp_str
   compile' throw
-  postpone' #end
+  execute' #end
 ;
 
 : log_int ( num -- ) [ 1 ] logf" %zd"  ;
