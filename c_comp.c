@@ -237,31 +237,41 @@ static Comp comp_rewind(Comp prev, Comp next) {
   return next;
 }
 
+static const U64 *comp_find_dysym(Comp *comp, const char *name) {
+  const auto code = &comp->code;
+  const auto inds = &code->gots.inds;
+
+  if (!dict_has(inds, name)) return nullptr;
+
+  const auto ind = dict_get(inds, name);
+  return &code->got.dat[ind];
+}
+
 /*
 Used for registering dynamically-linked symbols.
 
 The provided address should be used only in interpretation. When we implement
 AOT compilation, GOT addresses should be pre-zeroed and patched by the linker.
 */
-static Ind comp_register_dysym(Comp *comp, const char *name, U64 addr) {
-  const auto code    = &comp->code;
-  const auto names   = &code->gots.names;
-  const auto inds    = &code->gots.inds;
-  const auto val_ind = dict_ind(inds, name);
+static const U64 *comp_register_dysym(Comp *comp, const char *name, U64 addr) {
+  const auto code  = &comp->code;
+  const auto got   = &code->got;
+  const auto names = &code->gots.names;
+  const auto inds  = &code->gots.inds;
 
-  if (ind_valid(val_ind)) return inds->vals[val_ind];
+  if (dict_has(inds, name)) {
+    const auto got_ind = dict_get(inds, name);
+    return &got->dat[got_ind];
+  }
 
-  const auto got     = &code->got;
   const auto got_ind = got->len;
-
   list_push(got, addr);
   aver(stack_len(names) == got_ind);
 
   const auto got_name = names->top++;
-
   averr(str_copy(got_name, name));
   dict_set(inds, got_name->buf, got_ind);
-  return got_ind;
+  return &got->dat[got_ind];
 }
 
 static Err comp_append_call_sym(Comp *comp, Sym *callee) {
@@ -282,11 +292,7 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
       try(comp_append_call_intrin(comp, callee));
       break;
     }
-    case SYM_EXT_PTR: {
-      try(comp_append_load_extern_ptr(comp, callee->name.buf));
-      break;
-    }
-    case SYM_EXT_PROC: {
+    case SYM_EXTERN: {
       try(comp_append_call_extern(comp, callee));
       break;
     }
@@ -390,6 +396,30 @@ static Err comp_append_recur(Comp *comp) {
       .recur = asm_append_breakpoint(comp, ASM_CODE_RECUR),
     }
   );
+  return nullptr;
+}
+
+/*
+Takes an address and compiles instructions for accessing it at a PC-relative
+offset. Intended for entries in the `data` and `got` regions of `Comp_heap`.
+Their addresses are far away from the instruction addresses, and the offsets
+can't be encoded inline into `ldr` instructions.
+
+On Arm64, this is the `adrp & add` idiom.
+*/
+static Err comp_append_page_addr(Comp *comp, Uint adr, U8 reg) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+  asm_append_page_addr(comp, reg, adr);
+  sym->norm.has_loads = true;
+  return nullptr;
+}
+
+static Err comp_append_page_load(Comp *comp, Uint adr, U8 reg) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+  asm_append_page_load(comp, reg, adr);
+  sym->norm.has_loads = true;
   return nullptr;
 }
 

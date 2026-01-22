@@ -1,7 +1,7 @@
 #pragma once
 #include "./c_interp_internal.c"
 
-static Err interp_validate_buf_ptr(Sint ptr, const U8 **out) {
+static Err interp_validate_data_ptr(Sint ptr, const U8 **out) {
   /*
   Some systems deliberately ensure that virtual memory addresses
   are just out of range of `int32`. Would be nice to check if the
@@ -21,26 +21,7 @@ static Err interp_validate_buf_ptr(Sint ptr, const U8 **out) {
   return errf("suspiciously invalid-looking data pointer: %p", (U8 *)ptr);
 }
 
-static Err interp_pop_buf(Interp *interp, const U8 **out) {
-  Sint buf;
-  try(int_stack_pop(&interp->ints, &buf));
-  try(interp_validate_buf_ptr(buf, out));
-  return nullptr;
-}
-
-static Err interp_pop_buf_opt(Interp *interp, const U8 **out) {
-  Sint buf;
-  try(int_stack_pop(&interp->ints, &buf));
-  if (buf) {
-    try(interp_validate_buf_ptr(buf, out));
-  }
-  else if (out) {
-    *out = nullptr;
-  }
-  return nullptr;
-}
-
-static Err interp_validate_buf_len(Sint len, Ind *out) {
+static Err interp_validate_data_len(Sint len, Ind *out) {
   if (len > 0 && len < (Sint)IND_MAX) {
     *out = (Ind)len;
     return nullptr;
@@ -48,10 +29,29 @@ static Err interp_validate_buf_len(Sint len, Ind *out) {
   return errf("invalid data length: " FMT_SINT, len);
 }
 
-static Err interp_pop_len(Interp *interp, Ind *out) {
+static Err interp_pop_data_ptr(Interp *interp, const U8 **out) {
+  Sint buf;
+  try(int_stack_pop(&interp->ints, &buf));
+  try(interp_validate_data_ptr(buf, out));
+  return nullptr;
+}
+
+static Err interp_pop_data_ptr_opt(Interp *interp, const U8 **out) {
+  Sint buf;
+  try(int_stack_pop(&interp->ints, &buf));
+  if (buf) {
+    try(interp_validate_data_ptr(buf, out));
+  }
+  else if (out) {
+    *out = nullptr;
+  }
+  return nullptr;
+}
+
+static Err interp_pop_data_len(Interp *interp, Ind *out) {
   Sint len;
   try(int_stack_pop(&interp->ints, &len));
-  try(interp_validate_buf_len(len, out));
+  try(interp_validate_data_len(len, out));
   return nullptr;
 }
 
@@ -95,21 +95,28 @@ static Err intrin_alloc_data(Interp *interp) {
   const U8 *buf;
   Ind       len;
   const U8 *adr;
-  try(interp_pop_len(interp, &len));
-  try(interp_pop_buf_opt(interp, &buf));
+  try(interp_pop_data_len(interp, &len));
+  try(interp_pop_data_ptr_opt(interp, &buf));
   try(comp_alloc_data(&interp->comp, buf, len, &adr));
   try(int_stack_push(&interp->ints, (Sint)adr));
   return nullptr;
 }
 
-// Should be used on addresses returned by `intrin_alloc_data`,
-// which may be out of range of regular `ldr` instructions.
 static Err intrin_comp_page_addr(Interp *interp) {
   const U8 *adr;
   U8        reg;
   try(interp_pop_reg(interp, &reg));
-  try(interp_pop_buf(interp, &adr));
-  asm_append_page_addr(&interp->comp, reg, adr);
+  try(interp_pop_data_ptr(interp, &adr));
+  try(comp_append_page_addr(&interp->comp, (Uint)adr, reg));
+  return nullptr;
+}
+
+static Err intrin_comp_page_load(Interp *interp) {
+  const U8 *adr;
+  U8        reg;
+  try(interp_pop_reg(interp, &reg));
+  try(interp_pop_data_ptr(interp, &adr));
+  try(comp_append_page_load(&interp->comp, (Uint)adr, reg));
   return nullptr;
 }
 
@@ -160,6 +167,16 @@ static Err intrin_import(Interp *interp) {
   return nullptr;
 }
 
+// See comment on `interp_extern_got` for explanation.
+static Err intrin_extern_got(Interp *interp) {
+  const char *name;
+  Ind         len;
+  try(interp_pop_data_len(interp, &len));
+  try(interp_pop_data_ptr(interp, (const U8 **)&name));
+  try(interp_extern_got(interp, name, len));
+  return nullptr;
+}
+
 static Err intrin_extern_proc(Interp *interp) {
   const auto ints = &interp->ints;
   Sint       out_len;
@@ -172,8 +189,8 @@ static Err intrin_extern_proc(Interp *interp) {
 static Err intrin_find_word(Interp *interp) {
   const U8 *buf;
   Ind       len;
-  try(interp_pop_len(interp, &len));
-  try(interp_pop_buf(interp, &buf));
+  try(interp_pop_data_len(interp, &len));
+  try(interp_pop_data_ptr(interp, &buf));
   return interp_find_word(interp, (const char *)buf, len);
 }
 
@@ -200,8 +217,8 @@ static Err intrin_get_local(Interp *interp) {
   const U8  *buf;
   Ind        len;
   Local     *loc;
-  try(interp_pop_len(interp, &len));
-  try(interp_pop_buf(interp, &buf));
+  try(interp_pop_data_len(interp, &len));
+  try(interp_pop_data_ptr(interp, &buf));
   try(interp_get_local(interp, (const char *)buf, len, &loc));
 
   if (!loc->mem) comp_local_alloc_mem(comp, loc);

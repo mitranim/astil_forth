@@ -148,7 +148,7 @@ static Err interp_call_extern(Interp *interp, const Sym *sym) {
     "[system] calling external procedure " FMT_QUOTED
     " at address %p; inp_len: %d; out_len: %d\n",
     sym->name.buf,
-    sym->ext_proc,
+    sym->exter,
     sym->inp_len,
     sym->out_len
   ));
@@ -169,11 +169,10 @@ static Err interp_call_sym(Interp *interp, const Sym *sym) {
   }
 
   switch (sym->type) {
-    case SYM_NORM:     return interp_call_norm(interp, sym);
-    case SYM_INTRIN:   return interp_call_intrin(interp, sym);
-    case SYM_EXT_PTR:  return int_stack_push(&interp->ints, (Sint)sym->ext_ptr);
-    case SYM_EXT_PROC: return interp_call_extern(interp, sym);
-    default:           unreachable();
+    case SYM_NORM:   return interp_call_norm(interp, sym);
+    case SYM_INTRIN: return interp_call_intrin(interp, sym);
+    case SYM_EXTERN: return interp_call_extern(interp, sym);
+    default:         unreachable();
   }
 }
 
@@ -385,14 +384,7 @@ static Err interp_parse_until(Interp *interp, U8 delim) {
   return nullptr;
 }
 
-static Err interp_read_extern(Interp *interp, void **out_addr) {
-  try(interp_read_word(interp));
-  const auto name = interp->reader->word.buf;
-
-  IF_DEBUG(
-    eprintf("[system] read name of extern symbol: " FMT_QUOTED "\n", name)
-  );
-
+static Err find_extern(const char *name, void **out) {
   const auto addr = dlsym(RTLD_DEFAULT, name);
 
   if (!addr) {
@@ -405,7 +397,37 @@ static Err interp_read_extern(Interp *interp, void **out_addr) {
     "[system] found address of extern symbol " FMT_QUOTED ": %p\n", name, addr
   ));
 
-  if (out_addr) *out_addr = addr;
+  if (out) *out = addr;
+  return nullptr;
+}
+
+/*
+Used for accessing external variables such as `stdout`. The resulting address
+points to an entry in the GOT (global offset table), and must be used with
+intrinsics `intrin_comp_page_addr` or `intrin_comp_page_load` which compile
+instructions for accessing that entry.
+*/
+static Err interp_extern_got(Interp *interp, const char *name, Ind len) {
+  if (DEBUG) aver((Sint)strlen(name) == len);
+
+  const auto comp     = &interp->comp;
+  auto       got_addr = comp_find_dysym(comp, name);
+
+  if (!got_addr) {
+    void *ext_addr;
+    try(find_extern(name, &ext_addr));
+    got_addr = comp_register_dysym(comp, name, (U64)ext_addr);
+    if (DEBUG) aver(*got_addr == (Uint)ext_addr);
+  }
+
+  try(int_stack_push(&interp->ints, (Sint)got_addr));
+  return nullptr;
+}
+
+static Err interp_read_extern(Interp *interp, void **out) {
+  try(interp_read_word(interp));
+  const auto name = interp->reader->word.buf;
+  try(find_extern(name, out));
   return nullptr;
 }
 
@@ -429,12 +451,12 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
   const auto sym = stack_push(
     &interp->syms,
     (Sym){
-      .type     = SYM_EXT_PROC,
-      .name     = interp->reader->word,
-      .ext_proc = addr,
-      .inp_len  = (U8)inp_len,
-      .out_len  = (U8)out_len,
-      .clobber  = ARCH_VOLATILE_REGS, // Only used in reg-based call-conv.
+      .type    = SYM_EXTERN,
+      .name    = interp->reader->word,
+      .exter   = addr,
+      .inp_len = (U8)inp_len,
+      .out_len = (U8)out_len,
+      .clobber = ARCH_VOLATILE_REGS, // Only used in reg-based call-conv.
     }
   );
 

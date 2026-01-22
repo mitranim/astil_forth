@@ -571,16 +571,8 @@ static Err comp_append_call_intrin(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-static Err comp_append_load_extern_ptr(Comp *comp, const char *name) {
-  comp->ctx.proc_body = true;
-  U8 reg;
-  try(comp_next_valid_arg_reg(comp, &reg));
-  asm_append_dysym_load(comp, name, reg);
-  return nullptr;
-}
-
 static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_EXT_PROC));
+  IF_DEBUG(aver(callee->type == SYM_EXTERN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));

@@ -34,6 +34,7 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_COMP_LOAD,       // comp_load
   INTRIN_ALLOC_DATA,      // alloc_data
   INTRIN_COMP_PAGE_ADDR,  // comp_page_addr
+  INTRIN_COMP_PAGE_LOAD,  // comp_page_load
   INTRIN_COMP_CALL,       // comp_call
   INTRIN_QUIT,            // quit
   INTRIN_CHAR,            // char
@@ -42,13 +43,15 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_IMPORT,          // import
   INTRIN_IMPORT_QUOTE,    // import\"
   INTRIN_IMPORT_TICK,     // import'
-  INTRIN_EXTERN_PTR,      // extern_ptr:
+  INTRIN_EXTERN_GOT,      // extern_got
   INTRIN_EXTERN_PROC,     // extern:
   INTRIN_FIND_WORD,       // find_word
   INTRIN_INLINE_WORD,     // inline_word
   INTRIN_EXECUTE,         // execute
   INTRIN_GET_LOCAL,       // get_local
   INTRIN_ANON_LOCAL,      // anon_local
+  INTRIN_DEBUG_ON,        // debug_on
+  INTRIN_DEBUG_OFF,       // debug_off
   INTRIN_DEBUG_FLUSH,     // debug_flush
   INTRIN_DEBUG_THROW,     // debug_throw
   INTRIN_DEBUG_STACK_LEN, // debug_stack_len

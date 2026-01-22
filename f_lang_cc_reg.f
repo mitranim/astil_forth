@@ -49,6 +49,10 @@
 8 let: cell
 
 \ Similar to standard `variable`.
+\
+\ FIXME this is totally wrong. This inlines the hardcoded address!
+\
+\ What to do: create a word which compiles `adrp & ldr`.
 : var: { init -- } ( C: "name" -- ) ( E: -- adr )
   0 cell alloc_data { adr }
   adr postpone' let:
@@ -193,6 +197,94 @@
 ;
 
 : c" comp_cstr ;
+
+\ FIXME adapt to reg CC.
+\
+\ Analogous to `extern:`, but for external variables rather than procedures.
+\
+\ Unlike in the stack-based CC, where `extern_val:` creates a regular word,
+\ this creates a _compiling_ word, which loads the external value into the
+\ next argument register. This makes the resulting "variable" usable as an
+\ argument inline, but precludes its use in interpretation mode.
+\
+\
+\ Analogous to `extern:`, but for external variables
+\ rather than procedures. Creates a word which, when
+\ mentioned, compiles instructions for accessing the
+\ value referenced by the external variable it found.
+: extern_val: ( C: "name" str len -- ) ( E: -- val )
+  #word_beg
+  immediate \ We're compiling a compiling word.
+
+  parse_word extern_got comp_push \ Address of GOT entry holding extern addr.
+  1 comp_push                     \ x1
+  compile' comp_page_load \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+
+  1 comp_push 1 comp_push 0 comp_push
+  compile' asm_load_off compile' comp_instr \ ldur x1, [x1]
+  compile' asm_push_x1  compile' comp_instr \ str x1, [x27], 8
+  #word_end
+;
+
+extern_val: stdin  __stdinp
+extern_val: stdout __stdoutp
+extern_val: stderr __stderrp
+
+
+\ : extern_val: { str len -- } ( C: "name" -- ) ( E: -- val )
+\   #word_beg
+
+\   #word_end
+\ ;
+
+\ parse_word __stdinp  extern_val: stdin
+\ parse_word __stdoutp extern_val: stdout
+\ parse_word __stderrp extern_val: stderr
+
+\ extern_ptr: __stdinp
+\ extern_ptr: __stdoutp
+\ extern_ptr: __stderrp
+
+\ \ word' __stdinp  @: stdin
+\ \ word' __stdoutp @: stdout
+\ \ word' __stderrp @: stderr
+
+\ \ TODO: turn into compiling words.
+\ : stdin  { -- file } __stdinp  @ ;
+\ : stdout { -- file } __stdoutp @ ;
+\ : stderr { -- file } __stderrp @ ;
+
+\ : stdin  ( E: -- file ) [ immediate compile' __stdinp  @ ] ;
+\ : stdout ( E: -- file ) [ immediate compile' __stdoutp @ ] ;
+\ : stderr ( E: -- file ) [ immediate compile' __stderrp @ ] ;
+
+
+
+\ 4 0 extern: fwrite
+\ 1 0 extern: putchar
+\ 2 0 extern: fputc
+\ 2 0 extern: fputs
+\ 1 0 extern: printf
+\ 2 0 extern: fprintf
+\ 3 0 extern: snprintf
+\ 1 0 extern: fflush
+
+\ : eputchar { code -- } stderr { file } code file fputc ;
+\ : puts { cstr -- } stdout { file } cstr file fputs ;
+\ : eputs { cstr -- } stderr { file } cstr file fputs ;
+\ : flush stdout fflush ;
+\ : eflush stderr fflush ;
+
+\ : type ( str len -- ) 1 swap stdout fwrite ;
+\ : etype ( str len -- ) 1 swap stderr fwrite ;
+\ : lf 10 putchar ; \ Renamed from `cr` which would be a misnomer.
+\ : elf 10 eputchar ;
+\ : space 32 putchar ;
+\ : espace 32 eputchar ;
+
+\ : log" comp_cstr compile' puts ;
+\ : elog" comp_cstr compile' eputs ;
+
 \ 6 1 extern: mmap
 \ 3 1 extern: mprotect
 
@@ -227,5 +319,7 @@
 \ \ The compiler doesn't need to provide any of that.
 \ \
 \ \ Define floating point stuff too, while at it.
+
+\ : @: { XT -- } ( E: -- val ) ; \ TODO consider
 
 debug_stack

@@ -206,7 +206,7 @@ static void asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
 }
 
 static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
-  aver(callee->type == SYM_EXT_PROC);
+  aver(callee->type == SYM_EXTERN);
 
   // Free to use because extern calls clobber everything anyway.
   constexpr auto reg = ARCH_SCRATCH_REG_8;

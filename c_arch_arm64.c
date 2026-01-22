@@ -214,9 +214,9 @@ any procedures with multiple outputs.
 Note: this works identically for both of our callventions.
 */
 static Err arch_call_extern(Sint_stack *stack, const Sym *sym) {
-  aver(sym->type == SYM_EXT_PROC);
+  aver(sym->type == SYM_EXTERN);
 
-  const auto fun     = (Extern_fun *)sym->ext_proc;
+  const auto fun     = (Extern_fun *)sym->exter;
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
@@ -934,6 +934,16 @@ static Err asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
   return nullptr;
 }
 
+static void asm_append_page_addr(Comp *comp, U8 reg, Uint adr) {
+  const auto pageoff = asm_append_adrp(comp, reg, adr);
+  if (pageoff) asm_append_add_imm(comp, reg, reg, pageoff);
+}
+
+static void asm_append_page_load(Comp *comp, U8 reg, Uint adr) {
+  const auto pageoff = asm_append_adrp(comp, reg, adr);
+  asm_append_load_scaled_offset(comp, reg, reg, pageoff);
+}
+
 static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
   const auto code = &comp->code;
   const auto inds = &code->gots.inds;
@@ -943,13 +953,7 @@ static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
   aver(ind_valid(got_ind));
 
   const auto got_addr = comp->code.heap->got + got_ind;
-  const auto pageoff  = asm_append_adrp(comp, reg, (Uint)got_addr);
-  asm_append_load_scaled_offset(comp, reg, reg, pageoff);
-}
-
-static void asm_append_page_addr(Comp *comp, U8 reg, const U8 *adr) {
-  const auto pageoff = asm_append_adrp(comp, reg, (Uint)adr);
-  if (pageoff) asm_append_add_imm(comp, reg, reg, pageoff);
+  asm_append_page_load(comp, reg, (Uint)got_addr);
 }
 
 // Simple, naive inlining without support for relocation.

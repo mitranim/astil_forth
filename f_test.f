@@ -1,6 +1,10 @@
 import' ./f_lang.f
 import' ./f_testing.f
 
+T{ <T> }T
+T{ 10 <T> 10 }T
+T{ 10 20 <T> 10 20 }T
+
 : test_conditionals
   T{ false #if  10 #end                                                      <T>    }T
   T{ true  #if  10 #end                                                      <T> 10 }T

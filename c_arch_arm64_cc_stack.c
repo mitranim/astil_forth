@@ -107,14 +107,8 @@ static void asm_append_call_intrin(
   else asm_append_zero_reg(comp, ARCH_REG_ERR);
 }
 
-static void asm_append_load_extern_ptr(Comp *comp, const char *name) {
-  constexpr auto reg = ARCH_SCRATCH_REG_8;
-  asm_append_dysym_load(comp, name, reg);
-  asm_append_stack_push_from(comp, reg);
-}
-
 static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_EXT_PROC));
+  IF_DEBUG(aver(callee->type == SYM_EXTERN));
 
   const auto inp_len = callee->inp_len;
   const auto out_len = callee->out_len;

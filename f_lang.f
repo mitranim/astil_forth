@@ -486,11 +486,11 @@
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
-: next_word ( "name" -- exec_tok ) parse_word find_word ;
-: '         ( "name" -- exec_tok ) next_word  comp_push ;
-: inline'   next_word inline_word ;
-: postpone' next_word comp_call ;
-: postpone_compile'  next_word comp_push ' comp_call comp_call ;
+: next_word ( "word" -- exec_tok ) parse_word find_word ;
+: '         ( C: "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
+: inline'   ( C: "word" -- ) ( E: <word> ) next_word inline_word ;
+: postpone' ( C: "word" -- ) ( E: <word> ) next_word comp_call ;
+: compile'  ( C: "word" -- ) next_word comp_push ' comp_call comp_call ;
 
 : drop ( val -- ) [
   ARCH_REG_DAT_SP ARCH_REG_DAT_SP 8 asm_sub_imm comp_instr \ sub x27, x27, 8
@@ -857,8 +857,8 @@
 \ which is planned for later.
 
 \ For words which define words. Kinda like `create`.
-: #word_beg postpone_compile' : ;
-: #word_end postpone_compile' ; not_comp_only ;
+: #word_beg compile' : ;
+: #word_end compile' ; not_comp_only ;
 
 \ Similar to standard `constant`.
 : let: ( C: val -- ) ( E: -- val ) #word_beg comp_push #word_end ;
@@ -946,7 +946,7 @@
 \ Usage: `throw" some_error_msg"`.
 \
 \ Also see `sthrowf"` for formatted errors.
-: throw" ( C: "str" -- ) comp_str postpone_compile' throw ;
+: throw" ( C: "str" -- ) comp_str compile' throw ;
 
 \ ## Memory
 \
@@ -1324,13 +1324,30 @@
 
 : ?dup ( val bool -- val ?val ) #if dup #end ;
 
-extern_ptr: __stdinp
-extern_ptr: __stdoutp
-extern_ptr: __stderrp
+\ Finds an extern symbol by name and creates a new word which loads the address
+\ of that symbol. The extern symbol can be either a variable or a procedure.
+: extern_ptr: ( C: "name" str len -- ) ( E: -- ptr )
+  #word_beg
+  parse_word extern_got to: adr \ Addr of GOT entry holding extern addr.
+  adr 1       comp_page_load    \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr        \ str x1, [x27], 8
+  #word_end
+;
 
-: stdin  __stdinp  @ ;
-: stdout __stdoutp @ ;
-: stderr __stderrp @ ;
+\ Like `extern_ptr:` but with an additional load instruction.
+\ Analogous to extern vars in C. Lets us access stdio files.
+: extern_val: ( C: "name" str len -- ) ( E: -- val )
+  #word_beg
+  parse_word extern_got to: adr     \ Addr of GOT entry holding extern addr.
+  adr 1              comp_page_load \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  1 1 0 asm_load_off comp_instr     \ ldur x1, [x1]
+        asm_push_x1  comp_instr     \ str x1, [x27], 8
+  #word_end
+;
+
+extern_val: stdin  __stdinp
+extern_val: stdout __stdoutp
+extern_val: stderr __stderrp
 
 4 0 extern: fwrite
 1 0 extern: putchar
@@ -1346,7 +1363,6 @@ extern_ptr: __stderrp
 : eputs ( cstr -- ) stderr fputs ;
 : flush stdout fflush ;
 : eflush stderr fflush ;
-
 : type ( str len -- ) 1 swap stdout fwrite ;
 : etype ( str len -- ) 1 swap stderr fwrite ;
 : lf 10 putchar ; \ Renamed from `cr` which would be a misnomer.
@@ -1354,8 +1370,8 @@ extern_ptr: __stderrp
 : space 32 putchar ;
 : espace 32 eputchar ;
 
-: log" comp_cstr postpone_compile' puts ;
-: elog" comp_cstr postpone_compile' eputs ;
+: log" comp_cstr compile' puts ;
+: elog" comp_cstr compile' eputs ;
 
 \ Compiles movement of values from the data stack
 \ to the locals in the intuitive "reverse" order.
@@ -1399,7 +1415,7 @@ extern_ptr: __stderrp
 \ For compiling words which modify a local by applying the given function.
 : mut_local' ( C: "name" fun -- ) ( E: -- )
   postpone' '
-  postpone_compile' mut_local
+  compile' mut_local
 ;
 
 \ Usage: `++: some_local`.
@@ -1438,7 +1454,7 @@ extern_ptr: __stderrp
 : systack_ptr ( -- sp ) [
   inline
   1 ARCH_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
-                 asm_push_x1 comp_instr \ str x1, [x27], 8
+                 asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 : asm_comp_systack_push ( len -- )
@@ -1485,19 +1501,19 @@ extern_ptr: __stderrp
 \
 \   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
 : logf" ( C: N -- ) ( E: i1 … iN -- )
-  va- postpone' c" postpone_compile' printf -va
+  va- postpone' c" compile' printf -va
 ;
 
 \ Format-prints to stderr.
 : elogf" ( C: N -- ) ( E: i1 … iN -- )
-  va- postpone_compile' stderr postpone' c" postpone_compile' fprintf -va
+  va- compile' stderr postpone' c" compile' fprintf -va
 ;
 
 \ Formats into the provided buffer using `snprintf`. Usage example:
 \
 \   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
 : sf" ( C: N -- ) ( E: buf size i1 … iN -- )
-  va- comp_cstr postpone_compile' snprintf -va
+  va- comp_cstr compile' snprintf -va
 ;
 
 \ Formats an error message into the provided buffer using `snprintf`,
@@ -1510,11 +1526,11 @@ extern_ptr: __stderrp
 \ Also see `throwf"` which comes with its own buffer.
 : sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
-  postpone_compile'  dup2
+  compile'  dup2
   comp_cstr
-  postpone_compile'  snprintf
+  compile'  snprintf
   -va
-  postpone_compile'  throw
+  compile'  throw
 ;
 
 4096 buf: ERR_BUF
@@ -1524,19 +1540,19 @@ extern_ptr: __stderrp
 \   10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
 : throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
-  postpone_compile'  ERR_BUF
+  compile'  ERR_BUF
   comp_cstr
-  postpone_compile'  snprintf
+  compile'  snprintf
   -va
-  postpone_compile' ERR_BUF
-  postpone_compile' throw
+  compile' ERR_BUF
+  compile' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
 : throw_if" ( C: "str" -- ) ( E: pred -- )
   postpone' #if
   comp_str
-  postpone_compile' throw
+  compile' throw
   postpone' #end
 ;
 
@@ -1572,10 +1588,8 @@ extern_ptr: __stderrp
 
 : .sc .s stack_clear ;
 
+extern_val: errno __error
 1 1 extern: strerror
-extern_ptr: __error
-: errno __error @ ;
-
 6 1 extern: mmap
 3 1 extern: mprotect
 

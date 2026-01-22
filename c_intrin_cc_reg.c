@@ -87,7 +87,7 @@ static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   return nullptr;
 }
 
-static Err interp_validate_buf_ptr(Sint val) {
+static Err interp_validate_data_ptr(Sint val) {
   /*
   Some systems deliberately ensure that virtual memory addresses
   are just out of range of `int32`. Would be nice to check if the
@@ -104,16 +104,16 @@ static Err interp_validate_buf_ptr(Sint val) {
   return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
 }
 
-static Err interp_validate_buf_len(Sint val) {
+static Err interp_validate_data_len(Sint val) {
   if (val > 0 && val < (Sint)IND_MAX) return nullptr;
   return errf("invalid data length: " FMT_SINT, val);
 }
 
 static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
   if (buf) {
-    try(interp_validate_buf_ptr(buf));
+    try(interp_validate_data_ptr(buf));
   }
-  try(interp_validate_buf_len(len));
+  try(interp_validate_data_len(len));
 
   const U8 *adr;
   try(comp_alloc_data(&interp->comp, (const U8 *)buf, (Ind)len, &adr));
@@ -121,12 +121,17 @@ static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
   return nullptr;
 }
 
-// Should be used on addresses returned by `intrin_alloc_data`,
-// which may be out of range of regular `ldr` instructions.
 static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
-  try(interp_validate_buf_ptr(adr));
+  try(interp_validate_data_ptr(adr));
   try(asm_validate_reg(reg));
-  asm_append_page_addr(&interp->comp, (U8)reg, (const U8 *)adr);
+  try(comp_append_page_addr(&interp->comp, adr, reg));
+  return nullptr;
+}
+
+static Err intrin_comp_page_load(Sint adr, Sint reg, Interp *interp) {
+  try(interp_validate_data_ptr(adr));
+  try(asm_validate_reg(reg));
+  try(comp_append_page_load(&interp->comp, adr, reg));
   return nullptr;
 }
 
@@ -155,12 +160,20 @@ static Err intrin_parse(Sint delim, Interp *interp) {
 }
 
 static Err intrin_import(Sint buf, Sint len, Interp *interp) {
-  try(interp_validate_buf_ptr(buf));
-  try(interp_validate_buf_len(len));
+  try(interp_validate_data_ptr(buf));
+  try(interp_validate_data_len(len));
 
   const auto path = (const char *)buf;
   if (DEBUG) aver((Sint)strlen(path) == len);
   try(interp_import(interp, path)) return nullptr;
+}
+
+// See comment on `interp_extern_got` for explanation.
+static Err intrin_extern_got(Sint name, Sint len, Interp *interp) {
+  try(interp_validate_data_ptr(name));
+  try(interp_validate_data_len(len));
+  try(interp_extern_got(interp, (const char *)name, (Ind)len));
+  return nullptr;
 }
 
 static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
@@ -169,8 +182,8 @@ static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
 }
 
 static Err intrin_find_word(Sint buf, Sint len, Interp *interp) {
-  try(interp_validate_buf_ptr(buf));
-  try(interp_validate_buf_len(len));
+  try(interp_validate_data_ptr(buf));
+  try(interp_validate_data_len(len));
   try(interp_find_word(interp, (const char *)buf, (Ind)len));
   return nullptr;
 }
@@ -225,8 +238,8 @@ static Err intrin_comp_next_arg_reg(Interp *interp) {
 
 static Err intrin_get_local(Sint buf, Sint len, Interp *interp) {
   Local *loc;
-  try(interp_validate_buf_ptr(buf));
-  try(interp_validate_buf_len(len));
+  try(interp_validate_data_ptr(buf));
+  try(interp_validate_data_len(len));
   try(interp_get_local(interp, (const char *)buf, (Ind)len, &loc));
 
   const auto tok = local_token(loc);

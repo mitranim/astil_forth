@@ -106,13 +106,8 @@ static Err comp_append_call_intrin(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-static Err comp_append_load_extern_ptr(Comp *comp, const char *name) {
-  asm_append_load_extern_ptr(comp, name);
-  return nullptr;
-}
-
 static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_EXT_PROC));
+  IF_DEBUG(aver(callee->type == SYM_EXTERN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   asm_append_call_extern(comp, caller, callee);

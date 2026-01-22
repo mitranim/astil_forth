@@ -53,7 +53,8 @@ static Err intrin_colon(Interp *interp) {
 }
 
 static Err intrin_semicolon(Interp *interp) {
-  const auto comp = &interp->comp;
+  const auto comp  = &interp->comp;
+  const auto redef = interp->comp.ctx.redefining; // Snapshot before clearing.
 
 #ifdef NATIVE_CALL_ABI
   try(comp_validate_ret_args(comp));
@@ -65,7 +66,7 @@ static Err intrin_semicolon(Interp *interp) {
   interp_snapshot(interp);
 
   const auto words = &interp->words;
-  if (dict_has(words, sym->name.buf) && !interp->comp.ctx.redefining) {
+  if (dict_has(words, sym->name.buf) && !redef) {
     eprintf("[system] redefined word " FMT_QUOTED "\n", sym->name.buf);
   }
   dict_set(words, sym->name.buf, sym);
@@ -207,23 +208,9 @@ static Err intrin_import_tick(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_extern_ptr(Interp *interp) {
-  void *addr;
-  try(interp_read_extern(interp, &addr));
+static void intrin_debug_on(Interp *) { DEBUG = true; }
 
-  const auto sym = stack_push(
-    &interp->syms,
-    (Sym){
-      .type    = SYM_EXT_PTR,
-      .name    = interp->reader->word,
-      .ext_ptr = addr,
-    }
-  );
-
-  dict_set(&interp->words, sym->name.buf, sym);
-  comp_register_dysym(&interp->comp, sym->name.buf, (U64)addr);
-  return nullptr;
-}
+static void intrin_debug_off(Interp *) { DEBUG = false; }
 
 static void debug_flush(void *) {
   fflush(stdout);
@@ -318,10 +305,20 @@ static Err debug_word(Interp *interp) {
     case SYM_NORM: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   name: %s\n"
-        "[debug]   type: normal\n"
+        "[debug]   name:            %s\n"
+        "[debug]   type:            normal\n"
+        "[debug]   throws:          %s\n"
+        "[debug]   immediate:       %s\n"
+        "[debug]   comp_only:       %s\n"
+        "[debug]   interp_only:     %s\n"
+        "[debug]   inlinable:       %s\n"
         "[debug]   execution token: %p\n",
         name,
+        fmt_bool(sym->throws),
+        fmt_bool(sym->immediate),
+        fmt_bool(sym->comp_only),
+        fmt_bool(sym->interp_only),
+        fmt_bool(sym->norm.inlinable),
         sym
       );
       comp_debug_print_sym_instrs(&interp->comp, sym, "[debug]   ");
@@ -346,28 +343,14 @@ static Err debug_word(Interp *interp) {
       return nullptr;
     }
 
-    case SYM_EXT_PTR: {
-      eprintf(
-        "[debug] word:\n"
-        "[debug]   name: %s\n"
-        "[debug]   type: external symbol\n"
-        "[debug]   execution token: %p\n"
-        "[debug]   address: %p\n",
-        name,
-        sym,
-        sym->ext_ptr
-      );
-      return nullptr;
-    }
-
-    case SYM_EXT_PROC: {
+    case SYM_EXTERN: {
       eprintf(
         "[debug] word:\n"
         "[debug]   name: %s\n"
         "[debug]   type: external procedure\n"
         "[debug]   address: %p\n",
         name,
-        sym->ext_proc
+        sym->exter
       );
       return nullptr;
     }
@@ -530,6 +513,15 @@ static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
   .comp_only = true,
 };
 
+static constexpr auto INTRIN_COMP_PAGE_LOAD = (Sym){
+  .name.buf  = "comp_page_load",
+  .intrin    = (void *)intrin_comp_page_load,
+  .inp_len   = 2, // ( adr reg -- )
+  .out_len   = 0,
+  .throws    = true,
+  .comp_only = true,
+};
+
 static constexpr auto INTRIN_COMP_CALL = (Sym){
   .name.buf  = "comp_call",
   .intrin    = (void *)intrin_comp_call,
@@ -584,9 +576,11 @@ static constexpr auto INTRIN_IMPORT_TICK = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_EXTERN_PTR = (Sym){
-  .name.buf = "extern_ptr:",
-  .intrin   = (void *)intrin_extern_ptr,
+static constexpr auto INTRIN_EXTERN_GOT = (Sym){
+  .name.buf = "extern_got",
+  .intrin   = (void *)intrin_extern_got,
+  .inp_len  = 2,
+  .out_len  = 1,
   .throws   = true,
 };
 
@@ -634,6 +628,16 @@ static constexpr auto INTRIN_ANON_LOCAL = (Sym){
   .intrin    = (void *)intrin_anon_local,
   .throws    = true,
   .comp_only = true,
+};
+
+static constexpr auto INTRIN_DEBUG_ON = (Sym){
+  .name.buf = "debug_on",
+  .intrin   = (void *)intrin_debug_on,
+};
+
+static constexpr auto INTRIN_DEBUG_OFF = (Sym){
+  .name.buf = "debug_off",
+  .intrin   = (void *)intrin_debug_off,
 };
 
 static constexpr auto INTRIN_DEBUG_FLUSH = (Sym){

@@ -58,7 +58,7 @@ static void sym_auto_comp_only(Sym *caller, const Sym *callee) {
 
   IF_DEBUG(eprintf(
     "[system] word " FMT_QUOTED " uses compile-only word " FMT_QUOTED
-    ", marking as compily-only\n",
+    ", marking as compile-only\n",
     caller->name.buf,
     callee->name.buf
   ));

@@ -18,7 +18,7 @@ Metadata for a word in a Forth dictionary / wordset.
 typedef struct Sym {
   Word_str name;
 
-  enum { SYM_NORM = 1, SYM_INTRIN, SYM_EXT_PTR, SYM_EXT_PROC } type;
+  enum { SYM_NORM = 1, SYM_INTRIN, SYM_EXTERN } type;
 
   union {
     struct {
@@ -28,9 +28,8 @@ typedef struct Sym {
       bool       has_rets;  // Has explicit early returns.
     } norm;
 
-    void *intrin;   // Interpreter intrinsic; implies `interp_only`.
-    void *ext_ptr;  // Pointer to extern variable; obtained from `dlsym`.
-    void *ext_proc; // Pointer to extern procedure; obtained from `dlsym`.
+    void *intrin; // Interpreter intrinsic; implies `interp_only`.
+    void *exter;  // Pointer to extern procedure; obtained from `dlsym`.
   };
 
   Sym_set callees;     // Dependencies.

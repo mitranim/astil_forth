@@ -3,9 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#define NATIVE_CALL_ABI
+// #define NATIVE_CALL_ABI
 
-static bool DEBUG = false;
+static thread_local bool DEBUG = false;
 
 #ifdef PROD
 #define IF_DEBUG(code)
