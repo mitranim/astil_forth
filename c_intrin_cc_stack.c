@@ -58,6 +58,18 @@ static Err interp_pop_buf(Interp *interp, const U8 **out) {
   return nullptr;
 }
 
+static Err interp_pop_buf_opt(Interp *interp, const U8 **out) {
+  Sint buf;
+  try(int_stack_pop(&interp->ints, &buf));
+  if (buf) {
+    try(interp_validate_buf_ptr(buf, out));
+  }
+  else if (out) {
+    *out = nullptr;
+  }
+  return nullptr;
+}
+
 static Err interp_validate_buf_len(Sint len, Ind *out) {
   if (len > 0 && len < (Sint)IND_MAX) {
     *out = (Ind)len;
@@ -81,23 +93,25 @@ static Err interp_pop_reg(Interp *interp, U8 *out) {
   return nullptr;
 }
 
-static Err intrin_comp_const(Interp *interp) {
-  U8        reg;
+static Err intrin_alloc_data(Interp *interp) {
   const U8 *buf;
   Ind       len;
-  try(interp_pop_reg(interp, &reg));
+  const U8 *adr;
   try(interp_pop_len(interp, &len));
-  try(interp_pop_buf(interp, &buf));
-  try(interp_comp_const(interp, buf, len, reg));
+  try(interp_pop_buf_opt(interp, &buf));
+  try(comp_alloc_data(&interp->comp, buf, len, &adr));
+  try(int_stack_push(&interp->ints, (Sint)adr));
   return nullptr;
 }
 
-static Err intrin_comp_static(Interp *interp) {
-  U8  reg;
-  Ind len;
+// Should be used on addresses returned by `intrin_alloc_data`,
+// which may be out of range of regular `ldr` instructions.
+static Err intrin_comp_page_addr(Interp *interp) {
+  const U8 *adr;
+  U8        reg;
   try(interp_pop_reg(interp, &reg));
-  try(interp_pop_len(interp, &len));
-  try(interp_comp_static(interp, len, reg));
+  try(interp_pop_buf(interp, &adr));
+  asm_append_page_addr(&interp->comp, reg, adr);
   return nullptr;
 }
 

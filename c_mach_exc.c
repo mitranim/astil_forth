@@ -350,7 +350,7 @@ kern_return_t catch_mach_exception_raise_state(
   const auto  bad_addr  = (void *)code[1]; // undocumented
   const auto  ints      = &interp->ints;
   const void *ints_low  = ints->cellar;
-  const void *ints_high = (U8 const *)ints_low + ints->bytelen;
+  const void *ints_high = (const U8 *)ints_low + ints->bytelen;
 
   if (!(bad_addr >= ints_low && bad_addr < ints_high)) {
     eprintf(SYS_REC_FMT "bad access at address %p\n", bad_addr);

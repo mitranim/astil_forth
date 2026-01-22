@@ -512,19 +512,20 @@ static constexpr auto INTRIN_COMP_LOAD = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_CONST = (Sym){
-  .name.buf  = "comp_const",
-  .intrin    = (void *)intrin_comp_const,
-  .inp_len   = 3,
+static constexpr auto INTRIN_ALLOC_DATA = (Sym){
+  .name.buf  = "alloc_data",
+  .intrin    = (void *)intrin_alloc_data,
+  .inp_len   = 2, // ( buf len -- addr ) ; buffer address may be nil
+  .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_STATIC = (Sym){
-  .name.buf  = "comp_static",
-  .intrin    = (void *)intrin_comp_static,
-  .inp_len   = 2,
-  .out_len   = 1,
+static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
+  .name.buf  = "comp_page_addr",
+  .intrin    = (void *)intrin_comp_page_addr,
+  .inp_len   = 2, // ( adr reg -- )
+  .out_len   = 0,
   .throws    = true,
   .comp_only = true,
 };

@@ -67,12 +67,10 @@ typedef struct {
 // Sections are accessed and modified via `Comp_code`.
 typedef struct {
   Instr_heap exec;                        // 4 MiB; executable code.
-  U8         consts[1 << 18];             // 256 KiB; constant values.
-  U8         guard_0[MEM_PAGE];           // PROT_NONE
   U8         data[1 << 18];               // 256 KiB; mutable values.
-  U8         guard_1[MEM_PAGE];           // PROT_NONE
+  U8         guard_0[MEM_PAGE];           // PROT_NONE
   U64        got[MEM_PAGE / sizeof(U64)]; // Global offset table.
-  U8         guard_2[MEM_PAGE];           // PROT_NONE
+  U8         guard_1[MEM_PAGE];           // PROT_NONE
 } Comp_heap;
 
 // "GOT" = global offset table.
@@ -86,7 +84,6 @@ typedef struct {
   Comp_heap  *heap;            // Executable code and data.
   Instr_list  code_write;      // References `.code.instrs`.
   Instr_list  code_exec;       // References `.heap.code.instrs`.
-  U8_list     consts;          // References `.heap.consts`.
   U8_list     data;            // References `.heap.datas`.
   U64_list    got;             // References `.heap.got`.
   Comp_got    gots;            // Offsets of intrin/extern symbols in GOT.

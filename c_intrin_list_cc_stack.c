@@ -20,8 +20,8 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_HERE,            // here
   INTRIN_COMP_INSTR,      // comp_instr
   INTRIN_COMP_LOAD,       // comp_load
-  INTRIN_COMP_CONST,      // comp_const
-  INTRIN_COMP_STATIC,     // comp_static
+  INTRIN_ALLOC_DATA,      // alloc_data
+  INTRIN_COMP_PAGE_ADDR,  // comp_page_addr
   INTRIN_COMP_CALL,       // comp_call
   INTRIN_QUIT,            // quit
   INTRIN_CHAR,            // char

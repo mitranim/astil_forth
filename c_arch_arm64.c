@@ -66,10 +66,6 @@ static Instr *comp_code_next_prog_counter(const Comp_code *code) {
   return list_spare_ptr(&code->code_exec, code->code_write.len);
 }
 
-static U8 *comp_code_next_const(const Comp_code *code) {
-  return list_next_ptr(&code->consts);
-}
-
 static U8 *comp_code_next_data(const Comp_code *code) {
   return list_next_ptr(&code->data);
 }
@@ -951,51 +947,9 @@ static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
   asm_append_load_scaled_offset(comp, reg, reg, pageoff);
 }
 
-static Err err_out_of_space_const() {
-  return err_str("unable to allocate a constant: out of space");
-}
-
-static Err asm_alloc_const_append_load(
-  Comp *comp, U8 const *src, Uint len, U8 reg
-) {
-  const auto code = &comp->code;
-  const auto cons = &code->consts;
-
-  // TODO find if this is ever needed.
-  // cons->len = __builtin_align_up(cons->len, sizeof(void *));
-
-  if (len > list_rem_bytes(cons)) return err_out_of_space_const();
-
-  const auto addr = comp_code_next_const(code);
-  list_push_raw(cons, src, len);
-
-  const auto pageoff = asm_append_adrp(comp, reg, (Uint)addr);
+static void asm_append_page_addr(Comp *comp, U8 reg, const U8 *adr) {
+  const auto pageoff = asm_append_adrp(comp, reg, (Uint)adr);
   if (pageoff) asm_append_add_imm(comp, reg, reg, pageoff);
-  return nullptr;
-}
-
-static Err err_out_of_space_data() {
-  return err_str("unable to allocate static data: out of space");
-}
-
-static Err asm_alloc_data_append_load(
-  Comp *comp, Uint len, U8 reg, U8 **out_addr
-) {
-  const auto code = &comp->code;
-  const auto data = &code->data;
-
-  // TODO find if this is ever needed.
-  // data->len = __builtin_align_up(data->len, sizeof(void *));
-
-  if (len > list_rem_bytes(data)) return err_out_of_space_data();
-
-  const auto addr = comp_code_next_data(code);
-  data->len += len * list_val_size(data);
-
-  const auto pageoff = asm_append_adrp(comp, reg, (Uint)addr);
-  if (pageoff) asm_append_add_imm(comp, reg, reg, pageoff);
-  if (out_addr) *out_addr = addr;
-  return nullptr;
 }
 
 // Simple, naive inlining without support for relocation.

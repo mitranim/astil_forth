@@ -825,11 +825,11 @@
 : str" ( -- cstr len ) parse_str ;
 
 : comp_str ( C: <str> -- ) ( E: -- cstr len )
-  parse_str tuck            ( len str len )
-  inc                       \ Reserve 1 more for null byte.
-  1              comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  2 swap         comp_load  \ ldr x2, <len>
-  asm_push_x1_x2 comp_instr \ stp x1, x2, [x27], 16
+  parse_str tuck                ( len str len )
+  inc                           \ Reserve 1 more for null byte.
+  alloc_data 1   comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  2 swap         comp_load      \ ldr x2, <len>
+  asm_push_x1_x2 comp_instr     \ stp x1, x2, [x27], 16
 ;
 
 \ Same as standard `s"` in compilation mode.
@@ -840,9 +840,9 @@
 : cstr" ( C: <str> -- ) ( E: -- cstr ) parse_str drop ;
 
 : comp_cstr ( C: <str> -- ) ( E: -- cstr )
-  parse_str   inc        \ Reserve 1 more for null byte.
-  1           comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr \ stp x1, x2, [x27], 16
+  parse_str inc               \ Reserve 1 more for null byte.
+  alloc_data 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1  comp_instr     \ str x1, [x27], 8
 ;
 
 \ For use inside words.
@@ -855,7 +855,7 @@
 \
 \ We could easily define variables without compiler support,
 \ allocating memory via libc. The reason for special support
-\ such as `comp_static` is compatibility with AOT compilation
+\ such as `alloc_data` is compatibility with AOT compilation
 \ which is planned for later.
 
 \ For words which define words. Kinda like `create`.
@@ -868,13 +868,12 @@
 \ Similar to standard `variable`.
 : var: ( C: init "name" -- ) ( E: -- addr )
   #word_beg
-  cell 1      comp_static \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr  \ str x1, [x27], 8
+  sp cell -                  \ Address of the `init` value.
+  cell        alloc_data     ( -- addr )
+  1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr     \ str x1, [x27], 8
+  drop                       \ Don't need the `init` value anymore.
   #word_end
-
-  \ Store the initial value to the given address,
-  \ which is located in compiler-managed memory.
-  !
 ;
 
 \ Creates a global variable which refers to a buffer of at least
@@ -884,17 +883,20 @@
 \ which we don't have because we segregate code and data.
 : buf: ( C: size "name" -- ) ( E: -- addr size )
   #word_beg
-  dup 1       comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr       \ str x1, [x27], 8
-              comp_push        \ str <size>, [x27], 8
+  dup 0 swap  alloc_data     ( -- addr )
+  1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr     \ str x1, [x27], 8
+              comp_push      \ str <size>, [x27], 8
   #word_end
 ;
 
 \ Shortcut for the standard idiom `create <name> N cells allot`.
 : cells: ( C: len "name" -- ) ( E: -- addr )
   #word_beg
-  cells 1     comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr       \ str x1, [x27], 8
+  cells 0 swap alloc_data     ( -- addr )
+  1            comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1  comp_instr     \ str x1, [x27], 8
+               comp_push      \ str <size>, [x27], 8
   #word_end
 ;
 

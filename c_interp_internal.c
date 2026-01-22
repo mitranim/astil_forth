@@ -344,39 +344,6 @@ static Err interp_read_sym(Interp *interp, Sym **out) {
   return interp_require_sym(interp, interp->reader->word.buf, out);
 }
 
-/*
-Stores constant data of arbitrary length, namely a string,
-into the constant region, and compiles `( -- addr size )`.
-
-TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
-*/
-static Err interp_comp_const(Interp *interp, const U8 *buf, Ind len, U8 reg) {
-  try(asm_alloc_const_append_load(&interp->comp, buf, len, (U8)reg));
-
-  IF_DEBUG(eprintf(
-    "[system] appended constant with address %p and length " FMT_UINT "\n",
-    buf,
-    (Uint)len
-  ));
-
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->norm.has_loads = true;
-  return nullptr;
-}
-
-// TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
-static Err interp_comp_static(Interp *interp, Ind len, U8 reg) {
-  U8 *addr;
-  try(asm_alloc_data_append_load(&interp->comp, len, reg, &addr));
-  try(int_stack_push(&interp->ints, (Sint)addr));
-
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->norm.has_loads = true;
-  return nullptr;
-}
-
 static Err err_sym_out_bounds(const Sym *floor, const Sym *ceil, const Sym *val) {
   return errf(
     "expected a word address between %p and %p; got an out of bounds value: %p",

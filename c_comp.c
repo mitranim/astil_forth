@@ -100,7 +100,6 @@ static bool comp_code_valid(const Comp_code *code) {
     is_aligned(&code->heap) &&
     is_aligned(&code->code_write) &&
     is_aligned(&code->code_exec) &&
-    is_aligned(&code->consts) &&
     is_aligned(&code->data) &&
     is_aligned(&code->got) &&
     is_aligned(&code->gots) &&
@@ -109,7 +108,6 @@ static bool comp_code_valid(const Comp_code *code) {
     comp_heap_valid(code->heap) &&
     list_valid((const List *)&code->code_write) &&
     list_valid((const List *)&code->code_exec) &&
-    list_valid((const List *)&code->consts) &&
     list_valid((const List *)&code->data) &&
     list_valid((const List *)&code->got) &&
     (
@@ -164,7 +162,6 @@ static Err comp_heap_init(Comp_heap **out) {
   *out            = heap;
 
   try(mprotect_jit(heap->exec.instrs, sizeof(heap->exec.instrs)));
-  try(mprotect_mutable(heap->consts, sizeof(heap->consts)));
   try(mprotect_mutable(heap->data, sizeof(heap->data)));
   try(mprotect_mutable(heap->got, sizeof(heap->got)));
   return nullptr;
@@ -190,12 +187,6 @@ static void comp_code_init_lists(Comp_code *code) {
     .dat = code->heap->exec.instrs,
     .len = 0,
     .cap = arr_cap(code->heap->exec.instrs),
-  };
-
-  code->consts = (typeof(code->consts)){
-    .dat = code->heap->consts,
-    .len = 0,
-    .cap = arr_cap(code->heap->consts),
   };
 
   code->data = (typeof(code->data)){
@@ -399,6 +390,32 @@ static Err comp_append_recur(Comp *comp) {
       .recur = asm_append_breakpoint(comp, ASM_CODE_RECUR),
     }
   );
+  return nullptr;
+}
+
+static Err err_out_of_space_data() {
+  return err_str("unable to allocate static data: out of space");
+}
+
+// The resulting address is located at a significant distance from executable
+// code, and needs to be accessed via the `adrp & add/ldr` idiom.
+static Err comp_alloc_data(Comp *comp, const U8 *src, Ind len, const U8 **out) {
+  const auto data = &comp->code.data;
+  data->len       = __builtin_align_up(data->len, sizeof(void *));
+
+  if (len > list_rem_bytes(data)) return err_out_of_space_data();
+
+  const auto adr = list_next_ptr(data);
+  data->len += len;
+
+  if (src) memcpy(adr, src, len);
+  if (out) *out = adr;
+
+  IF_DEBUG(eprintf(
+    "[system] allocated data region with address %p and length " FMT_IND "\n",
+    adr,
+    len
+  ));
   return nullptr;
 }
 
