@@ -140,5 +140,5 @@ typedef struct {
   Loc_fixups  loc_fix;    // Used for resolving stable locations for locals.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
-  bool        proc_body;  // Found a non-immediate word or brace params.
+  bool        proc_body;  // Not looking for brace params anymore.
 } Comp_ctx;

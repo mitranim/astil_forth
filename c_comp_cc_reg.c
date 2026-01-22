@@ -449,7 +449,20 @@ static Err comp_append_push_imm(Comp *comp, Sint imm) {
 }
 
 static Err comp_call_intrin(Interp *interp, const Sym *sym) {
-  return arch_call_intrin(interp, sym);
+  /*
+  A bit of "state-smartness" for braces. The end result is that the braces
+  immediately following `: <name>` are used for parameters, and the braces
+  anywhere else are used for assignments. Alternatively, we could instruct
+  `intrin_colon` to immediately parse ahead, and backtrack when `{` is not
+  found. Might do that later. Either approach seems very un-Forth-like.
+  */
+  const auto ctx   = &interp->comp.ctx;
+  const auto first = ctx->sym && !ctx->proc_body;
+
+  try(arch_call_intrin(interp, sym));
+
+  if (first && ctx->sym) ctx->proc_body = true;
+  return nullptr;
 }
 
 static Err comp_before_append_call(Comp *comp, const Sym *callee) {

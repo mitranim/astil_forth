@@ -18,39 +18,41 @@
 : '         ( C: "word" -- ) ( E: -- XT ) next_word comp_push ;
 : inline'   ( C: "word" -- ) ( E: word )  next_word inline_word ;
 : postpone' ( C: "word" -- ) ( E: word )  next_word comp_call ;
-: postpone_compile' next_word comp_push ' comp_call comp_call ;
+: compile' next_word comp_push ' comp_call comp_call ;
 
 \ For words which define words. Kinda like `create`.
-: #word_beg postpone_compile' : ;
-: #word_end postpone_compile' ; not_comp_only ;
+: #word_beg compile' : ;
+: #word_end compile' ; not_comp_only ;
 
 \ Similar to standard `constant`.
 : let: { val -- } ( E: -- val )
-  #word_beg 0 1 comp_word_sig val comp_push #word_end
+  #word_beg
+  immediate \ Compiling a compiling word.
+  val comp_push compile' comp_push
+  #word_end
 ;
 
-\ TODO: consider supporting inference of out-params.
-: ASM_INSTR_SIZE  { -- size  } 4      ;
-: ASM_REG_DAT_SP  { -- reg   } 27     ;
-: ASM_REG_FP      { -- reg   } 29     ;
-: ASM_REG_SP      { -- reg   } 31     ;
-: ASM_EQ          { -- cond  } 0b0000 ;
-: ASM_NE          { -- cond  } 0b0001 ;
-: ASM_CS          { -- cond  } 0b0010 ;
-: ASM_CC          { -- cond  } 0b0011 ;
-: ASM_MI          { -- cond  } 0b0100 ;
-: ASM_PL          { -- cond  } 0b0101 ;
-: ASM_VS          { -- cond  } 0b0110 ;
-: ASM_VC          { -- cond  } 0b0111 ;
-: ASM_HI          { -- cond  } 0b1000 ;
-: ASM_LS          { -- cond  } 0b1001 ;
-: ASM_GE          { -- cond  } 0b1010 ;
-: ASM_LT          { -- cond  } 0b1011 ;
-: ASM_GT          { -- cond  } 0b1100 ;
-: ASM_LE          { -- cond  } 0b1101 ;
-: ASM_AL          { -- cond  } 0b1110 ;
-: ASM_NV          { -- cond  } 0b1111 ;
-: ASM_PLACEHOLDER { -- instr } 666    ; \ udf 666; used in retropatching.
+4      let: ASM_INSTR_SIZE
+27     let: ASM_REG_DAT_SP
+29     let: ASM_REG_FP
+31     let: ASM_REG_SP
+0b0000 let: ASM_EQ
+0b0001 let: ASM_NE
+0b0010 let: ASM_CS
+0b0011 let: ASM_CC
+0b0100 let: ASM_MI
+0b0101 let: ASM_PL
+0b0110 let: ASM_VS
+0b0111 let: ASM_VC
+0b1000 let: ASM_HI
+0b1001 let: ASM_LS
+0b1010 let: ASM_GE
+0b1011 let: ASM_LT
+0b1100 let: ASM_GT
+0b1101 let: ASM_LE
+0b1110 let: ASM_AL
+0b1111 let: ASM_NV
+666    let: ASM_PLACEHOLDER
 
 : or { i1 i2 -- i3 }
   \ orr x0, x0, x1
