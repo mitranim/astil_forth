@@ -1,36 +1,6 @@
 #pragma once
 #include "./c_interp_internal.c"
 
-static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }
-
-static Err intrin_recur(Interp *interp) {
-  return comp_append_recur(&interp->comp);
-}
-
-static Err intrin_comp_instr(Interp *interp) {
-  Sint val;
-  try(int_stack_pop(&interp->ints, &val));
-  try(asm_append_instr_from_int(&interp->comp, val));
-  return nullptr;
-}
-
-static Err intrin_comp_load(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-
-  Sint imm;
-  Sint reg;
-  try(int_stack_pop(&interp->ints, &imm));
-  try(int_stack_pop(&interp->ints, &reg));
-
-  aver(reg >= 0 && reg < ARCH_REG_LEN);
-
-  bool has_load = true;
-  asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
-  if (has_load) sym->norm.has_loads = true;
-  return nullptr;
-}
-
 static Err interp_validate_buf_ptr(Sint ptr, const U8 **out) {
   /*
   Some systems deliberately ensure that virtual memory addresses
@@ -90,6 +60,34 @@ static Err interp_pop_reg(Interp *interp, U8 *out) {
   try(int_stack_pop(&interp->ints, &reg));
   try(asm_validate_reg(reg));
   if (out) *out = (U8)reg;
+  return nullptr;
+}
+
+static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }
+
+static Err intrin_recur(Interp *interp) {
+  return comp_append_recur(&interp->comp);
+}
+
+static Err intrin_comp_instr(Interp *interp) {
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+  try(asm_append_instr_from_int(&interp->comp, val));
+  return nullptr;
+}
+
+static Err intrin_comp_load(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+
+  Sint imm;
+  U8   reg;
+  try(interp_pop_reg(interp, &reg));
+  try(int_stack_pop(&interp->ints, &imm));
+
+  bool has_load = true;
+  asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
+  if (has_load) sym->norm.has_loads = true;
   return nullptr;
 }
 

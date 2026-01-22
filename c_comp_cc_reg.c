@@ -180,10 +180,32 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
 }
 
 static Err err_arity_mismatch(
-  const char *action, const char *type, U8 req, U8 ava
+  const char *caller,
+  const char *callee,
+  const char *action,
+  const char *type,
+  U8          req,
+  U8          ava
 ) {
+  if (callee) {
+    return errf(
+      "in " FMT_QUOTED ": unable to %s " FMT_QUOTED
+      ": arity mismatch: required %s: %d; available %s: %d",
+      caller,
+      action,
+      callee,
+      type,
+      req,
+      type,
+      ava
+    );
+  }
+
+  // TODO simplify and deduplicate.
   return errf(
-    "unable to %s: arity mismatch: required %s: %d; available %s: %d",
+    "in " FMT_QUOTED
+    ": unable to %s: arity mismatch: required %s: %d; available %s: %d",
+    caller,
     action,
     type,
     req,
@@ -192,9 +214,34 @@ static Err err_arity_mismatch(
   );
 }
 
-static Err err_partial_args(const char *action, const char *type, U8 low, U8 len) {
+static Err err_partial_args(
+  const char *caller,
+  const char *callee,
+  const char *action,
+  const char *type,
+  U8          low,
+  U8          len
+) {
+  if (callee) {
+    return errf(
+      "in " FMT_QUOTED ": unable to %s " FMT_QUOTED
+      ": earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or add `--` to assignments to discard unused values",
+      caller,
+      action,
+      callee,
+      type,
+      low,
+      len,
+      len - low,
+      type
+    );
+  }
+
+  // TODO simplify and deduplicate.
   return errf(
-    "unable to %s: earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or add `--` to assignments to discard unused values",
+    "in " FMT_QUOTED
+    ": unable to %s: earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or add `--` to assignments to discard unused values",
+    caller,
     action,
     type,
     low,
@@ -205,36 +252,42 @@ static Err err_partial_args(const char *action, const char *type, U8 low, U8 len
 }
 
 static Err comp_validate_args(
-  Comp *comp, const char *action, const char *type, U8 req_len
+  Comp *comp, const char *callee, const char *action, const char *type, U8 req_len
 ) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
   const auto ctx     = &comp->ctx;
   const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
+  const auto caller  = sym->name.buf;
 
   if (!arg_low) {
     if (arg_len == req_len) return nullptr;
-    return err_arity_mismatch(action, type, req_len, arg_len);
+    return err_arity_mismatch(caller, callee, action, type, req_len, arg_len);
   }
   if (arg_low >= arg_len) {
-    return err_arity_mismatch(action, type, req_len, 0);
+    return err_arity_mismatch(caller, callee, action, type, req_len, 0);
   }
-  return err_partial_args(action, type, arg_low, arg_len);
+  return err_partial_args(caller, callee, action, type, arg_low, arg_len);
 }
 
-static Err comp_validate_call_args(Comp *comp, U8 inp_len) {
-  return comp_validate_args(comp, "call", "arguments", inp_len);
+static Err comp_validate_call_args(Comp *comp, const Sym *callee) {
+  const auto name = callee->name.buf;
+  const auto len  = callee->inp_len;
+  return comp_validate_args(comp, name, "call", "arguments", len);
 }
 
 static Err comp_validate_ret_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, "return", "outputs", sym->out_len);
+  return comp_validate_args(comp, nullptr, "return", "outputs", sym->out_len);
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  return comp_validate_args(comp, "recur", "arguments", sym->inp_len);
+  return comp_validate_args(comp, nullptr, "recur", "arguments", sym->inp_len);
 }
 
 static Err err_assign_no_args(const char *name) {
@@ -467,7 +520,7 @@ static Err comp_call_intrin(Interp *interp, const Sym *sym) {
 
 static Err comp_before_append_call(Comp *comp, const Sym *callee) {
   comp->ctx.proc_body = true;
-  try(comp_validate_call_args(comp, callee->inp_len));
+  try(comp_validate_call_args(comp, callee));
   try(comp_clobber_from_call(comp, callee));
   return nullptr;
 }

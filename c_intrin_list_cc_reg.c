@@ -8,6 +8,7 @@ static constexpr USED Sym INTRIN[] = {
   // Specific to this CC.
   INTRIN_BRACE,                // {
   INTRIN_COMP_WORD_SIG,        // comp_word_sig
+  INTRIN_COMP_NEXT_ARG,        // comp_next_arg
   INTRIN_COMP_NEXT_ARG_REG,    // comp_next_arg_reg
   INTRIN_COMP_CLOBBER_BARRIER, // comp_clobber_barrier
   INTRIN_COMP_LOCAL_GET,       // comp_local_get

@@ -482,7 +482,7 @@
 
 \ Non-immediate replacement for `literal`.
 : comp_push ( C: num -- ) ( E: -- num )
-  1 swap      comp_load  \ ldr x1, <num>
+  1           comp_load  \ ldr x1, <num>
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
@@ -746,7 +746,7 @@
 
 : ! ( val adr -- ) [
         asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 0 asm_store_off comp_instr \ str x1, [x2]
+  1 2 0 asm_store_off comp_instr \ stur x1, [x2]
 ] ;
 
 : !2 ( val0 val1 adr -- val0 val1 ) [
@@ -822,22 +822,20 @@
 \ Same as standard `s"` in interpretation mode.
 \ For top-level code in scripts.
 \ Inside words, use `"`.
-: str" ( -- cstr len ) parse_str ;
+: str" ( <str> -- cstr len ) parse_str ;
+: cstr" ( <str> -- cstr ) parse_str drop ;
 
 : comp_str ( C: <str> -- ) ( E: -- cstr len )
   parse_str tuck                ( len str len )
   inc                           \ Reserve 1 more for null byte.
   alloc_data 1   comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  2 swap         comp_load      \ ldr x2, <len>
+  2              comp_load      \ ldr x2, <len>
   asm_push_x1_x2 comp_instr     \ stp x1, x2, [x27], 16
 ;
 
 \ Same as standard `s"` in compilation mode.
 \ Words ending with a quote are automatically immediate.
 : " comp_str ;
-
-\ For top-level code in scripts.
-: cstr" ( C: <str> -- ) ( E: -- cstr ) parse_str drop ;
 
 : comp_cstr ( C: <str> -- ) ( E: -- cstr )
   parse_str inc               \ Reserve 1 more for null byte.
@@ -1631,7 +1629,7 @@ extern_ptr: __error
 : cells_guarded: ( C: len "name" -- ) ( E: -- addr )
   #word_beg
   cells mem_alloc drop
-  1 swap      comp_load  \ ldr x1, <addr>
+  1           comp_load  \ ldr x1, <addr>
   1 asm_push1 comp_instr \ str x2, [x27], 8
   #word_end
 ;

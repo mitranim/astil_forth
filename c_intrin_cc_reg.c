@@ -76,7 +76,7 @@ static Err intrin_comp_instr(Instr instr, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_load(Sint reg, Sint imm, Interp *interp) {
+static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   try(asm_validate_reg(reg));
@@ -109,19 +109,24 @@ static Err interp_validate_buf_len(Sint val) {
   return errf("invalid data length: " FMT_SINT, val);
 }
 
-// TODO: either provide a way to align, or auto-align to `sizeof(void*)`.
-static Err intrin_comp_const(Sint buf, Sint len, Sint reg, Interp *interp) {
-  try(interp_validate_buf_ptr(buf));
+static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
+  if (buf) {
+    try(interp_validate_buf_ptr(buf));
+  }
   try(interp_validate_buf_len(len));
-  try(asm_validate_reg(reg));
-  try(interp_comp_const(interp, (const U8 *)buf, (Ind)len, (U8)reg));
+
+  const U8 *adr;
+  try(comp_alloc_data(&interp->comp, (const U8 *)buf, (Ind)len, &adr));
+  try(int_stack_push(&interp->ints, (Sint)adr));
   return nullptr;
 }
 
-static Err intrin_comp_static(Sint len, Sint reg, Interp *interp) {
-  try(interp_validate_buf_len(len));
+// Should be used on addresses returned by `intrin_alloc_data`,
+// which may be out of range of regular `ldr` instructions.
+static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
+  try(interp_validate_buf_ptr(adr));
   try(asm_validate_reg(reg));
-  try(interp_comp_static(interp, (Ind)len, (U8)reg));
+  asm_append_page_addr(&interp->comp, (U8)reg, (const U8 *)adr);
   return nullptr;
 }
 
@@ -206,6 +211,11 @@ or an output. This assumes that we can decide the reg immediately, which
 holds on _some_ architectures under _some_ assumptions, but does not hold
 in the general case. See the comments in `./c_comp_cc_reg.c`.
 */
+static Err intrin_comp_next_arg(Interp *interp) {
+  try(comp_next_valid_arg_reg(&interp->comp, nullptr));
+  return nullptr;
+}
+
 static Err intrin_comp_next_arg_reg(Interp *interp) {
   U8 reg;
   try(comp_next_valid_arg_reg(&interp->comp, &reg));
@@ -265,7 +275,7 @@ static void intrin_debug_ctx(Interp *interp) {
     " at %p\n"
     "[debug]   input param count:  %d\n"
     "[debug]   output param count: %d\n"
-    "[debug]   arguments total:    %d\n"
+    "[debug]   arguments:          %d\n"
     "[debug]   arguments consumed: %d\n",
     name,
     sym,
@@ -358,6 +368,13 @@ static constexpr USED auto INTRIN_BRACE = (Sym){
   .intrin    = (void *)intrin_brace,
   .throws    = true,
   .immediate = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_NEXT_ARG = (Sym){
+  .name.buf  = "comp_next_arg",
+  .intrin    = (void *)intrin_comp_next_arg,
+  .throws    = true,
   .comp_only = true,
 };
 

@@ -13,23 +13,46 @@
 : unreachable abort ;
 : nop ;
 
-: comp_push { val -- }                    comp_next_arg_reg val comp_load ;
-: next_word { -- XT } ( "word" -- XT )    parse_word find_word ;
+: comp_push { val -- } comp_next_arg_reg { reg } val reg comp_load ;
+: next_word { -- XT } ( "word" -- XT ) parse_word find_word ;
+: word'     { -- XT } next_word ;
 : '         ( C: "word" -- ) ( E: -- XT ) next_word comp_push ;
-: inline'   ( C: "word" -- ) ( E: word )  next_word inline_word ;
-: postpone' ( C: "word" -- ) ( E: word )  next_word comp_call ;
+: inline'   ( C: "word" -- ) ( E: word ) next_word inline_word ;
+: postpone' ( C: "word" -- ) ( E: word ) next_word comp_call ;
 : compile' next_word comp_push ' comp_call comp_call ;
+
+: @ { adr -- val } [
+  comp_next_arg
+  0b11_111_0_00_01_0_000000000_00_00000_00000 comp_instr \ ldur x0, [x0]
+  \ TODO:
+  \ 0 0 0 asm_load_off comp_instr \ ldur x0, [x0]
+] ;
+
+: ! { val adr -- } [
+  0b11_111_0_00_00_0_000000000_00_00001_00000 comp_instr \ stur x0, [x1]
+  \ TODO:
+  \ 0 1 0 asm_store_off comp_instr \ stur x0, [x1]
+] ;
 
 \ For words which define words. Kinda like `create`.
 : #word_beg compile' : ;
 : #word_end compile' ; not_comp_only ;
 
 \ Similar to standard `constant`.
-: let: { val -- } ( E: -- val )
+: let: { val -- } ( C: "name" -- ) ( E: -- val )
   #word_beg
   immediate \ Compiling a compiling word.
   val comp_push compile' comp_push
   #word_end
+;
+
+8 let: cell
+
+\ Similar to standard `variable`.
+: var: { init -- } ( C: "name" -- ) ( E: -- adr )
+  0 cell alloc_data { adr }
+  adr postpone' let:
+  init adr !
 ;
 
 4      let: ASM_INSTR_SIZE
@@ -133,7 +156,7 @@
   parse_word        { buf -- }
   buf c@            { char }
   comp_next_arg_reg { reg }
-  reg char comp_load
+  char reg comp_load
 ;
 
 \ Same as standard `s"` in interpretation mode.
@@ -145,20 +168,31 @@
 \ Same as standard `s"` in interpretation mode.
 \ For top-level code in scripts. Inside words, use `"`.
 : str" { -- cstr len } parse_str ;
+: cstr" { -- cstr } parse_str { str -- } str ;
 
 : comp_str ( C: <str> -- ) ( E: -- cstr len )
-  comp_next_arg_reg { R0 }
-  comp_next_arg_reg { R1 }
-  parse_str         { buf len }
-  len inc           { cap } \ Reserve terminating null byte.
-  buf cap R0 comp_const     \ `adrp R0, <page>` & `add R0, R0, <pageoff>`
-  R1 len     comp_load      \ ldr R1, <len>
+  parse_str          { buf len }
+  len inc            { cap } \ Reserve terminating null byte.
+  buf cap alloc_data { adr }
+  comp_next_arg_reg  { RS }
+  comp_next_arg_reg  { RL }
+  adr RS comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
+  len RL comp_load      \ ldr RL, <len>
 ;
 
 \ Same as standard `s"` in compilation mode.
 \ Words ending with a quote are automatically immediate.
 : " ( C: <str> -- ) ( E: -- cstr len ) comp_str ;
 
+: comp_cstr ( C: <str> -- ) ( E: -- cstr )
+  parse_str          { buf len }
+  len inc            { cap } \ Reserve terminating null byte.
+  buf cap alloc_data { adr }
+  comp_next_arg_reg  { reg }
+  adr reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
+;
+
+: c" comp_cstr ;
 \ 6 1 extern: mmap
 \ 3 1 extern: mprotect
 
