@@ -124,14 +124,14 @@ static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
 static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
   try(asm_validate_reg(reg));
-  try(comp_append_page_addr(&interp->comp, adr, reg));
+  try(comp_append_page_addr(&interp->comp, (Uint)adr, (U8)reg));
   return nullptr;
 }
 
 static Err intrin_comp_page_load(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
   try(asm_validate_reg(reg));
-  try(comp_append_page_load(&interp->comp, adr, reg));
+  try(comp_append_page_load(&interp->comp, (Uint)adr, (U8)reg));
   return nullptr;
 }
 

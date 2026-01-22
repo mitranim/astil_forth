@@ -38,7 +38,7 @@
 : #word_beg compile' : ;
 : #word_end compile' ; not_comp_only ;
 
-\ Similar to standard `constant`.
+\ Similar to standard `constant`, but compile-only.
 : let: { val -- } ( C: "name" -- ) ( E: -- val )
   #word_beg
   immediate \ Compiling a compiling word.
@@ -48,15 +48,18 @@
 
 8 let: cell
 
-\ Similar to standard `variable`.
-\
-\ FIXME this is totally wrong. This inlines the hardcoded address!
-\
-\ What to do: create a word which compiles `adrp & ldr`.
+\ Compiles this common idiom:
+\   adrp <reg>, <page>
+\   add <reg>, <reg>, <pageoff>
+: var_adr { adr -- } comp_next_arg_reg { reg } adr reg comp_page_addr ;
+
+\ Similar to standard `variable`, but just like `let:`, the resulting word is
+\ compile-only, because it needs to negotiate a register with the compiler.
+\ Also unlike standard `variable`, this takes an initial value like `let:`.
 : var: { init -- } ( C: "name" -- ) ( E: -- adr )
   0 cell alloc_data { adr }
-  adr postpone' let:
   init adr !
+  #word_beg immediate adr comp_push compile' var_adr #word_end
 ;
 
 4      let: ASM_INSTR_SIZE

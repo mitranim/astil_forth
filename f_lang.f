@@ -1329,7 +1329,7 @@
 : extern_ptr: ( C: "name" str len -- ) ( E: -- ptr )
   #word_beg
   parse_word extern_got to: adr \ Addr of GOT entry holding extern addr.
-  adr 1       comp_page_load    \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  adr 1       comp_page_load    \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
   asm_push_x1 comp_instr        \ str x1, [x27], 8
   #word_end
 ;
@@ -1339,7 +1339,7 @@
 : extern_val: ( C: "name" str len -- ) ( E: -- val )
   #word_beg
   parse_word extern_got to: adr     \ Addr of GOT entry holding extern addr.
-  adr 1              comp_page_load \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  adr 1              comp_page_load \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
   1 1 0 asm_load_off comp_instr     \ ldur x1, [x1]
         asm_push_x1  comp_instr     \ str x1, [x27], 8
   #word_end

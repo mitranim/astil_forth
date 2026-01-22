@@ -496,12 +496,11 @@ static constexpr auto INTRIN_COMP_LOAD = (Sym){
 };
 
 static constexpr auto INTRIN_ALLOC_DATA = (Sym){
-  .name.buf  = "alloc_data",
-  .intrin    = (void *)intrin_alloc_data,
-  .inp_len   = 2, // ( buf len -- addr ) ; buffer address may be nil
-  .out_len   = 1,
-  .throws    = true,
-  .comp_only = true,
+  .name.buf = "alloc_data",
+  .intrin   = (void *)intrin_alloc_data,
+  .inp_len  = 2, // ( buf len -- addr ) ; buffer address may be nil
+  .out_len  = 1,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
