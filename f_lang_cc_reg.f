@@ -717,7 +717,7 @@
 
 : parse_char { -- char } parse_word { buf -- } buf c@ ;
 
-: char' { -- char } parse_char ;
+: char' { -- char } ( E: "str" -- char ) parse_char ;
 
 :: char' ( C: "str" -- ) ( E: -- char )
   parse_char        { char }
@@ -749,11 +749,11 @@
   adr reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
 ;
 
-:  " { -- cstr len }                    parse_str ;
-:: " ( C: "str" -- ) ( E: -- cstr len ) comp_str ;
+:  " { -- cstr len } ( E: "str" -- cstr len ) parse_str ;
+:: " ( C: "str" -- ) ( E: -- cstr len )       comp_str ;
 
-:  c" { -- cstr }                    parse_cstr ;
-:: c" ( C: "str" -- ) ( E: -- cstr ) comp_cstr ;
+:  c" { -- cstr }     ( E: "str" -- cstr ) parse_cstr ;
+:: c" ( C: "str" -- ) ( E: -- cstr )       comp_cstr ;
 
 \ ## Memory
 \
@@ -882,6 +882,32 @@
 
   [ not_comp_only ]
 ;
+
+\ ## Exceptions — basic
+\
+\ Exception definitions are split. See additional words below
+\ which support message formatting via the C "printf" family.
+\
+\ We dedicate one special register to an error value, which
+\ is either zero or an address of a null-delimited string.
+\ To "throw", we have to store a string into that register
+\ and instruct the compiler to insert a "try" check.
+
+\ The annotation `throws` makes the compiler insert an error check
+\ after any call to this procedure, and makes it "contagious": all
+\ callers automatically receive "throws".
+: throw { cstr -- } [
+  throws
+  ASM_REG_ERR 0 asm_mov_reg comp_instr \ mov x28, x0
+] ;
+
+\ Usage:
+\
+\   throw" some_error_msg"
+\
+\ Also see `sthrowf"` for error message formatting.
+:  throw" ( E: "str" -- ) parse_cstr throw ;
+:: throw" ( C: "str" -- ) comp_cstr compile' throw ;
 
 \ ## IO
 \

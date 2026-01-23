@@ -987,25 +987,33 @@
   parse_word get_local comp_pop_local_set
 ;
 
-\ ## Exceptions
+\ ## Exceptions — basic
 \
 \ Exception definitions are split. See additional words below
 \ which support message formatting via the C "printf" family.
 \
-\ `x0` is our error register. The annotation `throws` makes the compiler
-\ insert an error check after each call to this procedure and any other
-\ procedure which calls this one, turning the error into an exception.
-\ The `len` parameter is here because buffer variables return it.
-: throw ( cstr len -- )
-  [ throws ]
-  drop
-  [ 0 asm_pop1 comp_instr ] \ ldr x0, [x27, -8]!
-;
-
-\ Usage: `throw" some_error_msg"`.
+\ We dedicate one special register to an error value, which
+\ is either zero or an address of a null-delimited string.
+\ To "throw", we have to store a string into that register
+\ and instruct the compiler to insert a "try" check.
 \
-\ Also see `sthrowf"` for formatted errors.
-:: throw" ( C: "str" -- ) comp_str compile' throw ;
+\ Under the stack-based calling convention, the exception
+\ register is `x0`, matching the convention in our C code.
+
+\ The annotation `throws` makes the compiler insert an error check
+\ after any call to this procedure, and makes it "contagious": all
+\ callers automatically receive "throws".
+: throw ( cstr -- ) [
+  throws
+  0 asm_pop1 comp_instr \ ldr x0, [x27, -8]!
+] ;
+
+\ Usage:
+\
+\   throw" some_error_msg"
+\
+\ Also see `sthrowf"` for error message formatting.
+:: throw" ( C: "str" -- ) comp_cstr compile' throw ;
 
 \ ## Memory
 \
@@ -1591,7 +1599,8 @@ extern_val: stderr __stderrp
 \ Also see `throwf"` which comes with its own buffer.
 :: sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
-  compile'  dup2
+  compile'  over
+  compile'  swap
   comp_cstr
   compile'  snprintf
   -va
@@ -1600,6 +1609,8 @@ extern_val: stderr __stderrp
 
 4096 buf: ERR_BUF
 
+\ ## Exceptions — advanced
+\
 \ Like `sthrowf"` but easier to use. Example:
 \
 \   10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
@@ -1610,16 +1621,19 @@ extern_val: stderr __stderrp
   compile'  snprintf
   -va
   compile' ERR_BUF
+  compile' drop
   compile' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
 :: throw_if" ( C: "str" -- ) ( E: pred -- )
   execute'' #if
-  comp_str
+  comp_cstr
   compile' throw
   execute'' #end
 ;
+
+\ ## Stack printing
 
 : log_int ( num -- ) [ 1 ] logf" %zd"  ;
 : log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
@@ -1652,6 +1666,8 @@ extern_val: stderr __stderrp
 ;
 
 : .sc .s stack_clear ;
+
+\ ## More memory stuff
 
 extern_val: errno __error
 1 1 extern: strerror
