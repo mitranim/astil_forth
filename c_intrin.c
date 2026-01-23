@@ -298,11 +298,17 @@ static Err debug_mem(Interp *interp) {
 static void interp_repr_sym(const Interp *interp, const Sym *sym) {
   switch (sym->type) {
     case SYM_NORM: {
-      eprintf(
+      fprintf(
+        stderr,
         "[debug] word:\n"
         "[debug]   name:            %s\n"
         "[debug]   wordlist:        %d\n"
         "[debug]   type:            normal\n"
+#ifdef NATIVE_CALL_CONV
+        "[debug]   inp_len:         %d\n"
+        "[debug]   out_len:         %d\n"
+        "[debug]   clobber:         0b%s\n"
+#endif
         "[debug]   throws:          %s\n"
         "[debug]   comp_only:       %s\n"
         "[debug]   interp_only:     %s\n"
@@ -310,6 +316,11 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   execution token: %p\n",
         sym->name.buf,
         sym->wordlist,
+#ifdef NATIVE_CALL_CONV
+        sym->inp_len,
+        sym->out_len,
+        uint32_to_bit_str((U32)sym->clobber),
+#endif
         fmt_bool(sym->throws),
         fmt_bool(sym->comp_only),
         fmt_bool(sym->interp_only),
@@ -327,13 +338,19 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
     case SYM_INTRIN: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   name:            %s\n"
-        "[debug]   wordlist:        %d\n"
-        "[debug]   type:            intrinsic\n"
-        "[debug]   execution token: %p\n"
-        "[debug]   address:         %p\n",
+        "[debug]   name:               %s\n"
+        "[debug]   wordlist:           %d\n"
+        "[debug]   type:               intrinsic\n"
+        "[debug]   inp_len:            %d\n"
+        "[debug]   out_len:            %d\n"
+        "[debug]   throws:             %d\n"
+        "[debug]   execution token:    %p\n"
+        "[debug]   executable address: %p\n",
         sym->name.buf,
         sym->wordlist,
+        sym->inp_len,
+        sym->out_len,
+        sym->throws,
         sym,
         sym->intrin
       );

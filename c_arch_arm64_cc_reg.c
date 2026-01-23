@@ -255,7 +255,7 @@ the procedure receive them as their locations, even when their lifetimes do
 not overlap with clobbers. Dirty but simple way of avoiding an additional IR
 and data flow analysis.
 */
-static void arch_resolve_local_location(Comp *comp, Local *loc) {
+static void arch_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
   if (loc->location != LOC_UNKNOWN) return;
 
   const auto reg = bits_pop_low(&comp->ctx.vol_regs);
@@ -263,6 +263,7 @@ static void arch_resolve_local_location(Comp *comp, Local *loc) {
   if (bits_has(ARCH_VOLATILE_REGS, reg)) {
     loc->location = LOC_REG;
     loc->reg      = reg;
+    bits_add_to(&sym->clobber, reg);
     return;
   }
 
@@ -270,13 +271,13 @@ static void arch_resolve_local_location(Comp *comp, Local *loc) {
   loc->location = LOC_MEM;
 }
 
-static void asm_fixup_loc_read(Comp *comp, Loc_fixup *fix) {
+static void asm_fixup_loc_read(Comp *comp, Loc_fixup *fix, Sym *sym) {
   IF_DEBUG(aver(fix->type == LOC_FIX_READ));
 
   const auto read = &fix->read;
   const auto loc  = read->loc;
 
-  arch_resolve_local_location(comp, loc);
+  arch_resolve_local_location(comp, loc, sym);
   *read->instr = asm_instr_local_read(loc, read->reg);
 }
 
@@ -297,7 +298,7 @@ static void asm_fixup_loc_write(Comp *comp, Loc_fixup *fix, Sym *sym) {
   }
 
   const auto loc = write->loc;
-  arch_resolve_local_location(comp, loc);
+  arch_resolve_local_location(comp, loc, sym);
   *write->instr = asm_instr_local_write(loc, write->reg);
 }
 
@@ -311,7 +312,7 @@ static void asm_fixup_locals(Comp *comp, Sym *sym) {
   for (stack_range(auto, fix, &ctx->loc_fix)) {
     switch (fix->type) {
       case LOC_FIX_READ: {
-        asm_fixup_loc_read(comp, fix);
+        asm_fixup_loc_read(comp, fix, sym);
         continue;
       }
       case LOC_FIX_WRITE: {

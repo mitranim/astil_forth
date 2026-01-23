@@ -15,40 +15,51 @@
 : unreachable abort ;
 : nop ;
 
-: comp_push { val -- } ( E: -- val )
-  comp_next_arg_reg { reg } val reg comp_load
-;
+\ ## Compilation-related words
+\
+\ These words are used for metaprogramming and mostly rely on
+\ compiler intrinsics. We define them first to be able to use
+\ constants via `let:`.
+\
+\ Unlike in standard Forth, we use separate wordlists for
+\ regular and compile-time / immediate words. As a result,
+\ we have to define parsing words like "compile" in pairs:
+\ one tick seeks in the regular wordlist, and double tick
+\ seeks in the compile-time wordlist.
+
+\ Non-immediate replacement for standard `literal`.
+: comp_push { val -- } ( E: -- val ) comp_next_arg_reg { reg } val reg comp_load ;
 
 : next_word { list -- XT } ( "word" -- XT ) parse_word list find_word ;
 
 :  tick_next { list -- } ( "word" -- ) ( E: -- XT ) list next_word comp_push ;
-:: '  1 tick_next ; \ 1 = WORDLIST_EXEC
-:: '' 2 tick_next ; \ 2 = WORDLIST_COMP
+:: '  1 tick_next ; \ WORDLIST_EXEC
+:: '' 2 tick_next ; \ WORDLIST_COMP
 
 :  inline_next { list -- } ( "word" -- ) ( E: <word> )
   list next_word inline_word
 ;
-:: inline'  1 inline_next ; \ WORDLIST_EXEC
-:: inline'' 2 inline_next ; \ WORDLIST_COMP
+:: inline'  1 inline_next ;
+:: inline'' 2 inline_next ;
 
 \ "execute" is renamed from standard "postpone".
 :  execute_next { list -- } ( "word" -- ) ( E: <word> )
   list next_word comp_call
 ;
-:: execute'  1 execute_next ; \ WORDLIST_EXEC
-:: execute'' 2 execute_next ; \ WORDLIST_COMP
+:: execute'  1 execute_next ;
+:: execute'' 2 execute_next ;
 
 :  compile_next { list -- } ( "word" -- )
   list next_word comp_push ' comp_call comp_call
 ;
-:: compile'  1 compile_next ; \ WORDLIST_EXEC
-:: compile'' 2 compile_next ; \ WORDLIST_COMP
+:: compile'  1 compile_next ;
+:: compile'' 2 compile_next ;
 
 : semicolon execute'' ; ;
 
 : @ { adr -- val } [
-  0b11_111_0_00_01_0_000000000_00_00000_00000 comp_instr \ ldur x0, [x0]
   comp_next_arg
+  0b11_111_0_00_01_0_000000000_00_00000_00000 comp_instr \ ldur x0, [x0]
 ] ;
 
 : ! { val adr -- } [
@@ -77,12 +88,14 @@
 
 \ ## Assembler and bitwise ops
 \
-\ We have to interleave definitions of assembler words with definitions
+\ We interleave definitions of assembler words with definitions
 \ of various arithmetic words used by the assembler.
 
 4      let: ASM_INSTR_SIZE
-27     let: ASM_REG_DAT_SP
+27     let: ASM_REG_INTERP
+28     let: ASM_REG_ERR
 29     let: ASM_REG_FP
+30     let: ASM_REG_LR
 31     let: ASM_REG_SP
 0b0000 let: ASM_EQ
 0b0001 let: ASM_NE
@@ -103,48 +116,48 @@
 666    let: ASM_PLACEHOLDER
 
 : or { i1 i2 -- i3 } [
-  0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
   comp_next_arg
+  0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
 ] ;
 
 : and { i1 i2 -- i3 } [
-  0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
   comp_next_arg
+  0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
 ] ;
 
 : xor { i1 i2 -- i3 } [
-  0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
   comp_next_arg
+  0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
 ] ;
 
 : lsl { i1 bits -- i2 } [
-  0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
   comp_next_arg
+  0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
 ] ;
 
 : lsr { i1 bits -- i2 } [
-  0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
   comp_next_arg
+  0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
 ] ;
 
 : invert { i1 -- i2 } [
-  0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
   comp_next_arg
+  0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
 ] ;
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
 : inc { i1 -- i2 } [
-  0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
   comp_next_arg
+  0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
 ] ;
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
 : dec { i1 -- i2 } [
-  0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
   comp_next_arg
+  0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
 ] ;
 
-: low_bits { len -- bits } len 1 lsl dec ;
+: low_bits { len -- bits } 1 len lsl dec ;
 : bit_trunc { imm len -- imm } len low_bits imm and ;
 
 \ cmp Xn, <imm>
@@ -166,15 +179,15 @@
 ;
 
 : <>0 { int -- bool } [
+  comp_next_arg
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_NE asm_cset     comp_instr \ cset x0, ne
-  comp_next_arg
 ] ;
 
 : =0 { int -- bool } [
+  comp_next_arg
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_EQ asm_cset     comp_instr \ cset x0, eq
-  comp_next_arg
 ] ;
 
 \ Shared by a lot of load and store instructions. 64-bit only.
@@ -325,18 +338,301 @@
   0b00_11_1_0_0_1_00_000000000000_00000_00000 or
 ;
 
-\ ## Math
-\
-\ TODO: arithmetic here.
+\ neg Xd, Xd
+: asm_neg { Xd -- instr }
+  Xd 0b1_1_0_01011_00_0_00001_000000_11111_00000 or
+;
 
-\ : align_down { len wid -- len } wid negate len and ;
-\ : align_up   { len wid -- len } wid dec len + wid align_down ;
+\ add Xd, Xn, <imm12>
+: asm_add_imm { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_0_0_100010_0_000000000000_00000_00000 or
+;
+
+\ add Xd, Xn, Xm
+: asm_add_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ sub Xd, Xn, <imm12>
+: asm_sub_imm { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_1_0_100010_0_000000000000_00000_00000 or
+;
+
+\ sub Xd, Xn, Xm
+: asm_sub_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_1_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ sub Xd, Xn, Xm, lsl 3
+: asm_sub_reg_words { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_sub_reg
+  0b0_0_0_00000_00_0_00000_000011_00000_00000 or
+;
+
+\ mul Xd, Xn, Xm
+: asm_mul { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_00_11011_000_00000_0_11111_00000_00000 or
+;
+
+\ sdiv Xd, Xn, Xm
+: asm_sdiv { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_0_0_11010110_00000_00001_1_00000_00000 or
+;
+
+\ msub Xd, Xn, Xm, Xa
+: asm_msub { Xd Xn Xm Xa -- instr }
+  Xn  5 lsl { Xn }
+  Xm 16 lsl { Xm }
+  Xa 10 lsl
+  Xd or Xn or Xm or
+  0b1_00_11011_000_00000_1_00000_00000_00000 or
+;
+
+: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
+  cond 12 lsl { cond }
+  Xd Xm Xn asm_pattern_arith_reg
+  cond or
+;
+
+\ csel Xd, Xn, Xm, <cond>
+: asm_csel { Xd Xn Xm cond -- instr }
+  Xd Xm Xn cond asm_pattern_arith_csel
+  0b1_0_0_11010100_00000_0000_0_0_00000_00000 or
+;
+
+\ csneg Xd, Xn, Xm, <cond>
+: asm_csneg { Xd Xn Xm cond -- instr }
+  Xd Xm Xn cond asm_pattern_arith_csel
+  0b1_1_0_11010100_00000_0000_0_1_00000_00000 or
+;
+
+\ asr Xd, Xn, imm6
+: asm_asr_imm { Xd Xn imm6 -- instr }
+  Xd Xn imm6 asm_pattern_arith_reg
+  0b1_00_100110_1_000000_111111_00000_00000 or
+;
+
+\ asr Xd, Xn, Xm
+: asm_asr_reg { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_0_0_11010110_00000_0010_10_00000_00000 or
+;
+
+\ Arithmetic (sign-preserving) right shift.
+: asr { i1 bits -- i2 } [
+  comp_next_arg
+  0 0 1 asm_asr_reg comp_instr \ asr x0, x0, x1
+] ;
+
+\ eor Xd, Xn, Xm
+: asm_eor_reg { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_10_01010_00_0_00000_000000_00000_00000 or
+;
+
+\ cmp Xn, Xm
+: asm_cmp_reg { Xn Xm -- instr }
+  Xn  5 lsl { Xn }
+  Xm 16 lsl
+  Xn or
+  0b1_1_1_01011_00_0_00000_000_000_00000_11111 or
+;
+
+\ b <off>
+: asm_branch { imm26 -- instr }
+  imm26
+  2  lsr       \ Offset is implicitly times 4.
+  26 bit_trunc \ Offset may be negative.
+  0b0_00_101_00000000000000000000000000 or
+;
+
+\ b.cond <off>
+: asm_branch_cond { cond off -- instr }
+  off 2 asr 19 bit_trunc 5 lsl \ Implicitly times 4.
+  cond or
+  0b010_101_00_0000000000000000000_0_0000 or
+;
+
+\ `imm19` offset is implicitly times 4 and can be negative.
+: asm_pattern_compare_branch { Xt imm19 -- instr_mask }
+  imm19 2 lsr 19 bit_trunc 5 lsl
+  Xt or
+;
+
+\ cbz x1, <off>
+: asm_cmp_branch_zero { Xt imm19 -- instr }
+  Xt imm19 asm_pattern_compare_branch
+  0b1_011010_0_0000000000000000000_00000 or
+;
+
+\ cbnz x1, <off>
+: asm_cmp_branch_not_zero { Xt imm19 -- instr }
+  Xt imm19 asm_pattern_compare_branch
+  0b1_011010_1_0000000000000000000_00000 or
+;
+
+\ eor Xd, Xd, Xd
+: asm_zero_reg { Xd -- instr } Xd Xd Xd asm_eor_reg ;
+
+: asm_mov_reg { Xd Xm -- instr }
+  Xm 16 lsl
+  Xd or
+  0b1_01_01010_00_0_00000_000000_11111_00000 or
+;
+
+\ Immediate must be unsigned.
+: asm_mov_imm { Xd imm -- instr }
+  imm 5 lsl
+  Xd or
+  0b1_10_100101_00_0000000000000000_00000 or
+;
+
+\ mvn Xd, Xm
+: asm_mvn { Xd Xm -- instr }
+  Xm 16 lsl
+  Xd or
+  0b1_01_01010_00_1_00000_000000_11111_00000 or
+;
+
+\ `ret x30`; requires caution with SP / FP.
+0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 let: asm_ret
+
+0b110_101_01000000110010_0000_000_11111 let: asm_nop
+
+\ svc 666
+0b110_101_00_000_0000001010011010_000_01 let: asm_svc
+
+\ ## Arithmetic
+
+: negate { i1 -- i2 } [
+  comp_next_arg
+  0 asm_neg comp_instr \ neg x0, x0
+] ;
+
+: + { i1 i2 -- i3 } [
+  comp_next_arg
+  0 0 1 asm_add_reg comp_instr \ add x0, x0, x1
+] ;
+
+: - { i1 i2 -- i3 } [
+  comp_next_arg
+  0 0 1 asm_sub_reg comp_instr \ sub x0, x0, x1
+] ;
+
+: * { i1 i2 -- i3 } [
+  comp_next_arg
+  0 0 1 asm_mul comp_instr \ mul x0, x0, x1
+] ;
+
+: / { i1 i2 -- i3 } [
+  comp_next_arg
+  0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
+] ;
+
+\ FIXME: declare clobber
+: mod { i1 i2 -- i3 } [
+    2 0 1 asm_sdiv comp_instr \ sdiv x2, x0, x1
+  0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
+  comp_next_arg
+] ;
+
+\ FIXME: declare clobber
+: /mod { dividend divisor -- rem quo } [
+  comp_next_arg comp_next_arg
+    2 0 1 asm_sdiv  comp_instr \ sdiv x2, x0, x1
+  0 2 1 0 asm_msub  comp_instr \ msub x0, x2, x1, x0
+] ;
+
+: abs { int -- +int } [
+  comp_next_arg
+  0            asm_cmp_zero comp_instr \ cmp x0, 0
+  0 0 0 ASM_PL asm_csneg    comp_instr \ cneg x0, x0, pl
+] ;
+
+: min { i1 i2 -- i1|i2 } [
+  comp_next_arg
+  0 1          asm_cmp_reg comp_instr \ cmp x0, x1
+  0 0 1 ASM_LT asm_csel    comp_instr \ csel x0, x0, x1, lt
+] ;
+
+: max { i1 i2 -- i1|i2 } [
+  comp_next_arg
+  0 1          asm_cmp_reg comp_instr \ cmp x0, x1
+  0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
+] ;
+
+: align_down { len wid -- len } wid negate len and ;
+: align_up   { len wid -- len } wid dec len + wid align_down ;
+
+\ ## Assembler continued
+
+\ lsl Xd, Xn, <imm>
+: asm_lsl_imm { Xd Xn imm6 -- instr }
+  imm6 negate 64 mod 6 bit_trunc 16 lsl { immr }
+  63 imm6 -          6 bit_trunc 10 lsl { imms }
+  Xn 5 lsl
+  Xd or imms or immr or
+  0b1_10_100110_1_000000_000000_00000_00000 or
+;
+
+\ tbz Xt, <bit>, <imm>
+: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
+  imm14 2 lsr 14 bit_trunc 5 lsl { imm14 } \ Implicitly times 4.
+  bit   5 lsr             31 lsl { b5 }
+  bit         5 bit_trunc 19 lsl \ b40
+  Xt or imm14 or b5 or
+  0b0_01_101_1_0_00000_00000000000000_00000 or
+;
+
+\ orr Xd, Xn, #(1 << bit)
+\
+\ TODO add general-purpose `orr`.
+: asm_orr_bit { Xd Xn bit -- instr }
+  64 bit - 16 lsl { immr }
+  Xn        5 lsl
+  Xd or immr or
+  0b1_01_100100_1_000000_000000_00000_00000 or
+;
+
+: asm_comp_cset_reg { cond -- } ( E: i1 i2 -- bool )
+  comp_next_arg
+  0 1    asm_cmp_reg comp_instr \ cmp x0, x1
+  0 cond asm_cset    comp_instr \ cset x0, <cond>
+;
+
+: asm_comp_cset_zero { cond -- } ( E: num -- bool )
+  comp_next_arg
+  0      asm_cmp_zero comp_instr \ cmp x0, 0
+  0 cond asm_cset     comp_instr \ cset x0, <cond>
+;
+
+\ ## Numeric comparison
+
+\ https://gforth.org/manual/Numeric-comparison.html
+: =   { i1 i2 -- bool } [ ASM_EQ asm_comp_cset_reg  ] ;
+: <>  { i1 i2 -- bool } [ ASM_NE asm_comp_cset_reg  ] ;
+: >   { i1 i2 -- bool } [ ASM_GT asm_comp_cset_reg  ] ;
+: <   { i1 i2 -- bool } [ ASM_LT asm_comp_cset_reg  ] ;
+: <=  { i1 i2 -- bool } [ ASM_LE asm_comp_cset_reg  ] ;
+: >=  { i1 i2 -- bool } [ ASM_GE asm_comp_cset_reg  ] ;
+: <0  { num   -- bool } [ ASM_LT asm_comp_cset_zero ] ; \ Or `MI`.
+: >0  { num   -- bool } [ ASM_GT asm_comp_cset_zero ] ;
+: <=0 { num   -- bool } [ ASM_LE asm_comp_cset_zero ] ;
+: >=0 { num   -- bool } [ ASM_GE asm_comp_cset_zero ] ; \ Or `PL`.
+
+: odd { i1 -- bool } i1 1 and ;
 
 \ ## Characters and strings
 
 : c@ { str -- char } [
-  0 0 0 asm_load_byte_off comp_instr \ ldrb x0, [x0]
   comp_next_arg
+  0 0 0 asm_load_byte_off comp_instr \ ldrb x0, [x0]
 ] ;
 
 : parse_char { -- char } parse_word { buf -- } buf c@ ;
@@ -566,13 +862,13 @@ extern_val: errno __error
   adr len pflag mprotect
 ;
 
-\ : mem_alloc { size1 -- addr size2 }
-\         PAGE_SIZE align_up { size2 }
-\   size2 PAGE_SIZE 1 lsl +  { size }
-\   size  PROT_NONE mem_map  { addr }
-\   addr  PAGE_SIZE +        { addr }
-\   addr  size2 mem_unprot   { -- }
-\   addr  size2
-\ ;
+: mem_alloc { size1 -- addr size2 }
+  size1 PAGE_SIZE align_up { size2 }
+  PAGE_SIZE 1 lsl size2 +  { size }
+  size PROT_NONE mem_map   { addr }
+  addr PAGE_SIZE +         { addr }
+  addr size2 mem_unprot    { -- }
+  addr size2
+;
 
 debug_stack
