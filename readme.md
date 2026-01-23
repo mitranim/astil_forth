@@ -145,13 +145,13 @@ More ergonomic control flow structures:
 
 Because the system uses native procedure calls, there is no return stack; see below.
 
-There is no `state`, `does>`, or any form of state-smartness. (Anton Ertl would probably [approve](https://www.complang.tuwien.ac.at/papers/ertl01state.pdf).) Many words come in separate "interpretation" and "compilation" variants, such as `str"` vs `"`. Compiled variants get shorter names.
+There is no `state` or `does>`. The system supports separately defining regular and compile-time definitions of words, overloading them by name, and placing the variants in separate wordlists. When finding a word by name, the caller must choose the wordlist, and thus the variant of that word.
 
 Exceptions are strings (error messages) rather than numeric codes.
 
 Booleans are `0 1` rather than `0 -1`.
 
-Word-modifying words like `immediate` and `comp_only` can only be used inside colon definitions.
+Word-modifying words like `comp_only` can only be used inside colon definitions.
 
 Special _semantic_ roles get special _syntactic_ roles. Other Forths already follow some rules, which we replicate:
 - String-parsing words end with `"` and terminate with `"`.
@@ -161,7 +161,6 @@ Special _semantic_ roles get special _syntactic_ roles. Other Forths already fol
 - Word-parsing words which declare must end with `:`.
 - Word-parsing words which don't declare must end with `'`.
 - Other immediate words begin with `#`.
-- Any of the above _automatically_ makes a word immediate.
 
 Examples:
 - Declaring words: `: let: var: to:`.

@@ -17,13 +17,14 @@ Every Forth interpreter is a compiler.
 Would be nice to have a name reflecting both.
 */
 typedef struct {
-  Sint_stack  ints;    // Forth integer stack.
-  Reader     *reader;  // Each input file has its own parser state.
-  Sym_stack   syms;    // Defined symbols.
-  Sym_dict    words;   // Symbols by name.
-  Str_set     imports; // Realpaths of already-imported files.
-  Comp        comp;    // Code and compilation context.
-  Interp_snap snap;    // Stable snapshot for rewinding.
+  Sint_stack  ints;      // Forth integer stack.
+  Reader     *reader;    // Each input file has its own parser state.
+  Sym_stack   syms;      // Defined symbols.
+  Sym_dict    dict_exec; // Wordlist `WORDLIST_EXEC`.
+  Sym_dict    dict_comp; // Wordlist `WORDLIST_COMP`.
+  Str_set     imports;   // Realpaths of already-imported files.
+  Comp        comp;      // Code and compilation context.
+  Interp_snap snap;      // Stable snapshot for rewinding.
 } Interp;
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);

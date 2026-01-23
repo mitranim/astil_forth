@@ -22,7 +22,7 @@ static Err err_wordlist_at_capacity(const char *name) {
   return errf("unable to create word " FMT_QUOTED ": wordlist at capacity", name);
 }
 
-static Err intrin_colon(Interp *interp) {
+static Err interp_word_begin(Interp *interp, Wordlist wordlist) {
   const auto comp = &interp->comp;
   if (comp->ctx.sym) return err_nested_definition(interp);
 
@@ -30,7 +30,12 @@ static Err intrin_colon(Interp *interp) {
   try(read_word(read));
 
   const auto name = read->word;
-  IF_DEBUG(eprintf("[system] read word name: " FMT_QUOTED "\n", name.buf));
+
+  IF_DEBUG(eprintf(
+    "[system] read word name: " FMT_QUOTED "; associating with wordlist %d\n",
+    name.buf,
+    wordlist
+  ));
 
   const auto syms = &interp->syms;
   if (stack_rem(syms) <= 0) return err_wordlist_at_capacity(name.buf);
@@ -42,15 +47,25 @@ static Err intrin_colon(Interp *interp) {
   const auto sym = stack_push(
     syms,
     (Sym){
-      .type      = SYM_NORM,
-      .name      = name,
-      .immediate = is_name_immediate(&name),
+      .type     = SYM_NORM,
+      .name     = name,
+      .wordlist = wordlist,
     }
   );
 
   comp_sym_beg(comp, sym);
   return nullptr;
 }
+
+static Err intrin_colon(Interp *interp) {
+  return interp_word_begin(interp, WORDLIST_EXEC);
+}
+
+static Err intrin_colon_colon(Interp *interp) {
+  return interp_word_begin(interp, WORDLIST_COMP);
+}
+
+static void interp_repr_sym(const Interp *, const Sym *);
 
 static Err intrin_semicolon(Interp *interp) {
   const auto comp  = &interp->comp;
@@ -65,21 +80,22 @@ static Err intrin_semicolon(Interp *interp) {
   comp_sym_end(comp, sym);
   interp_snapshot(interp);
 
-  const auto words = &interp->words;
-  if (dict_has(words, sym->name.buf) && !redef) {
-    eprintf("[system] redefined word " FMT_QUOTED "\n", sym->name.buf);
+  const auto name     = sym->name.buf;
+  const auto wordlist = sym->wordlist;
+
+  Sym_dict *dict;
+  try(interp_wordlist(interp, wordlist, &dict));
+
+  if (dict_has(dict, name) && !redef) {
+    eprintf(
+      "[system] redefined word " FMT_QUOTED " in wordlist %d\n", name, wordlist
+    );
   }
-  dict_set(words, sym->name.buf, sym);
+  dict_set(dict, name, sym);
 
-  /*
-  Prints instructions as hexpairs in the system's endian order,
-  which is usually little endian. How to disassemble:
-
-    echo <hex> | llvm-mc --disassemble --hex
-  */
   IF_DEBUG({
-    eprintf("[system] compiled word: " FMT_QUOTED "\n", sym->name.buf);
-    comp_debug_print_sym_instrs(comp, sym, "[system]   ");
+    eputs("[debug] compiled:");
+    interp_repr_sym(interp, sym);
 
     // const auto read = interp->reader;
     // eprintf(
@@ -94,7 +110,7 @@ static Err intrin_semicolon(Interp *interp) {
   //     "[system] warning: " FMT_SINT " stack items after defining " FMT_QUOTED
   //     "; this usually indicates a bug\n",
   //     stack_len(ints),
-  //     sym->name.buf
+  //     name
   //   );
   // }
   return nullptr;
@@ -106,13 +122,6 @@ static void intrin_bracket_beg(Interp *interp) {
 
 static void intrin_bracket_end(Interp *interp) {
   interp->comp.ctx.compiling = true;
-}
-
-static Err intrin_immediate(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->immediate = true;
-  return nullptr;
 }
 
 static Err intrin_comp_only(Interp *interp) {
@@ -295,27 +304,22 @@ static Err debug_mem(Interp *interp) {
   return nullptr;
 }
 
-static Err debug_word(Interp *interp) {
-  Sym *sym;
-  try(interp_read_sym(interp, &sym));
-
-  const auto name = sym->name.buf;
-
+static void interp_repr_sym(const Interp *interp, const Sym *sym) {
   switch (sym->type) {
     case SYM_NORM: {
       eprintf(
         "[debug] word:\n"
         "[debug]   name:            %s\n"
+        "[debug]   wordlist:        %d\n"
         "[debug]   type:            normal\n"
         "[debug]   throws:          %s\n"
-        "[debug]   immediate:       %s\n"
         "[debug]   comp_only:       %s\n"
         "[debug]   interp_only:     %s\n"
         "[debug]   inlinable:       %s\n"
         "[debug]   execution token: %p\n",
-        name,
+        sym->name.buf,
+        sym->wordlist,
         fmt_bool(sym->throws),
-        fmt_bool(sym->immediate),
         fmt_bool(sym->comp_only),
         fmt_bool(sym->interp_only),
         fmt_bool(sym->norm.inlinable),
@@ -326,37 +330,55 @@ static Err debug_word(Interp *interp) {
         eprintf("[debug]   symbol: ");
         repr_struct(sym);
       });
-      return nullptr;
+      return;
     }
 
     case SYM_INTRIN: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   name: %s\n"
-        "[debug]   type: intrinsic\n"
+        "[debug]   name:            %s\n"
+        "[debug]   wordlist:        %d\n"
+        "[debug]   type:            intrinsic\n"
         "[debug]   execution token: %p\n"
-        "[debug]   address: %p\n",
-        name,
+        "[debug]   address:         %p\n",
+        sym->name.buf,
+        sym->wordlist,
         sym,
         sym->intrin
       );
-      return nullptr;
+      return;
     }
 
     case SYM_EXTERN: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   name: %s\n"
-        "[debug]   type: external procedure\n"
-        "[debug]   address: %p\n",
-        name,
+        "[debug]   name:     %s\n"
+        "[debug]   wordlist: %d\n"
+        "[debug]   type:     external procedure\n"
+        "[debug]   address:  %p\n",
+        sym->name.buf,
+        sym->wordlist,
         sym->exter
       );
-      return nullptr;
+      return;
     }
 
     default: unreachable();
   }
+}
+
+static Err debug_word(Interp *interp) {
+  try(interp_read_word(interp));
+  const auto name = interp->reader->word.buf;
+
+  const auto exec = dict_get(&interp->dict_exec, name);
+  if (exec) interp_repr_sym(interp, exec);
+
+  const auto comp = dict_get(&interp->dict_comp, name);
+  if (comp) interp_repr_sym(interp, comp);
+
+  if (exec || comp) return nullptr;
+  return errf("word " FMT_QUOTED " is not present in any wordlist\n", name);
 }
 
 static Err debug_sync_code(Interp *interp) {
@@ -389,56 +411,59 @@ Some fields are used only in the register-based callvention:
 */
 
 static constexpr auto INTRIN_COLON = (Sym){
-  .name.buf  = ":",
-  .intrin    = (void *)intrin_colon,
-  .throws    = true,
-  .immediate = true,
+  .name.buf = ":",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_colon,
+  .throws   = true,
+};
+
+static constexpr auto INTRIN_COLON_COLON = (Sym){
+  .name.buf = "::",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_colon_colon,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_SEMICOLON = (Sym){
   .name.buf  = ";",
+  .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_semicolon,
   .throws    = true,
-  .immediate = true,
   .comp_only = true,
 };
 
 static constexpr auto INTRIN_BRACKET_BEG = (Sym){
   .name.buf  = "[",
+  .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_bracket_beg,
-  .immediate = true,
+  .comp_only = true,
 };
 
 static constexpr auto INTRIN_BRACKET_END = (Sym){
   .name.buf = "]",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_bracket_end,
 };
 
 static constexpr auto INTRIN_RET = (Sym){
   .name.buf  = "#ret",
+  .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_ret,
   .throws    = true,
-  .immediate = true,
   .comp_only = true,
 };
 
 static constexpr auto INTRIN_RECUR = (Sym){
   .name.buf  = "#recur",
+  .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_recur,
-  .throws    = true,
-  .immediate = true,
-  .comp_only = true,
-};
-
-static constexpr auto INTRIN_IMMEDIATE = (Sym){
-  .name.buf  = "immediate",
-  .intrin    = (void *)intrin_immediate,
   .throws    = true,
   .comp_only = true,
 };
 
 static constexpr auto INTRIN_COMP_ONLY = (Sym){
   .name.buf  = "comp_only",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_only,
   .throws    = true,
   .comp_only = true,
@@ -446,6 +471,7 @@ static constexpr auto INTRIN_COMP_ONLY = (Sym){
 
 static constexpr auto INTRIN_NOT_COMP_ONLY = (Sym){
   .name.buf  = "not_comp_only",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_not_comp_only,
   .throws    = true,
   .comp_only = true,
@@ -453,6 +479,7 @@ static constexpr auto INTRIN_NOT_COMP_ONLY = (Sym){
 
 static constexpr auto INTRIN_INLINE = (Sym){
   .name.buf  = "inline",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline,
   .throws    = true,
   .comp_only = true,
@@ -460,6 +487,7 @@ static constexpr auto INTRIN_INLINE = (Sym){
 
 static constexpr auto INTRIN_THROWS = (Sym){
   .name.buf  = "throws",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_throws,
   .throws    = true,
   .comp_only = true,
@@ -467,6 +495,7 @@ static constexpr auto INTRIN_THROWS = (Sym){
 
 static constexpr auto INTRIN_REDEFINE = (Sym){
   .name.buf  = "redefine",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_redefine,
   .throws    = true,
   .comp_only = true,
@@ -474,12 +503,14 @@ static constexpr auto INTRIN_REDEFINE = (Sym){
 
 static constexpr auto INTRIN_HERE = (Sym){
   .name.buf  = "here",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_here,
   .comp_only = true,
 };
 
 static constexpr auto INTRIN_COMP_INSTR = (Sym){
   .name.buf    = "comp_instr",
+  .wordlist    = WORDLIST_EXEC,
   .intrin      = (void *)intrin_comp_instr,
   .inp_len     = 1,
   .throws      = true,
@@ -489,6 +520,7 @@ static constexpr auto INTRIN_COMP_INSTR = (Sym){
 
 static constexpr auto INTRIN_COMP_LOAD = (Sym){
   .name.buf  = "comp_load",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_load,
   .inp_len   = 2,
   .throws    = true,
@@ -497,6 +529,7 @@ static constexpr auto INTRIN_COMP_LOAD = (Sym){
 
 static constexpr auto INTRIN_ALLOC_DATA = (Sym){
   .name.buf = "alloc_data",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_alloc_data,
   .inp_len  = 2, // ( buf len -- addr ) ; buffer address may be nil
   .out_len  = 1,
@@ -505,6 +538,7 @@ static constexpr auto INTRIN_ALLOC_DATA = (Sym){
 
 static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
   .name.buf  = "comp_page_addr",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_page_addr,
   .inp_len   = 2, // ( adr reg -- )
   .out_len   = 0,
@@ -514,6 +548,7 @@ static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
 
 static constexpr auto INTRIN_COMP_PAGE_LOAD = (Sym){
   .name.buf  = "comp_page_load",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_page_load,
   .inp_len   = 2, // ( adr reg -- )
   .out_len   = 0,
@@ -523,6 +558,7 @@ static constexpr auto INTRIN_COMP_PAGE_LOAD = (Sym){
 
 static constexpr auto INTRIN_COMP_CALL = (Sym){
   .name.buf  = "comp_call",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_call,
   .inp_len   = 1,
   .throws    = true,
@@ -531,18 +567,21 @@ static constexpr auto INTRIN_COMP_CALL = (Sym){
 
 static constexpr auto INTRIN_QUIT = (Sym){
   .name.buf = "quit",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_quit,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_CHAR = (Sym){
   .name.buf = "char",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_char,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_PARSE = (Sym){
   .name.buf = "parse",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_parse,
   .inp_len  = 1,
   .out_len  = 2,
@@ -551,6 +590,7 @@ static constexpr auto INTRIN_PARSE = (Sym){
 
 static constexpr auto INTRIN_PARSE_WORD = (Sym){
   .name.buf = "parse_word",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_parse_word,
   .out_len  = 2,
   .throws   = true,
@@ -558,6 +598,7 @@ static constexpr auto INTRIN_PARSE_WORD = (Sym){
 
 static constexpr auto INTRIN_IMPORT = (Sym){
   .name.buf = "import",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import,
   .inp_len  = 2,
   .throws   = true,
@@ -565,18 +606,21 @@ static constexpr auto INTRIN_IMPORT = (Sym){
 
 static constexpr auto INTRIN_IMPORT_QUOTE = (Sym){
   .name.buf = "import\"",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import_quote,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_IMPORT_TICK = (Sym){
   .name.buf = "import'",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import_tick,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_EXTERN_GOT = (Sym){
   .name.buf = "extern_got",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_extern_got,
   .inp_len  = 2,
   .out_len  = 1,
@@ -585,6 +629,7 @@ static constexpr auto INTRIN_EXTERN_GOT = (Sym){
 
 static constexpr auto INTRIN_EXTERN_PROC = (Sym){
   .name.buf = "extern:",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_extern_proc,
   .inp_len  = 2,
   .throws   = true,
@@ -592,14 +637,16 @@ static constexpr auto INTRIN_EXTERN_PROC = (Sym){
 
 static constexpr auto INTRIN_FIND_WORD = (Sym){
   .name.buf = "find_word",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_find_word,
-  .inp_len  = 2,
+  .inp_len  = 3,
   .out_len  = 1,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_INLINE_WORD = (Sym){
   .name.buf  = "inline_word",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline_word,
   .inp_len   = 1,
   .throws    = true,
@@ -608,6 +655,7 @@ static constexpr auto INTRIN_INLINE_WORD = (Sym){
 
 static constexpr auto INTRIN_EXECUTE = (Sym){
   .name.buf = "execute",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_execute,
   .inp_len  = 1,
   .throws   = true,
@@ -615,6 +663,7 @@ static constexpr auto INTRIN_EXECUTE = (Sym){
 
 static constexpr auto INTRIN_GET_LOCAL = (Sym){
   .name.buf  = "get_local",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_get_local,
   .inp_len   = 2,
   .out_len   = 1,
@@ -624,6 +673,7 @@ static constexpr auto INTRIN_GET_LOCAL = (Sym){
 
 static constexpr auto INTRIN_ANON_LOCAL = (Sym){
   .name.buf  = "anon_local",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_anon_local,
   .throws    = true,
   .comp_only = true,
@@ -631,70 +681,82 @@ static constexpr auto INTRIN_ANON_LOCAL = (Sym){
 
 static constexpr auto INTRIN_DEBUG_ON = (Sym){
   .name.buf = "debug_on",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_debug_on,
 };
 
 static constexpr auto INTRIN_DEBUG_OFF = (Sym){
   .name.buf = "debug_off",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_debug_off,
 };
 
 static constexpr auto INTRIN_DEBUG_FLUSH = (Sym){
   .name.buf = "debug_flush",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_flush,
 };
 
 static constexpr auto INTRIN_DEBUG_THROW = (Sym){
   .name.buf = "debug_throw",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_throw,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_STACK_LEN = (Sym){
   .name.buf = "debug_stack_len",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_stack_len,
 };
 
 static constexpr auto INTRIN_DEBUG_STACK = (Sym){
   .name.buf = "debug_stack",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_stack,
 };
 
 static constexpr auto INTRIN_DEBUG_DEPTH = (Sym){
   .name.buf = "debug_depth",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_depth,
 };
 
 static constexpr auto INTRIN_DEBUG_TOP_INT = (Sym){
   .name.buf = "debug_top_int",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_top_int,
 };
 
 static constexpr auto INTRIN_DEBUG_TOP_PTR = (Sym){
   .name.buf = "debug_top_ptr",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_top_ptr,
 };
 
 static constexpr auto INTRIN_DEBUG_TOP_STR = (Sym){
   .name.buf = "debug_top_str",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_top_str,
 };
 
 static constexpr auto INTRIN_DEBUG_MEM = (Sym){
   .name.buf = "debug_mem",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_mem,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_WORD = (Sym){
-  .name.buf  = "debug'",
-  .intrin    = (void *)debug_word,
-  .throws    = true,
-  .immediate = true,
+  .name.buf = "debug'",
+  .wordlist = WORDLIST_COMP,
+  .intrin   = (void *)debug_word,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_SYNC_CODE = (Sym){
   .name.buf = "debug_sync_code",
+  .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_sync_code,
   .throws   = true,
 };

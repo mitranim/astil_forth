@@ -181,10 +181,10 @@ static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_find_word(Sint buf, Sint len, Interp *interp) {
+static Err intrin_find_word(Sint wordlist, Sint buf, Sint len, Interp *interp) {
   try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
-  try(interp_find_word(interp, (const char *)buf, (Ind)len));
+  try(interp_find_word(interp, (const char *)buf, (Ind)len, (Wordlist)wordlist));
   return nullptr;
 }
 
@@ -378,14 +378,15 @@ static Err intrin_comp_clobber_barrier(Interp *interp) {
 
 static constexpr USED auto INTRIN_BRACE = (Sym){
   .name.buf  = "{",
+  .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_brace,
   .throws    = true,
-  .immediate = true,
   .comp_only = true,
 };
 
 static constexpr USED auto INTRIN_COMP_NEXT_ARG = (Sym){
   .name.buf  = "comp_next_arg",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_next_arg,
   .throws    = true,
   .comp_only = true,
@@ -393,6 +394,7 @@ static constexpr USED auto INTRIN_COMP_NEXT_ARG = (Sym){
 
 static constexpr USED auto INTRIN_COMP_NEXT_ARG_REG = (Sym){
   .name.buf  = "comp_next_arg_reg",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_next_arg_reg,
   .out_len   = 1,
   .throws    = true,
@@ -401,6 +403,7 @@ static constexpr USED auto INTRIN_COMP_NEXT_ARG_REG = (Sym){
 
 static constexpr USED auto INTRIN_COMP_WORD_SIG = (Sym){
   .name.buf  = "comp_word_sig",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_word_sig,
   .inp_len   = 2,
   .throws    = true,
@@ -409,6 +412,7 @@ static constexpr USED auto INTRIN_COMP_WORD_SIG = (Sym){
 
 static constexpr USED auto INTRIN_COMP_CLOBBER_BARRIER = (Sym){
   .name.buf  = "comp_clobber_barrier",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_clobber_barrier,
   .throws    = true,
   .comp_only = true,
@@ -416,6 +420,7 @@ static constexpr USED auto INTRIN_COMP_CLOBBER_BARRIER = (Sym){
 
 static constexpr USED auto INTRIN_COMP_LOCAL_GET = (Sym){
   .name.buf  = "comp_local_get",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_get,
   .inp_len   = 1,
   .throws    = true,
@@ -424,6 +429,7 @@ static constexpr USED auto INTRIN_COMP_LOCAL_GET = (Sym){
 
 static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
   .name.buf  = "comp_local_set",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_set,
   .throws    = true,
   .comp_only = true,
@@ -431,13 +437,14 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
 
 static constexpr USED auto INTRIN_DEBUG_CTX = (Sym){
   .name.buf  = "debug_ctx",
+  .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_debug_ctx,
   .comp_only = true,
 };
 
 static constexpr USED auto INTRIN_DEBUG_CTX_IMM = (Sym){
   .name.buf  = "#debug_ctx",
+  .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_debug_ctx,
-  .immediate = true,
   .comp_only = true,
 };

@@ -30,14 +30,15 @@ static void interp_rewind(Interp *interp) {
 
   /*
   TODO: support deletion in dicts.
-  For now, accessing a partially-defined word is UB.
+  For now, accessing a partially-defined word
+  after recovering from an exception is UB.
 
-  const auto len_next = (Ind)stack_len(syms);
-  const auto words = &interp->words;
-  for (Ind ind = len_prev; ind < len_next; ind++) {
-    const auto sym = &syms->floor[ind];
-    dict_del(words, sym->buf.name);
-  }
+    const auto len_next = (Ind)stack_len(syms);
+    const auto words = &interp->words;
+    for (Ind ind = len_prev; ind < len_next; ind++) {
+      const auto sym = &syms->floor[ind];
+      dict_del(words, sym->buf.name);
+    }
   */
 
   stack_trunc_to(syms, len_prev);
@@ -73,6 +74,29 @@ static void interp_handle_err(Interp *interp, Err err) {
   eprintf(TTY_RED_BEG "error:" TTY_RED_END " %s\n", err);
   backtrace_print();
   interp_rewind(interp);
+}
+
+static Err err_unrecognized_wordlist(Wordlist val) {
+  return errf(
+    "unrecognized wordlist type %d; known types: WORDLIST_EXEC = %d, WORDLIST_COMP = %d",
+    val,
+    WORDLIST_EXEC,
+    WORDLIST_COMP
+  );
+}
+
+static Err interp_wordlist(Interp *interp, Wordlist val, Sym_dict **out) {
+  switch (val) {
+    case WORDLIST_EXEC: {
+      if (out) *out = &interp->dict_exec;
+      return nullptr;
+    }
+    case WORDLIST_COMP: {
+      if (out) *out = &interp->dict_comp;
+      return nullptr;
+    }
+    default: return err_unrecognized_wordlist(val);
+  }
 }
 
 static Err read_interp_num(Interp *interp) {
@@ -180,26 +204,48 @@ static Err interp_require_current_sym(const Interp *interp, Sym **out) {
   return comp_require_current_sym(&interp->comp, out);
 }
 
-static Err err_undefined_word(const char *name) {
+static Err err_word_undefined(const char *name) {
   return errf("undefined word " FMT_QUOTED, name);
 }
 
-static Err interp_word(Interp *interp, Word_str word) {
-  const auto comp = &interp->comp;
-  const auto name = word.buf;
+static Err err_word_undefined_in_wordlist(const char *name, Wordlist list) {
+  return errf("word " FMT_QUOTED " not found in wordlist %d", name, list);
+}
 
-  if (comp->ctx.compiling) {
+static Err err_word_comp_only(const char *name) {
+  return errf("word " FMT_QUOTED " is compile-time only", name);
+}
+
+static Err interp_word(Interp *interp, Word_str word) {
+  const auto dict_exec = &interp->dict_exec;
+  const auto dict_comp = &interp->dict_comp;
+  const auto comp      = &interp->comp;
+  const auto ctx       = &comp->ctx;
+  const auto name      = word.buf;
+
+  if (ctx->compiling) {
     const auto loc = comp_local_get(comp, name);
     if (loc) return comp_append_local_get(comp, loc);
+
+    auto sym = dict_get(dict_comp, name);
+    if (sym) return interp_call_sym(interp, sym);
+
+    sym = dict_get(dict_exec, name);
+    if (sym) return comp_append_call_sym(comp, sym);
+
+    return err_word_undefined(name);
   }
 
-  const auto sym = dict_get(&interp->words, name);
-  if (!sym) return err_undefined_word(word.buf);
+  auto sym = dict_get(dict_exec, name);
+  if (sym) return interp_call_sym(interp, sym);
 
-  if (comp->ctx.compiling && !sym->immediate) {
-    return comp_append_call_sym(comp, sym);
+  sym = dict_get(dict_comp, name);
+  if (sym) {
+    if (sym->comp_only && !ctx->sym) return err_word_comp_only(name);
+    return interp_call_sym(interp, sym);
   }
-  return interp_call_sym(interp, sym);
+
+  return err_word_undefined(name);
 }
 
 static Err read_interp_word(Interp *interp) {
@@ -324,23 +370,11 @@ static Err interp_import(Interp *interp, const char *path) {
   return err;
 }
 
-static Err interp_require_sym(Interp *interp, const char *name, Sym **out) {
-  const auto sym = dict_get(&interp->words, name);
-  if (!sym) return err_undefined_word(name);
-  if (out) *out = sym;
-  return nullptr;
-}
-
 static Err interp_read_word(Interp *interp) {
   const auto read = interp->reader;
   try(read_word(read));
   IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", read->word.buf));
   return nullptr;
-}
-
-static Err interp_read_sym(Interp *interp, Sym **out) {
-  try(interp_read_word(interp));
-  return interp_require_sym(interp, interp->reader->word.buf, out);
 }
 
 static Err err_sym_out_bounds(const Sym *floor, const Sym *ceil, const Sym *val) {
@@ -451,29 +485,38 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
   const auto sym = stack_push(
     &interp->syms,
     (Sym){
-      .type    = SYM_EXTERN,
-      .name    = interp->reader->word,
-      .exter   = addr,
-      .inp_len = (U8)inp_len,
-      .out_len = (U8)out_len,
-      .clobber = ARCH_VOLATILE_REGS, // Only used in reg-based call-conv.
+      .type     = SYM_EXTERN,
+      .name     = interp->reader->word,
+      .wordlist = WORDLIST_EXEC,
+      .exter    = addr,
+      .inp_len  = (U8)inp_len,
+      .out_len  = (U8)out_len,
+      .clobber  = ARCH_VOLATILE_REGS, // Only used in reg-based call-conv.
     }
   );
 
-  dict_set(&interp->words, sym->name.buf, sym);
+  dict_set(&interp->dict_exec, sym->name.buf, sym);
   comp_register_dysym(&interp->comp, sym->name.buf, (U64)addr);
   return nullptr;
 }
 
-static Err interp_find_word(Interp *interp, const char *name, Ind len) {
+static Err interp_find_word(
+  Interp *interp, const char *name, Ind len, Wordlist wordlist
+) {
   if (DEBUG) aver((Sint)strlen(name) == len);
 
-  const auto sym = dict_get(&interp->words, name);
-  if (!sym) return err_undefined_word(name);
+  Sym_dict *dict;
+  try(interp_wordlist(interp, wordlist, &dict));
 
-  IF_DEBUG(
-    eprintf("[system] found symbol " FMT_QUOTED " at address %p\n", name, sym)
-  );
+  const auto sym = dict_get(dict, name);
+  if (!sym) return err_word_undefined(name);
+
+  IF_DEBUG(eprintf(
+    "[system] found symbol " FMT_QUOTED " in wordlist %d; address: %p\n",
+    name,
+    wordlist,
+    sym
+  ));
 
   try(int_stack_push(&interp->ints, (Sint)sym));
   return nullptr;

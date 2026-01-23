@@ -1,6 +1,6 @@
 : drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] ;
-: \ [ immediate ] 10 parse drop2 ;
-: ( [ immediate ] 41 parse drop2 ;
+:: \ 10 parse drop2 ;
+:: ( 41 parse drop2 ;
 
 \ Can use comments now!
 \
@@ -499,12 +499,28 @@
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
-\ Note: `execute'` is renamed from `postpone`.
-: next_word ( "word" -- exec_tok ) parse_word find_word ;
-: '         ( C: "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
-: inline'   ( C: "word" -- ) ( E: <word> ) next_word inline_word ;
-: execute'  ( C: "word" -- ) ( E: <word> ) next_word comp_call ;
-: compile'  ( C: "word" -- ) next_word comp_push ' comp_call comp_call ;
+\ SYNC[wordlist_enum].
+: WORDLIST_EXEC 1 ;
+: WORDLIST_COMP 2 ;
+
+: next_word ( wordlist "word" -- exec_tok ) parse_word find_word ;
+
+: tick_next ( C: wordlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
+:: '  WORDLIST_EXEC tick_next ;
+:: '' WORDLIST_COMP tick_next ;
+
+:  inline_next ( wordlist "word" -- ) ( E: <word> ) next_word inline_word ;
+:: inline'  WORDLIST_EXEC inline_next ;
+:: inline'' WORDLIST_COMP inline_next ;
+
+\ Note: `execute` is renamed from `postpone`.
+: execute_next ( wordlist "word" -- ) ( E: <word> ) next_word comp_call ;
+:: execute'  WORDLIST_EXEC execute_next ;
+:: execute'' WORDLIST_COMP execute_next ;
+
+:  compile_next ( wordlist "word" -- ) next_word comp_push ' comp_call comp_call ;
+:: compile'  WORDLIST_EXEC compile_next ;
+:: compile'' WORDLIST_COMP compile_next ;
 
 : drop ( val -- ) [
   ARCH_REG_DAT_SP ARCH_REG_DAT_SP 8 asm_sub_imm comp_instr \ sub x27, x27, 8
@@ -825,7 +841,7 @@
   1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
 ] ;
 
-: char' parse_word drop c@ comp_push ;
+:: char' parse_word drop c@ comp_push ;
 
 \ Same as standard `s"` in interpretation mode.
 \ The parser ensures a trailing null byte.
@@ -849,7 +865,7 @@
 
 \ Same as standard `s"` in compilation mode.
 \ Words ending with a quote are automatically immediate.
-: " comp_str ;
+:: " comp_str ;
 
 : comp_cstr ( C: <str> -- ) ( E: -- cstr )
   parse_str inc               \ Reserve 1 more for null byte.
@@ -859,7 +875,7 @@
 
 \ For use inside words.
 \ Words ending with a quote are automatically immediate.
-: c" comp_cstr ;
+:: c" comp_cstr ;
 
 \ ## Variables
 \
@@ -871,8 +887,8 @@
 \ which is planned for later.
 
 \ For words which define words. Kinda like `create`.
-: #word_beg compile' : ;
-: #word_end compile' ; not_comp_only ;
+:: #word_beg compile' : ;
+:: #word_end compile'' ; not_comp_only ;
 
 \ Similar to standard `constant`.
 : let: ( C: val -- ) ( E: -- val ) #word_beg comp_push #word_end ;
@@ -935,7 +951,7 @@
   1 swap asm_local_set comp_instr \ str x1, [FP, <loc>]
 ;
 
-: to: ( C: "name" -- ) ( E: val -- )
+:: to: ( C: "name" -- ) ( E: val -- )
   parse_word get_local comp_pop_local_set
 ;
 
@@ -957,7 +973,7 @@
 \ Usage: `throw" some_error_msg"`.
 \
 \ Also see `sthrowf"` for formatted errors.
-: throw" ( C: "str" -- ) comp_str compile' throw ;
+:: throw" ( C: "str" -- ) comp_str compile' throw ;
 
 \ ## Memory
 \
@@ -1029,11 +1045,11 @@
 : ifn_pop ( fun[prev] adr[ifn]  -- ) ifn_patch execute ;
 : if_init COND_EXISTS @ COND_EXISTS on! ' if_done ;
 
-: #elif ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
+:: #elif ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
   ' execute reserve_cond ' if_pop
 ;
 
-: #elifn ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
+:: #elifn ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
   ' execute reserve_cond ' ifn_pop
 ;
 
@@ -1041,17 +1057,17 @@
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `#end`.
 \ Prepending a nop terminates this chain.
-: #if ( C: -- prev fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
-  if_init execute' #elif
+:: #if ( C: -- prev fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  if_init execute'' #elif
 ;
 
-: #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
-  if_init execute' #elifn
+:: #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
+  if_init execute'' #elifn
 ;
 
 : else_pop ( fun[prev] adr[else] -- ) patch_uncond_forward execute ;
 
-: #else
+:: #else
   ( C: fun[exec] adr[if] fun[if] -- adr[else] fun[else] )
   here to: adr reserve_instr
 
@@ -1067,7 +1083,7 @@
 \ an instruction address and checks the error register. That's about 3-5
 \ lines in Forth, 3 instructions total. This should reduce or remove the
 \ overhead of calling compiler intrinsics in control chains.
-: #end ( C: fun -- ) execute ;
+:: #end ( C: fun -- ) execute ;
 
 \ ## Loops
 \
@@ -1126,30 +1142,30 @@
 ;
 
 : loop_end ( adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
-: loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end execute' #end ;
+: loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end execute'' #end ;
 
-: #loop
+:: #loop
   ( C: -- frame fun[frame!] … adr[beg] fun[loop] )
   \ Control frame is split: ↑ auxiliary constructs like "leave" go here.
   loop_frame_beg here ' loop_pop
 ;
 
 \ Can be used in any loop.
-: #leave
+:: #leave
   ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
   stack_len to: len
   here reserve_instr ' else_pop len loop_aux
 ;
 
 \ Can be used in any loop.
-: #while
+:: #while
   ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
   stack_len to: len
   reserve_cond ' if_pop len loop_aux
 ;
 
 \ Assumes that the top control frame is from `#loop`.
-: #until ( C: prev… <loop> -- )
+:: #until ( C: prev… <loop> -- )
       asm_pop_x1          comp_instr \ ldr x1, [x27, -8]!
   1 8 asm_cmp_branch_zero comp_instr \ cbnz x1, 8
   execute
@@ -1190,7 +1206,7 @@
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
-: #for
+:: #for
   ( C: -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: ceil -- )
   anon_local for_loop_init
@@ -1203,7 +1219,7 @@
 \   -for: ind
 \     ind .
 \   #end
-: -for:
+:: -for:
   ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: ceil -- )
   parse_word get_local for_loop_init
@@ -1255,7 +1271,7 @@
 \   +for: ind
 \     ind .
 \   #end
-: +for:
+:: +for:
   ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] loc_cur fun[pop] )
   ( E: ceil floor -- )
   loop_frame_beg
@@ -1285,7 +1301,7 @@
 \
 \   ceil floor step +loop: ind ind . #end
 \   123  23    3    +loop: ind ind . #end
-: +loop:
+:: +loop:
   ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] loc_cur loc_step fun[pop] )
   ( E: ceil floor step -- )
   loop_frame_beg
@@ -1303,7 +1319,7 @@
 ;
 
 \ Like in `+loop:`, the range is `[floor,ceil)`.
-: -loop:
+:: -loop:
   ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
   ( E: ceil floor step -- )
   loop_frame_beg
@@ -1381,8 +1397,8 @@ extern_val: stderr __stderrp
 : space 32 putchar ;
 : espace 32 eputchar ;
 
-: log" comp_cstr compile' puts ;
-: elog" comp_cstr compile' eputs ;
+:: log" comp_cstr compile' puts ;
+:: elog" comp_cstr compile' eputs ;
 
 \ Compiles movement of values from the data stack
 \ to the locals in the intuitive "reverse" order.
@@ -1391,8 +1407,7 @@ extern_val: stderr __stderrp
 \ Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
 \ Capture order matches stack push order in the parens notation
 \ like in Gforth and VfxForth. Types are not supported.
-: {
-  [ immediate ]
+:: {
   0 to: loc_len
 
   #loop
@@ -1424,14 +1439,14 @@ extern_val: stderr __stderrp
 ;
 
 \ For compiling words which modify a local by applying the given function.
-: mut_local' ( C: "name" fun -- ) ( E: -- )
-  execute' '
+:: mut_local' ( C: "name" fun -- ) ( E: -- )
+  execute'' '
   compile' mut_local
 ;
 
 \ Usage: `++: some_local`.
-: ++: ( C: "name" -- ) ( E: -- ) mut_local' inc ;
-: --: ( C: "name" -- ) ( E: -- ) mut_local' dec ;
+:: ++: ( C: "name" -- ) ( E: -- ) mut_local' inc ;
+:: --: ( C: "name" -- ) ( E: -- ) mut_local' dec ;
 
 : within { num one two -- bool }
   one num >
@@ -1511,19 +1526,19 @@ extern_val: stderr __stderrp
 \ which must be available at compile time. Usage example:
 \
 \   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
-: logf" ( C: N -- ) ( E: i1 … iN -- )
-  va- execute' c" compile' printf -va
+:: logf" ( C: N -- ) ( E: i1 … iN -- )
+  va- execute'' c" compile' printf -va
 ;
 
 \ Format-prints to stderr.
-: elogf" ( C: N -- ) ( E: i1 … iN -- )
-  va- compile' stderr execute' c" compile' fprintf -va
+:: elogf" ( C: N -- ) ( E: i1 … iN -- )
+  va- compile' stderr execute'' c" compile' fprintf -va
 ;
 
 \ Formats into the provided buffer using `snprintf`. Usage example:
 \
 \   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
-: sf" ( C: N -- ) ( E: buf size i1 … iN -- )
+:: sf" ( C: N -- ) ( E: buf size i1 … iN -- )
   va- comp_cstr compile' snprintf -va
 ;
 
@@ -1535,7 +1550,7 @@ extern_val: stderr __stderrp
 \   SOME_BUF 10 20 30 [ 20 ] sthrowf" error codes: %zu %zu %zu"
 \
 \ Also see `throwf"` which comes with its own buffer.
-: sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
+:: sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
   va-
   compile'  dup2
   comp_cstr
@@ -1549,7 +1564,7 @@ extern_val: stderr __stderrp
 \ Like `sthrowf"` but easier to use. Example:
 \
 \   10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
-: throwf" ( C: len -- ) ( E: i1 … iN -- )
+:: throwf" ( C: len -- ) ( E: i1 … iN -- )
   va-
   compile'  ERR_BUF
   comp_cstr
@@ -1560,11 +1575,11 @@ extern_val: stderr __stderrp
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
-: throw_if" ( C: "str" -- ) ( E: pred -- )
-  execute' #if
+:: throw_if" ( C: "str" -- ) ( E: pred -- )
+  execute'' #if
   comp_str
   compile' throw
-  execute' #end
+  execute'' #end
 ;
 
 : log_int ( num -- ) [ 1 ] logf" %zd"  ;

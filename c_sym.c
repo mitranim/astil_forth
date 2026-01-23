@@ -32,22 +32,6 @@ static void sym_init_intrin(Sym *sym) {
   sym->interp_only = true;
 }
 
-/*
-We have a convention where words starting or ending with some specific
-characters are automatically considered immediate, without any opt-out.
-Marking words as implicitly immediate is discouraged. Immediacy should
-be apparent from word names.
-*/
-static bool is_name_immediate(const Word_str *name) {
-  if (!name || !name->len) return false;
-
-  const auto head = name->buf[0];
-  if (head == '#') return true;
-
-  const auto last = name->buf[name->len - 1];
-  return last == ':' || last == '\'' || last == '"';
-}
-
 static bool is_sym_leaf(const Sym *sym) { return !sym->callees.len; }
 
 static void sym_auto_comp_only(Sym *caller, const Sym *callee) {

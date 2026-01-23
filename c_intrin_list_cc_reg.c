@@ -18,12 +18,12 @@ static constexpr USED Sym INTRIN[] = {
 
   // Shared.
   INTRIN_COLON,           // :
+  INTRIN_COLON_COLON,     // ::
   INTRIN_SEMICOLON,       // ;
   INTRIN_BRACKET_BEG,     // [
   INTRIN_BRACKET_END,     // ]
   INTRIN_RET,             // #ret
   INTRIN_RECUR,           // #recur
-  INTRIN_IMMEDIATE,       // immediate
   INTRIN_COMP_ONLY,       // comp_only
   INTRIN_NOT_COMP_ONLY,   // not_comp_only
   INTRIN_INLINE,          // inline

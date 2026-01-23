@@ -323,6 +323,12 @@ static void comp_sym_end(Comp *comp, Sym *sym) {
   comp_ctx_trunc(&comp->ctx);
 }
 
+/*
+Prints instructions as hexpairs in the system's endian order,
+which is usually little endian. How to disassemble:
+
+  echo <hex> | llvm-mc --disassemble --hex
+*/
 static void comp_debug_print_sym_instrs(
   const Comp *comp, const Sym *sym, const char *prefix
 ) {

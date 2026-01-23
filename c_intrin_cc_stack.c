@@ -154,7 +154,8 @@ static Err intrin_parse(Interp *interp) {
   Sint delim;
   try(int_stack_pop(&interp->ints, &delim));
   try(validate_char_ascii_printable(delim));
-  return interp_parse_until(interp, (U8)delim);
+  try(interp_parse_until(interp, (U8)delim));
+  return nullptr;
 }
 
 static Err intrin_import(Interp *interp) {
@@ -183,15 +184,19 @@ static Err intrin_extern_proc(Interp *interp) {
   Sint       inp_len;
   try(int_stack_pop(ints, &out_len));
   try(int_stack_pop(ints, &inp_len));
-  return interp_extern_proc(interp, inp_len, out_len);
+  try(interp_extern_proc(interp, inp_len, out_len));
+  return nullptr;
 }
 
 static Err intrin_find_word(Interp *interp) {
+  Sint      wordlist;
   const U8 *buf;
   Ind       len;
   try(interp_pop_data_len(interp, &len));
   try(interp_pop_data_ptr(interp, &buf));
-  return interp_find_word(interp, (const char *)buf, len);
+  try(int_stack_pop(&interp->ints, &wordlist));
+  try(interp_find_word(interp, (const char *)buf, len, (Wordlist)wordlist));
+  return nullptr;
 }
 
 static Err intrin_inline_word(Interp *interp) {
