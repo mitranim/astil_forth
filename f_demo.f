@@ -1,6 +1,6 @@
 import' ./f_lang.f
 
-str" hello world! (top level)" type lf
+log" hello world! (top level)" lf
 
 : hello log" hello world! (deferred)" lf ;
 hello

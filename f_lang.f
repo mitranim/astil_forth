@@ -843,19 +843,12 @@
 
 :: char' parse_word drop c@ comp_push ;
 
-\ Same as standard `s"` in interpretation mode.
-\ The parser ensures a trailing null byte.
-\ All our strings are zero-terminated.
-: parse_str ( -- cstr len ) char' " parse ;
-: parse_cstr ( -- cstr ) parse_str drop ;
+\ Interpretation semantics of standard `s"`.
+\ The parser ensures null-termination.
+: parse_str ( E: "str" -- cstr len ) char' " parse ;
 
-\ Same as standard `s"` in interpretation mode.
-\ For top-level code in scripts.
-\ Inside words, use `"`.
-: str" ( <str> -- cstr len ) parse_str ;
-: cstr" ( <str> -- cstr ) parse_str drop ;
-
-: comp_str ( C: <str> -- ) ( E: -- cstr len )
+\ Compilation semantics of standard `s"`.
+: comp_str ( C: "str" -- ) ( E: -- cstr len )
   parse_str tuck                ( len str len )
   inc                           \ Reserve 1 more for null byte.
   alloc_data 1   comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
@@ -863,19 +856,17 @@
   asm_push_x1_x2 comp_instr     \ stp x1, x2, [x27], 16
 ;
 
-\ Same as standard `s"` in compilation mode.
-\ Words ending with a quote are automatically immediate.
-:: " comp_str ;
-
-: comp_cstr ( C: <str> -- ) ( E: -- cstr )
+: comp_cstr ( C: "str" -- ) ( E: -- cstr )
   parse_str inc               \ Reserve 1 more for null byte.
   alloc_data 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1  comp_instr     \ str x1, [x27], 8
 ;
 
-\ For use inside words.
-\ Words ending with a quote are automatically immediate.
-:: c" comp_cstr ;
+:  " ( E: "str" -- cstr len )           parse_str ;
+:: " ( C: "str" -- ) ( E: -- cstr len ) comp_str ;
+
+:  c" ( E: "str" -- cstr )           parse_str drop ;
+:: c" ( C: "str" -- ) ( E: -- cstr ) comp_cstr ;
 
 \ ## Variables
 \
@@ -959,7 +950,7 @@
 \
 \ Exception definitions are split. See additional words below
 \ which support message formatting via the C "printf" family.
-
+\
 \ `x0` is our error register. The annotation `throws` makes the compiler
 \ insert an error check after each call to this procedure and any other
 \ procedure which calls this one, turning the error into an exception.
@@ -1397,7 +1388,10 @@ extern_val: stderr __stderrp
 : space 32 putchar ;
 : espace 32 eputchar ;
 
+:  log" parse_str drop puts ;
 :: log" comp_cstr compile' puts ;
+
+:  elog" parse_str drop eputs ;
 :: elog" comp_cstr compile' eputs ;
 
 \ Compiles movement of values from the data stack

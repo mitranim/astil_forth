@@ -547,4 +547,4 @@ test_to
 ;
 test_locals
 
-str" [test] ok" etype elf eflush
+elog" [test] ok" elf
