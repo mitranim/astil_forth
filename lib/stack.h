@@ -6,7 +6,10 @@
 #include <string.h>
 
 // Stack with guards. Macros below assume the "empty ascending" style.
-// SYNC[stack_floor_top].
+//
+// Field ordering matters; some code hardcodes the offsets.
+//
+// SYNC[stack_field_offsets].
 typedef struct {
   Uint  bytelen; // Size of full region in bytes.
   void *cellar;  // Starting address of full region: `guard|stack|guard`.
@@ -15,6 +18,7 @@ typedef struct {
   void *ceil;    // Starting address of second guard, just above the stack.
 } Stack;
 
+// SYNC[stack_field_offsets].
 #define stack_of(Elem) \
   struct {             \
     Uint  bytelen;     \

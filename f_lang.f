@@ -735,6 +735,10 @@
                asm_push_x1   comp_instr \ str x1, [x27], 8
 ] ;
 
+: cell 8 ;
+: cells ( len -- size ) 3 lsl ;
+: /cells ( size -- len ) 3 asr ;
+
 \ ## Assembler continued
 
 \ lsl Xd, Xn, <imm>
@@ -802,15 +806,15 @@
         asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
+: ! ( val adr -- ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 asm_store_off comp_instr \ stur x1, [x2]
+] ;
+
 : @2 ( adr -- val0 val1 ) [
           asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
   1 2 1 0 asm_load_pair_off comp_instr \ ldp x1, x2, [x1]
           asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
-] ;
-
-: ! ( val adr -- ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 0 asm_store_off comp_instr \ stur x1, [x2]
 ] ;
 
 : !2 ( val0 val1 adr -- val0 val1 ) [
@@ -825,8 +829,8 @@
   1 2 0 asm_store_off_32 comp_instr \ str w1, x2
 ] ;
 
-: on!  ( adr -- ) 1 swap ! ;
 : off! ( adr -- ) 0 swap ! ;
+: on!  ( adr -- ) 1 swap ! ;
 
 \ ## Stack introspection
 
@@ -854,10 +858,6 @@
                    asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
   ASM_REG_DAT_SP 1 asm_mov_reg comp_instr \ mov x27, x1
 ] ;
-
-: cell 8 ;
-: cells ( len -- size ) 3 lsl ;
-: /cells ( size -- len ) 3 asr ;
 
 \ Stack introspection doesn't need to be optimal.
 : sp_at       ( ind    -- ptr ) cells sp0 + ;
@@ -926,6 +926,10 @@
 \ Similar to standard `constant`.
 : let: ( C: val -- ) ( E: -- val ) #word_beg comp_push #word_end ;
 
+0 let: nil
+0 let: false
+1 let: true
+
 \ Similar to standard `variable`.
 : var: ( C: init "name" -- ) ( E: -- addr )
   #word_beg
@@ -958,9 +962,6 @@
                comp_push      \ str <size>, [x27], 8
   #word_end
 ;
-
-0 let: false
-1 let: true
 
 \ ## Locals
 \
@@ -1020,10 +1021,10 @@
 
 1 1 extern: strlen  ( cstr -- len )
 3 1 extern: strncmp ( str0 str1 len -- )
-3 0 extern: strncpy ( buf[tar] buf[src] len -- )
-3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
+3 0 extern: strncpy ( dst src str_len -- )
+3 0 extern: strlcpy ( dst src buf_len -- )
 
-: move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
+: move    ( src dst len -- ) swap_over strncpy ;
 : fill    ( buf len char -- ) swap memset ;
 : erase   ( buf len -- ) 0 fill ;
 : blank   ( buf len -- ) 32 fill ;

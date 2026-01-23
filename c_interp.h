@@ -15,6 +15,14 @@ typedef struct {
 Every compiler is an interpreter.
 Every Forth interpreter is a compiler.
 Would be nice to have a name reflecting both.
+
+The Forth code which uses the register-based calling convention
+accesses the data stack via the interpreter object, rather than
+via a dedicated register, and hardcodes the field offsets which
+must be kept in sync.
+
+SYNC[interp_stack_offset].
+SYNC[stack_field_offsets].
 */
 typedef struct {
   Sint_stack  ints;      // Forth integer stack.

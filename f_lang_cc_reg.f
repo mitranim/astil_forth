@@ -57,15 +57,6 @@
 
 : semicolon execute'' ; ;
 
-: @ { adr -- val } [
-  comp_next_arg
-  0b11_111_0_00_01_0_000000000_00_00000_00000 comp_instr \ ldur x0, [x0]
-] ;
-
-: ! { val adr -- } [
-  0b11_111_0_00_00_0_000000000_00_00001_00000 comp_instr \ stur x0, [x1]
-] ;
-
 \ Similar to standard `constant`.
 : let: { val -- } ( C: "name" -- ) ( E: -- val )
   parse_word { str len }
@@ -84,7 +75,9 @@
   [ not_comp_only ]
 ;
 
-8 let: cell
+0 let: nil
+0 let: false
+1 let: true
 
 \ ## Assembler and bitwise ops
 \
@@ -419,8 +412,8 @@
 ;
 
 \ asr Xd, Xn, Xm
-: asm_asr_reg { Xd Xn imm12 -- instr }
-  Xd Xn imm12 asm_pattern_arith_imm
+: asm_asr_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
   0b1_0_0_11010110_00000_0010_10_00000_00000 or
 ;
 
@@ -570,6 +563,10 @@
 : align_down { len wid -- len } wid negate len and ;
 : align_up   { len wid -- len } wid dec len + wid align_down ;
 
+8 let: cell
+: cells { len -- size } len 3 lsl ;
+: /cells { size -- len } size 3 asr ;
+
 \ ## Assembler continued
 
 \ lsl Xd, Xn, <imm>
@@ -627,6 +624,89 @@
 : >=0 { num   -- bool } [ ASM_GE asm_comp_cset_zero ] ; \ Or `PL`.
 
 : odd { i1 -- bool } i1 1 and ;
+
+\ ## Memory load / store
+
+: @ { adr -- val } [
+  comp_next_arg
+  0 0 0 asm_load_off comp_instr \ ldur x0, [x0]
+] ;
+
+: ! { val adr -- } [
+  0 1 0 asm_store_off comp_instr \ stur x0, [x1]
+] ;
+
+: @2 { adr -- val0 val1 } [
+  comp_next_arg comp_next_arg
+  0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
+] ;
+
+: !2 { val0 val1 adr -- val0 val1 } [
+  comp_next_arg comp_next_arg
+  0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
+] ;
+
+\ 32-bit version of `!`. Used for patching instructions.
+: !32 { val adr -- } [
+  0 1 0 asm_store_off_32 comp_instr \ str w0, x1
+] ;
+
+: off! { adr -- } false adr ! ;
+: on!  { adr -- } true adr ! ;
+
+\ ## Stack introspection
+\
+\ Under the register calling convention, the Forth data stack
+\ is used only in top-level interpretation. Because of this,
+\ we don't reserve any registers for the stack floor / top.
+\
+\ Instead, the stack is accessed directly on the interpreter
+\ object, which IS unavoidably stored in a special register.
+\ Compared to the stack CC, the reg-based CC gets away with
+\ fewer special registers.
+\
+\ Note: our stack is empty-ascending.
+\
+\ SYNC[interp_stack_offset].
+\ SYNC[stack_field_offsets].
+
+16 let: INTERP_INTS_FLOOR
+24 let: INTERP_INTS_TOP
+
+\ add <reg>, x27, INTERP_INTS_TOP
+:: stack_top_ptr ( E: -- adr )
+  comp_next_arg_reg
+  ASM_REG_INTERP INTERP_INTS_TOP asm_add_imm comp_instr
+;
+
+: stack_top_ptr { -- adr } stack_top_ptr ;
+
+\ ldur <reg>, [x27, INTERP_INTS_FLOOR]
+:: stack_floor ( E: -- adr )
+  comp_next_arg_reg
+  ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_off comp_instr
+;
+
+: stack_floor { -- adr } stack_floor ;
+
+\ ldur <reg>, [x27, INTERP_INTS_TOP]
+:: stack_top ( E: -- adr )
+  comp_next_arg_reg
+  ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr
+;
+
+: stack_top { -- adr } stack_top ;
+
+\ Updates the stack top address in the interpreter.
+: stack! { adr -- } [
+  \ stur x0, [x27, INTERP_INTS_TOP]
+  0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
+] ;
+
+: stack_at    { ind -- adr } ind cells stack_floor + ;
+: stack_len   {     -- len } stack_top stack_floor - /cells ;
+: stack_clear {     --     } stack_floor stack! ;
+: stack_trunc { len --     } len stack_at stack! ;
 
 \ ## Characters and strings
 
@@ -689,19 +769,22 @@
 
 1 1 extern: strlen  ( cstr -- len )
 3 1 extern: strncmp ( str0 str1 len -- )
-3 0 extern: strncpy ( buf[tar] buf[src] len -- )
-3 0 extern: strlcpy ( buf[tar] buf[src] buf_len -- )
+3 0 extern: strncpy ( dst src str_len -- )
+3 0 extern: strlcpy ( dst src buf_len -- )
 
-\ FIXME finish
-\
-\ : move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
-\ : fill    ( buf len char -- ) swap memset ;
-\ : erase   ( buf len -- ) 0 fill ;
-\ : blank   ( buf len -- ) 32 fill ;
-\ : compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
-\ : str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
-\ : str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
-\ : str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
+: move  { src dst len  -- } dst src len strncpy ;
+: fill  { buf len char -- } buf char len memset ;
+: erase { buf len      -- } buf len 0 fill ;
+: blank { buf len      -- } buf len 32 fill ;
+
+: compare { str0 len0 str1 len1 -- direction }
+  len0 len1 min { len }
+  str0 str1 len strncmp
+;
+
+: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0 ;
+: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 ;
+: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
 
 \ ## Variables, buffers, extern vars
 
@@ -735,7 +818,7 @@
 \ Similar to standard `variable`, but takes an initial value like `let:`.
 : var: { val -- } ( C: "name" -- ) ( E: -- ptr )
   parse_word { str len }
-  0 cell alloc_data { adr }
+  nil cell alloc_data { adr }
   val adr !
 
   str len colon
@@ -762,7 +845,7 @@
 \ at least the given size in bytes.
 : buf: { cap -- } ( C: cap "name" -- ) ( E: -- adr cap )
   parse_word { str len }
-  0 cap alloc_data { adr }
+  nil cap alloc_data { adr }
 
   str len colon
     0 2 comp_word_sig ( E: -- ptr )
@@ -854,7 +937,7 @@ extern_val: errno __error
 
 : mem_map { len pflag -- adr }
   MAP_ANON MAP_PRIVATE or { mflag }
-  0 len pflag mflag -1 0 mmap
+  nil len pflag mflag -1 0 mmap
 ;
 
 : mem_unprot { adr len -- err }

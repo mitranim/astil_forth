@@ -41,7 +41,7 @@ asm_call_forth:
   ldr x2, [x2]
   stp x26, x2, [sp, -16]!
 
-  ldp x26, x27, [x28, INTERP_INTS_FLOOR] // SYNC[stack_floor_top].
+  ldp x26, x27, [x28, INTERP_INTS_FLOOR]
   blr x1
 
 asm_call_forth_epilogue:
