@@ -83,12 +83,12 @@ static constexpr U8 ARCH_REG_SP = 31;
 // Extremely primitive heuristic.
 static constexpr U8 ARCH_INLINABLE_INSTR_LEN = 4;
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 
 static constexpr U8 ARCH_REG_ERR    = 28;
 static constexpr U8 ARCH_REG_INTERP = 27;
 
-#else // NATIVE_CALL_ABI
+#else // NATIVE_CALL_CONV
 
 /*
 Using `x0` as the error register exactly matches how we return errors in C.
@@ -102,7 +102,7 @@ static constexpr U8 ARCH_REG_INTERP    = 28; // Interp
 static constexpr U8 ARCH_REG_INT_TOP   = 27; // Interp.ints.top
 static constexpr U8 ARCH_REG_INT_FLOOR = 26; // Interp.ints.floor
 
-#endif // NATIVE_CALL_ABI
+#endif // NATIVE_CALL_CONV
 
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {

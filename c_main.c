@@ -7,7 +7,7 @@
 
 // #include "./c_mach_exec.c"
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 static Err init_exception_handling() { return nullptr; }
 #else
 #include "./c_mach_exc.c"

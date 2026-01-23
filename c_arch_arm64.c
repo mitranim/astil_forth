@@ -1019,7 +1019,7 @@ static Err asm_inline_sym(Comp *comp, const Sym *sym) {
   return nullptr;
 }
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 #include "./c_arch_arm64_cc_reg.c" // IWYU pragma: export
 #else
 #include "./c_arch_arm64_cc_stack.c" // IWYU pragma: export
@@ -1063,7 +1063,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   const auto write = &comp->code.code_write;
   const auto spans = &sym->norm.spans;
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
   asm_fixup_locals(comp, sym);
 #endif
 

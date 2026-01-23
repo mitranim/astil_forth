@@ -39,7 +39,7 @@ typedef struct {
 
 typedef stack_of(Asm_fixup) Asm_fixups;
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 #include "./c_comp_cc_reg.h"
 #else
 #include "./c_comp_cc_stack.h"

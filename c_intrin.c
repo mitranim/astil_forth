@@ -62,7 +62,7 @@ static Err intrin_semicolon(Interp *interp) {
   const auto comp  = &interp->comp;
   const auto redef = interp->comp.ctx.redefining; // Snapshot before clearing.
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
   try(comp_validate_ret_args(comp));
 #endif
 
@@ -378,7 +378,7 @@ static Err debug_sync_code(Interp *interp) {
   return nullptr;
 }
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 #include "./c_intrin_cc_reg.c"
 #else
 #include "./c_intrin_cc_stack.c"
@@ -752,7 +752,7 @@ static constexpr auto INTRIN_DEBUG_SYNC_CODE = (Sym){
   .throws   = true,
 };
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 #include "./c_intrin_list_cc_reg.c" // IWYU pragma: export
 #else
 #include "./c_intrin_list_cc_stack.c" // IWYU pragma: export

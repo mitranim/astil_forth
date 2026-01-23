@@ -68,7 +68,7 @@ static Err comp_inline_sym(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-#ifdef NATIVE_CALL_ABI
+#ifdef NATIVE_CALL_CONV
 #include "./c_comp_cc_reg.c"
 #else
 #include "./c_comp_cc_stack.c"
