@@ -153,10 +153,11 @@ static Err intrin_redefine(Interp *interp) {
 Caution: unlike in other Forth systems, `here` is not an executable address.
 Executable code is copied to a different memory page when finalizing a word.
 */
-static void intrin_here(Interp *interp) {
-  stack_push(
+static Err intrin_here(Interp *interp) {
+  try(int_stack_push(
     &interp->ints, (Sint)(comp_code_next_writable_instr(&interp->comp.code))
-  );
+  ));
+  return nullptr;
 }
 
 static Err intrin_quit(Interp *interp) {
@@ -513,6 +514,8 @@ static constexpr auto INTRIN_HERE = (Sym){
   .name.buf  = "here",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_here,
+  .out_len   = 1,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -683,6 +686,7 @@ static constexpr auto INTRIN_ANON_LOCAL = (Sym){
   .name.buf  = "anon_local",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_anon_local,
+  .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };

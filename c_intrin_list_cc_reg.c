@@ -6,16 +6,18 @@
 
 static constexpr USED Sym INTRIN[] = {
   // Specific to this CC.
-  INTRIN_BRACE,                // {
-  INTRIN_COMP_WORD_SIG,        // comp_word_sig
-  INTRIN_COMP_NEXT_ARG,        // comp_next_arg
-  INTRIN_COMP_NEXT_ARG_REG,    // comp_next_arg_reg
-  INTRIN_COMP_CLOBBER_BARRIER, // comp_clobber_barrier
-  INTRIN_COMP_LOCAL_GET,       // comp_local_get
-  INTRIN_COMP_LOCAL_SET,       // comp_local_set
-  INTRIN_DEBUG_CTX,            // debug_ctx
-  INTRIN_DEBUG_CTX_IMM,        // #debug_ctx
-  INTRIN_DEBUG_ARG,            // debug_arg
+  INTRIN_BRACE,             // {
+  INTRIN_COMP_WORD_SIG,     // comp_word_sig
+  INTRIN_COMP_NEXT_ARG,     // comp_next_arg
+  INTRIN_COMP_NEXT_ARG_REG, // comp_next_arg_reg
+  INTRIN_COMP_SCRATCH_REG,  // comp_scratch_reg
+  INTRIN_COMP_CLOBBER,      // comp_clobber
+  INTRIN_COMP_BARRIER,      // comp_barrier
+  INTRIN_COMP_LOCAL_GET,    // comp_local_get
+  INTRIN_COMP_LOCAL_SET,    // comp_local_set
+  INTRIN_DEBUG_CTX,         // debug_ctx
+  INTRIN_DEBUG_CTX_IMM,     // #debug_ctx
+  INTRIN_DEBUG_ARG,         // debug_arg
 
   // Shared.
   INTRIN_COLON,             // :

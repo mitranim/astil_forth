@@ -11,10 +11,9 @@ Special registers:
 The special registers must be kept in sync with `f_lang_cc_reg.f`.
 */
 #pragma once
+#include "./c_arch_arm64.h"
 #include "./c_interp.h"
 #include "./lib/bits.c"
-#include "c_arch_arm64.h"
-#include "lib/fmt.h"
 
 #ifdef CLANGD
 #include "./c_arch_arm64.c"
@@ -50,7 +49,7 @@ static Err err_call_arity_mismatch(const char *name, U8 inp_len, Sint ints_len) 
   );
 }
 
-static Err arch_call_norm(Interp *interp, const Sym *sym) {
+Err arch_call_norm(Interp *interp, const Sym *sym) {
   const auto fun     = comp_sym_exec_instr(&interp->comp, sym);
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
@@ -84,24 +83,41 @@ static Err arch_call_norm(Interp *interp, const Sym *sym) {
   - Special error register.
 
   Our alternative stack-based calling convention uses an additional
-  trampoline written in assembly, but we don't need one here.
+  trampoline written in assembly, but we don't need one here yet.
 
   SYNC[arch_arm64_cc_reg_special_regs].
   */
-  __asm__ volatile(
-    "blr %[fun]\n"
-    : "+r"(x0),
-      "+r"(x1),
-      "+r"(x2),
-      "+r"(x3),
-      "+r"(x4),
-      "+r"(x5),
-      "+r"(x6),
-      "+r"(x7),
-      "+r"(reg_err)
-    : [fun] "r"(fun), "r"(reg_interp)
-    : "x10", "x11", "x12", "x13", "x14", "x15", "x16", "cc", "memory"
-  );
+  __asm__ volatile("blr %[fun]\n"
+                   : "+r"(x0),
+                     "+r"(x1),
+                     "+r"(x2),
+                     "+r"(x3),
+                     "+r"(x4),
+                     "+r"(x5),
+                     "+r"(x6),
+                     "+r"(x7),
+                     "+r"(reg_err)
+                   : [fun] "r"(fun), "r"(reg_interp)
+                   : "x8",
+                     "x9",
+                     "x10",
+                     "x11",
+                     "x12",
+                     "x13",
+                     "x14",
+                     "x15",
+                     "x16",
+                     "x17",
+                     "x19",
+                     "x20",
+                     "x21",
+                     "x22",
+                     "x23",
+                     "x24",
+                     "x25",
+                     "x26",
+                     "cc",
+                     "memory");
 
   if (out_len > 0) try(int_stack_push(ints, x0));
   if (out_len > 1) try(int_stack_push(ints, x1));

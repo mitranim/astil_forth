@@ -1070,7 +1070,7 @@
 \ b -<pc_off>
 : patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
 
-0 var: COND_EXISTS
+0 var: COND_HAS
 
 \ cbz x1, <else|end>
 : if_patch ( adr[if] -- ) dup pc_off 1 swap asm_cmp_branch_zero swap !32 ;
@@ -1078,10 +1078,10 @@
 \ cbnz x1, <else|end>
 : ifn_patch ( adr[ifn] -- ) dup pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
 
-: if_done ( cond_prev -- ) COND_EXISTS ! ;
-: if_pop ( fun[prev] adr[if]  -- ) if_patch execute ;
+: if_done ( cond_prev -- ) COND_HAS ! ;
+: if_pop  ( fun[prev] adr[if]  -- ) if_patch execute ;
 : ifn_pop ( fun[prev] adr[ifn]  -- ) ifn_patch execute ;
-: if_init COND_EXISTS @ COND_EXISTS on! ' if_done ;
+: if_init COND_HAS @ COND_HAS on! ' if_done ;
 
 :: #elif ( C: -- fun[exec] adr[elif] fun[elif] ) ( E: pred -- )
   ' execute reserve_cond ' if_pop
@@ -1094,12 +1094,12 @@
 \ With this strange setup, `#end` pops the top control frame,
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `#end`.
-\ Prepending a nop terminates this chain.
+\ Prepending `if_done` terminates this chain.
 :: #if ( C: -- prev fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
   if_init execute'' #elif
 ;
 
-:: #ifn ( C: -- fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
+:: #ifn ( C: -- prev fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
   if_init execute'' #elifn
 ;
 
@@ -1108,19 +1108,13 @@
 :: #else
   ( C: fun[exec] adr[if] fun[if] -- adr[else] fun[else] )
   here to: adr reserve_instr
-
-  \ Turn `fun[exec]` into `fun[nop]` to prevent "if" from chaining.
-  ' nop 2 bury
-
-  execute
+  ' nop 2 bury \ Disable `fun[exec]` to prevent "if" from chaining.
+  execute      \ Pop just the top frame.
   adr ' else_pop
 ;
 
-\ TODO: replace `'` in control structures with raw native code pointers,
-\ and replace `execute` with a new word, let's say `call`, which invokes
-\ an instruction address and checks the error register. That's about 3-5
-\ lines in Forth, 3 instructions total. This should reduce or remove the
-\ overhead of calling compiler intrinsics in control chains.
+\ TODO: use raw instruction addresses and `blr`
+\ instead of execution tokens and `execute`.
 :: #end ( C: fun -- ) execute ;
 
 \ ## Loops

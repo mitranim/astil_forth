@@ -115,17 +115,12 @@ typedef stack_of(Loc_fixup) Loc_fixups;
 /*
 Transient context used in compilation of a single word.
 
-Internal notes.
-
-`.inited` controls the mode of `{`. When false, `{` declares parameters.
-When true, `{` assigns locals. Set to `true` upon encountering the first
-non-immediate word, or declaring parameters with `{`.
-
-Immediate words are called without checking their input-output signatures,
-and without any implicit effect on the compilation state. Immediate words
-which modify compilation state, such as conditionals, interact with the
-compiler imperatively rather than declaratively, by invoking intrinsics.
-They also communicate "out of band" through the data stack.
+Internal note on argument handling. Words can be immediate and regular.
+Immediate words always communicate through the interpreter's data stack.
+When invoking an immediate word, its arguments come from the data stack,
+and its outputs go back into the data stack. All of this happens without
+any effects on the compile-time context by default. Some immediate words
+choose to affect compilation by invoking various compiler intrinsics.
 */
 typedef struct {
   Sym        *sym;        // What we're currently compiling.

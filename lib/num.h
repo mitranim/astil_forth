@@ -68,3 +68,5 @@ For powers of 2 this is equivalent to `big % smol`
 but avoids "div" instructions which may be slower.
 */
 #define modulo2(big, smol) ((big) & ((smol) - 1))
+
+#define ALLOW_OVERFLOW __attribute__((no_sanitize("integer")))

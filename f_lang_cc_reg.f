@@ -28,28 +28,30 @@
 \ seeks in the compile-time wordlist.
 
 \ Non-immediate replacement for standard `literal`.
-: comp_push { val -- } ( E: -- val ) comp_next_arg_reg { reg } val reg comp_load ;
+: comp_push { val } ( E: -- val ) comp_next_arg_reg { reg } val reg comp_load ;
 
 : next_word { list -- XT } ( "word" -- XT ) parse_word list find_word ;
 
-:  tick_next { list -- } ( "word" -- ) ( E: -- XT ) list next_word comp_push ;
-:: '  1 tick_next ; \ WORDLIST_EXEC
-:: '' 2 tick_next ; \ WORDLIST_COMP
+:  tick_next { list } ( "word" -- ) ( E: -- XT ) list next_word comp_push ;
+:  '  {    -- XT } (    "word" -- ) 1 next_word ; \ WORDLIST_EXEC
+:  '' {    -- XT } (    "word" -- ) 2 next_word ; \ WORDLIST_COMP
+:: '  ( E: -- XT ) ( C: "word" -- ) 1 tick_next ; \ WORDLIST_EXEC
+:: '' ( E: -- XT ) ( C: "word" -- ) 2 tick_next ; \ WORDLIST_COMP
 
-:  inline_next { list -- } ( "word" -- ) ( E: <word> )
+:  inline_next { list } ( "word" -- ) ( E: <word> )
   list next_word inline_word
 ;
 :: inline'  1 inline_next ;
 :: inline'' 2 inline_next ;
 
 \ "execute" is renamed from standard "postpone".
-:  execute_next { list -- } ( "word" -- ) ( E: <word> )
+:  execute_next { list } ( "word" -- ) ( E: <word> )
   list next_word comp_call
 ;
 :: execute'  1 execute_next ;
 :: execute'' 2 execute_next ;
 
-:  compile_next { list -- } ( "word" -- )
+:  compile_next { list } ( "word" -- )
   list next_word comp_push ' comp_call comp_call
 ;
 :: compile'  1 compile_next ;
@@ -58,7 +60,7 @@
 : semicolon execute'' ; ;
 
 \ Similar to standard `constant`.
-: let: { val -- } ( C: "name" -- ) ( E: -- val )
+: let: { val } ( C: "name" -- ) ( E: -- val )
   parse_word { str len }
 
   \ Execution-time semantics.
@@ -528,17 +530,18 @@
   0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
 ] ;
 
-\ FIXME: declare clobber
 : mod { i1 i2 -- i3 } [
-    2 0 1 asm_sdiv comp_instr \ sdiv x2, x0, x1
+                   comp_next_arg
+  0b100            comp_clobber
+  2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
-  comp_next_arg
 ] ;
 
-\ FIXME: declare clobber
 : /mod { dividend divisor -- rem quo } [
-  comp_next_arg comp_next_arg
-    2 0 1 asm_sdiv  comp_instr \ sdiv x2, x0, x1
+                    comp_next_arg \ rem
+                    comp_next_arg \ quo
+  0b100             comp_clobber
+  2 0 1   asm_sdiv  comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub  comp_instr \ msub x0, x2, x1, x0
 ] ;
 
@@ -597,13 +600,13 @@
   0b1_01_100100_1_000000_000000_00000_00000 or
 ;
 
-: asm_comp_cset_reg { cond -- } ( E: i1 i2 -- bool )
+: asm_comp_cset_reg { cond } ( E: i1 i2 -- bool )
   comp_next_arg
   0 1    asm_cmp_reg comp_instr \ cmp x0, x1
   0 cond asm_cset    comp_instr \ cset x0, <cond>
 ;
 
-: asm_comp_cset_zero { cond -- } ( E: num -- bool )
+: asm_comp_cset_zero { cond } ( E: num -- bool )
   comp_next_arg
   0      asm_cmp_zero comp_instr \ cmp x0, 0
   0 cond asm_cset     comp_instr \ cset x0, <cond>
@@ -632,7 +635,7 @@
   0 0 0 asm_load_off comp_instr \ ldur x0, [x0]
 ] ;
 
-: ! { val adr -- } [
+: ! { val adr } [
   0 1 0 asm_store_off comp_instr \ stur x0, [x1]
 ] ;
 
@@ -647,12 +650,12 @@
 ] ;
 
 \ 32-bit version of `!`. Used for patching instructions.
-: !32 { val adr -- } [
+: !32 { val adr } [
   0 1 0 asm_store_off_32 comp_instr \ str w0, x1
 ] ;
 
-: off! { adr -- } false adr ! ;
-: on!  { adr -- } true adr ! ;
+: off! { adr } false adr ! ;
+: on!  { adr } true adr ! ;
 
 \ ## Stack introspection
 \
@@ -698,7 +701,7 @@
 : stack_top { -- adr } stack_top ;
 
 \ Updates the stack top address in the interpreter.
-: stack! { adr -- } [
+: stack! { adr } [
   \ stur x0, [x27, INTERP_INTS_TOP]
   0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
 ] ;
@@ -707,6 +710,43 @@
 : stack_len   {     -- len } stack_top stack_floor - /cells ;
 : stack_clear {     --     } stack_floor stack! ;
 : stack_trunc { len --     } len stack_at stack! ;
+
+\ Used by control structures such as conditionals.
+\
+\ Under the reg-based CC, compiled code does NOT use the Forth data stack.
+\ However, conditionals and loops need to use it for control information
+\ during compilation.
+\
+\ Each control structure pushes one or several "frames". Each frame consists
+\ of several inputs followed by a procedure which takes those inputs. Frame
+\ size is unknown to outside code; the knowledge of how many inputs to "pop"
+\ is hidden inside each frame's procedure. In other words, arities vary.
+\
+\ We can't really communicate any of this to the compiler,
+\ so we have to fall back on regular old push and pop here.
+
+: stack> { -- val } [
+  comp_next_arg
+  0b10 comp_clobber
+
+  \ ldur x1, [x27, INTERP_INTS_TOP]
+  \ ldr  x0, [x1, -8]!
+  \ stur x1, [x27, INTERP_INTS_TOP]
+  1 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off  comp_instr
+  0 1 -8                           asm_load_pre  comp_instr
+  1 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
+] ;
+
+: >stack { val } [
+  0b10 comp_clobber
+
+  \ ldur x1, [x27, INTERP_INTS_TOP]
+  \ str  x0, [x1], 8
+  \ stur x1, [x27, INTERP_INTS_TOP]
+  1 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off   comp_instr
+  0 1 8                            asm_store_post comp_instr
+  1 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off  comp_instr
+] ;
 
 \ ## Characters and strings
 
@@ -772,10 +812,10 @@
 3 0 extern: strncpy ( dst src str_len -- )
 3 0 extern: strlcpy ( dst src buf_len -- )
 
-: move  { src dst len  -- } dst src len strncpy ;
-: fill  { buf len char -- } buf char len memset ;
-: erase { buf len      -- } buf len 0 fill ;
-: blank { buf len      -- } buf len 32 fill ;
+: move  { src dst len  } dst src len strncpy ;
+: fill  { buf len char } buf char len memset ;
+: erase { buf len      } buf len 0 fill ;
+: blank { buf len      } buf len 32 fill ;
 
 : compare { str0 len0 str1 len1 -- direction }
   len0 len1 min { len }
@@ -795,28 +835,28 @@
 \
 \ Used for taking an address of a data entry
 \ in the code heap allocated via `alloc_data`.
-: comp_extern_addr { adr -- } ( E: -- adr )
+: comp_extern_addr { adr } ( E: -- adr )
   comp_next_arg_reg { reg }
   adr reg comp_page_addr
 ;
 
 \ Used for loading a value in a data entry
 \ or GOT entry in the code heap.
-: comp_extern_load { adr -- } ( E: -- val )
+: comp_extern_load { adr } ( E: -- val )
   comp_next_arg_reg { reg }
   adr reg comp_page_load \ adrp & ldr
 ;
 
 \ Used for loading the value behind an address
 \ stored in a GOT entry in the code heap.
-: comp_extern_load_load { adr -- } ( E: -- val )
+: comp_extern_load_load { adr } ( E: -- val )
   comp_next_arg_reg { reg }
   adr reg                comp_page_load \ adrp & ldr
   reg reg 0 asm_load_off comp_instr     \ ldur x0, [x0]
 ;
 
 \ Similar to standard `variable`, but takes an initial value like `let:`.
-: var: { val -- } ( C: "name" -- ) ( E: -- ptr )
+: var: { val } ( C: "name" -- ) ( E: -- ptr )
   parse_word { str len }
   nil cell alloc_data { adr }
   val adr !
@@ -833,7 +873,7 @@
   [ not_comp_only ]
 ;
 
-: comp_buf { adr cap -- } ( E: -- adr cap )
+: comp_buf { adr cap } ( E: -- adr cap )
   comp_next_arg_reg { RA }
   comp_next_arg_reg { RL }
   adr RA comp_page_addr
@@ -843,7 +883,7 @@
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
 \ at least the given size in bytes.
-: buf: { cap -- } ( C: cap "name" -- ) ( E: -- adr cap )
+: buf: { cap } ( C: cap "name" -- ) ( E: -- adr cap )
   parse_word { str len }
   nil cap alloc_data { adr }
 
@@ -896,7 +936,7 @@
 \ The annotation `throws` makes the compiler insert an error check
 \ after any call to this procedure, and makes it "contagious": all
 \ callers automatically receive "throws".
-: throw { cstr -- } [
+: throw { cstr } [
   throws
   ASM_REG_ERR 0 asm_mov_reg comp_instr \ mov x28, x0
 ] ;
@@ -908,6 +948,99 @@
 \ Also see `sthrowf"` for error message formatting.
 :  throw" ( E: "str" -- ) parse_cstr throw ;
 :: throw" ( C: "str" -- ) comp_cstr compile' throw ;
+
+\ ## Conditionals
+\
+\ General idea:
+\
+\   #if        \ cbz <outside>
+\     if_true
+\   #end
+\   outside
+\
+\   #if        \ cbz <if_false>
+\     if_true
+\   #else      \ b <outside>
+\     if_false
+\   #end
+\   outside
+\
+\ Similarly to Gforth, our conditionals use the Forth data stack
+\ to store control information at compile time. When terminated,
+\ they use this information to "fixup" reserved instructions.
+\
+\ Unlike other Forth systems, we also support chains
+\ of "elif" terminated with a single "end".
+
+: pop_execute stack> execute ;
+: reserve_instr ASM_PLACEHOLDER comp_instr ;
+: reserve_here {     -- adr } here { out } ASM_PLACEHOLDER comp_instr out ;
+: pc_from      { adr -- off } here             adr - ; \ For forward jumps.
+: pc_to        { adr -- off } here { out } adr out - ; \ For backward jumps.
+: patch_uncond_forward { adr } adr pc_from asm_branch adr !32 ; \ b <pc_off>
+: patch_uncond_back    { adr } adr pc_to   asm_branch adr !32 ; \ b -<pc_off>
+
+0 var: COND_HAS
+
+\ cbz x0, <else|end>
+: if_patch ( adr[if] -- )
+  stack>      { adr }
+  adr pc_from { off }
+  0 off asm_cmp_branch_zero adr !32
+;
+
+\ cbnz x0, <else|end>
+: ifn_patch ( adr[if] )
+  stack> { adr }
+  adr pc_from { off }
+  0 off asm_cmp_branch_not_zero adr !32
+;
+
+: if_done ( cond_prev ) stack> COND_HAS ! ;
+: if_pop  ( fun[prev] adr[if] ) if_patch stack> execute ;
+: ifn_pop ( fun[prev] adr[ifn] ) ifn_patch stack> execute ;
+: if_init { -- cond fun }
+  COND_HAS @ { cond } COND_HAS on! cond ' if_done
+;
+
+:: #elif { -- fun[exec] adr[if] fun[if] } ( E: pred -- )
+  reserve_here { adr }
+  1 comp_barrier
+  ' pop_execute adr ' if_pop
+;
+
+:: #elifn { -- fun[exec] adr[if] fun[if] } ( E: pred -- )
+  reserve_here { adr } ' pop_execute adr ' ifn_pop
+;
+
+\ With this strange setup, `#end` pops the top control frame,
+\ which pops the next control frame, and so on. This allows us
+\ to pop any amount of control constructs with a single `#end`.
+\ Prepending `if_done` terminates this chain.
+:: #if { -- cond fun[done] fun[exec] adr[if] fun[if] } ( E: pred -- )
+  if_init { A B } execute'' #elif { C D E } A B C D E
+;
+
+:: #ifn { -- cond fun[nop] fun[exec] adr[ifn] fun[ifn] } ( E: pred -- )
+  if_init { A B } execute'' #elifn { C D E } A B C D E
+;
+
+: else_pop ( fun[prev] adr[else] ) stack> patch_uncond_forward stack> execute ;
+
+:: #else { fun_exec adr_if fun_if -- adr_else fun_else }
+  0 comp_barrier
+  reserve_here { adr_else }
+
+  ' nop  >stack \ Replace `fun_exec` to prevent further chaining.
+  adr_if >stack
+  fun_if execute
+
+  adr_else ' else_pop
+;
+
+\ TODO: use raw instruction addresses and `blr`
+\ instead of execution tokens and `execute`.
+:: #end { fun } 0 comp_barrier fun execute ;
 
 \ ## IO
 \
@@ -928,13 +1061,13 @@ extern_val: stderr __stderrp
 3 0 extern: snprintf ( … buf cap fmt -- )
 1 0 extern: fflush   ( file -- )
 
-: eputchar { char -- } char stderr fputc ;
-: puts { cstr -- } cstr stdout fputs ;
-: eputs { cstr -- } cstr stderr fputs ;
+: eputchar { char } char stderr fputc ;
+: puts { cstr } cstr stdout fputs ;
+: eputs { cstr } cstr stderr fputs ;
 : flush stdout fflush ;
 : eflush stderr fflush ;
-: type { str len -- } str 1 len stdout fwrite ;
-: etype { str len -- } str 1 len stderr fwrite ;
+: type { str len } str 1 len stdout fwrite ;
+: etype { str len } str 1 len stderr fwrite ;
 : lf 10 putchar ; \ Renamed from `cr` which would be a misnomer.
 : elf 10 eputchar ;
 : space 32 putchar ;
@@ -980,4 +1113,4 @@ extern_val: errno __error
   addr size2
 ;
 
-debug_stack
+log" [lang] ok" lf

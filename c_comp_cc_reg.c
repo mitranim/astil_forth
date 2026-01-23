@@ -175,7 +175,6 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
 
   ctx->loc_regs[reg] = loc;
   loc->stable        = false;
-  if (loc->write && !loc->write->confirmed) loc->write = nullptr;
 }
 
 static Err err_arity_mismatch(
@@ -224,7 +223,7 @@ static Err err_partial_args(
   if (callee) {
     return errf(
       "in " FMT_QUOTED ": unable to %s " FMT_QUOTED
-      ": earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or add `--` to assignments to discard unused values",
+      ": earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or use `--` inside braces to discard unused values",
       caller,
       action,
       callee,
@@ -239,7 +238,7 @@ static Err err_partial_args(
   // TODO simplify and deduplicate.
   return errf(
     "in " FMT_QUOTED
-    ": unable to %s: earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or add `--` to assignments to discard unused values",
+    ": unable to %s: earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or use `--` inside braces to discard unused values",
     caller,
     action,
     type,
@@ -298,6 +297,7 @@ static Err err_assign_no_args(const char *name) {
 }
 
 static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
+  // printf("loc->write before fixup: %p\n", loc->write);
   const auto fix = stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
@@ -310,7 +310,9 @@ static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
       }
     }
   );
+  // repr_struct(fix);
   loc->write = &fix->write;
+  // printf("loc->write after fixup: %p\n", loc->write);
 }
 
 /*
@@ -358,23 +360,36 @@ static Err comp_clobber_reg(Comp *comp, U8 reg) {
   const auto loc = comp_local_get_for_reg(comp, reg);
   comp_local_reg_del(comp, loc, reg);
 
+  // if (loc && str_eq(&loc->name, "out")) {
+  //   printf("reg: %d\n", reg);
+  //   printf("loc->stable: %d\n", loc->stable);
+  //   printf(
+  //     "comp_local_has_regs(comp, loc): %d\n", comp_local_has_regs(comp, loc)
+  //   );
+  // }
+
   if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return nullptr;
   comp_append_local_write(comp, loc, reg);
   loc->stable = true;
   return nullptr;
 }
 
-static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
-  // For now, we require the clobber list to include inputs, outputs,
-  // and auxiliary clobbers. We end up checking input clobbers twice:
-  // here and when building the arguments. Might consider deduping at
-  // some later point.
-  auto clob = callee->clobber;
+static Err comp_clobber_regs(Comp *comp, Bits clob) {
   while (clob) try(comp_clobber_reg(comp, bits_pop_low(&clob)));
   return nullptr;
 }
 
-static Err comp_next_valid_inp_param_reg(Comp *comp, U8 *out) {
+static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
+  /*
+  For now, we require the clobber list to include inputs, outputs,
+  and auxiliary clobbers. We end up checking input clobbers twice:
+  here and when building the arguments. Might consider deduping at
+  some later point.
+  */
+  return comp_clobber_regs(comp, callee->clobber);
+}
+
+static Err comp_next_inp_param_reg(Comp *comp, U8 *out) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
@@ -386,7 +401,7 @@ static Err comp_next_valid_inp_param_reg(Comp *comp, U8 *out) {
   return nullptr;
 }
 
-static Err comp_next_valid_out_param_reg(Comp *comp, U8 *out) {
+static Err comp_next_out_param_reg(Comp *comp, U8 *out) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
@@ -398,8 +413,17 @@ static Err comp_next_valid_out_param_reg(Comp *comp, U8 *out) {
   return nullptr;
 }
 
-static Err comp_next_valid_arg_reg(Comp *comp, U8 *out) {
+static Err comp_next_arg_reg(Comp *comp, U8 *out) {
   const auto reg = comp->ctx.arg_len++;
+  try(arch_validate_input_param_reg(reg));
+  try(comp_clobber_reg(comp, reg));
+  if (out) *out = reg;
+  return nullptr;
+}
+
+// TODO: support asking for multiple scratch regs (when we need that).
+static Err comp_scratch_reg(Comp *comp, U8 *out) {
+  const auto reg = comp->ctx.arg_len;
   try(arch_validate_input_param_reg(reg));
   try(comp_clobber_reg(comp, reg));
   if (out) *out = reg;
@@ -411,6 +435,7 @@ static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   (void)comp;
   auto write = loc->write;
   loc->write = nullptr;
+  // printf("appending read; write: %p\n", write);
 
   while (write) {
     write->confirmed = true;
@@ -444,7 +469,7 @@ static Err comp_append_local_get(Comp *comp, Local *loc) {
     return nullptr;
   }
 
-  try(comp_next_valid_arg_reg(comp, &reg));
+  try(comp_next_arg_reg(comp, &reg));
 
   const auto any = comp_local_reg_any(comp, loc);
   if (any >= 0) {
@@ -468,7 +493,7 @@ static Err comp_add_input_param(Comp *comp, Word_str name) {
   try(comp_local_add(comp, name, &loc));
 
   U8 reg;
-  try(comp_next_valid_inp_param_reg(comp, &reg));
+  try(comp_next_inp_param_reg(comp, &reg));
 
   comp_local_reg_add(comp, loc, reg);
   return nullptr;
@@ -481,13 +506,13 @@ declares them. However, we keep their count, for the call signature.
 */
 static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
   (void)name;
-  try(comp_next_valid_out_param_reg(comp, reg));
+  try(comp_next_out_param_reg(comp, reg));
   return nullptr;
 }
 
 static Err comp_append_push_imm(Comp *comp, Sint imm) {
   U8 reg;
-  try(comp_next_valid_arg_reg(comp, &reg));
+  try(comp_next_arg_reg(comp, &reg));
   asm_append_imm_to_reg(comp, reg, imm, nullptr);
 
   IF_DEBUG(eprintf(
@@ -523,6 +548,12 @@ static Err comp_after_append_call(Comp *comp, const Sym *callee) {
   ctx->arg_len   = callee->out_len;
   ctx->arg_low   = 0;
   return nullptr;
+}
+
+static void comp_clear_args(Comp *comp) {
+  const auto ctx = &comp->ctx;
+  ctx->arg_len   = 0;
+  ctx->arg_low   = 0;
 }
 
 static Err comp_append_call_norm(Comp *comp, const Sym *callee, bool *inlined) {
@@ -562,6 +593,56 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   try(comp_before_append_call(comp, callee));
   asm_append_call_extern(comp, caller, callee);
   try(comp_after_append_call(comp, callee));
+  return nullptr;
+}
+
+static Err comp_barrier(Comp *comp, U8 inp_len) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
+  const auto ctx     = &comp->ctx;
+  const auto arg_low = ctx->arg_low;
+  const auto arg_len = ctx->arg_len;
+  const auto caller  = sym->name.buf;
+
+  if (arg_low) {
+    return errf(
+      "in " FMT_QUOTED
+      ": invalid state in control flow: some but not all prior arguments were partially consumed by assignments (%d of %d)",
+      caller,
+      arg_low,
+      arg_len
+    );
+  }
+
+  if (arg_len && !inp_len) {
+    return errf(
+      "in " FMT_QUOTED
+      ": invalid state in control flow: expected no pending arguments; found %d unused arguments",
+      caller,
+      arg_len
+    );
+  }
+
+  if (arg_len != inp_len) {
+    return errf(
+      "in " FMT_QUOTED
+      ": arity mismatch in control flow: required arguments: exactly %d; available arguments: %d",
+      caller,
+      inp_len,
+      arg_len
+    );
+  }
+
+  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
+    // const auto loc = ctx->loc_regs[reg];
+    // printf(
+    //   "barrier clobbering reg: %d; local: %s\n", reg, loc ? loc->name.buf : nullptr
+    // );
+    try(comp_clobber_reg(comp, reg));
+  }
+
+  comp_clear_args(comp);
   return nullptr;
 }
 

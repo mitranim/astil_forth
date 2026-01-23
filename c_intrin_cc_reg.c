@@ -1,6 +1,9 @@
 #pragma once
 #include "./c_interp_internal.c"
-#include "lib/fmt.h"
+
+// #ifdef CLANGD
+// #include "./c_intrin.c"
+// #endif
 
 /*
 The braces immediately following `: <name>` are used for parameters,
@@ -124,12 +127,14 @@ static Err intrin_ret(Interp *interp) {
   const auto comp = &interp->comp;
   try(comp_validate_ret_args(comp));
   try(comp_append_ret(comp));
+  comp_clear_args(comp);
   return nullptr;
 }
 
 static Err intrin_recur(Interp *interp) {
   const auto comp = &interp->comp;
   try(comp_validate_recur_args(comp));
+  try(comp_clobber_regs(comp, ARCH_VOLATILE_REGS));
   try(comp_append_recur(comp));
   return nullptr;
 }
@@ -236,13 +241,6 @@ static Err intrin_inline_word(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
-/*
-TODO: convert to compile-time with the following semantics:
-- Verify that at least one argument is available.
-- Compile `blr <reg>` where `<reg>` is the latest arg.
-- Compile a "try" (check the error reg).
-- Assume no output and reset args to 0.
-*/
 static Err intrin_execute(Sint ptr, Interp *interp) {
   Sym *sym;
   try(interp_sym_by_ptr(interp, ptr, &sym));
@@ -273,15 +271,32 @@ holds on _some_ architectures under _some_ assumptions, but does not hold
 in the general case. See the comments in `./c_comp_cc_reg.c`.
 */
 static Err intrin_comp_next_arg(Interp *interp) {
-  try(comp_next_valid_arg_reg(&interp->comp, nullptr));
+  try(comp_next_arg_reg(&interp->comp, nullptr));
   return nullptr;
 }
 
 static Err intrin_comp_next_arg_reg(Interp *interp) {
   U8 reg;
-  try(comp_next_valid_arg_reg(&interp->comp, &reg));
+  try(comp_next_arg_reg(&interp->comp, &reg));
   try(int_stack_push(&interp->ints, reg));
   return nullptr;
+}
+
+static Err intrin_comp_scratch_reg(Interp *interp) {
+  U8 reg;
+  try(comp_scratch_reg(&interp->comp, &reg));
+  try(int_stack_push(&interp->ints, reg));
+  return nullptr;
+}
+
+static Err err_invalid_clobber_mask(Sint bits) {
+  return errf("invalid clobber mask %s", uint64_to_bit_str((Uint)bits));
+}
+
+static Err intrin_comp_clobber(Sint bits, Interp *interp) {
+  const auto rem = bits_del_all((Uint)bits, ARCH_VOLATILE_REGS);
+  if (rem) return err_invalid_clobber_mask(bits);
+  return comp_clobber_regs(&interp->comp, (Bits)bits);
 }
 
 static Err intrin_get_local(Sint buf, Sint len, Interp *interp) {
@@ -369,7 +384,9 @@ static void intrin_debug_ctx(Interp *interp) {
       for (U8 ind = 0; ind < cap; ind++) {
         const auto loc = arr[ind];
         if (!loc) continue;
-        eprintf("[debug]     %d -- %s\n", ind, loc->name.buf);
+
+        const auto name = loc->name.len ? loc->name.buf : "(anonymous)";
+        eprintf("[debug]     %d -- %s\n", ind, name);
       }
     }
   }
@@ -409,25 +426,27 @@ static void intrin_debug_arg(Sint val, Interp *) {
 }
 
 /*
-Control constructs such as counted loops must use this to emit a barrier AFTER
+Control constructs such as counted loops use this to emit a barrier AFTER
 initializing their own locals or otherwise using the available arguments.
+This resets the argument list, and clobbers all temporary associations of
+locals with registers.
 
   #if ->
     use x0 for condition check
-    emit clobber barrier
+    emit barrier with arity 1
     <body>
 
   +loop: ->
     create locals; use "set" with x0 x1 x2
-    emit clobber barrier
+    emit barrier with arity 3
     begin loop
     use "get" with locals
+
+Might eventually get a more general mechanism.
 */
-static Err intrin_comp_clobber_barrier(Interp *interp) {
-  const auto comp = &interp->comp;
-  for (U8 reg = 0; reg < arr_cap(comp->ctx.loc_regs); reg++) {
-    try(comp_clobber_reg(comp, reg));
-  }
+static Err intrin_comp_barrier(Sint inp_len, Interp *interp) {
+  try(arch_validate_input_param_reg(inp_len));
+  try(comp_barrier(&interp->comp, (U8)inp_len));
   return nullptr;
 }
 
@@ -457,6 +476,15 @@ static constexpr USED auto INTRIN_BRACE = (Sym){
   .comp_only = true,
 };
 
+static constexpr USED auto INTRIN_COMP_WORD_SIG = (Sym){
+  .name.buf  = "comp_word_sig",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_word_sig,
+  .inp_len   = 2,
+  .throws    = true,
+  .comp_only = true,
+};
+
 static constexpr USED auto INTRIN_COMP_NEXT_ARG = (Sym){
   .name.buf  = "comp_next_arg",
   .wordlist  = WORDLIST_EXEC,
@@ -474,19 +502,29 @@ static constexpr USED auto INTRIN_COMP_NEXT_ARG_REG = (Sym){
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_COMP_WORD_SIG = (Sym){
-  .name.buf  = "comp_word_sig",
+static constexpr USED auto INTRIN_COMP_SCRATCH_REG = (Sym){
+  .name.buf  = "comp_scratch_reg",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_word_sig,
-  .inp_len   = 2,
+  .intrin    = (void *)intrin_comp_scratch_reg,
+  .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_COMP_CLOBBER_BARRIER = (Sym){
-  .name.buf  = "comp_clobber_barrier",
+static constexpr USED auto INTRIN_COMP_CLOBBER = (Sym){
+  .name.buf  = "comp_clobber",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_clobber_barrier,
+  .intrin    = (void *)intrin_comp_clobber,
+  .inp_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_BARRIER = (Sym){
+  .name.buf  = "comp_barrier",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_barrier,
+  .inp_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
@@ -504,6 +542,7 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
   .name.buf  = "comp_local_set",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_set,
+  .inp_len   = 1,
   .throws    = true,
   .comp_only = true,
 };

@@ -1,6 +1,10 @@
 #pragma once
 #include "./c_interp_internal.c"
 
+// #ifdef CLANGD
+// #include "./c_intrin.c"
+// #endif
+
 static Err interp_validate_data_ptr(Sint ptr, const U8 **out) {
   /*
   Some systems deliberately ensure that virtual memory addresses

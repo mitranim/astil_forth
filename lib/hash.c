@@ -12,8 +12,6 @@ Simplest hash function that came up in search:
 FNV-1a; assumes little endian.
 */
 
-#define ALLOW_OVERFLOW __attribute__((no_sanitize("integer")))
-
 ALLOW_OVERFLOW static Hash hash_str(const char *src) {
   Hash out = 0xCBF29CE484222325ull;
   Hash val;
