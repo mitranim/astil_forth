@@ -987,6 +987,32 @@
   parse_word get_local comp_pop_local_set
 ;
 
+\ ## Memory
+\
+\ The program is implicitly linked with `libc`,
+\ so we get to use C stdlib procedures.
+
+2 1 extern: calloc  ( len size -- addr )
+1 1 extern: malloc  ( size -- addr )
+1 0 extern: free    ( addr -- )
+3 0 extern: memset  ( buf char len -- )
+3 0 extern: memcpy  ( dst src len -- )
+3 0 extern: memmove ( dst src len -- )
+
+1 1 extern: strlen  ( cstr -- len )
+3 1 extern: strncmp ( str0 str1 len -- )
+3 0 extern: strncpy ( dst src str_len -- )
+3 0 extern: strlcpy ( dst src buf_len -- )
+
+: move    ( src dst len -- ) swap_over strncpy ;
+: fill    ( buf len char -- ) swap memset ;
+: erase   ( buf len -- ) 0 fill ;
+: blank   ( buf len -- ) 32 fill ;
+: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
+: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
+: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
+: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
+
 \ ## Exceptions — basic
 \
 \ Exception definitions are split. See additional words below
@@ -1014,32 +1040,6 @@
 \
 \ Also see `sthrowf"` for error message formatting.
 :: throw" ( C: "str" -- ) comp_cstr compile' throw ;
-
-\ ## Memory
-\
-\ The program is implicitly linked with `libc`,
-\ so we get to use C stdlib procedures.
-
-2 1 extern: calloc  ( len size -- addr )
-1 1 extern: malloc  ( size -- addr )
-1 0 extern: free    ( addr -- )
-3 0 extern: memset  ( buf char len -- )
-3 0 extern: memcpy  ( dst src len -- )
-3 0 extern: memmove ( dst src len -- )
-
-1 1 extern: strlen  ( cstr -- len )
-3 1 extern: strncmp ( str0 str1 len -- )
-3 0 extern: strncpy ( dst src str_len -- )
-3 0 extern: strlcpy ( dst src buf_len -- )
-
-: move    ( src dst len -- ) swap_over strncpy ;
-: fill    ( buf len char -- ) swap memset ;
-: erase   ( buf len -- ) 0 fill ;
-: blank   ( buf len -- ) 32 fill ;
-: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
-: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
-: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
-: str<>   ( str0 len0 str1 len1 -- bool ) compare <>0 ;
 
 \ ## Conditionals
 \
