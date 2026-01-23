@@ -149,126 +149,126 @@
 ] ;
 
 \ Shared by a lot of load and store instructions. 64-bit only.
-: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 base_instr -- instr )
-  swap 3 lsr 7 bit_trunc 15 lsl or \ imm7
-  swap                   5  lsl or \ Xn
-  swap                   10 lsl or \ Xt2
-                                or \ Xt1
+: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr )
+  3 lsr 7 bit_trunc 15 lsl    \ imm7
+  swap              5  lsl or \ Xn
+  swap              10 lsl or \ Xt2
+                           or \ Xt1
 ;
 
 \ ldp Xt1, Xt2, [Xn, <imm>]!
 : asm_load_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
-  0b10_101_0_011_1_0000000_00000_00000_00000
   asm_pattern_load_store_pair
+  0b10_101_0_011_1_0000000_00000_00000_00000 or
 ;
 
 \ ldp Xt1, Xt2, [Xn], <imm>
 : asm_load_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
-  0b10_101_0_001_1_0000000_00000_00000_00000
   asm_pattern_load_store_pair
+  0b10_101_0_001_1_0000000_00000_00000_00000 or
 ;
 
 \ ldp Xt1, Xt2, [Xn, <imm>]
 : asm_load_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
-  0b10_101_0_010_1_0000000_00000_00000_00000
   asm_pattern_load_store_pair
+  0b10_101_0_010_1_0000000_00000_00000_00000 or
 ;
 
 \ stp Xt1, Xt2, [Xn, <imm>]!
 : asm_store_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
-  0b10_101_0_011_0_0000000_00000_00000_00000
   asm_pattern_load_store_pair
+  0b10_101_0_011_0_0000000_00000_00000_00000 or
 ;
 
 \ stp Xt1, Xt2, [Xn], <imm>
 : asm_store_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
-  0b10_101_0_001_0_0000000_00000_00000_00000
   asm_pattern_load_store_pair
+  0b10_101_0_001_0_0000000_00000_00000_00000 or
 ;
 
 \ stp Xt1, Xt2, [Xn, <imm>]
 : asm_store_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
-  0b10_101_0_010_0_0000000_00000_00000_00000
   asm_pattern_load_store_pair
+  0b10_101_0_010_0_0000000_00000_00000_00000 or
 ;
 
 \ Shared by a lot of load and store instructions.
 \ Patches these bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
-: asm_pattern_load_store ( Xt Xn imm9 base_instr -- instr )
-  swap 9 bit_trunc 12 lsl or \ imm9
-  swap             5  lsl or \ Xn
-                          or \ Xt
+: asm_pattern_load_store ( Xt Xn imm9 -- instr )
+  9 bit_trunc 12 lsl    \ imm9
+  swap        5  lsl or \ Xn
+                     or \ Xt
 ;
 
 \ ldr Xt, [Xn, <imm>]!
 : asm_load_pre ( Xt Xn imm9 -- instr )
-  0b11_111_0_00_01_0_000000000_11_00000_00000
   asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_11_00000_00000 or
 ;
 
 \ ldr Xt, [Xn], <imm>
 : asm_load_post ( Xt Xn imm9 -- instr )
-  0b11_111_0_00_01_0_000000000_01_00000_00000
   asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_01_00000_00000 or
 ;
 
 \ str Xt, [Xn, <imm>]!
 : asm_store_pre ( Xt Xn imm9 -- instr )
-  0b11_111_0_00_00_0_000000000_11_00000_00000
   asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_11_00000_00000 or
 ;
 
 \ str Xt, [Xn], <imm>
 : asm_store_post ( Xt Xn imm9 -- instr )
-  0b11_111_0_00_00_0_000000000_01_00000_00000
   asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_01_00000_00000 or
 ;
 
 \ ldur Xt, [Xn, <imm>]
 : asm_load_off ( Xt Xn imm9 -- instr )
-  0b11_111_0_00_01_0_000000000_00_00000_00000
   asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_00_00000_00000 or
 ;
 
 \ stur Xt, [Xn, <imm>]
 : asm_store_off ( Xt Xn imm9 -- instr )
-  0b11_111_0_00_00_0_000000000_00_00000_00000
   asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_00_00000_00000 or
 ;
 
 \ ldur Wt, [Xn, <imm>]
 : asm_load_off_32 ( Wt Xn imm9 -- instr )
-  0b10_111_0_00_01_0_000000000_00_00000_00000
   asm_pattern_load_store
+  0b10_111_0_00_01_0_000000000_00_00000_00000 or
 ;
 
 \ stur Wt, [Xn, <imm>]
 : asm_store_off_32 ( Wt Xn imm9 -- instr )
-  0b10_111_0_00_00_0_000000000_00_00000_00000
   asm_pattern_load_store
+  0b10_111_0_00_00_0_000000000_00_00000_00000 or
 ;
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
 \ Assumes `lsl` is already part of the base instruction.
-: asm_pattern_load_store_with_register ( Xt Xn Xm scale base_instr -- instr )
-  swap <>0 12 lsl or \ lsl 3
-  swap     16 lsl or \ Xm
-  swap     5  lsl or \ Xn
-                  or \ Xt
+: asm_pattern_load_store_with_register ( Xt Xn Xm scale -- instr )
+  <>0  12 lsl    \ lsl 3
+  swap 16 lsl or \ Xm
+  swap 5  lsl or \ Xn
+              or \ Xt
 ;
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
 : asm_load_with_register ( Xt Xn Xm scale -- instr )
-  0b11_111_0_00_01_1_00000_011_0_10_00000_00000
   asm_pattern_load_store_with_register
+  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 or
 ;
 
 \ str Xt, [Xn, Xm, lsl <scale>]
 : asm_store_with_register ( Xt Xn Xm scale -- instr )
-  0b11_111_0_00_00_1_00000_011_0_10_00000_00000
   asm_pattern_load_store_with_register
+  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 or
 ;
 
 \ Shared by some integer arithmetic instructions.
@@ -283,6 +283,20 @@
   12 bit_trunc 10 lsl    \ imm12
   swap          5 lsl or \ Xn
                       or \ Xd
+;
+
+\ Immediate offset must be unsigned.
+\ ldr Xt, [Xn, <imm>]
+: asm_load_scaled_off ( Xt Xn imm9 -- instr )
+  3 lsr asm_pattern_arith_imm
+  0b11_111_0_01_01_000000000000_00000_00000 or
+;
+
+\ Immediate offset must be unsigned.
+\ str Xt, [Xn, <imm>]
+: asm_store_scaled_off ( Xt Xn imm9 -- instr )
+  3 lsr asm_pattern_arith_imm
+  0b11_111_0_01_00_000000000000_00000_00000 or
 ;
 
 : asm_load_byte_off ( Wt Wn imm12 -- instr )
@@ -425,28 +439,27 @@
 ;
 
 \ `imm19` offset is implicitly times 4 and can be negative.
-: asm_pattern_compare_branch ( Xt imm19 base_instr -- instr )
-  swap 2 lsr 19 bit_trunc 5 lsl \ imm19
-                             or \ instr
-                             or \ Xt
+: asm_pattern_compare_branch ( Xt imm19 -- instr )
+  2 lsr 19 bit_trunc 5 lsl \ imm19
+                        or \ Xt
 ;
 
 \ cbz x1, <off>
 : asm_cmp_branch_zero ( Xt imm19 -- instr )
-  0b1_011010_0_0000000000000000000_00000
   asm_pattern_compare_branch
+  0b1_011010_0_0000000000000000000_00000 or
 ;
 
 \ cbnz x1, <off>
 : asm_cmp_branch_not_zero ( Xt imm19 -- instr )
-  0b1_011010_1_0000000000000000000_00000
   asm_pattern_compare_branch
+  0b1_011010_1_0000000000000000000_00000 or
 ;
 
 \ Same as `0 pick`.
 : dup ( i1 -- i1 i1 ) [
   1 ARCH_REG_DAT_SP -8 asm_load_off comp_instr \ ldur x1, [x27, -8]
-                      asm_push_x1  comp_instr \ str x1, [x27], 8
+                       asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 \ eor <reg>, <reg>, <reg>
@@ -500,31 +513,31 @@
 \ Same as `1 pick 1 pick`.
 : dup2 ( i1 i2 -- i1 i2 i1 i2 ) [
   1 2 ARCH_REG_DAT_SP -16 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -16]
-      1               2  asm_push2         comp_instr \ stp x1, x2, [x27], 16
+  1 2                     asm_push2         comp_instr \ stp x1, x2, [x27], 16
 ] ;
 
 \ Same as `swap drop`.
 : nip ( i1 i2 -- i2 ) [
-                      asm_pop_x1    comp_instr \ ldr x1, [x27, -8]!
+                       asm_pop_x1    comp_instr \ ldr x1, [x27, -8]!
   1 ARCH_REG_DAT_SP -8 asm_store_off comp_instr \ stur x1, [x27, -8]
 ] ;
 
 \ Same as `swap2 drop2`.
 : nip2 ( i1 i2 i3 i4 -- i3 i4 ) [
-                         asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+                          asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
   1 2 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
 ] ;
 
 \ Same as `1 pick`.
 : over ( i1 i2 -- i1 i2 i1 ) [
   1 ARCH_REG_DAT_SP -16 asm_load_off comp_instr \ ldur x1, [x27, -16]
-                       asm_push_x1  comp_instr \ str x1, [x27], 8
+                        asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
 \ Same as `3 pick 3 pick`.
 : over2 ( i1 i2 i3 i4 -- i1 i2 i3 i4 i1 i2 ) [
   1 2 ARCH_REG_DAT_SP -32 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -32]
-                         asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
+                          asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
 ] ;
 
 \ Same as `3 roll 3 roll`.
@@ -543,16 +556,16 @@
 
 \ Same as `over -rot`.
 : dup_over ( i1 i2 -- i1 i1 i2 ) [
-  1 2              ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
-  1 2              ARCH_REG_DAT_SP -8  asm_store_pair_off comp_instr \ stp x1, x2, [x27, -8]
-    ARCH_REG_DAT_SP ARCH_REG_DAT_SP  8  asm_add_imm        comp_instr \ add x27, x27, 8
+  1 2             ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
+  1 2             ARCH_REG_DAT_SP -8  asm_store_pair_off comp_instr \ stp x1, x2, [x27, -8]
+  ARCH_REG_DAT_SP ARCH_REG_DAT_SP  8  asm_add_imm        comp_instr \ add x27, x27, 8
 ] ;
 
 \ Same as `dup rot`.
 : tuck ( i1 i2 -- i2 i1 i2 ) [
   1 2 ARCH_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
   2 1 ARCH_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -16]
-                       2 asm_push1          comp_instr \ str x2, [x27], 8
+                       2  asm_push1          comp_instr \ str x2, [x27], 8
 ] ;
 
 : tuck2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 i3 i4 ) [
@@ -586,10 +599,10 @@
 
 \ Pushes the stack item found at the given index, duplicating it.
 : pick ( … ind -- … [ind] ) [
-                       asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
-  1 1                  asm_mvn                comp_instr \ mvn x1, x1
+                        asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
+  1 1                   asm_mvn                comp_instr \ mvn x1, x1
   1 ARCH_REG_DAT_SP 1 1 asm_load_with_register comp_instr \ ldr x1, [x27, x1, lsl 3]
-                       asm_push_x1            comp_instr \ str x1, [x27], 8
+                        asm_push_x1            comp_instr \ str x1, [x27], 8
 ] ;
 
 \ FIFO version of `pick`: starts from stack bottom.
@@ -601,8 +614,8 @@
 
 \ Overwrite the cell at the given index with the given value.
 : bury ( … val ind -- … ) [
-                       asm_pop_x1_x2           comp_instr \ ldp x1, x2, [x27, -16]!
-  2 2                  asm_mvn                 comp_instr \ mvn x2, x2
+                        asm_pop_x1_x2           comp_instr \ ldp x1, x2, [x27, -16]!
+  2 2                   asm_mvn                 comp_instr \ mvn x2, x2
   1 ARCH_REG_DAT_SP 2 1 asm_store_with_register comp_instr \ str x1, [x27, x2, lsl 3]
 ] ;
 
@@ -785,7 +798,7 @@
 \ Sets the stack pointer register to the given address.
 \ Uses two instructions for the same reason as the above.
 : sp! ( adr -- ) [
-                   asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
+                    asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
   ARCH_REG_DAT_SP 1 asm_mov_reg comp_instr \ mov x27, x1
 ] ;
 
@@ -907,11 +920,8 @@
 \ When we ask for a local, the compiler returns an FP offset.
 \ We can compile load/store and push/pop as we like.
 
-: asm_local_get ( reg fp_off -- instr ) ARCH_REG_FP swap asm_load_off ;
-: asm_local_set ( reg fp_off -- instr ) ARCH_REG_FP swap asm_store_off ;
-
-\ : asm_local_get ( fp_off reg -- instr ) ARCH_REG_FP rot asm_load_off ;
-\ : asm_local_set ( fp_off reg -- instr ) ARCH_REG_FP rot asm_store_off ;
+: asm_local_get ( reg fp_off -- instr ) ARCH_REG_FP swap asm_load_scaled_off ;
+: asm_local_set ( reg fp_off -- instr ) ARCH_REG_FP swap asm_store_scaled_off ;
 
 \ SYNC[asm_local_read].
 : comp_local_get_push ( fp_off -- )

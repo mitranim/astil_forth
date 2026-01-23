@@ -310,6 +310,8 @@ Variants:
 
   str <val_reg>, [<addr_reg>, <off>]
   ldr <val_reg>, [<addr_reg>, <off>]
+
+Scaled offset can only be unsigned.
 */
 static Instr asm_instr_load_store_scaled_offset(
   bool is_load, U8 val_reg, U8 addr_reg, Uint off
@@ -444,6 +446,16 @@ static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
 }
 
 /*
+In prologue / epilogue, we can often allocate stack space for the frame record
+and locals in one `stp` / `ldp` instruction with a pre/post index, whose range
+is limited to [-512,504]. The frame record takes 16. When exceeding this size,
+we have to use another instruction.
+
+SYNC[asm_locals_sp_off].
+*/
+static constexpr Ind ASM_LOCALS_MAX_PAIR_OFF = 488;
+
+/*
 Variants:
 
   opc 0 = stp
@@ -459,8 +471,9 @@ Unlike in `str` and `ldr`, the offset in `stp` and `ldp`
 is implicitly a multiple of the register width in bytes.
 */
 static Instr asm_instr_load_store_pair_pre_post(
-  bool is_load, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
+  bool is_load, U8 reg0, U8 reg1, U8 addr_reg, Sint mod
 ) {
+  aver(mod >= -512 && mod <= 504); // See Arm64 docs.
   aver(divisible_by(mod, 8));
   mod /= 8;
 
@@ -477,16 +490,20 @@ static Instr asm_instr_load_store_pair_pre_post(
     ((Instr)addr_reg << 5) | reg0;
 }
 
-static Instr asm_instr_store_pair_pre_post(U8 reg0, U8 reg1, U8 addr_reg, S8 mod) {
+static Instr asm_instr_store_pair_pre_post(
+  U8 reg0, U8 reg1, U8 addr_reg, Sint mod
+) {
   return asm_instr_load_store_pair_pre_post(0b0, reg0, reg1, addr_reg, mod);
 }
 
-static Instr asm_instr_load_pair_pre_post(U8 reg0, U8 reg1, U8 addr_reg, S8 mod) {
+static Instr asm_instr_load_pair_pre_post(
+  U8 reg0, U8 reg1, U8 addr_reg, Sint mod
+) {
   return asm_instr_load_store_pair_pre_post(0b1, reg0, reg1, addr_reg, mod);
 }
 
 static void asm_append_store_pair_pre_post(
-  Comp *comp, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
+  Comp *comp, U8 reg0, U8 reg1, U8 addr_reg, Sint mod
 ) {
   asm_append_instr(
     comp, asm_instr_store_pair_pre_post(reg0, reg1, addr_reg, mod)
@@ -494,7 +511,7 @@ static void asm_append_store_pair_pre_post(
 }
 
 static void asm_append_load_pair_pre_post(
-  Comp *comp, U8 reg0, U8 reg1, U8 addr_reg, S8 mod
+  Comp *comp, U8 reg0, U8 reg1, U8 addr_reg, Sint mod
 ) {
   asm_append_instr(comp, asm_instr_load_pair_pre_post(reg0, reg1, addr_reg, mod));
 }
@@ -702,10 +719,13 @@ static void comp_local_alloc_mem(Comp *comp, Local *loc) {
   loc->mem = ++comp->ctx.mem_locs;
 }
 
-static Sint local_fp_off(Local *loc) {
-  return -((Sint)loc->mem * (Sint)sizeof(Sint));
+// SYNC[local_fp_off].
+static Ind local_fp_off(Local *loc) {
+  return 16 + (loc->mem * (Ind)sizeof(Sint));
 }
 
+// TODO: detect when the offset exceeds what we can encode inline
+// in a `ldp` / `stp`, and fall back on different encoding.
 static Ind asm_locals_sp_off(Comp *comp) {
   const auto len = comp->ctx.mem_locs;
 
@@ -719,7 +739,7 @@ to reserve space for locals. Since the locals aren't known upfront, and the
 SP adjustment may or may not be needed, we fixup the prologue when appending
 the epilogue, at which point everything is known.
 
-SYNC[asm_prologue].
+SYNC[asm_prologue_epilogue].
 */
 static void asm_reserve_sym_prologue(Comp *comp) {
   asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
@@ -727,11 +747,11 @@ static void asm_reserve_sym_prologue(Comp *comp) {
   asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
 }
 
-// SYNC[asm_prologue].
+// SYNC[asm_prologue_epilogue].
 static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   const auto instrs = &comp->code.code_write;
   const auto sp_off = asm_locals_sp_off(comp);
-  const auto leaf   = is_sym_leaf(sym);
+  const auto leaf   = is_sym_leaf(sym) && !sp_off;
   const auto spans  = &sym->norm.spans;
   const auto inner  = &instrs->dat[spans->inner];
   auto       floor  = inner;
@@ -746,17 +766,19 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
     aver(pro[2] == brk);
   });
 
-  if (sp_off) {
-    floor -= 1;
-    floor[0] = asm_instr_sub_imm(ARCH_REG_SP, ARCH_REG_SP, sp_off);
-  }
-
   if (!leaf) {
-    floor -= 2;
-    floor[0] = asm_instr_store_pair_pre_post(
-      ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, -16
-    );
-    floor[1] = asm_instr_add_imm(ARCH_REG_FP, ARCH_REG_SP, 0);
+    *--floor = asm_instr_add_imm(ARCH_REG_FP, ARCH_REG_SP, 0);
+    if (sp_off <= ASM_LOCALS_MAX_PAIR_OFF) {
+      *--floor = asm_instr_store_pair_pre_post(
+        ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, (Sint)-16 - (Sint)sp_off
+      );
+    }
+    else {
+      *--floor = asm_instr_store_pair_pre_post(
+        ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, -16
+      );
+      *--floor = asm_instr_sub_imm(ARCH_REG_SP, ARCH_REG_SP, sp_off);
+    }
   }
 
   *instr_floor = (Ind)(floor - instrs->dat);
@@ -781,14 +803,21 @@ static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
   return true;
 }
 
+// SYNC[asm_prologue_epilogue].
 static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
   const auto sp_off = asm_locals_sp_off(comp);
-  const auto leaf   = is_sym_leaf(sym);
+  const auto leaf   = is_sym_leaf(sym) && !sp_off;
 
-  if (sp_off) {
-    asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
+  if (leaf) return;
+
+  // SYNC[local_fp_off].
+  if (sp_off <= ASM_LOCALS_MAX_PAIR_OFF) {
+    asm_append_load_pair_pre_post(
+      comp, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, sp_off + 16
+    );
   }
-  if (!leaf) {
+  else {
+    asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
     asm_append_load_pair_pre_post(
       comp, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, 16
     );

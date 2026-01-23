@@ -225,7 +225,7 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
     }
     case LOC_MEM: {
       const auto off = local_fp_off(loc);
-      return asm_instr_load_unscaled_offset(tar_reg, ARCH_REG_FP, off);
+      return asm_instr_load_scaled_offset(tar_reg, ARCH_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
     default:          unreachable();
@@ -241,7 +241,7 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
     }
     case LOC_MEM: {
       const auto off = local_fp_off(loc);
-      return asm_instr_store_unscaled_offset(src_reg, ARCH_REG_FP, off);
+      return asm_instr_store_scaled_offset(src_reg, ARCH_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
     default:          unreachable();
