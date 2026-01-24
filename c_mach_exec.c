@@ -87,7 +87,7 @@ static Err compile_mach_executable(Interp *interp) {
       .flags     = MHF_NOUNDEFS | MHF_DYLDLINK | MHF_TWOLEVEL | MHF_PIE |
         MHF_HAS_TLV_DESCRIPTORS,
       .cmd_count = 1,
-      .cmd_size  = sizeof(Mach_load_cmd_seg), // FIXME there's more
+      .cmd_size  = sizeof(Mach_load_cmd_seg), // TODO there's more
     };
     try(file_stream_write(str, &head, sizeof(head), 1));
   }

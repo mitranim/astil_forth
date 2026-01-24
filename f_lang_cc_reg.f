@@ -706,10 +706,12 @@
   0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
 ] ;
 
-: stack_at    { ind -- adr } ind cells stack_floor + ;
-: stack_len   {     -- len } stack_top stack_floor - /cells ;
-: stack_clear {     --     } stack_floor stack! ;
-: stack_trunc { len --     } len stack_at stack! ;
+: stack_at    { ind  -- adr } ind cells stack_floor + ;
+: stack_len   {      -- len } stack_top stack_floor - /cells ;
+: stack_clear {      --     } stack_floor stack! ;
+: stack_trunc { len  --     } len stack_at stack! ;
+: stack+      { diff --     } diff dec cells          stack_top      + stack! ;
+: stack-      { diff --     } diff dec cells { diff } stack_top diff - stack! ;
 
 \ Used by control structures such as conditionals.
 \
@@ -746,6 +748,17 @@
   1 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off   comp_instr
   0 1 8                            asm_store_post comp_instr
   1 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off  comp_instr
+] ;
+
+: >>stack { one two } [
+  0b11 comp_clobber
+
+  \ ldur x2,     [x27, INTERP_INTS_TOP]
+  \ stp  x0, x1, [x2], 16
+  \ stur x2,     [x27, INTERP_INTS_TOP]
+  2 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off        comp_instr
+  0 1 2 16                         asm_store_pair_post comp_instr
+  2 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off       comp_instr
 ] ;
 
 \ ## Characters and strings
@@ -983,34 +996,22 @@
 0 var: COND_HAS
 
 \ cbz x0, <else|end>
-: if_patch ( adr[if] -- )
-  stack>      { adr }
-  adr pc_from { off }
-  0 off asm_cmp_branch_zero adr !32
-;
+: if_patch { adr } adr pc_from { off } 0 off asm_cmp_branch_zero adr !32 ;
 
 \ cbnz x0, <else|end>
-: ifn_patch ( adr[if] )
-  stack> { adr }
-  adr pc_from { off }
-  0 off asm_cmp_branch_not_zero adr !32
-;
+: ifn_patch { adr } adr pc_from { off } 0 off asm_cmp_branch_not_zero adr !32 ;
 
 : if_done ( cond_prev ) stack> COND_HAS ! ;
-: if_pop  ( fun[prev] adr[if] ) if_patch stack> execute ;
-: ifn_pop ( fun[prev] adr[ifn] ) ifn_patch stack> execute ;
-: if_init { -- cond fun }
-  COND_HAS @ { cond } COND_HAS on! cond ' if_done
-;
+: if_pop  ( fun[prev] adr[if] ) stack> if_patch stack> execute ;
+: ifn_pop ( fun[prev] adr[ifn] ) stack> ifn_patch stack> execute ;
+: if_init { -- cond fun } COND_HAS @ { cond } COND_HAS on! cond ' if_done ;
 
 :: #elif { -- fun[exec] adr[if] fun[if] } ( E: pred -- )
-  reserve_here { adr }
-  1 comp_barrier
-  ' pop_execute adr ' if_pop
+  reserve_here { adr } 1 comp_barrier ' pop_execute adr ' if_pop
 ;
 
 :: #elifn { -- fun[exec] adr[if] fun[if] } ( E: pred -- )
-  reserve_here { adr } ' pop_execute adr ' ifn_pop
+  reserve_here { adr } 1 comp_barrier ' pop_execute adr ' ifn_pop
 ;
 
 \ With this strange setup, `#end` pops the top control frame,
@@ -1040,7 +1041,160 @@
 
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
-:: #end { fun } 0 comp_barrier fun execute ;
+:  control_end { fun } 0 comp_barrier fun execute ;
+:: #end        { fun } fun control_end ;
+
+\ ## Loops
+\
+\ Unlike other Forth systems, we implement termination of arbitrary
+\ control structures with a generic `#end`. This works for all loops
+\ and eliminates the need to remember many different terminators.
+\
+\ Our solution isn't complicated, either. We simply push procedures
+\ with their arguments to the control stack, and pop the latest one
+\ with `#end`. Each procedure pops its arguments and does something,
+\ then pops the next procedure in the chain. The cascade terminates
+\ when encountering a procedure which doesn't pop a preceding one.
+
+\ Stack position of a special location in the top loop frame
+\ on the control stack. This is where auxiliary structures
+\ such as `#leave` place their own control frames.
+0 var: LOOP_FRAME
+
+: loop_frame! ( C: frame_ind -- ) stack> LOOP_FRAME ! ;
+
+: loop_frame_beg ( C: -- frame_ind frame_fun )
+  LOOP_FRAME @ ' loop_frame! >>stack
+  stack_len LOOP_FRAME !
+;
+
+\ Used by auxiliary loop constructs such as "leave" and "while"
+\ to insert their control frame before a loop control frame.
+\ This allows to pop the control frames in the right order
+\ with a single "end" word.
+: loop_aux
+  ( C: prev… <loop> …rest… <frame> stack_len -- prev… <frame> <loop> …rest )
+  stack>    { stack_len_0 }
+  stack_len { stack_len_1 }
+
+  LOOP_FRAME @
+  #ifn
+    throw" auxiliary loop constructs require an ancestor loop frame"
+  #end
+
+  stack_len_1  stack_len_0 - { frame_len }
+  frame_len    cells         { frame_size }
+  stack_len_0  stack_at      { frame_sp_prev }
+  stack_len_1  stack_at      { frame_sp_temp }
+  LOOP_FRAME @ stack_at      { loop_sp_prev }
+  loop_sp_prev frame_size  + { loop_sp_next }
+
+  \ Need a backup copy of the frame we're moving,
+  \ because we're about to overwrite that data.
+  frame_len stack+
+  frame_sp_temp frame_sp_prev frame_size memmove
+
+  \ Move everything starting with the loop frame,
+  \ making space for the aux frame we're inserting.
+  frame_sp_temp loop_sp_next - { rest_size }
+  loop_sp_next loop_sp_prev rest_size memmove
+
+  \ The aux frame is now behind the moved loop frame.
+  loop_sp_prev frame_sp_temp frame_size memmove
+  frame_len stack-
+
+  \ Subsequent aux constructs will be inserted after the new frame.
+  LOOP_FRAME @ frame_len + LOOP_FRAME !
+;
+
+: loop_end { adr } adr pc_to asm_branch comp_instr ; \ b <begin>
+
+: loop_pop ( C: fun[prev] …aux… adr[beg] -- )
+  stack> loop_end stack> control_end
+;
+
+\ Implementation note. Each loop frame is "split" in two sub-frames:
+\ the "prev frame" and the "current frame". Auxiliary loop constructs
+\ such as "leave" and "while" insert their own frames in-between these
+\ subframes. See `loop_aux`.
+:: #loop ( C: -- ind_frame fun_frame adr_loop fun_loop )
+  0 comp_barrier
+  here { adr }
+  loop_frame_beg adr ' loop_pop >>stack
+;
+
+\ Can be used in any loop.
+:: #leave
+  ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
+  0            comp_barrier
+  stack_len    { len }
+  reserve_here >stack
+  ' else_pop   >stack
+  len          >stack
+  loop_aux
+;
+
+\ Can be used in any loop.
+:: #while
+  ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
+  1            comp_barrier
+  stack_len    { len }
+  reserve_here >stack
+  ' if_pop     >stack
+  len          >stack
+  loop_aux
+;
+
+\ Assumes that the top control frame is from `#loop`.
+:: #until ( C: fun -- )
+  1                       comp_barrier \ Request `x0`.
+  0 8 asm_cmp_branch_zero comp_instr   \ cbnz x0, 8
+  stack> execute
+;
+
+: for_loop_pop ( C: fun[prev] …aux… adr[cond] adr[beg] -- )
+  stack> loop_end \ b <begin>
+  stack> if_patch \ Retropatch loop condition.
+  stack> execute  \ Pop auxiliaries; restore previous loop frame.
+;
+
+: for_loop_init
+  { ceil }
+  ( C: ceil -- ind_frame fun_frame adr_cond adr_beg fun_for )
+  ( E: ceil -- )
+
+  loop_frame_beg      ( -- ind_frame fun_frame )
+  ceil comp_local_set \ Grab the initial ceiling value.
+  0 comp_barrier      \ Clobber locals, including the ceiling.
+
+  here { adr_beg }
+  ceil comp_local_get { reg }      \ mov Xd, <ceil> | ldr Xd, <ceil>
+  here { adr_cond } reserve_instr  \ cbz Xd, <end>
+  reg reg 1 asm_sub_imm comp_instr \ sub Xd, Xd, 1
+  ceil comp_local_set              \ mov <ceil>, Xd | str Xd, <ceil>
+
+  adr_cond       >stack
+  adr_beg        >stack
+  ' for_loop_pop >stack
+;
+
+\ A count-down-by-one loop. Analogue of the non-standard
+\ `for … next` loop. Usage; ceiling must be positive:
+\
+\   123
+\   #for
+\     log" looping"
+\   #end
+\
+\ Anton Ertl circa 1994:
+\
+\ > This is the preferred loop of native code compiler writers
+\   who are too lazy to optimize `?do` loops properly.
+:: #for
+  ( C: -- ind_frame fun_frame adr_cond adr_beg fun_for )
+  ( E: ceil -- )
+  anon_local for_loop_init
+;
 
 \ ## IO
 \

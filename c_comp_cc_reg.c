@@ -165,7 +165,6 @@ static void comp_local_reg_del(Comp *comp, Local *loc, U8 reg) {
 
 static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
   validate_param_reg(reg);
-  aver(!comp_local_get_for_reg(comp, reg));
 
   const auto ctx = &comp->ctx;
   for (U8 ind = 0; ind < arr_cap(ctx->loc_regs); ind++) {
@@ -297,46 +296,42 @@ static Err err_assign_no_args(const char *name) {
 }
 
 static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
-  // printf("loc->write before fixup: %p\n", loc->write);
   const auto fix = stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
       .type  = LOC_FIX_WRITE,
       .write = (Local_write){
-        .instr = asm_append_breakpoint(comp, ASM_CODE_LOC_WRITE),
-        .prev  = loc->write,
-        .loc   = loc,
-        .reg   = reg,
+        .instr     = asm_append_breakpoint(comp, ASM_CODE_LOC_WRITE),
+        .prev      = loc->write,
+        .loc       = loc,
+        .reg       = reg,
+        .confirmed = loc->read,
       }
     }
   );
-  // repr_struct(fix);
   loc->write = &fix->write;
-  // printf("loc->write after fixup: %p\n", loc->write);
 }
 
 /*
-Abstract "set" operation. Does not immediately create a "write";
-those are added lazily on clobbers. Does not check, confirm, or
-invalidate the latest pending "write" if any; writes are confirmed
-by "reads", and link with each other for a chain confirmation.
+Abstract "set" operation used by brace-assignment. Does not immediately create
+a "write"; those are added lazily on clobbers. Does not check, confirm, or
+invalidate the latest pending "write" if any; writes are confirmed by "reads",
+and link with each other for a chain confirmation.
 */
-static Err comp_append_local_set(Comp *comp, Local *loc) {
+static Err comp_append_local_set(Comp *comp, Local *loc, U8 *out) {
   const auto ctx = &comp->ctx;
   const auto rem = (Sint)ctx->arg_len - (Sint)ctx->arg_low;
 
   if (!(rem > 0)) return err_assign_no_args(loc->name.buf);
 
   const auto reg = ctx->arg_low++;
-
-  // Failure in this assertion implies an unhandled clobber.
-  aver(!comp_local_has_reg(comp, loc, reg));
   comp_local_reg_reset(comp, loc, reg);
 
   if (ctx->arg_len == ctx->arg_low) {
     ctx->arg_len = 0;
     ctx->arg_low = 0;
   }
+  if (out) *out = reg;
   return nullptr;
 }
 
@@ -359,14 +354,6 @@ static Err comp_clobber_reg(Comp *comp, U8 reg) {
 
   const auto loc = comp_local_get_for_reg(comp, reg);
   comp_local_reg_del(comp, loc, reg);
-
-  // if (loc && str_eq(&loc->name, "out")) {
-  //   printf("reg: %d\n", reg);
-  //   printf("loc->stable: %d\n", loc->stable);
-  //   printf(
-  //     "comp_local_has_regs(comp, loc): %d\n", comp_local_has_regs(comp, loc)
-  //   );
-  // }
 
   if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return nullptr;
   comp_append_local_write(comp, loc, reg);
@@ -435,7 +422,7 @@ static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   (void)comp;
   auto write = loc->write;
   loc->write = nullptr;
-  // printf("appending read; write: %p\n", write);
+  loc->read  = true; // Confirm subsequent writes.
 
   while (write) {
     write->confirmed = true;
@@ -462,7 +449,7 @@ Note that "get" happens as part of building an argument list,
 which clobbers parameter registers, which may be associated
 with other locals. The clobbers are handled in that logic.
 */
-static Err comp_append_local_get(Comp *comp, Local *loc) {
+static Err comp_append_local_get(Comp *comp, Local *loc, U8 *out) {
   auto reg = comp->ctx.arg_len;
   if (is_param_reg(reg) && comp_local_has_reg(comp, loc, reg)) {
     comp->ctx.arg_len++;
@@ -479,6 +466,7 @@ static Err comp_append_local_get(Comp *comp, Local *loc) {
 
   comp_append_local_read(comp, loc, reg);
   comp_local_reg_add(comp, loc, reg);
+  if (out) *out = reg;
   return nullptr;
 }
 
@@ -635,10 +623,6 @@ static Err comp_barrier(Comp *comp, U8 inp_len) {
   }
 
   for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
-    // const auto loc = ctx->loc_regs[reg];
-    // printf(
-    //   "barrier clobbering reg: %d; local: %s\n", reg, loc ? loc->name.buf : nullptr
-    // );
     try(comp_clobber_reg(comp, reg));
   }
 

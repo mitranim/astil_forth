@@ -4,6 +4,10 @@
 #include "./lib/stack.h"
 #include "./lib/str.h"
 
+// #ifdef CLANGD
+// #include "./c_comp.h"
+// #endif
+
 typedef struct {
   Word_str name;   // May be empty.
   Ind      mem;    // Index of FP offset.

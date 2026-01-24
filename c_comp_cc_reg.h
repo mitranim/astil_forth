@@ -6,6 +6,10 @@
 #include "./lib/num.h"
 #include "./lib/str.h"
 
+// #ifdef CLANGD
+// #include "./c_comp.h"
+// #endif
+
 typedef struct Local_write Local_write;
 
 /*
@@ -57,6 +61,8 @@ need for IR and multiple passes. The next "read" operation for this
 local confirms every preceding unconfirmed "write". Every confirmed
 "write" is later rewritten with a `mov` or `str` instruction.
 
+Additionally, a "read" causes _subsequent_ "writes" to be confirmed.
+
 When a local runs out of temp registers and we emit a "write" operation,
 the local is considered "stable" until the next "set". Its location now
 holds an up-to-date value, and can be repeatedly "read" from. The local
@@ -68,6 +74,7 @@ typedef struct {
   Word_str     name;
   Local_write *write;  // Latest unconfirmed "write"; confirmed by "reads".
   bool         stable; // Has up-to-date value in assigned stable location.
+  bool         read;   // Has a read; auto-confirm all subsequent writes.
 
   // Final stable location used for writes and reads.
   // Locals which are never "read" are not considered.

@@ -864,8 +864,8 @@
 : stack_len   (        -- len ) sp sp0 - /cells ;
 : stack_clear ( …      -- )     sp0 sp! ;
 : stack_trunc ( … len  -- … )   sp_at sp! ;
-: stack+      ( … diff -- … )   sp swap dec cells + sp! ;
-: stack-      ( … diff -- … )   sp swap inc cells - sp! ;
+: stack+      ( … diff -- … )   dec cells sp swap + sp! ;
+: stack-      ( … diff -- … )   inc cells sp swap - sp! ;
 
 \ ## Characters and strings
 
@@ -1122,11 +1122,16 @@
 \ Unlike other Forth systems, we implement termination of arbitrary
 \ control structures with a generic `#end`. This works for all loops
 \ and eliminates the need to remember many different terminators.
-\ The added internal complexity is manageable.
+\
+\ Our solution isn't complicated, either. We simply push procedures
+\ with their arguments to the control stack, and pop the latest one
+\ with `#end`. Each procedure pops its arguments and does something,
+\ then pops the next procedure in the chain. The cascade terminates
+\ when encountering a procedure which doesn't pop a preceding one.
 
-\ Stack position of a special location in the top loop frame on the control
-\ stack. This is where auxiliary structures such as `#leave` place their own
-\ control frames.
+\ Stack position of a special location in the top loop frame
+\ on the control stack. This is where auxiliary structures
+\ such as `#leave` place their own control frames.
 0 var: LOOP_FRAME
 
 : loop_frame! ( frame_ind -- ) LOOP_FRAME ! ;
@@ -1176,6 +1181,10 @@
 : loop_end ( adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
 : loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end execute'' #end ;
 
+\ Implementation note. Each loop frame is "split" in two sub-frames:
+\ the "prev frame" and the "current frame". Auxiliary loop constructs
+\ such as "leave" and "while" insert their own frames in-between these
+\ subframes. See `loop_aux`.
 :: #loop
   ( C: -- frame fun[frame!] … adr[beg] fun[loop] )
   \ Control frame is split: ↑ auxiliary constructs like "leave" go here.
@@ -1210,18 +1219,18 @@
 ;
 
 : for_loop_init
-  ( C: local_ind -- frame fun[frame!] … adr[cond] adr[beg] fun[for] )
-  ( E: limit -- )
+  ( C: ceil_loc -- frame fun[frame!] … adr[cond] adr[beg] fun[for] )
+  ( E: ceil -- )
 
-  to: index
+  to: ceil                \ We'll reuse ceiling as index.
   loop_frame_beg
-  index comp_pop_local_set \ Reuse limit as index.
+  ceil comp_pop_local_set \ Grab the initial ceiling value.
 
   here to: adr_beg
-  1 index asm_local_get comp_instr    \ ldur x1, [FP, <loc_off>]
-  here to: adr_cond     reserve_instr \ cbz x1, <end>
-  1 1 1   asm_sub_imm   comp_instr    \ sub x1, x1, 1
-  1 index asm_local_set comp_instr    \ stur x1, [FP, <loc_off>]
+  1 ceil asm_local_get comp_instr    \ ldur x1, [FP, <loc_off>]
+  here to: adr_cond    reserve_instr \ cbz x1, <end>
+  1 1 1  asm_sub_imm   comp_instr    \ sub x1, x1, 1
+  1 ceil asm_local_set comp_instr    \ stur x1, [FP, <loc_off>]
 
   adr_cond adr_beg ' for_loop_pop
 ;

@@ -225,7 +225,7 @@ static Err interp_word(Interp *interp, Word_str word) {
 
   if (ctx->compiling) {
     const auto loc = comp_local_get(comp, name);
-    if (loc) return comp_append_local_get(comp, loc);
+    if (loc) return comp_append_local_get(comp, loc, nullptr);
 
     auto sym = dict_get(dict_comp, name);
     if (sym) return interp_call_sym(interp, sym);

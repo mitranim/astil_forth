@@ -63,15 +63,22 @@ static Err comp_append_push_imm(Comp *comp, Sint imm) {
   return nullptr;
 }
 
-static Err comp_append_local_get(Comp *comp, Local *loc) {
-  asm_append_local_read(comp, local_fp_off(loc));
+static Err comp_append_local_get(Comp *comp, Local *loc, Ind *out) {
+  const auto off = local_fp_off(loc);
+  asm_append_local_read(comp, off);
+  if (out) *out = off;
   return nullptr;
 }
 
+/*
+The language bootstrap file implements this on its own.
+
 static Err comp_append_local_set(Comp *comp, Local *loc) {
-  asm_append_local_write(comp, local_fp_off(loc));
+  const auto off = local_fp_off(loc);
+  asm_append_local_write(comp, off);
   return nullptr;
 }
+*/
 
 static Err comp_call_intrin(Interp *interp, const Sym *callee) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));

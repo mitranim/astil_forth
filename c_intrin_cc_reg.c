@@ -52,7 +52,7 @@ static Err intrin_brace(Interp *interp) {
 
     Local *loc;
     try(comp_local_get_or_make(comp, word, &loc));
-    try(comp_append_local_set(comp, loc));
+    try(comp_append_local_set(comp, loc, nullptr));
   }
 
   // Treat the remaining arguments as consumed, and the remaining words after
@@ -318,21 +318,21 @@ static Err intrin_anon_local(Interp *interp) {
   return nullptr;
 }
 
-// FIXME use in `f_lang_cc_reg.f` instead of custom asm.
 static Err intrin_comp_local_get(Sint ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
+  U8         reg;
   try(comp_validate_local(comp, ptr, &loc));
-  try(comp_append_local_get(comp, loc));
+  try(comp_append_local_get(comp, loc, &reg));
+  try(int_stack_push(&interp->ints, reg));
   return nullptr;
 }
 
-// FIXME use in `f_lang_cc_reg.f` instead of custom asm.
 static Err intrin_comp_local_set(Sint ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
   try(comp_validate_local(comp, ptr, &loc));
-  try(comp_append_local_set(comp, loc));
+  try(comp_append_local_set(comp, loc, nullptr));
   return nullptr;
 }
 
@@ -534,6 +534,7 @@ static constexpr USED auto INTRIN_COMP_LOCAL_GET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_get,
   .inp_len   = 1,
+  .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
