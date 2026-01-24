@@ -1198,6 +1198,19 @@
   anon_local for_loop_init
 ;
 
+\ Like `#for` but requires a local name to make the index
+\ accessible. Usage; ceiling must be positive:
+\
+\   123
+\   -for: ind
+\     ind .
+\   #end
+:: -for:
+  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
+  ( E: ceil -- )
+  parse_word get_local for_loop_init
+;
+
 \ ## IO
 \
 \ Having access to `libc` spares us from having
@@ -1217,6 +1230,7 @@ extern_val: stderr __stderrp
 3 0 extern: snprintf ( … buf cap fmt -- )
 1 0 extern: fflush   ( file -- )
 
+: emit { char } char putchar ;
 : eputchar { char } char stderr fputc ;
 : puts { cstr } cstr stdout fputs ;
 : eputs { cstr } cstr stderr fputs ;
@@ -1269,4 +1283,4 @@ extern_val: errno __error
   addr size2
 ;
 
-log" [lang] ok" lf
+\ log" [lang] ok" lf

@@ -1062,23 +1062,24 @@
 \ Unlike other Forth systems, we also support chains
 \ of "elif" terminated with a single "end".
 
-: pc_off ( adr -- off ) here swap - ; \ For forward jumps.
+: pc_from ( adr -- off ) here swap - ; \ For forward jumps.
+: pc_to   ( adr -- off ) here      - ; \ For backward jumps.
 : reserve_instr ASM_PLACEHOLDER comp_instr ;
 : reserve_cond asm_pop_x1 comp_instr here reserve_instr ;
 
 \ b <pc_off>
-: patch_uncond_forward ( adr -- ) dup pc_off asm_branch swap !32 ;
+: patch_uncond_forward ( adr -- ) dup pc_from asm_branch swap !32 ;
 
 \ b -<pc_off>
-: patch_uncond_back ( adr -- ) here - asm_branch swap !32 ;
+: patch_uncond_back ( adr -- ) pc_to asm_branch swap !32 ;
 
 0 var: COND_HAS
 
 \ cbz x1, <else|end>
-: if_patch ( adr[if] -- ) dup pc_off 1 swap asm_cmp_branch_zero swap !32 ;
+: if_patch ( adr[if] -- ) dup pc_from 1 swap asm_cmp_branch_zero swap !32 ;
 
 \ cbnz x1, <else|end>
-: ifn_patch ( adr[ifn] -- ) dup pc_off 1 swap asm_cmp_branch_not_zero swap !32 ;
+: ifn_patch ( adr[ifn] -- ) dup pc_from 1 swap asm_cmp_branch_not_zero swap !32 ;
 
 : if_done ( cond_prev -- ) COND_HAS ! ;
 : if_pop  ( fun[prev] adr[if]  -- ) if_patch execute ;
@@ -1180,7 +1181,7 @@
   LOOP_FRAME @ frame_len + LOOP_FRAME !
 ;
 
-: loop_end ( adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
+: loop_end ( adr[beg] -- ) pc_to asm_branch comp_instr ; \ b <begin>
 : loop_pop ( fun[prev] …aux… adr[beg] -- ) loop_end execute'' #end ;
 
 \ Implementation note. Each loop frame is "split" in two sub-frames:
@@ -1292,7 +1293,7 @@
   to: asm_cond
   loop_end \ b <begin>
   to: adr_cond
-  asm_cond adr_cond pc_off asm_branch_cond adr_cond !32 \ b.cond <end>
+  asm_cond adr_cond pc_from asm_branch_cond adr_cond !32 \ b.cond <end>
   execute \ Pop auxiliaries; restore previous loop frame.
 ;
 
@@ -1434,6 +1435,7 @@ extern_val: stderr __stderrp
 3 0 extern: snprintf ( … buf cap fmt -- )
 1 0 extern: fflush   ( file -- )
 
+: emit putchar ;
 : eputchar ( char -- ) stderr fputc ;
 : puts ( cstr -- ) stdout fputs ;
 : eputs ( cstr -- ) stderr fputs ;
