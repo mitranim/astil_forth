@@ -571,6 +571,8 @@
 8 let: cell
 : cells { len -- size } len 3 lsl ;
 : /cells { size -- len } size 3 asr ;
+: +cell { adr -- adr } adr cell + ;
+: -cell { adr -- adr } adr cell - ;
 
 \ ## Assembler continued
 
@@ -646,8 +648,7 @@
   0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
 ] ;
 
-: !2 { val0 val1 adr -- val0 val1 } [
-  comp_next_arg comp_next_arg
+: !2 { val0 val1 adr -- } [
   0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
 ] ;
 
@@ -870,21 +871,23 @@
   reg reg 0 asm_load_off comp_instr     \ ldur x0, [x0]
 ;
 
+: init_data_word { name name_len adr }
+  name name_len colon
+    0 1 comp_word_sig ( E: -- ptr )
+    adr comp_extern_addr
+  semicolon
+
+  name name_len colon_colon
+    adr comp_push compile' comp_extern_addr
+  semicolon
+;
+
 \ Similar to standard `variable`, but takes an initial value like `let:`.
 : var: { val } ( C: "name" -- ) ( E: -- ptr )
   parse_word { str len }
   nil cell alloc_data { adr }
   val adr !
-
-  str len colon
-    0 1 comp_word_sig ( E: -- ptr )
-    adr comp_extern_addr
-  semicolon
-
-  str len colon_colon
-    adr comp_push compile' comp_extern_addr
-  semicolon
-
+  str len adr init_data_word
   [ not_comp_only ]
 ;
 
@@ -898,7 +901,9 @@
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
 \ at least the given size in bytes.
-: buf: { cap } ( C: cap "name" -- ) ( E: -- adr cap )
+\
+\ TODO dedup code with `init_data_word`.
+: buf: { cap } ( C: "name" -- ) ( E: -- adr cap )
   parse_word { str len }
   nil cap alloc_data { adr }
 
@@ -911,6 +916,15 @@
     adr comp_push cap comp_push compile' comp_buf
   semicolon
 
+  [ not_comp_only ]
+;
+
+\ Shortcut for the standard idiom `create <name> N cells allot`.
+: cells: { len } ( C: "name" -- ) ( E: -- adr )
+  parse_word          { name name_len }
+  len cells           { size }
+  nil size alloc_data { adr }
+  name name_len adr init_data_word
   [ not_comp_only ]
 ;
 
@@ -998,39 +1012,65 @@
 0 var: COND_HAS
 
 \ cbz x0, <else|end>
-: if_patch { adr } adr pc_from { off } 0 off asm_cmp_branch_zero adr !32 ;
-
-\ cbnz x0, <else|end>
-: ifn_patch { adr } adr pc_from { off } 0 off asm_cmp_branch_not_zero adr !32 ;
-
-: if_done ( cond_prev ) stack> COND_HAS ! ;
-: if_pop  ( fun[prev] adr[if] ) stack> if_patch stack> execute ;
-: ifn_pop ( fun[prev] adr[ifn] ) stack> ifn_patch stack> execute ;
-: if_init { -- cond fun } COND_HAS @ { cond } COND_HAS on! cond ' if_done ;
-
-:: #elif { -- fun[exec] adr[if] fun[if] } ( E: pred -- )
-  reserve_here { adr } 1 comp_barrier ' pop_execute adr ' if_pop
+: if_patch ( C: adr -- )
+  stack>      { adr }
+  adr pc_from { off }
+  0 off asm_cmp_branch_zero adr !32
 ;
 
-:: #elifn { -- fun[exec] adr[if] fun[if] } ( E: pred -- )
-  reserve_here { adr } 1 comp_barrier ' pop_execute adr ' ifn_pop
+\ cbnz x0, <else|end>
+: ifn_patch ( C: adr -- )
+  stack>      { adr }
+  adr pc_from { off }
+  0 off asm_cmp_branch_not_zero adr !32
+;
+
+: if_done ( C: cond_prev        -- ) stack> COND_HAS ! ;
+: if_pop  ( C: fun_prev adr_if  -- ) if_patch  stack> execute ;
+: ifn_pop ( C: fun_prev adr_ifn -- ) ifn_patch stack> execute ;
+
+: elif_init ( C: -- fun[exec] adr[if] ) ( E: pred -- )
+  reserve_here { adr }
+  1 comp_barrier
+  ' pop_execute >stack
+  adr           >stack
+;
+
+:: #elif ( C: -- fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  elif_init ' if_pop >stack
+;
+
+:: #elifn ( C: -- fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  elif_init ' ifn_pop >stack
+;
+
+: if_init ( C: -- cond fun )
+  COND_HAS @ { cond } COND_HAS on!
+  cond      >stack
+  ' if_done >stack
 ;
 
 \ With this strange setup, `#end` pops the top control frame,
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `#end`.
 \ Prepending `if_done` terminates this chain.
-:: #if { -- cond fun[done] fun[exec] adr[if] fun[if] } ( E: pred -- )
-  if_init { A B } execute'' #elif { C D E } A B C D E
+:: #if ( C: -- cond fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
+  if_init execute'' #elif
 ;
 
-:: #ifn { -- cond fun[nop] fun[exec] adr[ifn] fun[ifn] } ( E: pred -- )
-  if_init { A B } execute'' #elifn { C D E } A B C D E
+:: #ifn ( C: -- cond fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
+  if_init execute'' #elifn
 ;
 
-: else_pop ( fun[prev] adr[else] ) stack> patch_uncond_forward stack> execute ;
+: else_pop ( C: fun[prev] adr[else] -- )
+  stack> patch_uncond_forward stack> execute
+;
 
-:: #else { fun_exec adr_if fun_if -- adr_else fun_else }
+:: #else ( C: fun_exec adr_if fun_if -- adr_else fun_else )
+  stack> { fun_if }
+  stack> { adr_if }
+  stack> { fun_exec }
+
   0 comp_barrier
   reserve_here { adr_else }
 
@@ -1038,13 +1078,13 @@
   adr_if >stack
   fun_if execute
 
-  adr_else ' else_pop
+  adr_else   >stack
+  ' else_pop >stack
 ;
 
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
-:  control_end { fun } 0 comp_barrier fun execute ;
-:: #end        { fun } fun control_end ;
+:: #end ( C: fun -- ) 0 comp_barrier pop_execute ;
 
 \ ## Loops
 \
@@ -1109,10 +1149,10 @@
   LOOP_FRAME @ frame_len + LOOP_FRAME !
 ;
 
-: loop_end { adr } adr pc_to asm_branch comp_instr ; \ b <begin>
+: loop_end ( C: adr -- ) stack> pc_to asm_branch comp_instr ; \ b <begin>
 
 : loop_pop ( C: fun[prev] …aux… adr[beg] -- )
-  stack> loop_end stack> control_end
+  loop_end execute'' #end
 ;
 
 \ Implementation note. Each loop frame is "split" in two sub-frames:
@@ -1155,9 +1195,9 @@
 ;
 
 : for_loop_pop ( C: fun[prev] …aux… adr[cond] adr[beg] -- )
-  stack> loop_end \ b <begin>
-  stack> if_patch \ Retropatch loop condition.
-  stack> execute  \ Pop auxiliaries; restore previous loop frame.
+  loop_end    \ b <begin>
+  if_patch    \ Retropatch loop condition.
+  pop_execute \ Pop auxiliaries; restore previous loop frame.
 ;
 
 : for_loop_init
@@ -1281,6 +1321,16 @@ extern_val: errno __error
   addr PAGE_SIZE +         { addr }
   addr size2 mem_unprot    { -- }
   addr size2
+;
+
+\ ## Exceptions continued
+
+\ Similar to standard `abort"`, with clearer naming.
+:: throw_if" ( C: "str" -- ) ( E: pred -- )
+  execute'' #if
+  comp_cstr
+  compile' throw
+  execute'' #end
 ;
 
 \ log" [lang] ok" lf

@@ -738,8 +738,10 @@
 ] ;
 
 : cell 8 ;
-: cells ( len -- size ) 3 lsl ;
+: cells  ( len -- size ) 3 lsl ;
 : /cells ( size -- len ) 3 asr ;
+: +cell  ( adr -- adr )  cell + ;
+: -cell  ( adr -- adr )  cell - ;
 
 \ ## Assembler continued
 
@@ -948,20 +950,20 @@
 \ at least the given size in bytes.
 : buf: ( C: size "name" -- ) ( E: -- addr size )
   #word_beg
-  dup 0 swap  alloc_data     ( -- addr )
-  1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1 comp_instr     \ str x1, [x27], 8
-              comp_push      \ str <size>, [x27], 8
+  dup nil swap alloc_data     ( -- addr )
+  1            comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1  comp_instr     \ str x1, [x27], 8
+               comp_push      \ str <size>, [x27], 8
   #word_end
 ;
 
 \ Shortcut for the standard idiom `create <name> N cells allot`.
 : cells: ( C: len "name" -- ) ( E: -- addr )
   #word_beg
-  cells 0 swap alloc_data     ( -- addr )
-  1            comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1  comp_instr     \ str x1, [x27], 8
-               comp_push      \ str <size>, [x27], 8
+  cells nil swap alloc_data     ( -- addr )
+  1              comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1    comp_instr     \ str x1, [x27], 8
+               \ comp_push      \ str <size>, [x27], 8
   #word_end
 ;
 
@@ -985,9 +987,7 @@
   1 swap asm_local_set comp_instr \ str x1, [FP, <loc>]
 ;
 
-:: to: ( C: "name" -- ) ( E: val -- )
-  parse_word get_local comp_pop_local_set
-;
+:: to: ( C: "name" -- ) ( E: val -- ) parse_word get_local comp_pop_local_set ;
 
 \ ## Memory
 \
@@ -1534,7 +1534,7 @@ extern_val: stderr __stderrp
 : systack_ptr ( -- sp ) [
   inline
   1 ASM_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
-                 asm_push_x1  comp_instr \ str x1, [x27], 8
+                 asm_push_x1 comp_instr \ str x1, [x27], 8
 ] ;
 
 : asm_comp_systack_push ( len -- )

@@ -48,7 +48,7 @@ import' ./f_lang_s.f
 
     equal #if T_reset #ret #end
   #else
-    rel0 rel1 [ 2 ] elogf" stack length mismatch: (%zd) <T> (%zd)" lf
+    rel0 rel1 [ 2 ] elogf" stack length mismatch: (%zd) <T> (%zd)" elf
   #end
 
   elog" stack content mismatch: T{ "
@@ -70,7 +70,7 @@ import' ./f_lang_s.f
     inc
   #end drop
 
-  elog" }T" lf
+  elog" }T" elf
 
   T_reset
   throw" test failure"
