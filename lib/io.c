@@ -218,7 +218,7 @@ int main(void) {
   printf("%s\n", path_join("io.c", "blah.c"));
   printf("%s\n", realpath(path_join("io.c", "num.h"), nullptr));
   printf(
-    "%s\n", realpath("/Users/m/code/m/forth/f_test.f/.././f_lang.f", nullptr)
+    "%s\n", realpath("/Users/m/code/m/forth/f_test.f/.././f_lang_s.f", nullptr)
   );
 }
 */

@@ -1,4 +1,4 @@
-import' ./f_lang.f
+import' ./f_lang_s.f
 
 log" hello world! (top level)" lf
 

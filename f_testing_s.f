@@ -7,11 +7,8 @@
 \   T{ 10 20    <T> 10 20    } \ OK
 \   T{ 10 20    <T> 10 20 30 } \ Fail
 \   T{ 10 20 30 <T> 10 20    } \ Fail
-\
-\ This file expects the language core to be already imported.
-\ It can also be substituted with a different implementation.
-\
-\   import' ./f_lang.f
+
+import' ./f_lang_s.f
 
 0 var: T_LEN_0 \ Stack length at `T{`.
 0 var: T_LEN_1 \ Stack length at `<T>`.

@@ -10,7 +10,7 @@ Special registers:
 - `x26` = floor of integer stack
 - `x0`  = error string pointer
 
-The special registers are also hardcoded in `f_lang.f`.
+The special registers are also hardcoded in `f_lang_s.f`.
 */
 #pragma once
 #include "./c_interp.h"

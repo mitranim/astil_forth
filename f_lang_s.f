@@ -9,7 +9,9 @@
 \ We define basic words in terms of machine instructions, building up from
 \ there. Currently only the Arm64 CPU architecture is supported.
 \
-\ The reason for `::` will become apparent later.
+\ The compiler and language come in two variants: stack-CC and register-CC.
+\ This file uses the traditional stack-based calling convention. See the
+\ file `./f_lang_r.f` for the register-based calling convention.
 
 \ brk 666
 : abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;

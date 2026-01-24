@@ -19,8 +19,8 @@ MACH_GEN_SRC ?= mach/mach_exc.defs
 MACH_GEN_OUT ?= $(GEN)/mach_exc.c
 ALL_SRC ?= $(wildcard *.s *.c *.h **/*.c **/*.h) $(ASM_GEN_SRC)
 MAIN_SRC ?= c_main.c
-MAIN_EXE ?= forth.exe
-MAIN_EXE_ABS ?= $(PWD)/$(MAIN_EXE)
+MAIN_S ?= forth_s
+MAIN_R ?= forth_r
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
 WATCH ?= watchexec $(and $(CLEAR),-c) -i=$(GEN) -r -d=1ms -n -q
@@ -30,7 +30,7 @@ WATCH_PROG ?= $(WATCH) -e=f
 WATCH_ALL ?= $(WATCH) -e=c,h,s,f
 WATCH_IMM ?= $(WATCH) -e=f,exe --no-vcs-ignore
 
-ARTIF ?= *.o *.exe *.dSYM *.plist *.elf *.dbg \
+ARTIF ?= $(MAIN_S) $(MAIN_R) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg
 
 # Disables some dangerous behaviors. Without this, `$@` sometimes changes from
@@ -38,32 +38,51 @@ ARTIF ?= *.o *.exe *.dSYM *.plist *.elf *.dbg \
 # in weird `cc` build commands that don't work and delete the wrong files.
 .SUFFIXES:
 
-# Auto-delete intermediary executable if any.
+# Auto-delete intermediary executables if any.
+# Automatically affects `run_file`.
 .INTERMEDIATE: $(FILE_EXE)
 
 .PHONY: build
-build: $(MAIN_EXE)
+build: $(MAIN_S) $(MAIN_R)
 
 .PHONY: build_w
 build_w:
 	$(WATCH_COMP) -- $(MAKE) clean build
 
 .PHONY: run
-# run: $(MAIN_EXE)
 run:
-	rlwrap -n sandbox-exec -f sandbox.sb -D MAIN="$(MAIN_EXE_ABS)" ./$(MAIN_EXE) $(args)
+	rlwrap -n sandbox-exec -f sandbox.sb -D MAIN="$(PWD)/$(file)" ./$(file) $(args)
+
+# Stack-CC version.
+.PHONY: run_s
+run_s:
+	$(MAKE) run file=$(MAIN_S)
+
+# Register-CC version.
+.PHONY: run_r
+run_r:
+	$(MAKE) run file=$(MAIN_R)
 
 # Usage example:
 #
-#   make run_w args='f_lang.f f_test.f -'
-.PHONY: run_w
-run_w:
-	$(WATCH_IMM) -- $(MAKE) run
+#   make run_s_w args='f_lang_s.f f_test.f -'
+.PHONY: run_s_w
+run_s_w:
+	$(WATCH_IMM) -- $(MAKE) run_s
 
-$(MAIN_EXE): $(ALL_SRC) $(ASM_GEN_OUT)
+.PHONY: run_r_w
+run_r_w:
+	$(WATCH_IMM) -- $(MAKE) run_r
+
+$(MAIN_S): $(ALL_SRC) $(ASM_GEN_OUT)
 	$(CC) $(CFLAGS) $(MAIN_SRC) -o $@
 
-# Usage: `make run_file file=some_file.c`
+$(MAIN_R): $(ALL_SRC) $(ASM_GEN_OUT)
+	$(CC) $(CFLAGS) -DNATIVE_CALL_CONV $(MAIN_SRC) -o $@
+
+# Usage example:
+#
+#   make run_file file=some_file.c
 .PHONY: run_file
 run_file: $(FILE_EXE) $(ALL_SRC)
 	./$(FILE_EXE)
@@ -75,6 +94,10 @@ run_file_w:
 # For executables from arbitrary C files. This is possible because our C files
 # specify all their dependencies with `#include`, without needing the build
 # system to describe the dependencies.
+#
+# Even on Unix, using `.exe` is convenient. It makes this recipe
+# possible, allows to use `.INTERMEDIATE` for auto-cleanup, and
+# allows `make clean` to delete these executables by wildcard.
 %.exe: %.c $(ALL_SRC)
 	$(CC) $(CFLAGS) -x c $< -o $@
 
@@ -92,7 +115,7 @@ debug:
 		--one-line "settings set show-statusline false" \
 		--one-line "settings set target.disable-aslr true" \
 		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
-		--file $(MAIN_EXE) -- $(args)
+		--file $(file) -- $(args)
 
 .PHONY: debug_run
 debug_run:
@@ -103,7 +126,7 @@ debug_run:
 		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
 		--one-line "run" \
 		--one-line "quit" \
-		--file $(MAIN_EXE) -- $(args)
+		--file $(file) -- $(args)
 
 # .PHONY: debug_run
 # debug_run:
@@ -118,7 +141,7 @@ debug_run:
 # 		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
 # 		--one-line "run" \
 # 		--one-line "quit" \
-# 		--file $(MAIN_EXE) -- $(args)
+# 		--file $(file) -- $(args)
 
 .PHONY: debug_run_w
 debug_run_w:
@@ -137,12 +160,13 @@ asm:
 .PHONY: disasm
 disasm:
 	mkdir -p $(LOCAL)
-	llvm-objdump $(DISASM) $(or $(file),$(MAIN_EXE)) > $(LOCAL)/out.s
+	llvm-objdump $(DISASM) $(or $(file),$(MAIN_S)) > $(LOCAL)/out.s
 
 .PHONY: clean
 clean:
 	rm -rf $(GEN) $(wildcard $(ARTIF))
 
+# MIG is even worse than this.
 $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 	mkdir -p $(GEN)
 	xcrun mig -server $(GEN)/tmp.c -user /dev/null -header /dev/null $(MACH_GEN_SRC) \

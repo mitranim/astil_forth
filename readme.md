@@ -7,6 +7,7 @@ Goals:
 - [x] Easy _self-assembly_ in user/lib code.
 - [x] Language features can be implemented in user/lib code.
 - [x] Enough language features (in user/lib code) to be usable for scripting.
+- [x] Support register-based calls.
 - [x] Avoid a VM or complex IR.
 - [x] Keep the code clear and educational for other compiler amateurs.
 - [ ] AOT compilation.
@@ -21,16 +22,16 @@ This is possible because of direct access to compilation. Outside the Forth worl
 
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
 
-Most language features are implemented in `f_lang.f`, bootstrapping the language on the fly, often via inline assembly.
+The interpreter written in C doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
+- The stack-CC version boots via `f_lang_s.f`.
+- The register-CC version boots via `f_lang_r.f`.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
 ## Show me the code!
 
-Note: in this system, Forth is defined _in Forth_ on the fly via the `f_lang.f` file. Other files have to import it first.
-
 ```forth
-import' ./f_lang.f
+import' ./f_lang_s.f
 
 : main
   log" hello world!" cr
@@ -56,7 +57,7 @@ main
 
 ```sh
 make
-./forth.exe f_lang.f -    # REPL mode.
+./forth.exe f_lang_s.f -    # REPL mode.
 ./forth.exe f_demo.f      # One-shot run.
 ```
 
@@ -86,7 +87,7 @@ Many procedure names are "namespaced", but many other symbols are not; you may n
 
 ## Easy C interop
 
-It's trivial to declare and call extern procedures. Examples can be found in the core file `f_lang.f` which makes extensive use of that. Should work for any linked library, such as libc.
+It's trivial to declare and call extern procedures. Examples can be found in the core files `f_lang_s.f` and `f_lang_r.f`, which make extensive use of that. Should work for any linked library, such as libc.
 
 ```forth
 \ The numbers describe input and output parameters.
@@ -104,19 +105,11 @@ main
 
 ### Simplicity vs optimization
 
-This system uses naive single-pass assembly, with a tiny post-pass to fix PC offsets.
+A core premise of this system is forward-only single-pass compilation. This keeps it simple, while still allowing a degree of low-hanging optimizations, such as basic register allocation and inlining. Some instructions are reserved in the first pass, and patched in a post-pass.
 
-This approach is incompatible with many optimizations. It requires every operation to be self-contained, bloating the instruction count. For example, simple addition, even if inlined, becomes 6 instructions instead of 1, and most of them are memory ops to boot:
-
-```forth
-push push pop2 add push pop
-```
-
-Optimizing Forth compilers, such as VfxForth and Gforth, allocate registers and fictionalize many stack operations. Inevitably, this makes the compiler complex. It's not possible to allocate registers in the first pass through source text. You end up with an IR and more passes. This interferes with self-bootstrapping in library code; simply vomiting instructions into the procedure body no longer suffices, as the program must become IR-aware or negotiate register slots with the compiler.
+This approach is at odds with most advanced compiler optimizations, which rely on building and analyzing intermediary representations before assembling. Complex compilers end up with multiple IR levels, and multiple passes. This interferes with self-assembly in library code; simply vomiting instructions into the procedure body no longer suffices; the code must now emit the first-pass IR instead of regular instructions.
 
 I had a go, and bounced off the complexity. How to keep an optimizing compiler simple?
-
-Such tradeoffs might be irrelevant when your CPU/ISA is designed for stack languages. Notable example: [GreenArrays chips](https://www.greenarraychips.com) designed or co-designed by Forth's inventor Chuck Moore. Looking at this architecture is enlightening in how much _simpler_ an ISA, efficient compilation, and the hardware/software stack can be.
 
 ### Other limitations
 
@@ -140,12 +133,15 @@ More ergonomic control flow structures:
 - `elif` is supported.
 - Any amount of `else elif` is popped with a single `end`.
 - Most loops are terminated with `end`. No need to remember other terminators.
-  - Arguably sometimes less flexible.
 - Loop controls like `leave` and `while` are terminated by the same `end` as the loop.
 
 Because the system uses native procedure calls, there is no return stack; see below.
 
-There is no `state` or `does>`. The system supports separately defining regular and compile-time definitions of words, overloading them by name, and placing the variants in separate wordlists. When finding a word by name, the caller must choose the wordlist, and thus the variant of that word.
+There is no `state` or `does>`, or any form of state-smartness. Instead, the system uses two wordlists:
+- "exec" -- regular words; not immediate.
+- "comp" -- compile-time words; immediate.
+
+Each word can be defined _twice_: an "exec" variant and a "comp" variant. In compilation mode, the "comp" variant is used first. In interpretation mode, the "exec" variant is used first. When finding a word by name, the caller must choose the wordlist, and thus the variant.
 
 Exceptions are strings (error messages) rather than numeric codes.
 
@@ -163,7 +159,7 @@ Special _semantic_ roles get special _syntactic_ roles. Other Forths already fol
 - Other immediate words begin with `#`.
 
 Examples:
-- Declaring words: `: let: var: to:`.
+- Declaring words: `: :: let: var: to:`.
   - Code editors are encouraged to highlight the next word like a declaration.
 - Parsing words: `' postpone' compile'`.
   - Code editors are encouraged to highlight the next word like a string.
@@ -179,9 +175,9 @@ The REPL doesn't print "ok".
 
 ### No return stack
 
-Since our system is "subroutine-threaded", where procedures call and return natively, it doesn't provide a return stack. The system stack provided by the OS is sufficient.
+Since we use native calls and don't target embedded systems, the role of the return stack is fulfilled by the system stack provided by the OS.
 
-Operations which would normally use the return stack for scratch space can just use registers, locals, or globals.
+Operations which would normally use the return stack for scratch space just use registers, locals, or globals.
 
 ## What is compilation
 

@@ -3,8 +3,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#define NATIVE_CALL_CONV
-
 static thread_local bool DEBUG = false;
 
 #ifdef PROD
