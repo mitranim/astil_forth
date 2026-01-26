@@ -52,7 +52,7 @@ static Err intrin_brace(Interp *interp) {
 
     Local *loc;
     try(comp_local_get_or_make(comp, word, &loc));
-    try(comp_append_local_set(comp, loc, nullptr));
+    try(comp_append_local_set_next(comp, loc));
   }
 
   // Treat the remaining arguments as consumed, and the remaining words after
@@ -147,7 +147,7 @@ static Err intrin_comp_instr(Instr instr, Interp *interp) {
 static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  try(asm_validate_reg(reg));
+  try(arch_validate_reg(reg));
 
   bool has_load = true;
   asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
@@ -169,14 +169,14 @@ static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
 
 static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
-  try(asm_validate_reg(reg));
+  try(arch_validate_reg(reg));
   try(comp_append_page_addr(&interp->comp, (Uint)adr, (U8)reg));
   return nullptr;
 }
 
 static Err intrin_comp_page_load(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
-  try(asm_validate_reg(reg));
+  try(arch_validate_reg(reg));
   try(comp_append_page_load(&interp->comp, (Uint)adr, (U8)reg));
   return nullptr;
 }
@@ -210,7 +210,7 @@ static Err intrin_import(Sint buf, Sint len, Interp *interp) {
   try(interp_validate_data_len(len));
 
   const auto path = (const char *)buf;
-  if (DEBUG) aver((Sint)strlen(path) == len);
+  IF_DEBUG(aver((Sint)strlen(path) == len));
   try(interp_import(interp, path)) return nullptr;
 }
 
@@ -254,7 +254,7 @@ input and output parameter counts. The compiler normally
 infers the counts when parsing `{}` signatures which are
 not available when meta-programming.
 */
-static Err intrin_comp_word_sig(Sint inp_len, Sint out_len, Interp *interp) {
+static Err intrin_comp_signature(Sint inp_len, Sint out_len, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   try(arch_validate_input_param_reg(inp_len));
@@ -264,17 +264,28 @@ static Err intrin_comp_word_sig(Sint inp_len, Sint out_len, Interp *interp) {
   return nullptr;
 }
 
-/*
-This is slightly abstract: an "arg" may eventually become either an input
-or an output. This assumes that we can decide the reg immediately, which
-holds on _some_ architectures under _some_ assumptions, but does not hold
-in the general case. See the comments in `./c_comp_cc_reg.c`.
-*/
-static Err intrin_comp_next_arg(Interp *interp) {
-  try(comp_next_arg_reg(&interp->comp, nullptr));
+static Err intrin_comp_args_valid(Sint action, Sint args, Interp *interp) {
+  try(interp_validate_data_ptr(action));
+  try(comp_validate_args(&interp->comp, (const char *)action, args));
   return nullptr;
 }
 
+static Err intrin_comp_args_get(Interp *interp) {
+  try(int_stack_push(&interp->ints, interp->comp.ctx.arg_len));
+  return nullptr;
+}
+
+static Err intrin_comp_args_set(Sint len, Interp *interp) {
+  try(arch_validate_input_param_reg(len));
+  interp->comp.ctx.arg_len = (U8)len;
+  return nullptr;
+}
+
+/*
+Used by words which compile other words. For example, "var" uses this to load
+its data address into the next argument register, playing nicely with our
+on-the-fly register allocation.
+*/
 static Err intrin_comp_next_arg_reg(Interp *interp) {
   U8 reg;
   try(comp_next_arg_reg(&interp->comp, &reg));
@@ -299,7 +310,7 @@ static Err intrin_comp_clobber(Sint bits, Interp *interp) {
   return comp_clobber_regs(&interp->comp, (Bits)bits);
 }
 
-static Err intrin_get_local(Sint buf, Sint len, Interp *interp) {
+static Err intrin_comp_named_local(Sint buf, Sint len, Interp *interp) {
   Local *loc;
   try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
@@ -310,7 +321,7 @@ static Err intrin_get_local(Sint buf, Sint len, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_anon_local(Interp *interp) {
+static Err intrin_comp_anon_local(Interp *interp) {
   const auto comp = &interp->comp;
   const auto loc  = comp_local_anon(comp);
   const auto tok  = local_token(loc);
@@ -318,21 +329,38 @@ static Err intrin_anon_local(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_local_get(Sint ptr, Interp *interp) {
+static Err intrin_comp_local_free(Sint ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
-  U8         reg;
   try(comp_validate_local(comp, ptr, &loc));
-  try(comp_append_local_get(comp, loc, &reg));
-  try(int_stack_push(&interp->ints, reg));
+
+  IF_DEBUG(eprintf(
+    "[system] freeing local " FMT_QUOTED
+    "; prior temp registers: %s; value is stable: %d",
+    loc->name.buf,
+    comp_local_fmt_reg_bits(comp, loc),
+    loc->stable
+  ));
+
+  comp_local_regs_clear(comp, loc);
   return nullptr;
 }
 
-static Err intrin_comp_local_set(Sint ptr, Interp *interp) {
+static Err intrin_comp_local_get(Sint reg, Sint loc_ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
-  try(comp_validate_local(comp, ptr, &loc));
-  try(comp_append_local_set(comp, loc, nullptr));
+  try(arch_validate_reg(reg));
+  try(comp_validate_local(comp, loc_ptr, &loc));
+  try(comp_append_local_get(comp, loc, (U8)reg));
+  return nullptr;
+}
+
+static Err intrin_comp_local_set(Sint reg, Sint loc_ptr, Interp *interp) {
+  const auto comp = &interp->comp;
+  Local     *loc;
+  try(arch_validate_reg(reg));
+  try(comp_validate_local(comp, loc_ptr, &loc));
+  try(comp_append_local_set(comp, loc, (U8)reg));
   return nullptr;
 }
 
@@ -428,25 +456,11 @@ static void intrin_debug_arg(Sint val, Interp *) {
 /*
 Control constructs such as counted loops use this to emit a barrier AFTER
 initializing their own locals or otherwise using the available arguments.
-This resets the argument list, and clobbers all temporary associations of
-locals with registers.
-
-  #if ->
-    use x0 for condition check
-    emit barrier with arity 1
-    <body>
-
-  +loop: ->
-    create locals; use "set" with x0 x1 x2
-    emit barrier with arity 3
-    begin loop
-    use "get" with locals
-
-Might eventually get a more general mechanism.
+This validates that there are no unused arguments, and clobbers each temp
+register-local association. Might eventually get a more general mechanism.
 */
-static Err intrin_comp_barrier(Sint inp_len, Interp *interp) {
-  try(arch_validate_input_param_reg(inp_len));
-  try(comp_barrier(&interp->comp, (U8)inp_len));
+static Err intrin_comp_barrier(Interp *interp) {
+  try(comp_barrier(&interp->comp));
   return nullptr;
 }
 
@@ -476,19 +490,38 @@ static constexpr USED auto INTRIN_BRACE = (Sym){
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_COMP_WORD_SIG = (Sym){
-  .name.buf  = "comp_word_sig",
+static constexpr USED auto INTRIN_COMP_SIGNATURE = (Sym){
+  .name.buf  = "comp_signature",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_word_sig,
+  .intrin    = (void *)intrin_comp_signature,
   .inp_len   = 2,
   .throws    = true,
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_COMP_NEXT_ARG = (Sym){
-  .name.buf  = "comp_next_arg",
+static constexpr USED auto INTRIN_COMP_ARGS_VALID = (Sym){
+  .name.buf  = "comp_args_valid",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_next_arg,
+  .intrin    = (void *)intrin_comp_args_valid,
+  .inp_len   = 2,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_ARGS_GET = (Sym){
+  .name.buf  = "comp_args_get",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_args_get,
+  .out_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_COMP_ARGS_SET = (Sym){
+  .name.buf  = "comp_args_set",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_args_set,
+  .inp_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
@@ -524,7 +557,6 @@ static constexpr USED auto INTRIN_COMP_BARRIER = (Sym){
   .name.buf  = "comp_barrier",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_barrier,
-  .inp_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
@@ -533,8 +565,7 @@ static constexpr USED auto INTRIN_COMP_LOCAL_GET = (Sym){
   .name.buf  = "comp_local_get",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_get,
-  .inp_len   = 1,
-  .out_len   = 1,
+  .inp_len   = 2,
   .throws    = true,
   .comp_only = true,
 };
@@ -543,6 +574,15 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
   .name.buf  = "comp_local_set",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_set,
+  .inp_len   = 2,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_LOCAL_FREE = (Sym){
+  .name.buf  = "comp_local_free",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_local_free,
   .inp_len   = 1,
   .throws    = true,
   .comp_only = true,

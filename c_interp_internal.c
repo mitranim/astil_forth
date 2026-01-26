@@ -225,7 +225,7 @@ static Err interp_word(Interp *interp, Word_str word) {
 
   if (ctx->compiling) {
     const auto loc = comp_local_get(comp, name);
-    if (loc) return comp_append_local_get(comp, loc, nullptr);
+    if (loc) return comp_append_local_get_next(comp, loc);
 
     auto sym = dict_get(dict_comp, name);
     if (sym) return interp_call_sym(interp, sym);
@@ -442,7 +442,7 @@ intrinsics `intrin_comp_page_addr` or `intrin_comp_page_load` which compile
 instructions for accessing that entry.
 */
 static Err interp_extern_got(Interp *interp, const char *name, Ind len) {
-  if (DEBUG) aver((Sint)strlen(name) == len);
+  IF_DEBUG(aver((Sint)strlen(name) == len));
 
   const auto comp     = &interp->comp;
   auto       got_addr = comp_find_dysym(comp, name);
@@ -451,7 +451,7 @@ static Err interp_extern_got(Interp *interp, const char *name, Ind len) {
     void *ext_addr;
     try(find_extern(name, &ext_addr));
     got_addr = comp_register_dysym(comp, name, (U64)ext_addr);
-    if (DEBUG) aver(*got_addr == (Uint)ext_addr);
+    IF_DEBUG(aver(*got_addr == (Uint)ext_addr));
   }
 
   try(int_stack_push(&interp->ints, (Sint)got_addr));
@@ -503,7 +503,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
 static Err interp_find_word(
   Interp *interp, const char *name, Ind len, Wordlist wordlist
 ) {
-  if (DEBUG) aver((Sint)strlen(name) == len);
+  IF_DEBUG(aver((Sint)strlen(name) == len));
 
   Sym_dict *dict;
   try(interp_wordlist(interp, wordlist, &dict));

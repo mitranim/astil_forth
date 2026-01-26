@@ -23,7 +23,7 @@ static Err reader_err(Reader *read, Err err) {
 
   return err_wrapf(
     "%s\n"
-    "reader context: " READ_POS_FMT,
+    "parser position: " READ_POS_FMT,
     err,
     READ_POS_ARGS(read)
   );

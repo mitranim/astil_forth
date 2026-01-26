@@ -67,7 +67,7 @@
 
   \ Execution-time semantics.
   str len colon
-    0 1 comp_word_sig ( E: -- val )
+    0 1 comp_signature ( E: -- val )
     val comp_push
   semicolon
 
@@ -113,45 +113,45 @@
 666    let: ASM_PLACEHOLDER
 
 : or { i1 i2 -- i3 } [
-  comp_next_arg
   0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
+  1 comp_args_set
 ] ;
 
 : and { i1 i2 -- i3 } [
-  comp_next_arg
   0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
+  1 comp_args_set
 ] ;
 
 : xor { i1 i2 -- i3 } [
-  comp_next_arg
   0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
+  1 comp_args_set
 ] ;
 
 : lsl { i1 bits -- i2 } [
-  comp_next_arg
   0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
+  1 comp_args_set
 ] ;
 
 : lsr { i1 bits -- i2 } [
-  comp_next_arg
   0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
+  1 comp_args_set
 ] ;
 
 : invert { i1 -- i2 } [
-  comp_next_arg
   0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
+  1 comp_args_set
 ] ;
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
 : inc { i1 -- i2 } [
-  comp_next_arg
   0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
+  1 comp_args_set
 ] ;
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
 : dec { i1 -- i2 } [
-  comp_next_arg
   0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
+  1 comp_args_set
 ] ;
 
 : low_bits { len -- bits } 1 len lsl dec ;
@@ -176,15 +176,15 @@
 ;
 
 : <>0 { int -- bool } [
-  comp_next_arg
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_NE asm_cset     comp_instr \ cset x0, ne
+  1                     comp_args_set
 ] ;
 
 : =0 { int -- bool } [
-  comp_next_arg
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_EQ asm_cset     comp_instr \ cset x0, eq
+  1                     comp_args_set
 ] ;
 
 \ Shared by a lot of load and store instructions. 64-bit only.
@@ -423,8 +423,8 @@
 
 \ Arithmetic (sign-preserving) right shift.
 : asr { i1 bits -- i2 } [
-  comp_next_arg
   0 0 1 asm_asr_reg comp_instr \ asr x0, x0, x1
+  1                 comp_args_set
 ] ;
 
 \ eor Xd, Xn, Xm
@@ -442,36 +442,61 @@
 ;
 
 \ b <off>
-: asm_branch { imm26 -- instr }
-  imm26
+: asm_branch { off26 -- instr }
+  off26
   2  lsr       \ Offset is implicitly times 4.
   26 bit_trunc \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 or
 ;
 
-\ b.cond <off>
-: asm_branch_cond { cond off -- instr }
-  off 2 asr 19 bit_trunc 5 lsl \ Implicitly times 4.
+\ b.<cond> <off>
+: asm_branch_cond { off19 cond -- instr }
+  off19 2 asr 19 bit_trunc 5 lsl \ Implicitly times 4.
   cond or
   0b010_101_00_0000000000000000000_0_0000 or
 ;
 
-\ `imm19` offset is implicitly times 4 and can be negative.
-: asm_pattern_compare_branch { Xt imm19 -- instr_mask }
-  imm19 2 lsr 19 bit_trunc 5 lsl
+\ `off19` offset is implicitly times 4 and can be negative.
+: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
+  off19 2 lsr 19 bit_trunc 5 lsl
   Xt or
 ;
 
 \ cbz x1, <off>
-: asm_cmp_branch_zero { Xt imm19 -- instr }
-  Xt imm19 asm_pattern_compare_branch
+: asm_cmp_branch_zero { Xt off19 -- instr }
+  Xt off19 asm_pattern_cmp_branch
   0b1_011010_0_0000000000000000000_00000 or
 ;
 
 \ cbnz x1, <off>
-: asm_cmp_branch_not_zero { Xt imm19 -- instr }
-  Xt imm19 asm_pattern_compare_branch
+: asm_cmp_branch_not_zero { Xt off19 -- instr }
+  Xt off19 asm_pattern_cmp_branch
   0b1_011010_1_0000000000000000000_00000 or
+;
+
+\ `off9` offset is implicitly times 4 and can be negative.
+: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
+  off9 2 lsr 9 bit_trunc 5  lsl { off9 }
+  cond                   21 lsl
+  Xt or off9 or
+;
+
+\ Not supported on M3 Pro.
+\ cb.<cond> Xt, <imm>, <off>
+: asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
+  Xt off9 cond asm_pattern_cmp_branch_cond { mask }
+  imm6 15 lsl
+  mask or
+  0b1_1110101_000_000000_0_000000000_00000 or
+;
+
+\ Not supported on M3 Pro.
+\ cb.<cond> Xt, Xm, <off>
+: asm_cmp_reg_branch { Xt Xm off9 cond -- instr }
+  Xt off9 cond asm_pattern_cmp_branch_cond { mask }
+  Xm 16 lsl
+  mask or
+  0b1_1110100_000_00000_00_000000000_00000 or
 ;
 
 \ eor Xd, Xd, Xd
@@ -508,61 +533,60 @@
 \ ## Arithmetic
 
 : negate { i1 -- i2 } [
-  comp_next_arg
   0 asm_neg comp_instr \ neg x0, x0
+  1         comp_args_set
 ] ;
 
 : + { i1 i2 -- i3 } [
-  comp_next_arg
   0 0 1 asm_add_reg comp_instr \ add x0, x0, x1
+  1                 comp_args_set
 ] ;
 
 : - { i1 i2 -- i3 } [
-  comp_next_arg
   0 0 1 asm_sub_reg comp_instr \ sub x0, x0, x1
+  1                 comp_args_set
 ] ;
 
 : * { i1 i2 -- i3 } [
-  comp_next_arg
   0 0 1 asm_mul comp_instr \ mul x0, x0, x1
+  1             comp_args_set
 ] ;
 
 : / { i1 i2 -- i3 } [
-  comp_next_arg
   0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
+  1              comp_args_set
 ] ;
 
 : mod { i1 i2 -- i3 } [
-                   comp_next_arg
   0b100            comp_clobber
   2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
+  1                comp_args_set
 ] ;
 
 : /mod { dividend divisor -- rem quo } [
-                    comp_next_arg \ rem
-                    comp_next_arg \ quo
   0b100             comp_clobber
   2 0 1   asm_sdiv  comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub  comp_instr \ msub x0, x2, x1, x0
+  2                 comp_args_set
 ] ;
 
 : abs { int -- +int } [
-  comp_next_arg
   0            asm_cmp_zero comp_instr \ cmp x0, 0
   0 0 0 ASM_PL asm_csneg    comp_instr \ cneg x0, x0, pl
+  1                         comp_args_set
 ] ;
 
 : min { i1 i2 -- i1|i2 } [
-  comp_next_arg
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_LT asm_csel    comp_instr \ csel x0, x0, x1, lt
+  1                        comp_args_set
 ] ;
 
 : max { i1 i2 -- i1|i2 } [
-  comp_next_arg
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
+  1                        comp_args_set
 ] ;
 
 : align_down { len wid -- len } wid negate len and ;
@@ -605,15 +629,15 @@
 ;
 
 : asm_comp_cset_reg { cond } ( E: i1 i2 -- bool )
-  comp_next_arg
   0 1    asm_cmp_reg comp_instr \ cmp x0, x1
   0 cond asm_cset    comp_instr \ cset x0, <cond>
+  1                  comp_args_set
 ;
 
 : asm_comp_cset_zero { cond } ( E: num -- bool )
-  comp_next_arg
   0      asm_cmp_zero comp_instr \ cmp x0, 0
   0 cond asm_cset     comp_instr \ cset x0, <cond>
+  1                   comp_args_set
 ;
 
 \ ## Numeric comparison
@@ -635,8 +659,8 @@
 \ ## Memory load / store
 
 : @ { adr -- val } [
-  comp_next_arg
   0 0 0 asm_load_off comp_instr \ ldur x0, [x0]
+  1                  comp_args_set
 ] ;
 
 : ! { val adr } [
@@ -644,8 +668,8 @@
 ] ;
 
 : @2 { adr -- val0 val1 } [
-  comp_next_arg comp_next_arg
   0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
+  2                         comp_args_set
 ] ;
 
 : !2 { val0 val1 adr -- } [
@@ -731,7 +755,6 @@
 \ so we have to fall back on regular old push and pop here.
 
 : stack> { -- val } [
-  comp_next_arg
   0b10 comp_clobber
 
   \ ldur x1, [x27, INTERP_INTS_TOP]
@@ -740,6 +763,7 @@
   1 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off  comp_instr
   0 1 -8                           asm_load_pre  comp_instr
   1 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
+  1                                              comp_args_set
 ] ;
 
 : >stack { val } [
@@ -767,8 +791,8 @@
 \ ## Characters and strings
 
 : c@ { str -- char } [
-  comp_next_arg
   0 0 0 asm_load_byte_off comp_instr \ ldrb x0, [x0]
+  1                       comp_args_set
 ] ;
 
 : parse_char { -- char } parse_word { buf -- } buf c@ ;
@@ -873,7 +897,7 @@
 
 : init_data_word { name name_len adr }
   name name_len colon
-    0 1 comp_word_sig ( E: -- ptr )
+    0 1 comp_signature ( E: -- ptr )
     adr comp_extern_addr
   semicolon
 
@@ -908,7 +932,7 @@
   nil cap alloc_data { adr }
 
   str len colon
-    0 2 comp_word_sig ( E: -- ptr )
+    0 2 comp_signature ( E: -- ptr )
     adr cap comp_buf
   semicolon
 
@@ -941,7 +965,7 @@
   parse_word extern_got { adr }
 
   buf len colon
-    0 1 comp_word_sig ( E: -- val )
+    0 1 comp_signature ( E: -- val )
     adr comp_extern_load_load
   semicolon
 
@@ -951,6 +975,44 @@
 
   [ not_comp_only ]
 ;
+
+\ ## IO
+\
+\ Having access to `libc` spares us from having
+\ to implement these procedures or provide them
+\ as intrinsics.
+
+extern_val: stdin  __stdinp
+extern_val: stdout __stdoutp
+extern_val: stderr __stderrp
+
+4 0 extern: fwrite   ( src size len file -- )
+1 0 extern: putchar  ( char -- )
+2 0 extern: fputc    ( char file -- )
+2 0 extern: fputs    ( cstr file -- )
+1 0 extern: printf   ( … fmt -- )
+2 0 extern: fprintf  ( … file fmt -- )
+3 0 extern: snprintf ( … buf cap fmt -- )
+1 0 extern: fflush   ( file -- )
+
+: emit     { char }    char putchar ;
+: eputchar { char }    char stderr fputc ;
+: puts     { cstr }    cstr stdout fputs ;
+: eputs    { cstr }    cstr stderr fputs ;
+: flush                stdout fflush ;
+: eflush               stderr fflush ;
+: type     { str len } str 1 len stdout fwrite ;
+: etype    { str len } str 1 len stderr fwrite ;
+: lf                   10 putchar ; \ Renamed from `cr`.
+: elf                  10 eputchar ;
+: space                32 putchar ;
+: espace               32 eputchar ;
+
+:  log" parse_cstr puts ;
+:: log" comp_cstr compile' puts ;
+
+:  elog" parse_cstr eputs ;
+:: elog" comp_cstr compile' eputs ;
 
 \ ## Exceptions — basic
 \
@@ -1004,24 +1066,24 @@
 : pop_execute stack> execute ;
 : reserve_instr ASM_PLACEHOLDER comp_instr ;
 : reserve_here {     -- adr } here { out } ASM_PLACEHOLDER comp_instr out ;
-: pc_from      { adr -- off } here             adr - ; \ For forward jumps.
-: pc_to        { adr -- off } here { out } adr out - ; \ For backward jumps.
-: patch_uncond_forward { adr } adr pc_from asm_branch adr !32 ; \ b <pc_off>
-: patch_uncond_back    { adr } adr pc_to   asm_branch adr !32 ; \ b -<pc_off>
+: off_to_pc    { adr -- off } here             adr - ; \ For forward jumps.
+: off_from_pc  { adr -- off } here { out } adr out - ; \ For backward jumps.
+: patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 ; \ b <off>
+: patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 ; \ b <off>
 
 0 var: COND_HAS
 
 \ cbz x0, <else|end>
 : if_patch ( C: adr -- )
   stack>      { adr }
-  adr pc_from { off }
+  adr off_to_pc { off }
   0 off asm_cmp_branch_zero adr !32
 ;
 
 \ cbnz x0, <else|end>
 : ifn_patch ( C: adr -- )
   stack>      { adr }
-  adr pc_from { off }
+  adr off_to_pc { off }
   0 off asm_cmp_branch_not_zero adr !32
 ;
 
@@ -1029,18 +1091,20 @@
 : if_pop  ( C: fun_prev adr_if  -- ) if_patch  stack> execute ;
 : ifn_pop ( C: fun_prev adr_ifn -- ) ifn_patch stack> execute ;
 
-: elif_init ( C: -- fun[exec] adr[if] ) ( E: pred -- )
+: elif_init ( C: -- fun_exec adr_if ) ( E: pred -- )
   reserve_here { adr }
-  1 comp_barrier
+  comp_barrier \ Clobber / relocate locals.
   ' pop_execute >stack
   adr           >stack
 ;
 
-:: #elif ( C: -- fun[exec] adr[if] fun[if] ) ( E: pred -- )
+:: #elif ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
+  c" when calling `#elif`" 1 comp_args_valid 0 comp_args_set
   elif_init ' if_pop >stack
 ;
 
-:: #elifn ( C: -- fun[exec] adr[if] fun[if] ) ( E: pred -- )
+:: #elifn ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
+  c" when calling `#elifn`" 1 comp_args_valid 0 comp_args_set
   elif_init ' ifn_pop >stack
 ;
 
@@ -1054,16 +1118,20 @@
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `#end`.
 \ Prepending `if_done` terminates this chain.
-:: #if ( C: -- cond fun[done] fun[exec] adr[if] fun[if] ) ( E: pred -- )
-  if_init execute'' #elif
+:: #if ( C: -- cond fun_done fun_exec adr_if fun_if ) ( E: pred -- )
+  \ if_init execute'' #elif
+  c" when calling `#if`" 1 comp_args_valid 0 comp_args_set
+  if_init elif_init ' if_pop >stack
 ;
 
-:: #ifn ( C: -- cond fun[nop] fun[exec] adr[ifn] fun[ifn] ) ( E: pred -- )
-  if_init execute'' #elifn
+:: #ifn ( C: -- cond fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
+  \ if_init execute'' #elifn
+  c" when calling `#ifn`" 1 comp_args_valid 0 comp_args_set
+  if_init elif_init ' ifn_pop >stack
 ;
 
-: else_pop ( C: fun[prev] adr[else] -- )
-  stack> patch_uncond_forward stack> execute
+: else_pop ( C: fun_prev adr_else -- )
+  stack> patch_branch_forward stack> execute
 ;
 
 :: #else ( C: fun_exec adr_if fun_if -- adr_else fun_else )
@@ -1071,20 +1139,20 @@
   stack> { adr_if }
   stack> { fun_exec }
 
-  0 comp_barrier
+  c" when calling `#else`" 0 comp_args_valid
+  comp_barrier \ Clobber / relocate locals.
   reserve_here { adr_else }
 
-  ' nop  >stack \ Replace `fun_exec` to prevent further chaining.
-  adr_if >stack
-  fun_if execute
-
+  ' nop      >stack \ Replace `fun_exec` to prevent further chaining.
+  adr_if     >stack
+  fun_if     execute
   adr_else   >stack
   ' else_pop >stack
 ;
 
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
-:: #end ( C: fun -- ) 0 comp_barrier pop_execute ;
+:: #end ( C: fun -- ) comp_barrier pop_execute ;
 
 \ ## Loops
 \
@@ -1105,7 +1173,7 @@
 
 : loop_frame! ( C: frame_ind -- ) stack> LOOP_FRAME ! ;
 
-: loop_frame_beg ( C: -- frame_ind frame_fun )
+: loop_frame_init ( C: -- frame_ind frame_fun )
   LOOP_FRAME @ ' loop_frame! >>stack
   stack_len LOOP_FRAME !
 ;
@@ -1149,26 +1217,26 @@
   LOOP_FRAME @ frame_len + LOOP_FRAME !
 ;
 
-: loop_end ( C: adr -- ) stack> pc_to asm_branch comp_instr ; \ b <begin>
-
-: loop_pop ( C: fun[prev] …aux… adr[beg] -- )
-  loop_end execute'' #end
+: loop_end ( C: adr -- )
+  stack> off_from_pc asm_branch comp_instr \ b <beg>
+  comp_barrier                             \ Clobber / relocate locals.
 ;
+
+: loop_pop ( C: fun_prev …aux… adr_beg -- ) loop_end pop_execute ;
 
 \ Implementation note. Each loop frame is "split" in two sub-frames:
 \ the "prev frame" and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
 :: #loop ( C: -- ind_frame fun_frame adr_loop fun_loop )
-  0 comp_barrier
+  comp_barrier \ Clobber / relocate locals.
   here { adr }
-  loop_frame_beg adr ' loop_pop >>stack
+  loop_frame_init adr ' loop_pop >>stack
 ;
 
 \ Can be used in any loop.
-:: #leave
-  ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
-  0            comp_barrier
+:: #leave ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
+  comp_barrier \ Clobber / relocate locals.
   stack_len    { len }
   reserve_here >stack
   ' else_pop   >stack
@@ -1177,9 +1245,9 @@
 ;
 
 \ Can be used in any loop.
-:: #while
-  ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
-  1            comp_barrier
+:: #while ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
+  c" when calling `#while`" 1 comp_args_valid 0 comp_args_set
+  comp_barrier \ Clobber / relocate locals.
   stack_len    { len }
   reserve_here >stack
   ' if_pop     >stack
@@ -1189,35 +1257,44 @@
 
 \ Assumes that the top control frame is from `#loop`.
 :: #until ( C: fun -- )
-  1                       comp_barrier \ Request `x0`.
-  0 8 asm_cmp_branch_zero comp_instr   \ cbnz x0, 8
+  c" when calling `#until`" 1 comp_args_valid 0 comp_args_set
+  comp_barrier \ Clobber / relocate locals.
+  0 8 asm_cmp_branch_zero comp_instr \ cbnz x0, 8
   stack> execute
 ;
 
-: for_loop_pop ( C: fun[prev] …aux… adr[cond] adr[beg] -- )
-  loop_end    \ b <begin>
-  if_patch    \ Retropatch loop condition.
-  pop_execute \ Pop auxiliaries; restore previous loop frame.
+: count_loop_pop { cond } ( fun_prev …aux… adr_cond adr_beg -- )
+  loop_end    \ b <beg>; clobber / relocate locals.
+  stack>      { adr }
+  adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
+  pop_execute \ Pop auxiliaries; restore the previous loop frame.
 ;
 
-: for_loop_init
-  { ceil }
-  ( C: ceil -- ind_frame fun_frame adr_cond adr_beg fun_for )
+: for_countdown_loop_pop ( fun_prev …aux… adr_cond adr_beg cur_loc -- )
+  stack> { cur }
+  ASM_LE count_loop_pop  \ b <beg>; retropatch b.<cond> <end>
+  cur    comp_local_free \ Don't need a register for this local anymore.
+;
+
+: for_countdown_loop_init
+  { cur }
+  ( C: cur_loc -- ind_frame fun_frame adr_cond adr_beg fun_for cur_loc )
   ( E: ceil -- )
+  loop_frame_init ( -- ind_frame fun_frame )
 
-  loop_frame_beg      ( -- ind_frame fun_frame )
-  ceil comp_local_set \ Grab the initial ceiling value.
-  0 comp_barrier      \ Clobber locals, including the ceiling.
+  0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { adr_beg }                 \ Skip above instr when repeating.
+  0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
+  0 asm_cmp_zero    comp_instr     \ cmp x0, 0
+  here { adr_cond } reserve_instr  \ b.<cond> <end>
+  0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
+  0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
 
-  here { adr_beg }
-  ceil comp_local_get { reg }      \ mov Xd, <ceil> | ldr Xd, <ceil>
-  here { adr_cond } reserve_instr  \ cbz Xd, <end>
-  reg reg 1 asm_sub_imm comp_instr \ sub Xd, Xd, 1
-  ceil comp_local_set              \ mov <ceil>, Xd | str Xd, <ceil>
-
-  adr_cond       >stack
-  adr_beg        >stack
-  ' for_loop_pop >stack
+  adr_cond                 >stack
+  adr_beg                  >stack
+  cur                      >stack
+  ' for_countdown_loop_pop >stack
 ;
 
 \ A count-down-by-one loop. Analogue of the non-standard
@@ -1233,9 +1310,10 @@
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
 :: #for
-  ( C: -- ind_frame fun_frame adr_cond adr_beg fun_for )
+  ( C: -- ind_frame fun_frame … adr_cond adr_beg fun_for cur_loc )
   ( E: ceil -- )
-  anon_local for_loop_init
+  c" when calling `#for`" 1 comp_args_valid 0 comp_args_set
+  comp_anon_local for_countdown_loop_init
 ;
 
 \ Like `#for` but requires a local name to make the index
@@ -1246,48 +1324,138 @@
 \     ind .
 \   #end
 :: -for:
-  ( C: "name" -- frame fun[frame!] … adr[cond] adr[beg] fun[pop] )
+  ( C: "name" -- frame fun_frame … loc adr_cond adr_beg fun_pop )
   ( E: ceil -- )
-  parse_word get_local for_loop_init
+  c" when calling `+for:`" 1 comp_args_valid 0 comp_args_set
+  parse_word comp_named_local for_countdown_loop_init
 ;
 
-\ ## IO
+: for_countup_loop_pop ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur -- )
+  stack> { cur }
+  stack> { lim }
+
+  0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
+  1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
+  1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
+  ASM_LE count_loop_pop            \ b <beg>; retropatch b.<cond> <end>
+
+  lim comp_local_free \ Don't need a register for this local anymore.
+;
+
+:: +for:
+  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_lim loc_cur fun_pop )
+  ( E: ceil floor -- )
+  c" when calling `+for:`" 2 comp_args_valid 0 comp_args_set
+
+  loop_frame_init             ( -- ind_frame fun_frame )
+  comp_anon_local             { lim } \ ceil  = limit
+  parse_word comp_named_local { cur } \ floor = cursor
+
+  0 lim             comp_local_set \ mov <lim>, x0 | str x0, [FP, <lim>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { adr_beg }                 \ Skip above instr when repeating.
+  1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
+  0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
+  here { adr_cond } reserve_instr  \ b.<cond> <end>
+
+  adr_cond               >stack
+  adr_beg                >stack
+  lim                    >stack
+  cur                    >stack
+  ' for_countup_loop_pop >stack
+;
+
+: loop_countup_pop
+  ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur loc_step )
+  stack> { step }
+  stack> { cur }
+  stack> { lim }
+
+  0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
+  1 cur             comp_local_get \ mov x1, <cur>  | ldr x1, [FP, <cur>]
+  2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
+  1 1 2 asm_add_reg comp_instr     \ add x1, x1, x2
+  ASM_LE count_loop_pop            \ b <beg>; retropatch b.<cond> <end>
+
+  \ Don't need registers for these locals anymore.
+  lim  comp_local_free
+  step comp_local_free
+;
+
+\ Similar to the standard `?do ... +loop`, but terminated with `#end`
+\ like other loops. Takes a name to make the index accessible. Usage:
 \
-\ Having access to `libc` spares us from having
-\ to implement these procedures or provide them
-\ as intrinsics.
+\   ceil floor step +loop: ind ind . #end
+\   123  23    3    +loop: ind ind . #end
+:: +loop:
+  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
+  ( E: ceil floor step -- )
+  c" when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
+  loop_frame_init
 
-extern_val: stdin  __stdinp
-extern_val: stdout __stdoutp
-extern_val: stderr __stderrp
+  comp_anon_local             { lim } \ ceil  = limit
+  parse_word comp_named_local { cur } \ floor = cursor
+  comp_anon_local             { step }
 
-4 0 extern: fwrite   ( src size len file -- )
-1 0 extern: putchar  ( char -- )
-2 0 extern: fputc    ( char file -- )
-2 0 extern: fputs    ( cstr file -- )
-1 0 extern: printf   ( … fmt -- )
-2 0 extern: fprintf  ( … file fmt -- )
-3 0 extern: snprintf ( … buf cap fmt -- )
-1 0 extern: fflush   ( file -- )
+  0 lim             comp_local_set \ mov <lim>,  x0 | str x0, [FP, <lim>]
+  2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { adr_beg }                 \ Skip above instrs when repeating.
+  1 cur             comp_local_set \ mov <cur>,  x1 | str x1, [FP, <cur>]
+  0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
+  here { adr_cond } reserve_instr  \ b.<cond> <end>
 
-: emit { char } char putchar ;
-: eputchar { char } char stderr fputc ;
-: puts { cstr } cstr stdout fputs ;
-: eputs { cstr } cstr stderr fputs ;
-: flush stdout fflush ;
-: eflush stderr fflush ;
-: type { str len } str 1 len stdout fwrite ;
-: etype { str len } str 1 len stderr fwrite ;
-: lf 10 putchar ; \ Renamed from `cr` which would be a misnomer.
-: elf 10 eputchar ;
-: space 32 putchar ;
-: espace 32 eputchar ;
+  adr_cond           >stack
+  adr_beg            >stack
+  lim                >stack
+  cur                >stack
+  step               >stack
+  ' loop_countup_pop >stack
+;
 
-:  log" parse_cstr puts ;
-:: log" comp_cstr compile' puts ;
+: loop_countdown_pop
+  ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur loc_step )
+  stack> { step }
+  stack> { cur }
+  stack> { lim }
+  ASM_LT count_loop_pop \ b <beg>; retropatch b.<cond> <end>
 
-:  elog" parse_cstr eputs ;
-:: elog" comp_cstr compile' eputs ;
+  \ Don't need registers for these locals anymore.
+  lim  comp_local_free
+  step comp_local_free
+;
+
+\ Like in `+loop:`, the range is `[floor,ceil)`.
+:: -loop:
+  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
+  ( E: ceil floor step -- )
+  c" when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
+  loop_frame_init
+
+  parse_word comp_named_local { cur } \ ceil  = cursor
+  comp_anon_local             { lim } \ floor = limit
+  comp_anon_local             { step }
+
+  0 cur             comp_local_set \ mov <cur>,  x0 | str x0, [FP, <cur>]
+  1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
+  2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { adr_beg }                 \ Skip above instrs when repeating.
+  0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
+  1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
+  2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
+  0 0 2 asm_sub_reg comp_instr     \ sub x0, x0, x2
+  0 1   asm_cmp_reg comp_instr     \ cmp x0, x1
+  here { adr_cond } reserve_instr  \ b.<cond> <end>
+  0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+
+  adr_cond             >stack
+  adr_beg              >stack
+  lim                  >stack
+  cur                  >stack
+  step                 >stack
+  ' loop_countdown_pop >stack
+;
 
 \ ## More memory stuff
 
@@ -1333,4 +1501,4 @@ extern_val: errno __error
   execute'' #end
 ;
 
-\ log" [lang] ok" lf
+log" [lang] ok" lf

@@ -137,7 +137,7 @@ static S8 comp_local_reg_any(Comp *comp, Local *loc) {
   book-keeping. There's no point and it would make things fragile.
   */
   for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
-    if (comp_local_get_for_reg(comp, reg) == loc) return (S8)reg;
+    if (ctx->loc_regs[reg] == loc) return (S8)reg;
   }
   return -1;
 }
@@ -168,7 +168,7 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
 
   const auto ctx = &comp->ctx;
   for (U8 ind = 0; ind < arr_cap(ctx->loc_regs); ind++) {
-    if (comp_local_get_for_reg(comp, ind) != loc) continue;
+    if (ctx->loc_regs[ind] != loc) continue;
     ctx->loc_regs[ind] = nullptr;
   }
 
@@ -176,116 +176,84 @@ static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
   loc->stable        = false;
 }
 
-static Err err_arity_mismatch(
-  const char *caller,
-  const char *callee,
-  const char *action,
-  const char *type,
-  U8          req,
-  U8          ava
-) {
-  if (callee) {
-    return errf(
-      "in " FMT_QUOTED ": unable to %s " FMT_QUOTED
-      ": arity mismatch: required %s: %d; available %s: %d",
-      caller,
-      action,
-      callee,
-      type,
-      req,
-      type,
-      ava
-    );
+static void comp_local_regs_clear(Comp *comp, Local *loc) {
+  const auto ctx = &comp->ctx;
+  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
+    if (ctx->loc_regs[reg] == loc) ctx->loc_regs[reg] = nullptr;
   }
+}
 
-  // TODO simplify and deduplicate.
+// For debug logging.
+static Bits comp_local_reg_bits(const Comp *comp, const Local *loc) {
+  const auto ctx = &comp->ctx;
+  Bits       out = 0;
+  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
+    if (ctx->loc_regs[reg] == loc) bits_add_to(&out, reg);
+  }
+  return out;
+}
+
+static const char *comp_local_fmt_reg_bits(const Comp *comp, const Local *loc) {
+  return uint32_to_bit_str((U32)comp_local_reg_bits(comp, loc));
+}
+
+static Err err_args_partial(
+  const char *caller, const char *action, Sint low, Sint len
+) {
   return errf(
     "in " FMT_QUOTED
-    ": unable to %s: arity mismatch: required %s: %d; available %s: %d",
+    ": %s: prior values were partially consumed by assignments: " FMT_SINT
+    " of " FMT_SINT
+    "; hint: either use more assignments, or use `--` inside braces to discard unused values",
     caller,
     action,
-    type,
+    low,
+    len
+  );
+}
+
+static Err err_args_arity(
+  const char *caller, const char *action, Sint req, Sint ava
+) {
+  return errf(
+    "in " FMT_QUOTED ": %s: arity mismatch: required vs provided: " FMT_SINT
+    " vs " FMT_SINT "",
+    caller,
+    action,
     req,
-    type,
     ava
   );
 }
 
-static Err err_partial_args(
-  const char *caller,
-  const char *callee,
-  const char *action,
-  const char *type,
-  U8          low,
-  U8          len
-) {
-  if (callee) {
-    return errf(
-      "in " FMT_QUOTED ": unable to %s " FMT_QUOTED
-      ": earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or use `--` inside braces to discard unused values",
-      caller,
-      action,
-      callee,
-      type,
-      low,
-      len,
-      len - low,
-      type
-    );
-  }
-
-  // TODO simplify and deduplicate.
-  return errf(
-    "in " FMT_QUOTED
-    ": unable to %s: earlier %s were partially consumed by assignments: %d of %d; hint: either use %d more assignments to clear the %s, or use `--` inside braces to discard unused values",
-    caller,
-    action,
-    type,
-    low,
-    len,
-    len - low,
-    type
-  );
-}
-
-static Err comp_validate_args(
-  Comp *comp, const char *callee, const char *action, const char *type, U8 req_len
-) {
+static Err comp_validate_args(Comp *comp, const char *action, Sint req) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
   const auto ctx     = &comp->ctx;
   const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
-  const auto caller  = sym->name.buf;
+  const auto name    = sym->name.buf;
 
-  if (!arg_low) {
-    if (arg_len == req_len) return nullptr;
-    return err_arity_mismatch(caller, callee, action, type, req_len, arg_len);
-  }
-  if (arg_low >= arg_len) {
-    return err_arity_mismatch(caller, callee, action, type, req_len, 0);
-  }
-  return err_partial_args(caller, callee, action, type, arg_low, arg_len);
+  if (arg_low) return err_args_partial(name, action, arg_low, arg_len);
+  if (req != arg_len) return err_args_arity(name, action, req, arg_len);
+  return nullptr;
 }
 
 static Err comp_validate_call_args(Comp *comp, const Sym *callee) {
-  const auto name = callee->name.buf;
-  const auto len  = callee->inp_len;
-  return comp_validate_args(comp, name, "call", "arguments", len);
+  return comp_validate_args(comp, "unable to compile call", callee->inp_len);
 }
 
 static Err comp_validate_ret_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, nullptr, "return", "outputs", sym->out_len));
+  try(comp_validate_args(comp, "unable to return", sym->out_len));
   return nullptr;
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, nullptr, "recur", "arguments", sym->inp_len));
+  try(comp_validate_args(comp, "unable to recur", sym->inp_len));
   return nullptr;
 }
 
@@ -312,13 +280,21 @@ static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
   loc->write = &fix->write;
 }
 
+// Lower-level, unsafe analogue of `comp_append_local_set_next`.
+static Err comp_append_local_set(Comp *comp, Local *loc, U8 reg) {
+  try(arch_validate_output_param_reg(reg));
+  comp_local_reg_reset(comp, loc, reg);
+  return nullptr;
+}
+
 /*
-Abstract "set" operation used by brace-assignment. Does not immediately create
-a "write"; those are added lazily on clobbers. Does not check, confirm, or
-invalidate the latest pending "write" if any; writes are confirmed by "reads",
-and link with each other for a chain confirmation.
+Abstract "set" operation invoked via `{}` braces. Used both for parameter
+declarations and regular assignments. Does not immediately create a "write";
+those are added lazily on clobbers. Does not check, confirm, or invalidate
+the latest pending "write" if any; writes are confirmed by "reads", and link
+with each other for a chain confirmation.
 */
-static Err comp_append_local_set(Comp *comp, Local *loc, U8 *out) {
+static Err comp_append_local_set_next(Comp *comp, Local *loc) {
   const auto ctx = &comp->ctx;
   const auto rem = (Sint)ctx->arg_len - (Sint)ctx->arg_low;
 
@@ -331,7 +307,6 @@ static Err comp_append_local_set(Comp *comp, Local *loc, U8 *out) {
     ctx->arg_len = 0;
     ctx->arg_low = 0;
   }
-  if (out) *out = reg;
   return nullptr;
 }
 
@@ -442,16 +417,38 @@ static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   );
 }
 
+static Err err_local_get_not_inited(const char *name) {
+  return errf(
+    "unable to get the value of local " FMT_QUOTED ": value not initialized",
+    name
+  );
+}
+
+// Lower-level, unsafe analogue of `comp_append_local_get_next`.
+static Err comp_append_local_get(Comp *comp, Local *loc, U8 reg) {
+  try(arch_validate_input_param_reg(reg));
+  if (comp_local_has_reg(comp, loc, reg)) return nullptr;
+
+  if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
+
+  comp_append_local_read(comp, loc, reg);
+  comp_local_reg_add(comp, loc, reg);
+  return nullptr;
+}
+
 /*
-Abstract "get" operation. May fall back on a "read".
+Abstract "get" operation invoked by simply mentioning
+a local inside a word. May fall back on a "read".
 
 Note that "get" happens as part of building an argument list,
 which clobbers parameter registers, which may be associated
 with other locals. The clobbers are handled in that logic.
 */
-static Err comp_append_local_get(Comp *comp, Local *loc, U8 *out) {
+static Err comp_append_local_get_next(Comp *comp, Local *loc) {
   auto reg = comp->ctx.arg_len;
-  if (is_param_reg(reg) && comp_local_has_reg(comp, loc, reg)) {
+  try(arch_validate_input_param_reg(reg));
+
+  if (comp_local_has_reg(comp, loc, reg)) {
     comp->ctx.arg_len++;
     return nullptr;
   }
@@ -464,9 +461,10 @@ static Err comp_append_local_get(Comp *comp, Local *loc, U8 *out) {
     return nullptr;
   }
 
+  if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
+
   comp_append_local_read(comp, loc, reg);
   comp_local_reg_add(comp, loc, reg);
-  if (out) *out = reg;
   return nullptr;
 }
 
@@ -584,49 +582,26 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-static Err comp_barrier(Comp *comp, U8 inp_len) {
+static Err comp_barrier(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
   const auto ctx     = &comp->ctx;
   const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
-  const auto caller  = sym->name.buf;
+  const auto name    = sym->name.buf;
 
   if (arg_low) {
-    return errf(
-      "in " FMT_QUOTED
-      ": invalid state in control flow: some but not all prior arguments were partially consumed by assignments (%d of %d)",
-      caller,
-      arg_low,
-      arg_len
+    return err_args_partial(
+      name, " arity mismatch in control flow", arg_low, arg_len
     );
   }
-
-  if (arg_len && !inp_len) {
-    return errf(
-      "in " FMT_QUOTED
-      ": invalid state in control flow: expected no pending arguments; found %d unused arguments",
-      caller,
-      arg_len
-    );
+  if (arg_len) {
+    return err_args_arity(name, " arity mismatch in control flow", 0, arg_len);
   }
-
-  if (arg_len != inp_len) {
-    return errf(
-      "in " FMT_QUOTED
-      ": arity mismatch in control flow: required arguments: exactly %d; available arguments: %d",
-      caller,
-      inp_len,
-      arg_len
-    );
-  }
-
   for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
     try(comp_clobber_reg(comp, reg));
   }
-
-  comp_clear_args(comp);
   return nullptr;
 }
 

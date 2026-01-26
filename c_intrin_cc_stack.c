@@ -62,7 +62,7 @@ static Err interp_pop_data_len(Interp *interp, Ind *out) {
 static Err interp_pop_reg(Interp *interp, U8 *out) {
   Sint reg;
   try(int_stack_pop(&interp->ints, &reg));
-  try(asm_validate_reg(reg));
+  try(arch_validate_reg(reg));
   if (out) *out = (U8)reg;
   return nullptr;
 }
@@ -256,7 +256,7 @@ static Err intrin_execute(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_get_local(Interp *interp) {
+static Err intrin_comp_named_local(Interp *interp) {
   const auto comp = &interp->comp;
   const U8  *buf;
   Ind        len;
@@ -275,7 +275,7 @@ static Err intrin_get_local(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_anon_local(Interp *interp) {
+static Err intrin_comp_anon_local(Interp *interp) {
   const auto comp = &interp->comp;
   const auto loc  = comp_local_anon(comp);
 

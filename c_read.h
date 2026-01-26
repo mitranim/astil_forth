@@ -23,11 +23,10 @@ typedef struct {
   bool     tty;      // True if file is interactive teletype.
 } Reader;
 
-#define READ_POS_FMT "position " FMT_IND "; %s:" FMT_IND ":" FMT_IND
+#define READ_POS_FMT "%s:" FMT_IND ":" FMT_IND
 
-#define READ_POS_ARGS(read)                                          \
-  (read)->word_pos.ind, (read)->file_path.buf, (read)->word_pos.row, \
-    (read)->word_pos.col
+#define READ_POS_ARGS(read) \
+  (read)->file_path.buf, (read)->word_pos.row, (read)->word_pos.col
 
 typedef enum : U8 {
   CHAR_EOF = 1,

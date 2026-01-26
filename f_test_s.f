@@ -161,9 +161,11 @@ test_loop_while_leave
 test_loop_until
 
 : test_loop_for_anon
-  T{ 4 #for 10        #end <T> 10 10 10 10 }T
-  T{ 4 #for 10 #leave #end <T> 10          }T
-  T{ 4 #for #leave 10 #end <T>             }T
+  T{ -123 #for           #end <T>             }T
+  T{ 0    #for           #end <T>             }T
+  T{ 4    #for 10        #end <T> 10 10 10 10 }T
+  T{ 4    #for 10 #leave #end <T> 10          }T
+  T{ 4    #for #leave 10 #end <T>             }T
 
   T{
     0
@@ -212,8 +214,10 @@ test_loop_until
 test_loop_for_anon
 
 : test_loop_for_minus
-  T{ 12 -for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
-  T{ 12 -for: ind ind #leave #end <T> 11                        }T
+  T{ -123 -for: ind ind        #end <T>                           }T
+  T{ 0    -for: ind ind        #end <T>                           }T
+  T{ 12   -for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
+  T{ 12   -for: ind ind #leave #end <T> 11                        }T
 
   T{
     12 -for: ind

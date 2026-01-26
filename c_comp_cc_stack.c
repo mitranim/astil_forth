@@ -63,17 +63,16 @@ static Err comp_append_push_imm(Comp *comp, Sint imm) {
   return nullptr;
 }
 
-static Err comp_append_local_get(Comp *comp, Local *loc, Ind *out) {
+static Err comp_append_local_get_next(Comp *comp, Local *loc) {
   const auto off = local_fp_off(loc);
   asm_append_local_read(comp, off);
-  if (out) *out = off;
   return nullptr;
 }
 
 /*
 The language bootstrap file implements this on its own.
 
-static Err comp_append_local_set(Comp *comp, Local *loc) {
+static Err comp_append_local_set_next(Comp *comp, Local *loc) {
   const auto off = local_fp_off(loc);
   asm_append_local_write(comp, off);
   return nullptr;

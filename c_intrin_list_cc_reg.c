@@ -7,14 +7,17 @@
 static constexpr USED Sym INTRIN[] = {
   // Specific to this CC.
   INTRIN_BRACE,             // {
-  INTRIN_COMP_WORD_SIG,     // comp_word_sig
-  INTRIN_COMP_NEXT_ARG,     // comp_next_arg
+  INTRIN_COMP_SIGNATURE,    // comp_word_sig
+  INTRIN_COMP_ARGS_VALID,   // comp_args_valid
+  INTRIN_COMP_ARGS_GET,     // comp_args_get
+  INTRIN_COMP_ARGS_SET,     // comp_args_set
   INTRIN_COMP_NEXT_ARG_REG, // comp_next_arg_reg
   INTRIN_COMP_SCRATCH_REG,  // comp_scratch_reg
   INTRIN_COMP_CLOBBER,      // comp_clobber
   INTRIN_COMP_BARRIER,      // comp_barrier
   INTRIN_COMP_LOCAL_GET,    // comp_local_get
   INTRIN_COMP_LOCAL_SET,    // comp_local_set
+  INTRIN_COMP_LOCAL_FREE,   // comp_local_free
   INTRIN_DEBUG_CTX,         // debug_ctx
   INTRIN_DEBUG_CTX_IMM,     // #debug_ctx
   INTRIN_DEBUG_ARG,         // debug_arg
@@ -53,8 +56,8 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_FIND_WORD,         // find_word
   INTRIN_INLINE_WORD,       // inline_word
   INTRIN_EXECUTE,           // execute
-  INTRIN_GET_LOCAL,         // get_local
-  INTRIN_ANON_LOCAL,        // anon_local
+  INTRIN_COMP_NAMED_LOCAL,  // comp_named_local
+  INTRIN_COMP_ANON_LOCAL,   // comp_anon_local
   INTRIN_DEBUG_ON,          // debug_on
   INTRIN_DEBUG_OFF,         // debug_off
   INTRIN_DEBUG_FLUSH,       // debug_flush

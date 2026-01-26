@@ -133,6 +133,31 @@ static Err comp_code_ensure_sym_ready(Comp_code *code, const Sym *sym) {
   return err_sym_not_ready(sym->name.buf);
 }
 
+static Err arch_validate_reg(Sint reg) {
+  if (reg >= 0 && reg < ARCH_REG_LEN) return nullptr;
+  return errf("invalid register value " FMT_SINT, reg);
+}
+
+static Err arch_validate_input_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ARCH_INP_PARAM_REG_LEN) return nullptr;
+  return errf(
+    "too many input parameters: %d registers available, " FMT_SINT
+    " parameters requested",
+    ARCH_INP_PARAM_REG_LEN,
+    reg
+  );
+}
+
+static Err arch_validate_output_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ARCH_OUT_PARAM_REG_LEN) return nullptr;
+  return errf(
+    "too many output parameters: %d registers available, " FMT_SINT
+    " parameters requested",
+    ARCH_OUT_PARAM_REG_LEN,
+    reg
+  );
+}
+
 static Err err_imm_range_signed(Sint imm, Uint wid, Sint min, Sint max) {
   return errf(
     "value " FMT_SINT " out of signed " FMT_UINT "-bit range [" FMT_SINT
@@ -197,11 +222,6 @@ static Err imm_signed(Sint src, U8 wid, Instr *out) {
 
   *out = ((Instr)src & (Instr)max) | (src < 0 ? (Instr)sig : 0);
   return nullptr;
-}
-
-static Err asm_validate_reg(Sint reg) {
-  if (reg >= 0 && reg < ARCH_REG_LEN) return nullptr;
-  return errf("invalid register value " FMT_SINT, reg);
 }
 
 /*
@@ -280,8 +300,8 @@ static void asm_append_load_store_pre_post(
   Instr mod_val;
 
   averr(imm_signed(mod, 9, &mod_val));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
+  averr(arch_validate_reg(val_reg));
+  averr(arch_validate_reg(addr_reg));
 
   asm_append_instr(
     comp,
@@ -320,8 +340,8 @@ static Instr asm_instr_load_store_scaled_offset(
   off /= 8;
 
   averr(imm_unsigned(off, 12));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
+  averr(arch_validate_reg(val_reg));
+  averr(arch_validate_reg(addr_reg));
 
   return (Instr)0b11'111'0'01'00'000000000000'00000'00000 |
     ((Instr)is_load << 22) | ((Instr)off << 10) | ((Instr)addr_reg << 5) |
@@ -362,8 +382,8 @@ static Instr asm_instr_load_store_unscaled_offset(
 ) {
   Instr imm;
   averr(imm_signed(off, 9, &imm));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
+  averr(arch_validate_reg(val_reg));
+  averr(arch_validate_reg(addr_reg));
 
   return (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) |
     ((Instr)imm << 12) | ((Instr)addr_reg << 5) | val_reg;
@@ -392,7 +412,7 @@ static void asm_append_store_unscaled_offset(
 }
 
 static void asm_append_load_literal_offset(Comp *comp, U8 reg, Sint off) {
-  averr(asm_validate_reg(reg));
+  averr(arch_validate_reg(reg));
 
   Instr imm;
   averr(imm_signed(off, 19, &imm));
@@ -481,9 +501,9 @@ static Instr asm_instr_load_store_pair_pre_post(
   Instr mod_val;
 
   averr(imm_signed(mod, 7, &mod_val));
-  averr(asm_validate_reg(reg0));
-  averr(asm_validate_reg(reg1));
-  averr(asm_validate_reg(addr_reg));
+  averr(arch_validate_reg(reg0));
+  averr(arch_validate_reg(reg1));
+  averr(arch_validate_reg(addr_reg));
 
   return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (order << 23) |
     ((Instr)is_load << 22) | (mod_val << 15) | ((Instr)reg1 << 10) |
@@ -550,13 +570,13 @@ static void asm_append_branch_link_to_offset(Comp *comp, Sint pc_off) {
 }
 
 static void asm_append_branch_link_to_reg(Comp *comp, U8 reg) {
-  averr(asm_validate_reg(reg));
+  averr(arch_validate_reg(reg));
   const auto base = (Instr)0b110'101'1'0'0'01'11111'0000'0'0'00000'00000;
   asm_append_instr(comp, base | ((Instr)reg << 5));
 }
 
 static Instr asm_compare_branch(U8 reg, Sint off, bool non_zero) {
-  averr(asm_validate_reg(reg));
+  averr(arch_validate_reg(reg));
 
   Instr imm;
   averr(imm_signed(off, 19, &imm));
@@ -691,8 +711,8 @@ static void asm_fixup_load(Comp *comp, const Asm_fixup *fix, Sym *sym) {
 
 static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
   averr(imm_unsigned(imm12, 12));
-  averr(asm_validate_reg(src_reg));
-  averr(asm_validate_reg(tar_reg));
+  averr(arch_validate_reg(src_reg));
+  averr(arch_validate_reg(tar_reg));
   return ((Instr)imm12 << 10) | ((Instr)src_reg << 5) | tar_reg;
 }
 
@@ -840,8 +860,8 @@ metadata for every return address and create backtraces when unwinding.
 static void asm_register_call(Comp *, const Sym *) {}
 
 static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
-  averr(asm_validate_reg(tar_reg));
-  averr(asm_validate_reg(src_reg));
+  averr(arch_validate_reg(tar_reg));
+  averr(arch_validate_reg(src_reg));
 
   return (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 |
     ((Instr)src_reg << 16) | (Instr)tar_reg;
@@ -922,7 +942,7 @@ static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) 
 }
 
 static void asm_append_zero_reg(Comp *comp, U8 reg) {
-  averr(asm_validate_reg(reg));
+  averr(arch_validate_reg(reg));
   const auto ireg  = (Instr)reg;
   const auto base  = (Instr)0b1'10'01010'00'0'00000'000000'00000'00000;
   const auto instr = base | (ireg << 16) | (ireg << 5) | ireg;
@@ -1077,7 +1097,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   spans->ceil = write->len;
 
   // Execution never reaches this. Makes it easier to tell words apart.
-  if (DEBUG) asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM);
+  IF_DEBUG(asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM));
 
   const auto code       = &comp->code;
   code->valid_instr_len = write->len;

@@ -672,20 +672,20 @@ static constexpr auto INTRIN_EXECUTE = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_GET_LOCAL = (Sym){
-  .name.buf  = "get_local",
+static constexpr auto INTRIN_COMP_NAMED_LOCAL = (Sym){
+  .name.buf  = "comp_named_local",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_get_local,
+  .intrin    = (void *)intrin_comp_named_local,
   .inp_len   = 2,
   .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_ANON_LOCAL = (Sym){
-  .name.buf  = "anon_local",
+static constexpr auto INTRIN_COMP_ANON_LOCAL = (Sym){
+  .name.buf  = "comp_anon_local",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_anon_local,
+  .intrin    = (void *)intrin_comp_anon_local,
   .out_len   = 1,
   .throws    = true,
   .comp_only = true,
