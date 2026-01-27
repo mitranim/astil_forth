@@ -464,35 +464,35 @@ T{ 234 1 ?dup <T> 234 234 }T
 
 : test_varargs
   c" numbers (should be 10 20 30): %zd %zd %zd"
-  10 20 30 [ 3 va- ] debug_stack printf [ -va ] lf
+  10 20 30 [ 3 ] va{ debug_stack printf }va lf
 ;
 \ test_varargs
 
 : test_fmt
-  10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
+  10 20 30 [ 3 ] logf" numbers: %zd %zd %zd" lf
 ;
 \ test_fmt
 
 : test_efmt
-  10 20 30 [ 3 ] elogf" numbers: %zu %zu %zu" lf
+  10 20 30 [ 3 ] elogf" numbers: %zd %zd %zd" lf
 ;
 \ test_efmt
 
 4096 buf: STR_BUF
 
 : test_str_fmt
-  STR_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu"
+  STR_BUF 10 20 30 [ 3 ] sf" numbers: %zd %zd %zd"
   STR_BUF drop puts
 ;
 \ test_str_fmt
 
 : test_sthrowf
-  STR_BUF 10 20 30 [ 3 ] sthrowf" codes: %zu %zu %zu"
+  STR_BUF 10 20 30 [ 3 ] sthrowf" codes: %zd %zd %zd"
 ;
 \ test_sthrowf
 
 : test_throwf
-  10 20 30 [ 3 ] throwf" codes: %zu %zu %zu"
+  10 20 30 [ 3 ] throwf" codes: %zd %zd %zd"
 ;
 \ test_throwf
 

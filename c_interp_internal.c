@@ -534,3 +534,15 @@ static Err interp_get_local(
   if (out) *out = loc;
   return nullptr;
 }
+
+static void debug_mem_at_ind(const Uint *adr, Ind ind) {}
+
+static void debug_mem_at(const Uint *adr) {
+  eprintf("[debug] memory at address %p:\n", adr);
+  for (Ind ind = 0; ind < 8; ind++) {
+    const auto ptr = adr + ind;
+    eprintf(
+      "[debug]   %p -- " FMT_UINT_HEX " (" FMT_SINT ")\n", ptr, *ptr, (Sint)*ptr
+    );
+  }
+}

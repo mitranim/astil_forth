@@ -1560,39 +1560,59 @@ extern_val: stderr __stderrp
 
 \ Short for "varargs". Sets up arguments for a variadic call.
 \ Assumes the Apple Arm64 ABI where varargs use the systack.
-\ Usage:
+\ Usage example:
 \
 \   : some_word
-\     #c" numbers: %zd %zd %zd"
-\     10 20 30 [ 3 va- ] printf [ -va ] lf
+\     10 20 30 [ 3 ] va{ c" numbers: %zd %zd %zd" printf }va lf
 \   ;
 \
 \ Caution: varargs can only be used in direct calls to variadic procedures.
 \ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
-: va- ( C: len -- len ) ( E: <systack_push> ) dup asm_comp_systack_push ;
-: -va ( C: len -- )     ( E: <systack_pop> )      asm_comp_systack_pop ;
+:: va{ ( C: N -- N ) ( E: <systack_push> ) dup asm_comp_systack_push ;
+:: }va ( C: N -- )   ( E: <systack_pop )       asm_comp_systack_pop  ;
+
+\ Short for "compile variadic args".
+: comp_va{ ( C: N -- N ) ( E: <systack_push> ) dup asm_comp_systack_push ;
+: }va_comp ( C: N -- )   ( E: <systack_pop> )      asm_comp_systack_pop ;
 
 \ Format-prints to stdout using `printf`. `N` is the variadic arg count,
 \ which must be available at compile time. Usage example:
 \
-\   10 20 30 [ 3 ] logf" numbers: %zu %zu %zu" lf
+\   10 20 30 [ 3 ] logf" numbers: %zd %zd %zd" lf
 \
 \ TODO define a `:` variant.
 :: logf" ( C: N -- ) ( E: i1 … iN -- )
-  va- execute'' c" compile' printf -va
+  comp_va{ comp_cstr compile' printf }va_comp
 ;
 
-\ Format-prints to stderr.
-\ TODO define a `:` variant.
+\ Format-prints to stderr. TODO define a `:` variant.
 :: elogf" ( C: N -- ) ( E: i1 … iN -- )
-  va- compile' stderr execute'' c" compile' fprintf -va
+  comp_va{ compile' stderr comp_cstr compile' fprintf }va_comp
 ;
 
 \ Formats into the provided buffer using `snprintf`. Usage example:
 \
-\   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zu %zu %zu" lf
+\   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zd %zd %zd" lf
 :: sf" ( C: N -- ) ( E: buf size i1 … iN -- )
-  va- comp_cstr compile' snprintf -va
+  comp_va{ comp_cstr compile' snprintf }va_comp
+;
+
+\ ## Exceptions — continued
+
+4096 buf: ERR_BUF
+
+\ Like `sthrowf"` but easier to use. Example:
+\
+\   10 20 30 [ 3 ] throwf" error codes: %zd %zd %zd"
+:: throwf" ( C: len -- ) ( E: i1 … iN -- )
+  comp_va{
+    compile'  ERR_BUF
+    comp_cstr
+    compile'  snprintf
+  }va_comp
+  compile' ERR_BUF
+  compile' drop
+  compile' throw
 ;
 
 \ Formats an error message into the provided buffer using `snprintf`,
@@ -1600,35 +1620,17 @@ extern_val: stderr __stderrp
 \ terminated; `buf:` ensures this automatically. Usage example:
 \
 \   4096 buf: SOME_BUF
-\   SOME_BUF 10 20 30 [ 20 ] sthrowf" error codes: %zu %zu %zu"
+\   SOME_BUF 10 20 30 [ 3 ] sthrowf" error codes: %zd %zd %zd"
 \
 \ Also see `throwf"` which comes with its own buffer.
 :: sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
-  va-
-  compile'  over
-  compile'  swap
-  comp_cstr
-  compile'  snprintf
-  -va
+  comp_va{
+    compile'  over
+    compile'  swap
+    comp_cstr
+    compile'  snprintf
+  }va_comp
   compile'  throw
-;
-
-4096 buf: ERR_BUF
-
-\ ## Exceptions — advanced
-\
-\ Like `sthrowf"` but easier to use. Example:
-\
-\   10 20 30 [ 20 ] throwf" error codes: %zu %zu %zu"
-:: throwf" ( C: len -- ) ( E: i1 … iN -- )
-  va-
-  compile'  ERR_BUF
-  comp_cstr
-  compile'  snprintf
-  -va
-  compile' ERR_BUF
-  compile' drop
-  compile' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
@@ -1641,9 +1643,9 @@ extern_val: stderr __stderrp
 
 \ ## Stack printing
 
-: log_int ( num -- ) [ 1 ] logf" %zd"  ;
+: log_int  ( num     -- ) [ 1 ] logf" %zd"  ;
 : log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
-: . ( num -- ) stack_len dec log_cell lf ;
+: .        ( num     -- ) stack_len dec log_cell lf ;
 
 : .s
   stack_len to: len
@@ -1660,15 +1662,10 @@ extern_val: stderr __stderrp
 
   len [ 1 ] logf" stack <%zd>:" lf
 
-  0
-  #loop
-    dup to: ind
-    ind len < #while
+  len 0 +for: ind
     space space
     ind pick0 ind log_cell lf
-    inc
   #end
-  drop
 ;
 
 : .sc .s stack_clear ;
@@ -1722,13 +1719,14 @@ extern_val: errno __error
   addr  size2
 ;
 
-\ Calling this "guarded" is an overstatement. The size gets page-aligned,
-\ which often means there's an unguarded upper region which is writable
-\ and readable and allows overflows. However, underflows into the lower
-\ guard are successfully prevented.
+\ Allocates space for N cells with lower and upper guards. Underflowing and
+\ overflowing into the guards triggers a segfault. The size gets page-aligned,
+\ usually leaving additional unguarded readable and writable space between the
+\ requested region and the upper guard. The lower guard is immediately below
+\ the returned address and immediately prevents underflows.
 \
 \ TODO consider compiling with lazy-init; dig up the old code.
-: cells_guarded: ( C: len "name" -- ) ( E: -- addr )
+: cells_guard: ( C: len "name" -- ) ( E: -- addr )
   #word_beg
   cells mem_alloc drop
   1           comp_load  \ ldr x1, <addr>

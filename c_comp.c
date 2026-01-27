@@ -47,7 +47,10 @@ static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
 }
 
 static Local *comp_local_anon(Comp *comp) {
-  return stack_push(&comp->ctx.locals, (Local){});
+  const auto ctx = &comp->ctx;
+  const auto loc = stack_push(&ctx->locals, (Local){});
+  str_fmt(&loc->name, "(anon_" FMT_IND ")", ctx->anon_locs++);
+  return loc;
 }
 
 static Err err_local_invalid(Local *ptr) {
@@ -353,7 +356,7 @@ static void comp_debug_print_sym_instrs(
     fputc('\n', stderr);
   }
 
-  {
+  if (comp_code_is_sym_ready(code, sym)) {
     const auto instrs = &code->code_exec;
     const auto floor  = &instrs->dat[spans->prologue];
     const auto ceil   = &instrs->dat[spans->ceil];

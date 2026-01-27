@@ -286,6 +286,13 @@ static Err intrin_comp_anon_local(Interp *interp) {
   return nullptr;
 }
 
+static Err debug_mem(Interp *interp) {
+  Sint adr;
+  try(int_stack_pop(&interp->ints, &adr));
+  debug_mem_at((const Uint *)adr);
+  return nullptr;
+}
+
 static constexpr USED auto INTRIN_COLON_NAMED = (Sym){
   .name.buf = "colon",
   .wordlist = WORDLIST_EXEC,

@@ -18,6 +18,8 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     is_aligned(&ctx->asm_fix) &&
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
+    is_aligned(&ctx->anon_locs) &&
+    is_aligned(&ctx->mem_locs) &&
     stack_valid((const Stack *)&ctx->asm_fix) &&
     stack_valid((const Stack *)&ctx->locals) &&
     dict_valid((const Dict *)&ctx->local_dict)
@@ -48,6 +50,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   dict_trunc((Dict *)&ctx->local_dict);
 
   ptr_clear(&ctx->sym);
+  ptr_clear(&ctx->anon_locs);
   ptr_clear(&ctx->mem_locs);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);

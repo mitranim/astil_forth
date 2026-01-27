@@ -58,3 +58,14 @@ typedef str_buf(256) Path_str;
     const auto str_eq_tmp = str;                     \
     !strncmp(tar, str_eq_tmp->buf, str_eq_tmp->len); \
   })
+
+// TODO when running out of capacity, return error instead of crashing.
+#define str_fmt(str, fmt, ...)                                            \
+  ({                                                                      \
+    const auto tmp_str = str;                                             \
+    const auto tmp_len = snprintf(                                        \
+      tmp_str->buf, arr_cap(tmp_str->buf), fmt __VA_OPT__(, ) __VA_ARGS__ \
+    );                                                                    \
+    aver((Uint)tmp_len < arr_cap(tmp_str->buf));                          \
+    tmp_str->len = (Ind)tmp_len;                                          \
+  })

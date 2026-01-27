@@ -300,6 +300,17 @@ static Err intrin_comp_scratch_reg(Interp *interp) {
   return nullptr;
 }
 
+/*
+Control constructs such as counted loops use this to emit a barrier AFTER
+initializing their own locals or otherwise using the available arguments.
+This validates that there are no unused arguments, and clobbers each temp
+register-local association. Might eventually get a more general mechanism.
+*/
+static Err intrin_comp_barrier(Interp *interp) {
+  try(comp_barrier(&interp->comp));
+  return nullptr;
+}
+
 static Err err_invalid_clobber_mask(Sint bits) {
   return errf("invalid clobber mask %s", uint64_to_bit_str((Uint)bits));
 }
@@ -380,13 +391,15 @@ static void intrin_debug_ctx(Interp *interp) {
     "[debug]   input param count:  %d\n"
     "[debug]   output param count: %d\n"
     "[debug]   arguments:          %d\n"
-    "[debug]   arguments consumed: %d\n",
+    "[debug]   arguments consumed: %d\n"
+    "[debug]   data stack len:     " FMT_SINT "\n",
     name,
     sym,
     inp_len,
     out_len,
     ctx->arg_len,
-    ctx->arg_low
+    ctx->arg_low,
+    stack_len(&interp->ints)
   );
 
   if (loc_len) {
@@ -453,14 +466,8 @@ static void intrin_debug_arg(Sint val, Interp *) {
   );
 }
 
-/*
-Control constructs such as counted loops use this to emit a barrier AFTER
-initializing their own locals or otherwise using the available arguments.
-This validates that there are no unused arguments, and clobbers each temp
-register-local association. Might eventually get a more general mechanism.
-*/
-static Err intrin_comp_barrier(Interp *interp) {
-  try(comp_barrier(&interp->comp));
+static Err debug_mem(Sint adr, Interp *interp) {
+  debug_mem_at((const Uint *)adr);
   return nullptr;
 }
 
@@ -544,19 +551,19 @@ static constexpr USED auto INTRIN_COMP_SCRATCH_REG = (Sym){
   .comp_only = true,
 };
 
+static constexpr USED auto INTRIN_COMP_BARRIER = (Sym){
+  .name.buf  = "comp_barrier",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_barrier,
+  .throws    = true,
+  .comp_only = true,
+};
+
 static constexpr USED auto INTRIN_COMP_CLOBBER = (Sym){
   .name.buf  = "comp_clobber",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_clobber,
   .inp_len   = 1,
-  .throws    = true,
-  .comp_only = true,
-};
-
-static constexpr USED auto INTRIN_COMP_BARRIER = (Sym){
-  .name.buf  = "comp_barrier",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_barrier,
   .throws    = true,
   .comp_only = true,
 };

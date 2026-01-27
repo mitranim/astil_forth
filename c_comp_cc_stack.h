@@ -23,6 +23,7 @@ typedef struct {
   Asm_fixups  asm_fix;
   Local_stack locals;
   Local_dict  local_dict;
+  Ind         anon_locs;  // For auto-naming of anonymous locals.
   Ind         mem_locs;   // How many locals need stack memory.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.

@@ -727,6 +727,8 @@
 
 : stack_top { -- adr } stack_top ;
 
+: stack@ { -- val } stack_top @ ;
+
 \ Updates the stack top address in the interpreter.
 : stack! { adr } [
   \ stur x0, [x27, INTERP_INTS_TOP]
@@ -1092,8 +1094,8 @@ extern_val: stderr __stderrp
 : ifn_pop ( C: fun_prev adr_ifn -- ) ifn_patch stack> execute ;
 
 : elif_init ( C: -- fun_exec adr_if ) ( E: pred -- )
-  reserve_here { adr }
   comp_barrier \ Clobber / relocate locals.
+  reserve_here { adr }
   ' pop_execute >stack
   adr           >stack
 ;
@@ -1457,6 +1459,125 @@ extern_val: stderr __stderrp
   ' loop_countdown_pop >stack
 ;
 
+\ ## Varargs and formatting
+
+\ Short for "compile variadic arguments begin".
+\ Assumes the Apple Arm64 ABI where varargs use the systack.
+: comp_va_beg { len -- }
+  len 2 align_up 0 2
+  -loop: ind
+    ind     { Xd }
+    ind inc { Xt }
+    \ We always store pairs because Arm64 requires the SP to be aligned to 16
+    \ bytes when accessing memory. When length is odd, we also store an unused
+    \ garbage value from an unused register, which is fine.
+    Xd Xt ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp Xd, Xt, [SP, -16]!
+  #end
+;
+
+\ Short for "compile variadic arguments end".
+: comp_va_end { len -- }
+  len >=0 #if
+    len cells 16 align_up { off }
+    ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
+  #end
+;
+
+\ For use in compile-time words; see `logf"` below.
+: comp_va{ ( C: -- len ) ( E: <systack_push> )
+  comp_args_get { len }
+  len comp_va_beg
+  len >stack
+  0 comp_args_set
+;
+
+\ For use in compile-time words; see `logf"` below.
+: }va_comp ( C: len -- ) ( E: <systack_pop ) stack> comp_va_end ;
+
+\ Sets up arguments for a variadic call. Usage example:
+\
+\   : some_word
+\     10 20 30 va{ c" numbers: %zd %zd %zd" printf }va lf
+\   ;
+\
+\ Caution: varargs can only be used in direct calls to variadic procedures.
+\ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
+:: va{ comp_va{ ;
+:: }va }va_comp ;
+
+\ Format-prints to stdout using `printf`. Usage example:
+\
+\   10 20 30 logf" numbers: %zd %zd %zd" lf
+\
+\ TODO define a `:` variant.
+:: logf" ( C: i0 … iN -- ) ( E: i0 … iN -- )
+  comp_va{ comp_cstr compile' printf }va_comp
+;
+
+\ Format-prints to stderr. TODO define a `:` variant.
+:: elogf" ( C: N -- ) ( E: i1 … iN -- )
+  comp_va{ compile' stderr comp_cstr compile' fprintf }va_comp
+;
+
+\ TODO: port `sf"` from stack-CC.
+
+\ ## Exceptions — continued
+
+4096 buf: ERR_BUF
+
+\ Like `sthrowf"` but easier to use. Example:
+\
+\   10 20 30 throwf" error codes: %zd %zd %zd"
+\
+\ TODO: port `sthrowf"` from stack-CC.
+:: throwf" ( C: len -- ) ( E: i1 … iN -- )
+  comp_va{
+    compile'  ERR_BUF
+    comp_cstr
+    compile'  snprintf
+  }va_comp
+  compile' ERR_BUF
+  1 comp_args_set \ Drop buffer length.
+  compile' throw
+;
+
+\ Similar to standard `abort"`, with clearer naming.
+:: throw_if" ( C: "str" -- ) ( E: pred -- )
+  execute'' #if
+  comp_cstr
+  compile' throw
+  execute'' #end
+;
+
+\ ## Stack printing
+
+: log_int  { num     -- } num logf" %zd" ;
+: log_cell { num ind -- } num num ind logf" %zd 0x%zx <%zd>" ;
+: .        { num     -- } stack_len { ind } num ind log_cell lf ;
+
+: .s
+  stack_len { len }
+
+  len #ifn
+    log" stack is empty" lf
+    #ret
+  #end
+
+  len <0 #if
+    len logf" stack length is negative: %zd" lf
+    #ret
+  #end
+
+  len logf" stack <%zd>:" lf
+
+  len 0 +for: ind
+    space space
+    ind stack_at @ ind log_cell lf
+  #end
+;
+
+: .sc .s stack_clear ;
+
 \ ## More memory stuff
 
 extern_val: errno __error
@@ -1472,33 +1593,56 @@ extern_val: errno __error
 2     let: MAP_PRIVATE
 4096  let: MAP_ANON
 
-: mem_map { len pflag -- adr }
+: mem_map_err
+  errno        { err }
+  err strerror { str }
+  err str throwf" unable to map memory; code: %d; message: %s"
+;
+
+: mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or { mflag }
-  nil len pflag mflag -1 0 mmap
+  0 size pflag mflag -1 0 mmap { addr }
+  addr -1 = #if mem_map_err #end
+  addr
 ;
 
-: mem_unprot { adr len -- err }
+: mem_unprot_err
+  errno        { err }
+  err strerror { str }
+  err str throwf" unable to unprotect memory; code: %d; message: %s"
+;
+
+: mem_unprot { addr size }
   PROT_READ PROT_WRITE or { pflag }
-  adr len pflag mprotect
+  addr size pflag mprotect
+  -1 = #if throw" unable to mprotect" #end
 ;
 
+\ Allocates a guarded buffer: `guard|data|guard`.
+\ Attempting to read or write inside the guards,
+\ aka underflow or overflow, triggers a segfault.
+\ The given size is rounded up to the page size.
 : mem_alloc { size1 -- addr size2 }
   size1 PAGE_SIZE align_up { size2 }
   PAGE_SIZE 1 lsl size2 +  { size }
   size PROT_NONE mem_map   { addr }
   addr PAGE_SIZE +         { addr }
-  addr size2 mem_unprot    { -- }
+  addr size2 mem_unprot
   addr size2
 ;
 
-\ ## Exceptions continued
-
-\ Similar to standard `abort"`, with clearer naming.
-:: throw_if" ( C: "str" -- ) ( E: pred -- )
-  execute'' #if
-  comp_cstr
-  compile' throw
-  execute'' #end
+\ Allocates space for N cells with lower and upper guards. Underflowing and
+\ overflowing into the guards triggers a segfault. The size gets page-aligned,
+\ usually leaving additional unguarded readable and writable space between the
+\ requested region and the upper guard. The lower guard is immediately below
+\ the returned address and immediately prevents underflows.
+\
+\ TODO consider compiling with lazy-init; dig up the old code.
+: cells_guard: { len } ( C: "name" -- ) ( E: -- adr )
+  parse_word          { name name_len }
+  len cells mem_alloc { adr -- }
+  name name_len adr init_data_word
+  [ not_comp_only ]
 ;
 
 log" [lang] ok" lf

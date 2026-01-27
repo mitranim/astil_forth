@@ -133,6 +133,7 @@ typedef struct {
   Sym        *sym;        // What we're currently compiling.
   Local_stack locals;     // Includes current word's input params.
   Local_dict  local_dict; // So we can find locals by name.
+  Ind         anon_locs;  // For auto-naming of anonymous locals.
   Ind         mem_locs;   // How many locals need stack memory.
   Local      *loc_regs[ARCH_ALL_PARAM_REG_LEN]; // Temp reg-local associations.
   Bits        vol_regs;   // Volatile registers available for locals.

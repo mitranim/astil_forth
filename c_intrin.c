@@ -279,23 +279,6 @@ static void debug_top_str(Interp *interp) {
   );
 }
 
-static Err debug_mem(Interp *interp) {
-  Sint val;
-  try(int_stack_pop(&interp->ints, &val));
-
-  auto ptr = (const Uint *)val;
-  eprintf("[debug] memory at address %p:\n", ptr);
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 0, *(ptr + 0));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 1, *(ptr + 1));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 2, *(ptr + 2));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 3, *(ptr + 3));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 4, *(ptr + 4));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 5, *(ptr + 5));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 6, *(ptr + 6));
-  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 7, *(ptr + 7));
-  return nullptr;
-}
-
 static void interp_repr_sym(const Interp *interp, const Sym *sym) {
   switch (sym->type) {
     case SYM_NORM: {
@@ -756,6 +739,7 @@ static constexpr auto INTRIN_DEBUG_MEM = (Sym){
   .name.buf = "debug_mem",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_mem,
+  .inp_len  = 1,
   .throws   = true,
 };
 

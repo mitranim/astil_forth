@@ -59,6 +59,8 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     is_aligned(&ctx->loc_fix) &&
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
+    is_aligned(&ctx->anon_locs) &&
+    is_aligned(&ctx->mem_locs) &&
     is_aligned(&ctx->loc_regs) &&
     is_aligned(&ctx->vol_regs) &&
     is_aligned(ctx->sym) &&
@@ -99,6 +101,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
   ptr_clear(&ctx->sym);
+  ptr_clear(&ctx->anon_locs);
   ptr_clear(&ctx->mem_locs);
   ptr_clear(&ctx->arg_low);
   ptr_clear(&ctx->arg_len);
@@ -163,19 +166,6 @@ static void comp_local_reg_del(Comp *comp, Local *loc, U8 reg) {
   ctx->loc_regs[reg] = nullptr;
 }
 
-static void comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
-  validate_param_reg(reg);
-
-  const auto ctx = &comp->ctx;
-  for (U8 ind = 0; ind < arr_cap(ctx->loc_regs); ind++) {
-    if (ctx->loc_regs[ind] != loc) continue;
-    ctx->loc_regs[ind] = nullptr;
-  }
-
-  ctx->loc_regs[reg] = loc;
-  loc->stable        = false;
-}
-
 static void comp_local_regs_clear(Comp *comp, Local *loc) {
   const auto ctx = &comp->ctx;
   for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
@@ -216,8 +206,8 @@ static Err err_args_arity(
   const char *caller, const char *action, Sint req, Sint ava
 ) {
   return errf(
-    "in " FMT_QUOTED ": %s: arity mismatch: required vs provided: " FMT_SINT
-    " vs " FMT_SINT "",
+    "in " FMT_QUOTED ": %s: arity mismatch: required: " FMT_SINT
+    ", provided: " FMT_SINT,
     caller,
     action,
     req,
@@ -280,36 +270,6 @@ static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
   loc->write = &fix->write;
 }
 
-// Lower-level, unsafe analogue of `comp_append_local_set_next`.
-static Err comp_append_local_set(Comp *comp, Local *loc, U8 reg) {
-  try(arch_validate_output_param_reg(reg));
-  comp_local_reg_reset(comp, loc, reg);
-  return nullptr;
-}
-
-/*
-Abstract "set" operation invoked via `{}` braces. Used both for parameter
-declarations and regular assignments. Does not immediately create a "write";
-those are added lazily on clobbers. Does not check, confirm, or invalidate
-the latest pending "write" if any; writes are confirmed by "reads", and link
-with each other for a chain confirmation.
-*/
-static Err comp_append_local_set_next(Comp *comp, Local *loc) {
-  const auto ctx = &comp->ctx;
-  const auto rem = (Sint)ctx->arg_len - (Sint)ctx->arg_low;
-
-  if (!(rem > 0)) return err_assign_no_args(loc->name.buf);
-
-  const auto reg = ctx->arg_low++;
-  comp_local_reg_reset(comp, loc, reg);
-
-  if (ctx->arg_len == ctx->arg_low) {
-    ctx->arg_len = 0;
-    ctx->arg_low = 0;
-  }
-  return nullptr;
-}
-
 /*
 Must be invoked whenever a register needs to be used for ANYTHING
 other than the current procedure's input parameters. Examples:
@@ -349,6 +309,77 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   some later point.
   */
   return comp_clobber_regs(comp, callee->clobber);
+}
+
+static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
+  validate_param_reg(reg);
+
+  const auto ctx = &comp->ctx;
+  for (U8 ind = 0; ind < arr_cap(ctx->loc_regs); ind++) {
+    if (ctx->loc_regs[ind] != loc) continue;
+    ctx->loc_regs[ind] = nullptr;
+  }
+
+  const auto prev = ctx->loc_regs[reg];
+  if (prev && prev != loc) try(comp_clobber_reg(comp, reg));
+
+  ctx->loc_regs[reg] = loc;
+  loc->stable        = false;
+
+  IF_DEBUG({
+    if (prev) {
+      eprintf(
+        "[system] reset local " FMT_QUOTED
+        " to register %d, clobbering local " FMT_QUOTED,
+        loc->name.buf,
+        reg,
+        prev->name.buf
+      );
+    }
+    else {
+      eprintf(
+        "[system] reset local " FMT_QUOTED " to register %d", loc->name.buf, reg
+      );
+    }
+  });
+  return nullptr;
+}
+
+// Lower-level, unsafe analogue of `comp_append_local_set_next`.
+static Err comp_append_local_set(Comp *comp, Local *loc, U8 reg) {
+  try(arch_validate_output_param_reg(reg));
+  try(comp_local_reg_reset(comp, loc, reg));
+
+  IF_DEBUG(eprintf(
+    "[system] appended \"set\" of local " FMT_QUOTED " from register %d",
+    loc->name.buf,
+    reg
+  ));
+
+  return nullptr;
+}
+
+/*
+Abstract "set" operation invoked via `{}` braces. Used both for parameter
+declarations and regular assignments. Does not immediately create a "write";
+those are added lazily on clobbers. Does not check, confirm, or invalidate
+the latest pending "write" if any; writes are confirmed by "reads", and link
+with each other for a chain confirmation.
+*/
+static Err comp_append_local_set_next(Comp *comp, Local *loc) {
+  const auto ctx = &comp->ctx;
+  const auto rem = (Sint)ctx->arg_len - (Sint)ctx->arg_low;
+
+  if (!(rem > 0)) return err_assign_no_args(loc->name.buf);
+
+  const auto reg = ctx->arg_low++;
+  try(comp_local_reg_reset(comp, loc, reg));
+
+  if (ctx->arg_len == ctx->arg_low) {
+    ctx->arg_len = 0;
+    ctx->arg_low = 0;
+  }
+  return nullptr;
 }
 
 static Err comp_next_inp_param_reg(Comp *comp, U8 *out) {
