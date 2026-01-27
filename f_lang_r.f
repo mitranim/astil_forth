@@ -112,44 +112,44 @@
 0b1111 let: ASM_NV
 666    let: ASM_PLACEHOLDER
 
-: or { i1 i2 -- i3 } [
+: or { i0 i1 -- i2 } [
   0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
   1 comp_args_set
 ] ;
 
-: and { i1 i2 -- i3 } [
+: and { i0 i1 -- i2 } [
   0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
   1 comp_args_set
 ] ;
 
-: xor { i1 i2 -- i3 } [
+: xor { i0 i1 -- i2 } [
   0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
   1 comp_args_set
 ] ;
 
-: lsl { i1 bits -- i2 } [
+: lsl { i0 bits -- i1 } [
   0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
   1 comp_args_set
 ] ;
 
-: lsr { i1 bits -- i2 } [
+: lsr { i0 bits -- i1 } [
   0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
   1 comp_args_set
 ] ;
 
-: invert { i1 -- i2 } [
+: invert { i0 -- i1 } [
   0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
   1 comp_args_set
 ] ;
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
-: inc { i1 -- i2 } [
+: inc { i0 -- i1 } [
   0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
   1 comp_args_set
 ] ;
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
-: dec { i1 -- i2 } [
+: dec { i0 -- i1 } [
   0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
   1 comp_args_set
 ] ;
@@ -422,7 +422,7 @@
 ;
 
 \ Arithmetic (sign-preserving) right shift.
-: asr { i1 bits -- i2 } [
+: asr { i0 bits -- i1 } [
   0 0 1 asm_asr_reg comp_instr \ asr x0, x0, x1
   1                 comp_args_set
 ] ;
@@ -532,32 +532,32 @@
 
 \ ## Arithmetic
 
-: negate { i1 -- i2 } [
+: negate { i0 -- i1 } [
   0 asm_neg comp_instr \ neg x0, x0
   1         comp_args_set
 ] ;
 
-: + { i1 i2 -- i3 } [
+: + { i0 i1 -- i2 } [
   0 0 1 asm_add_reg comp_instr \ add x0, x0, x1
   1                 comp_args_set
 ] ;
 
-: - { i1 i2 -- i3 } [
+: - { i0 i1 -- i2 } [
   0 0 1 asm_sub_reg comp_instr \ sub x0, x0, x1
   1                 comp_args_set
 ] ;
 
-: * { i1 i2 -- i3 } [
+: * { i0 i1 -- i2 } [
   0 0 1 asm_mul comp_instr \ mul x0, x0, x1
   1             comp_args_set
 ] ;
 
-: / { i1 i2 -- i3 } [
+: / { i0 i1 -- i2 } [
   0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
   1              comp_args_set
 ] ;
 
-: mod { i1 i2 -- i3 } [
+: mod { i0 i1 -- i2 } [
   0b100            comp_clobber
   2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
@@ -577,13 +577,13 @@
   1                         comp_args_set
 ] ;
 
-: min { i1 i2 -- i1|i2 } [
+: min { i0 i1 -- i0|i1 } [
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_LT asm_csel    comp_instr \ csel x0, x0, x1, lt
   1                        comp_args_set
 ] ;
 
-: max { i1 i2 -- i1|i2 } [
+: max { i0 i1 -- i0|i1 } [
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
   1                        comp_args_set
@@ -628,7 +628,7 @@
   0b1_01_100100_1_000000_000000_00000_00000 or
 ;
 
-: asm_comp_cset_reg { cond } ( E: i1 i2 -- bool )
+: asm_comp_cset_reg { cond } ( E: i0 i1 -- bool )
   0 1    asm_cmp_reg comp_instr \ cmp x0, x1
   0 cond asm_cset    comp_instr \ cset x0, <cond>
   1                  comp_args_set
@@ -643,18 +643,18 @@
 \ ## Numeric comparison
 
 \ https://gforth.org/manual/Numeric-comparison.html
-: =   { i1 i2 -- bool } [ ASM_EQ asm_comp_cset_reg  ] ;
-: <>  { i1 i2 -- bool } [ ASM_NE asm_comp_cset_reg  ] ;
-: >   { i1 i2 -- bool } [ ASM_GT asm_comp_cset_reg  ] ;
-: <   { i1 i2 -- bool } [ ASM_LT asm_comp_cset_reg  ] ;
-: <=  { i1 i2 -- bool } [ ASM_LE asm_comp_cset_reg  ] ;
-: >=  { i1 i2 -- bool } [ ASM_GE asm_comp_cset_reg  ] ;
+: =   { i0 i1 -- bool } [ ASM_EQ asm_comp_cset_reg  ] ;
+: <>  { i0 i1 -- bool } [ ASM_NE asm_comp_cset_reg  ] ;
+: >   { i0 i1 -- bool } [ ASM_GT asm_comp_cset_reg  ] ;
+: <   { i0 i1 -- bool } [ ASM_LT asm_comp_cset_reg  ] ;
+: <=  { i0 i1 -- bool } [ ASM_LE asm_comp_cset_reg  ] ;
+: >=  { i0 i1 -- bool } [ ASM_GE asm_comp_cset_reg  ] ;
 : <0  { num   -- bool } [ ASM_LT asm_comp_cset_zero ] ; \ Or `MI`.
 : >0  { num   -- bool } [ ASM_GT asm_comp_cset_zero ] ;
 : <=0 { num   -- bool } [ ASM_LE asm_comp_cset_zero ] ;
 : >=0 { num   -- bool } [ ASM_GE asm_comp_cset_zero ] ; \ Or `PL`.
 
-: odd { i1 -- bool } i1 1 and ;
+: odd { i0 -- bool } i0 1 and ;
 
 \ ## Memory load / store
 
