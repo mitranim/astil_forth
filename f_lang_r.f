@@ -371,14 +371,14 @@
 ;
 
 \ mul Xd, Xn, Xm
-: asm_mul { Xd Xn imm12 -- instr }
-  Xd Xn imm12 asm_pattern_arith_imm
+: asm_mul { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
   0b1_00_11011_000_00000_0_11111_00000_00000 or
 ;
 
 \ sdiv Xd, Xn, Xm
-: asm_sdiv { Xd Xn imm12 -- instr }
-  Xd Xn imm12 asm_pattern_arith_imm
+: asm_sdiv { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
   0b1_0_0_11010110_00000_00001_1_00000_00000 or
 ;
 
@@ -565,10 +565,11 @@
 ] ;
 
 : /mod { dividend divisor -- rem quo } [
-  0b100             comp_clobber
-  2 0 1   asm_sdiv  comp_instr \ sdiv x2, x0, x1
-  0 2 1 0 asm_msub  comp_instr \ msub x0, x2, x1, x0
-  2                 comp_args_set
+  0b100               comp_clobber
+  2 1     asm_mov_reg comp_instr \ mov x2, x1
+  1 0 2   asm_sdiv    comp_instr \ sdiv x1, x0, x2
+  0 1 2 0 asm_msub    comp_instr \ msub x0, x1, x2, x0
+  2                   comp_args_set
 ] ;
 
 : abs { int -- +int } [
@@ -684,7 +685,7 @@
 : off! { adr } false adr ! ;
 : on!  { adr } true adr ! ;
 
-\ ## Stack introspection
+\ ## Stack introspection and manipulation
 \
 \ Under the register calling convention, the Forth data stack
 \ is used only in top-level interpretation. Because of this,
@@ -735,12 +736,13 @@
   0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
 ] ;
 
-: stack_at    { ind  -- adr } ind cells stack_floor + ;
-: stack_len   {      -- len } stack_top stack_floor - /cells ;
-: stack_clear {      --     } stack_floor stack! ;
-: stack_trunc { len  --     } len stack_at stack! ;
-: stack+      { diff --     } diff dec cells          stack_top      + stack! ;
-: stack-      { diff --     } diff dec cells { diff } stack_top diff - stack! ;
+: stack_at      { ind  -- adr } ind cells stack_floor + ;
+: stack_at@     { ind  -- val } ind stack_at @ ;
+: stack_len     {      -- len } stack_top stack_floor - /cells ;
+: stack_clear   {      --     } stack_floor stack! ;
+: stack_set_len { len  --     } len stack_at stack! ;
+: stack+        { diff --     } diff dec cells          stack_top      + stack! ;
+: stack-        { diff --     } diff dec cells { diff } stack_top diff - stack! ;
 
 \ Used by control structures such as conditionals.
 \
@@ -1357,6 +1359,7 @@ extern_val: stderr __stderrp
   comp_barrier                     \ Clobber / relocate locals.
   here { adr_beg }                 \ Skip above instr when repeating.
   1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
+  comp_barrier                     \ Tell lazy-ass compiler to commit local set.
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here { adr_cond } reserve_instr  \ b.<cond> <end>
 
@@ -1404,6 +1407,7 @@ extern_val: stderr __stderrp
   comp_barrier                     \ Clobber / relocate locals.
   here { adr_beg }                 \ Skip above instrs when repeating.
   1 cur             comp_local_set \ mov <cur>,  x1 | str x1, [FP, <cur>]
+  comp_barrier                     \ Tell lazy-ass compiler to commit local set.
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here { adr_cond } reserve_instr  \ b.<cond> <end>
 
@@ -1457,6 +1461,24 @@ extern_val: stderr __stderrp
   cur                  >stack
   step                 >stack
   ' loop_countdown_pop >stack
+;
+
+\ ## Stack manipulation — continued
+
+\ ldur <stack>, [x27, INTERP_INTS_TOP]
+\ ...
+\ str  <arg>,   [<stack>], 8
+\ ...
+\ stur <stack>, [x27, INTERP_INTS_TOP]
+: comp_args_to_stack { len }
+  len #ifn #ret #end
+  comp_scratch_reg { stack }
+
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr \ ldur <stack>
+  len 0 +for: arg
+    arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
+  #end
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr \ stur <stack>
 ;
 
 \ ## Varargs and formatting
@@ -1645,4 +1667,4 @@ extern_val: errno __error
   [ not_comp_only ]
 ;
 
-log" [lang] ok" lf
+\ log" [lang] ok" lf

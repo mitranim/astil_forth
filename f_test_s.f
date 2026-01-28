@@ -1,8 +1,8 @@
 import' ./f_lang_s.f
 import' ./f_testing_s.f
 
-T{ <T> }T
-T{ 10 <T> 10 }T
+T{       <T>       }T
+T{ 10    <T> 10    }T
 T{ 10 20 <T> 10 20 }T
 
 : test_conditionals
@@ -33,7 +33,7 @@ T{ 10 20 <T> 10 20 }T
 ;
 test_conditionals
 
-: test_recursion ( val -- )
+: test_recursion ( val -- val )
   dup 13 <= #if #ret #end
   dec #recur
 ;
@@ -160,12 +160,13 @@ test_loop_while_leave
 ;
 test_loop_until
 
-: test_loop_for_anon
-  T{ -123 #for           #end <T>             }T
-  T{ 0    #for           #end <T>             }T
-  T{ 4    #for 10        #end <T> 10 10 10 10 }T
-  T{ 4    #for 10 #leave #end <T> 10          }T
-  T{ 4    #for #leave 10 #end <T>             }T
+: test_loop_for
+  T{ -12 #for           #end <T>             }T
+  T{ -1  #for           #end <T>             }T
+  T{ 0   #for           #end <T>             }T
+  T{ 4   #for 10        #end <T> 10 10 10 10 }T
+  T{ 4   #for 10 #leave #end <T> 10          }T
+  T{ 4   #for #leave 10 #end <T>             }T
 
   T{
     0
@@ -211,13 +212,14 @@ test_loop_until
     0 1 2 3 4 5
   }T
 ;
-test_loop_for_anon
+test_loop_for
 
-: test_loop_for_minus
-  T{ -123 -for: ind ind        #end <T>                           }T
-  T{ 0    -for: ind ind        #end <T>                           }T
-  T{ 12   -for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
-  T{ 12   -for: ind ind #leave #end <T> 11                        }T
+: test_loop_for_countdown
+  T{ -12 -for: ind ind        #end <T>                           }T
+  T{ -1  -for: ind ind        #end <T>                           }T
+  T{ 0   -for: ind ind        #end <T>                           }T
+  T{ 12  -for: ind ind        #end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
+  T{ 12  -for: ind ind #leave #end <T> 11                        }T
 
   T{
     12 -for: ind
@@ -257,9 +259,9 @@ test_loop_for_anon
     11 10 9 8
   }T
 ;
-test_loop_for_minus
+test_loop_for_countdown
 
-: test_loop_for_plus
+: test_loop_for_countup
   T{ 12 -1  +for: ind ind        #end <T> -1 0 1 2 3 4 5 6 7 8 9 10 11 }T
   T{ 12 0   +for: ind ind        #end <T>    0 1 2 3 4 5 6 7 8 9 10 11 }T
   T{ 12 1   +for: ind ind        #end <T>      1 2 3 4 5 6 7 8 9 10 11 }T
@@ -308,16 +310,18 @@ test_loop_for_minus
     0 1 2 3 4 5
   }T
 ;
-test_loop_for_plus
+test_loop_for_countup
 
-: test_plus_loop
-  T{ 8 0 1 +loop: ind ind #end <T> 0 1 2 3 4 5 6 7 }T
-  T{ 8 0 2 +loop: ind ind #end <T> 0 2 4 6         }T
-  T{ 8 0 3 +loop: ind ind #end <T> 0 3 6           }T
+: test_loop_countup
+  T{ 8 0 1 +loop: ind ind #end ind <T> 0 1 2 3 4 5 6 7 8 }T
+  T{ 8 0 2 +loop: ind ind #end ind <T> 0 2 4 6         8 }T
+  T{ 8 0 3 +loop: ind ind #end ind <T> 0 3 6           9 }T
+  T{ 8 0 4 +loop: ind ind #end ind <T> 0 4             8 }T
+  T{ 8 0 5 +loop: ind ind #end ind <T> 0 5            10 }T
 ;
-test_plus_loop
+test_loop_countup
 
-: test_plus_loop_nested
+: test_loop_countup_nested
   T{
     4 0 1
     +loop: one
@@ -336,14 +340,14 @@ test_plus_loop
           3 3 4 5
   }T
 ;
-test_plus_loop_nested
+test_loop_countup_nested
 
-: test_minus_loop
+: test_loop_countdown
   T{ 8 0 1 -loop: ind ind #end <T> 7 6 5 4 3 2 1 0 }T
   T{ 8 0 2 -loop: ind ind #end <T> 6 4 2 0         }T
   T{ 8 0 3 -loop: ind ind #end <T> 5 2             }T
 ;
-test_minus_loop
+test_loop_countdown
 
 : test_sc 10 20 30 stack_len .sc ;
 \ test_sc
@@ -528,6 +532,7 @@ test_to
   T{ 10 20    { one }              one one            <T> 10 20 20 }T
   T{ 10 20    { one -- }           one one            <T> 10 20 20 }T
   T{ 10 20    { one two }                             <T>          }T
+  T{ 10 20    { one two -- }                          <T>          }T
   T{ 10 20    { one two }          one                <T> 10       }T
   T{ 10 20    { one two }          two                <T> 20       }T
   T{ 10 20    { one two }          one two            <T> 10 20    }T
@@ -537,6 +542,7 @@ test_to
   T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
   T{ 10 20    { one two }          one one two        <T> 10 10 20 }T
   T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
+  T{ 10 20    { one --     }       one one            <T> 10 20 20 }T
   T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
   T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
   T{ 10 20    { -- one two }                          <T> 10 20    }T

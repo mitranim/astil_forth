@@ -836,7 +836,7 @@
 : off! ( adr -- ) 0 swap ! ;
 : on!  ( adr -- ) 1 swap ! ;
 
-\ ## Stack introspection
+\ ## Stack introspection and manipulation
 
 \ Floor of data stack.
 \ str x26, [x27], 8
@@ -864,12 +864,12 @@
 ] ;
 
 \ Stack introspection doesn't need to be optimal.
-: sp_at       ( ind    -- ptr ) cells sp0 + ;
-: stack_len   (        -- len ) sp sp0 - /cells ;
-: stack_clear ( …      -- )     sp0 sp! ;
-: stack_trunc ( … len  -- … )   sp_at sp! ;
-: stack+      ( … diff -- … )   dec cells sp swap + sp! ;
-: stack-      ( … diff -- … )   inc cells sp swap - sp! ;
+: sp_at         ( ind    -- ptr ) cells sp0 + ;
+: stack_len     (        -- len ) sp sp0 - /cells ;
+: stack_clear   ( …      -- )     sp0 sp! ;
+: stack_set_len ( … len  -- … )   sp_at sp! ;
+: stack+        ( … diff -- … )   dec cells sp swap + sp! ;
+: stack-        ( … diff -- … )   inc cells sp swap - sp! ;
 
 \ ## Characters and strings
 

@@ -144,7 +144,7 @@ static Err arch_validate_input_param_reg(Sint reg) {
     "too many input parameters: %d registers available, " FMT_SINT
     " parameters requested",
     ARCH_INP_PARAM_REG_LEN,
-    reg
+    reg + 1
   );
 }
 
@@ -154,7 +154,7 @@ static Err arch_validate_output_param_reg(Sint reg) {
     "too many output parameters: %d registers available, " FMT_SINT
     " parameters requested",
     ARCH_OUT_PARAM_REG_LEN,
-    reg
+    reg + 1
   );
 }
 

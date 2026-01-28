@@ -623,12 +623,10 @@ static Err comp_barrier(Comp *comp) {
   const auto name    = sym->name.buf;
 
   if (arg_low) {
-    return err_args_partial(
-      name, " arity mismatch in control flow", arg_low, arg_len
-    );
+    return err_args_partial(name, "in control flow", arg_low, arg_len);
   }
   if (arg_len) {
-    return err_args_arity(name, " arity mismatch in control flow", 0, arg_len);
+    return err_args_arity(name, "in control flow", 0, arg_len);
   }
   for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
     try(comp_clobber_reg(comp, reg));

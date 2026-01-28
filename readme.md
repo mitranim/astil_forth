@@ -28,6 +28,8 @@ The interpreter written in C doesn't actually implement Forth. It provides just 
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
+All the code is authored by me. None is bot-generated.
+
 ## Show me the code!
 
 ```forth
