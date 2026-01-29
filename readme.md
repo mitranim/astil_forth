@@ -103,7 +103,7 @@ Many procedure names are "namespaced", but many other symbols are not; you may n
 
 ## Easy C interop
 
-It's trivial to declare and call extern procedures. Examples can be found in the core files `f_lang_s.f` and `f_lang_r.f`, which make extensive use of that. Should work for any linked library, such as libc.
+It's trivial to declare and call extern procedures. Examples can be found in the core files `forth/lang_s.f` and `forth/lang_r.f`, which make extensive use of that. Should work for any linked library, such as libc.
 
 ```forth
 \ The numbers describe input and output parameters.

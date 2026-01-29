@@ -8,7 +8,7 @@ Special registers:
 - `x28` = error string pointer.
 - `x27` = interpreter pointer.
 
-The special registers must be kept in sync with `f_lang_r.f`.
+The special registers must be kept in sync with `lang_r.f`.
 */
 #pragma once
 #include "./arch_arm64.h"
