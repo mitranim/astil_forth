@@ -31,7 +31,7 @@ WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=f
 WATCH_ALL ?= $(WATCH) -e=c,h,s,f
-WATCH_IMM ?= $(WATCH) -e=f,exe --no-vcs-ignore
+WATCH_IMM ?= $(WATCH) -e=f,exe -w=$(MAIN_S) -w=$(MAIN_R) --no-vcs-ignore
 
 ARTIF ?= $(MAIN_S) $(MAIN_R) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg

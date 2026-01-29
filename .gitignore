@@ -10,11 +10,15 @@
 !/comp
 !/mach
 !/forth
-!/sublime
+!/bench
 !/talks
+!/sublime
+
 
 # Should be listed last.
 .*
+*.exe
+*.dSYM
 !.git*
 !*ignore
 !*rc
