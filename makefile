@@ -12,13 +12,14 @@ STRICT_FLAGS ?= $(and $(STRICT),-Werror)
 COMPILE_FLAGS ?= $(shell printf ' %s' $$(cat compile_flags.txt))
 CFLAGS ?= $(and $(PROD),-DPROD) $(STRICT_FLAGS) $(DEBUG_FLAGS) $(CRASH_FLAGS) $(COMPILE_FLAGS)
 LOCAL ?= local
+SRC ?= comp
 GEN ?= generated
-ASM_GEN_SRC ?= c_asm_gen.c
-ASM_GEN_OUT ?= $(GEN)/c_asm.s
+ASM_GEN_SRC ?= $(SRC)/asm_gen.c
+ASM_GEN_OUT ?= $(SRC)/asm_generated.s
 MACH_GEN_SRC ?= mach/mach_exc.defs
 MACH_GEN_OUT ?= $(GEN)/mach_exc.c
 ALL_SRC ?= $(wildcard *.s *.c *.h **/*.c **/*.h) $(ASM_GEN_SRC)
-MAIN_SRC ?= c_main.c
+MAIN_SRC ?= $(SRC)/main.c
 MAIN_S ?= forth_s
 MAIN_R ?= forth_r
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
@@ -65,7 +66,7 @@ run_r:
 
 # Usage example:
 #
-#   make run_s_w args='f_lang_s.f f_test.f -'
+#   make run_s_w args='forth/lang_s.f forth/test_s.f -'
 .PHONY: run_s_w
 run_s_w:
 	$(WATCH_IMM) -- $(MAKE) run_s
@@ -105,7 +106,6 @@ run_file_w:
 	$(CC) $(CFLAGS) -x c $< -o $@
 
 $(ASM_GEN_OUT): $(ASM_GEN_SRC) $(ALL_SRC)
-	mkdir -p $(GEN)
 	$(CC) $(CFLAGS) -S $< -o - | awk '/^[[:space:]]*\.set[[:space:]]+[A-Z_]+[[:space:]]*,[[:space:]]*[[:digit:]]/' > $(ASM_GEN_OUT)
 
 .PHONY: debug

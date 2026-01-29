@@ -1,6 +1,6 @@
 ## Overview
 
-A native code Forth system designed for self-bootstrapping. Currently supports only Arm64.
+A native-code Forth system designed for self-bootstrapping. Currently supports only Arm64.
 
 Goals:
 - [x] Simple JIT compilation to native code.
@@ -23,8 +23,8 @@ This is possible because of direct access to compilation. Outside the Forth worl
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
 
 The interpreter written in C doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
-- The stack-CC version boots via `f_lang_s.f`.
-- The register-CC version boots via `f_lang_r.f`.
+- The stack-CC version boots via `lang_s.f`.
+- The register-CC version boots via `lang_r.f`.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
@@ -33,7 +33,7 @@ All the code is authored by me. None is bot-generated.
 ## Show me the code!
 
 ```forth
-import' ./f_lang_s.f
+import' forth/lang_s.f
 
 : main
   log" hello world!" cr
@@ -59,8 +59,14 @@ main
 
 ```sh
 make
-./forth.exe f_lang_s.f -    # REPL mode.
-./forth.exe f_demo.f      # One-shot run.
+
+# Stack-based calling convention.
+./forth_s forth/lang_s.f -   # REPL mode.
+./forth_s forth/test_s.f     # One-shot run.
+
+# Register-based calling convention.
+./forth_r forth/lang_r.f -   # REPL mode.
+./forth_r forth/test_r.f     # One-shot run.
 ```
 
 Rebuild continuously while hacking:
@@ -68,8 +74,6 @@ Rebuild continuously while hacking:
 ```sh
 make build_w
 ```
-
-Unix users will scoff at `*.exe`, but it's convenient in development for hiding binary files from code editors 😛. Drop the extension when adding the executable to your `$PATH`.
 
 When debugging weird crashes, the following are useful:
 
@@ -81,11 +85,11 @@ make debug_run '<file>' DEBUG=true
 
 ## Library
 
-Should be usable as a library in another C/C++ program. The "main" file is only a tiny adapter over the top-level library API. See `./c_main.c`.
+Should be usable as a library in another C/C++ program. The "main" file is only a tiny adapter over the top-level library API. See `comp/main.c`.
 
-In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to use this as a library by simply cloning the repo into a subfolder and including `./c_interp.c` which provides the top-level API, and includes all other files it needs.
+In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to use this as a library by simply cloning the repo into a subfolder and including `comp/interp.c` which provides the top-level API, and includes all other files it needs.
 
-Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Everything here should be `static`.
+Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Practically every symbol is declared as `static`.
 
 ## Easy C interop
 

@@ -7,8 +7,9 @@
 !/*.md
 !/*.txt
 !/makefile
-!/lib
+!/comp
 !/mach
+!/forth
 
 # Should be listed last.
 .*
