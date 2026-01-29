@@ -1,0 +1,1171 @@
+: drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] ;
+: \ 10 parse drop2 ;
+: ( 41 parse drop2 ;
+
+(
+Can use comments now!
+
+This file boostraps the Forth system by self-assembling.
+We define basic words in terms of machine instructions.
+Currently only the Arm64 CPU architecture is supported.
+)
+
+\ brk 666
+: abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;
+: unreachable abort ;
+
+: ASM_COND_EQ 0b0000 ;
+: ASM_COND_NE 0b0001 ;
+: ASM_COND_CS 0b0010 ;
+: ASM_COND_CC 0b0011 ;
+: ASM_COND_MI 0b0100 ;
+: ASM_COND_PL 0b0101 ;
+: ASM_COND_VS 0b0110 ;
+: ASM_COND_VC 0b0111 ;
+: ASM_COND_HI 0b1000 ;
+: ASM_COND_LS 0b1001 ;
+: ASM_COND_GE 0b1010 ;
+: ASM_COND_LT 0b1011 ;
+: ASM_COND_GT 0b1100 ;
+: ASM_COND_LE 0b1101 ;
+: ASM_COND_AL 0b1110 ;
+: ASM_COND_NV 0b1111 ;
+
+: asm_pop_x1_x2
+  \ ldp x1, x2, [x27, -16]!
+  0b10_101_0_011_1_1111110_00010_11011_00001
+;
+
+: asm_push_x1_x2
+  \ stp x1, x2, [x27], 16
+  0b10_101_0_001_0_0000010_00010_11011_00001
+;
+
+: asm_pop_x1
+  \ ldr x1, [x27, -8]!
+  0b11_111_0_00_01_0_111111000_11_11011_00001
+;
+
+: asm_push_x1
+  \ str x1, [x27], 8
+  0b11_111_0_00_00_0_000001000_01_11011_00001
+;
+
+: or ( i1 i2 -- i3 ) [
+  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_01_01010_00_0_00010_000000_00001_00001 comp_instr \ orr x1, x1, x2
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+: and ( i1 i2 -- i3 ) [
+  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_00_01010_00_0_00010_000000_00001_00001 comp_instr \ and x1, x1, x2
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+: xor ( i1 i2 -- i3 ) [
+  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_10_01010_00_0_00010_000000_00001_00001 comp_instr \ eor x1, x1, x2
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+: lshift ( i1 bits -- i2 ) [
+  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_0_0_11010110_00010_0010_00_00001_00001 comp_instr \ lsl x1, x1, x2
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+: rshift ( i1 bits -- i2 ) [
+  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_0_0_11010110_00010_0010_01_00001_00001 comp_instr \ lsr x1, x1, x2
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+: invert ( i1 -- i2 ) [
+  asm_pop_x1                                 comp_instr \ ldr x1, [x27, -8]!
+  0b1_01_01010_00_1_00001_000000_11111_00001 comp_instr \ mvn x1, x1
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+\ cmp Xn, 0
+: asm_cmp_zero ( Xn -- instr )
+  5 lshift
+  0b1_1_1_100010_0_000000000000_00000_11111
+  or
+;
+
+\ Our parsing rules prevent `1+` or `+1` from being a word name.
+: inc ( i1 -- i2 ) [
+  asm_pop_x1                                comp_instr \ ldr x1, [x27, -8]!
+  0b1_0_0_100010_0_000000000001_00001_00001 comp_instr \ add x1, x1, 1
+  asm_push_x1                               comp_instr \ str x1, [x27], 8
+] ;
+
+\ Our parsing rules prevent `1-` or `-1` from being a word name.
+: dec ( i1 -- i2 ) [
+  asm_pop_x1                                comp_instr \ ldr x1, [x27, -8]!
+  0b1_1_0_100010_0_000000000001_00001_00001 comp_instr \ sub x1, x1, 1
+  asm_push_x1                               comp_instr \ str x1, [x27], 8
+] ;
+
+: swap ( i1 i2 -- i2 i1 ) [
+  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
+  0b10_101_0_001_0_0000010_00001_11011_00010 comp_instr \ stp x2, x1, [x27], 16
+] ;
+
+: low_bits ( bit_len -- bits ) 1 swap lshift dec ;
+: bit_trunc ( imm bit_len -- imm ) low_bits and ;
+
+\ cset Xd, <cond>
+: asm_cset ( Xd cond -- )
+  0b1_0_0_11010100_11111_0000_0_1_11111_00000
+  swap 1 xor 12 lshift or \ cond
+                       or \ Xd
+;
+
+: <>0 ( int -- bool ) [
+                asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+              1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 ASM_COND_NE asm_cset     comp_instr \ cset x1, ne
+                asm_push_x1  comp_instr \ str x1, [x27], 8
+] ;
+
+: =0 ( int -- bool ) [
+                asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+              1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 ASM_COND_EQ asm_cset     comp_instr \ cset x1, eq
+                asm_push_x1  comp_instr \ str x1, [x27], 8
+] ;
+
+\ Shared by a lot of load and store instructions. 64-bit only.
+: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 base_instr -- instr )
+  swap 3 rshift 7 bit_trunc 15 lshift or \ imm7
+  swap                      5  lshift or \ Xn
+  swap                      10 lshift or \ Xt2
+                                      or \ Xt1
+;
+
+\ ldp Xt1, Xt2, [Xn, <imm>]!
+: asm_load_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
+  0b10_101_0_011_1_0000000_00000_00000_00000
+  asm_pattern_load_store_pair
+;
+
+\ ldp Xt1, Xt2, [Xn], <imm>
+: asm_load_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
+  0b10_101_0_001_1_0000000_00000_00000_00000
+  asm_pattern_load_store_pair
+;
+
+\ ldp Xt1, Xt2, [Xn, <imm>]
+: asm_load_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
+  0b10_101_0_010_1_0000000_00000_00000_00000
+  asm_pattern_load_store_pair
+;
+
+\ stp Xt1, Xt2, [Xn, <imm>]!
+: asm_store_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
+  0b10_101_0_011_0_0000000_00000_00000_00000
+  asm_pattern_load_store_pair
+;
+
+\ stp Xt1, Xt2, [Xn], <imm>
+: asm_store_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
+  0b10_101_0_001_0_0000000_00000_00000_00000
+  asm_pattern_load_store_pair
+;
+
+\ stp Xt1, Xt2, [Xn, <imm>]
+: asm_store_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
+  0b10_101_0_010_0_0000000_00000_00000_00000
+  asm_pattern_load_store_pair
+;
+
+(
+Shared by a lot of load and store instructions.
+Patches these bits:
+  0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
+)
+: asm_pattern_load_store ( Xt Xn imm9 base_instr -- instr )
+  swap 9 bit_trunc 12 lshift or \ imm9
+  swap             5  lshift or \ Xn
+                             or \ Xt
+;
+
+\ ldr Xt, [Xn, <imm>]!
+: asm_load_pre ( Xt Xn imm9 -- instr )
+  0b11_111_0_00_01_0_000000000_11_00000_00000
+  asm_pattern_load_store
+;
+
+\ ldr Xt, [Xn], <imm>
+: asm_load_post ( Xt Xn imm9 -- instr )
+  0b11_111_0_00_01_0_000000000_01_00000_00000
+  asm_pattern_load_store
+;
+
+\ str Xt, [Xn, <imm>]!
+: asm_store_pre ( Xt Xn imm9 -- instr )
+  0b11_111_0_00_00_0_000000000_11_00000_00000
+  asm_pattern_load_store
+;
+
+\ str Xt, [Xn], <imm>
+: asm_store_post ( Xt Xn imm9 -- instr )
+  0b11_111_0_00_00_0_000000000_01_00000_00000
+  asm_pattern_load_store
+;
+
+\ ldur Xt, [Xn, <imm>]
+: asm_load_off ( Xt Xn imm9 -- instr )
+  0b11_111_0_00_01_0_000000000_00_00000_00000
+  asm_pattern_load_store
+;
+
+\ stur Xt, [Xn, <imm>]
+: asm_store_off ( Xt Xn imm9 -- instr )
+  0b11_111_0_00_00_0_000000000_00_00000_00000
+  asm_pattern_load_store
+;
+
+\ ldur Wt, [Xn, <imm>]
+: asm_load_off_32 ( Wt Xn imm9 -- instr )
+  0b10_111_0_00_01_0_000000000_00_00000_00000
+  asm_pattern_load_store
+;
+
+\ stur Wt, [Xn, <imm>]
+: asm_store_off_32 ( Wt Xn imm9 -- instr )
+  0b10_111_0_00_00_0_000000000_00_00000_00000
+  asm_pattern_load_store
+;
+
+(
+Shared by register-offset load and store instructions.
+`scale` must be 0 or 1; if 1, offset is multiplied by 8.
+Assumes `lsl` is already part of the base instruction.
+)
+: asm_pattern_load_store_with_register ( Xt Xn Xm scale base_instr -- instr )
+  swap <>0 12 lshift or \ lsl 3
+  swap     16 lshift or \ Xm
+  swap     5  lshift or \ Xn
+                     or \ Xt
+;
+
+\ ldr Xt, [Xn, Xm, lsl <scale>]
+: asm_load_with_register ( Xt Xn Xm scale -- instr )
+  0b11_111_0_00_01_1_00000_011_0_10_00000_00000
+  asm_pattern_load_store_with_register
+;
+
+\ str Xt, [Xn, Xm, lsl <scale>]
+: asm_store_with_register ( Xt Xn Xm scale -- instr )
+  0b11_111_0_00_00_1_00000_011_0_10_00000_00000
+  asm_pattern_load_store_with_register
+;
+
+\ str Xd, [x27], 8
+: asm_push1 ( Xd -- instr ) 27 8 asm_store_post ;
+
+\ ldr Xd, [x27, -8]!
+: asm_pop1 ( Xd -- instr ) 27 -8 asm_load_pre ;
+
+\ stp Xt1, Xt2, [x27], 16
+: asm_push2 ( Xt1 Xt2 -- instr ) 27 16 asm_store_pair_post ;
+
+\ ldp Xt1, Xt2, [x27, -16]!
+: asm_pop2 ( Xt1 Xt2 -- instr ) 27 -16 asm_load_pair_pre ;
+
+\ Shared by some integer arithmetic instructions.
+: asm_pattern_arith_reg ( Xd Xn Xm base_instr -- instr )
+  swap 16 lshift or \ Xm
+  swap 5  lshift or \ Xn
+                 or \ Xd
+;
+
+: asm_pattern_arith_imm ( Xd Xn imm12 base_instr -- instr )
+  swap 12 bit_trunc 10 lshift or \ imm12
+  swap              5  lshift or \ Xn
+                              or \ Xd
+;
+
+: asm_neg ( reg -- instr )
+  0b1_1_0_01011_00_0_00001_000000_11111_00000 or
+;
+
+\ add Xd, Xn, <imm12>
+: asm_add_imm ( Xd Xn imm12 -- instr )
+  0b1_0_0_100010_0_000000000000_00000_00000
+  asm_pattern_arith_imm
+;
+
+\ add Xd, Xn, Xm
+: asm_add_reg ( Xd Xn Xm -- instr )
+  0b1_0_0_01011_00_0_00000_000000_00000_00000
+  asm_pattern_arith_reg
+;
+
+\ sub Xd, Xn, <imm12>
+: asm_sub_imm ( Xd Xn Xm -- instr )
+  0b1_1_0_100010_0_000000000000_00000_00000
+  asm_pattern_arith_imm
+;
+
+\ sub Xd, Xn, Xm
+: asm_sub_reg ( Xd Xn Xm -- instr )
+  0b1_1_0_01011_00_0_00000_000000_00000_00000
+  asm_pattern_arith_reg
+;
+
+\ mul Xd, Xn, Xm
+: asm_mul ( Xd Xn Xm -- instr )
+  0b1_00_11011_000_00000_0_11111_00000_00000
+  asm_pattern_arith_reg
+;
+
+\ sdiv Xd, Xn, Xm
+: asm_sdiv ( Xd Xn Xm -- instr )
+  0b1_0_0_11010110_00000_00001_1_00000_00000
+  asm_pattern_arith_reg
+;
+
+\ msub Xd, Xn, Xm, Xa
+: asm_msub ( Xd Xn Xm Xa -- instr )
+  0b1_00_11011_000_00000_1_00000_00000_00000
+  swap 10 lshift or \ Xa
+  swap 16 lshift or \ Xm
+  swap 5  lshift or \ Xn
+                 or \ Xd
+;
+
+: asm_csneg ( Xd Xn Xm cond -- instr )
+  0b1_1_0_11010100_00000_0000_0_1_00000_00000
+  swap 12 lshift or     \ cond
+  asm_pattern_arith_reg \ Xd Xm Xn
+;
+
+\ asr Xd, Xn, imm6
+: asm_asr_imm ( Xd Xn imm6 -- instr )
+  0b1_00_100110_1_000000_111111_00000_00000
+  asm_pattern_arith_reg
+;
+
+\ asr Xd, Xn, Xm
+: asm_asr_reg ( Xd Xn Xm -- instr )
+  0b1_0_0_11010110_00000_0010_10_00000_00000
+  asm_pattern_arith_reg
+;
+
+\ eor Xd, Xn, Xm
+: asm_eor_reg ( Xd Xn Xm -- instr )
+  0b1_10_01010_00_0_00000_000000_00000_00000
+  asm_pattern_arith_reg
+;
+
+: asm_csel ( Xd Xn Xm cond -- instr )
+  0b1_0_0_11010100_00000_0000_0_0_00000_00000
+  swap 12 lshift or     \ cond
+  asm_pattern_arith_reg \ Xd Xn Xm
+;
+
+\ cmp Xn, Xm
+: asm_cmp_reg ( Xm Xn -- instr )
+  0b1_1_1_01011_00_0_00000_000_000_00000_11111
+  swap 5  lshift or \ Xn
+  swap 16 lshift or \ Xm
+;
+
+\ b <off>
+: asm_branch ( imm26 -- instr )
+  2  rshift    \ Offset is implicitly times 4.
+  26 bit_trunc \ Offset may be negative.
+  0b0_00_101_00000000000000000000000000 or
+;
+
+: asm_pattern_compare_branch ( imm19 Xt base_instr -- instr )
+  or           \ Xt
+  swap
+  2  rshift    \ Offset is times 4 implicitly.
+  19 bit_trunc \ Offset may be negative.
+  5  lshift
+  or           \ imm19
+;
+
+\ cbz x1, <off>
+: asm_cmp_branch_zero ( imm19 Xt -- instr )
+  0b1_011010_0_0000000000000000000_00000
+  asm_pattern_compare_branch
+;
+
+\ cbnz x1, <off>
+: asm_cmp_branch_not_zero ( imm19 Xt -- instr )
+  0b1_011010_1_0000000000000000000_00000
+  asm_pattern_compare_branch
+;
+
+\ Arithmetic (sign-preserving) right shift.
+: arshift ( i1 bits -- i2 ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 asm_asr_reg   comp_instr \ asr x1, x1, x2
+        asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+\ Same as `0 pick`.
+: dup ( i1 -- i1 i1 ) [
+  1 27 -8 asm_load_off comp_instr \ ldur x1, [x27, -8]
+          asm_push_x1  comp_instr \ str x1, [x27], 8
+] ;
+
+\ eor <reg>, <reg>, <reg>
+: asm_zero_reg ( reg -- instr ) dup dup asm_eor_reg ;
+
+: asm_mov_reg ( Xd Xm -- instr )
+  0b1_01_01010_00_0_00000_000000_11111_00000
+  swap 16 lshift or \ Xm
+                 or \ Xd
+;
+
+\ svc 666
+: asm_svc 0b110_101_00_000_0000001010011010_000_01 ;
+
+: ASM_PLACEHOLDER 666 ; \ Instruction `udf 666` used for retropatching.
+
+\ Non-immediate replacement for `literal`.
+: comp_push ( C: num -- ) ( E: -- num )
+  1 swap      comp_load  \ ldr x1, <num>
+  asm_push_x1 comp_instr \ str x1, [x27], 8
+;
+
+: ' ( -- word_ptr ) parse_word find_word ;
+: #' ( -- word_ptr ) ' comp_push ;
+: #inline' ' inline_word ;
+: #postpone' ' comp_call ;
+: #compile' ' comp_push #' comp_call comp_call ;
+
+: drop ( val -- ) [
+  27 27 8 asm_sub_imm comp_instr \ sub x27, x27, 8
+] ;
+
+\ Same as `1 pick 1 pick`.
+: dup2 ( i1 i2 -- i1 i2 i1 i2 ) [
+  1 2 27 -16 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -16]
+      1   2  asm_push2         comp_instr \ stp x1, x2, [x27], 16
+] ;
+
+\ Same as `swap drop`.
+: nip ( i1 i2 -- i2 ) [
+          asm_pop_x1    comp_instr \ ldr x1, [x27, -8]!
+  1 27 -8 asm_store_off comp_instr \ stur x1, [x27, -8]
+] ;
+
+\ Same as `swap2 drop2`.
+: nip2 ( i1 i2 i3 i4 -- i3 i4 ) [
+             asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 27 -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+] ;
+
+\ Same as `1 pick`.
+: over ( i1 i2 -- i1 i2 i1 ) [
+  1 27 -16 asm_load_off comp_instr \ ldur x1, [x27, -16]
+           asm_push_x1  comp_instr \ str x1, [x27], 8
+] ;
+
+\ Same as `3 pick 3 pick`.
+: over2 ( i1 i2 i3 i4 -- i1 i2 i3 i4 i1 i2 ) [
+  1 2 27 -32 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -32]
+             asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
+] ;
+
+\ Same as `3 roll 3 roll`.
+: swap2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 ) [
+  1 2 27 -32 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -32]
+  3 4 27 -16 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -16]
+  3 4 27 -32 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -32]
+  1 2 27 -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+] ;
+
+\ Same as `-rot swap rot`.
+: swap_over ( i1 i2 i3 -- i2 i1 i3 ) [
+  1 2 27 -24 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -24]
+  2 1 27 -24 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -24]
+] ;
+
+\ Same as `over -rot`.
+: dup_over ( i1 i2 -- i1 i1 i2 ) [
+  1 2  27 -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
+  1 2  27 -8  asm_store_pair_off comp_instr \ stp x1, x2, [x27, -8]
+    27 27  8  asm_add_imm        comp_instr \ add x27, x27, 8
+] ;
+
+\ Same as `dup rot`.
+: tuck ( i1 i2 -- i2 i1 i2 ) [
+  1 2 27 -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
+  2 1 27 -16 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -16]
+           2 asm_push1          comp_instr \ str x2, [x27], 8
+] ;
+
+: tuck2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 i3 i4 ) [
+  #inline' swap2
+  3 4 asm_push2 comp_instr \ stp x3, x4, [x27], 16
+] ;
+
+\ Same as `2 roll`.
+: rot ( i1 i2 i3 -- i2 i3 i1 ) [
+    1 27 -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
+  2 3 27 -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
+  2 3 27 -24 asm_store_pair_off comp_instr \ stp x2, x3, [x27, -24]
+    1 27  -8 asm_store_off      comp_instr \ stur x1, [x27, -8]
+] ;
+
+: -rot ( i1 i2 i3 -- i3 i1 i2 ) [
+    1 27 -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
+  2 3 27 -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
+    3 27 -24 asm_store_off      comp_instr \ stur x3, [x27, -24]
+  1 2 27 -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+] ;
+
+: rot2 ( i1 i2 i3 i4 i5 i6 -- i3 i4 i5 i6 i1 i2 ) [
+  1 2 27 -48 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -48]
+  3 4 27 -32 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -32]
+  5 6 27 -16 asm_load_pair_off  comp_instr \ ldp x5, x6, [x27, -16]
+  3 4 27 -48 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -48]
+  5 6 27 -32 asm_store_pair_off comp_instr \ stp x5, x6, [x27, -32]
+  1 2 27 -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+] ;
+
+\ Pushes the stack item found at the given index, duplicating it.
+: pick ( … ind -- … [ind] ) [
+  asm_pop_x1                                 comp_instr \ ldr x1, [x27, -8]!
+  0b1_01_01010_00_1_00001_000000_11111_00001 comp_instr \ mvn x1, x1
+  1 27 1 1 asm_load_with_register            comp_instr \ ldr x1, [x27, x1, lsl 3]
+  asm_push_x1                                comp_instr \ str x1, [x27], 8
+] ;
+
+\ FIFO version of `pick`: starts from stack bottom.
+: pick0 ( … ind -- … [ind] ) [
+  asm_pop_x1                      comp_instr \ ldr x1, [x27, -8]!
+  1 26 1 1 asm_load_with_register comp_instr \ ldr x1, [x26, x1, lsl 3]
+  asm_push_x1                     comp_instr \ str x1, [x27], 8
+] ;
+
+: flip ( i1 i2 i3 -- i3 i2 i1 ) [
+    1 27 -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
+   2  27 -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
+   2  27 -24 asm_store_off comp_instr \ str x2, [x27, -24]
+   1  27 -8  asm_store_off comp_instr \ str x1, [x27, -8]
+] ;
+
+: negate ( i1 -- i2 ) [
+    asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
+  1 asm_neg     comp_instr \ neg x1, x1
+    asm_push_x1 comp_instr \ str x1, [x27], 8
+] ;
+
+: + ( i1 i2 -- i3 ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 asm_add_reg   comp_instr \ add x1, x1, x2
+        asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+\ From i1 subtract i2.
+: - ( i1 i2 -- i3 ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 asm_sub_reg   comp_instr \ sub x1, x1, x2
+        asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+: * ( i1 i2 -- i3 ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 asm_mul       comp_instr \ mul x1, x1, x2
+        asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+\ Div i1 by i2.
+: / ( i1 i2 -- i3 ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 asm_sdiv      comp_instr \ sdiv x1, x1, x2
+        asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+: mod ( i1 i2 -- i3 ) [
+          asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+    3 1 2 asm_sdiv      comp_instr \ sdiv x3, x1, x2
+  1 3 2 1 asm_msub      comp_instr \ msub x1, x3, x2, x1
+          asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+: /mod ( dividend divisor -- rem quo ) [
+      1 2 asm_pop2  comp_instr \ ldp x1, x2, [x27, -16]!
+    3 1 2 asm_sdiv  comp_instr \ sdiv x3, x1, x2
+  1 3 2 1 asm_msub  comp_instr \ msub x1, x3, x2, x1
+      1 3 asm_push2 comp_instr \ stp x1, x3, [x27], 16
+] ;
+
+: abs ( ±int -- +int ) [
+                    asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+                  1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 1 1 ASM_COND_PL asm_csneg    comp_instr \ cneg x1, x1, mi
+                    asm_push_x1  comp_instr \ str x1, [x27], 8
+] ;
+
+: min ( i1 i2 -- i1|i2 ) [
+                    asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+                2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+  1 1 2 ASM_COND_LT asm_csel      comp_instr \ csel x1, x1, x2, lt
+                    asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+: max ( i1 i2 -- i1|i2 ) [
+                    asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+                2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+  1 1 2 ASM_COND_GT asm_csel      comp_instr \ csel x1, x1, x2, gt
+                    asm_push_x1   comp_instr \ str x1, [x27], 8
+] ;
+
+: asm_comp_cmp_cond ( cond -- )
+         asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+     2 1 asm_cmp_reg   comp_instr \ cmp x1, x2
+  1 swap asm_cset      comp_instr \ cset x1, <cond>
+         asm_push_x1   comp_instr \ str x1, [x27], 8
+;
+
+: asm_comp_cmp_zero ( cond -- )
+         asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+       1 asm_cmp_zero comp_instr \ cmp x1, 0
+  1 swap asm_cset     comp_instr \ cset x1, <cond>
+         asm_push_x1  comp_instr \ str x1, [x27], 8
+;
+
+\ https://gforth.org/manual/Numeric-comparison.html
+: =   ( i1 i2 -- bool ) [ ASM_COND_EQ asm_comp_cmp_cond ] ;
+: <>  ( i1 i2 -- bool ) [ ASM_COND_NE asm_comp_cmp_cond ] ;
+: >   ( i1 i2 -- bool ) [ ASM_COND_GT asm_comp_cmp_cond ] ;
+: <   ( i1 i2 -- bool ) [ ASM_COND_LT asm_comp_cmp_cond ] ;
+: <=  ( i1 i2 -- bool ) [ ASM_COND_LE asm_comp_cmp_cond ] ;
+: >=  ( i1 i2 -- bool ) [ ASM_COND_GE asm_comp_cmp_cond ] ;
+: <0  ( num   -- bool ) [ ASM_COND_LT asm_comp_cmp_zero ] ; \ Or `MI`.
+: >0  ( num   -- bool ) [ ASM_COND_GT asm_comp_cmp_zero ] ;
+: <=0 ( num   -- bool ) [ ASM_COND_LE asm_comp_cmp_zero ] ;
+: >=0 ( num   -- bool ) [ ASM_COND_GE asm_comp_cmp_zero ] ; \ Or `PL`.
+
+: odd ( i1 -- bool ) 1 and ;
+
+: @ ( adr -- val ) [
+        asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
+  1 1 0 asm_load_off comp_instr \ ldur x1, [x1]
+        asm_push_x1  comp_instr \ str x1, [x27], 8
+] ;
+
+: ! ( val adr -- ) [
+        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 asm_store_off comp_instr \ str x1, [x2]
+] ;
+
+\ 32-bit version of `!`. Used for patching instructions.
+: !32 ( val adr -- ) [
+        asm_pop_x1_x2    comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 asm_store_off_32 comp_instr \ str w1, x2
+] ;
+
+: on!  ( adr -- ) 1 swap ! ;
+: off! ( adr -- ) 0 swap ! ;
+
+\ Floor of data stack.
+: sp0 ( -- adr ) [ 26 asm_push1 comp_instr ] ; \ str x26, [x27], 8
+
+(
+Pushes the address of the next writable stack cell.
+Like `sp@` in Gforth but renamed to make sense.
+Note: our integer stack is empty-ascending.
+
+Should have been `str x27, [x27], 8`, but Arm64 has a quirk where an
+address-modifying load or store which also uses the address register
+in the value position is considered to be "unpredictable". Different
+CPUs are allowed to handle this differently; on Apple Silicon chips,
+this is considered a "bad instruction" and blows up.
+)
+: sp ( -- adr ) [
+  27 27 0 asm_store_off comp_instr \ stur x27, [x27]
+  27 27 8 asm_add_imm   comp_instr \ add x27, x27, 8
+] ;
+
+\ Sets the stack pointer register to the given address.
+\ Uses two instructions for the same reason as the above.
+: sp! ( adr -- ) [
+       asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
+  27 1 asm_mov_reg comp_instr \ mov x27, x1
+] ;
+
+: cell ( -- size ) 8 ;
+: cells ( len -- size ) 3 lshift ;
+: /cells ( size -- len ) 3 arshift ;
+
+\ Stack introspection doesn't need to be optimal.
+: depth ( -- len ) sp sp0 - /cells ;
+: stack_clear ( ... -- ) sp0 sp! ;
+: stack_trunc ( ... len -- ... ) cells sp0 + sp! ;
+
+(
+Conditionals work like this:
+
+  #if        \ cbz <outside>
+    if_true
+  #end
+  outside
+
+  #if        \ cbz <if_false>
+    if_true
+  #else      \ b <outside>
+    if_false
+  #end
+  outside
+)
+
+: reserve_instr ASM_PLACEHOLDER comp_instr ;
+
+: if_branch ( pc_off -- instr ) 1 asm_cmp_branch_zero ;
+
+: #if ( C: -- fun adr ) ( E: pred -- )
+  asm_pop_x1 comp_instr #' if_branch here reserve_instr
+;
+
+: ifn_branch ( pc_off -- instr ) 1 asm_cmp_branch_not_zero ;
+
+: #ifn ( C: -- fun adr ) ( E: pred -- )
+  asm_pop_x1 comp_instr #' ifn_branch here reserve_instr
+;
+
+: #end ( C: fun adr -- )
+  here over - ( fun adr pc_off )
+  rot execute ( adr instr )
+  swap !32    \ Retropatch instruction.
+;
+
+: uncond_branch ( adr pc_off -- ) asm_branch swap !32 ;
+
+: #else ( C: fun[if] adr[if] -- fun[else] adr[else] )
+  #' asm_branch here reserve_instr swap2 #postpone' #end
+;
+
+: #begin ( C: -- adr[beg] ) here ;
+: #again ( C: adr[beg] -- ) here - asm_branch comp_instr ; \ b <begin>
+
+\ Usage: `#begin ... #leave #again #end`.
+: #leave ( C: adr[beg] -- fun[b] adr[b] adr[beg] )
+  #' asm_branch here reserve_instr rot
+;
+
+: #while ( C: -- adr[cbz] ) ( E: pred -- )
+  asm_pop_x1 comp_instr here reserve_instr
+;
+
+: #repeat ( C: adr[beg] adr[cbz] -- )
+  swap here -   asm_branch          comp_instr \ Go back to #begin.
+  here over - 1 asm_cmp_branch_zero swap   !32 \ Retropatch #while.
+;
+
+: #until ( C: adr[beg] -- ) ( E: pred -- )
+  asm_pop_x1                       comp_instr \ Load predicate.
+  here - 1 asm_cmp_branch_not_zero comp_instr \ cbz 1, <begin>
+;
+
+: ?dup ( val bool -- val ?val ) #if dup #end ;
+
+\ Renamed from `s"`.
+: " ( -- cstr len ) 34 parse ;
+
+\ Same as compile-time semantics of `s"` in standard Forth.
+: #"
+  " tuck                    ( len str len )
+  inc                       \ Reserve 1 more for null byte.
+  1              comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  2 swap         comp_load  \ ldr x2, <len>
+  asm_push_x1_x2 comp_instr \ stp x1, x2, [x27], 16
+;
+
+\ Short for "C string". The parser ensures a trailing null byte.
+: c" ( -- cstr ) " drop ;
+
+\ Like `#"` but doesn't load length so we don't have to drop it.
+: #c"
+  " inc                  \ Reserve 1 more for null byte.
+  1           comp_const \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr \ stp x1, x2, [x27], 16
+;
+
+(
+The program is implicitly linked with `libc`.
+We're free to use Posix-standard C functions.
+C variables like `stdout` are a bit trickier,
+but also optional; we could `fdopen` instead.
+)
+
+:extern_ptr __stdinp
+:extern_ptr __stdoutp
+:extern_ptr __stderrp
+
+: stdin  __stdinp  @ ;
+: stdout __stdoutp @ ;
+: stderr __stderrp @ ;
+
+4 0 :extern fwrite
+1 0 :extern putchar
+2 0 :extern fputc
+2 0 :extern fputs
+1 0 :extern printf
+2 0 :extern fprintf
+3 0 :extern snprintf
+1 0 :extern fflush
+
+: eputchar ( code -- ) stderr fputc ;
+: puts ( cstr -- ) stdout fputs ;
+: eputs ( cstr -- ) stderr fputs ;
+: flush stdout fflush ;
+: eflush stderr fflush ;
+
+: type ( str len -- ) 1 swap stdout fwrite ;
+: etype ( str len -- ) 1 swap stderr fwrite ;
+: cr 10 putchar ;
+: ecr 10 putchar ;
+: space 32 putchar ;
+
+: ." " type ;
+: e" " etype ;
+: #." #postpone' #c" #compile' puts ;
+: #e" #postpone' #c" #compile' eputs ;
+
+: align_down ( size alignment -- size ) negate and ;
+: align_up   ( size alignment -- size ) tuck dec + swap align_down ;
+
+(
+On Arm64, we can't modify `sp` by 8 bytes and leave it like that.
+The ABI requires it to be aligned to 16 bytes when loading or storing.
+We store a pair to have a predictable value in the upper 8 bytes,
+instead of leaving random stack garbage there.
+
+TODO better name: this pops one stack item, but `dup` implies otherwise.
+)
+: dup>systack [
+  inline
+             asm_pop_x1         comp_instr \ ldr x1, [x27, -8]!
+  1 1 31 -16 asm_store_pair_pre comp_instr \ stp x1, x1, [sp, -16]!
+] ;
+
+: pair>systack ( Forth: i1 i2 -- | System: -- i1 i2 ) [
+  inline
+             asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 31 -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
+] ;
+
+(
+Note: `add` is one of the few instructions which treat `x31` as `sp`
+rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
+)
+: systack_ptr ( -- sp ) [
+  inline
+  1 31 0 asm_add_imm comp_instr \ add x1, sp, 0
+         asm_push_x1 comp_instr \ str x1, [x27], 8
+] ;
+
+: asm_comp_systack_push ( len -- )
+  dup <=0 #if drop #ret #end
+
+  dup odd #if
+    #' dup>systack inline_word
+    dec
+  #end
+
+  dup #ifn drop #ret #end
+
+  #begin
+    dup #while
+    #' pair>systack inline_word
+    2 -
+  #repeat
+  drop
+;
+
+: asm_comp_systack_pop ( len -- )
+  dup <=0 #if #ret #end
+  cells 16 align_up
+  31 31 rot asm_add_imm comp_instr \ add sp, sp, <size>
+;
+
+(
+Short for "varargs". Sets up arguments for a variadic call.
+Assumes the Apple Arm64 ABI where varargs use the systack.
+Usage:
+
+  : some_word
+    #c" numbers: %zd %zd %zd"
+    10 20 30 [ 3 va- ] printf [ -va ] cr
+  ;
+
+Caution: varargs can only be used in direct calls to variadic procedures.
+Indirect calls DO NOT WORK because the stack pointer is changed by calls.
+)
+: va- ( C: len -- len ) ( E: <systack_push> ) dup asm_comp_systack_push ;
+: -va ( C: len -- )     ( E: <systack_pop> )      asm_comp_systack_pop ;
+
+(
+Format-prints to stdout using `printf`. `N` is the variadic arg count,
+which must be available at compile time. Usage example:
+
+  10 20 30 [ 3 ] #f" numbers: %zu %zu %zu" cr
+)
+: #f" ( C: N -- ) ( E: i1 ... iN -- )
+  va- #postpone' #c" #compile' printf -va
+;
+
+\ Format-prints to stderr.
+: #ef" ( C: N -- ) ( E: i1 ... iN -- )
+  va- #compile' stderr #postpone' #c" #compile' fprintf -va
+;
+
+(
+Formats into the provided buffer using `snprintf`. Usage example:
+
+  SOME_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu" cr
+)
+: #sf" ( C: N -- ) ( E: buf size i1 ... iN -- )
+  va- #postpone' #c" #compile' snprintf -va
+;
+
+(
+`x0` is our error register. The annotation `throws` makes the compiler
+insert an error check after each call to this procedure and any other
+procedure which calls this one, turning the error into an exception.
+The `len` parameter is here because buffer variables return it.
+)
+: throw ( cstr len -- )
+  [ throws ]
+  drop
+  [ 0 asm_pop1 comp_instr ] \ ldr x0, [x27, -8]!
+;
+
+(
+Usage: `#throw" some_error_msg"`.
+
+Also see `#sthrowf"` for formatted errors.
+)
+: #throw" #postpone' #" #compile' throw ;
+
+(
+Formats an error message into the provided buffer using `snprintf`,
+then throws the buffer as the error value. The buffer must be zero
+terminated; `:buf` and `:buf_tmp` ensure this automatically.
+Usage example:
+
+  4096 :buf SOME_BUF
+  SOME_BUF 10 20 30 [ 20 ] #sthrowf" error codes: %zu %zu %zu"
+
+Also see `#throwf"` which comes with its own buffer.
+)
+: #sthrowf" ( C: len -- ) ( E: buf size i1 ... iN -- )
+  va-
+  #compile'   dup2
+  #postpone'  #c"
+  #compile'   snprintf
+  -va
+  #compile'   throw
+;
+
+: print_int ( num -- ) [ 1 ] #f" %zd"  ;
+: print_cell ( num ind -- ) dup_over [ 3 ] #f" %zd 0x%zx <%zd>" ;
+: . ( num -- ) depth dec print_cell cr ;
+
+: .s
+  depth #ifn
+    #." stack is empty" cr
+    #ret
+  #end
+
+  depth <0 #if
+    #." stack length is negative: " depth print_int cr
+    #ret
+  #end
+
+  depth [ 1 ] #f" stack <%zd>:" cr
+  depth 0 ( len ind )
+
+  #begin
+    dup2 > #while
+    space space
+    dup pick0 over print_cell cr
+    inc
+  #repeat
+  drop2
+;
+
+: .sc .s stack_clear ;
+
+2 1 :extern calloc  ( len size -- addr )
+1 1 :extern malloc  ( size -- addr )
+1 0 :extern free    ( addr -- )
+3 0 :extern memset  ( buf char len -- )
+1 1 :extern strlen  ( cstr -- len )
+3 0 :extern strncmp ( str0 str1 len -- )
+3 0 :extern strncpy ( buf[tar] buf[src] len -- )
+3 0 :extern strlcpy ( buf[tar] buf[src] buf_len -- )
+
+: move    ( buf[src] buf[tar] len -- ) swap_over strncpy ;
+: fill    ( buf len char -- ) swap memset ;
+: erase   ( buf len -- ) 0 fill ;
+: blank   ( buf len -- ) 32 fill ;
+: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
+: str=    ( str0 len0 str1 len1 -- bool ) compare =0 ;
+: str<    ( str0 len0 str1 len1 -- bool ) compare <0 ;
+
+\ For words which define words. Kinda like `create`.
+: #word_beg #compile' : ;
+: #word_end #compile' ; not_comp_only ;
+
+(
+Words for declaring constants and variables. Unlike in standard Forth,
+variables also take an initial value.
+
+The "tmp" variants are backed by calloc and are only valid within the runtime
+of the current process. The non-tmp variants will be eventually placed within
+the executable space of a compiled program when we implement AOT compilation.
+For now, there's no practical difference. The "tmp" variants will probably be
+removed; they're provided for demonstration purposes: how easily this system
+lets you implement global variables with no compiler support.
+)
+
+\ Same as standard `constant`.
+: :let ( C: val -- ) ( E: -- val ) #word_beg comp_push inline #word_end ;
+
+\ Similar to standard `variable`.
+: :var ( C: init "name" -- ) ( E: -- addr )
+  #word_beg
+  cell 1      comp_static \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr  \ str x1, [x27], 8
+  #word_end
+  !
+;
+
+: :var_tmp #word_beg cell 1 calloc dup comp_push #word_end ! ;
+
+(
+Creates a global variable which refers to a buffer of at least
+the given size in bytes, rounded up to page size.
+
+Serves the same role as the standard idiom `create <name> N allot`
+which we don't have because we segregate code and data.
+)
+: :buf ( C: size "name" -- ) ( E: -- addr size )
+  #word_beg
+  dup 1       comp_static drop \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr       \ str x1, [x27], 8
+              comp_push        \ str <len>, [x27], 8
+  #word_end
+;
+
+: :buf_tmp #word_beg dup 1 calloc comp_push comp_push #word_end ;
+
+0 :let false
+1 :let true
+
+4096 :buf ERR_BUF
+
+(
+Like `#sthrowf"` but easier to use. Example:
+
+  10 20 30 [ 20 ] #throwf" error codes: %zu %zu %zu"
+)
+: #throwf" ( C: len -- ) ( E: i1 ... iN -- )
+  va-
+  #compile'  ERR_BUF
+  #postpone' #c"
+  #compile'  snprintf
+  -va
+  #compile' ERR_BUF
+  #compile' throw
+;
+
+1 1 :extern strerror
+:extern_ptr __error
+: errno __error @ ;
+
+6 1 :extern mmap
+3 1 :extern mprotect
+
+16384 :let PAGE_SIZE
+0     :let PROT_NONE
+1     :let PROT_READ
+2     :let PROT_WRITE
+2     :let MAP_PRIVATE
+4096  :let MAP_ANON
+
+\ Allocates fully-protected, inaccessible memory.
+\ Middle area needs to be enabled with `mem_unprot`.
+: mem_map ( pflag size -- addr )
+  0 flip
+  MAP_ANON MAP_PRIVATE or
+  -1 0 mmap
+  dup -1 = #if drop #throw" unable to mmap" #end
+;
+
+: mem_unprot ( addr size -- )
+  PROT_READ PROT_WRITE or
+  mprotect
+  -1 = #if #throw" unable to mprotect" #end
+;
+
+(
+Allocates a guarded buffer: `guard|data|guard`.
+Attempting to read or write inside the guards,
+aka underflow or overflow, triggers a segfault.
+)
+: mem_alloc ( size1 -- addr size2 )
+  PAGE_SIZE align_up dup
+  PAGE_SIZE + \ low guard
+  PAGE_SIZE + \ high guard
+  PROT_NONE swap
+  mem_map     ( size2 addr[base] )
+  PAGE_SIZE + ( size2 addr[data] )
+  swap dup2 mem_unprot
+;
+
+: init_buf_var ( var_addr size -- buf_addr size )
+  over @ #if swap @ swap #ret #end
+  dup mem_alloc drop ( var_addr size buf_addr )
+  2 pick ! swap @ swap
+;
+
+(
+Exactly like `:buf`, but created inside the Forth program without any support
+from the interpreter / compiler. Unlike `:buf`, this isn't limited to the
+storage preallocated by the interpreter, and may request any amount supported
+by the OS and hardware. Also unlike `:buf`, this is initialized lazily the
+first time the variable is accessed, and has slightly more overhead for each
+subsequent access.
+)
+: :buf_var ( C: size "name" -- ) ( E: -- addr size2 )
+  PAGE_SIZE align_up
+  #word_beg
+  cell 1      comp_static drop \ `adrp x1, <addr@page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr       \ str <addr>, [x27], 8
+              comp_push        \ str <size>, [x27], 8
+  #compile' init_buf_var
+  #word_end
+;
+
+(
+FIXME new plan for static memory:
+
+- Allocate one huge arena for executable code,
+  const data, readwrite data, and Forth stack.
+- Writable heap is _only_ for code. Doesn't have other sections.
+- Intersperse all sections with guards.
+- Allocate only from these regions, without using `mmap` in Forth.
+- `comp_static` adds guards between all buffers that it allocates.
+- When building the Mach-O executable:
+  - Compactify by eliding unused regions. No need to bloat the executable!
+  - Guards are automatic; just leave unmapped holes.
+- Drop "tmp" variants; really don't need them.
+  - Education purposes are fine, but this confuses readers.
+- Also: interp-only words could be written in a separate sector,
+  allowing us to elide them from the executable. This is an optimization
+  for later. We should be able to enforce this pretty easily.
+)

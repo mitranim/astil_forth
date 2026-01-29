@@ -1,0 +1,90 @@
+UseTab: Never
+
+IndentWidth: 2
+PPIndentWidth: 2
+IndentWrappedFunctionNames: false
+IndentGotoLabels: true
+IndentCaseLabels: true
+ObjCBlockIndentWidth: 2
+ContinuationIndentWidth: 2
+BracedInitializerIndentWidth: 2
+ConstructorInitializerIndentWidth: 2
+# IndentPPDirectives: BeforeHash
+
+AlignOperands: DontAlign
+AlignEscapedNewlines: Left
+AlignTrailingComments: Always
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: None
+AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+
+BreakStringLiterals: false
+BreakAfterReturnType: None
+BreakAfterAttributes: Always
+BreakBeforeInlineASMColon: OnlyMultiline
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakFunctionDefinitionParameters: false
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakAfterDefinitionReturnType: None
+BreakBeforeBraces: Custom
+BraceWrapping:
+  BeforeElse: true
+
+PenaltyBreakString: 4096
+PenaltyBreakAssignment: 4096
+PenaltyBreakOpenParenthesis: 0
+PenaltyBreakBeforeFirstCallParameter: 0
+PenaltyIndentedWhitespace: 0
+PenaltyReturnTypeOnItsOwnLine: 4096
+PenaltyExcessCharacter: 32
+
+RemoveSemicolon: true
+RemoveBracesLLVM: false
+RemoveEmptyLinesInUnwrappedLines: true
+
+BinPackArguments: false
+BinPackParameters: false
+
+SpaceInEmptyBlock: false
+SpacesInAngles: Never
+SpacesInParens: Never
+SpacesInSquareBrackets: false
+SpacesInContainerLiterals: false
+SpacesInCStyleCastParentheses: false
+
+AllowShortEnumsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortCaseExpressionOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+Cpp11BracedListStyle: true
+SkipMacroDefinitionBody: false
+KeepEmptyLines:
+  AtStartOfBlock: false
+  AtStartOfFile: false
+ReflowComments: false
+SeparateDefinitionBlocks: Always
+QualifierAlignment: Custom
+QualifierOrder: [static, inline, volatile, friend, constexpr, const, restrict, type]
+TypenameMacros: [list_of, stack_of, span_of, dict_of, map_of, set_of, str_buf]
+IntegerLiteralSeparator:
+  Decimal: 3
+  DecimalMinDigits: 5
+
+# Requires clang-format 22+.
+NumericLiteralCase:
+  ExponentLetter: Lower
+  HexDigit: Upper
+  Prefix: Lower
+  Suffix: Lower

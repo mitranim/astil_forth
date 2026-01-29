@@ -1,0 +1,192 @@
+include" ./f_init.ft"
+include" ./f_testing.ft"
+
+: test_conditionals
+  T{ false #if  10          #end <T>    }T
+  T{ true  #if  10          #end <T> 10 }T
+  T{ false #if  10 #else 20 #end <T> 20 }T
+  T{ true  #if  10 #else 20 #end <T> 10 }T
+  T{ false #ifn 10          #end <T> 10 }T
+  T{ true  #ifn 10          #end <T>    }T
+  T{ false #ifn 10 #else 20 #end <T> 10 }T
+  T{ true  #ifn 10 #else 20 #end <T> 20 }T
+;
+test_conditionals
+
+1 0 :extern sleep
+: sleep_loop #begin #." sleeping" cr 1 sleep #again ;
+: test_again sleep_loop ;
+
+: countdown_repeat ( val -- )
+  #begin
+    debug_top_int
+    dup #while
+    dec
+  #repeat
+  debug_top_int
+  drop
+;
+
+: test_repeat 12 countdown_repeat ;
+
+: countdown_until ( val -- )
+  #begin
+    debug_top_int
+    dec
+    dup
+  #until
+  debug_top_int
+  drop
+;
+
+: test_until 12 countdown_until ;
+
+: test_sc 10 20 30 depth .sc ;
+
+T{  0    0   = <T> 1 }T
+T{  0    123 = <T> 0 }T
+T{  123  0   = <T> 0 }T
+T{ -123  0   = <T> 0 }T
+T{ -123  123 = <T> 0 }T
+T{  123 -123 = <T> 0 }T
+T{ -123 -123 = <T> 1 }T
+T{  123  123 = <T> 1 }T
+
+T{  0    0   <> <T> 0 }T
+T{  0    123 <> <T> 1 }T
+T{  123  0   <> <T> 1 }T
+T{ -123  0   <> <T> 1 }T
+T{ -123  123 <> <T> 1 }T
+T{  123 -123 <> <T> 1 }T
+T{ -123 -123 <> <T> 0 }T
+T{  123  123 <> <T> 0 }T
+
+T{  0    0   > <T> 0 }T
+T{  0    123 > <T> 0 }T
+T{  123  0   > <T> 1 }T
+T{ -123  0   > <T> 0 }T
+T{ -123  123 > <T> 0 }T
+T{  123 -123 > <T> 1 }T
+T{ -123 -123 > <T> 0 }T
+T{  123  123 > <T> 0 }T
+
+T{  0    0   < <T> 0 }T
+T{  0    123 < <T> 1 }T
+T{  123  0   < <T> 0 }T
+T{ -123  0   < <T> 1 }T
+T{ -123  123 < <T> 1 }T
+T{  123 -123 < <T> 0 }T
+T{ -123 -123 < <T> 0 }T
+T{  123  123 < <T> 0 }T
+
+T{  0    0    <= <T> 1 }T
+T{  0    123  <= <T> 1 }T
+T{  123  0    <= <T> 0 }T
+T{ -123  0    <= <T> 1 }T
+T{ -123  123  <= <T> 1 }T
+T{  123 -123  <= <T> 0 }T
+T{ -123 -123  <= <T> 1 }T
+T{  123  123  <= <T> 1 }T
+
+T{  0    0    >= <T> 1 }T
+T{  0    123  >= <T> 0 }T
+T{  123  0    >= <T> 1 }T
+T{ -123  0    >= <T> 0 }T
+T{ -123  123  >= <T> 0 }T
+T{  123 -123  >= <T> 1 }T
+T{ -123 -123  >= <T> 1 }T
+T{  123  123  >= <T> 1 }T
+
+T{ 10 20 30 swap_over <T> 20 10 30 }T
+
+T{ 123 0 ?dup <T> 123     }T
+T{ 234 1 ?dup <T> 234 234 }T
+
+123 :var_tmp VAR_TMP
+T{ VAR_TMP @     <T> 123 }T
+T{ 234 VAR_TMP ! <T>     }T
+T{ VAR_TMP @     <T> 234 }T
+T{ 345 VAR_TMP ! <T>     }T
+T{ VAR_TMP @     <T> 345 }T
+
+123 :var VAR
+T{ VAR @     <T> 123 }T
+T{ 234 VAR ! <T>     }T
+T{ VAR @     <T> 234 }T
+T{ 345 VAR ! <T>     }T
+T{ VAR @     <T> 345 }T
+
+T{ 234 123 - <T> 111   }T
+T{ 234 123 + <T> 357   }T
+T{ 234 123 * <T> 28782 }T
+T{ 234 123 / <T> 1     }T
+
+T{ 12 1 mod <T> 0 }T
+T{ 12 2 mod <T> 0 }T
+T{ 12 3 mod <T> 0 }T
+T{ 12 4 mod <T> 0 }T
+T{ 12 5 mod <T> 2 }T
+T{ 12 6 mod <T> 0 }T
+T{ 12 7 mod <T> 5 }T
+T{ 12 8 mod <T> 4 }T
+T{ 12 9 mod <T> 3 }T
+
+T{ 12 1 /mod <T> 0 12 }T
+T{ 12 2 /mod <T> 0 6  }T
+T{ 12 3 /mod <T> 0 4  }T
+T{ 12 4 /mod <T> 0 3  }T
+T{ 12 5 /mod <T> 2 2  }T
+T{ 12 6 /mod <T> 0 2  }T
+T{ 12 7 /mod <T> 5 1  }T
+T{ 12 8 /mod <T> 4 1  }T
+T{ 12 9 /mod <T> 3 1  }T
+
+T{    0 abs <T>   0 }T
+T{ -123 abs <T> 123 }T
+T{  123 abs <T> 123 }T
+
+T{  123  234 min <T>  123 }T
+T{  234  123 min <T>  123 }T
+T{  0    123 min <T>  0   }T
+T{  123  0   min <T>  0   }T
+T{  0   -123 min <T> -123 }T
+T{ -123  0   min <T> -123 }T
+T{ -123  234 min <T> -123 }T
+T{  234 -123 min <T> -123 }T
+
+T{  123  234 max <T>  234 }T
+T{  234  123 max <T>  234 }T
+T{  0    123 max <T>  123 }T
+T{  123  0   max <T>  123 }T
+T{  0   -123 max <T>  0   }T
+T{ -123  0   max <T>  0   }T
+T{ -123  234 max <T>  234 }T
+T{  234 -123 max <T>  234 }T
+
+: test_varargs
+  #c" numbers (should be 10 20 30): %zd %zd %zd"
+  10 20 30 [ 3 va- ] debug_stack printf [ -va ] cr
+;
+
+: test_#f"
+  10 20 30 [ 3 ] #f" numbers: %zu %zu %zu" cr
+;
+
+: test_#ef"
+  10 20 30 [ 3 ] #ef" numbers: %zu %zu %zu" cr
+;
+
+4096 :buf_tmp STR_BUF
+
+: test_#sf"
+  STR_BUF 10 20 30 [ 3 ] #sf" numbers: %zu %zu %zu"
+  STR_BUF drop puts
+;
+
+: test_sthrowf
+  STR_BUF 10 20 30 [ 3 ] #sthrowf" codes: %zu %zu %zu"
+;
+
+: test_throwf
+  10 20 30 [ 3 ] #throwf" codes: %zu %zu %zu"
+;

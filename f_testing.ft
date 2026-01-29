@@ -1,0 +1,80 @@
+(
+Vaguely similar to regular Forth testing words:
+
+  https://forth-standard.org/standard/testsuite
+
+Example tests:
+
+  T{ 10 20 30 <T> 10 20 30 }    \ OK
+  T{ 10 20 30 <T> 10 20 30 40 } \ Fail
+)
+
+0    :var T_LEN_0 \ Length before `T{`.
+0    :var T_LEN_1 \ Length at `<T>`.
+0    :var T_LEN_2 \ Length at `}T`.
+0    :var T_LEN_3 \ Relative length before `<T>`.
+0    :var T_LEN_4 \ Relative length after `<T>`.
+4096 :buf T_ERR
+
+: T_equal ( max ind -- bool )
+  #begin
+    dup2 > #while
+    dup  T_LEN_0 @ + pick0
+    over T_LEN_1 @ + pick0
+    <> #if drop2 0 #ret #end
+    inc
+  #repeat
+  drop2 1
+;
+
+: T{ depth T_LEN_0 ! ;
+
+: <T> depth T_LEN_1 ! ;
+
+: }T
+  depth T_LEN_2 !
+  T_LEN_1 @ T_LEN_0 @ - T_LEN_3 !
+  T_LEN_2 @ T_LEN_1 @ - T_LEN_4 !
+
+  T_LEN_3 @
+  T_LEN_4 @
+
+  \ Does the depth match?
+  = #if
+    \ Does the content match?
+    T_LEN_4 @ 0 T_equal
+    #if
+      \ Reset to initial stack depth.
+      T_LEN_0 @ stack_trunc
+      #ret
+    #end
+  #else
+    T_LEN_3 @
+    T_LEN_4 @
+    [ 2 ] #ef" stack depth mismatch: (%zd) <T> (%zd)" cr
+  #end
+
+  #e" stack content mismatch: T{ "
+
+  T_LEN_0 @
+  #begin
+    dup T_LEN_1 @ < #while
+    dup pick0 [ 1 ] #ef" %zd "
+    inc
+  #repeat
+
+  #e" <T> "
+
+  #begin
+    dup T_LEN_2 @ < #while
+    dup pick0 [ 1 ] #ef" %zd "
+    inc
+  #repeat drop
+
+  #e" }T" cr
+
+  \ Reset to initial stack depth.
+  T_LEN_0 @ stack_trunc
+  #throw" test failure"
+  unreachable
+;

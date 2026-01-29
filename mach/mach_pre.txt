@@ -1,0 +1,14 @@
+/*
+This horror is created by the Mach Interface Generator.
+
+See also:
+
+  make mach_gen
+  lib/mach_exc.c
+*/
+
+#pragma once
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wall"
+#pragma clang diagnostic ignored "-Wmissing-variable-declarations"
+

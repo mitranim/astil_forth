@@ -1,0 +1,19 @@
+/*
+!/*.c
+!/*.h
+!/*.s
+!/*.ft
+!/*.sb
+!/*.md
+!/*.txt
+!/makefile
+!/lib
+!/mach
+
+# Should be listed last.
+.*
+!.git*
+!*ignore
+!*rc
+!*config
+!.clang-format

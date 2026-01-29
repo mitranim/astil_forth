@@ -1,0 +1,1003 @@
+#pragma once
+#include "./c_asm.c"
+#include "./c_interp.h"
+#include "./c_read.c"
+#include "./c_read.h"
+#include "./c_sym.c"
+#include "./lib/dict.c"
+#include "./lib/err.h"
+#include "./lib/fmt.c"
+#include "./lib/misc.h"
+#include "./lib/stack.h"
+#include "./lib/str.c"
+#include <dlfcn.h>
+#include <string.h>
+
+/*
+Intrinsic procedures necessary for "bootstrapping" the Forth system.
+Should be kept to a minimum. Non-fundamental words should be written
+in Forth; where regular language is insufficient, we use inline asm.
+
+Intrinsics don't even provide conditionals or arithmetic.
+*/
+
+// TODO: avoid forward declarations.
+Err interp_include(Interp *, const char *);
+Err interp_call_sym(Interp *, const Sym *);
+Err compile_call_sym(Interp *, Sym *);
+
+static Err err_undefined_word(const char *name) {
+  return errf("undefined word " FMT_QUOTED, name);
+}
+
+static Err interp_read_word(Interp *interp) {
+  const auto read = interp->reader;
+  try(read_skip_whitespace(read));
+  try(read_word(read));
+  IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", read->word.buf));
+  return nullptr;
+}
+
+static Err interp_read_sym(Interp *interp, Sym **out) {
+  try(interp_read_word(interp));
+
+  const auto name = interp->reader->word.buf;
+  const auto sym  = dict_get(&interp->dict, name);
+
+  if (!sym) return err_undefined_word(name);
+  if (out) *out = sym;
+  return nullptr;
+}
+
+static Err err_current_sym_not_defining() {
+  return err_str("unable to find current symbol: not inside a colon definition");
+}
+
+static Err current_sym(const Interp *interp, Sym **out) {
+  const auto sym = interp->defining;
+  if (!sym) return err_current_sym_not_defining();
+  if (out) *out = sym;
+  return nullptr;
+}
+
+static Err err_nested_definition(const Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  return errf("unexpected \":\" in definition of " FMT_QUOTED, sym->name.buf);
+}
+
+static Err err_wordlist_at_capacity(const char *name) {
+  return errf("unable to create word " FMT_QUOTED ": wordlist at capacity", name);
+}
+
+static Err intrin_colon(Interp *interp) {
+  if (interp->defining) return err_nested_definition(interp);
+
+  const auto read = interp->reader;
+  const auto asm  = &interp->asm;
+
+  try(read_skip_whitespace(read));
+  try(read_word(read));
+
+  const auto name = read->word;
+  IF_DEBUG(eprintf("[system] read word name: " FMT_QUOTED "\n", name.buf));
+
+  const auto syms = &interp->syms;
+  if (!stack_rem(syms)) return err_wordlist_at_capacity(name.buf);
+
+  /*
+  Add to the symbol list, but not to the symbol dict.
+  During the colon, the new word is not yet visible.
+  */
+  const auto sym = stack_push(
+    syms,
+    (Sym){
+      .type      = SYM_NORM,
+      .name      = name,
+      .immediate = is_name_immediate(&name),
+    }
+  );
+  asm_sym_beg(asm, sym);
+
+  interp->defining  = sym;
+  interp->compiling = true;
+  return nullptr;
+}
+
+static Err err_semi_not_compiling() {
+  return err_str("unsupported use of \";\" when not compiling");
+}
+
+static Err intrin_semicolon(Interp *interp) {
+  const auto asm = &interp->asm;
+
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  if (!interp->compiling) return err_semi_not_compiling();
+  try(asm_sym_end(asm, sym));
+
+  const auto dict = &interp->dict;
+  if (dict_has(dict, sym->name.buf) && !interp->redefining) {
+    eprintf("[system] redefined word " FMT_QUOTED "\n", sym->name.buf);
+  }
+  dict_set(dict, sym->name.buf, sym);
+
+  /*
+  Prints instructions as hexpairs in the system's endian order,
+  which is usually little endian. How to disassemble:
+
+    echo <hex> | llvm-mc --disassemble --hex
+  */
+  IF_DEBUG({
+    const auto exec = &sym->norm.exec;
+
+    eprintf(
+      "[system] compiled symbol " FMT_QUOTED
+      " with executable address %p; instructions (" FMT_SINT "): ",
+      sym->name.buf,
+      exec->floor,
+      stack_len(exec)
+    );
+    eprint_byte_range_hex((U8 *)exec->floor, (U8 *)exec->top);
+    fputc('\n', stderr);
+
+    // const auto read = interp->reader;
+    // eprintf(
+    //   "[system] [reader] position " FMT_UINT "; %s:" FMT_UINT ":" FMT_UINT "\n",
+    //   READ_POS_ARGS(read)
+    // );
+  });
+
+  interp->asm_snap   = interp->asm;
+  interp->defining   = nullptr;
+  interp->compiling  = false;
+  interp->redefining = false;
+
+  // const auto ints = &interp->ints;
+  // if (stack_len(ints)) {
+  //   eprintf(
+  //     "[system] warning: " FMT_SINT " stack items after defining " FMT_QUOTED
+  //     "; this usually indicates a bug\n",
+  //     stack_len(ints),
+  //     sym->name.buf
+  //   );
+  // }
+  return nullptr;
+}
+
+static void intrin_bracket_beg(Interp *interp) { interp->compiling = false; }
+
+static void intrin_bracket_end(Interp *interp) { interp->compiling = true; }
+
+// static Err intrin_immediate(Interp *interp) {
+//   Sym *sym;
+//   try(current_sym(interp, &sym));
+//   sym->immediate = true;
+//   return nullptr;
+// }
+
+static Err intrin_comp_only(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->comp_only = true;
+  return nullptr;
+}
+
+static Err intrin_not_comp_only(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->comp_only = false;
+  return nullptr;
+}
+
+static Err intrin_inline(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->inlined = true;
+  return nullptr;
+}
+
+static Err intrin_throws(Interp *interp) {
+  Sym *sym;
+  try(current_sym(interp, &sym));
+  sym->throws = true;
+  return nullptr;
+}
+
+static Err err_redefine_not_defining() {
+  return err_str("unsupported use of \"redefine\" outside a colon definition");
+}
+
+static Err intrin_redefine(Interp *interp) {
+  try(current_sym(interp, nullptr));
+  interp->redefining = true;
+  return nullptr;
+}
+
+/*
+Caution: unlike in other Forth systems, `here` is not an executable address.
+Executable code is copied to a different memory page when finalizing a word.
+*/
+static void intrin_here(Interp *interp) {
+  stack_push(&interp->ints, (Sint)(asm_next_writable_instr(&interp->asm)));
+}
+
+static Err intrin_comp_instr(Interp *interp) {
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+  try(asm_append_instr_from_int(&interp->asm, val));
+  return nullptr;
+}
+
+static Err intrin_comp_load(Interp *interp) {
+  Sint imm;
+  Sint reg;
+  try(int_stack_pop(&interp->ints, &imm));
+  try(int_stack_pop(&interp->ints, &reg));
+
+  aver(reg >= 0 && reg < ASM_REG_LEN);
+  asm_append_imm_to_reg(&interp->asm, (U8)reg, imm);
+  return nullptr;
+}
+
+static Err err_invalid_data_len(Sint len) {
+  return errf("invalid data length: " FMT_SINT, len);
+}
+
+/*
+Stores constant data of arbitrary length, namely a string,
+into the constant region, and compiles `( -- addr size )`.
+*/
+static Err intrin_comp_const(Interp *interp) {
+  const auto ints = &interp->ints;
+
+  Sint reg;
+  Sint len;
+  Sint buf;
+  try(int_stack_pop(ints, &reg));
+  try(int_stack_pop(ints, &len));
+  try(int_stack_pop(ints, &buf));
+
+  try(asm_validate_reg(reg));
+  if (!(len > 0)) return err_invalid_data_len(len);
+
+  try(asm_alloc_const_append_load(&interp->asm, (U8 *)buf, (Uint)len, (U8)reg));
+
+  IF_DEBUG(eprintf(
+    "[system] appended constant with address %p and length " FMT_UINT "\n",
+    (void *)buf,
+    (Uint)len
+  ));
+  return nullptr;
+}
+
+// ( C: size register -- addr )
+static Err intrin_comp_static(Interp *interp) {
+  const auto ints = &interp->ints;
+
+  Sint reg;
+  Sint len;
+  try(int_stack_pop(ints, &reg));
+  try(int_stack_pop(ints, &len));
+  try(asm_validate_reg(reg));
+
+  if (!(len > 0)) return err_invalid_data_len(len);
+
+  U8 *addr;
+  try(asm_alloc_data_append_load(&interp->asm, (Uint)len, (U8)reg, &addr));
+  try(int_stack_push(&interp->ints, (Sint)addr));
+  return nullptr;
+}
+
+static Err err_sym_out_bounds(const Sym *floor, const Sym *ceil, const Sym *val) {
+  return errf(
+    "expected a word address between %p and %p; got an out of bounds value: %p",
+    floor,
+    ceil,
+    val
+  );
+}
+
+static Err interp_validate_sym_ptr(Interp *interp, Sym *sym) {
+  const auto syms = &interp->syms;
+  if (sym >= syms->floor && sym < syms->ceil) return nullptr;
+  return err_sym_out_bounds(syms->floor, syms->ceil, sym);
+}
+
+static Err interp_sym_by_ptr(Interp *interp, Sym **out) {
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+
+  const auto sym = (Sym *)val;
+  try(interp_validate_sym_ptr(interp, sym));
+
+  IF_DEBUG(eprintf(
+    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
+  ));
+
+  if (out) *out = sym;
+  return nullptr;
+}
+
+static Err intrin_comp_call(Interp *interp) {
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+
+  const auto sym = (Sym *)val;
+  try(interp_validate_sym_ptr(interp, sym));
+
+  IF_DEBUG(eprintf(
+    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
+  ));
+  return compile_call_sym(interp, sym);
+}
+
+static const Err ERR_QUIT = "quit";
+
+static Err intrin_quit(Interp *interp) {
+  if (interp->defining) {
+    return err_str("can't quit while defining a word");
+  }
+  return ERR_QUIT;
+}
+
+static void intrin_ret(Interp *interp) { asm_append_ret(&interp->asm); }
+
+static Err err_char_eof() {
+  return err_str("EOF where a character was expected");
+}
+
+static Err intrin_char(Interp *interp) {
+  const auto read = interp->reader;
+  U8         byte;
+
+  try(read_ascii_printable(read, &byte));
+  if (!byte) return err_char_eof();
+  try(int_stack_push(&interp->ints, byte));
+  return nullptr;
+}
+
+// TODO: not fundamental, implement in Forth via intrinsic `char`.
+static Err intrin_parse(Interp *interp) {
+  const auto read = interp->reader;
+  const auto ints = &interp->ints;
+
+  // IF_DEBUG(eprintf(
+  //   "[system] stack length before pop delim: " FMT_UINT "\n", stack_len(ints)
+  // ));
+
+  Sint delim;
+  try(int_stack_pop(ints, &delim));
+
+  // IF_DEBUG(eprintf(
+  //   "[system] stack_len(ints) before parsing: " FMT_SINT "\n", stack_len(ints)
+  // ));
+
+  try(validate_char_ascii_printable(delim));
+  try(read_skip_whitespace(read));
+  try(read_until(read, (U8)delim));
+
+  // IF_DEBUG(eprintf(
+  //   "[system] parsed until delim " FMT_CHAR "; length: " FMT_UINT
+  //   "; string: %s\n",
+  //   (int)delim,
+  //   read->buf.len,
+  //   read->buf.buf
+  // ));
+
+  try(int_stack_push(ints, (Sint)read->buf.buf));
+  try(int_stack_push(ints, (Sint)read->buf.len));
+
+  // IF_DEBUG({
+  //   eprintf(
+  //     "[system] stack_len(ints) after parsing: " FMT_SINT "\n", stack_len(ints)
+  //   );
+  //   eprintf("[system] stack pointer after parsing: %p\n", ints->top);
+  // });
+  return nullptr;
+}
+
+// Technically not fundamental. TODO implement in Forth via intrinsic `char`.
+static Err intrin_parse_word(Interp *interp) {
+  try(interp_read_word(interp));
+
+  const auto word = &interp->reader->word;
+  const auto ints = &interp->ints;
+
+  try(int_stack_push(ints, (Sint)word->buf));
+  try(int_stack_push(ints, (Sint)word->len));
+  return nullptr;
+}
+
+static Err intrin_include(Interp *interp) {
+  const auto ints = &interp->ints;
+  Sint       path;
+
+  try(int_stack_pop(ints, nullptr)); // discard length
+  try(int_stack_pop(ints, &path));
+  try(interp_include(interp, (const char *)path));
+  return nullptr;
+}
+
+static Err intrin_include_quote(Interp *interp) {
+  const auto read = interp->reader;
+  try(read_skip_whitespace(read));
+  try(read_until(read, '"'));
+  try(interp_include(interp, (const char *)read->buf.buf));
+  return nullptr;
+}
+
+static Err err_extern_redefinition(const char *name) {
+  return errf("unexpected attempt to redefine extern word " FMT_QUOTED, name);
+}
+
+static Err intrin_read_extern(Interp *interp, void **out_addr) {
+  try(interp_read_word(interp));
+  const auto name = interp->reader->word.buf;
+
+  IF_DEBUG(
+    eprintf("[system] read name of extern symbol: " FMT_QUOTED "\n", name)
+  );
+
+  const auto addr = dlsym(RTLD_DEFAULT, name);
+
+  if (!addr) {
+    return errf(
+      "unable to find extern symbol " FMT_QUOTED "; error: %s", name, dlerror()
+    );
+  }
+
+  IF_DEBUG(eprintf(
+    "[system] found address of extern symbol " FMT_QUOTED ": %p\n", name, addr
+  ));
+
+  if (out_addr) *out_addr = addr;
+  return nullptr;
+}
+
+static Err intrin_extern_ptr(Interp *interp) {
+  void *addr;
+  try(intrin_read_extern(interp, &addr));
+
+  const auto sym = stack_push(
+    &interp->syms,
+    (Sym){
+      .type         = SYM_EXT_PTR,
+      .name         = interp->reader->word,
+      .ext_ptr.addr = addr,
+    }
+  );
+
+  dict_set(&interp->dict, sym->name.buf, sym);
+  asm_register_dysym(&interp->asm, sym->name.buf, (U64)addr);
+  return nullptr;
+}
+
+static Err intrin_extern_proc(Interp *interp) {
+  void *addr;
+  try(intrin_read_extern(interp, &addr));
+
+  const auto ints = &interp->ints;
+  Sint       out_len;
+  Sint       inp_len;
+  try(int_stack_pop(ints, &out_len));
+  try(int_stack_pop(ints, &inp_len));
+
+  if (inp_len < 0) return err_str("negative input parameter count");
+  if (inp_len > ASM_PARAM_REG_LEN) return err_str("too many input parameters");
+  if (out_len < 0) return err_str("negative output parameter count");
+  if (out_len > 1) return err_str("too many output parameters");
+
+  const auto sym = stack_push(
+    &interp->syms,
+    (Sym){
+      .type             = SYM_EXT_PROC,
+      .name             = interp->reader->word,
+      .ext_proc.fun     = addr,
+      .ext_proc.inp_len = (U8)inp_len,
+      .ext_proc.out_len = (U8)out_len,
+    }
+  );
+
+  dict_set(&interp->dict, sym->name.buf, sym);
+  asm_register_dysym(&interp->asm, sym->name.buf, (U64)addr);
+  return nullptr;
+}
+
+static Err interp_find_word(Interp *interp, Sym **out) {
+  Sint len;
+  Sint buf;
+  try(int_stack_pop(&interp->ints, &len));
+  try(int_stack_pop(&interp->ints, &buf));
+
+  const auto name = (const char *)buf;
+  if (DEBUG) aver((Sint)strlen(name) == len);
+
+  const auto sym = dict_get(&interp->dict, name);
+  if (!sym) return err_undefined_word(name);
+
+  IF_DEBUG(
+    eprintf("[system] found symbol " FMT_QUOTED " at address %p\n", name, sym)
+  );
+
+  *out = sym;
+  return nullptr;
+}
+
+static Err intrin_find_word(Interp *interp) {
+  Sym *sym;
+  try(interp_find_word(interp, &sym));
+  return int_stack_push(&interp->ints, (Sint)sym);
+}
+
+static Err err_inline_not_defining() {
+  return err_str("unsupported use of \"inline\" outside a colon definition");
+}
+
+static Err err_inline_not_norm(const Sym *sym) {
+  switch (sym->type) {
+    case SYM_INTRIN: {
+      return errf(
+        "unable to inline word " FMT_QUOTED " which is an interpreter intrinsic",
+        sym->name.buf
+      );
+    }
+    case SYM_EXT_PTR: {
+      return errf(
+        "unable to inline word " FMT_QUOTED " which is an external symbol",
+        sym->name.buf
+      );
+    }
+    case SYM_EXT_PROC: {
+      return errf(
+        "unable to inline word " FMT_QUOTED " which is an external procedure",
+        sym->name.buf
+      );
+    }
+    case SYM_NORM: unreachable();
+    default:       unreachable();
+  }
+}
+
+static Err err_inline_not_leaf(const Sym *sym) {
+  return errf(
+    "unable to inline word " FMT_QUOTED ": not a leaf procedure", sym->name.buf
+  );
+}
+
+// Edge case which doesn't matter, but throwing words could be inlined.
+static Err err_inline_throws(const Sym *sym) {
+  return errf("unable to inline word " FMT_QUOTED " which throws", sym->name.buf);
+}
+
+static Err interp_inline_sym(Interp *interp, Sym *sym) {
+  if (sym->type != SYM_NORM) return err_inline_not_norm(sym);
+  if (!is_sym_leaf(sym)) return err_inline_not_leaf(sym);
+  if (sym->throws) return err_inline_throws(sym);
+  return asm_inline_sym(&interp->asm, sym);
+}
+
+static Err intrin_inline_word(Interp *interp) {
+  if (!interp->defining) return err_inline_not_defining();
+  Sym *sym;
+  try(interp_sym_by_ptr(interp, &sym));
+  return interp_inline_sym(interp, sym);
+}
+
+static Err intrin_execute(Interp *interp) {
+  Sym *sym;
+  try(interp_sym_by_ptr(interp, &sym));
+  return interp_call_sym(interp, sym);
+}
+
+// TODO figure out how to get a hold of stream pointers in Forth.
+static void debug_flush(void *) {
+  fflush(stdout);
+  fflush(stderr);
+}
+
+static Err debug_throw() { return "debug_throw"; }
+
+static void debug_stack(Interp *interp) {
+  const auto ints = &interp->ints;
+  const auto len  = stack_len(ints);
+
+  if (!len) {
+    eprintf("[debug] stack is empty (%p)\n", ints->floor);
+    return;
+  }
+
+  eprintf("[debug] stack (%p) (" FMT_SINT "):\n", ints->floor, len);
+
+  for (stack_range(auto, ptr, ints)) {
+    eprintf(
+      "[debug]   %p -- " FMT_SINT " " FMT_UINT_HEX "\n", ptr, *ptr, (Uint)*ptr
+    );
+  }
+}
+
+static void debug_depth(Interp *interp) {
+  eprintf("[debug] stack depth: " FMT_SINT "\n", stack_len(&interp->ints));
+}
+
+static void debug_top_int(Interp *interp) {
+  eprintf("[debug] stack top int: " FMT_SINT "\n", stack_head(&interp->ints));
+}
+
+static void debug_top_ptr(Interp *interp) {
+  const auto ints = &interp->ints;
+
+  if (stack_len(ints)) {
+    eprintf("[debug] stack top ptr: %p\n", (void *)stack_head(ints));
+  }
+  else {
+    eputs("[debug] stack top ptr: none (empty)");
+  }
+}
+
+static void debug_top_str(Interp *interp) {
+  eprintf(
+    "[debug] stack top string: %s\n", (const char *)stack_head(&interp->ints)
+  );
+}
+
+static Err debug_mem(Interp *interp) {
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+
+  auto ptr = (const Uint *)val;
+  eprintf("[debug] memory at address %p:\n", ptr);
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 0, *(ptr + 0));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 1, *(ptr + 1));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 2, *(ptr + 2));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 3, *(ptr + 3));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 4, *(ptr + 4));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 5, *(ptr + 5));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 6, *(ptr + 6));
+  eprintf("[debug]   %p -- " FMT_UINT_HEX "\n", ptr + 7, *(ptr + 7));
+  return nullptr;
+}
+
+static Err debug_word(Interp *interp) {
+  Sym *sym;
+  try(interp_read_sym(interp, &sym));
+
+  const auto name = sym->name.buf;
+
+  switch (sym->type) {
+    case SYM_NORM: {
+      const auto exec = &sym->norm.exec;
+      eprintf(
+        "[debug] word:\n"
+        "[debug]   name: %s\n"
+        "[debug]   type: normal\n"
+        "[debug]   address: %p\n"
+        "[debug]   instructions (" FMT_SINT "): ",
+        name,
+        exec->floor,
+        stack_len(exec)
+      );
+      eprint_byte_range_hex((U8 *)exec->floor, (U8 *)exec->top);
+      fputc('\n', stderr);
+
+      IF_DEBUG({
+        eprintf("[debug] symbol: ");
+        repr_struct(sym);
+      });
+      return nullptr;
+    }
+
+    case SYM_INTRIN: {
+      eprintf(
+        "[debug] word:\n"
+        "[debug]   name: %s\n"
+        "[debug]   type: intrinsic\n"
+        "[debug]   address: %p\n",
+        name,
+        sym->intrin.fun
+      );
+      return nullptr;
+    }
+
+    case SYM_EXT_PTR: {
+      eprintf(
+        "[debug] word:\n"
+        "[debug]   name: %s\n"
+        "[debug]   type: external symbol\n"
+        "[debug]   address: %p\n",
+        name,
+        sym->ext_ptr.addr
+      );
+      return nullptr;
+    }
+
+    case SYM_EXT_PROC: {
+      eprintf(
+        "[debug] word:\n"
+        "[debug]   name: %s\n"
+        "[debug]   type: external procedure\n"
+        "[debug]   address: %p\n",
+        name,
+        sym->ext_proc.fun
+      );
+      return nullptr;
+    }
+
+    default: unreachable();
+  }
+}
+
+// The field `.name.len` must be set separately (CBA to maintain here).
+static constexpr Sym USED INTRIN[] = {
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = ":",
+    .intrin.fun  = (void *)intrin_colon,
+    .throws      = true,
+    .immediate   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = ";",
+    .intrin.fun  = (void *)intrin_semicolon,
+    .throws      = true,
+    .immediate   = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "[",
+    .intrin.fun  = (void *)intrin_bracket_beg,
+    .immediate   = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "]",
+    .intrin.fun  = (void *)intrin_bracket_end,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  // (Sym){
+  //   .type        = SYM_INTRIN,
+  //   .name.buf    = "immediate",
+  //   .intrin.fun  = (void *)intrin_immediate,
+  //   .throws      = true,
+  //   .comp_only   = true,
+  //   .interp_only = true,
+  // },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_only",
+    .intrin.fun  = (void *)intrin_comp_only,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "not_comp_only",
+    .intrin.fun  = (void *)intrin_not_comp_only,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "inline",
+    .intrin.fun  = (void *)intrin_inline,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "throws",
+    .intrin.fun  = (void *)intrin_throws,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "redefine",
+    .intrin.fun  = (void *)intrin_redefine,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "here",
+    .intrin.fun  = (void *)intrin_here,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_instr",
+    .intrin.fun  = (void *)intrin_comp_instr,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_load",
+    .intrin.fun  = (void *)intrin_comp_load,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_const",
+    .intrin.fun  = (void *)intrin_comp_const,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_static",
+    .intrin.fun  = (void *)intrin_comp_static,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "comp_call",
+    .intrin.fun  = (void *)intrin_comp_call,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "quit",
+    .intrin.fun  = (void *)intrin_quit,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "#ret",
+    .intrin.fun  = (void *)intrin_ret,
+    .immediate   = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "char",
+    .intrin.fun  = (void *)intrin_char,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "parse",
+    .intrin.fun  = (void *)intrin_parse,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "parse_word",
+    .intrin.fun  = (void *)intrin_parse_word,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "include",
+    .intrin.fun  = (void *)intrin_include,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "include\"",
+    .intrin.fun  = (void *)intrin_include_quote,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = ":extern_ptr",
+    .intrin.fun  = (void *)intrin_extern_ptr,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = ":extern",
+    .intrin.fun  = (void *)intrin_extern_proc,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "find_word",
+    .intrin.fun  = (void *)intrin_find_word,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "inline_word",
+    .intrin.fun  = (void *)intrin_inline_word,
+    .throws      = true,
+    .comp_only   = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "execute",
+    .intrin.fun  = (void *)intrin_execute,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_flush",
+    .intrin.fun  = (void *)debug_flush,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_throw",
+    .intrin.fun  = (void *)debug_throw,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_stack",
+    .intrin.fun  = (void *)debug_stack,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_depth",
+    .intrin.fun  = (void *)debug_depth,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_top_int",
+    .intrin.fun  = (void *)debug_top_int,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_top_ptr",
+    .intrin.fun  = (void *)debug_top_ptr,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_top_str",
+    .intrin.fun  = (void *)debug_top_str,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "debug_mem",
+    .intrin.fun  = (void *)debug_mem,
+    .throws      = true,
+    .interp_only = true,
+  },
+  (Sym){
+    .type        = SYM_INTRIN,
+    .name.buf    = "#debug'",
+    .intrin.fun  = (void *)debug_word,
+    .throws      = true,
+    .immediate   = true,
+    .interp_only = true,
+  },
+};

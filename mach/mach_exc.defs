@@ -1,0 +1,31 @@
+/*
+Stripped-down variant of the following file (on MacOS 15.3):
+
+  "$(xcrun --sdk macosx --show-sdk-path)/usr/include/mach/mach_exc.defs"
+*/
+
+subsystem mach_exc 2405;
+
+#include <mach/mach_types.defs>
+
+ServerPrefix catch_;
+
+type mach_exception_data_t = array[*:2] of int64_t;
+type exception_type_t      = int;
+
+routine mach_exception_raise(
+  exception_port : mach_port_t;
+  thread         : mach_port_t;
+  task           : mach_port_t;
+  exception      : exception_type_t;
+  code           : mach_exception_data_t
+);
+
+routine mach_exception_raise_state(
+        exception_port : mach_port_t;
+        exception      : exception_type_t;
+        code           : mach_exception_data_t, const;
+  inout flavor         : int;
+        old_state      : thread_state_t, const;
+    out new_state      : thread_state_t
+);
