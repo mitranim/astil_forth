@@ -61,12 +61,12 @@ main
 make
 
 # Stack-based calling convention.
-./forth_s forth/lang_s.f -   # REPL mode.
-./forth_s forth/test_s.f     # One-shot run.
+./astil_s forth/lang_s.f -   # REPL mode.
+./astil_s forth/test_s.f     # One-shot run.
 
 # Register-based calling convention.
-./forth_r forth/lang_r.f -   # REPL mode.
-./forth_r forth/test_r.f     # One-shot run.
+./astil_r forth/lang_r.f -   # REPL mode.
+./astil_r forth/test_r.f     # One-shot run.
 ```
 
 Rebuild continuously while hacking:
@@ -82,6 +82,16 @@ make debug_run '<file>'
 make debug_run '<file>' RECOVERY=false
 make debug_run '<file>' DEBUG=true
 ```
+
+## Sublime Text
+
+Due to divergence from the standard, this dialect needs its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
+
+```sh
+ln -sf "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
+```
+
+Note that for standard-adjacent Forths, you should use the [sublime-forth](https://github.com/mitranim/sublime-forth) package, which is available on Package Control.
 
 ## Library
 
@@ -194,3 +204,7 @@ Especially murky in the Forth world. Docs will often mention compilation, and so
 Sometimes it's useful to describe a non-assembler as a "JIT compiler". For example, one of my Go libraries implements JIT-construction of data structures which, when subsequently interpreted, allow efficient deep traversal of complex Go data structures; it delegates setup to "compilation time" and eliminates many costs at "runtime", although both steps occur when the program runs, and the result is interpreted.
 
 Perhaps we should differentiate "JIT compilers" and "JIT assemblers". But at the end of the day, everything is interpreted, one way or another.
+
+## Name
+
+The name Astil references a sentient magic grimoire from some anime I watched. A book of magic words. Fitting for a Forth, don't you think?

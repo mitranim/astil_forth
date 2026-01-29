@@ -10,6 +10,7 @@
 !/comp
 !/mach
 !/forth
+!/sublime
 
 # Should be listed last.
 .*
