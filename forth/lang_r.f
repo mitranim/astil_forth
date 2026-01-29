@@ -802,6 +802,10 @@
   1                       comp_args_set
 ] ;
 
+: c! { char str -- } [
+  0 1 0 asm_store_byte_off comp_instr \ strb x0, [x1]
+] ;
+
 : parse_char { -- char } parse_word { buf -- } buf c@ ;
 
 : char' { -- char } ( E: "str" -- char ) parse_char ;
@@ -950,14 +954,16 @@
   [ not_comp_only ]
 ;
 
-\ Shortcut for the standard idiom `create <name> N cells allot`.
-: cells: { len } ( C: "name" -- ) ( E: -- adr )
-  parse_word          { name name_len }
-  len cells           { size }
-  nil size alloc_data { adr }
-  name name_len adr init_data_word
+\ Shortcut for the standard idiom `create <name> N allot`.
+\ Like `buf:` but doesn't return capacity.
+: mem: { cap } ( C: "name" -- ) ( E: -- adr )
+  nil cap alloc_data { adr }
+  parse_word adr init_data_word
   [ not_comp_only ]
 ;
+
+\ Shortcut for the standard idiom `create <name> N cells allot`.
+: cells: { len } ( C: "name" -- ) ( E: -- adr ) len cells execute' mem: ;
 
 4096 buf: BUF
 

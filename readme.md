@@ -61,12 +61,12 @@ main
 make
 
 # Stack-based calling convention.
-./astil_s forth/lang_s.f -   # REPL mode.
-./astil_s forth/test_s.f     # One-shot run.
+./astil_s.exe forth/lang_s.f -   # REPL mode.
+./astil_s.exe forth/test_s.f     # One-shot run.
 
 # Register-based calling convention.
-./astil_r forth/lang_r.f -   # REPL mode.
-./astil_r forth/test_r.f     # One-shot run.
+./astil_r.exe forth/lang_r.f -   # REPL mode.
+./astil_r.exe forth/test_r.f     # One-shot run.
 ```
 
 Rebuild continuously while hacking:

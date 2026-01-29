@@ -935,10 +935,10 @@
 1 let: true
 
 \ Similar to standard `variable`.
-: var: ( C: init "name" -- ) ( E: -- addr )
+: var: ( C: init "name" -- ) ( E: -- adr )
   #word_beg
   sp cell -                  \ Address of the `init` value.
-  cell        alloc_data     ( -- addr )
+  cell        alloc_data     ( -- adr )
   1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1 comp_instr     \ str x1, [x27], 8
   drop                       \ Don't need the `init` value anymore.
@@ -947,25 +947,28 @@
 
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
-\ at least the given size in bytes.
-: buf: ( C: size "name" -- ) ( E: -- addr size )
+\ at least the given capacity in bytes.
+: buf: ( C: cap "name" -- ) ( E: -- adr cap )
   #word_beg
-  dup nil swap alloc_data     ( -- addr )
+  dup nil swap alloc_data     ( -- adr )
   1            comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1  comp_instr     \ str x1, [x27], 8
-               comp_push      \ str <size>, [x27], 8
+               comp_push      \ str <cap>, [x27], 8
+  #word_end
+;
+
+\ Shortcut for the standard idiom `create <name> N allot`.
+\ Like `buf:` but doesn't return capacity.
+: mem: ( C: cap "name" -- ) ( E: -- adr )
+  #word_beg
+  nil swap    alloc_data     ( -- adr )
+  1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1 comp_instr     \ str x1, [x27], 8
   #word_end
 ;
 
 \ Shortcut for the standard idiom `create <name> N cells allot`.
-: cells: ( C: len "name" -- ) ( E: -- addr )
-  #word_beg
-  cells nil swap alloc_data     ( -- addr )
-  1              comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1    comp_instr     \ str x1, [x27], 8
-               \ comp_push      \ str <size>, [x27], 8
-  #word_end
-;
+: cells: ( C: len "name" -- ) ( E: -- adr ) cells execute' mem: ;
 
 \ ## Locals: basic
 \

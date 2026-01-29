@@ -20,8 +20,8 @@ MACH_GEN_SRC ?= mach/mach_exc.defs
 MACH_GEN_OUT ?= $(GEN)/mach_exc.c
 ALL_SRC ?= $(wildcard *.s *.c *.h **/*.c **/*.h) $(ASM_GEN_SRC)
 MAIN_SRC ?= $(SRC)/main.c
-MAIN_S ?= astil_s
-MAIN_R ?= astil_r
+MAIN_S ?= astil_s.exe
+MAIN_R ?= astil_r.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
 INSTALL_DIR ?= /usr/local/bin
@@ -31,7 +31,7 @@ WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=f
 WATCH_ALL ?= $(WATCH) -e=c,h,s,f
-WATCH_IMM ?= $(WATCH) -e=f,exe -w=$(MAIN_S) -w=$(MAIN_R) --no-vcs-ignore
+WATCH_IMM ?= $(WATCH) -e=f,exe --no-vcs-ignore
 
 ARTIF ?= $(MAIN_S) $(MAIN_R) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg
@@ -164,9 +164,9 @@ disasm:
 	mkdir -p $(LOCAL)
 	llvm-objdump $(DISASM) $(or $(file),$(MAIN_S)) > $(LOCAL)/out.s
 
-.PHONY: install
-install: build
-	ln -sf astil_r "$(INSTALL_DIR)/astil"
+# .PHONY: install
+# install: build
+# 	ln -sf $(MAIN_R) "$(INSTALL_DIR)/astil"
 
 .PHONY: clean
 clean:

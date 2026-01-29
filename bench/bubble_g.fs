@@ -1,4 +1,4 @@
-\ Copied from Gforth's `bubble.fs`.
+\ Copy of Gforth's `bubble.fs`.
 
 \ .( Loading Bubble Sort benchmark...) cr
 
