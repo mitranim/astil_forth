@@ -10,10 +10,6 @@
 #include <stdio.h>
 #include <string.h>
 
-static void reader_init(Reader *read) {
-  read->tty = isatty(fileno(read->file));
-}
-
 static bool reader_valid(const Reader *read) {
   return read && is_aligned(read) && is_aligned(&read->file) && read->file;
 }

@@ -311,13 +311,35 @@ static Err interp_loop(Interp *interp) {
   return nullptr;
 }
 
+static Err interp_import_stdio(Interp *interp, const char *path) {
+  defer(file_deinit) FILE *file = fopen(path, "r");
+  if (!file) return err_file_unable_to_open(path);
+
+  const auto read = interp->reader;
+  read->file      = file;
+  try(str_copy(&read->file_path, path));
+
+  IF_DEBUG(eprintf("[system] reading code from stdio: " FMT_QUOTED "\n", path));
+
+  if (!isatty(fileno(file))) {
+    return reader_err(read, interp_loop(interp));
+  }
+
+  for (;;) {
+    const auto err = reader_err(read, interp_loop(interp));
+    if (!err) return nullptr;
+    interp_handle_err(interp, err);
+  }
+  return nullptr;
+}
+
 static Err interp_import_inner(
   Interp *interp, const char *prev, const char *next
 ) {
   if (prev) next = path_join(prev, next);
-  const auto real = realpath(next, nullptr);
+  const auto path = realpath(next, nullptr);
 
-  if (!real) {
+  if (!path) {
     const auto code = errno;
     return errf(
       "unable to realpath %s; code: %d; msg: %s", next, code, strerror(code)
@@ -326,47 +348,42 @@ static Err interp_import_inner(
 
   const auto imports = &interp->imports;
 
-  if (dict_has(imports, real)) {
+  if (dict_has(imports, path)) {
     IF_DEBUG(eprintf(
       "[debug] skipping import of already-imported file; path: " FMT_QUOTED
       "; realpath: " FMT_QUOTED "\n",
       next,
-      real
+      path
     ));
-    free(real);
+    free(path);
     return nullptr;
   }
 
-  dict_set(imports, real, (Empty){});
+  defer(file_deinit) FILE *file = fopen(path, "r");
+  if (!file) return err_file_unable_to_open(path);
 
   const auto read = interp->reader;
-  try(str_copy(&read->file_path, real));
-
-  const char              *path = nullptr; // Don't have to `free` this.
-  defer(file_deinit) FILE *file = nullptr;
-  try(file_open_fuzzy(real, &path, &read->file));
-  reader_init(read);
+  read->file      = file;
+  try(str_copy(&read->file_path, path));
+  dict_set(imports, path, EMPTY);
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
-
-  for (;;) {
-    auto err = interp_loop(interp);
-    if (!err) return nullptr;
-    err = reader_err(read, err);
-    if (!read->tty) return err;
-    interp_handle_err(interp, err);
-  }
-  return nullptr;
+  return reader_err(read, interp_loop(interp));
 }
 
 // There better not be a `longjmp` over this.
 static Err interp_import(Interp *interp, const char *path) {
-  const auto prev      = interp->reader;
-  const auto prev_path = prev ? prev->file_path.buf : nullptr;
-  Reader     next      = {};
-  interp->reader       = &next;
-  const auto err       = interp_import_inner(interp, prev_path, path);
-  interp->reader       = prev;
+  const auto prev            = interp->reader;
+  const auto prev_path       = prev ? prev->file_path.buf : nullptr;
+  const auto stdio_file_path = file_path_stdio(path);
+  Reader     next            = {};
+  interp->reader             = &next;
+
+  const auto err = stdio_file_path
+    ? interp_import_stdio(interp, stdio_file_path)
+    : interp_import_inner(interp, prev_path, path);
+
+  interp->reader = prev;
   return err;
 }
 

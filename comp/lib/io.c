@@ -76,35 +76,6 @@ The variable MUST be zero-initialized.
 */
 static void file_deinit(FILE **var) { var_deinit(var, fclose); }
 
-static Err file_open_fuzzy(const char *path, const char **resolved, FILE **out) {
-  if (!strcmp(path, "-") || !strcmp(path, "/dev/stdin")) {
-    if (resolved) *resolved = "/dev/stdin";
-    *out = stdin;
-    return nullptr;
-  }
-
-  if (!strcmp(path, "/dev/stdout")) {
-    if (resolved) *resolved = "/dev/stdout";
-    *out = stdout;
-    return nullptr;
-  }
-
-  if (!strcmp(path, "/dev/stderr")) {
-    if (resolved) *resolved = "/dev/stderr";
-    *out = stderr;
-    return nullptr;
-  }
-
-  const auto file = fopen(path, "r");
-  if (file) {
-    if (resolved) *resolved = path;
-    *out = file;
-    return nullptr;
-  }
-
-  return err_file_unable_to_open(path);
-}
-
 static Err file_open(const char *path, FILE **out) {
   const auto file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
@@ -190,6 +161,25 @@ static char *path_join(const char *one, const char *two) {
   }
 
   return BUF;
+}
+
+static bool is_file_path_stdin(const char *path) {
+  return !strcmp(path, "-") || !strcmp(path, "/dev/stdin");
+}
+
+// Normalizes the path so the file can be opened,
+// and returns a statically allocated string.
+static const char *file_path_stdio(const char *path) {
+  if (is_file_path_stdin(path)) {
+    return "/dev/stdin";
+  }
+  if (!strcmp(path, "/dev/stdout")) {
+    return "/dev/stdout";
+  }
+  if (!strcmp(path, "/dev/stderr")) {
+    return "/dev/stderr";
+  }
+  return nullptr;
 }
 
 /*

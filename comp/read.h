@@ -20,7 +20,6 @@ typedef struct {
   Read_buf buf;      // Used for arbitrary text.
   Read_buf back;     // Backtrack buffer.
   U8       last;     // Last read char.
-  bool     tty;      // True if file is interactive teletype.
 } Reader;
 
 #define READ_POS_FMT "%s:" FMT_IND ":" FMT_IND
