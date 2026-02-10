@@ -5,7 +5,7 @@ import' ../../forth/lang_s.f
 1 1 extern: fgetc
 
 : main
-  c" presentation/04_cheat_quine.f" strdup { path }
+  c" talks/svfig_2026_01_24/04_cheat_quine.f" strdup { path }
   c" r"           { mode }
   path mode fopen { file }
 
