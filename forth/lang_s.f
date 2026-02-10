@@ -1468,8 +1468,8 @@ extern_val: stderr __stderrp
 
     " --" str len str<> #while \ `--` to `}` is a comment.
 
-    \ Popped / used by `}` which we're about to call.
-    str len comp_named_local
+    \ Resulting local token is used by `}` which we're about to call.
+    str len comp_named_local ( -- loc_tok )
 
     loc_len inc to: loc_len
   #end
@@ -1501,8 +1501,8 @@ extern_val: stderr __stderrp
 
 : within { num one two -- bool }
   one num >
-  num two <=
-  =0 or =0
+  num two >
+  or =0
 ;
 
 \ ## Varargs and formatting

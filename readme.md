@@ -10,6 +10,7 @@ Goals:
 - [x] Support register-based calls.
 - [x] Avoid a VM or complex IR.
 - [x] Keep the code clear and educational for other compiler amateurs.
+- [ ] Rewrite in Forth to self-host.
 - [ ] AOT compilation.
 
 Most languages ship with a smart, powerful, all-knowing compiler with intrinsic knowledge of the entire language. I feel this approach is too inflexible. It makes the compiler a closed system. Modifying and improving the language requires changing the compiler's source code, which is usually over-complicated.
@@ -18,22 +19,22 @@ On top of that, most languages isolate you from the CPU, or even from the OS, fr
 
 This system explores the opposite direction. The interpreter/compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
 
-This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Our system implements much _better_ conditionals, but at the cost of more code.)
+This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Our system implements much nicer conditionals, but at the cost of more code.)
 
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
 
-The interpreter written in C doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
+The outer interpreter / compiler, which is written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
 - The stack-CC version boots via `lang_s.f`.
 - The register-CC version boots via `lang_r.f`.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
-All the code is authored by me. None is bot-generated.
+All of the code is authored by me. None is bot-generated.
 
 ## Show me the code!
 
 ```forth
-import' forth/lang_s.f
+import' forth/lang_r.f
 
 : main
   log" hello world!" cr
@@ -47,8 +48,8 @@ import' forth/lang_s.f
     log" branch 2" cr
   #end
 
-  12 for: ind
-    ind [ 1 ] logf" current number: %zd" cr
+  12 0 +for: ind
+    ind logf" current number: %zd" cr
   #end
 ;
 
@@ -85,7 +86,7 @@ make debug_run '<file>' DEBUG=true
 
 ## Sublime Text
 
-Due to divergence from the standard, this dialect needs its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
+Due to divergence from the standard, this dialect wants its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
 
 ```sh
 ln -sf "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
@@ -99,11 +100,11 @@ Should be usable as a library in another C/C++ program. The "main" file is only 
 
 In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to use this as a library by simply cloning the repo into a subfolder and including `comp/interp.c` which provides the top-level API, and includes all other files it needs.
 
-Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Practically every symbol is declared as `static`.
+Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every symbol is declared as `static`.
 
 ## Easy C interop
 
-It's trivial to declare and call extern procedures. Examples can be found in the core files `forth/lang_s.f` and `forth/lang_r.f`, which make extensive use of that. Should work for any linked library, such as libc.
+It's trivial to declare and call extern procedures. Examples can be found in the core files `forth/lang_s.f` and `forth/lang_r.f`. Should work for any linked library, such as libc.
 
 ```forth
 \ The numbers describe input and output parameters.
@@ -194,6 +195,10 @@ The REPL doesn't print "ok".
 Since we use native calls and don't target embedded systems, the role of the return stack is fulfilled by the system stack provided by the OS.
 
 Operations which would normally use the return stack for scratch space just use registers, locals, or globals.
+
+## Why so much C code
+
+Because I was learning and experimenting. Some of the code is generalized library stuff (would this logic translate into another project?), checks and error messages (safety and UX), debug logging, code which is relevant but currently unused, and the code-split of supporting two calling conventions.
 
 ## What is compilation
 

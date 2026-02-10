@@ -61,10 +61,7 @@
 
 : semicolon execute'' ; ;
 
-\ Similar to standard `constant`.
-: let: { val } ( C: "name" -- ) ( E: -- val )
-  parse_word { str len }
-
+: let_init { str len val } ( C: "name" -- ) ( E: -- val )
   \ Execution-time semantics.
   str len colon
     0 1 comp_signature ( E: -- val )
@@ -75,7 +72,11 @@
   str len colon_colon
     val comp_push compile' comp_push
   semicolon
+;
 
+\ Similar to standard `constant`.
+: let: { val } ( C: "name" -- ) ( E: -- val )
+  parse_word val let_init
   [ not_comp_only ]
 ;
 
@@ -92,6 +93,7 @@
 \ of various arithmetic words used by the assembler.
 
 4      let: ASM_INSTR_SIZE
+8      let: ASM_REG_SCRATCH
 27     let: ASM_REG_INTERP
 28     let: ASM_REG_ERR
 29     let: ASM_REG_FP
@@ -561,14 +563,14 @@
 ] ;
 
 : mod { i0 i1 -- i2 } [
-  0b100            comp_clobber
+  2                comp_clobber
   2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
   1                comp_args_set
 ] ;
 
 : /mod { dividend divisor -- rem quo } [
-  0b100               comp_clobber
+  2                   comp_clobber
   2 1     asm_mov_reg comp_instr \ mov x2, x1
   1 0 2   asm_sdiv    comp_instr \ sdiv x1, x0, x2
   0 1 2 0 asm_msub    comp_instr \ msub x0, x1, x2, x0
@@ -657,6 +659,12 @@
 : >0  { num   -- bool } [ ASM_GT asm_comp_cset_zero ] ;
 : <=0 { num   -- bool } [ ASM_LE asm_comp_cset_zero ] ;
 : >=0 { num   -- bool } [ ASM_GE asm_comp_cset_zero ] ; \ Or `PL`.
+
+: within { num one two -- bool }
+  one num > { one }
+  num two >
+  one or =0
+;
 
 : odd { i0 -- bool } i0 1 and ;
 
@@ -761,38 +769,46 @@
 \ We can't really communicate any of this to the compiler,
 \ so we have to fall back on regular old push and pop here.
 
-: stack> { -- val } [
-  0b10 comp_clobber
+\ ldur <top>, [x27, INTERP_INTS_TOP]
+: asm_stack_load { adr -- instr }
+  adr ASM_REG_INTERP INTERP_INTS_TOP asm_load_off
+;
 
-  \ ldur x1, [x27, INTERP_INTS_TOP]
-  \ ldr  x0, [x1, -8]!
-  \ stur x1, [x27, INTERP_INTS_TOP]
-  1 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off  comp_instr
-  0 1 -8                           asm_load_pre  comp_instr
-  1 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
-  1                                              comp_args_set
-] ;
+\ stur <top>, [x27, INTERP_INTS_TOP]
+: asm_stack_store { adr -- instr }
+  adr ASM_REG_INTERP INTERP_INTS_TOP asm_store_off
+;
 
+\ Usage:
+\
+\   stack>        unary
+\   stack> stack> binary
+\
+\ Mind the backwards order:
+\
+\   10 20 30 >>stack
+\   stack> stack> stack> { thirty twenty ten }
+\
+\ Also see `stack{` which is more convenient and less error-prone.
+:: stack> ( E: -- val )
+  comp_next_arg_reg { arg }
+  ASM_REG_SCRATCH   { top }
+
+  top                        comp_clobber
+  top        asm_stack_load  comp_instr
+  arg top -8 asm_load_pre    comp_instr \ ldr <arg>, [<top>, -8]!
+  top        asm_stack_store comp_instr
+;
+
+: stack> { -- val } stack> ;
+
+\ Also see `:: >>stack`, which is defined _way_ later in the file,
+\ when we have access to loops. Unlike this version it's variadic.
 : >stack { val } [
-  0b10 comp_clobber
-
-  \ ldur x1, [x27, INTERP_INTS_TOP]
-  \ str  x0, [x1], 8
-  \ stur x1, [x27, INTERP_INTS_TOP]
-  1 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off   comp_instr
-  0 1 8                            asm_store_post comp_instr
-  1 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off  comp_instr
-] ;
-
-: >>stack { one two } [
-  0b11 comp_clobber
-
-  \ ldur x2,     [x27, INTERP_INTS_TOP]
-  \ stp  x0, x1, [x2], 16
-  \ stur x2,     [x27, INTERP_INTS_TOP]
-  2 ASM_REG_INTERP INTERP_INTS_TOP asm_load_off        comp_instr
-  0 1 2 16                         asm_store_pair_post comp_instr
-  2 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off       comp_instr
+  1                     comp_clobber
+  1     asm_stack_load  comp_instr \ ldur x1, [x27, INTERP_INTS_TOP]
+  0 1 8 asm_store_post  comp_instr \ str x0, [x1], 8
+  1     asm_stack_store comp_instr \ stur x1, [x27, INTERP_INTS_TOP]
 ] ;
 
 \ ## Characters and strings
@@ -858,6 +874,7 @@
 3 0 extern: memcpy  ( dst src len -- )
 3 0 extern: memmove ( dst src len -- )
 
+1 1 extern: strdup  ( cstr -- cstr )
 1 1 extern: strlen  ( cstr -- len )
 3 1 extern: strncmp ( str0 str1 len -- )
 3 0 extern: strncpy ( dst src str_len -- )
@@ -1088,14 +1105,14 @@ extern_val: stderr __stderrp
 
 \ cbz x0, <else|end>
 : if_patch ( C: adr -- )
-  stack>      { adr }
+  stack>        { adr }
   adr off_to_pc { off }
   0 off asm_cmp_branch_zero adr !32
 ;
 
 \ cbnz x0, <else|end>
 : ifn_patch ( C: adr -- )
-  stack>      { adr }
+  stack>        { adr }
   adr off_to_pc { off }
   0 off asm_cmp_branch_not_zero adr !32
 ;
@@ -1132,13 +1149,11 @@ extern_val: stderr __stderrp
 \ to pop any amount of control constructs with a single `#end`.
 \ Prepending `if_done` terminates this chain.
 :: #if ( C: -- cond fun_done fun_exec adr_if fun_if ) ( E: pred -- )
-  \ if_init execute'' #elif
   c" when calling `#if`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' if_pop >stack
 ;
 
 :: #ifn ( C: -- cond fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
-  \ if_init execute'' #elifn
   c" when calling `#ifn`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' ifn_pop >stack
 ;
@@ -1148,9 +1163,7 @@ extern_val: stderr __stderrp
 ;
 
 :: #else ( C: fun_exec adr_if fun_if -- adr_else fun_else )
-  stack> { fun_if }
-  stack> { adr_if }
-  stack> { fun_exec }
+  stack> stack> stack> { fun_if adr_if fun_exec }
 
   c" when calling `#else`" 0 comp_args_valid
   comp_barrier \ Clobber / relocate locals.
@@ -1166,6 +1179,7 @@ extern_val: stderr __stderrp
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
 :: #end ( C: fun -- ) comp_barrier pop_execute ;
+:  #end { fun }       fun          execute ;
 
 \ ## Loops
 \
@@ -1187,7 +1201,8 @@ extern_val: stderr __stderrp
 : loop_frame! ( C: frame_ind -- ) stack> LOOP_FRAME ! ;
 
 : loop_frame_init ( C: -- frame_ind frame_fun )
-  LOOP_FRAME @ ' loop_frame! >>stack
+  LOOP_FRAME @  >stack
+  ' loop_frame! >stack
   stack_len LOOP_FRAME !
 ;
 
@@ -1244,7 +1259,8 @@ extern_val: stderr __stderrp
 :: #loop ( C: -- ind_frame fun_frame adr_loop fun_loop )
   comp_barrier \ Clobber / relocate locals.
   here { adr }
-  loop_frame_init adr ' loop_pop >>stack
+  loop_frame_init adr >stack
+  ' loop_pop          >stack
 ;
 
 \ Can be used in any loop.
@@ -1278,7 +1294,7 @@ extern_val: stderr __stderrp
 
 : count_loop_pop { cond } ( fun_prev …aux… adr_cond adr_beg -- )
   loop_end    \ b <beg>; clobber / relocate locals.
-  stack>      { adr }
+  stack> { adr }
   adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
   pop_execute \ Pop auxiliaries; restore the previous loop frame.
 ;
@@ -1344,8 +1360,7 @@ extern_val: stderr __stderrp
 ;
 
 : for_countup_loop_pop ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur -- )
-  stack> { cur }
-  stack> { lim }
+  stack> stack> { cur lim }
 
   0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
   1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
@@ -1381,9 +1396,7 @@ extern_val: stderr __stderrp
 
 : loop_countup_pop
   ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur loc_step )
-  stack> { step }
-  stack> { cur }
-  stack> { lim }
+  stack> stack> stack> { step cur lim }
 
   0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
   1 cur             comp_local_get \ mov x1, <cur>  | ldr x1, [FP, <cur>]
@@ -1430,9 +1443,7 @@ extern_val: stderr __stderrp
 
 : loop_countdown_pop
   ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur loc_step )
-  stack> { step }
-  stack> { cur }
-  stack> { lim }
+  stack> stack> stack> { step cur lim }
   ASM_LT count_loop_pop \ b <beg>; retropatch b.<cond> <end>
 
   \ Don't need registers for these locals anymore.
@@ -1470,24 +1481,6 @@ extern_val: stderr __stderrp
   cur                  >stack
   step                 >stack
   ' loop_countdown_pop >stack
-;
-
-\ ## Stack manipulation — continued
-
-\ ldur <stack>, [x27, INTERP_INTS_TOP]
-\ ...
-\ str  <arg>,   [<stack>], 8
-\ ...
-\ stur <stack>, [x27, INTERP_INTS_TOP]
-: comp_args_to_stack { len }
-  len #ifn #ret #end
-  comp_scratch_reg { stack }
-
-  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr \ ldur <stack>
-  len 0 +for: arg
-    arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
-  #end
-  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr \ stur <stack>
 ;
 
 \ ## Varargs and formatting
@@ -1578,6 +1571,75 @@ extern_val: stderr __stderrp
   comp_cstr
   compile' throw
   execute'' #end
+;
+
+\ ## Stack manipulation — continued
+
+\ Variadic alternative to `>stack`.
+:: >>stack ( E: …args… -- )
+  ASM_REG_SCRATCH { top }
+
+  top                comp_clobber
+  top asm_stack_load comp_instr
+
+  comp_args_get 0 +for: arg
+    arg top 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
+  #end
+
+  top asm_stack_store comp_instr
+  0 comp_args_set
+;
+
+\ Variadic assignment of locals from the stack:
+\
+\   10 20 30 >>stack
+\   stack{ ten twenty thirty }
+:: stack{ ( E: …args… -- )
+  0 { locs }
+
+  #loop
+    parse_word { str len }
+
+    " }" str len str= #if #leave #end
+    " --" str len str= throw_if" unsupported `--` in `stack{`"
+
+    str len comp_named_local >stack
+    locs inc { locs }
+  #end
+
+  locs #ifn #ret #end
+
+  0 { arg_reg } \ x0
+  1 { top_reg } \ x1
+
+  arg_reg comp_clobber
+  top_reg comp_clobber
+  top_reg asm_stack_load comp_instr
+
+  locs #for
+    stack> { loc }
+    arg_reg top_reg -8 asm_load_pre comp_instr     \ ldr x0, [x1, -8]!
+    arg_reg loc                     comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
+    arg_reg comp_clobber
+  #end
+
+  top_reg asm_stack_store comp_instr
+;
+
+\ ldur <stack>, [x27, INTERP_INTS_TOP]
+\ ...
+\ str  <arg>,   [<stack>], 8
+\ ...
+\ stur <stack>, [x27, INTERP_INTS_TOP]
+: comp_args_to_stack { len }
+  len #ifn #ret #end
+  comp_scratch_reg { stack }
+
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr \ ldur <stack>
+  len 0 +for: arg
+    arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
+  #end
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr \ stur <stack>
 ;
 
 \ ## Stack printing
@@ -1673,5 +1735,101 @@ extern_val: errno __error
   parse_word          { name name_len }
   len cells mem_alloc { adr -- }
   name name_len adr init_data_word
+  [ not_comp_only ]
+;
+
+\ ## Pretend types
+\
+\ We don't have a real type system, but it can still be useful
+\ to use type names, which simply return sizes, similar to the
+\ existing practice of `cell` / `cells`.
+
+\ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
+1 let: S8
+1 let: U8
+2 let: S16
+2 let: U16
+4 let: S32
+4 let: U32
+8 let: S64
+8 let: U64
+8 let: Adr
+8 let: Cstr \ char*
+4 let: Cint
+4 let: Cuint
+
+\ Defines a pretend "array type" which is really just capacity.
+\ Intended mainly for making struct fields more descriptive.
+\ See structs below. Usage:
+\
+\   123      let: SIZE
+\   234      let: LEN
+\   SIZE LEN arr: Type
+\   Type     mem: BUF
+: arr: { size len -- } ( C: "name" -- ) ( E: -- cap )
+  size len * execute' let:
+;
+
+\ ## Pretend struct types
+\
+\ Basic usage:
+\
+\   struct: Type
+\     S32 field: Type_field0
+\     U64 field: Type_field1
+\   #end
+\
+\   Type calloc { val }
+\
+\       val Type_field1 @
+\   123 val Type_field1 !
+
+: struct_pop ( C: str len off -- )
+  stack{ str len off }
+  str len off let_init
+  str free \ String was `strdup`'d.
+  [ not_comp_only ]
+;
+
+: struct: { -- str len off fun } ( C: "name" -- ) ( E: -- size )
+  parse_word   { str len }
+  str strdup   { str }
+  ' struct_pop { fun }
+  str len 0 fun
+;
+
+: struct_field_comp { off }
+  comp_args_get { len }
+  len #ifn throw" struct field must be preceded by struct pointer" #end
+
+  len dec { reg }
+  reg                     comp_clobber \ Disassociate locals from this reg.
+  reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
+;
+
+\ Since structs are intended for C interop, field alignment
+\ must match the C struct ABI of the target platform.
+: field: { off fun size -- off_next fun }
+  ( C: "name" -- )
+  ( E: struct_adr -- field_adr )
+  off size align_up { field_off }
+  field_off size +  { next_off }
+  parse_word        { str len }
+
+  \ Execution-time semantics.
+  str len colon
+    1 1 comp_signature ( E: struct_adr -- field_adr )
+    1 comp_args_set
+    field_off comp_push
+    compile' +
+  semicolon
+
+  \ Compile-time semantics.
+  str len colon_colon
+    field_off comp_push
+    compile' struct_field_comp
+  semicolon
+
+  next_off fun
   [ not_comp_only ]
 ;

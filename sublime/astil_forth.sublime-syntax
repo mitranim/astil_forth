@@ -5,15 +5,11 @@ scope: source.forth
 file_extensions: [f, af]
 
 variables:
+  eol: (?:\n|$)
   comment_line_begin: (?:\\+)
   comment_block_begin: \(
   comment_block_end: \)
   md_heading: (?:\s*((#+)\s+.*?)(?={{eol}}|{{comment_block_end}}))
-  word_begin: '(?<=^|\s)'
-  word_end: '(?=\s|$)'
-  word: '(?:\S+)'
-  parens_param: '(?:[^\s()]+)'
-  braces_param: '(?:[^\s{}]+)'
   delim: \(\)\[\]\{\}
   num_begin: '{{word_begin}}'
   num_end: '{{word_end}}'
@@ -22,12 +18,24 @@ variables:
   int_dec: '[0-9][0-9_]*'
   int_hex: '[0-9a-f][0-9a-f_]*'
   exponent: 'e[+-]?'
-  param: '[^\s"{{tick}}]+'
-  declarator: '[^\s"{{tick}}{{delim}}]+'
-  # keyword: (?:ret|recur|if|ifn|else|elif|elifn|end|while|until|leave|for|loop)
+  mod: \# # Conventional modifier prefix for custom control words.
   tick: \'
-  mod: \#
-  eol: (?:\n|$)
+  word_begin: '(?<=^|\s)'
+  word_end: '(?=\s|$)'
+  word: '(?:\S+)'
+  param: '[^\s"{{tick}}]+'
+  parens_param: '(?:[^\s()]+)'
+  braces_param: '(?:[^\s{}]+)'
+  brace_params_pre: (?:stack)
+  declarator: '[^\s"{{tick}}{{delim}}]+'
+  keyword: |-
+    (?x:
+      ret|recur|
+      if|ifn|else|elif|elifn|end|
+      while|until|leave|for|loop|
+      throw|throw[_]?{{word}}|{{word}}[_]?throw|
+      abort|quit|exit
+    )
 
 contexts:
   prototype:
@@ -43,12 +51,14 @@ contexts:
     - include: parsing-word-match
     - include: delimited-word-match
     - include: modified-word-match
+    - include: constant-match
     - include: keyword-match
     - include: any-word-match
 
   comment-match:
     - include: comment-line-match
     - include: comment-block-match
+    - include: parens-params-match
 
   comment-line-match:
     - match: '{{word_begin}}{{comment_line_begin}}{{word_end}}'
@@ -63,7 +73,7 @@ contexts:
 
   # Also see `parens-params-match`.
   comment-block-match:
-    - match: '{{word_begin}}{{comment_block_begin}}{{word_end}}'
+    - match: '{{word_begin}}{{comment_block_begin}}{{word_end}}(?={{eol}})'
       scope: punctuation.definition.comment.begin.forth
       push: [comment-block-pop, comment-heading-pop]
 
@@ -139,8 +149,25 @@ contexts:
   #   <beg>""  <string content>""<end>
   #   <beg>""" <string content>"""<end>
   string-double-match:
-    - match: '{{word_begin}}({{mod}})?([^\s"]*)("+){{word_end}}'
-      scope: variable.keyword.forth
+    - include: string-double-keyword-match
+    - include: string-double-other-match
+
+  string-double-keyword-match:
+    - match: '{{word_begin}}({{mod}})([^\s"]*)("+){{word_end}}(?:\s)'
+      captures:
+        1: storage.modifier.forth
+        2: variable.function.forth
+        3: punctuation.definition.string.begin.forth
+      push: string-pop
+    - match: '{{word_begin}}({{mod}})?({{keyword}})("+){{word_end}}(?:\s)'
+      captures:
+        1: storage.modifier.forth
+        2: variable.function.forth
+        3: punctuation.definition.string.begin.forth
+      push: string-pop
+
+  string-double-other-match:
+    - match: '{{word_begin}}({{mod}})?([^\s"]*)("+){{word_end}}(?:\s)'
       captures:
         1: storage.modifier.forth
         2: variable.other.forth
@@ -153,7 +180,7 @@ contexts:
   #   <beg>``  <string content>``<end>
   #   <beg>``` <string content>```<end>
   string-backtick-match:
-    - match: '{{word_begin}}({{mod}})?([^\s`]*)(`+){{word_end}}'
+    - match: '{{word_begin}}({{mod}})?([^\s`]*)(`+){{word_end}}(?:\s)'
       captures:
         1: storage.modifier.forth
         2: variable.other.forth
@@ -225,7 +252,7 @@ contexts:
     - include: nonblank-pop
 
   parens-param-match:
-    - match: '{{word_begin}}{{parens_param}}{{word_end}}'
+    - match: '{{parens_param}}'
       scope: variable.other.forth
 
   parens-end-pop:
@@ -234,8 +261,9 @@ contexts:
       pop: 1
 
   braces-params-match:
-    - match: '{{word_begin}}\{{{word_end}}'
-      scope: punctuation.section.braces.begin.forth
+    - match: '{{word_begin}}(?:{{brace_params_pre}})?(\{){{word_end}}'
+      captures:
+        1: punctuation.section.braces.begin.forth
       push: braces-params-inner-pop
 
   braces-params-inner-pop:
@@ -350,11 +378,13 @@ contexts:
       captures:
         1: storage.modifier.forth
 
-  keyword-match:
+  constant-match:
     - match: '{{word_begin}}(?:nil|true|false){{word_end}}'
       scope: constant.language.boolean.forth
-    # - match: '{{word_begin}}{{keyword}}{{word_end}}'
-    #   scope: variable.function.forth
+
+  keyword-match:
+    - match: '{{word_begin}}{{keyword}}{{word_end}}'
+      scope: variable.function.forth
 
   any-word-match:
     - match: '{{word_begin}}{{word}}{{word_end}}'

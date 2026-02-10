@@ -253,6 +253,12 @@ static Err err_word_len(const Reader *read, U8 len) {
   );
 }
 
+static void read_skip_space(Reader *read) {
+  const auto next = read_char(read);
+  if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) return;
+  reader_backtrack(read, next);
+}
+
 static void read_skip_whitespace(Reader *read) {
   for (;;) {
     const auto next = read_char(read);

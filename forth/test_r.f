@@ -626,4 +626,231 @@ T{  234 -123 max <T>  234 }T
 ;
 test_locals
 
+: test_stack_primitives
+  T{ stack_len <T> 0 }T
+
+  10 >stack
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 10 }T
+  T{ stack_len <T> 0  }T
+
+  20 >stack
+  30 >stack
+  T{ stack_len <T> 2  }T
+  T{ stack>    <T> 30 }T
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 20 }T
+  T{ stack_len <T> 0  }T
+;
+test_stack_primitives
+
+\ Since `>stack` and `stack>` are intended for moving values
+\ between registers and the Forth data stack, using them in
+\ interpreted code is meaningless, doesn't change anything.
+T{ 10 >stack <T> 10 }T
+T{ 20 stack> <T> 20 }T
+
+: test_to_stack_variadic
+  T{ stack_len <T> 0 }T
+  >>stack
+  T{ stack_len <T> 0 }T
+
+  10 >>stack
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 10 }T
+  T{ stack_len <T> 0  }T
+
+  20 30 >>stack
+  T{ stack_len <T> 2  }T
+  T{ stack>    <T> 30 }T
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 20 }T
+  T{ stack_len <T> 0  }T
+
+  40 50 60 >>stack
+  T{ stack_len <T> 3  }T
+  T{ stack>    <T> 60 }T
+  T{ stack_len <T> 2  }T
+  T{ stack>    <T> 50 }T
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 40 }T
+  T{ stack_len <T> 0  }T
+;
+test_to_stack_variadic
+
+: test_stack_braces
+  T{ stack_len <T> 0 }T
+  stack{ }
+  T{ stack_len <T> 0 }T
+
+  10 >>stack
+  T{ stack_len <T> 1 }T
+  stack{ one }
+  T{ stack_len one <T> 0 10 }T
+
+  10 20 >>stack
+  T{ stack_len <T> 2 }T
+  stack{ one two }
+  T{ stack_len one two <T> 0 10 20 }T
+
+  10 20 30 >>stack
+  T{ stack_len <T> 3 }T
+  stack{ one two three }
+  T{ stack_len one two three <T> 0 10 20 30 }T
+;
+test_stack_braces
+
+1 1 arr: Arr0
+1 2 arr: Arr1
+1 3 arr: Arr2
+2 1 arr: Arr3
+3 1 arr: Arr4
+3 2 arr: Arr5
+3 3 arr: Arr6
+
+T{ Arr0 <T> 1 }T
+T{ Arr1 <T> 2 }T
+T{ Arr2 <T> 3 }T
+T{ Arr3 <T> 2 }T
+T{ Arr4 <T> 3 }T
+T{ Arr5 <T> 6 }T
+T{ Arr6 <T> 9 }T
+
+struct: Typ
+  8 field: Typ_field0
+  4 field: Typ_field1
+#end
+
+struct: Typ0 #end
+
+struct: Typ1
+  U8 field: Typ1_field
+#end
+
+struct: Typ2
+  U8  field: Typ2_field0
+  U32 field: Typ2_field1
+#end
+
+struct: Typ3
+  U32 field: Typ3_field0
+  U8  field: Typ3_field1
+#end
+
+struct: Typ4
+  U8  field: Typ4_field0
+  U32 field: Typ4_field1
+  U64 field: Typ4_field2
+#end
+
+struct: Typ5
+  U32 field: Typ5_field0
+  U8  field: Typ5_field1
+  U64 field: Typ5_field2
+#end
+
+struct: Typ6
+  U32 field: Typ6_field0
+  U64 field: Typ6_field1
+  U8  field: Typ6_field2
+#end
+
+struct: Typ7
+  U64 field: Typ7_field0
+  U32 field: Typ7_field1
+  U32 field: Typ7_field2
+  U8  field: Typ7_field3
+#end
+
+struct: Typ8
+  U8  field: Typ8_field0
+  U8  field: Typ8_field1
+  U8  field: Typ8_field2
+  U32 field: Typ8_field3
+#end
+
+: test_structs
+  T{        Typ        <T>    12  }T
+  T{    0   Typ_field0 <T>    0   }T
+  T{    0   Typ_field1 <T>    8   }T
+  T{    123 Typ_field0 <T>    123 }T
+  T{    234 Typ_field0 <T>    234 }T
+  T{    123 Typ_field1 <T>    131 }T
+  T{    234 Typ_field1 <T>    242 }T
+  T{ 99 123 Typ_field0 <T> 99 123 }T
+  T{ 99 234 Typ_field0 <T> 99 234 }T
+  T{ 99 123 Typ_field1 <T> 99 131 }T
+  T{ 99 234 Typ_field1 <T> 99 242 }T
+
+  123 { val }
+
+  T{ val Typ_field0 <T> 123 }T
+  T{ val Typ_field1 <T> 131 }T
+
+  T{ val Typ_field0 <T> val }T
+  T{ val Typ_field1 <T> val 8 + }T
+
+  nil Typ alloc_data { val }
+
+  T{ val Typ_field0 <T> val     }T
+  T{ val Typ_field1 <T> val 8 + }T
+
+  T{    val Typ_field0 @ <T> 0  }T
+  T{ 10 val Typ_field0 ! <T>    }T
+  T{    val Typ_field0 @ <T> 10 }T
+
+  T{    val Typ_field1 @ <T> 0  }T
+  T{ 20 val Typ_field1 ! <T>    }T
+  T{    val Typ_field1 @ <T> 20 }T
+
+  T{    val Typ_field0 @ <T> 10 }T
+  T{ 30 val Typ_field0 ! <T>    }T
+  T{    val Typ_field0 @ <T> 30 }T
+
+  T{    val Typ_field1 @ <T> 20 }T
+  T{ 40 val Typ_field1 ! <T>    }T
+  T{    val Typ_field1 @ <T> 40 }T
+
+  T{ Typ0 <T> 0 }T
+
+  T{ Typ1 <T> 1 }T
+  T{ 123 Typ1_field <T> 123 }T
+
+  T{ Typ2 <T> 8 }T
+  T{ 123 Typ2_field0 <T> 123 }T
+  T{ 123 Typ2_field1 <T> 127 }T
+
+  T{ Typ3 <T> 5 }T
+  T{ 123 Typ3_field0 <T> 123 }T
+  T{ 123 Typ3_field1 <T> 127 }T
+
+  T{ Typ4 <T> 16 }T
+  T{ 123 Typ4_field0 <T> 123 }T
+  T{ 123 Typ4_field1 <T> 127 }T
+  T{ 123 Typ4_field2 <T> 131 }T
+
+  T{ Typ5 <T> 16 }T
+  T{ 123 Typ5_field0 <T> 123 }T
+  T{ 123 Typ5_field1 <T> 127 }T
+  T{ 123 Typ5_field2 <T> 131 }T
+
+  T{ Typ6 <T> 17 }T
+  T{ 123 Typ6_field0 <T> 123 }T
+  T{ 123 Typ6_field1 <T> 131 }T
+  T{ 123 Typ6_field2 <T> 139 }T
+
+  T{ Typ7 <T> 17 }T
+  T{ 123 Typ7_field0 <T> 123 }T
+  T{ 123 Typ7_field1 <T> 131 }T
+  T{ 123 Typ7_field2 <T> 135 }T
+  T{ 123 Typ7_field3 <T> 139 }T
+
+  T{ Typ8 <T> 8 }T
+  T{ 123 Typ8_field0 <T> 123 }T
+  T{ 123 Typ8_field1 <T> 124 }T
+  T{ 123 Typ8_field2 <T> 125 }T
+  T{ 123 Typ8_field3 <T> 127 }T
+;
+test_structs
+
 log" [test] ok" lf

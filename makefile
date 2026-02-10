@@ -119,17 +119,6 @@ debug:
 		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
 		--file $(file) -- $(args)
 
-.PHONY: debug_run
-debug_run:
-	lldb --batch \
-		--source-quietly \
-		--one-line "settings set show-statusline false" \
-		--one-line "settings set target.disable-aslr true" \
-		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
-		--one-line "run" \
-		--one-line "quit" \
-		--file $(file) -- $(args)
-
 # .PHONY: debug_run
 # debug_run:
 # 	lldb --batch \
@@ -144,6 +133,17 @@ debug_run:
 # 		--one-line "run" \
 # 		--one-line "quit" \
 # 		--file $(file) -- $(args)
+
+.PHONY: debug_run
+debug_run:
+	lldb --batch \
+		--source-quietly \
+		--one-line "settings set show-statusline false" \
+		--one-line "settings set target.disable-aslr true" \
+		$(and $(DEBUG),--one-line "settings set target.env-vars DEBUG=true") \
+		--one-line "run" \
+		--one-line "quit" \
+		--file $(file) -- $(args)
 
 .PHONY: debug_run_w
 debug_run_w:
@@ -162,7 +162,7 @@ asm:
 .PHONY: disasm
 disasm:
 	mkdir -p $(LOCAL)
-	llvm-objdump $(DISASM) $(or $(file),$(MAIN_S)) > $(LOCAL)/out.s
+	llvm-objdump $(DISASM) $(or $(file),$(MAIN_R)) > $(LOCAL)/out.s
 
 # .PHONY: install
 # install: build

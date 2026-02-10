@@ -18,6 +18,7 @@ TODO:
 #include "./lib/dict.c"
 #include "./lib/err.h"
 #include "./lib/io.c"
+#include "./lib/list.h"
 #include "./lib/mach_misc.c"
 #include "./lib/mach_o.h"
 #include "./lib/mem.c"
@@ -61,16 +62,16 @@ static Err validate_callees_can_compile(Sym_set *visited, Sym *sym) {
 }
 
 static Err compile_mach_executable(Interp *interp) {
-  const auto dict = &interp->words;
+  const auto comp = &interp->comp;
+  const auto code = &comp->code;
+  const auto heap = &code->heap;
+  const auto exec = &code->code_exec;
+  const auto dict = &interp->dict_exec;
   const auto main = dict_get(dict, "main");
 
   if (!main) {
     return err_str("unable to build executable: word \"main\" is not defined");
   }
-
-  // const auto syms = &interp->syms;
-  const auto exec     = &interp->asm.exec;
-  const auto exec_len = stack_len(exec);
 
   defer(set_deinit) Sym_set visited = {};
   try(validate_callees_can_compile(&visited, main));
@@ -142,13 +143,14 @@ static Err compile_mach_executable(Interp *interp) {
   }
 
   {
-    const auto main_off = (U8 *)main->norm.exec.floor - (U8 *)exec->floor;
-    aver(main_off >= 0);
+    const auto pro = main->norm.spans.prologue;
+    const auto off = pro * sizeof(Instr);
+    aver(off > 0);
 
     const auto cmd = (Mach_load_cmd_main){
       .head.cmd     = MLC_MAIN,
       .head.cmdsize = sizeof(Mach_load_cmd_main),
-      .entryoff     = (U64)main_off,
+      .entryoff     = (U64)off,
     };
     try(file_stream_write(str, &cmd, sizeof(cmd), 1));
   }
@@ -188,17 +190,21 @@ static Err compile_mach_executable(Interp *interp) {
   Removing it would require us to relocate all PC-relative offsets in compiled
   code. Easy enough but requires additional book-keeping. Stay simple for now.
   */
-  try(file_stream_write(str, exec->floor, stack_val_size(exec), exec_len));
+  try(file_stream_write(str, exec->dat, list_val_size(exec), exec->len));
 
   /*
   Now missing:
   - Linker info for extern procedure calls.
+  - Store the data section.
+  - Store the GOT section.
   - Handle error string returned by `main`, if any.
     - Print string and exit with non-0.
   - `exit` syscall.
   */
 
   /*
+  TODO drop, we just dump executable code as-is.
+
   for (set_range(auto, dep, &main->deps)) {
     if (set_has(&visited, dep)) continue;
     set_add(&visited, dep);
@@ -209,3 +215,5 @@ static Err compile_mach_executable(Interp *interp) {
   try_errno(fclose(str));
   return nullptr;
 }
+
+int main(void) {}

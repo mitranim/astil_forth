@@ -160,6 +160,13 @@ static Err intrin_here(Interp *interp) {
   return nullptr;
 }
 
+/*
+This intrinsic is unnecessary for most programs, as they can simply
+call the libc function `exit` or do a raw exit syscall. However, on
+the slim chance a C program wants to embed this interpreter and run
+some Forth code, this allows Forth code to terminate interpretation
+without stopping the outer C program.
+*/
 static Err intrin_quit(Interp *interp) {
   const auto comp = &interp->comp;
   if (comp->ctx.sym) {
@@ -285,6 +292,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
       fprintf(
         stderr,
         "[debug] word:\n"
+        "[debug]   addr:            %p\n"
         "[debug]   name:            %s\n"
         "[debug]   wordlist:        %d\n"
         "[debug]   type:            normal\n"
@@ -298,6 +306,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   interp_only:     %s\n"
         "[debug]   inlinable:       %s\n"
         "[debug]   execution token: %p\n",
+        sym,
         sym->name.buf,
         sym->wordlist,
 #ifdef NATIVE_CALL_CONV
@@ -322,6 +331,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
     case SYM_INTRIN: {
       eprintf(
         "[debug] word:\n"
+        "[debug]   addr:            %p\n"
         "[debug]   name:               %s\n"
         "[debug]   wordlist:           %d\n"
         "[debug]   type:               intrinsic\n"
@@ -330,6 +340,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   throws:             %d\n"
         "[debug]   execution token:    %p\n"
         "[debug]   executable address: %p\n",
+        sym,
         sym->name.buf,
         sym->wordlist,
         sym->inp_len,
@@ -344,10 +355,12 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
     case SYM_EXTERN: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   name:     %s\n"
-        "[debug]   wordlist: %d\n"
-        "[debug]   type:     external procedure\n"
-        "[debug]   address:  %p\n",
+        "[debug]   addr:           %p\n"
+        "[debug]   name:           %s\n"
+        "[debug]   wordlist:       %d\n"
+        "[debug]   type:           extern\n"
+        "[debug]   extern address: %p\n",
+        sym,
         sym->name.buf,
         sym->wordlist,
         sym->exter

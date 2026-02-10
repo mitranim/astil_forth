@@ -311,14 +311,10 @@ static Err intrin_comp_barrier(Interp *interp) {
   return nullptr;
 }
 
-static Err err_invalid_clobber_mask(Sint bits) {
-  return errf("invalid clobber mask %s", uint64_to_bit_str((Uint)bits));
-}
-
-static Err intrin_comp_clobber(Sint bits, Interp *interp) {
-  const auto rem = bits_del_all((Uint)bits, ARCH_VOLATILE_REGS);
-  if (rem) return err_invalid_clobber_mask(bits);
-  return comp_clobber_regs(&interp->comp, (Bits)bits);
+static Err intrin_comp_clobber(Sint reg, Interp *interp) {
+  try(arch_validate_reg(reg));
+  try(comp_clobber_reg(&interp->comp, (U8)reg));
+  return nullptr;
 }
 
 static Err intrin_comp_named_local(Sint buf, Sint len, Interp *interp) {

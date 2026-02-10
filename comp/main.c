@@ -35,7 +35,15 @@ static Err run(int argc, const char **argv) {
   return nullptr;
 }
 
-int main(int argc, const char **argv) { try_main(run(argc, argv)); }
+int main(int argc, const char **argv) {
+  const auto err = run(argc, argv);
+  if (!err || err == ERR_QUIT) return 0;
+
+  fprintf(stderr, "error: %s\n", err);
+  backtrace_print();
+  if (DEBUG) abort();
+  return 1;
+}
 
 /*
 

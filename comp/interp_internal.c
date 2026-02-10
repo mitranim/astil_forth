@@ -322,11 +322,11 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
   IF_DEBUG(eprintf("[system] reading code from stdio: " FMT_QUOTED "\n", path));
 
   if (!isatty(fileno(file))) {
-    return reader_err(read, interp_loop(interp));
+    return interp_err(read, interp_loop(interp));
   }
 
   for (;;) {
-    const auto err = reader_err(read, interp_loop(interp));
+    const auto err = interp_err(read, interp_loop(interp));
     if (!err) return nullptr;
     interp_handle_err(interp, err);
   }
@@ -368,7 +368,7 @@ static Err interp_import_inner(
   dict_set(imports, path, EMPTY);
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
-  return reader_err(read, interp_loop(interp));
+  return interp_err(read, interp_loop(interp));
 }
 
 // There better not be a `longjmp` over this.
@@ -411,7 +411,7 @@ static Err interp_validate_sym_ptr(Interp *interp, Sym *sym) {
 
 static Err interp_parse_until(Interp *interp, U8 delim) {
   const auto read = interp->reader;
-  read_skip_whitespace(read);
+  read_skip_space(read);
   try(read_until(read, (U8)delim));
 
   // IF_DEBUG(eprintf(
@@ -528,8 +528,20 @@ static Err interp_find_word(
   const auto sym = dict_get(dict, name);
   if (!sym) return err_word_undefined(name);
 
+  // For later. We don't want this as a default behavior,
+  // but we might need another intrinsic with this.
+  //
+  // if (!sym) {
+  //   IF_DEBUG(eprintf(
+  //     "[system] did not find " FMT_QUOTED " in wordlist %d\n", name, wordlist
+  //   ));
+  //
+  //   try(int_stack_push(&interp->ints, 0));
+  //   return nullptr;
+  // }
+
   IF_DEBUG(eprintf(
-    "[system] found symbol " FMT_QUOTED " in wordlist %d; address: %p\n",
+    "[system] found " FMT_QUOTED " in wordlist %d; address: %p\n",
     name,
     wordlist,
     sym
