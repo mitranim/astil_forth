@@ -24,8 +24,8 @@ import' ./lang_r.f
   len 0 +for: ind
     ind len0 + stack_at@ { one }
     ind len1 + stack_at@ { two }
-    one two <> #if false #ret #end
-  #end
+    one two <> if false ret end
+  end
   true
 ;
 
@@ -47,18 +47,18 @@ import' ./lang_r.f
 
   \ Does the stack length match?
   rel0 rel1 =
-  #if
+  if
     \ Does the content match?
     len0 len1 rel1 T_stack_eq
-    #if T_reset #ret #end
-  #else
+    if T_reset ret end
+  else
     rel0 rel1 elogf" stack length mismatch: (%zd) <T> (%zd)" elf
-  #end
+  end
 
   elog" stack content mismatch: T{ "
-  len1 len0 +for: ind ind stack_at@ elogf" %zd " #end
+  len1 len0 +for: ind ind stack_at@ elogf" %zd " end
   elog" <T> "
-  len2 ind  +for: ind ind stack_at@ elogf" %zd " #end
+  len2 ind  +for: ind ind stack_at@ elogf" %zd " end
   elog" }T" elf
 
   T_reset
@@ -74,12 +74,12 @@ import' ./lang_r.f
   len1 len - { len0 }
 
   len0 len1 len T_stack_eq
-  #if len0 stack_set_len #ret #end
+  if len0 stack_set_len ret end
 
   elog" mismatch: T{ "
-  len1 len0 +for: ind ind stack_at@ elogf" %zd " #end
+  len1 len0 +for: ind ind stack_at@ elogf" %zd " end
   elog" <T> "
-  len2 ind  +for: ind ind stack_at@ elogf" %zd " #end
+  len2 ind  +for: ind ind stack_at@ elogf" %zd " end
   elog" }T" elf
 
   len0 stack_set_len

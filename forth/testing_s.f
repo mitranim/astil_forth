@@ -27,8 +27,8 @@ import' ./lang_s.f
   len 0 +for: ind
     ind len0 + pick0 { one }
     ind len1 + pick0 { two }
-    one two <> #if false #ret #end
-  #end
+    one two <> if false ret end
+  end
   true
 ;
 
@@ -44,18 +44,18 @@ import' ./lang_s.f
 
   \ Does the stack length match?
   rel0 rel1 =
-  #if
+  if
     \ Does the content match?
     len0 len1 rel1 T_stack_eq
-    #if T_reset #ret #end
-  #else
+    if T_reset ret end
+  else
     rel0 rel1 [ 2 ] elogf" stack length mismatch: (%zd) <T> (%zd)" elf
-  #end
+  end
 
   elog" stack content mismatch: T{ "
-  len1 len0 +for: ind ind pick0 [ 1 ] elogf" %zd " #end
+  len1 len0 +for: ind ind pick0 [ 1 ] elogf" %zd " end
   elog" <T> "
-  len2 ind  +for: ind ind pick0 [ 1 ] elogf" %zd " #end
+  len2 ind  +for: ind ind pick0 [ 1 ] elogf" %zd " end
   elog" }T" elf
 
   T_reset

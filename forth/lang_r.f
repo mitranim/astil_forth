@@ -1074,16 +1074,16 @@ extern_val: stderr __stderrp
 \
 \ General idea:
 \
-\   #if        \ cbz <outside>
+\   if        \ cbz <outside>
 \     if_true
-\   #end
+\   end
 \   outside
 \
-\   #if        \ cbz <if_false>
+\   if        \ cbz <if_false>
 \     if_true
-\   #else      \ b <outside>
+\   else      \ b <outside>
 \     if_false
-\   #end
+\   end
 \   outside
 \
 \ Similarly to Gforth, our conditionals use the Forth data stack
@@ -1128,13 +1128,13 @@ extern_val: stderr __stderrp
   adr           >stack
 ;
 
-:: #elif ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
-  c" when calling `#elif`" 1 comp_args_valid 0 comp_args_set
+:: elif ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
+  c" when calling `elif`" 1 comp_args_valid 0 comp_args_set
   elif_init ' if_pop >stack
 ;
 
-:: #elifn ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
-  c" when calling `#elifn`" 1 comp_args_valid 0 comp_args_set
+:: elifn ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
+  c" when calling `elifn`" 1 comp_args_valid 0 comp_args_set
   elif_init ' ifn_pop >stack
 ;
 
@@ -1144,17 +1144,17 @@ extern_val: stderr __stderrp
   ' if_done >stack
 ;
 
-\ With this strange setup, `#end` pops the top control frame,
+\ With this strange setup, `end` pops the top control frame,
 \ which pops the next control frame, and so on. This allows us
-\ to pop any amount of control constructs with a single `#end`.
+\ to pop any amount of control constructs with a single `end`.
 \ Prepending `if_done` terminates this chain.
-:: #if ( C: -- cond fun_done fun_exec adr_if fun_if ) ( E: pred -- )
-  c" when calling `#if`" 1 comp_args_valid 0 comp_args_set
+:: if ( C: -- cond fun_done fun_exec adr_if fun_if ) ( E: pred -- )
+  c" when calling `if`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' if_pop >stack
 ;
 
-:: #ifn ( C: -- cond fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
-  c" when calling `#ifn`" 1 comp_args_valid 0 comp_args_set
+:: ifn ( C: -- cond fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
+  c" when calling `ifn`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' ifn_pop >stack
 ;
 
@@ -1162,10 +1162,10 @@ extern_val: stderr __stderrp
   stack> patch_branch_forward stack> execute
 ;
 
-:: #else ( C: fun_exec adr_if fun_if -- adr_else fun_else )
+:: else ( C: fun_exec adr_if fun_if -- adr_else fun_else )
   stack> stack> stack> { fun_if adr_if fun_exec }
 
-  c" when calling `#else`" 0 comp_args_valid
+  c" when calling `else`" 0 comp_args_valid
   comp_barrier \ Clobber / relocate locals.
   reserve_here { adr_else }
 
@@ -1178,24 +1178,24 @@ extern_val: stderr __stderrp
 
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
-:: #end ( C: fun -- ) comp_barrier pop_execute ;
-:  #end { fun }       fun          execute ;
+:: end ( C: fun -- ) comp_barrier pop_execute ;
+:  end { fun }       fun          execute ;
 
 \ ## Loops
 \
 \ Unlike other Forth systems, we implement termination of arbitrary
-\ control structures with a generic `#end`. This works for all loops
+\ control structures with a generic `end`. This works for all loops
 \ and eliminates the need to remember many different terminators.
 \
 \ Our solution isn't complicated, either. We simply push procedures
 \ with their arguments to the control stack, and pop the latest one
-\ with `#end`. Each procedure pops its arguments and does something,
+\ with `end`. Each procedure pops its arguments and does something,
 \ then pops the next procedure in the chain. The cascade terminates
 \ when encountering a procedure which doesn't pop a preceding one.
 
 \ Stack position of a special location in the top loop frame
 \ on the control stack. This is where auxiliary structures
-\ such as `#leave` place their own control frames.
+\ such as `leave` place their own control frames.
 0 var: LOOP_FRAME
 
 : loop_frame! ( C: frame_ind -- ) stack> LOOP_FRAME ! ;
@@ -1216,9 +1216,9 @@ extern_val: stderr __stderrp
   stack_len { stack_len_1 }
 
   LOOP_FRAME @
-  #ifn
+  ifn
     throw" auxiliary loop constructs require an ancestor loop frame"
-  #end
+  end
 
   stack_len_1  stack_len_0 - { frame_len }
   frame_len    cells         { frame_size }
@@ -1256,15 +1256,15 @@ extern_val: stderr __stderrp
 \ the "prev frame" and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
-:: #loop ( C: -- ind_frame fun_frame adr_loop fun_loop )
+:: loop ( C: -- ind_frame fun_frame adr_loop fun_loop )
   comp_barrier \ Clobber / relocate locals.
   here { adr }
   loop_frame_init adr >stack
   ' loop_pop          >stack
 ;
 
-\ Can be used in any loop.
-:: #leave ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
+\ Breaks out of any loop.
+:: leave ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
   comp_barrier \ Clobber / relocate locals.
   stack_len    { len }
   reserve_here >stack
@@ -1273,9 +1273,9 @@ extern_val: stderr __stderrp
   loop_aux
 ;
 
-\ Can be used in any loop.
-:: #while ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
-  c" when calling `#while`" 1 comp_args_valid 0 comp_args_set
+\ Breaks out of any loop.
+:: while ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
+  c" when calling `while`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   stack_len    { len }
   reserve_here >stack
@@ -1284,9 +1284,9 @@ extern_val: stderr __stderrp
   loop_aux
 ;
 
-\ Assumes that the top control frame is from `#loop`.
-:: #until ( C: fun -- )
-  c" when calling `#until`" 1 comp_args_valid 0 comp_args_set
+\ Assumes that the top control frame is from `loop`.
+:: until ( C: fun -- )
+  c" when calling `until`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   0 8 asm_cmp_branch_zero comp_instr \ cbnz x0, 8
   stack> execute
@@ -1330,28 +1330,28 @@ extern_val: stderr __stderrp
 \ `for … next` loop. Usage; ceiling must be positive:
 \
 \   123
-\   #for
+\   for
 \     log" looping"
-\   #end
+\   end
 \
 \ Anton Ertl circa 1994:
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
-:: #for
+:: for
   ( C: -- ind_frame fun_frame … adr_cond adr_beg fun_for cur_loc )
   ( E: ceil -- )
-  c" when calling `#for`" 1 comp_args_valid 0 comp_args_set
+  c" when calling `for`" 1 comp_args_valid 0 comp_args_set
   comp_anon_local for_countdown_loop_init
 ;
 
-\ Like `#for` but requires a local name to make the index
+\ Like `for` but requires a local name to make the index
 \ accessible. Usage; ceiling must be positive:
 \
 \   123
 \   -for: ind
 \     ind .
-\   #end
+\   end
 :: -for:
   ( C: "name" -- frame fun_frame … loc adr_cond adr_beg fun_pop )
   ( E: ceil -- )
@@ -1409,11 +1409,11 @@ extern_val: stderr __stderrp
   step comp_local_free
 ;
 
-\ Similar to the standard `?do ... +loop`, but terminated with `#end`
+\ Similar to the standard `?do ... +loop`, but terminated with an `end`
 \ like other loops. Takes a name to make the index accessible. Usage:
 \
-\   ceil floor step +loop: ind ind . #end
-\   123  23    3    +loop: ind ind . #end
+\   ceil floor step +loop: ind ind . end
+\   123  23    3    +loop: ind ind . end
 :: +loop:
   ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
   ( E: ceil floor step -- )
@@ -1496,15 +1496,15 @@ extern_val: stderr __stderrp
     \ bytes when accessing memory. When length is odd, we also store an unused
     \ garbage value from an unused register, which is fine.
     Xd Xt ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp Xd, Xt, [SP, -16]!
-  #end
+  end
 ;
 
 \ Short for "compile variadic arguments end".
 : comp_va_end { len -- }
-  len >=0 #if
+  len >=0 if
     len cells 16 align_up { off }
     ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
-  #end
+  end
 ;
 
 \ For use in compile-time words; see `logf"` below.
@@ -1567,10 +1567,10 @@ extern_val: stderr __stderrp
 
 \ Similar to standard `abort"`, with clearer naming.
 :: throw_if" ( C: "str" -- ) ( E: pred -- )
-  execute'' #if
+  execute'' if
   comp_cstr
   compile' throw
-  execute'' #end
+  execute'' end
 ;
 
 \ ## Stack manipulation — continued
@@ -1584,7 +1584,7 @@ extern_val: stderr __stderrp
 
   comp_args_get 0 +for: arg
     arg top 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
-  #end
+  end
 
   top asm_stack_store comp_instr
   0 comp_args_set
@@ -1597,17 +1597,17 @@ extern_val: stderr __stderrp
 :: stack{ ( E: …args… -- )
   0 { locs }
 
-  #loop
+  loop
     parse_word { str len }
 
-    " }" str len str= #if #leave #end
+    " }"  str len str= if leave end
     " --" str len str= throw_if" unsupported `--` in `stack{`"
 
     str len comp_named_local >stack
     locs inc { locs }
-  #end
+  end
 
-  locs #ifn #ret #end
+  locs ifn ret end
 
   0 { arg_reg } \ x0
   1 { top_reg } \ x1
@@ -1616,12 +1616,12 @@ extern_val: stderr __stderrp
   top_reg comp_clobber
   top_reg asm_stack_load comp_instr
 
-  locs #for
+  locs for
     stack> { loc }
     arg_reg top_reg -8 asm_load_pre comp_instr     \ ldr x0, [x1, -8]!
     arg_reg loc                     comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
     arg_reg comp_clobber
-  #end
+  end
 
   top_reg asm_stack_store comp_instr
 ;
@@ -1632,13 +1632,13 @@ extern_val: stderr __stderrp
 \ ...
 \ stur <stack>, [x27, INTERP_INTS_TOP]
 : comp_args_to_stack { len }
-  len #ifn #ret #end
+  len ifn ret end
   comp_scratch_reg { stack }
 
   stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr \ ldur <stack>
   len 0 +for: arg
     arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
-  #end
+  end
   stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr \ stur <stack>
 ;
 
@@ -1651,30 +1651,27 @@ extern_val: stderr __stderrp
 : .s
   stack_len { len }
 
-  len #ifn
+  len ifn
     log" stack is empty" lf
-    #ret
-  #end
+    ret
+  end
 
-  len <0 #if
+  len <0 if
     len logf" stack length is negative: %zd" lf
-    #ret
-  #end
+    ret
+  end
 
   len logf" stack <%zd>:" lf
 
   len 0 +for: ind
     space space
     ind stack_at @ ind log_cell lf
-  #end
+  end
 ;
 
 : .sc .s stack_clear ;
 
 \ ## More memory stuff
-
-extern_val: errno __error
-1 1 extern: strerror
 
 6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
 3 1 extern: mprotect ( adr len pflag -- err )
@@ -1695,7 +1692,7 @@ extern_val: errno __error
 : mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or { mflag }
   0 size pflag mflag -1 0 mmap { addr }
-  addr -1 = #if mem_map_err #end
+  addr -1 = if mem_map_err end
   addr
 ;
 
@@ -1708,7 +1705,7 @@ extern_val: errno __error
 : mem_unprot { addr size }
   PROT_READ PROT_WRITE or { pflag }
   addr size pflag mprotect
-  -1 = #if throw" unable to mprotect" #end
+  -1 = if throw" unable to mprotect" end
 ;
 
 \ Allocates a guarded buffer: `guard|data|guard`.
@@ -1757,6 +1754,8 @@ extern_val: errno __error
 8 let: Cstr \ char*
 4 let: Cint
 4 let: Cuint
+8 let: Clong
+8 let: Culong
 
 \ Defines a pretend "array type" which is really just capacity.
 \ Intended mainly for making struct fields more descriptive.
@@ -1777,7 +1776,7 @@ extern_val: errno __error
 \   struct: Type
 \     S32 field: Type_field0
 \     U64 field: Type_field1
-\   #end
+\   end
 \
 \   Type calloc { val }
 \
@@ -1800,7 +1799,7 @@ extern_val: errno __error
 
 : struct_field_comp { off }
   comp_args_get { len }
-  len #ifn throw" struct field must be preceded by struct pointer" #end
+  len ifn throw" struct field must be preceded by struct pointer" end
 
   len dec { reg }
   reg                     comp_clobber \ Disassociate locals from this reg.

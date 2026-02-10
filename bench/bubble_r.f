@@ -17,14 +17,14 @@ LEN cells LIST + let:   CEIL
   CEIL LIST cell
   +loop: ptr
     pseudo_random ptr !
-  #end
+  end
 ;
 
 : list_dump
   CEIL LIST cell
   +loop: ptr
     ptr @ .
-  #end
+  end
 ;
 
 : list_verify
@@ -32,7 +32,7 @@ LEN cells LIST + let:   CEIL
   LIST cell
   +loop: ptr
     ptr @2 > throw_if" bubble_sort: not sorted"
-  #end
+  end
 ;
 
 : bubble
@@ -40,12 +40,12 @@ LEN cells LIST + let:   CEIL
   -loop: ceil_ptr
     ceil_ptr LIST cell
     +loop: ptr
-      ptr @2 > #if
+      ptr @2 > if
         ptr @2 { one two }
         two one ptr !2
-      #end
-    #end
-  #end
+      end
+    end
+  end
 ;
 
 : bubble_sort

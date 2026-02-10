@@ -37,20 +37,20 @@ All of the code is authored by me. None is bot-generated.
 import' forth/lang_r.f
 
 : main
-  log" hello world!" cr
+  log" hello world!" lf
 
   10
-  #if
-    log" branch 0" cr
-  #else 20 #elif
-    log" branch 1" cr
-  #else
-    log" branch 2" cr
-  #end
+  if
+    log" branch 0" lf
+  else 20 elif
+    log" branch 1" lf
+  else
+    log" branch 2" lf
+  end
 
   12 0 +for: ind
-    ind logf" current number: %zd" cr
-  #end
+    ind logf" current number: %zd" lf
+  end
 ;
 
 main
@@ -173,14 +173,15 @@ Special _semantic_ roles get special _syntactic_ roles. Other Forths already fol
 ...but not enough. There are more semantic roles which need syntactic distinction. Rules we add:
 - Word-parsing words which declare must end with `:`.
 - Word-parsing words which don't declare must end with `'`.
-- Other immediate words begin with `#`.
+- Custom and unusual control-related words begin with `#`.
 
 Examples:
 - Declaring words: `: :: let: var: to:`.
   - Code editors are encouraged to highlight the next word like a declaration.
 - Parsing words: `' postpone' compile'`.
   - Code editors are encouraged to highlight the next word like a string.
-- Control words: `#if #else #end`.
+- Custom or unusual control words: `#word_beg #word_end`.
+- (Well-known control words are unchanged: `if else end`.)
 
 Code editors are encouraged to syntax-highlight these prefixes and suffixes to clarify the semantic roles. Exceptions were made for `\ ( ; [` which are also immediate; special syntax highlighting is recommended for those.
 

@@ -13,100 +13,100 @@ T{ 10    <T> 10    }T
 T{ 10 20 <T> 10 20 }T
 
 : test_conditionals
-  \ false #if 10       #end \ Must fail to compile.
-  \ false #if #else 10 #end \ Must fail to compile.
+  \ false if 10      end \ Must fail to compile.
+  \ false if else 10 end \ Must fail to compile.
 
-  T{ -1 { val } false #if 10 { val } #end val <T> -1 }T
-  T{ -1 { val } true  #if 10 { val } #end val <T> 10 }T
+  T{ -1 { val } false if 10 { val } end val <T> -1 }T
+  T{ -1 { val } true  if 10 { val } end val <T> 10 }T
 
-  T{ false #if 10 { val } #else 20 { val } #end val <T> 20 }T
-  T{ true  #if 10 { val } #else 20 { val } #end val <T> 10 }T
+  T{ false if 10 { val } else 20 { val } end val <T> 20 }T
+  T{ true  if 10 { val } else 20 { val } end val <T> 10 }T
 
-  T{ -1 { val } false #ifn 10 { val } #end val <T> 10 }T
-  T{ -1 { val } true  #ifn 10 { val } #end val <T> -1 }T
+  T{ -1 { val } false ifn 10 { val } end val <T> 10 }T
+  T{ -1 { val } true  ifn 10 { val } end val <T> -1 }T
 
-  T{ false #ifn 10 { val } #else 20 { val } #end val <T> 10 }T
-  T{ true  #ifn 10 { val } #else 20 { val } #end val <T> 20 }T
+  T{ false ifn 10 { val } else 20 { val } end val <T> 10 }T
+  T{ true  ifn 10 { val } else 20 { val } end val <T> 20 }T
 
   T{
-    -1 { val } false #if 10 { val } #else false #elif 20 { val } #end val
+    -1 { val } false if 10 { val } else false elif 20 { val } end val
   <T>
     -1
   }T
 
   T{
     -1 { val }
-    false #if 10 { val } #else false #elif 20 { val } #else 30 { val } #end
+    false if 10 { val } else false elif 20 { val } else 30 { val } end
     val
   <T>
     30
   }T
 
   T{
-    -1 { val } false #if 10 { val } #else true #elif 20 { val } #end val
+    -1 { val } false if 10 { val } else true elif 20 { val } end val
   <T>
     20
   }T
 
   T{
     -1 { val }
-    false #if 10 { val } #else true #elif 20 { val } #else 30 { val } #end
+    false if 10 { val } else true elif 20 { val } else 30 { val } end
     val
   <T>
     20
   }T
 
   T{
-    -1 { val } true #if 10 { val } #else false #elif 20 { val } #end val
+    -1 { val } true if 10 { val } else false elif 20 { val } end val
   <T>
     10
   }T
 
   T{
     -1 { val }
-    true #if 10 { val } #else false #elif 20 { val } #else 30 { val } #end
+    true if 10 { val } else false elif 20 { val } else 30 { val } end
     val
   <T>
     10
   }T
 
   T{
-    -1 { val } false #if 10 { val } #else false #elifn 20 { val } #end val
+    -1 { val } false if 10 { val } else false elifn 20 { val } end val
   <T>
     20
   }T
 
   T{
     -1 { val }
-    false #if 10 { val } #else false #elifn 20 { val } #else 30 { val } #end
+    false if 10 { val } else false elifn 20 { val } else 30 { val } end
     val
   <T>
     20
   }T
 
   T{
-    -1 { val } false #if 10 { val } #else true #elifn 20 { val } #end val
+    -1 { val } false if 10 { val } else true elifn 20 { val } end val
   <T>
     -1
   }T
 
   T{
     -1 { val }
-    false #if 10 { val } #else true #elifn 20 { val } #else 30 { val } #end
+    false if 10 { val } else true elifn 20 { val } else 30 { val } end
     val
   <T>
     30
   }T
 
   T{
-    -1 { val } true #if 10 { val } #else false #elifn 20 { val } #end val
+    -1 { val } true if 10 { val } else false elifn 20 { val } end val
   <T>
     10
   }T
 
   T{
     -1 { val }
-    true #if 10 { val } #else false #elifn 20 { val } #else 30 { val } #end
+    true if 10 { val } else false elifn 20 { val } else 30 { val } end
     val
   <T>
     10
@@ -115,20 +115,20 @@ T{ 10 20 <T> 10 20 }T
 test_conditionals
 
 : test_recursion { val -- val }
-  val 13 <= #if val #ret #end
-  val dec #recur
+  val 13 <= if val ret end
+  val dec recur
 ;
 T{ 123 test_recursion <T> 13 }T
 
 1 0 extern: sleep
 
-: test_sleep_loop #loop log" sleeping" lf 1 sleep #end ;
+: test_sleep_loop loop log" sleeping" lf 1 sleep end ;
 \ test_sleep_loop
 
 : test_loop_leave
-  T{ -1 { val } #loop            #leave abort              #end val <T> -1 }T
-  T{ -1 { val } #loop 10 { val } #leave abort              #end val <T> 10 }T
-  T{ -1 { val } #loop 10 { val } #leave abort #leave abort #end val <T> 10 }T
+  T{ -1 { val } loop            leave abort             end val <T> -1 }T
+  T{ -1 { val } loop 10 { val } leave abort             end val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave abort leave abort end val <T> 10 }T
 ;
 test_loop_leave
 
@@ -137,15 +137,15 @@ test_loop_leave
     -1 { one }
     -2 { two }
     -3 { three }
-    #loop
+    loop
       10 { one }
-      #loop
+      loop
         20 { two }
-        #leave
-      #end
+        leave
+      end
       30 { three }
-      #leave
-    #end
+      leave
+    end
     one two three
   <T>
     10 20 30
@@ -156,7 +156,7 @@ test_loop_nested
 : test_loop_while
   T{
     -1 { val }
-    #loop false #while 10 { val } #end
+    loop false while 10 { val } end
     val
   <T>
     -1
@@ -164,7 +164,7 @@ test_loop_nested
 
   T{
     -1 { val }
-    #loop 10 { val } false #while 20 { val } #end
+    loop 10 { val } false while 20 { val } end
     val
   <T>
     10
@@ -172,7 +172,7 @@ test_loop_nested
 
   T{
     -1 { val }
-    #loop 10 { val } false #while 20 { val } true #while #end
+    loop 10 { val } false while 20 { val } true while end
     val
   <T>
     10
@@ -180,7 +180,7 @@ test_loop_nested
 
   T{
     -1 { val }
-    #loop 10 { val } true #while 20 { val } false #while #end
+    loop 10 { val } true while 20 { val } false while end
     val
   <T>
     20
@@ -188,10 +188,10 @@ test_loop_nested
 
   T{
     12 { val }
-    #loop
-      val 5 > #while
+    loop
+      val 5 > while
       val dec { val }
-    #end
+    end
     val
   <T>
     5
@@ -199,11 +199,11 @@ test_loop_nested
 
   T{
     12 { val }
-    #loop
-      val 5 > #while
-      val 7 > #while
+    loop
+      val 5 > while
+      val 7 > while
       val dec { val }
-    #end
+    end
     val
   <T>
     7
@@ -211,12 +211,12 @@ test_loop_nested
 
   T{
     12 { val }
-    #loop
+    loop
       val dec { val }
-      val #while
-      val #while
-      val #while
-    #end
+      val while
+      val while
+      val while
+    end
     val
   <T>
     0
@@ -225,28 +225,28 @@ test_loop_nested
 test_loop_while
 
 : test_loop_while_leave
-  T{ -1 { val } #loop            false #while 10 { val } #leave #end val <T> -1 }T
-  T{ -1 { val } #loop            true  #while 10 { val } #leave #end val <T> 10 }T
-  T{ -1 { val } #loop 10 { val } false #while 20 { val } #leave #end val <T> 10 }T
-  T{ -1 { val } #loop 10 { val } true  #while 20 { val } #leave #end val <T> 20 }T
-  T{ -1 { val } #loop 10 { val } true  #while #leave 20 { val } #end val <T> 10 }T
-  T{ -1 { val } #loop #leave 10 { val } true  #while 20 { val } #end val <T> -1 }T
+  T{ -1 { val } loop            false while 10 { val } leave end val <T> -1 }T
+  T{ -1 { val } loop            true  while 10 { val } leave end val <T> 10 }T
+  T{ -1 { val } loop 10 { val } false while 20 { val } leave end val <T> 10 }T
+  T{ -1 { val } loop 10 { val } true  while 20 { val } leave end val <T> 20 }T
+  T{ -1 { val } loop 10 { val } true  while leave 20 { val } end val <T> 10 }T
+  T{ -1 { val } loop leave 10 { val } true  while 20 { val } end val <T> -1 }T
 ;
 test_loop_while_leave
 
 : test_loop_until
-  T{ -1 { val } #loop                                 false  #until val <T> -1 }T
-  T{ -1 { val } #loop 10 { val }                      false  #until val <T> 10 }T
-  T{ -1 { val } #loop 10 { val } #leave               true   #until val <T> 10 }T
-  T{ -1 { val } #loop 10 { val } #leave #leave        true   #until val <T> 10 }T
-  T{ -1 { val } #loop 10 { val } #leave #leave #leave true   #until val <T> 10 }T
+  T{ -1 { val } loop                              false until val <T> -1 }T
+  T{ -1 { val } loop 10 { val }                   false until val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave             true  until val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave leave       true  until val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave leave leave true  until val <T> 10 }T
 
-  T{ 12 { val } #loop val dec { val } val     #until val <T> 0 }T
-  T{ 12 { val } #loop val dec { val } val 6 > #until val <T> 6 }T
+  T{ 12 { val } loop val dec { val } val     until val <T> 0 }T
+  T{ 12 { val } loop val dec { val } val 6 > until val <T> 6 }T
 
   T{
     12 { val }
-    #loop val dec { val } val 8 > #while val 6 > #until
+    loop val dec { val } val 8 > while val 6 > until
     val
   <T>
     8
@@ -255,20 +255,20 @@ test_loop_while_leave
 test_loop_until
 
 : test_loop_for
-  T{ -12 #for #end <T> }T
-  T{ -1  #for #end <T> }T
-  T{ 0   #for #end <T> }T
+  T{ -12 for end <T> }T
+  T{ -1  for end <T> }T
+  T{ 0   for end <T> }T
 
-  T{ 0 { val } 12 #for val inc { val }        #end val <T> 12 }T
-  T{ 0 { val } 12 #for val inc { val } #leave #end val <T> 1  }T
-  T{ 0 { val } 12 #for #leave val inc { val } #end val <T> 0  }T
+  T{ 0 { val } 12 for val inc { val }       end val <T> 12 }T
+  T{ 0 { val } 12 for val inc { val } leave end val <T> 1  }T
+  T{ 0 { val } 12 for leave val inc { val } end val <T> 0  }T
 
   T{
     0 { val }
-    12 #for
-      val 5 > #if #leave #end
+    12 for
+      val 5 > if leave end
       val inc { val }
-    #end
+    end
     val
   <T>
     6
@@ -276,10 +276,10 @@ test_loop_until
 
   T{
     0 { val }
-    12 #for
-      val 6 < #while
+    12 for
+      val 6 < while
       val inc { val }
-    #end
+    end
     val
   <T>
     6
@@ -287,11 +287,11 @@ test_loop_until
 
   T{
     0 { val }
-    12 #for
-      val 5 < #while
-      val 8 < #while
+    12 for
+      val 5 < while
+      val 8 < while
       val inc { val }
-    #end
+    end
     val
   <T>
     5
@@ -299,11 +299,11 @@ test_loop_until
 
   T{
     0 { val }
-    12 #for
-      val 8 < #while
-      val 5 < #while
+    12 for
+      val 8 < while
+      val 5 < while
       val inc { val }
-    #end
+    end
     val
   <T>
     5
@@ -312,21 +312,21 @@ test_loop_until
 test_loop_for
 
 : test_loop_for_countdown
-  T{ -12 -for: ind #end <T> }T
-  T{ -1  -for: ind #end <T> }T
-  T{ 0   -for: ind #end <T> }T
+  T{ -12 -for: ind end <T> }T
+  T{ -1  -for: ind end <T> }T
+  T{ 0   -for: ind end <T> }T
 
-  T{ -1 { ind } 12 -for: ind                          #end ind <T> 0  }T
-  T{ -1 { ind } 12 -for: ind              #leave      #end ind <T> 11 }T
-  T{ -1 { ind } 12 -for: ind ind 5 <= #if #leave #end #end ind <T> 5  }T
-  T{ -1 { ind } 12 -for: ind ind 5 >      #while      #end ind <T> 5  }T
+  T{ -1 { ind } 12 -for: ind                       end ind <T> 0  }T
+  T{ -1 { ind } 12 -for: ind            leave      end ind <T> 11 }T
+  T{ -1 { ind } 12 -for: ind ind 5 <= if leave end end ind <T> 5  }T
+  T{ -1 { ind } 12 -for: ind ind 5 >    while      end ind <T> 5  }T
 
   T{
     -1 { ind }
     12 -for: ind
-      ind 7 > #while
-      ind 5 > #while
-    #end
+      ind 7 > while
+      ind 5 > while
+    end
     ind
   <T>
     7
@@ -335,9 +335,9 @@ test_loop_for
   T{
     -1 { ind }
     12 -for: ind
-      ind 5 > #while
-      ind 7 > #while
-    #end
+      ind 5 > while
+      ind 7 > while
+    end
     ind
   <T>
     7
@@ -346,28 +346,28 @@ test_loop_for
 test_loop_for_countdown
 
 : test_loop_for_countup
-  T{ -1 -1 +for: ind #end ind <T> -1 }T
-  T{ -1 -2 +for: ind #end ind <T> -1 }T
-  T{  0 -2 +for: ind #end ind <T>  0 }T
-  T{  0  0 +for: ind #end ind <T>  0 }T
-  T{  1  0 +for: ind #end ind <T>  1 }T
-  T{  2  0 +for: ind #end ind <T>  2 }T
-  T{ 12  0 +for: ind #end ind <T> 12 }T
+  T{ -1 -1 +for: ind end ind <T> -1 }T
+  T{ -1 -2 +for: ind end ind <T> -1 }T
+  T{  0 -2 +for: ind end ind <T>  0 }T
+  T{  0  0 +for: ind end ind <T>  0 }T
+  T{  1  0 +for: ind end ind <T>  1 }T
+  T{  2  0 +for: ind end ind <T>  2 }T
+  T{ 12  0 +for: ind end ind <T> 12 }T
 
-  T{ -1 -2 +for: ind       #leave #end ind <T> -2 }T
-  T{ -1 -1 +for: ind       #leave #end ind <T> -1 }T
-  T{  0  0 +for: ind       #leave #end ind <T>  0 }T
-  T{  1  0 +for: ind       #leave #end ind <T>  0 }T
-  T{  1  1 +for: ind       #leave #end ind <T>  1 }T
-  T{  2  1 +for: ind       #leave #end ind <T>  1 }T
-  T{  2  1 +for: ind false #while #end ind <T>  1 }T
-  T{  2  1 +for: ind true  #while #end ind <T>  2 }T
+  T{ -1 -2 +for: ind       leave end ind <T> -2 }T
+  T{ -1 -1 +for: ind       leave end ind <T> -1 }T
+  T{  0  0 +for: ind       leave end ind <T>  0 }T
+  T{  1  0 +for: ind       leave end ind <T>  0 }T
+  T{  1  1 +for: ind       leave end ind <T>  1 }T
+  T{  2  1 +for: ind       leave end ind <T>  1 }T
+  T{  2  1 +for: ind false while end ind <T>  1 }T
+  T{  2  1 +for: ind true  while end ind <T>  2 }T
 
   T{
     -123 { ind }
     12 0 +for: ind
-      ind 5 > #if #leave #end
-    #end
+      ind 5 > if leave end
+    end
     ind
   <T>
     6
@@ -376,8 +376,8 @@ test_loop_for_countdown
   T{
     -123 { ind }
     12 0 +for: ind
-      ind 6 < #while
-    #end
+      ind 6 < while
+    end
     ind
   <T>
     6
@@ -386,9 +386,9 @@ test_loop_for_countdown
   T{
     -123 { ind }
     12 0 +for: ind
-      ind 8 < #while
-      ind 6 < #while
-    #end
+      ind 8 < while
+      ind 6 < while
+    end
     ind
   <T>
     6
@@ -397,9 +397,9 @@ test_loop_for_countdown
   T{
     -123 { ind }
     12 0 +for: ind
-      ind 6 < #while
-      ind 8 < #while
-    #end
+      ind 6 < while
+      ind 8 < while
+    end
     ind
   <T>
     6
@@ -408,19 +408,19 @@ test_loop_for_countdown
 test_loop_for_countup
 
 : test_loop_countup
-  T{ 8 0 1 +loop: ind #end ind <T> 8  }T
-  T{ 8 0 2 +loop: ind #end ind <T> 8  }T
-  T{ 8 0 3 +loop: ind #end ind <T> 9  }T
-  T{ 8 0 4 +loop: ind #end ind <T> 8  }T
-  T{ 8 0 5 +loop: ind #end ind <T> 10 }T
+  T{ 8 0 1 +loop: ind end ind <T> 8  }T
+  T{ 8 0 2 +loop: ind end ind <T> 8  }T
+  T{ 8 0 3 +loop: ind end ind <T> 9  }T
+  T{ 8 0 4 +loop: ind end ind <T> 8  }T
+  T{ 8 0 5 +loop: ind end ind <T> 10 }T
 ;
 test_loop_countup
 
 : test_loop_countup_nested
   T{
     4 0 1 +loop: one
-      7 one 1 +loop: two #end
-    #end
+      7 one 1 +loop: two end
+    end
     one two
   <T>
     4 7
@@ -429,11 +429,11 @@ test_loop_countup
 test_loop_countup_nested
 
 : test_loop_countdown
-  T{ 8 0 1 -loop: ind #end ind <T> 0 }T
-  T{ 8 0 2 -loop: ind #end ind <T> 0 }T
-  T{ 8 0 3 -loop: ind #end ind <T> 2 }T
-  T{ 8 0 4 -loop: ind #end ind <T> 0 }T
-  T{ 8 0 5 -loop: ind #end ind <T> 3 }T
+  T{ 8 0 1 -loop: ind end ind <T> 0 }T
+  T{ 8 0 2 -loop: ind end ind <T> 0 }T
+  T{ 8 0 3 -loop: ind end ind <T> 2 }T
+  T{ 8 0 4 -loop: ind end ind <T> 0 }T
+  T{ 8 0 5 -loop: ind end ind <T> 3 }T
 ;
 test_loop_countdown
 
@@ -719,55 +719,55 @@ T{ Arr6 <T> 9 }T
 struct: Typ
   8 field: Typ_field0
   4 field: Typ_field1
-#end
+end
 
-struct: Typ0 #end
+struct: Typ0 end
 
 struct: Typ1
   U8 field: Typ1_field
-#end
+end
 
 struct: Typ2
   U8  field: Typ2_field0
   U32 field: Typ2_field1
-#end
+end
 
 struct: Typ3
   U32 field: Typ3_field0
   U8  field: Typ3_field1
-#end
+end
 
 struct: Typ4
   U8  field: Typ4_field0
   U32 field: Typ4_field1
   U64 field: Typ4_field2
-#end
+end
 
 struct: Typ5
   U32 field: Typ5_field0
   U8  field: Typ5_field1
   U64 field: Typ5_field2
-#end
+end
 
 struct: Typ6
   U32 field: Typ6_field0
   U64 field: Typ6_field1
   U8  field: Typ6_field2
-#end
+end
 
 struct: Typ7
   U64 field: Typ7_field0
   U32 field: Typ7_field1
   U32 field: Typ7_field2
   U8  field: Typ7_field3
-#end
+end
 
 struct: Typ8
   U8  field: Typ8_field0
   U8  field: Typ8_field1
   U8  field: Typ8_field2
   U32 field: Typ8_field3
-#end
+end
 
 : test_structs
   T{        Typ        <T>    12  }T

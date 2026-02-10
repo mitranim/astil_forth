@@ -61,12 +61,12 @@ align create list elements cells allot
   loop
 ;
 
-: bubble-sort-with-flag ( -- )
-  initiate-seed
-  initiate-list
-  bubble-with-flag
-  verify-list
-;
+\ : bubble-sort-with-flag ( -- )
+\   initiate-seed
+\   initiate-list
+\   bubble-with-flag
+\   verify-list
+\ ;
 
 : main  ( -- )
   bubble-sort

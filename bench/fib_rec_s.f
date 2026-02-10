@@ -1,9 +1,9 @@
 import' ../forth/lang_s.f
 
 : fib { ind -- out }
-  ind 1 <= #if 1 #ret #end
-  ind 1 - #recur
-  ind 2 - #recur
+  ind 1 <= if 1 ret end
+  ind 1 - recur
+  ind 2 - recur
   +
 ;
 

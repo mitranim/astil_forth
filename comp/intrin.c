@@ -451,7 +451,7 @@ static constexpr auto INTRIN_BRACKET_END = (Sym){
 };
 
 static constexpr auto INTRIN_RET = (Sym){
-  .name.buf  = "#ret",
+  .name.buf  = "ret",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_ret,
   .throws    = true,
@@ -459,7 +459,7 @@ static constexpr auto INTRIN_RET = (Sym){
 };
 
 static constexpr auto INTRIN_RECUR = (Sym){
-  .name.buf  = "#recur",
+  .name.buf  = "recur",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_recur,
   .throws    = true,

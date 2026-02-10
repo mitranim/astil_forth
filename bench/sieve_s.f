@@ -13,26 +13,26 @@ FLAGS LEN + let: EFLAG
   0 3 ( num step )
 
   EFLAG FLAGS +for: ptr0
-    ptr0 c@ #if
+    ptr0 c@ if
       dup ptr0 +
-      dup EFLAG < #if
-        EFLAG swap 2 pick +loop: ptr1 0 ptr1 c! #end
-      #else
+      dup EFLAG < if
+        EFLAG swap 2 pick +loop: ptr1 0 ptr1 c! end
+      else
         drop
-      #end
+      end
       swap inc swap
-    #end
+    end
     2 +
-  #end
+  end
   drop
 ;
 
 : main
   \ find_prime .
 
-  RUNS #for
+  RUNS for
     find_prime drop
-  #end
+  end
 ;
 main
 
@@ -45,18 +45,18 @@ Runs notably slower.
   0 3 { num step }
 
   EFLAG FLAGS +for: ptr0
-    ptr0 c@ #if
+    ptr0 c@ if
       ptr0 step + { ptr1 }
 
       EFLAG ptr0 step +loop: ptr1
         0 ptr1 c!
-      #end
+      end
 
       num inc { num }
-    #end
+    end
 
     step 2 + { step }
-  #end
+  end
 
   num
 ;

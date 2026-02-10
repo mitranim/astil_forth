@@ -31,10 +31,10 @@ hello0
 
 1234567890 .
 
-: truth_num #if 10 #else 20 #end ;
+: truth_num if 10 else 20 end ;
 0 truth_num .
 1 truth_num .
 
-: truth_str #if " true!" #else " false!" #end ;
+: truth_str if " true!" else " false!" end ;
 0 truth_str type lf
 1 truth_str type lf

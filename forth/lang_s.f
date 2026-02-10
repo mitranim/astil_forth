@@ -1052,16 +1052,16 @@
 \
 \ General idea:
 \
-\   #if        \ cbz <outside>
+\   if        \ cbz <outside>
 \     if_true
-\   #end
+\   end
 \   outside
 \
-\   #if        \ cbz <if_false>
+\   if        \ cbz <if_false>
 \     if_true
-\   #else      \ b <outside>
+\   else      \ b <outside>
 \     if_false
-\   #end
+\   end
 \   outside
 \
 \ Unlike other Forth systems, we also support chains
@@ -1087,29 +1087,29 @@
 : ifn_pop ( fun_prev adr_ifn  -- ) ifn_patch execute ;
 : if_init COND_HAS @ COND_HAS on! ' if_done ;
 
-:: #elif ( C: -- fun_exec adr_elif fun_elif ) ( E: pred -- )
+:: elif ( C: -- fun_exec adr_elif fun_elif ) ( E: pred -- )
   ' execute reserve_cond ' if_pop
 ;
 
-:: #elifn ( C: -- fun_exec adr_elif fun_elif ) ( E: pred -- )
+:: elifn ( C: -- fun_exec adr_elif fun_elif ) ( E: pred -- )
   ' execute reserve_cond ' ifn_pop
 ;
 
-\ With this strange setup, `#end` pops the top control frame,
+\ With this strange setup, `end` pops the top control frame,
 \ which pops the next control frame, and so on. This allows us
-\ to pop any amount of control constructs with a single `#end`.
+\ to pop any amount of control constructs with a single `end`.
 \ Prepending `if_done` terminates this chain.
-:: #if ( C: -- prev fun_done fun_exec adr_if fun_if ) ( E: pred -- )
-  if_init execute'' #elif
+:: if ( C: -- prev fun_done fun_exec adr_if fun_if ) ( E: pred -- )
+  if_init execute'' elif
 ;
 
-:: #ifn ( C: -- prev fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
-  if_init execute'' #elifn
+:: ifn ( C: -- prev fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
+  if_init execute'' elifn
 ;
 
 : else_pop ( fun_prev adr_else -- ) patch_branch_forward execute ;
 
-:: #else
+:: else
   ( C: fun_exec adr_if fun_if -- adr_else fun_else )
   here to: adr reserve_instr
   ' nop 2 bury \ Disable `fun_exec` to prevent "if" from chaining.
@@ -1119,23 +1119,23 @@
 
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
-:: #end ( C: fun -- ) execute ;
+:: end ( C: fun -- ) execute ;
 
 \ ## Loops
 \
 \ Unlike other Forth systems, we implement termination of arbitrary
-\ control structures with a generic `#end`. This works for all loops
+\ control structures with a generic `end`. This works for all loops
 \ and eliminates the need to remember many different terminators.
 \
 \ Our solution isn't complicated, either. We simply push procedures
 \ with their arguments to the control stack, and pop the latest one
-\ with `#end`. Each procedure pops its arguments and does something,
+\ with `end`. Each procedure pops its arguments and does something,
 \ then pops the next procedure in the chain. The cascade terminates
 \ when encountering a procedure which doesn't pop a preceding one.
 
 \ Stack position of a special location in the top loop frame
 \ on the control stack. This is where auxiliary structures
-\ such as `#leave` place their own control frames.
+\ such as `leave` place their own control frames.
 0 var: LOOP_FRAME
 
 : loop_frame! ( frame_ind -- ) LOOP_FRAME ! ;
@@ -1153,9 +1153,9 @@
   stack_len to: stack_len_1
 
   LOOP_FRAME @
-  #ifn
+  ifn
     throw" auxiliary loop constructs require an ancestor loop frame"
-  #end
+  end
 
   stack_len_1  stack_len_0 - to: frame_len
   frame_len    cells         to: frame_size
@@ -1183,34 +1183,34 @@
 ;
 
 : loop_end ( adr_beg -- ) off_from_pc asm_branch comp_instr ; \ b <begin>
-: loop_pop ( fun_prev …aux… adr_beg -- ) loop_end execute'' #end ;
+: loop_pop ( fun_prev …aux… adr_beg -- ) loop_end execute'' end ;
 
 \ Implementation note. Each loop frame is "split" in two sub-frames:
 \ the "prev frame" and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
-:: #loop
+:: loop
   ( C: -- ind_frame fun_frame … adr_beg fun[loop] )
   \ Control frame is split: ↑ auxiliary constructs like "leave" go here.
   loop_frame_init here ' loop_pop
 ;
 
-\ Can be used in any loop.
-:: #leave
+\ Breaks out of any loop.
+:: leave
   ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
   stack_len to: len
   here reserve_instr ' else_pop len loop_aux
 ;
 
-\ Can be used in any loop.
-:: #while
+\ Breaks out of any loop.
+:: while
   ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
   stack_len to: len
   reserve_cond ' if_pop len loop_aux
 ;
 
-\ Assumes that the top control frame is from `#loop`.
-:: #until ( C: prev… <loop> -- )
+\ Assumes that the top control frame is from `loop`.
+:: until ( C: prev… <loop> -- )
       asm_pop_x1          comp_instr \ ldr x1, [x27, -8]!
   1 8 asm_cmp_branch_zero comp_instr \ cbnz x1, 8
   execute
@@ -1250,27 +1250,27 @@
 \ `for … next` loop. Usage; ceiling must be positive:
 \
 \   123
-\   #for
+\   for
 \     log" looping"
-\   #end
+\   end
 \
 \ Anton Ertl circa 1994:
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
-:: #for
+:: for
   ( C: -- ind_frame fun_frame … adr_cond adr_beg fun_pop )
   ( E: ceil -- )
   comp_anon_local for_countdown_loop_init
 ;
 
-\ Like `#for` but requires a local name to make the index
+\ Like `for` but requires a local name to make the index
 \ accessible. Usage; ceiling must be positive:
 \
 \   123
 \   -for: ind
 \     ind .
-\   #end
+\   end
 :: -for:
   ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg fun_pop )
   ( E: ceil -- )
@@ -1285,7 +1285,7 @@
   ASM_GE count_loop_pop          \ b <begin>; retropatch b.<cond> <end>
 ;
 
-\ Not used by `#for` and `-for:` because they get away
+\ Not used by `for` and `-for:` because they get away
 \ with storing just one local instead of two.
 \
 \ The meaning of "cursor" and "limit" may differ between loop words.
@@ -1310,7 +1310,7 @@
 \   123 34
 \   +for: ind
 \     ind .
-\   #end
+\   end
 :: +for:
   ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur fun_pop )
   ( E: ceil floor -- )
@@ -1335,11 +1335,11 @@
   ASM_GE count_loop_pop           \ b <begin>; retropatch b.<cond> <end>
 ;
 
-\ Similar to the standard `?do ... +loop`, but terminated with `#end`
+\ Similar to the standard `?do ... +loop`, but terminated with an `end`
 \ like other loops. Takes a name to make the index accessible. Usage:
 \
-\   ceil floor step +loop: ind ind . #end
-\   123  23    3    +loop: ind ind . #end
+\   ceil floor step +loop: ind ind . end
+\   123  23    3    +loop: ind ind . end
 :: +loop:
   ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
   ( E: ceil floor step -- )
@@ -1388,7 +1388,7 @@
   adr_cond adr_beg ' loop_countdown_pop
 ;
 
-: ?dup ( val bool -- val ?val ) #if dup #end ;
+: ?dup ( val bool -- val ?val ) if dup end ;
 
 \ Finds an extern symbol by name and creates a new word which loads the address
 \ of that symbol. The extern symbol can be either a variable or a procedure.
@@ -1453,7 +1453,7 @@ extern_val: stderr __stderrp
 
 \ Compiles movement of values from the data stack
 \ to the locals in the intuitive "reverse" order.
-: } ( locals… len -- ) #for comp_pop_local_set #end ;
+: } ( locals… len -- ) for comp_pop_local_set end ;
 
 \ Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
 \ Capture order matches stack push order in the parens notation
@@ -1461,21 +1461,21 @@ extern_val: stderr __stderrp
 :: {
   0 to: loc_len
 
-  #loop
+  loop
     parse_word to: len to: str
     " }" str len str=
-    #if loc_len } #ret #end
+    if loc_len } ret end
 
-    " --" str len str<> #while \ `--` to `}` is a comment.
+    " --" str len str<> while \ `--` to `}` is a comment.
 
     \ Resulting local token is used by `}` which we're about to call.
     str len comp_named_local ( -- loc_tok )
 
     loc_len inc to: loc_len
-  #end
+  end
 
   \ After `--`: skip all words which aren't `}`.
-  #loop parse_word " }" str<> #until
+  loop parse_word " }" str<> until
 
   loc_len }
 ;
@@ -1537,25 +1537,25 @@ extern_val: stderr __stderrp
 ] ;
 
 : asm_comp_systack_push ( len -- )
-  dup <=0 #if drop #ret #end
+  dup <=0 if drop ret end
 
-  dup odd #if
+  dup odd if
     ' dup>systack inline_word
     dec
-  #end
+  end
 
-  dup #ifn drop #ret #end
+  dup ifn drop ret end
 
-  #loop
-    dup #while
+  loop
+    dup while
     ' pair>systack inline_word
     2 -
-  #end
+  end
   drop
 ;
 
 : asm_comp_systack_pop ( len -- )
-  dup <=0 #if #ret #end
+  dup <=0 if ret end
   cells 16 align_up
   \ add sp, sp, <size>
   ASM_REG_SP ASM_REG_SP rot asm_add_imm comp_instr
@@ -1638,10 +1638,10 @@ extern_val: stderr __stderrp
 
 \ Similar to standard `abort"`, with clearer naming.
 :: throw_if" ( C: "str" -- ) ( E: pred -- )
-  execute'' #if
+  execute'' if
   comp_cstr
   compile' throw
-  execute'' #end
+  execute'' end
 ;
 
 \ ## Stack printing
@@ -1653,22 +1653,22 @@ extern_val: stderr __stderrp
 : .s
   stack_len to: len
 
-  len #ifn
+  len ifn
     log" stack is empty" lf
-    #ret
-  #end
+    ret
+  end
 
-  len <0 #if
+  len <0 if
     log" stack length is negative: " len log_int lf
-    #ret
-  #end
+    ret
+  end
 
   len [ 1 ] logf" stack <%zd>:" lf
 
   len 0 +for: ind
     space space
     ind pick0 ind log_cell lf
-  #end
+  end
 ;
 
 : .sc .s stack_clear ;
@@ -1696,7 +1696,7 @@ extern_val: errno __error
 : mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or to: mflag
   0 size pflag mflag -1 0 mmap
-  dup -1 = #if drop mem_map_err #end
+  dup -1 = if drop mem_map_err end
 ;
 
 : mem_unprot_err ( -- )
@@ -1706,7 +1706,7 @@ extern_val: errno __error
 
 : mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE or mprotect
-  -1 = #if throw" unable to mprotect" #end
+  -1 = if throw" unable to mprotect" end
 ;
 
 \ Allocates a guarded buffer: `guard|data|guard`.
