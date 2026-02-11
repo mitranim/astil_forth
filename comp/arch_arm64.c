@@ -46,10 +46,12 @@ bitfield layout is implementation-defined and non-portable.
 #pragma once
 #include "./arch_arm64.h"
 #include "./comp.h"
+#include "./lib/bits.c"
 #include "./lib/dict.c"
 #include "./lib/fmt.h"
 #include "./lib/jit.c"
 #include "./lib/list.c"
+#include "./lib/misc.h"
 #include "./lib/stack.c"
 #include "./sym.c"
 
@@ -470,70 +472,57 @@ In prologue / epilogue, we can often allocate stack space for the frame record
 and locals in one `stp` / `ldp` instruction with a pre/post index, whose range
 is limited to [-512,504]. The frame record takes 16. When exceeding this size,
 we have to use another instruction.
-
-SYNC[asm_locals_sp_off].
 */
-static constexpr Ind ASM_LOCALS_MAX_PAIR_OFF = 488;
+// static constexpr Ind ASM_MAX_LOAD_STORE_PAIR_OFF = 488;
+static constexpr Ind ASM_MAX_LOAD_STORE_PAIR_OFF = 504;
+
+// Opcode at bit 22 for the `ldp` / `stp` instructions.
+static constexpr Instr ASM_LOAD_PAIR_POST  = 0b001'1;
+static constexpr Instr ASM_LOAD_PAIR_PRE   = 0b011'1;
+static constexpr Instr ASM_LOAD_PAIR_OFF   = 0b010'1;
+static constexpr Instr ASM_STORE_PAIR_POST = 0b001'0;
+static constexpr Instr ASM_STORE_PAIR_PRE  = 0b011'0;
+static constexpr Instr ASM_STORE_PAIR_OFF  = 0b010'0;
 
 /*
-Variants:
+All variants of the `ldp` / `stp` instructions.
+Variant is determined by the `opc` argument.
+See the `ASM_*_PAIR_*` constants.
 
-  opc 0 = stp
-  opc 1 = ldp
+  ldp reg0, reg1, [addr_reg], off
+  ldp reg0, reg1, [addr_reg, off]!
+  ldp reg0, reg1, [addr_reg, off]
 
-  stp reg0, reg1, [addr_reg, -pre_off]!
-  stp reg0, reg1, [addr_reg], +post_off
-
-  ldp reg0, reg1, [addr_reg, -pre_off]!
-  ldp reg0, reg1, [addr_reg], +post_off
+  stp reg0, reg1, [addr_reg], off
+  stp reg0, reg1, [addr_reg, off]!
+  stp reg0, reg1, [addr_reg, off]
 
 Unlike in `str` and `ldr`, the offset in `stp` and `ldp`
 is implicitly a multiple of the register width in bytes.
 */
-static Instr asm_instr_load_store_pair_pre_post(
-  bool is_load, U8 reg0, U8 reg1, U8 addr_reg, Sint mod
+static Instr asm_instr_load_store_pair(
+  Instr opc, U8 reg0, U8 reg1, U8 addr_reg, Sint off
 ) {
-  aver(mod >= -512 && mod <= 504); // See Arm64 docs.
-  aver(divisible_by(mod, 8));
-  mod /= 8;
+  aver(off >= -512 && off <= 504); // See Arm64 docs.
+  aver(divisible_by(off, 8));
+  off /= 8;
 
-  Instr order = mod < 0 ? 0b011 : 0b001;
-  Instr mod_val;
-
-  averr(imm_signed(mod, 7, &mod_val));
+  Instr off_val;
+  averr(imm_signed(off, 7, &off_val));
   averr(arch_validate_reg(reg0));
   averr(arch_validate_reg(reg1));
   averr(arch_validate_reg(addr_reg));
 
-  return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (order << 23) |
-    ((Instr)is_load << 22) | (mod_val << 15) | ((Instr)reg1 << 10) |
-    ((Instr)addr_reg << 5) | reg0;
+  return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (opc << 22) |
+    (off_val << 15) | ((Instr)reg1 << 10) | ((Instr)addr_reg << 5) | reg0;
 }
 
-static Instr asm_instr_store_pair_pre_post(
-  U8 reg0, U8 reg1, U8 addr_reg, Sint mod
-) {
-  return asm_instr_load_store_pair_pre_post(0b0, reg0, reg1, addr_reg, mod);
-}
-
-static Instr asm_instr_load_pair_pre_post(
-  U8 reg0, U8 reg1, U8 addr_reg, Sint mod
-) {
-  return asm_instr_load_store_pair_pre_post(0b1, reg0, reg1, addr_reg, mod);
-}
-
-static void asm_append_store_pair_pre_post(
-  Comp *comp, U8 reg0, U8 reg1, U8 addr_reg, Sint mod
+static void asm_append_load_store_pair(
+  Comp *comp, Instr opc, U8 reg0, U8 reg1, U8 addr_reg, Sint off
 ) {
   asm_append_instr(
-    comp, asm_instr_store_pair_pre_post(reg0, reg1, addr_reg, mod)
+    comp, asm_instr_load_store_pair(opc, reg0, reg1, addr_reg, off)
   );
-}
-
-static void asm_append_load_pair_pre_post(
-  Comp *comp, U8 reg0, U8 reg1, U8 addr_reg, Sint mod
-) {
-  asm_append_instr(comp, asm_instr_load_pair_pre_post(reg0, reg1, addr_reg, mod));
 }
 
 // The offset is PC-relative and implicitly times 4.
@@ -716,41 +705,104 @@ static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
   return ((Instr)imm12 << 10) | ((Instr)src_reg << 5) | tar_reg;
 }
 
-static Instr asm_instr_add_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
-  return (Instr)0b1'0'0'100010'0'000000000000'00000'00000 |
-    asm_pattern_arith_imm(tar_reg, src_reg, imm12);
+static constexpr Uint ASM_ADD_SUB_SCALE = 12;
+
+static Instr asm_instr_add_imm(U8 tar_reg, U8 src_reg, Uint imm) {
+  Instr shift = 0;
+
+  if (imm && low_bits_zero(imm, ASM_ADD_SUB_SCALE)) {
+    shift = 1;
+    imm >>= ASM_ADD_SUB_SCALE;
+  }
+
+  return (Instr)0b1'0'0'100010'0'000000000000'00000'00000 | (shift << 22) |
+    asm_pattern_arith_imm(tar_reg, src_reg, imm);
 }
 
-static Instr asm_instr_sub_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
-  return (Instr)0b1'1'0'100010'0'000000000000'00000'00000 |
-    asm_pattern_arith_imm(tar_reg, src_reg, imm12);
+static Instr asm_instr_sub_imm(U8 tar_reg, U8 src_reg, Uint imm) {
+  Instr shift = 0;
+
+  if (imm && low_bits_zero(imm, ASM_ADD_SUB_SCALE)) {
+    shift = 1;
+    imm >>= ASM_ADD_SUB_SCALE;
+  }
+
+  return (Instr)0b1'1'0'100010'0'000000000000'00000'00000 | (shift << 22) |
+    asm_pattern_arith_imm(tar_reg, src_reg, imm);
 }
 
-static void asm_append_add_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm12) {
-  asm_append_instr(comp, asm_instr_add_imm(tar_reg, src_reg, imm12));
+// Also see `asm_append_add` which is smarter.
+static void asm_append_add_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm) {
+  asm_append_instr(comp, asm_instr_add_imm(tar_reg, src_reg, imm));
 }
 
-static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm12) {
-  asm_append_instr(comp, asm_instr_sub_imm(tar_reg, src_reg, imm12));
+static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm) {
+  asm_append_instr(comp, asm_instr_sub_imm(tar_reg, src_reg, imm));
 }
 
+static Instr asm_pattern_arith_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
+  averr(arch_validate_reg(src_reg));
+  averr(arch_validate_reg(tar_reg));
+  averr(arch_validate_reg(mod_reg));
+  return ((Instr)mod_reg << 16) | ((Instr)src_reg << 5) | tar_reg;
+}
+
+static Instr asm_instr_add_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
+  return (Instr)0b1'0'0'01011'00'0'00000'000000'00000'00000 |
+    asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
+}
+
+static Instr asm_instr_sub_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
+  return (Instr)0b1'1'0'01011'00'0'00000'000000'00000'00000 |
+    asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
+}
+
+static void asm_append_add_reg(Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg) {
+  asm_append_instr(comp, asm_instr_add_reg(tar_reg, src_reg, mod_reg));
+}
+
+static void asm_append_sub_reg(Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg) {
+  asm_append_instr(comp, asm_instr_sub_reg(tar_reg, src_reg, mod_reg));
+}
+
+// Arm64 requires the SP to be aligned to 16 when loading or storing.
+static Ind asm_align_sp_off(Ind off) { return __builtin_align_up(off, 16); }
+
+// and <reg>, <reg>, 0xfffffffffffffff0
+static void asm_append_sp_align(Comp *comp, U8 reg) {
+  averr(arch_validate_reg(reg));
+  asm_append_instr(comp, (Instr)0b1'00'100100'1'111100'111011'00000'00000 | reg);
+}
+
+/*
+Scaling by 4096 allows to encode the offset inline in `add` and `sub`
+up to 16-ish megabytes, which should be enough for real-world stacks.
+Clang does similar stuff.
+
+SYNC[asm_sp_off].
+*/
+static Ind asm_sp_off(Ind off) {
+  off = asm_align_sp_off(off);
+  if (high_bits_zero(off, ASM_ADD_SUB_SCALE)) return off;
+  return __builtin_align_up(off, (1 << ASM_ADD_SUB_SCALE));
+}
+
+// SYNC[asm_sp_off].
 static void comp_local_alloc_mem(Comp *comp, Local *loc) {
-  aver(!loc->mem);
-  loc->mem = comp->ctx.mem_locs++;
-}
+  aver(!loc->fp_off);
 
-// SYNC[local_fp_off].
-static Ind local_fp_off(Local *loc) {
-  return 16 + (loc->mem * (Ind)sizeof(Sint));
-}
+  const auto ctx = &comp->ctx;
+  auto       off = ctx->fp_off;
 
-// TODO: detect when the offset exceeds what we can encode inline
-// in a `ldp` / `stp`, and fall back on different encoding.
-static Ind asm_locals_sp_off(Comp *comp) {
-  const auto len = comp->ctx.mem_locs;
+  // Since locals use FP-relative addressing, they also require
+  // a frame record. When the total FP offset is small enough,
+  // we adjust the SP in one `ldr` / `str` instruction, which
+  // results in the FP being at the bottom of the frame, rather
+  // than at the top. So the frame is included in the offsets.
+  if (!off) off += ASM_FRAME_RECORD_SIZE;
 
-  // On Arm64, SP must be aligned to 16 bytes.
-  return __builtin_align_up((len * (Ind)sizeof(Sint)), 16);
+  loc->fp_off = off;
+  ctx->fp_off = off + sizeof(Sint);
 }
 
 /*
@@ -770,10 +822,10 @@ static void asm_reserve_sym_prologue(Comp *comp) {
 // SYNC[asm_prologue_epilogue].
 static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   const auto instrs = &comp->code.code_write;
-  const auto sp_off = asm_locals_sp_off(comp);
-  const auto leaf   = is_sym_leaf(sym) && !sp_off;
+  const auto sp_off = asm_sp_off(comp->ctx.fp_off);
   const auto spans  = &sym->norm.spans;
   const auto inner  = &instrs->dat[spans->inner];
+  const bool frame  = !is_sym_leaf(sym) || sp_off || sym->norm.has_alloca;
   auto       floor  = inner;
 
   IF_DEBUG({
@@ -786,18 +838,36 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
     aver(pro[2] == brk);
   });
 
-  if (!leaf) {
+  /*
+  We generally prefer to skip frame records in leaf procedures,
+  but if any locals are used, we have to create one, because we
+  address them relatively to the FP. A smarter compiler would
+  switch to SP-relative addressing, but that would require more
+  book-keeping and probably introduce new bugs. Maybe later.
+
+  Note that the instructions are added in reverse order.
+
+  SYNC[asm_sp_off].
+  */
+  if (frame) {
+    const auto off = sp_off ? sp_off : ASM_FRAME_RECORD_SIZE;
+
+    // mov x29, sp
     *--floor = asm_instr_add_imm(ARCH_REG_FP, ARCH_REG_SP, 0);
-    if (sp_off <= ASM_LOCALS_MAX_PAIR_OFF) {
-      *--floor = asm_instr_store_pair_pre_post(
-        ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, (Sint)-16 - (Sint)sp_off
+
+    if (off <= ASM_MAX_LOAD_STORE_PAIR_OFF) {
+      // stp x29, x30, [sp, -<off>]!
+      *--floor = asm_instr_load_store_pair(
+        ASM_STORE_PAIR_PRE, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, -(Sint)off
       );
     }
     else {
-      *--floor = asm_instr_store_pair_pre_post(
-        ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, -16
+      // stp x29, x30, [sp]
+      *--floor = asm_instr_load_store_pair(
+        ASM_STORE_PAIR_OFF, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, 0
       );
-      *--floor = asm_instr_sub_imm(ARCH_REG_SP, ARCH_REG_SP, sp_off);
+      // sub sp, sp, <off>
+      *--floor = asm_instr_sub_imm(ARCH_REG_SP, ARCH_REG_SP, off);
     }
   }
 
@@ -825,22 +895,33 @@ static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
 
 // SYNC[asm_prologue_epilogue].
 static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
-  const auto sp_off = asm_locals_sp_off(comp);
-  const auto leaf   = is_sym_leaf(sym) && !sp_off;
+  const auto sp_off = asm_sp_off(comp->ctx.fp_off);
+  const bool frame  = !is_sym_leaf(sym) || sp_off || sym->norm.has_alloca;
 
-  if (leaf) return;
+  // SYNC[asm_sp_off].
+  if (frame) {
+    if (sym->norm.has_alloca) {
+      // mov sp, x29
+      asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_FP, 0);
+    }
 
-  // SYNC[local_fp_off].
-  if (sp_off <= ASM_LOCALS_MAX_PAIR_OFF) {
-    asm_append_load_pair_pre_post(
-      comp, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, sp_off + 16
-    );
-  }
-  else {
-    asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
-    asm_append_load_pair_pre_post(
-      comp, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, 16
-    );
+    const auto off = sp_off ? sp_off : ASM_FRAME_RECORD_SIZE;
+
+    if (off <= ASM_MAX_LOAD_STORE_PAIR_OFF) {
+      // ldp x29, x30, [sp], <off>
+      asm_append_load_store_pair(
+        comp, ASM_LOAD_PAIR_POST, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, off
+      );
+    }
+    else {
+      // add sp, sp, <off>
+      asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, off);
+
+      // ldp x29, x30, [sp], <off>
+      asm_append_load_store_pair(
+        comp, ASM_LOAD_PAIR_OFF, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, 0
+      );
+    }
   }
 }
 
@@ -891,6 +972,16 @@ static Instr asm_maybe_mov_imm_to_reg(
   return base | (hw << 21) | (Instr)(scaled << 5) | reg;
 }
 
+/*
+When the immediate can't be encoded inline, we outline it and emit a fixup
+entry; when finalizing a procedure, we inline the immediate after the body,
+and rewrite the instruction into `ldr <off>`. There are better approaches.
+Constants should normally be placed in a dedicated section and folded, which
+should play better with the CPU cache. Some immediates can be split into
+`mov & add`. Maybe later.
+
+SYNC[asm_imm_to_reg].
+*/
 static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) {
   averr(imm_unsigned(reg, 5));
   if (has_load) *has_load = true;
@@ -939,6 +1030,16 @@ static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) 
       .imm.reg   = reg,
     }
   );
+}
+
+static void asm_append_add(Comp *comp, U8 tar_reg, U8 src_reg, Sint imm) {
+  if (imm >= 0 && imm < 4096) {
+    asm_append_add_imm(comp, tar_reg, src_reg, (Uint)imm);
+  }
+  else {
+    asm_append_imm_to_reg(comp, tar_reg, imm, nullptr);
+    asm_append_add_reg(comp, tar_reg, src_reg, tar_reg);
+  }
 }
 
 static void asm_append_zero_reg(Comp *comp, U8 reg) {
@@ -1080,25 +1181,27 @@ static void asm_sym_beg(Comp *comp, Sym *sym) {
 }
 
 static void asm_sym_end(Comp *comp, Sym *sym) {
-  const auto write = &comp->code.code_write;
+  const auto code  = &comp->code;
+  const auto write = &code->code_write;
   const auto spans = &sym->norm.spans;
 
 #ifdef NATIVE_CALL_CONV
   asm_fixup_locals(comp, sym);
 #endif
 
-  asm_fixup_sym_prologue(comp, sym, &spans->prologue);
   spans->epilogue = write->len;
+  asm_fixup_sym_prologue(comp, sym, &spans->prologue);
   asm_append_sym_epilogue(comp, sym);
+
   spans->ret = write->len;
   asm_append_instr(comp, ASM_INSTR_RET);
+
   spans->data = write->len;
   asm_fixup(comp, sym);
-  spans->ceil = write->len;
 
-  // Execution never reaches this. Makes it easier to tell words apart.
+  // Execution never reaches this. Makes it easier to tell procedures apart.
+  spans->ceil = write->len;
   IF_DEBUG(asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM));
 
-  const auto code       = &comp->code;
   code->valid_instr_len = write->len;
 }

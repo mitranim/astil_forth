@@ -60,8 +60,8 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
     is_aligned(&ctx->anon_locs) &&
-    is_aligned(&ctx->mem_locs) &&
-    is_aligned(&ctx->loc_regs) &&
+    is_aligned(&ctx->fp_off) &&
+    is_aligned(&ctx->reg_vals) &&
     is_aligned(&ctx->vol_regs) &&
     is_aligned(ctx->sym) &&
     (!ctx->sym || sym_valid(ctx->sym)) &&
@@ -97,12 +97,12 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->asm_fix);
   stack_trunc(&ctx->locals);
   dict_trunc((Dict *)&ctx->local_dict);
-  arr_clear(ctx->loc_regs);
+  arr_clear(ctx->reg_vals);
   ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
   ptr_clear(&ctx->sym);
   ptr_clear(&ctx->anon_locs);
-  ptr_clear(&ctx->mem_locs);
+  ptr_clear(&ctx->fp_off);
   ptr_clear(&ctx->arg_low);
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->compiling);
@@ -123,9 +123,16 @@ static void validate_param_reg(U8 reg) {
 
 static bool is_param_reg(U8 reg) { return bits_has(ARCH_ALL_PARAM_REGS, reg); }
 
+static const char *comp_local_name(Local *loc) {
+  if (!loc) return "(nil)";
+  if (loc->name.len) return loc->name.buf;
+  return "(anonymous)";
+}
+
 static Local *comp_local_get_for_reg(Comp *comp, U8 reg) {
   validate_param_reg(reg);
-  return comp->ctx.loc_regs[reg];
+  const auto val = comp->ctx.reg_vals[reg];
+  return val.type == REG_VAL_LOC ? val.loc : nullptr;
 }
 
 static bool comp_local_has_reg(Comp *comp, Local *loc, U8 reg) {
@@ -139,8 +146,8 @@ static S8 comp_local_reg_any(Comp *comp, Local *loc) {
   Could be "optimized" by creating two-way associations with extra
   book-keeping. There's no point and it would make things fragile.
   */
-  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
-    if (ctx->loc_regs[reg] == loc) return (S8)reg;
+  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+    if (comp_local_get_for_reg(comp, reg) == loc) return (S8)reg;
   }
   return -1;
 }
@@ -150,40 +157,36 @@ static bool comp_local_has_regs(Comp *comp, Local *loc) {
 }
 
 static void comp_local_reg_add(Comp *comp, Local *loc, U8 reg) {
+  const auto vals = comp->ctx.reg_vals;
+
   validate_param_reg(reg);
-  aver(!comp_local_get_for_reg(comp, reg));
-  const auto ctx     = &comp->ctx;
-  ctx->loc_regs[reg] = loc;
-}
+  aver(!vals[reg].type);
 
-static void comp_local_reg_del(Comp *comp, Local *loc, U8 reg) {
-  validate_param_reg(reg);
-
-  const auto prev = comp_local_get_for_reg(comp, reg);
-  aver(!prev || prev == loc);
-
-  const auto ctx     = &comp->ctx;
-  ctx->loc_regs[reg] = nullptr;
+  vals[reg] = (Reg_val){.type = REG_VAL_LOC, .loc = loc};
 }
 
 static void comp_local_regs_clear(Comp *comp, Local *loc) {
   const auto ctx = &comp->ctx;
-  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
-    if (ctx->loc_regs[reg] == loc) ctx->loc_regs[reg] = nullptr;
+
+  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+    if (comp_local_get_for_reg(comp, reg) != loc) continue;
+    ctx->reg_vals[reg] = (Reg_val){};
   }
 }
 
 // For debug logging.
-static Bits comp_local_reg_bits(const Comp *comp, const Local *loc) {
+static Bits comp_local_reg_bits(Comp *comp, const Local *loc) {
   const auto ctx = &comp->ctx;
   Bits       out = 0;
-  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
-    if (ctx->loc_regs[reg] == loc) bits_add_to(&out, reg);
+
+  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+    if (comp_local_get_for_reg(comp, reg) != loc) continue;
+    bits_add_to(&out, reg);
   }
   return out;
 }
 
-static const char *comp_local_fmt_reg_bits(const Comp *comp, const Local *loc) {
+static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
   return uint32_to_bit_str((U32)comp_local_reg_bits(comp, loc));
 }
 
@@ -287,8 +290,8 @@ static Err comp_clobber_reg(Comp *comp, U8 reg) {
 
   if (!is_param_reg(reg)) return nullptr;
 
-  const auto loc = comp_local_get_for_reg(comp, reg);
-  comp_local_reg_del(comp, loc, reg);
+  const auto loc          = comp_local_get_for_reg(comp, reg);
+  comp->ctx.reg_vals[reg] = (Reg_val){};
 
   if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return nullptr;
   comp_append_local_write(comp, loc, reg);
@@ -313,17 +316,13 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
 
 static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
   validate_param_reg(reg);
+  comp_local_regs_clear(comp, loc);
 
-  const auto ctx = &comp->ctx;
-  for (U8 ind = 0; ind < arr_cap(ctx->loc_regs); ind++) {
-    if (ctx->loc_regs[ind] != loc) continue;
-    ctx->loc_regs[ind] = nullptr;
-  }
-
-  const auto prev = ctx->loc_regs[reg];
+  const auto ctx  = &comp->ctx;
+  const auto prev = comp_local_get_for_reg(comp, reg);
   if (prev && prev != loc) try(comp_clobber_reg(comp, reg));
 
-  ctx->loc_regs[reg] = loc;
+  ctx->reg_vals[reg] = (Reg_val){.type = REG_VAL_LOC, .loc = loc};
   loc->stable        = false;
 
   IF_DEBUG({
@@ -527,17 +526,35 @@ static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
   return nullptr;
 }
 
-static Err comp_append_push_imm(Comp *comp, Sint imm) {
-  U8 reg;
-  try(comp_next_arg_reg(comp, &reg));
-  asm_append_imm_to_reg(comp, reg, imm, nullptr);
+static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) {
+  try(arch_validate_input_param_reg(reg));
+  try(comp_clobber_reg(comp, reg));
+
+  const auto instrs = &comp->code.code_write;
+  const auto floor  = instrs->len;
+
+  asm_append_imm_to_reg(comp, reg, imm, has_load);
+
+  const auto ceil = instrs->len;
+  const auto ctx  = &comp->ctx;
+
+  aver(!ctx->reg_vals[reg].type);
+  ctx->reg_vals[reg] = (Reg_val){
+    .type        = REG_VAL_IMM,
+    .imm         = imm,
+    .instr_floor = floor,
+    .instr_ceil  = ceil,
+  };
 
   IF_DEBUG(eprintf(
-    "[system] compiled literal number " FMT_SINT " as argument in register %d\n",
-    imm,
-    reg
+    "[system] compiled constant " FMT_SINT " as argument in register %d\n", imm, reg
   ));
   return nullptr;
+}
+
+static Err comp_append_push_imm(Comp *comp, Sint imm) {
+  const auto reg = comp->ctx.arg_len++;
+  return comp_append_imm_to_reg(comp, reg, imm, nullptr);
 }
 
 static Err comp_call_intrin(Interp *interp, const Sym *sym) {
@@ -628,9 +645,73 @@ static Err comp_barrier(Comp *comp) {
   if (arg_len) {
     return err_args_arity(name, "in control flow", 0, arg_len);
   }
-  for (U8 reg = 0; reg < arr_cap(ctx->loc_regs); reg++) {
+  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
     try(comp_clobber_reg(comp, reg));
   }
+  return nullptr;
+}
+
+static Err err_alloca_size_zero() {
+  return err_str("unable to `alloca`: provided size is zero");
+}
+
+static Err err_alloca_size_negative(Sint size) {
+  return errf("unable to `alloca`: provided size " FMT_SINT "is negative", size);
+}
+
+static Err err_alloca_size_exceeds(Sint size, Uint limit) {
+  return errf(
+    "unable to `alloca`: provided size " FMT_SINT " exceeds limit " FMT_UINT,
+    size,
+    limit
+  );
+}
+
+static Err comp_alloca_const(Comp *comp, Reg_val val) {
+  const auto size = val.imm;
+  if (!size) return err_alloca_size_zero();
+  if (size < 0) return err_alloca_size_negative(size);
+  if (size > (Sint)IND_MAX) return err_alloca_size_exceeds(size, IND_MAX);
+
+  // If possible, delete prior "imm to reg" instructions.
+  const auto instrs = &comp->code.code_write;
+  if (instrs->len == val.instr_ceil) instrs->len = val.instr_floor;
+
+  const auto off = asm_align_sp_off((Ind)size);
+
+  // sub x0, sp, <off>
+  // mov sp, x0
+  asm_append_sub_imm(comp, ARCH_PARAM_REG_0, ARCH_REG_SP, off);
+  asm_append_add_imm(comp, ARCH_REG_SP, ARCH_PARAM_REG_0, 0);
+  return nullptr;
+}
+
+// sub x0, sp, x0
+// and x0, x0, 0xfffffffffffffff0
+// mov sp, x0
+static Err comp_alloca_dynamic(Comp *comp) {
+  asm_append_sub_reg(comp, ARCH_PARAM_REG_0, ARCH_REG_SP, ARCH_PARAM_REG_0);
+  asm_append_sp_align(comp, ARCH_PARAM_REG_0);
+  asm_append_add_imm(comp, ARCH_REG_SP, ARCH_PARAM_REG_0, 0);
+  return nullptr;
+}
+
+static Err comp_alloca(Comp *comp) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+  try(comp_validate_args(comp, "unable to `alloca`", 1));
+
+  const auto ctx = &comp->ctx;
+  const auto val = ctx->reg_vals[0];
+
+  if (val.type == REG_VAL_IMM) {
+    try(comp_alloca_const(comp, val));
+  }
+  else {
+    try(comp_alloca_dynamic(comp));
+  }
+
+  sym->norm.has_alloca = true;
   return nullptr;
 }
 

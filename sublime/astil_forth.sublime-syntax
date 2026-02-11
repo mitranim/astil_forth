@@ -34,6 +34,7 @@ variables:
       if|ifn|else|elif|elifn|end|
       while|until|leave|for|loop|
       throw|throw[_]?{{word}}|{{word}}[_]?throw|
+      try|try[_]?{{word}}|{{word}}[_]?try|
       abort|quit|exit
     )
 
@@ -195,6 +196,11 @@ contexts:
         1: punctuation.definition.string.end.forth
         2: variable.other.forth
       pop: 1
+    # - include: str-escape-match
+
+  # str-escape-match:
+  #   - match: \\(?:.|\n)
+  #     scope: constant.character.escape.mox
 
   semi-match:
     - match: '{{word_begin}};{{word_end}}'

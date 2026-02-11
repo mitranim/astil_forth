@@ -116,6 +116,8 @@ typedef enum : Instr {
   ASM_CODE_PROC_DELIM,
 } Asm_magic;
 
+static constexpr U8 ASM_FRAME_RECORD_SIZE = 16;
+
 // ret x30
 static constexpr Instr
   ASM_INSTR_RET = 0b110'101'1'0'0'10'11111'0000'0'0'11110'00000;

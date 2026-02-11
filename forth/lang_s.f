@@ -738,10 +738,10 @@
 ] ;
 
 : cell 8 ;
-: cells  ( len -- size ) 3 lsl ;
-: /cells ( size -- len ) 3 asr ;
-: +cell  ( adr -- adr )  cell + ;
-: -cell  ( adr -- adr )  cell - ;
+: cells  ( len  -- size ) 3 lsl ;
+: /cells ( size -- len  ) 3 asr ;
+: +cell  ( adr  -- adr  ) cell + ;
+: -cell  ( adr  -- adr  ) cell - ;
 
 \ ## Assembler continued
 
@@ -979,13 +979,13 @@
 : asm_local_set ( reg fp_off -- instr ) ASM_REG_FP swap asm_store_scaled_off ;
 
 \ SYNC[asm_local_read].
-: comp_local_get_push ( fp_off -- )
+: comp_local_get_push ( C: fp_off -- ) ( E: -- val )
   1 swap asm_local_get comp_instr \ ldr x1, [FP, <loc>]
   1      asm_push1     comp_instr \ str x1, [x27], 8
 ;
 
 \ SYNC[asm_local_write].
-: comp_pop_local_set ( fp_off -- )
+: comp_pop_local_set ( C: fp_off -- ) ( E: val -- )
   1      asm_pop1      comp_instr \ ldr x1, [x27, -8]!
   1 swap asm_local_set comp_instr \ str x1, [FP, <loc>]
 ;
@@ -1532,8 +1532,15 @@ extern_val: stderr __stderrp
 \ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
 : systack_ptr ( -- sp ) [
   inline
-  1 ASM_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0
+  1 ASM_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0 | mov x1, sp
                  asm_push_x1 comp_instr \ str x1, [x27], 8
+] ;
+
+\ For debugging.
+: sysstack_frame_ptr ( -- fp ) [
+  inline
+  1 ASM_REG_FP asm_mov_reg comp_instr \ mov x1, x29
+               asm_push_x1 comp_instr \ str x1, [x27], 8
 ] ;
 
 : asm_comp_systack_push ( len -- )
@@ -1690,7 +1697,7 @@ extern_val: errno __error
 
 : mem_map_err ( -- )
   errno dup strerror
-  [ 2 ] throwf" unable to map memory; code: %d; message: %s"
+  [ 2 ] throwf" unable to map memory; code: %zd; message: %s"
 ;
 
 : mem_map { size pflag -- addr }
@@ -1701,7 +1708,7 @@ extern_val: errno __error
 
 : mem_unprot_err ( -- )
   errno dup strerror
-  [ 2 ] throwf" unable to unprotect memory; code: %d; message: %s"
+  [ 2 ] throwf" unable to unprotect memory; code: %zd; message: %s"
 ;
 
 : mem_unprot ( addr size -- )

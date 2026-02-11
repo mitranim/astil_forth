@@ -29,10 +29,11 @@ typedef struct Sym {
 
   union {
     struct {
-      Sym_instrs spans;     // Instruction ranges; used by the assembler.
-      bool       inlinable; // Inner code is safe to copy-paste.
-      bool       has_loads; // Has PC-relative data access.
-      bool       has_rets;  // Has explicit early returns.
+      Sym_instrs spans;      // Instruction ranges; used by the assembler.
+      bool       inlinable;  // Inner code is safe to copy-paste.
+      bool       has_loads;  // Has PC-relative data access.
+      bool       has_rets;   // Has explicit early returns.
+      bool       has_alloca; // Has dynamic stack allocation, modifies SP.
     } norm;
 
     void *intrin; // Interpreter intrinsic; implies `interp_only`.

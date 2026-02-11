@@ -212,6 +212,16 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
   asm_register_call(comp, caller);
 }
 
+/*
+TODO: descriptive error instead of crash.
+
+TODO: for both callventions: support larger offsets.
+Arm64 `ldr` and `str` are limited to 32760, which is
+insufficient when abusing `alloca`.
+*/
+static void asm_validate_local_off(Ind off) { aver(off > 0 && off <= 32'760); }
+
+// SYNC[asm_local_read].
 static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
   IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
 
@@ -220,7 +230,8 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
       return asm_instr_mov_reg(tar_reg, loc->reg);
     }
     case LOC_MEM: {
-      const auto off = local_fp_off(loc);
+      const auto off = loc->fp_off;
+      asm_validate_local_off(off);
       return asm_instr_load_scaled_offset(tar_reg, ARCH_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
@@ -228,6 +239,7 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
   }
 }
 
+// SYNC[asm_local_write].
 static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
   IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
 
@@ -236,7 +248,8 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
       return asm_instr_mov_reg(loc->reg, src_reg);
     }
     case LOC_MEM: {
-      const auto off = local_fp_off(loc);
+      const auto off = loc->fp_off;
+      asm_validate_local_off(off);
       return asm_instr_store_scaled_offset(src_reg, ARCH_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];

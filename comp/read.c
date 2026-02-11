@@ -131,15 +131,6 @@ static Err reader_peek_ascii_printable(Reader *read, U8 *out) {
 }
 */
 
-/*
-static Err err_num_sign(Read *read, Sint radix) {
-  return errf(
-    "syntax error: unexpected negative numeric literal in radix " FMT_SINT "; only decimal literals may be negative; other radixes are treated as unsigned",
-    radix
-  );
-}
-*/
-
 static Err err_not_digit(U8 val) {
   return errf(
     "unexpected non-digit character " FMT_CHAR " after numeric literal", val
@@ -156,58 +147,28 @@ static Err err_digit_radix(U8 dig, U8 val, Sint radix) {
   );
 }
 
-static Err err_overflow(Sint radix) {
+static Err err_overflow(U8 radix, const char *mode) {
   return errf(
-    "overflow of numeric literal (size: " FMT_UINT " bits; radix: " FMT_SINT ")",
+    "overflow of numeric literal (size: " FMT_UINT
+    " bytes; radix: %d; mode: %s)",
     sizeof(Sint),
+    radix,
+    mode
+  );
+}
+
+static Err err_minus_unsigned(U8 radix) {
+  return errf(
+    "unsupported minus sign before an unsigned numeric literal in radix %d; only decimals may be signed",
     radix
   );
 }
 
-static Err read_num(Reader *read, Sint *out) {
-  Sint sign = 1;
-  Sint num  = 0;
-  U8   head;
-
-  try(read_ascii_printable(read, &head));
-
-  if (head == '-') {
-    sign = -1;
-    try(read_ascii_printable(read, &head));
-  }
-  else if (head == '+') {
-    try(read_ascii_printable(read, &head));
-  }
-
-  if (HEAD_CHAR_KIND[head] != CHAR_DECIMAL) return err_not_digit(head);
-
-  num        = sign * (Sint)CHAR_TO_DIGIT[head];
-  Sint radix = 10;
-
-  if (num == 0) {
-    try(read_ascii_printable(read, &head));
-
-    switch (head) {
-      case 'b': {
-        radix = 2;
-        break;
-      }
-      case 'o': {
-        radix = 8;
-        break;
-      }
-      case 'x': {
-        radix = 16;
-        break;
-      }
-      default: {
-        reader_backtrack(read, head);
-        break;
-      }
-    }
-  }
-
+static Err read_num_internal(
+  Reader *read, Sint num, S8 sign, U8 radix, bool is_signed, Sint *out
+) {
   for (;;) {
+    U8 head;
     try(read_ascii_printable(read, &head));
 
     // Cosmetic group separator.
@@ -232,11 +193,22 @@ static Err read_num(Reader *read, Sint *out) {
         if (dig >= radix) {
           return err_digit_radix(dig, head, radix);
         }
-        Sint next;
-        if (__builtin_mul_overflow(num, radix, &next)) {
-          return err_overflow(radix);
+
+        if (is_signed) {
+          Sint next;
+          if (__builtin_mul_overflow(num, radix, &next)) {
+            return err_overflow(radix, "signed");
+          }
+          num = next + (dig * sign);
         }
-        num = next + (dig * sign);
+        else {
+          Uint prev = (Uint)num;
+          Uint next = prev * (Uint)radix;
+          if (__builtin_mul_overflow(prev, radix, &next)) {
+            return err_overflow(radix, "unsigned");
+          }
+          num = (Sint)next + dig;
+        }
         continue;
       }
     }
@@ -245,6 +217,66 @@ static Err read_num(Reader *read, Sint *out) {
 done:
   *out = num;
   return nullptr;
+}
+
+/*
+Supported formats:
+
+- Binary:  0b10100101
+- Octal:   0o123467
+- Decimal: 123 +234 -345
+- Hex:     0x123456789abcdef
+
+Binary, octal, and hex are treated as unsigned during parsing,
+and the preceding minus is forbidden for them, as it's unclear
+what its semantics should be: either `~num + 1` as with signed
+multiplication by -1, or simply set the sign bit to 1.
+*/
+static Err read_num(Reader *read, Sint *out) {
+  S8 sign = 1;
+  U8 head;
+
+  try(read_ascii_printable(read, &head));
+
+  if (head == '-') {
+    sign = -1;
+    try(read_ascii_printable(read, &head));
+  }
+  else if (head == '+') {
+    try(read_ascii_printable(read, &head));
+  }
+
+  if (HEAD_CHAR_KIND[head] != CHAR_DECIMAL) return err_not_digit(head);
+
+  const auto num = (Sint)CHAR_TO_DIGIT[head];
+
+  if (num == 0) {
+    try(read_ascii_printable(read, &head));
+
+    switch (head) {
+      case 'b': {
+        const auto radix = 2;
+        if (sign < 0) return err_minus_unsigned(radix);
+        return read_num_internal(read, num, 0, radix, false, out);
+      }
+      case 'o': {
+        const auto radix = 8;
+        if (sign < 0) return err_minus_unsigned(radix);
+        return read_num_internal(read, num, 0, radix, false, out);
+      }
+      case 'x': {
+        const auto radix = 16;
+        if (sign < 0) return err_minus_unsigned(radix);
+        return read_num_internal(read, num, 0, radix, false, out);
+      }
+      default: {
+        reader_backtrack(read, head);
+        break;
+      }
+    }
+  }
+
+  return read_num_internal(read, num * sign, sign, 10, true, out);
 }
 
 static Err err_word_len(const Reader *read, U8 len) {

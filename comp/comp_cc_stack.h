@@ -10,8 +10,8 @@
 
 typedef struct {
   Word_str name;   // May be empty.
-  Ind      mem;    // Index of FP offset.
-  bool     inited; // True if `mem` has been assigned.
+  Ind      fp_off; // Offset from frame pointer.
+  bool     inited; // True if `fp_off` has been assigned.
 } Local;
 
 typedef stack_of(Local)  Local_stack;
@@ -24,7 +24,8 @@ typedef struct {
   Local_stack locals;
   Local_dict  local_dict;
   Ind         anon_locs;  // For auto-naming of anonymous locals.
-  Ind         mem_locs;   // How many locals need stack memory.
+  Ind         fp_off;     // Stack space reserved for locals.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
+  bool        has_alloca; // True if SP is dynamically adjusted in the body.
 } Comp_ctx;

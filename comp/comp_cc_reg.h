@@ -85,8 +85,8 @@ typedef struct {
   } location;
 
   union {
-    U8  reg; // For `LOC_REG` only.
-    Ind mem; // For `LOC_MEM` only; index of FP offset.
+    U8  reg;    // For `LOC_REG` only.
+    Ind fp_off; // For `LOC_MEM` only; FP offset.
   };
 } Local;
 
@@ -119,6 +119,21 @@ typedef struct {
 
 typedef stack_of(Loc_fixup) Loc_fixups;
 
+// Value associated with a register.
+typedef struct {
+  enum { REG_VAL_IMM = 1, REG_VAL_LOC } type;
+
+  Sint   imm; // Compile-time constant.
+  Local *loc;
+
+  // We track the `[floor,ceil)` instruction range for compile-time constants.
+  // When consuming a constant at compile time via `alloca`, this allows us to
+  // backtrack, deleting the previously-assembled instructions which move that
+  // constant to a parameter register.
+  Ind instr_floor;
+  Ind instr_ceil;
+} Reg_val;
+
 /*
 Transient context used in compilation of a single word.
 
@@ -134,13 +149,14 @@ typedef struct {
   Local_stack locals;     // Includes current word's input params.
   Local_dict  local_dict; // So we can find locals by name.
   Ind         anon_locs;  // For auto-naming of anonymous locals.
-  Ind         mem_locs;   // How many locals need stack memory.
-  Local      *loc_regs[ARCH_ALL_PARAM_REG_LEN]; // Temp reg-local associations.
+  Ind         fp_off;     // Stack space reserved for locals.
+  Reg_val     reg_vals[ARCH_ALL_PARAM_REG_LEN]; // Values in registers.
   Bits        vol_regs;   // Volatile registers available for locals.
   U8          arg_low;    // How many args got consumed by assignments.
-  U8          arg_len;    // Available args for the next call or assignment.
-  Asm_fixups  asm_fix;    // Used for patching instructions in a post-pass.
-  Loc_fixups  loc_fix;    // Used for resolving stable locations for locals.
+  U8          arg_len;    // Available args for the next call or assign.
+  Asm_fixups  asm_fix;    // For patching instructions in a post-pass.
+  Loc_fixups  loc_fix;    // For resolving stable locations for locals.
   bool        redefining; // Temporarily suppress "redefined" diagnostic.
   bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
+  bool        has_alloca; // True if SP is dynamically adjusted in the body.
 } Comp_ctx;

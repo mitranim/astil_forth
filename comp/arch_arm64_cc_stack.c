@@ -57,20 +57,16 @@ static void asm_append_stack_push_imm(Comp *comp, Sint imm) {
   asm_append_stack_push_from(comp, ARCH_SCRATCH_REG_8);
 }
 
-// TODO: for both callventions: detect when local offsets don't fit
-// into `ldur/stur`. We can either produce an error, or emit different
-// instructions which allow for a larger negative offset.
-//
 // SYNC[asm_local_read].
-static void asm_append_local_read(Comp *comp, Sint off) {
-  asm_append_load_unscaled_offset(comp, ARCH_SCRATCH_REG_8, ARCH_REG_FP, off);
+static void asm_append_local_read(Comp *comp, Ind off) {
+  asm_append_load_scaled_offset(comp, ARCH_SCRATCH_REG_8, ARCH_REG_FP, off);
   asm_append_stack_push_from(comp, ARCH_SCRATCH_REG_8);
 }
 
 // SYNC[asm_local_write].
-static void asm_append_local_write(Comp *comp, Sint off) {
+static void asm_append_local_write(Comp *comp, Ind off) {
   asm_append_stack_pop_into(comp, ARCH_SCRATCH_REG_8);
-  asm_append_store_unscaled_offset(comp, ARCH_SCRATCH_REG_8, ARCH_REG_FP, off);
+  asm_append_store_scaled_offset(comp, ARCH_SCRATCH_REG_8, ARCH_REG_FP, off);
 }
 
 static void asm_append_call_intrin_before(Comp *comp) {

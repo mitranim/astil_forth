@@ -144,13 +144,14 @@ static Err intrin_comp_instr(Instr instr, Interp *interp) {
   return nullptr;
 }
 
+// SYNC[comp_constant].
 static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   try(arch_validate_reg(reg));
 
   bool has_load = true;
-  asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
+  try(comp_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load));
   if (has_load) sym->norm.has_loads = true;
   return nullptr;
 }
@@ -336,23 +337,6 @@ static Err intrin_comp_anon_local(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_local_free(Sint ptr, Interp *interp) {
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(comp_validate_local(comp, ptr, &loc));
-
-  IF_DEBUG(eprintf(
-    "[system] freeing local " FMT_QUOTED
-    "; prior temp registers: %s; value is stable: %d",
-    loc->name.buf,
-    comp_local_fmt_reg_bits(comp, loc),
-    loc->stable
-  ));
-
-  comp_local_regs_clear(comp, loc);
-  return nullptr;
-}
-
 static Err intrin_comp_local_get(Sint reg, Sint loc_ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
@@ -370,6 +354,25 @@ static Err intrin_comp_local_set(Sint reg, Sint loc_ptr, Interp *interp) {
   try(comp_append_local_set(comp, loc, (U8)reg));
   return nullptr;
 }
+
+static Err intrin_comp_local_free(Sint ptr, Interp *interp) {
+  const auto comp = &interp->comp;
+  Local     *loc;
+  try(comp_validate_local(comp, ptr, &loc));
+
+  IF_DEBUG(eprintf(
+    "[system] freeing local " FMT_QUOTED
+    "; prior temp registers: %s; value is stable: %d",
+    loc->name.buf,
+    comp_local_fmt_reg_bits(comp, loc),
+    loc->stable
+  ));
+
+  comp_local_regs_clear(comp, loc);
+  return nullptr;
+}
+
+static Err intrin_alloca(Interp *interp) { return comp_alloca(&interp->comp); }
 
 static void intrin_debug_ctx(Interp *interp) {
   const auto ctx     = &interp->comp.ctx;
@@ -407,23 +410,44 @@ static void intrin_debug_ctx(Interp *interp) {
   }
 
   {
-    const auto arr = ctx->loc_regs;
-    const auto cap = arr_cap(ctx->loc_regs);
-    U8         len = 0;
+    constexpr auto cap      = arr_cap(ctx->reg_vals);
+    const auto     arr      = ctx->reg_vals;
+    const auto     args     = ctx->arg_len;
+    bool           has_vals = false;
+    U8             last_val = 0;
 
     for (U8 ind = 0; ind < cap; ind++) {
-      if (arr[ind]) len++;
+      if (!arr[ind].type) continue;
+      has_vals = true;
+      last_val = ind;
     }
 
-    if (len) {
-      eprintf("[debug]   locals in param registers (%d):\n", len);
+    if (has_vals || args) {
+      eprintf("[debug]   values in param registers:\n");
 
-      for (U8 ind = 0; ind < cap; ind++) {
-        const auto loc = arr[ind];
-        if (!loc) continue;
+      auto val_cap = cap;
+      val_cap      = min(val_cap, last_val);
+      val_cap      = min(val_cap, args); // Macro `min` is not nestable.
 
-        const auto name = loc->name.len ? loc->name.buf : "(anonymous)";
-        eprintf("[debug]     %d -- %s\n", ind, name);
+      for (U8 ind = 0; ind < val_cap; ind++) {
+        const auto val = arr[ind];
+
+        switch (val.type) {
+          case REG_VAL_IMM: {
+            eprintf("[debug]     %d -- constant: " FMT_SINT "\n", ind, val.imm);
+            break;
+          }
+          case REG_VAL_LOC: {
+            const auto loc  = val.loc;
+            const auto name = comp_local_name(loc);
+            eprintf("[debug]     %d -- local: %s\n", ind, name);
+            break;
+          }
+          default: {
+            eprintf("[debug]     %d -- unknown\n", ind);
+            break;
+          }
+        }
       }
     }
   }
@@ -587,6 +611,14 @@ static constexpr auto INTRIN_COMP_LOCAL_FREE = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_free,
   .inp_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr auto INTRIN_ALLOCA = (Sym){
+  .name.buf  = "alloca",
+  .wordlist  = WORDLIST_COMP,
+  .intrin    = (void *)intrin_alloca,
   .throws    = true,
   .comp_only = true,
 };

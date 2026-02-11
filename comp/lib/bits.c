@@ -1,6 +1,6 @@
 #pragma once
 #include "./bits.h"
-#include "./err.h"
+#include "./err.c"
 #include "./num.h"
 
 // Is there a simpler way?
@@ -94,6 +94,12 @@ ALLOW_OVERFLOW static U8 bits_push_low(Bits *tar) {
   *tar           = set | (set + 1);
   return ind;
 }
+
+static bool low_bits_zero(Uint val, Uint scale) {
+  return !(val & ((1 << scale) - 1));
+}
+
+static bool high_bits_zero(Uint val, Uint scale) { return !(val >> scale); }
 
 /*
 #include <stdio.h>

@@ -20,8 +20,8 @@ typedef struct {
   enum {
     ASM_FIX_RET = 1,
     ASM_FIX_TRY,
-    ASM_FIX_IMM,
     ASM_FIX_RECUR,
+    ASM_FIX_IMM,
   } type;
 
   union {

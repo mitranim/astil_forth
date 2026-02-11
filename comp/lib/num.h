@@ -56,6 +56,15 @@ static constexpr auto INVALID_IND = (Ind)-1;
     (val) != INVALID_IND;                                          \
   })
 
+// Caution: can't be nested with itself or `max`.
+#define min(one, two)                      \
+  ({                                       \
+    const auto tmp_one = one;              \
+    const auto tmp_two = two;              \
+    tmp_one < tmp_two ? tmp_one : tmp_two; \
+  })
+
+// Caution: can't be nested with itself or `min`.
 #define max(one, two)                      \
   ({                                       \
     const auto tmp_one = one;              \

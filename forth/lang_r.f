@@ -433,8 +433,8 @@
 ] ;
 
 \ eor Xd, Xn, Xm
-: asm_eor_reg { Xd Xn imm12 -- instr }
-  Xd Xn imm12 asm_pattern_arith_imm
+: asm_eor_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
   0b1_10_01010_00_0_00000_000000_00000_00000 or
 ;
 
@@ -599,10 +599,10 @@
 : align_up   { len wid -- len } wid dec len + wid align_down ;
 
 8 let: cell
-: cells { len -- size } len 3 lsl ;
-: /cells { size -- len } size 3 asr ;
-: +cell { adr -- adr } adr cell + ;
-: -cell { adr -- adr } adr cell - ;
+: cells  { len  -- size } len 3 lsl ;
+: /cells { size -- len  } size 3 asr ;
+: +cell  { adr  -- adr  } adr cell + ;
+: -cell  { adr  -- adr  } adr cell - ;
 
 \ ## Assembler continued
 
@@ -811,6 +811,18 @@
   1     asm_stack_store comp_instr \ stur x1, [x27, INTERP_INTS_TOP]
 ] ;
 
+\ For debugging.
+: systack_ptr { -- sp } [
+  0 ASM_REG_SP 0 asm_add_imm comp_instr \ add x0, sp, 0 | mov x0, sp
+  1 comp_args_set
+] ;
+
+\ For debugging.
+: sysstack_frame_ptr { -- fp } [
+  0 ASM_REG_FP asm_mov_reg comp_instr \ mov x0, x29
+  1 comp_args_set
+] ;
+
 \ ## Characters and strings
 
 : c@ { str -- char } [
@@ -866,6 +878,8 @@
 \
 \ The program is implicitly linked with `libc`,
 \ so we get to use C stdlib procedures.
+\
+\ Compiler also provides `alloca` intrinsically.
 
 2 1 extern: calloc  ( len size -- addr )
 1 1 extern: malloc  ( size -- addr )
@@ -1148,6 +1162,8 @@ extern_val: stderr __stderrp
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `end`.
 \ Prepending `if_done` terminates this chain.
+\
+\ TODO: define more variants like `=if` with fewer instructions.
 :: if ( C: -- cond fun_done fun_exec adr_if fun_if ) ( E: pred -- )
   c" when calling `if`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' if_pop >stack
@@ -1573,6 +1589,26 @@ extern_val: stderr __stderrp
   execute'' end
 ;
 
+extern_val: errno __error
+1 1 extern: strerror
+
+: try_errno_run { code cstr }
+  code -1 <> if ret end
+  code strerror { msg }
+  cstr code msg throwf" %s; code: %zd; message: %s"
+;
+
+\ Shortcut for calling `libc` functions which return
+\ `-1` and set `errno` on failure. Usage:
+\
+\   0 1 extern: some_proc
+\   some_proc try_errno" unable to do X"
+\
+\ TODO: define a `:` (interpretation-time) version.
+:: try_errno" ( C: "context" -- ) ( E: code -- )
+  comp_cstr compile' try_errno_run
+;
+
 \ ## Stack manipulation — continued
 
 \ Variadic alternative to `>stack`.
@@ -1686,7 +1722,7 @@ extern_val: stderr __stderrp
 : mem_map_err
   errno        { err }
   err strerror { str }
-  err str throwf" unable to map memory; code: %d; message: %s"
+  err str throwf" unable to map memory; code: %zd; message: %s"
 ;
 
 : mem_map { size pflag -- addr }
@@ -1699,7 +1735,7 @@ extern_val: stderr __stderrp
 : mem_unprot_err
   errno        { err }
   err strerror { str }
-  err str throwf" unable to unprotect memory; code: %d; message: %s"
+  err str throwf" unable to unprotect memory; code: %zd; message: %s"
 ;
 
 : mem_unprot { addr size }
@@ -1757,9 +1793,7 @@ extern_val: stderr __stderrp
 8 let: Clong
 8 let: Culong
 
-\ Defines a pretend "array type" which is really just capacity.
-\ Intended mainly for making struct fields more descriptive.
-\ See structs below. Usage:
+\ Defines a pretend "array type" which is really just capacity. Usage:
 \
 \   123      let: SIZE
 \   234      let: LEN
@@ -1778,7 +1812,7 @@ extern_val: stderr __stderrp
 \     U64 field: Type_field1
 \   end
 \
-\   Type calloc { val }
+\   Type alloca { val }
 \
 \       val Type_field1 @
 \   123 val Type_field1 !
@@ -1806,11 +1840,14 @@ extern_val: stderr __stderrp
   reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
 ;
 
-\ Since structs are intended for C interop, field alignment
-\ must match the C struct ABI of the target platform.
 : field: { off fun size -- off_next fun }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
+
+  \ Since structs are intended for C interop, alignment
+  \ must match the C struct ABI of the target platform.
+  \ The ABI compatibility seems to hold in many cases,
+  \ but has NOT been thoroughly tested.
   off size align_up { field_off }
   field_off size +  { next_off }
   parse_word        { str len }

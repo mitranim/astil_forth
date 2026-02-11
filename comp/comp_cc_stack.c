@@ -19,7 +19,7 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
     is_aligned(&ctx->anon_locs) &&
-    is_aligned(&ctx->mem_locs) &&
+    is_aligned(&ctx->fp_off) &&
     stack_valid((const Stack *)&ctx->asm_fix) &&
     stack_valid((const Stack *)&ctx->locals) &&
     dict_valid((const Dict *)&ctx->local_dict)
@@ -51,14 +51,14 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
 
   ptr_clear(&ctx->sym);
   ptr_clear(&ctx->anon_locs);
-  ptr_clear(&ctx->mem_locs);
+  ptr_clear(&ctx->fp_off);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
 }
 
 // Returns a token representing a local which can be given to Forth code.
 // In the reg-based calling convention, this returns a different value.
-static Sint local_token(Local *loc) { return local_fp_off(loc); }
+static Sint local_token(Local *loc) { return loc->fp_off; }
 
 static Err comp_append_push_imm(Comp *comp, Sint imm) {
   asm_append_stack_push_imm(comp, imm);
@@ -67,7 +67,7 @@ static Err comp_append_push_imm(Comp *comp, Sint imm) {
 }
 
 static Err comp_append_local_get_next(Comp *comp, Local *loc) {
-  const auto off = local_fp_off(loc);
+  const auto off = loc->fp_off;
   asm_append_local_read(comp, off);
   return nullptr;
 }
@@ -76,7 +76,7 @@ static Err comp_append_local_get_next(Comp *comp, Local *loc) {
 The language bootstrap file implements this on its own.
 
 static Err comp_append_local_set_next(Comp *comp, Local *loc) {
-  const auto off = local_fp_off(loc);
+  const auto off = loc->fp_off;
   asm_append_local_write(comp, off);
   return nullptr;
 }

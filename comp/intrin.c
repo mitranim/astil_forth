@@ -305,6 +305,14 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   comp_only:       %s\n"
         "[debug]   interp_only:     %s\n"
         "[debug]   inlinable:       %s\n"
+        "[debug]   has_loads:       %s\n"
+        "[debug]   has_rets:        %s\n"
+        "[debug]   has_alloca:      %s\n"
+        "[debug]   callers:         " FMT_IND
+        "\n"
+        "[debug]   callees:         " FMT_IND
+        "\n"
+        "[debug]   is_leaf:         %s\n"
         "[debug]   execution token: %p\n",
         sym,
         sym->name.buf,
@@ -318,6 +326,12 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         fmt_bool(sym->comp_only),
         fmt_bool(sym->interp_only),
         fmt_bool(sym->norm.inlinable),
+        fmt_bool(sym->norm.has_loads),
+        fmt_bool(sym->norm.has_rets),
+        fmt_bool(sym->norm.has_alloca),
+        sym->callers.len,
+        sym->callees.len,
+        fmt_bool(is_sym_leaf(sym)),
         sym
       );
       comp_debug_print_sym_instrs(&interp->comp, sym, "[debug]   ");

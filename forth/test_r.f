@@ -12,6 +12,13 @@ T{       <T>       }T
 T{ 10    <T> 10    }T
 T{ 10 20 <T> 10 20 }T
 
+: test_test
+  T{       <T>       }T
+  T{ 10    <T> 10    }T
+  T{ 10 20 <T> 10 20 }T
+;
+test_test
+
 : test_conditionals
   \ false if 10      end \ Must fail to compile.
   \ false if else 10 end \ Must fail to compile.
@@ -700,6 +707,61 @@ test_to_stack_variadic
 ;
 test_stack_braces
 
+: test_alloca_cell
+  cell alloca { ptr }
+
+  T{ ptr @ <T> ptr @ }T \ Should not segfault. The value is undefined.
+
+  123 ptr !
+  T{ ptr @ <T> 123 }T
+
+  234 ptr !
+  T{ ptr @ <T> 234 }T
+;
+test_alloca_cell
+
+: test_alloca_align
+  systack_ptr { SP }
+  1  alloca   { adr0 }
+  2  alloca   { adr1 }
+  4  alloca   { adr2 }
+  8  alloca   { adr3 }
+  16 alloca   { adr4 }
+  32 alloca   { adr5 }
+
+  \ Compiler ensures natural alignment up to 16.
+  T{ adr0 1  mod <T> 0 }T
+  T{ adr1 2  mod <T> 0 }T
+  T{ adr2 4  mod <T> 0 }T
+  T{ adr3 8  mod <T> 0 }T
+  T{ adr4 16 mod <T> 0 }T
+  T{ adr5 16 mod <T> 0 }T
+
+  T{ adr0 <T> SP 16 - }T
+  T{ adr1 <T> SP 32 - }T
+  T{ adr2 <T> SP 48 - }T
+  T{ adr3 <T> SP 64 - }T
+  T{ adr4 <T> SP 80 - }T
+  T{ adr5 <T> SP 112 - }T
+;
+test_alloca_align
+
+65536 let: SIZE_BIG
+
+: test_alloca_big
+  SIZE_BIG alloca { adr0 }
+  SIZE_BIG alloca { adr1 }
+  SIZE_BIG alloca { adr2 }
+
+  T{ adr0 16 mod <T> 0 }T
+  T{ adr1 16 mod <T> 0 }T
+  T{ adr2 16 mod <T> 0 }T
+
+  T{ adr0 adr1 - <T> SIZE_BIG }T
+  T{ adr1 adr2 - <T> SIZE_BIG }T
+;
+test_alloca_big
+
 1 1 arr: Arr0
 1 2 arr: Arr1
 1 3 arr: Arr2
@@ -769,6 +831,7 @@ struct: Typ8
   U32 field: Typ8_field3
 end
 
+\ Fields must have natural alignment, like in C.
 : test_structs
   T{        Typ        <T>    12  }T
   T{    0   Typ_field0 <T>    0   }T
