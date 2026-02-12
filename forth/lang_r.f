@@ -1808,27 +1808,28 @@ extern_val: errno __error
 \ Basic usage:
 \
 \   struct: Type
-\     S32 field: Type_field0
-\     U64 field: Type_field1
+\     1  S32 field: Type_number
+\     32 U8  field: Type_buffer
 \   end
 \
 \   Type alloca { val }
 \
-\       val Type_field1 @
-\   123 val Type_field1 !
+\       val Type_number @
+\   123 val Type_number !
 
-: struct_pop ( C: str len off -- )
-  stack{ str len off }
-  str len off let_init
+: struct_pop ( C: str len align off -- )
+  stack{ str len align off }
+  off align align_up { size }
+  str len size let_init
   str free \ String was `strdup`'d.
   [ not_comp_only ]
 ;
 
-: struct: { -- str len off fun } ( C: "name" -- ) ( E: -- size )
+: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
   parse_word   { str len }
   str strdup   { str }
   ' struct_pop { fun }
-  str len 0 fun
+  str len 0 0 fun
 ;
 
 : struct_field_comp { off }
@@ -1840,7 +1841,8 @@ extern_val: errno __error
   reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
 ;
 
-: field: { off fun size -- off_next fun }
+\ For alignment reasons, every field is considered an array.
+: field: { align off fun arr_len size -- align off_next fun }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
 
@@ -1848,12 +1850,12 @@ extern_val: errno __error
   \ must match the C struct ABI of the target platform.
   \ The ABI compatibility seems to hold in many cases,
   \ but has NOT been thoroughly tested.
-  off size align_up { field_off }
-  field_off size +  { next_off }
-  parse_word        { str len }
+  off size align_up          { field_off }
+  size arr_len * field_off + { next_off }
+  parse_word                 { name name_len }
 
   \ Execution-time semantics.
-  str len colon
+  name name_len colon
     1 1 comp_signature ( E: struct_adr -- field_adr )
     1 comp_args_set
     field_off comp_push
@@ -1861,11 +1863,13 @@ extern_val: errno __error
   semicolon
 
   \ Compile-time semantics.
-  str len colon_colon
+  name name_len colon_colon
     field_off comp_push
     compile' struct_field_comp
   semicolon
 
-  next_off fun
+  align size max { align }
+  align next_off fun
+
   [ not_comp_only ]
 ;

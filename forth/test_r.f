@@ -779,141 +779,157 @@ T{ Arr5 <T> 6 }T
 T{ Arr6 <T> 9 }T
 
 struct: Typ
-  8 field: Typ_field0
-  4 field: Typ_field1
+  1 8 field: Typ_field0
+  1 4 field: Typ_field1
 end
+
+\ Field alignment and padding needs to match C.
+\ We test alignment for a lot more cases below.
+T{        Typ        <T>    16  }T
+T{    0   Typ_field0 <T>    0   }T
+T{    0   Typ_field1 <T>    8   }T
+T{    123 Typ_field0 <T>    123 }T
+T{    234 Typ_field0 <T>    234 }T
+T{    123 Typ_field1 <T>    131 }T
+T{    234 Typ_field1 <T>    242 }T
+
+Typ mem: ptr
+
+T{ ptr Typ_field0 <T> ptr     }T
+T{ ptr Typ_field1 <T> ptr 8 + }T
+
+T{    ptr Typ_field0 @ <T> 0  }T
+T{ 10 ptr Typ_field0 ! <T>    }T
+T{    ptr Typ_field0 @ <T> 10 }T
+
+T{    ptr Typ_field1 @ <T> 0  }T
+T{ 20 ptr Typ_field1 ! <T>    }T
+T{    ptr Typ_field1 @ <T> 20 }T
+
+T{    ptr Typ_field0 @ <T> 10 }T
+T{ 30 ptr Typ_field0 ! <T>    }T
+T{    ptr Typ_field0 @ <T> 30 }T
+
+T{    ptr Typ_field1 @ <T> 20 }T
+T{ 40 ptr Typ_field1 ! <T>    }T
+T{    ptr Typ_field1 @ <T> 40 }T
 
 struct: Typ0 end
+T{ Typ0           <T> 0   }T
 
 struct: Typ1
-  U8 field: Typ1_field
+  1 U8 field: Typ1_field
 end
+
+T{ Typ1           <T> 1   }T
+T{ 123 Typ1_field <T> 123 }T
 
 struct: Typ2
-  U8  field: Typ2_field0
-  U32 field: Typ2_field1
+  1 U8  field: Typ2_field0
+  1 U32 field: Typ2_field1
 end
+
+T{ Typ2            <T> 8   }T
+T{ 123 Typ2_field0 <T> 123 }T
+T{ 123 Typ2_field1 <T> 127 }T
 
 struct: Typ3
-  U32 field: Typ3_field0
-  U8  field: Typ3_field1
+  1 U32 field: Typ3_field0
+  1 U8  field: Typ3_field1
 end
+
+T{ Typ3            <T> 8   }T
+T{ 123 Typ3_field0 <T> 123 }T
+T{ 123 Typ3_field1 <T> 127 }T
 
 struct: Typ4
-  U8  field: Typ4_field0
-  U32 field: Typ4_field1
-  U64 field: Typ4_field2
+  1 U8  field: Typ4_field0
+  1 U32 field: Typ4_field1
+  1 U64 field: Typ4_field2
 end
+
+T{ Typ4            <T> 16  }T
+T{ 123 Typ4_field0 <T> 123 }T
+T{ 123 Typ4_field1 <T> 127 }T
+T{ 123 Typ4_field2 <T> 131 }T
 
 struct: Typ5
-  U32 field: Typ5_field0
-  U8  field: Typ5_field1
-  U64 field: Typ5_field2
+  1 U32 field: Typ5_field0
+  1 U8  field: Typ5_field1
+  1 U64 field: Typ5_field2
 end
+
+T{ Typ5            <T> 16  }T
+T{ 123 Typ5_field0 <T> 123 }T
+T{ 123 Typ5_field1 <T> 127 }T
+T{ 123 Typ5_field2 <T> 131 }T
 
 struct: Typ6
-  U32 field: Typ6_field0
-  U64 field: Typ6_field1
-  U8  field: Typ6_field2
+  1 U32 field: Typ6_field0
+  1 U64 field: Typ6_field1
+  1 U8  field: Typ6_field2
 end
+
+T{ Typ6            <T> 24  }T
+T{ 123 Typ6_field0 <T> 123 }T
+T{ 123 Typ6_field1 <T> 131 }T
+T{ 123 Typ6_field2 <T> 139 }T
 
 struct: Typ7
-  U64 field: Typ7_field0
-  U32 field: Typ7_field1
-  U32 field: Typ7_field2
-  U8  field: Typ7_field3
+  1 U64 field: Typ7_field0
+  1 U32 field: Typ7_field1
+  1 U32 field: Typ7_field2
+  1 U8  field: Typ7_field3
 end
+
+T{ Typ7            <T> 24  }T
+T{ 123 Typ7_field0 <T> 123 }T
+T{ 123 Typ7_field1 <T> 131 }T
+T{ 123 Typ7_field2 <T> 135 }T
+T{ 123 Typ7_field3 <T> 139 }T
 
 struct: Typ8
-  U8  field: Typ8_field0
-  U8  field: Typ8_field1
-  U8  field: Typ8_field2
-  U32 field: Typ8_field3
+  1 U8  field: Typ8_field0
+  1 U8  field: Typ8_field1
+  1 U8  field: Typ8_field2
+  1 U32 field: Typ8_field3
 end
 
-\ Fields must have natural alignment, like in C.
-: test_structs
-  T{        Typ        <T>    12  }T
-  T{    0   Typ_field0 <T>    0   }T
-  T{    0   Typ_field1 <T>    8   }T
-  T{    123 Typ_field0 <T>    123 }T
-  T{    234 Typ_field0 <T>    234 }T
-  T{    123 Typ_field1 <T>    131 }T
-  T{    234 Typ_field1 <T>    242 }T
-  T{ 99 123 Typ_field0 <T> 99 123 }T
-  T{ 99 234 Typ_field0 <T> 99 234 }T
-  T{ 99 123 Typ_field1 <T> 99 131 }T
-  T{ 99 234 Typ_field1 <T> 99 242 }T
+T{ Typ8            <T> 8   }T
+T{ 123 Typ8_field0 <T> 123 }T
+T{ 123 Typ8_field1 <T> 124 }T
+T{ 123 Typ8_field2 <T> 125 }T
+T{ 123 Typ8_field3 <T> 127 }T
 
-  123 { val }
+struct: Typ9
+  1   U8 field: Typ9_field0
+  128 U8 field: Typ9_field1
+end
 
-  T{ val Typ_field0 <T> 123 }T
-  T{ val Typ_field1 <T> 131 }T
+T{ Typ9            <T> 129 }T
+T{ 123 Typ9_field0 <T> 123 }T
+T{ 123 Typ9_field1 <T> 124 }T
 
-  T{ val Typ_field0 <T> val }T
-  T{ val Typ_field1 <T> val 8 + }T
+struct: Typ10
+  1   U8  field: Typ10_field0
+  2   U8  field: Typ10_field1
+  3   U32 field: Typ10_field2
+  128 U8  field: Typ10_field3
+end
 
-  nil Typ alloc_data { val }
+T{ Typ10            <T> 144 }T
+T{ 123 Typ10_field0 <T> 123 }T
+T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
+T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
+T{ 123 Typ10_field3 <T> 139 }T
 
-  T{ val Typ_field0 <T> val     }T
-  T{ val Typ_field1 <T> val 8 + }T
+struct: Typ11
+  3 5   field: Typ11_field0
+  1 U64 field: Typ11_field1
+end
 
-  T{    val Typ_field0 @ <T> 0  }T
-  T{ 10 val Typ_field0 ! <T>    }T
-  T{    val Typ_field0 @ <T> 10 }T
-
-  T{    val Typ_field1 @ <T> 0  }T
-  T{ 20 val Typ_field1 ! <T>    }T
-  T{    val Typ_field1 @ <T> 20 }T
-
-  T{    val Typ_field0 @ <T> 10 }T
-  T{ 30 val Typ_field0 ! <T>    }T
-  T{    val Typ_field0 @ <T> 30 }T
-
-  T{    val Typ_field1 @ <T> 20 }T
-  T{ 40 val Typ_field1 ! <T>    }T
-  T{    val Typ_field1 @ <T> 40 }T
-
-  T{ Typ0 <T> 0 }T
-
-  T{ Typ1 <T> 1 }T
-  T{ 123 Typ1_field <T> 123 }T
-
-  T{ Typ2 <T> 8 }T
-  T{ 123 Typ2_field0 <T> 123 }T
-  T{ 123 Typ2_field1 <T> 127 }T
-
-  T{ Typ3 <T> 5 }T
-  T{ 123 Typ3_field0 <T> 123 }T
-  T{ 123 Typ3_field1 <T> 127 }T
-
-  T{ Typ4 <T> 16 }T
-  T{ 123 Typ4_field0 <T> 123 }T
-  T{ 123 Typ4_field1 <T> 127 }T
-  T{ 123 Typ4_field2 <T> 131 }T
-
-  T{ Typ5 <T> 16 }T
-  T{ 123 Typ5_field0 <T> 123 }T
-  T{ 123 Typ5_field1 <T> 127 }T
-  T{ 123 Typ5_field2 <T> 131 }T
-
-  T{ Typ6 <T> 17 }T
-  T{ 123 Typ6_field0 <T> 123 }T
-  T{ 123 Typ6_field1 <T> 131 }T
-  T{ 123 Typ6_field2 <T> 139 }T
-
-  T{ Typ7 <T> 17 }T
-  T{ 123 Typ7_field0 <T> 123 }T
-  T{ 123 Typ7_field1 <T> 131 }T
-  T{ 123 Typ7_field2 <T> 135 }T
-  T{ 123 Typ7_field3 <T> 139 }T
-
-  T{ Typ8 <T> 8 }T
-  T{ 123 Typ8_field0 <T> 123 }T
-  T{ 123 Typ8_field1 <T> 124 }T
-  T{ 123 Typ8_field2 <T> 125 }T
-  T{ 123 Typ8_field3 <T> 127 }T
-;
-test_structs
+T{ Typ11            <T> 24  }T
+T{ 123 Typ11_field0 <T> 123 }T
+T{ 123 Typ11_field1 <T> 139 }T
 
 log" [test] ok" lf
