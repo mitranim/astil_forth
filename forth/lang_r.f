@@ -32,29 +32,29 @@
 \ Non-immediate replacement for standard `literal`.
 : comp_push { val } ( E: -- val ) comp_next_arg_reg { reg } val reg comp_load ;
 
-: next_word { list -- XT } ( "word" -- XT ) parse_word list find_word ;
+: next_word { wlist -- XT } ( "word" -- XT ) parse_word wlist find_word ;
 
-:  tick_next { list } ( "word" -- ) ( E: -- XT ) list next_word comp_push ;
+:  tick_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push ;
 :  '  {    -- XT } (    "word" -- ) 1 next_word ; \ WORDLIST_EXEC
 :  '' {    -- XT } (    "word" -- ) 2 next_word ; \ WORDLIST_COMP
 :: '  ( E: -- XT ) ( C: "word" -- ) 1 tick_next ; \ WORDLIST_EXEC
 :: '' ( E: -- XT ) ( C: "word" -- ) 2 tick_next ; \ WORDLIST_COMP
 
-:  inline_next { list } ( "word" -- ) ( E: <word> )
-  list next_word inline_word
+: inline_next { wlist } ( "word" -- ) ( E: <word> )
+  wlist next_word inline_word
 ;
 :: inline'  1 inline_next ;
 :: inline'' 2 inline_next ;
 
 \ "execute" is renamed from standard "postpone".
-:  execute_next { list } ( "word" -- ) ( E: <word> )
-  list next_word comp_call
+: execute_next { wlist } ( "word" -- ) ( E: <word> )
+  wlist next_word comp_call
 ;
 :: execute'  1 execute_next ;
 :: execute'' 2 execute_next ;
 
-:  compile_next { list } ( "word" -- )
-  list next_word comp_push ' comp_call comp_call
+: compile_next { wlist } ( "word" -- )
+  wlist next_word comp_push ' comp_call comp_call
 ;
 :: compile'  1 compile_next ;
 :: compile'' 2 compile_next ;
@@ -64,7 +64,7 @@
 : let_init { str len val } ( C: "name" -- ) ( E: -- val )
   \ Execution-time semantics.
   str len colon
-    0 1 comp_signature ( E: -- val )
+    0 1 comp_signature_set ( E: -- val )
     val comp_push
   semicolon
 
@@ -77,7 +77,7 @@
 \ Similar to standard `constant`.
 : let: { val } ( C: "name" -- ) ( E: -- val )
   parse_word val let_init
-  [ not_comp_only ]
+  [ 0 comp_only ]
 ;
 
 0 let: nil
@@ -94,8 +94,7 @@
 
 4      let: ASM_INSTR_SIZE
 8      let: ASM_REG_SCRATCH
-27     let: ASM_REG_INTERP
-28     let: ASM_REG_ERR
+28     let: ASM_REG_INTERP
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP
@@ -342,7 +341,9 @@
 
 \ neg Xd, Xd
 : asm_neg { Xd -- instr }
-  Xd 0b1_1_0_01011_00_0_00001_000000_11111_00000 or
+  Xd 16 lsl \ Xt
+  Xd or
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 or
 ;
 
 \ add Xd, Xn, <imm12>
@@ -694,7 +695,7 @@
 ] ;
 
 : off! { adr } false adr ! ;
-: on!  { adr } true adr ! ;
+: on!  { adr } true  adr ! ;
 
 \ ## Stack introspection and manipulation
 \
@@ -715,7 +716,7 @@
 16 let: INTERP_INTS_FLOOR
 24 let: INTERP_INTS_TOP
 
-\ add <reg>, x27, INTERP_INTS_TOP
+\ add <reg>, x28, INTERP_INTS_TOP
 :: stack_top_ptr ( E: -- adr )
   comp_next_arg_reg
   ASM_REG_INTERP INTERP_INTS_TOP asm_add_imm comp_instr
@@ -723,7 +724,7 @@
 
 : stack_top_ptr { -- adr } stack_top_ptr ;
 
-\ ldur <reg>, [x27, INTERP_INTS_FLOOR]
+\ ldur <reg>, [x28, INTERP_INTS_FLOOR]
 :: stack_floor ( E: -- adr )
   comp_next_arg_reg
   ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_off comp_instr
@@ -731,7 +732,7 @@
 
 : stack_floor { -- adr } stack_floor ;
 
-\ ldur <reg>, [x27, INTERP_INTS_TOP]
+\ ldur <reg>, [x28, INTERP_INTS_TOP]
 :: stack_top ( E: -- adr )
   comp_next_arg_reg
   ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr
@@ -743,7 +744,7 @@
 
 \ Updates the stack top address in the interpreter.
 : stack! { adr } [
-  \ stur x0, [x27, INTERP_INTS_TOP]
+  \ stur x0, [x28, INTERP_INTS_TOP]
   0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
 ] ;
 
@@ -769,12 +770,12 @@
 \ We can't really communicate any of this to the compiler,
 \ so we have to fall back on regular old push and pop here.
 
-\ ldur <top>, [x27, INTERP_INTS_TOP]
+\ ldur <top>, [x28, INTERP_INTS_TOP]
 : asm_stack_load { adr -- instr }
   adr ASM_REG_INTERP INTERP_INTS_TOP asm_load_off
 ;
 
-\ stur <top>, [x27, INTERP_INTS_TOP]
+\ stur <top>, [x28, INTERP_INTS_TOP]
 : asm_stack_store { adr -- instr }
   adr ASM_REG_INTERP INTERP_INTS_TOP asm_store_off
 ;
@@ -806,9 +807,9 @@
 \ when we have access to loops. Unlike this version it's variadic.
 : >stack { val } [
   1                     comp_clobber
-  1     asm_stack_load  comp_instr \ ldur x1, [x27, INTERP_INTS_TOP]
+  1     asm_stack_load  comp_instr \ ldur x1, [x28, INTERP_INTS_TOP]
   0 1 8 asm_store_post  comp_instr \ str x0, [x1], 8
-  1     asm_stack_store comp_instr \ stur x1, [x27, INTERP_INTS_TOP]
+  1     asm_stack_store comp_instr \ stur x1, [x28, INTERP_INTS_TOP]
 ] ;
 
 \ For debugging.
@@ -890,7 +891,8 @@
 
 1 1 extern: strdup  ( cstr -- cstr )
 1 1 extern: strlen  ( cstr -- len )
-3 1 extern: strncmp ( str0 str1 len -- )
+2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
+3 1 extern: strncmp ( str0 str1 len -- cmp )
 3 0 extern: strncpy ( dst src str_len -- )
 3 0 extern: strlcpy ( dst src buf_len -- )
 
@@ -899,11 +901,13 @@
 : erase { buf len      } buf len 0 fill ;
 : blank { buf len      } buf len 32 fill ;
 
+\ See `ccompare` below for null-terminated strings.
 : compare { str0 len0 str1 len1 -- direction }
   len0 len1 min { len }
   str0 str1 len strncmp
 ;
 
+\ See `cstr=` and more below for null-terminated strings.
 : str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0 ;
 : str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 ;
 : str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
@@ -939,7 +943,7 @@
 
 : init_data_word { name name_len adr }
   name name_len colon
-    0 1 comp_signature ( E: -- ptr )
+    0 1 comp_signature_set ( E: -- ptr )
     adr comp_extern_addr
   semicolon
 
@@ -954,7 +958,7 @@
   nil cell alloc_data { adr }
   val adr !
   str len adr init_data_word
-  [ not_comp_only ]
+  [ false comp_only ]
 ;
 
 : comp_buf { adr cap } ( E: -- adr cap )
@@ -974,7 +978,7 @@
   nil cap alloc_data { adr }
 
   str len colon
-    0 2 comp_signature ( E: -- ptr )
+    0 2 comp_signature_set ( E: -- ptr cap )
     adr cap comp_buf
   semicolon
 
@@ -982,7 +986,7 @@
     adr comp_push cap comp_push compile' comp_buf
   semicolon
 
-  [ not_comp_only ]
+  [ false comp_only ]
 ;
 
 \ Shortcut for the standard idiom `create <name> N allot`.
@@ -990,7 +994,7 @@
 : mem: { cap } ( C: "name" -- ) ( E: -- adr )
   nil cap alloc_data { adr }
   parse_word adr init_data_word
-  [ not_comp_only ]
+  [ false comp_only ]
 ;
 
 \ Shortcut for the standard idiom `create <name> N cells allot`.
@@ -1009,7 +1013,7 @@
   parse_word extern_got { adr }
 
   buf len colon
-    0 1 comp_signature ( E: -- val )
+    0 1 comp_signature_set ( E: -- val )
     adr comp_extern_load_load
   semicolon
 
@@ -1017,7 +1021,7 @@
     adr comp_push compile' comp_extern_load_load
   semicolon
 
-  [ not_comp_only ]
+  [ false comp_only ]
 ;
 
 \ ## IO
@@ -1063,18 +1067,29 @@ extern_val: stderr __stderrp
 \ Exception definitions are split. See additional words below
 \ which support message formatting via the C "printf" family.
 \
-\ We dedicate one special register to an error value, which
-\ is either zero or an address of a null-delimited string.
-\ To "throw", we have to store a string into that register
-\ and instruct the compiler to insert a "try" check.
+\ At the ABI level, we return errors as the last output parameter,
+\ similar to Go. However, the error is appended implicitly, and by
+\ default is treated as an exception.
+\
+\ We support switching into no-throw mode, which disables exceptions and makes
+\ errors explicit. This mode behaves like C: control flow is entirely manual.
+\ It's mainly meant for callbacks which are passed to C.
+\
+\ Example:
+\
+\   : word { -- one two } c" some_error" throw ;
+\
+\   : throwing
+\     word { one two }
+\     catch' word { one two err }
+\   ;
+\
+\   : non_throwing [ false throws ]
+\     word { one two err } \ Implicit catch.
+\   ;
 
-\ The annotation `throws` makes the compiler insert an error check
-\ after any call to this procedure, and makes it "contagious": all
-\ callers automatically receive "throws".
-: throw { cstr } [
-  throws
-  ASM_REG_ERR 0 asm_mov_reg comp_instr \ mov x28, x0
-] ;
+:: catch'  WORDLIST_EXEC catch ;
+:: catch'' WORDLIST_COMP catch ;
 
 \ Usage:
 \
@@ -1082,7 +1097,10 @@ extern_val: stderr __stderrp
 \
 \ Also see `sthrowf"` for error message formatting.
 :  throw" ( E: "str" -- ) parse_cstr throw ;
-:: throw" ( C: "str" -- ) comp_cstr compile' throw ;
+:: throw" ( C: "str" -- ) comp_cstr execute'' throw ;
+
+:  abort" ( E: "str" -- ) execute'  log" elf abort ;
+:: abort" ( C: "str" -- ) execute'' log" compile' elf compile' abort ;
 
 \ ## Conditionals
 \
@@ -1499,6 +1517,20 @@ extern_val: stderr __stderrp
   ' loop_countdown_pop >stack
 ;
 
+\ ## String comparison continued
+
+\ `strcmp` doesn't like null string pointers.
+: ccompare { cstr0 cstr1 -- cmp }
+  cstr0 cstr1 or ifn 0 ret end
+  cstr0 ifn -1 ret end
+  cstr1 ifn +1 ret end
+  cstr0 cstr1 strcmp
+;
+
+: cstr=  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare =0 ;
+: cstr<  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <0 ;
+: cstr<> { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <>0 ;
+
 \ ## Varargs and formatting
 
 \ Short for "compile variadic arguments begin".
@@ -1578,14 +1610,14 @@ extern_val: stderr __stderrp
   }va_comp
   compile' ERR_BUF
   1 comp_args_set \ Drop buffer length.
-  compile' throw
+  execute'' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
 :: throw_if" ( C: "str" -- ) ( E: pred -- )
   execute'' if
   comp_cstr
-  compile' throw
+  execute'' throw
   execute'' end
 ;
 
@@ -1662,11 +1694,11 @@ extern_val: errno __error
   top_reg asm_stack_store comp_instr
 ;
 
-\ ldur <stack>, [x27, INTERP_INTS_TOP]
+\ ldur <stack>, [x28, INTERP_INTS_TOP]
 \ ...
 \ str  <arg>,   [<stack>], 8
 \ ...
-\ stur <stack>, [x27, INTERP_INTS_TOP]
+\ stur <stack>, [x28, INTERP_INTS_TOP]
 : comp_args_to_stack { len }
   len ifn ret end
   comp_scratch_reg { stack }
@@ -1768,7 +1800,7 @@ extern_val: errno __error
   parse_word          { name name_len }
   len cells mem_alloc { adr -- }
   name name_len adr init_data_word
-  [ not_comp_only ]
+  [ false comp_only ]
 ;
 
 \ ## Pretend types
@@ -1822,7 +1854,7 @@ extern_val: errno __error
   off align align_up { size }
   str len size let_init
   str free \ String was `strdup`'d.
-  [ not_comp_only ]
+  [ false comp_only ]
 ;
 
 : struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
@@ -1856,7 +1888,7 @@ extern_val: errno __error
 
   \ Execution-time semantics.
   name name_len colon
-    1 1 comp_signature ( E: struct_adr -- field_adr )
+    1 1 comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
     field_off comp_push
     compile' +
@@ -1871,5 +1903,5 @@ extern_val: errno __error
   align size max { align }
   align next_off fun
 
-  [ not_comp_only ]
+  [ false comp_only ]
 ;

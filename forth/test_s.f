@@ -360,6 +360,11 @@ T{ VAR @     <T> 234 }T
 T{ 345 VAR ! <T>     }T
 T{ VAR @     <T> 345 }T
 
+T{ 0    negate <T> 0    }T
+T{ 123  negate <T> -123 }T
+T{ -123 negate <T> 123  }T
+
+\ `=` is used by the testing tools, so this test is almost meaningless.
 T{  0    0   = <T> 1 }T
 T{  0    123 = <T> 0 }T
 T{  123  0   = <T> 0 }T
@@ -466,6 +471,20 @@ T{ 10 20 30 swap_over <T> 20 10 30 }T
 T{ 123 0 ?dup <T> 123     }T
 T{ 234 1 ?dup <T> 234 234 }T
 
+T{ nil            nil     cstr= <T> true  }T
+T{ nil            c" one" cstr= <T> false }T
+T{ c" one"        nil     cstr= <T> false }T
+T{ c" one" strdup c" two" cstr= <T> false }T
+T{ c" two" strdup c" one" cstr= <T> false }T
+T{ c" one" strdup c" one" cstr= <T> true  }T
+
+T{ nil            nil     cstr< <T> false }T
+T{ nil            c" one" cstr< <T> true  }T
+T{ c" one"        nil     cstr< <T> false }T
+T{ c" one" strdup c" two" cstr< <T> true  }T
+T{ c" two" strdup c" one" cstr< <T> false }T
+T{ c" one" strdup c" one" cstr< <T> false }T
+
 : test_varargs
   c" numbers (should be 10 20 30): %zd %zd %zd"
   10 20 30 [ 3 ] va{ debug_stack printf }va lf
@@ -556,5 +575,53 @@ test_to
   T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
 ;
 test_locals
+
+: test_catch_invalid
+  \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
+  \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
+;
+
+: test_catch0_val [ true throws ] 123 ;
+: test_catch0_err throw" test_err" ;
+
+: test_catch0
+  T{ test_catch0_val                <T> 123     }T
+  T{ catch' test_catch0_val         <T> 123 nil }T
+  T{ catch' test_catch0_err { err } <T>         }T
+  T{ c" test_err" err cstr=         <T> true    }T
+;
+test_catch0
+
+: test_catch1_cond ( one -- two )
+  dup if 2 * ret end
+  drop
+  throw" test_err"
+;
+
+: test_catch1
+  T{ 123 test_catch1_cond                <T> 246     }T
+  T{ 123 catch' test_catch1_cond         <T> 246 nil }T
+  T{ 0   catch' test_catch1_cond { err } <T>         }T
+  T{ c" test_err" err cstr=              <T> true    }T
+;
+test_catch1
+
+: test_catch2_cond ( one two -- three four )
+  dup2 <>0 swap <>0 and if * dup ret end
+  drop2
+  throw" test_err"
+;
+
+: test_catch2
+  T{ 11 22 test_catch2_cond                <T> 242 242     }T
+  T{ 11 22 catch' test_catch2_cond         <T> 242 242 nil }T
+
+  T{ 0  22 catch' test_catch2_cond { err } <T>             }T
+  T{ c" test_err" err cstr=                <T> true        }T
+
+  T{ 11 0  catch' test_catch2_cond { err } <T>             }T
+  T{ c" test_err" err cstr=                <T> true        }T
+;
+test_catch2
 
 log" [test] ok" lf

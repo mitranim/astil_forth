@@ -23,7 +23,8 @@ typedef struct {
   Ind floor;    // Setup instructions; some may be skipped.
   Ind prologue; // Actual start; somewhere in `[prologue,inner]`.
   Ind inner;    // First useful instruction.
-  Ind epilogue; // Cleanup instructions; may be `== .ret`.
+  Ind epi_ok;   // Cleanups the error register on success.
+  Ind epi_err;  // Doesn't touch the error reg; may be `== .ret`.
   Ind ret;      // Always `ret`.
   Ind data;     // Local immediate values.
   Ind ceil;     // Next instruction outside this symbol's range.
@@ -83,22 +84,16 @@ static constexpr U8 ARCH_REG_SP = 31;
 // Extremely primitive heuristic.
 static constexpr U8 ARCH_INLINABLE_INSTR_LEN = 4;
 
-#ifdef NATIVE_CALL_CONV
+static constexpr U8 ARCH_REG_INTERP = 28;
 
-static constexpr U8 ARCH_REG_ERR    = 28;
-static constexpr U8 ARCH_REG_INTERP = 27;
-
-#else // NATIVE_CALL_CONV
+#ifndef NATIVE_CALL_CONV
 
 /*
 Using `x0` as the error register exactly matches how we return errors in C.
-When calling procs which don't return errors, we nullify the register after
-the call.
 
 SYNC[arch_arm64_cc_stack_special_regs].
 */
 static constexpr U8 ARCH_REG_ERR       = ARCH_PARAM_REG_0;
-static constexpr U8 ARCH_REG_INTERP    = 28; // Interp
 static constexpr U8 ARCH_REG_INT_TOP   = 27; // Interp.ints.top
 static constexpr U8 ARCH_REG_INT_FLOOR = 26; // Interp.ints.floor
 
@@ -106,9 +101,10 @@ static constexpr U8 ARCH_REG_INT_FLOOR = 26; // Interp.ints.floor
 
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {
-  ASM_CODE_RET = 1,
+  ASM_CODE_IMM = 1,
+  ASM_CODE_RET,
   ASM_CODE_TRY,
-  ASM_CODE_IMM,
+  ASM_CODE_THROW,
   ASM_CODE_RECUR,
   ASM_CODE_PROLOGUE,
   ASM_CODE_LOC_READ,

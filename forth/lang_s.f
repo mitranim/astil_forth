@@ -332,11 +332,6 @@
 \ ldp Xt1, Xt2, [x27, -16]!
 : asm_pop2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP -16 asm_load_pair_pre ;
 
-\ neg Xd, Xd
-: asm_neg ( Xd -- instr )
-  0b1_1_0_01011_00_0_00001_000000_11111_00000 or
-;
-
 \ add Xd, Xn, <imm12>
 : asm_add_imm ( Xd Xn imm12 -- instr )
   asm_pattern_arith_imm
@@ -477,6 +472,12 @@
                       asm_push_x1  comp_instr \ str x1, [x27], 8
 ] ;
 
+\ neg Xd, Xd
+: asm_neg ( Xd -- instr )
+  dup 16 lsl or \ Xt
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 or
+;
+
 \ eor <reg>, <reg>, <reg>
 : asm_zero_reg ( reg -- instr ) dup dup asm_eor_reg ;
 
@@ -529,22 +530,22 @@
   asm_push_x1 comp_instr \ str x1, [x27], 8
 ;
 
-: next_word ( wordlist "word" -- exec_tok ) parse_word find_word ;
+: next_word ( wlist "word" -- exec_tok ) parse_word find_word ;
 
-:  tick_next ( C: wordlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
+:  tick_next ( C: wlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
 :: '  WORDLIST_EXEC tick_next ;
 :: '' WORDLIST_COMP tick_next ;
 
-:  inline_next ( wordlist "word" -- ) ( E: <word> ) next_word inline_word ;
+:  inline_next ( wlist "word" -- ) ( E: <word> ) next_word inline_word ;
 :: inline'  WORDLIST_EXEC inline_next ;
 :: inline'' WORDLIST_COMP inline_next ;
 
 \ "execute" is renamed from standard "postpone".
-:  execute_next ( wordlist "word" -- ) ( E: <word> ) next_word comp_call ;
+:  execute_next ( wlist "word" -- ) ( E: <word> ) next_word comp_call ;
 :: execute'  WORDLIST_EXEC execute_next ;
 :: execute'' WORDLIST_COMP execute_next ;
 
-:  compile_next ( wordlist "word" -- ) next_word comp_push ' comp_call comp_call ;
+:  compile_next ( wlist "word" -- ) next_word comp_push ' comp_call comp_call ;
 :: compile'  WORDLIST_EXEC compile_next ;
 :: compile'' WORDLIST_COMP compile_next ;
 
@@ -925,7 +926,7 @@
 
 \ For words which define words. Kinda like `create`.
 :: #word_beg compile' : ;
-:: #word_end compile'' ; not_comp_only ;
+:: #word_end compile'' ; 0 comp_only ;
 
 \ Similar to standard `constant`.
 : let: ( C: val -- ) ( E: -- val ) #word_beg comp_push #word_end ;
@@ -1006,8 +1007,10 @@
 3 0 extern: memcpy  ( dst src len -- )
 3 0 extern: memmove ( dst src len -- )
 
+1 1 extern: strdup  ( cstr -- cstr )
 1 1 extern: strlen  ( cstr -- len )
-3 1 extern: strncmp ( str0 str1 len -- )
+2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
+3 1 extern: strncmp ( str0 str1 len -- cmp )
 3 0 extern: strncpy ( dst src str_len -- )
 3 0 extern: strlcpy ( dst src buf_len -- )
 
@@ -1025,28 +1028,21 @@
 \ Exception definitions are split. See additional words below
 \ which support message formatting via the C "printf" family.
 \
-\ We dedicate one special register to an error value, which
-\ is either zero or an address of a null-delimited string.
-\ To "throw", we have to store a string into that register
-\ and instruct the compiler to insert a "try" check.
-\
-\ Under the stack-based calling convention, the exception
-\ register is `x0`, matching the convention in our C code.
+\ In this system, "exceptions" are simply return values.
+\ Since in stack-CC all internal functions are "nullary"
+\ in the ABI sense, the error register is always `x0`.
+\ The value held in this register, if any, is a string.
+\ This also matches the convention used by our C code.
 
-\ The annotation `throws` makes the compiler insert an error check
-\ after any call to this procedure, and makes it "contagious": all
-\ callers automatically receive "throws".
-: throw ( cstr -- ) [
-  throws
-  0 asm_pop1 comp_instr \ ldr x0, [x27, -8]!
-] ;
+:: catch'  WORDLIST_EXEC catch ;
+:: catch'' WORDLIST_COMP catch ;
 
 \ Usage:
 \
 \   throw" some_error_msg"
 \
 \ Also see `sthrowf"` for error message formatting.
-:: throw" ( C: "str" -- ) comp_cstr compile' throw ;
+:: throw" ( C: "str" -- ) comp_cstr execute'' throw ;
 
 \ ## Conditionals
 \
@@ -1390,6 +1386,25 @@
 
 : ?dup ( val bool -- val ?val ) if dup end ;
 
+\ ## String comparison continued
+
+\ `strcmp` doesn't like null string pointers.
+: ccompare ( cstr0 cstr1 -- cmp )
+  to: cstr1
+  to: cstr0
+
+  cstr0 cstr1 or ifn 0 ret end
+  cstr0 ifn -1 ret end
+  cstr1 ifn +1 ret end
+  cstr0 cstr1 strcmp
+;
+
+: cstr=  ( cstr0 cstr1 -- bool ) ccompare =0 ;
+: cstr<  ( cstr0 cstr1 -- bool ) ccompare <0 ;
+: cstr<> ( cstr0 cstr1 -- bool ) ccompare <>0 ;
+
+\ ## Extern variables
+
 \ Finds an extern symbol by name and creates a new word which loads the address
 \ of that symbol. The extern symbol can be either a variable or a procedure.
 : extern_ptr: ( C: "ours" "extern" -- ) ( E: -- ptr )
@@ -1609,6 +1624,9 @@ extern_val: stderr __stderrp
 
 \ ## Exceptions — continued
 
+:  abort" ( E: "str" -- ) execute'  log" elf abort ;
+:: abort" ( C: "str" -- ) execute'' log" compile' elf compile' abort ;
+
 4096 buf: ERR_BUF
 
 \ Like `sthrowf"` but easier to use. Example:
@@ -1622,7 +1640,7 @@ extern_val: stderr __stderrp
   }va_comp
   compile' ERR_BUF
   compile' drop
-  compile' throw
+  execute'' throw
 ;
 
 \ Formats an error message into the provided buffer using `snprintf`,
@@ -1640,14 +1658,14 @@ extern_val: stderr __stderrp
     comp_cstr
     compile'  snprintf
   }va_comp
-  compile'  throw
+  execute'' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
 :: throw_if" ( C: "str" -- ) ( E: pred -- )
   execute'' if
   comp_cstr
-  compile' throw
+  execute'' throw
   execute'' end
 ;
 

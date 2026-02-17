@@ -37,6 +37,8 @@ we still had to resort to an IR of sorts: the "fixups".
 */
 #pragma once
 #include "./arch.c"
+#include "./arch_arm64.h"
+#include "./arch_arm64_cc_reg.c"
 #include "./comp.c"
 #include "./interp.h"
 #include "./lib/bits.c"
@@ -46,6 +48,7 @@ we still had to resort to an IR of sorts: the "fixups".
 #include "./lib/stack.c"
 #include "./lib/str.h"
 #include "./read.c"
+#include "./sym.h"
 
 // clang-format off
 
@@ -239,14 +242,22 @@ static Err comp_validate_call_args(Comp *comp, const Sym *callee) {
 static Err comp_validate_ret_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to return", sym->out_len));
-  return nullptr;
+  try(comp_validate_args(comp, "unable to compile return", sym->out_len));
+
+  if (sym->err != ERR_MODE_THROW) return nullptr;
+  if (sym->out_len < ARCH_OUT_PARAM_REG_LEN) return nullptr;
+
+  return errf(
+    "unable to compile return: too many output parameters: %d registers are available, %d are used, but 1 more is required for implicitly returned exception values",
+    ARCH_OUT_PARAM_REG_LEN,
+    sym->out_len
+  );
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to recur", sym->inp_len));
+  try(comp_validate_args(comp, "unable to compile recursive call", sym->inp_len));
   return nullptr;
 }
 
@@ -311,7 +322,13 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   here and when building the arguments. Might consider deduping at
   some later point.
   */
-  return comp_clobber_regs(comp, callee->clobber);
+  try(comp_clobber_regs(comp, callee->clobber));
+
+  if (callee->err == ERR_MODE_THROW) {
+    // Exceptions implicitly use an additional output register.
+    try(comp_clobber_reg(comp, callee->out_len));
+  }
+  return nullptr;
 }
 
 static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
@@ -329,7 +346,7 @@ static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
     if (prev) {
       eprintf(
         "[system] reset local " FMT_QUOTED
-        " to register %d, clobbering local " FMT_QUOTED,
+        " to register %d, clobbering local " FMT_QUOTED "\n",
         loc->name.buf,
         reg,
         prev->name.buf
@@ -337,7 +354,7 @@ static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
     }
     else {
       eprintf(
-        "[system] reset local " FMT_QUOTED " to register %d", loc->name.buf, reg
+        "[system] reset local " FMT_QUOTED " to register %d\n", loc->name.buf, reg
       );
     }
   });
@@ -577,10 +594,29 @@ and ONLY when not mixing GPRs and FPRs.
 TODO: for x64, we'll need a more general approach.
 See the comment at the top of this file.
 */
-static Err comp_after_append_call(Comp *comp, const Sym *callee) {
+static Err comp_after_append_call(
+  Comp *comp, const Sym *caller, const Sym *callee, bool catch
+) {
+  (void)caller;
+
   const auto ctx = &comp->ctx;
-  ctx->arg_len   = callee->out_len;
-  ctx->arg_low   = 0;
+
+  /*
+  An error / exception, if any, is always returned in the last output
+  register. `asm_append_call_norm` decides how to handle it depending
+  on the caller's throw / no-throw mode; we can also force a "catch".
+  Here we just need to adjust the argument count for no-throw callers
+  by appending the error.
+  */
+  if (catch) {
+    aver(callee->err == ERR_MODE_THROW);
+    ctx->arg_len = callee->out_len + 1;
+  }
+  else {
+    ctx->arg_len = callee->out_len;
+  }
+
+  ctx->arg_low = 0;
   return nullptr;
 }
 
@@ -590,7 +626,9 @@ static void comp_clear_args(Comp *comp) {
   ctx->arg_low   = 0;
 }
 
-static Err comp_append_call_norm(Comp *comp, const Sym *callee, bool *inlined) {
+static Err comp_append_call_norm(
+  Comp *comp, const Sym *callee, bool catch, bool *inlined
+) {
   IF_DEBUG(aver(callee->type == SYM_NORM));
 
   Sym *caller;
@@ -598,35 +636,38 @@ static Err comp_append_call_norm(Comp *comp, const Sym *callee, bool *inlined) {
   try(comp_before_append_call(comp, callee));
 
   if (callee->norm.inlinable) {
-    try(asm_inline_sym(comp, callee));
+    try(asm_inline_sym(comp, caller, callee, catch));
     if (inlined) *inlined = true;
   }
   else {
-    try(asm_append_call_norm(comp, caller, callee));
+    try(asm_append_call_norm(comp, caller, callee, catch));
     if (inlined) *inlined = false;
   }
 
-  try(comp_after_append_call(comp, callee));
+  try(comp_after_append_call(comp, caller, callee, catch));
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, const Sym *callee) {
+static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool catch) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  asm_append_call_intrin(comp, caller, callee);
-  try(comp_after_append_call(comp, callee));
+  try(asm_append_call_intrin(comp, caller, callee, catch));
+  try(comp_after_append_call(comp, caller, callee, catch));
   return nullptr;
 }
 
 static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   IF_DEBUG(aver(callee->type == SYM_EXTERN));
+
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
   asm_append_call_extern(comp, caller, callee);
-  try(comp_after_append_call(comp, callee));
+
+  constexpr bool catch = false;
+  try(comp_after_append_call(comp, caller, callee, catch));
   return nullptr;
 }
 
@@ -715,6 +756,24 @@ static Err comp_alloca(Comp *comp) {
   return nullptr;
 }
 
+static Err comp_append_throw(Comp *comp, const Sym *sym) {
+  aver(sym->err == ERR_MODE_THROW);
+  try(comp_validate_args(comp, "unable to throw", 1));
+  comp_clear_args(comp);
+
+  const auto src_reg = ARCH_PARAM_REG_0;
+  const auto tar_reg = arch_sym_err_reg(sym);
+  aver(tar_reg >= 0);
+
+  if (tar_reg != src_reg) {
+    try(comp_clobber_reg(comp, (U8)tar_reg));
+    asm_append_mov_reg(comp, (U8)tar_reg, (U8)src_reg);
+  }
+
+  asm_append_fixup_throw(comp); // b <err_epi>
+  return nullptr;
+}
+
 static const char *loc_fixup_fmt(Loc_fixup *fix) {
   static thread_local char BUF[4096];
 
@@ -734,13 +793,13 @@ static const char *loc_fixup_fmt(Loc_fixup *fix) {
       const auto val = &fix->write;
       return sprintbuf(
         BUF,
-        "{type = write, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %d}",
+        "{type = write, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %s}",
         val->loc->name.buf,
         val->loc,
         val->instr,
         val->reg,
         val->prev,
-        val->confirmed
+        fmt_bool(val->confirmed)
       );
     }
     default: unreachable();

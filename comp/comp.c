@@ -65,9 +65,11 @@ static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
   return nullptr;
 }
 
-static Err comp_inline_sym(Comp *comp, const Sym *callee) {
+static Err comp_inline_sym(
+  Comp *comp, Sym *caller, const Sym *callee, bool catch
+) {
   try(comp_require_current_sym(comp, nullptr));
-  try(asm_inline_sym(comp, callee));
+  try(asm_inline_sym(comp, caller, callee, catch));
   return nullptr;
 }
 
@@ -282,17 +284,20 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   try(comp_require_current_sym(comp, &caller));
   sym_auto_comp_only(caller, callee);
   sym_auto_interp_only(caller, callee);
-  sym_auto_throws(caller, callee);
+  try(sym_auto_throws(caller, callee));
+
+  const auto catch = caller->err == ERR_MODE_NO_THROW &&
+    callee->err == ERR_MODE_THROW;
 
   bool inlined = false;
 
   switch (callee->type) {
     case SYM_NORM: {
-      try(comp_append_call_norm(comp, callee, &inlined));
+      try(comp_append_call_norm(comp, callee, catch, &inlined));
       break;
     }
     case SYM_INTRIN: {
-      try(comp_append_call_intrin(comp, callee));
+      try(comp_append_call_intrin(comp, callee, catch));
       break;
     }
     case SYM_EXTERN: {
@@ -462,15 +467,6 @@ static const char *asm_fixup_fmt(Asm_fixup *fix) {
   static thread_local char BUF[4096];
 
   switch (fix->type) {
-    case ASM_FIX_RET: {
-      return sprintbuf(BUF, "{type = ret, instr = %p}", fix->ret);
-    }
-    case ASM_FIX_TRY: {
-      return sprintbuf(BUF, "{type = try, instr = %p}", fix->try);
-    }
-    case ASM_FIX_RECUR: {
-      return sprintbuf(BUF, "{type = recur, instr = %p}", fix->recur);
-    }
     case ASM_FIX_IMM: {
       const auto val = &fix->imm;
       return sprintbuf(
@@ -481,6 +477,28 @@ static const char *asm_fixup_fmt(Asm_fixup *fix) {
         val->num
       );
     }
+
+    case ASM_FIX_RET: {
+      return sprintbuf(BUF, "{type = ret, instr = %p}", fix->ret);
+    }
+
+    case ASM_FIX_TRY: {
+      return sprintbuf(
+        BUF,
+        "{type = try, instr = %p, err_reg = %d}",
+        fix->try.instr,
+        fix->try.err_reg
+      );
+    }
+
+    case ASM_FIX_THROW: {
+      return sprintbuf(BUF, "{type = throw, instr = %p}", fix->throw);
+    }
+
+    case ASM_FIX_RECUR: {
+      return sprintbuf(BUF, "{type = recur, instr = %p}", fix->recur);
+    }
+
     default: unreachable();
   }
 }

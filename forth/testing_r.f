@@ -52,10 +52,10 @@ import' ./lang_r.f
     len0 len1 rel1 T_stack_eq
     if T_reset ret end
   else
-    rel0 rel1 elogf" stack length mismatch: (%zd) <T> (%zd)" elf
+    rel0 rel1 elogf" [test] stack length mismatch: (%zd) <T> (%zd)" elf
   end
 
-  elog" stack content mismatch: T{ "
+  elog" [test] stack content mismatch: T{ "
   len1 len0 +for: ind ind stack_at@ elogf" %zd " end
   elog" <T> "
   len2 ind  +for: ind ind stack_at@ elogf" %zd " end
@@ -68,7 +68,10 @@ import' ./lang_r.f
 
 \ ## Compilation-mode test routines (inside words)
 
-: T_end_comp { len }
+\ Uses "abort" instead of "throw" to allow us to test the "no-throw" mode.
+\ `}T` compiles a call to this word into the current word. If this threw,
+\ testing "no-throw" words would be very cumbersome.
+: T_end_comp { len } [ false throws ]
   stack_len  { len2 }
   len2 len - { len1 }
   len1 len - { len0 }
@@ -76,14 +79,14 @@ import' ./lang_r.f
   len0 len1 len T_stack_eq
   if len0 stack_set_len ret end
 
-  elog" mismatch: T{ "
+  elog" [test] mismatch: T{ "
   len1 len0 +for: ind ind stack_at@ elogf" %zd " end
   elog" <T> "
   len2 ind  +for: ind ind stack_at@ elogf" %zd " end
   elog" }T" elf
 
   len0 stack_set_len
-  throw" test failure"
+  abort" test failure"
   unreachable
 ;
 

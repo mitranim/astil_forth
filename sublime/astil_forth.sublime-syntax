@@ -33,8 +33,8 @@ variables:
       ret|recur|
       if|ifn|else|elif|elifn|end|
       while|until|leave|for|loop|
-      throw|throw[_]?{{word}}|{{word}}[_]?throw|
-      try|try[_]?{{word}}|{{word}}[_]?try|
+      throw|throw[_]{{word}}|{{word}}[_]throw|
+      try|try[_]{{word}}|{{word}}[_]try|
       abort|quit|exit
     )
 

@@ -15,20 +15,34 @@ typedef enum : U8 {
   WORDLIST_COMP = 2,
 } Wordlist;
 
+typedef enum : U8 {
+  ERR_MODE_NONE = 0,
+  ERR_MODE_THROW,
+  ERR_MODE_NO_THROW,
+} Err_mode;
+
 /*
 Metadata for a word in a Forth dictionary / wordset.
 - "Norm" words are defined in Forth code.
 - "Intrin" words are provided by the interpreter / compiler.
 - "Extern" words are dynamically located in linked libraries.
+
+The struct definition is also partially hardcoded
+in some Forth examples, and must be kept in sync.
+
+SYNC[sym_fields].
 */
 typedef struct Sym {
+  enum { SYM_NORM = 1, SYM_INTRIN, SYM_EXTERN } type;
+
   Word_str name;
   Wordlist wordlist;
 
-  enum { SYM_NORM = 1, SYM_INTRIN, SYM_EXTERN } type;
-
+  // Every member of the union should begin with an instruction address.
+  // This makes it easier to get at them in Forth without an intrinsic.
   union {
     struct {
+      Instr     *exec;       // First executable instruction.
       Sym_instrs spans;      // Instruction ranges; used by the assembler.
       bool       inlinable;  // Inner code is safe to copy-paste.
       bool       has_loads;  // Has PC-relative data access.
@@ -40,14 +54,14 @@ typedef struct Sym {
     void *exter;  // Pointer to extern procedure; obtained from `dlsym`.
   };
 
-  Sym_set callees;     // Dependencies in compiled code.
-  Sym_set callers;     // Dependents in compiled code.
-  U8      inp_len;     // Input parameter count.
-  U8      out_len;     // Output parameter count.
-  Bits    clobber;     // Clobbers these registers; must include inps and outs.
-  bool    throws;      // Requires error handling.
-  bool    comp_only;   // Can only be used between `:` and `;`.
-  bool    interp_only; // Forbidden in AOT executables.
+  Sym_set  callees;     // Dependencies in compiled code.
+  Sym_set  callers;     // Dependents in compiled code.
+  U8       inp_len;     // Input parameter count.
+  U8       out_len;     // Output parameter count.
+  Bits     clobber;     // Clobbers these registers; must include inps and outs.
+  Err_mode err;         // Whether errors are exceptions in this procedure.
+  bool     comp_only;   // Can only be used between `:` and `;`.
+  bool     interp_only; // Forbidden in AOT executables.
 } Sym;
 
 typedef stack_of(Sym)  Sym_stack;

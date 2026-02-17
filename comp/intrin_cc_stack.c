@@ -108,6 +108,54 @@ static Err intrin_recur(Interp *interp) {
   return comp_append_recur(&interp->comp);
 }
 
+static Err intrin_catch(Interp *interp) {
+  Sint wordlist;
+  try(int_stack_pop(&interp->ints, &wordlist));
+  try(interp_catch(interp, (Wordlist)wordlist));
+  return nullptr;
+}
+
+static Err intrin_throw(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  try(sym_throws(sym, true));
+  asm_append_throw(&interp->comp);
+  return nullptr;
+}
+
+static Err intrin_throws(Interp *interp) {
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+
+  /*
+  Implicit "catch" via the "no-throw" mode is not viable in stack-CC
+  because the programmer would have to remember which functions throw
+  and which don't, the compiler doesn't bother to help.
+
+  In reg-CC, implicit catch is viable because it changes the arity
+  of the callee, and the compiler warns about arity mismatches.
+  */
+  if (!val) {
+    return err_str(
+      "unsupported use of no-throw mode under the stack calling convention; use explicit `catch` instead"
+    );
+  }
+
+  try(interp_throws(interp, !!val));
+  return nullptr;
+}
+
+static Err intrin_comp_only(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+
+  sym->comp_only = !!val;
+  return nullptr;
+}
+
 static Err intrin_comp_instr(Interp *interp) {
   Sint val;
   try(int_stack_pop(&interp->ints, &val));
@@ -239,11 +287,15 @@ static Err intrin_find_word(Interp *interp) {
 }
 
 static Err intrin_inline_word(Interp *interp) {
+  constexpr bool catch = false;
   Sint ptr;
-  Sym *sym;
+  Sym *caller;
+  Sym *callee;
+
   try(int_stack_pop(&interp->ints, &ptr));
-  try(interp_sym_by_ptr(interp, ptr, &sym));
-  try(comp_inline_sym(&interp->comp, sym));
+  try(interp_require_current_sym(interp, &caller));
+  try(interp_sym_by_ptr(interp, ptr, &callee));
+  try(comp_inline_sym(&interp->comp, caller, callee, catch));
   return nullptr;
 }
 
@@ -292,19 +344,3 @@ static Err debug_mem(Interp *interp) {
   debug_mem_at((const Uint *)adr);
   return nullptr;
 }
-
-static constexpr USED auto INTRIN_COLON_NAMED = (Sym){
-  .name.buf = "colon",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_colon_named,
-  .inp_len  = 2,
-  .throws   = true,
-};
-
-static constexpr USED auto INTRIN_COLON_COLON_NAMED = (Sym){
-  .name.buf = "colon_colon",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_colon_colon_named,
-  .inp_len  = 2,
-  .throws   = true,
-};

@@ -23,9 +23,11 @@ This is possible because of direct access to compilation. Outside the Forth worl
 
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
 
+The system comes in two variants which use different call conventions: stack-based and register-based. For code maintenance reasons, they compile separately from differently selected C files. The stack-CC version is considered legacy and has fewer features implemented.
+
 The outer interpreter / compiler, which is written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
-- The stack-CC version boots via `lang_s.f`.
-- The register-CC version boots via `lang_r.f`.
+- Stack-CC: boots via `lang_s.f`.
+- Register-CC: boots via `lang_r.f`.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 

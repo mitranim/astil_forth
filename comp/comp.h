@@ -18,22 +18,29 @@ Procedure prologue also implicitly undergoes fixup.
 */
 typedef struct {
   enum {
-    ASM_FIX_RET = 1,
+    ASM_FIX_IMM = 1,
+    ASM_FIX_RET,
     ASM_FIX_TRY,
+    ASM_FIX_THROW,
     ASM_FIX_RECUR,
-    ASM_FIX_IMM,
   } type;
 
   union {
-    Instr *ret;   // b <epilogue>
-    Instr *try;   // cbnz <epilogue>
-    Instr *recur; // b <begin>
-
     struct {
       Instr *instr; // Instruction to patch.
       Sint   num;   // Immediate value to load.
       U8     reg;   // Register to load into.
     } imm;
+
+    Instr *ret; // b <epi_ok>
+
+    struct {
+      U8     err_reg;
+      Instr *instr; // cbnz <err_reg>, <epi_err>
+    } try;
+
+    Instr *throw; // b <epi_err>
+    Instr *recur; // b <begin>
   };
 } Asm_fixup;
 

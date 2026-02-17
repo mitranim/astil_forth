@@ -6,22 +6,23 @@
 
 static constexpr USED Sym INTRIN[] = {
   // Specific to this CC.
-  INTRIN_BRACE,             // {
-  INTRIN_COMP_SIGNATURE,    // comp_word_sig
-  INTRIN_COMP_ARGS_VALID,   // comp_args_valid
-  INTRIN_COMP_ARGS_GET,     // comp_args_get
-  INTRIN_COMP_ARGS_SET,     // comp_args_set
-  INTRIN_COMP_NEXT_ARG_REG, // comp_next_arg_reg
-  INTRIN_COMP_SCRATCH_REG,  // comp_scratch_reg
-  INTRIN_COMP_CLOBBER,      // comp_clobber
-  INTRIN_COMP_BARRIER,      // comp_barrier
-  INTRIN_COMP_LOCAL_GET,    // comp_local_get
-  INTRIN_COMP_LOCAL_SET,    // comp_local_set
-  INTRIN_COMP_LOCAL_FREE,   // comp_local_free
-  INTRIN_ALLOCA,            // alloca
-  INTRIN_DEBUG_CTX,         // debug_ctx
-  INTRIN_DEBUG_CTX_IMM,     // #debug_ctx
-  INTRIN_DEBUG_ARG,         // debug_arg
+  INTRIN_BRACE,              // {
+  INTRIN_COMP_SIGNATURE_GET, // comp_signature_get
+  INTRIN_COMP_SIGNATURE_SET, // comp_signature_set
+  INTRIN_COMP_ARGS_VALID,    // comp_args_valid
+  INTRIN_COMP_ARGS_GET,      // comp_args_get
+  INTRIN_COMP_ARGS_SET,      // comp_args_set
+  INTRIN_COMP_NEXT_ARG_REG,  // comp_next_arg_reg
+  INTRIN_COMP_SCRATCH_REG,   // comp_scratch_reg
+  INTRIN_COMP_CLOBBER,       // comp_clobber
+  INTRIN_COMP_BARRIER,       // comp_barrier
+  INTRIN_COMP_LOCAL_GET,     // comp_local_get
+  INTRIN_COMP_LOCAL_SET,     // comp_local_set
+  INTRIN_COMP_LOCAL_FREE,    // comp_local_free
+  INTRIN_ALLOCA,             // alloca
+  INTRIN_DEBUG_CTX,          // debug_ctx
+  INTRIN_DEBUG_CTX_IMM,      // #debug_ctx
+  INTRIN_DEBUG_ARG,          // debug_arg
 
   // Shared.
   INTRIN_COLON,             // :
@@ -33,10 +34,11 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_BRACKET_END,       // ]
   INTRIN_RET,               // #ret
   INTRIN_RECUR,             // #recur
-  INTRIN_COMP_ONLY,         // comp_only
-  INTRIN_NOT_COMP_ONLY,     // not_comp_only
-  INTRIN_INLINE,            // inline
+  INTRIN_CATCH,             // catch
+  INTRIN_THROW,             // throw
   INTRIN_THROWS,            // throws
+  INTRIN_COMP_ONLY,         // comp_only
+  INTRIN_INLINE,            // inline
   INTRIN_REDEFINE,          // redefine
   INTRIN_HERE,              // here
   INTRIN_COMP_INSTR,        // comp_instr

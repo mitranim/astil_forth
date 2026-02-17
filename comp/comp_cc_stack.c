@@ -4,6 +4,7 @@ which is mutually exclusive with the register-based callvention.
 */
 #pragma once
 #include "./arch.c"
+#include "./arch_arm64.h"
 #include "./comp.c"
 #include "./lib/dict.c"
 
@@ -87,31 +88,47 @@ static Err comp_call_intrin(Interp *interp, const Sym *callee) {
   typedef Err(Fun)(Interp *);
   const auto fun = (Fun *)callee->intrin;
   const auto err = fun(interp);
-  return callee->throws ? err : nullptr;
+  if (callee->err == ERR_MODE_THROW) return err;
+  return nullptr;
 }
 
-static Err comp_append_call_norm(Comp *comp, const Sym *callee, bool *inlined) {
+/*
+This doesn't merge all clobbers from the callee because it would be a lie:
+in stack-CC, we don't actually track all register clobbers. We do however
+track the one we care about: the error reg.
+*/
+static void comp_add_clobbers(Sym *caller, const Sym *callee) {
+  IF_DEBUG(aver(caller->type == SYM_NORM));
+  const auto reg = ARCH_REG_ERR;
+  if (bits_has(callee->clobber, reg)) bits_add_to(&caller->clobber, reg);
+}
+
+static Err comp_append_call_norm(
+  Comp *comp, const Sym *callee, bool catch, bool *inlined
+) {
   IF_DEBUG(aver(callee->type == SYM_NORM));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
 
   if (callee->norm.inlinable) {
-    try(comp_inline_sym(comp, callee));
+    try(comp_inline_sym(comp, caller, callee, catch));
     if (inlined) *inlined = true;
   }
   else {
-    try(asm_append_call_norm(comp, caller, callee));
+    try(asm_append_call_norm(comp, caller, callee, catch));
     if (inlined) *inlined = false;
   }
+  comp_add_clobbers(caller, callee);
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, const Sym *callee) {
+static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool catch) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
-  asm_append_call_intrin(comp, caller, callee);
+  try(asm_append_call_intrin(comp, caller, callee, catch));
+  comp_add_clobbers(caller, callee);
   return nullptr;
 }
 
@@ -120,5 +137,6 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   asm_append_call_extern(comp, caller, callee);
+  comp_add_clobbers(caller, callee);
   return nullptr;
 }

@@ -118,12 +118,15 @@ static Err read_interp_num(Interp *interp) {
   return nullptr;
 }
 
-static Err err_sym_comp_only(const char *name) {
-  return errf(
-    "unsupported use of compile-only word " FMT_QUOTED
-    " outside a colon definition",
-    name
-  );
+static Err interp_require_current_sym(const Interp *interp, Sym **out) {
+  return comp_require_current_sym(&interp->comp, out);
+}
+
+static Err interp_throws(Interp *interp, bool val) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  try(sym_throws(sym, val));
+  return nullptr;
 }
 
 static Err interp_call_norm(Interp *interp, const Sym *sym) {
@@ -185,6 +188,14 @@ static Err interp_call_extern(Interp *interp, const Sym *sym) {
   return err;
 }
 
+static Err err_sym_comp_only(const char *name) {
+  return errf(
+    "unsupported use of compile-only word " FMT_QUOTED
+    " outside a colon definition",
+    name
+  );
+}
+
 static Err interp_call_sym(Interp *interp, const Sym *sym) {
   const auto comp = &interp->comp;
 
@@ -198,10 +209,6 @@ static Err interp_call_sym(Interp *interp, const Sym *sym) {
     case SYM_EXTERN: return interp_call_extern(interp, sym);
     default:         unreachable();
   }
-}
-
-static Err interp_require_current_sym(const Interp *interp, Sym **out) {
-  return comp_require_current_sym(&interp->comp, out);
 }
 
 static Err err_word_undefined(const char *name) {
@@ -563,8 +570,6 @@ static Err interp_get_local(
   if (out) *out = loc;
   return nullptr;
 }
-
-static void debug_mem_at_ind(const Uint *adr, Ind ind) {}
 
 static void debug_mem_at(const Uint *adr) {
   eprintf("[debug] memory at address %p:\n", adr);

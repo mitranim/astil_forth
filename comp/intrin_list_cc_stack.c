@@ -14,10 +14,11 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_BRACKET_END,       // ]
   INTRIN_RET,               // #ret
   INTRIN_RECUR,             // #recur
-  INTRIN_COMP_ONLY,         // comp_only
-  INTRIN_NOT_COMP_ONLY,     // not_comp_only
-  INTRIN_INLINE,            // inline
+  INTRIN_CATCH,             // catch
+  INTRIN_THROW,             // throw
   INTRIN_THROWS,            // throws
+  INTRIN_COMP_ONLY,         // comp_only
+  INTRIN_INLINE,            // inline
   INTRIN_REDEFINE,          // redefine
   INTRIN_HERE,              // here
   INTRIN_COMP_INSTR,        // comp_instr

@@ -473,16 +473,15 @@ and locals in one `stp` / `ldp` instruction with a pre/post index, whose range
 is limited to [-512,504]. The frame record takes 16. When exceeding this size,
 we have to use another instruction.
 */
-// static constexpr Ind ASM_MAX_LOAD_STORE_PAIR_OFF = 488;
-static constexpr Ind ASM_MAX_LOAD_STORE_PAIR_OFF = 504;
+static constexpr USED Ind ASM_MAX_LOAD_STORE_PAIR_OFF = 504;
 
 // Opcode at bit 22 for the `ldp` / `stp` instructions.
-static constexpr Instr ASM_LOAD_PAIR_POST  = 0b001'1;
-static constexpr Instr ASM_LOAD_PAIR_PRE   = 0b011'1;
-static constexpr Instr ASM_LOAD_PAIR_OFF   = 0b010'1;
-static constexpr Instr ASM_STORE_PAIR_POST = 0b001'0;
-static constexpr Instr ASM_STORE_PAIR_PRE  = 0b011'0;
-static constexpr Instr ASM_STORE_PAIR_OFF  = 0b010'0;
+static constexpr USED Instr ASM_LOAD_PAIR_POST  = 0b001'1;
+static constexpr USED Instr ASM_LOAD_PAIR_PRE   = 0b011'1;
+static constexpr USED Instr ASM_LOAD_PAIR_OFF   = 0b010'1;
+static constexpr USED Instr ASM_STORE_PAIR_POST = 0b001'0;
+static constexpr USED Instr ASM_STORE_PAIR_PRE  = 0b011'0;
+static constexpr USED Instr ASM_STORE_PAIR_OFF  = 0b010'0;
 
 /*
 All variants of the `ldp` / `stp` instructions.
@@ -564,7 +563,7 @@ static void asm_append_branch_link_to_reg(Comp *comp, U8 reg) {
   asm_append_instr(comp, base | ((Instr)reg << 5));
 }
 
-static Instr asm_compare_branch(U8 reg, Sint off, bool non_zero) {
+static Instr asm_instr_compare_branch(U8 reg, Sint off, bool non_zero) {
   averr(arch_validate_reg(reg));
 
   Instr imm;
@@ -578,37 +577,37 @@ static Instr asm_compare_branch(U8 reg, Sint off, bool non_zero) {
   return (Instr)0b1'011010'0'0000000000000000000'00000 | op | (imm << 5) | reg;
 }
 
-static Instr asm_compare_branch_zero(U8 reg, Sint off) {
-  return asm_compare_branch(reg, off, false);
+static Instr asm_instr_compare_branch_zero(U8 reg, Sint off) {
+  return asm_instr_compare_branch(reg, off, false);
 }
 
-static Instr asm_compare_branch_non_zero(U8 reg, Sint off) {
-  return asm_compare_branch(reg, off, true);
+static Instr asm_instr_compare_branch_non_zero(U8 reg, Sint off) {
+  return asm_instr_compare_branch(reg, off, true);
 }
 
 static void asm_append_compare_branch(
   Comp *comp, U8 reg, Sint off, bool non_zero
 ) {
-  asm_append_instr(comp, asm_compare_branch(reg, off, non_zero));
+  asm_append_instr(comp, asm_instr_compare_branch(reg, off, non_zero));
 }
 
 static void asm_append_compare_branch_zero(Comp *comp, U8 reg, Sint off) {
-  asm_append_instr(comp, asm_compare_branch_zero(reg, off));
+  asm_append_instr(comp, asm_instr_compare_branch_zero(reg, off));
 }
 
 static void asm_append_compare_branch_non_zero(Comp *comp, U8 reg, Sint off) {
-  asm_append_instr(comp, asm_compare_branch_non_zero(reg, off));
+  asm_append_instr(comp, asm_instr_compare_branch_non_zero(reg, off));
 }
 
-static const Instr *asm_sym_epilogue_writable(const Comp *comp, const Sym *sym) {
-  aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&comp->code.code_write, sym->norm.spans.epilogue);
-}
+// static const Instr *asm_sym_epilogue_writable(const Comp *comp, const Sym *sym) {
+//   aver(sym->type == SYM_NORM);
+//   return list_elem_ptr(&comp->code.code_write, sym->norm.spans.epilogue);
+// }
 
-static const Instr *asm_sym_epilogue_executable(const Comp *comp, const Sym *sym) {
-  aver(sym->type == SYM_NORM);
-  return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.epilogue);
-}
+// static const Instr *asm_sym_epilogue_executable(const Comp *comp, const Sym *sym) {
+//   aver(sym->type == SYM_NORM);
+//   return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.epilogue);
+// }
 
 static Instr *asm_sym_prologue_writable(const Comp *comp, const Sym *sym) {
   aver(sym->type == SYM_NORM);
@@ -634,38 +633,6 @@ static Instr asm_instr_breakpoint(Instr imm) {
 
 static Instr *asm_append_breakpoint(Comp *comp, Instr imm) {
   return asm_append_instr(comp, asm_instr_breakpoint(imm));
-}
-
-static void asm_fixup_ret(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_RET));
-
-  const auto epi = asm_sym_epilogue_writable(comp, sym);
-  const auto tar = fix->ret;
-  const auto off = epi - tar;
-
-  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET)));
-  *tar = asm_instr_branch_to_offset(off);
-}
-
-static void asm_fixup_try(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_TRY));
-
-  const auto epi = asm_sym_epilogue_writable(comp, sym);
-  const auto tar = fix->try;
-  const auto off = epi - tar;
-
-  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_TRY)));
-  *tar = asm_compare_branch_non_zero(ARCH_REG_ERR, off);
-}
-
-static void asm_fixup_recur(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_RECUR));
-
-  const auto tar = fix->recur;
-  const auto off = asm_sym_prologue_writable(comp, sym) - tar;
-
-  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RECUR)));
-  *tar = asm_instr_branch_link_to_offset(off);
 }
 
 static void asm_fixup_load(Comp *comp, const Asm_fixup *fix, Sym *sym) {
@@ -696,6 +663,42 @@ static void asm_fixup_load(Comp *comp, const Asm_fixup *fix, Sym *sym) {
   *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30) |
     (imm19 << 5) | imm->reg;
   sym->norm.has_loads = true;
+}
+
+static void asm_fixup_ret(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == ASM_FIX_RET));
+  IF_DEBUG(aver(sym->type == SYM_NORM));
+
+  const auto code = &comp->code.code_write;
+  const auto epi  = list_elem_ptr(code, sym->norm.spans.epi_ok);
+  const auto tar  = fix->ret;
+  const auto off  = epi - tar;
+
+  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET)));
+  *tar = asm_instr_branch_to_offset(off);
+}
+
+static void asm_fixup_recur(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == ASM_FIX_RECUR));
+
+  const auto tar = fix->recur;
+  const auto off = asm_sym_prologue_writable(comp, sym) - tar;
+
+  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RECUR)));
+  *tar = asm_instr_branch_link_to_offset(off);
+}
+
+static void asm_fixup_try(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == ASM_FIX_TRY));
+  IF_DEBUG(aver(sym->type == SYM_NORM));
+
+  const auto code  = &comp->code.code_write;
+  const auto epi   = list_elem_ptr(code, sym->norm.spans.epi_err);
+  const auto instr = fix->try.instr;
+  const auto off   = epi - instr;
+
+  IF_DEBUG(aver(*instr == asm_instr_breakpoint(ASM_CODE_TRY)));
+  *instr = asm_instr_compare_branch_non_zero(fix->try.err_reg, off);
 }
 
 static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
@@ -893,10 +896,19 @@ static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
   return true;
 }
 
+// TODO restructure to avoid the need for forward declarations.
+static void asm_append_sym_epilogue_ok(Comp *, Sym *);
+
 // SYNC[asm_prologue_epilogue].
 static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
   const auto sp_off = asm_sp_off(comp->ctx.fp_off);
   const bool frame  = !is_sym_leaf(sym) || sp_off || sym->norm.has_alloca;
+  const auto spans  = &sym->norm.spans;
+  const auto write  = &comp->code.code_write;
+
+  spans->epi_ok = write->len;
+  asm_append_sym_epilogue_ok(comp, sym);
+  spans->epi_err = write->len;
 
   // SYNC[asm_sp_off].
   if (frame) {
@@ -1044,23 +1056,44 @@ static void asm_append_add(Comp *comp, U8 tar_reg, U8 src_reg, Sint imm) {
 
 static void asm_append_zero_reg(Comp *comp, U8 reg) {
   averr(arch_validate_reg(reg));
+
+  // eor <reg>, <reg>, <reg>
   const auto ireg  = (Instr)reg;
   const auto base  = (Instr)0b1'10'01010'00'0'00000'000000'00000'00000;
   const auto instr = base | (ireg << 16) | (ireg << 5) | ireg;
   asm_append_instr(comp, instr);
 }
 
-static void asm_append_try(Comp *comp) {
+static void asm_append_fixup_try(Comp *comp, U8 reg) {
   stack_push(
     &comp->ctx.asm_fix,
     (Asm_fixup){
-      .type = ASM_FIX_TRY,
-      .try  = asm_append_breakpoint(comp, ASM_CODE_TRY),
+      .type        = ASM_FIX_TRY,
+      .try.err_reg = reg,
+      // cbnz <err>, <epi_err>
+      .try.instr = asm_append_breakpoint(comp, ASM_CODE_TRY),
     }
   );
 }
 
-static Err asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
+static void asm_append_fixup_throw(Comp *comp) {
+  stack_push(
+    &comp->ctx.asm_fix,
+    (Asm_fixup){
+      .type  = ASM_FIX_THROW,
+      .throw = asm_append_breakpoint(comp, ASM_CODE_THROW), // b <err_epi>
+    }
+  );
+}
+
+// TODO restructure to avoid the need for forward declarations.
+static Err asm_append_try_catch(
+  Comp *comp, Sym *caller, const Sym *callee, bool catch
+);
+
+static Err asm_append_call_norm(
+  Comp *comp, Sym *caller, const Sym *callee, bool catch
+) {
   try(comp_code_ensure_sym_ready(&comp->code, callee));
 
   const auto code   = &comp->code;
@@ -1070,7 +1103,7 @@ static Err asm_append_call_norm(Comp *comp, Sym *caller, const Sym *callee) {
   aver(comp_code_is_instr_ours(code, fun));
   asm_append_branch_link_to_offset(comp, pc_off);
   asm_register_call(comp, caller);
-  if (callee->throws) asm_append_try(comp);
+  try(asm_append_try_catch(comp, caller, callee, catch));
 
   IF_DEBUG(eprintf(
     "[system] in " FMT_QUOTED ": appended call to " FMT_QUOTED
@@ -1107,10 +1140,10 @@ static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
 }
 
 // Simple, naive inlining without support for relocation.
-static Err asm_inline_sym(Comp *comp, const Sym *sym) {
-  try(validate_sym_inlinable(sym));
+static Err asm_inline_sym(Comp *comp, Sym *caller, const Sym *callee, bool catch) {
+  try(validate_sym_inlinable(callee));
 
-  const auto spans  = &sym->norm.spans;
+  const auto spans  = &callee->norm.spans;
   const auto instrs = &comp->code.code_write;
   const auto floor  = spans->inner;
   const auto ceil   = spans->ret;
@@ -1118,19 +1151,20 @@ static Err asm_inline_sym(Comp *comp, const Sym *sym) {
   for (Ind ind = floor; ind < ceil; ind++) {
     list_push(instrs, instrs->dat[ind]);
   }
-  if (sym->throws) asm_append_try(comp);
+
+  try(asm_append_try_catch(comp, caller, callee, catch));
 
   IF_DEBUG({
     if (floor == ceil) {
       eprintf(
         "[system] skipped inlining " FMT_QUOTED ": zero useful instructions\n",
-        sym->name.buf
+        callee->name.buf
       );
     }
     else {
       eprintf(
         "[system] inlined word " FMT_QUOTED "; instructions (" FMT_IND "):\n",
-        sym->name.buf,
+        callee->name.buf,
         ceil - floor
       );
       eprint_byte_range_hex((U8 *)&instrs->dat[floor], (U8 *)&instrs->dat[ceil]);
@@ -1146,9 +1180,69 @@ static Err asm_inline_sym(Comp *comp, const Sym *sym) {
 #include "./arch_arm64_cc_stack.c" // IWYU pragma: export
 #endif
 
+static Err err_catch_no_throw(const char *callee) {
+  return errf(
+    "useless attempt to catch an error when calling word " FMT_QUOTED
+    " which does not throw",
+    callee
+  );
+}
+
+// Must be used after compiling every call to a non-extern procedure.
+static Err asm_append_try_catch(
+  Comp *comp, Sym *caller, const Sym *callee, bool force_catch
+) {
+  if (force_catch) {
+    if (callee->err != ERR_MODE_THROW) {
+      return err_catch_no_throw(callee->name.buf);
+    }
+    asm_append_catch(comp, caller, callee);
+    return nullptr;
+  }
+
+  if (callee->err != ERR_MODE_THROW) return nullptr;
+
+  switch (caller->err) {
+    case ERR_MODE_NONE: {
+      caller->err = ERR_MODE_THROW;
+      asm_append_try(comp, caller, callee);
+      return nullptr;
+    }
+
+    case ERR_MODE_THROW: {
+      asm_append_try(comp, caller, callee);
+      return nullptr;
+    }
+
+    case ERR_MODE_NO_THROW: {
+      asm_append_catch(comp, caller, callee);
+      return nullptr;
+    }
+
+    default: unreachable();
+  }
+}
+
+static void asm_fixup_throw(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
+  IF_DEBUG(aver(fix->type == ASM_FIX_THROW));
+  IF_DEBUG(aver(sym->type == SYM_NORM));
+
+  const auto code  = &comp->code.code_write;
+  const auto epi   = list_elem_ptr(code, sym->norm.spans.epi_err);
+  const auto instr = fix->throw;
+  const auto off   = epi - instr;
+
+  IF_DEBUG(aver(*instr == asm_instr_breakpoint(ASM_CODE_THROW)));
+  *instr = asm_instr_branch_to_offset(off);
+}
+
 static void asm_fixup(Comp *comp, Sym *sym) {
   for (stack_range(auto, fix, &comp->ctx.asm_fix)) {
     switch (fix->type) {
+      case ASM_FIX_IMM: {
+        asm_fixup_load(comp, fix, sym);
+        continue;
+      }
       case ASM_FIX_RET: {
         asm_fixup_ret(comp, fix, sym);
         continue;
@@ -1157,12 +1251,12 @@ static void asm_fixup(Comp *comp, Sym *sym) {
         asm_fixup_try(comp, fix, sym);
         continue;
       }
-      case ASM_FIX_RECUR: {
-        asm_fixup_recur(comp, fix, sym);
+      case ASM_FIX_THROW: {
+        asm_fixup_throw(comp, fix, sym);
         continue;
       }
-      case ASM_FIX_IMM: {
-        asm_fixup_load(comp, fix, sym);
+      case ASM_FIX_RECUR: {
+        asm_fixup_recur(comp, fix, sym);
         continue;
       }
       default: unreachable();
@@ -1185,11 +1279,16 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   const auto write = &code->code_write;
   const auto spans = &sym->norm.spans;
 
+  if (sym->err == ERR_MODE_THROW) {
+    const auto reg = arch_sym_err_reg(sym);
+    if (reg >= 0) bits_add_to(&sym->clobber, (U8)reg);
+  }
+
+// TODO organize better, preferably by ripping out stack-CC.
 #ifdef NATIVE_CALL_CONV
   asm_fixup_locals(comp, sym);
 #endif
 
-  spans->epilogue = write->len;
   asm_fixup_sym_prologue(comp, sym, &spans->prologue);
   asm_append_sym_epilogue(comp, sym);
 
@@ -1204,4 +1303,5 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   IF_DEBUG(asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM));
 
   code->valid_instr_len = write->len;
+  sym->norm.exec        = asm_sym_prologue_executable(comp, sym);
 }

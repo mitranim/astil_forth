@@ -16,6 +16,7 @@ The special registers are also hardcoded in `lang_s.f`.
 #include "./interp.h"
 #include "./lib/err.h"
 #include "./lib/num.h"
+#include "./sym.h"
 
 #ifdef CLANGD
 #include "./arch_arm64.c"
@@ -69,6 +70,45 @@ static void asm_append_local_write(Comp *comp, Ind off) {
   asm_append_store_scaled_offset(comp, ARCH_SCRATCH_REG_8, ARCH_REG_FP, off);
 }
 
+static S8 arch_sym_err_reg(const Sym *sym) {
+  if (sym->err != ERR_MODE_THROW) return -1;
+  return ARCH_REG_ERR;
+}
+
+/*
+Callers which don't officially throw nevertheless often clobber the error
+register. In reg-CC, we track the clobbers, whereas in stack-CC we simply
+always zero the register, so that outer callers don't mistake its clobber
+value for an error.
+*/
+static void asm_append_sym_epilogue_ok(Comp *comp, Sym *sym) {
+  if (!bits_has(sym->clobber, ARCH_REG_ERR)) return;
+  asm_append_zero_reg(comp, ARCH_REG_ERR);
+}
+
+static void asm_append_throw(Comp *comp) {
+  asm_append_stack_pop_into(comp, ARCH_REG_ERR);
+  asm_append_fixup_throw(comp); // b <err_epi>
+}
+
+static void asm_append_try(Comp *comp, const Sym *caller, const Sym *callee) {
+  IF_DEBUG(aver(caller->err == ERR_MODE_THROW));
+  IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
+  asm_append_fixup_try(comp, ARCH_REG_ERR); // cbnz <err>, <err_epi>
+}
+
+static void asm_append_catch(Comp *comp, const Sym *caller, const Sym *callee) {
+  (void)caller;
+  (void)callee;
+
+  IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
+
+  // Don't need to zero the error register here,
+  // because that's done in the word epilogue in
+  // the success case.
+  asm_append_stack_push_from(comp, ARCH_REG_ERR);
+}
+
 static void asm_append_call_intrin_before(Comp *comp) {
   asm_append_store_scaled_offset(
     comp, ARCH_REG_INT_TOP, ARCH_REG_INTERP, INTERP_INTS_TOP
@@ -85,8 +125,8 @@ static void asm_append_call_intrin_after(Comp *comp) {
 TODO: words which contain such calls may not appear in compiled executables.
 We detect these calls and set `Sym.interp_only` for later use.
 */
-static void asm_append_call_intrin(
-  Comp *comp, const Sym *caller, const Sym *callee
+static Err asm_append_call_intrin(
+  Comp *comp, Sym *caller, const Sym *callee, bool catch
 ) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
 
@@ -98,9 +138,8 @@ static void asm_append_call_intrin(
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
   asm_append_call_intrin_after(comp);
-
-  if (callee->throws) asm_append_try(comp);
-  else asm_append_zero_reg(comp, ARCH_REG_ERR);
+  try(asm_append_try_catch(comp, caller, callee, catch));
+  return nullptr;
 }
 
 static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
@@ -128,5 +167,10 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
   if (out_len) asm_append_stack_push_from(comp, ARCH_REG_ERR);
-  asm_append_zero_reg(comp, ARCH_REG_ERR);
+
+  /*
+  Extern procedures always clobber the error register. We don't need to
+  zero it here, because that's done in the epilogue in the success case.
+  See `asm_append_sym_epilogue_ok`.
+  */
 }

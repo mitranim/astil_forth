@@ -1,6 +1,8 @@
 -std=c2y
 -funsigned-char
 -Weverything
+-Wunused-parameter
+-Wunused-variable
 -Werror=return-type
 -Werror=format-insufficient-args
 -Wno-pre-c23-compat
