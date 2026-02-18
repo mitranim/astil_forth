@@ -120,6 +120,26 @@ It's trivial to declare and call extern procedures. Examples can be found in the
 main
 ```
 
+## Exceptions done right: ABI compatibility
+
+When using the register-based calling convention, you can _out of exceptions_ for individual words. Every call is "caught", and error values are always explicit.
+
+```
+: word [ false throws ]
+  word0 {           err }
+  word1 { val0      err }
+  word2 { val1 val2 err }
+;
+```
+
+Under the hood, an exception is a Go-style error value, implicitly appended to the success outputs. By default it's invisible and treated as an exception. When you "catch", the compiler reveals the error value, and skips the instructions it would normally insert to handle the error. A call becomes Go-style, as shown above. The caller has to check the error.
+
+The resulting system is an exact inverse of Go (and Rust). By default, errors are exceptions and don't clutter the code. When you want explicit errors, it's _for real_, without hidden panics. There is no separate panic mechanism, no stack unwinder. At the ABI level, caller code always has local control.
+
+The best part is cross-language ABI compatibility. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to libc and guarantee no surprises, such as a panic handler unwinding the C stack.
+
+This is fairly easy to implement. Not aware of any other language with this feature, which is weird. I think it's the only reasonable way of doing error handling.
+
 ## Limitations
 
 ### Simplicity vs optimization
