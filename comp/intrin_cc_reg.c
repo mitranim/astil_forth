@@ -163,6 +163,16 @@ static Err intrin_comp_only(bool val, Interp *interp) {
   return nullptr;
 }
 
+/*
+Caution: unlike in other Forth systems, `here` is not an executable address.
+Executable code is copied to a different memory page when finalizing a word.
+*/
+static Err intrin_here(Interp *interp, Instr **out) {
+  if (!out) return nullptr;
+  *out = comp_code_next_writable_instr(&interp->comp.code);
+  return nullptr;
+}
+
 static Err intrin_comp_instr(Instr instr, Interp *interp) {
   asm_append_instr(&interp->comp, instr);
   return nullptr;
@@ -180,15 +190,10 @@ static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp) {
-  if (buf) {
-    try(interp_validate_data_ptr(buf));
-  }
+static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp, const U8 **adr) {
+  if (buf) try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
-
-  const U8 *adr;
-  try(comp_alloc_data(&interp->comp, (const U8 *)buf, (Ind)len, &adr));
-  try(int_stack_push(&interp->ints, (Sint)adr));
+  try(comp_alloc_data(&interp->comp, (const U8 *)buf, (Ind)len, adr));
   return nullptr;
 }
 
@@ -224,9 +229,26 @@ static Err intrin_comp_call(Sint ptr, Interp *interp) {
   return comp_append_call_sym(&interp->comp, sym);
 }
 
-static Err intrin_parse(Sint delim, Interp *interp) {
+static Err intrin_char(Interp *interp, Sint *out) {
+  char byte;
+  try(interp_char(interp, &byte));
+  if (out) *out = byte;
+  return nullptr;
+}
+
+static Err intrin_parse(Sint delim, Interp *interp, const char **buf, Sint *len) {
+  Ind len_tmp;
   try(validate_char_ascii_printable(delim));
-  try(interp_parse_until(interp, (U8)delim));
+  try(interp_parse_until(interp, (U8)delim, buf, &len_tmp));
+  if (len) *len = len_tmp;
+  return nullptr;
+}
+
+// Technically not fundamental. TODO implement in Forth via intrinsic `char`.
+static Err intrin_parse_word(Interp *interp, const char **buf, Sint *len) {
+  Ind len_tmp;
+  try(interp_parse_word(interp, buf, &len_tmp));
+  if (len) *len = len_tmp;
   return nullptr;
 }
 
@@ -240,10 +262,12 @@ static Err intrin_import(Sint buf, Sint len, Interp *interp) {
 }
 
 // See comment on `interp_extern_got` for explanation.
-static Err intrin_extern_got(Sint name, Sint len, Interp *interp) {
+static Err intrin_extern_got(
+  Sint name, Sint len, Interp *interp, const U64 **got_addr
+) {
   try(interp_validate_data_ptr(name));
   try(interp_validate_data_len(len));
-  try(interp_extern_got(interp, (const char *)name, (Ind)len));
+  try(interp_extern_got(interp, (const char *)name, (Ind)len, got_addr));
   return nullptr;
 }
 
@@ -252,10 +276,12 @@ static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_find_word(Sint buf, Sint len, Sint wordlist, Interp *interp) {
+static Err intrin_find_word(
+  Sint buf, Sint len, Wordlist wordlist, Interp *interp, const Sym **sym
+) {
   try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
-  try(interp_find_word(interp, (const char *)buf, (Ind)len, (Wordlist)wordlist));
+  try(interp_find_word(interp, (const char *)buf, (Ind)len, wordlist, sym));
   return nullptr;
 }
 
@@ -277,13 +303,13 @@ static Err intrin_execute(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_signature_get(Interp *interp) {
+static Err intrin_comp_signature_get(
+  Interp *interp, Sint *inp_len, Sint *out_len
+) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-
-  const auto ints = &interp->ints;
-  try(int_stack_push(ints, (Sint)sym->inp_len));
-  try(int_stack_push(ints, (Sint)sym->out_len));
+  if (inp_len) *inp_len = (Sint)sym->inp_len;
+  if (out_len) *out_len = (Sint)sym->out_len;
   return nullptr;
 }
 
@@ -309,8 +335,8 @@ static Err intrin_comp_args_valid(Sint action, Sint args, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_args_get(Interp *interp) {
-  try(int_stack_push(&interp->ints, interp->comp.ctx.arg_len));
+static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
+  if (arg_len) *arg_len = (Sint)interp->comp.ctx.arg_len;
   return nullptr;
 }
 
@@ -326,17 +352,17 @@ Used by words which compile other words. For example, "var" uses this to load
 its data address into the next argument register, playing nicely with our
 on-the-fly register allocation.
 */
-static Err intrin_comp_next_arg_reg(Interp *interp) {
+static Err intrin_comp_next_arg_reg(Interp *interp, Sint *out) {
   U8 reg;
   try(comp_next_arg_reg(&interp->comp, &reg));
-  try(int_stack_push(&interp->ints, reg));
+  if (out) *out = (Sint)reg;
   return nullptr;
 }
 
-static Err intrin_comp_scratch_reg(Interp *interp) {
+static Err intrin_comp_scratch_reg(Interp *interp, Sint *out) {
   U8 reg;
   try(comp_scratch_reg(&interp->comp, &reg));
-  try(int_stack_push(&interp->ints, reg));
+  if (out) *out = (Sint)reg;
   return nullptr;
 }
 
@@ -357,22 +383,21 @@ static Err intrin_comp_clobber(Sint reg, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_named_local(Sint buf, Sint len, Interp *interp) {
+static Err intrin_comp_named_local(
+  Sint buf, Sint len, Interp *interp, const Local **out
+) {
   Local *loc;
   try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
   try(interp_get_local(interp, (const char *)buf, (Ind)len, &loc));
-
-  const auto tok = local_token(loc);
-  try(int_stack_push(&interp->ints, (Sint)tok));
+  if (out) *out = local_token(loc);
   return nullptr;
 }
 
-static Err intrin_comp_anon_local(Interp *interp) {
+static Err intrin_comp_anon_local(Interp *interp, const Local **out) {
   const auto comp = &interp->comp;
   const auto loc  = comp_local_anon(comp);
-  const auto tok  = local_token(loc);
-  try(int_stack_push(&interp->ints, (Sint)tok));
+  if (out) *out = local_token(loc);
   return nullptr;
 }
 

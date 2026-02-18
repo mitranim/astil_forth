@@ -153,42 +153,50 @@ static Err arch_call_norm(Interp *interp, const Sym *sym) {
   return err;
 }
 
+// See `asm_append_call_intrin` for the explanation of the calling convention.
 static Err arch_call_intrin(Interp *interp, const Sym *sym) {
   aver(sym->type == SYM_INTRIN);
 
-  const auto ints = &interp->ints;
-  auto       ind  = sym->inp_len;
-  aver(ind < ARCH_INP_PARAM_REG_LEN);
+  const auto ints  = &interp->ints;
+  const auto throw = sym->err == ERR_MODE_THROW;
 
-  Sint args[ARCH_INP_PARAM_REG_LEN] = {};
-  args[ind]                         = (Sint)interp;
+  Sint inps[ARCH_INP_PARAM_REG_LEN] = {};
+  Sint outs[ARCH_OUT_PARAM_REG_LEN] = {};
 
-  while (ind) {
-    ind--;
-    try(int_stack_pop(ints, &args[ind]));
+  aver(sym->inp_len < ARCH_INP_PARAM_REG_LEN);
+  aver(sym->out_len < ARCH_OUT_PARAM_REG_LEN);
+
+  Ind inp = 0;
+  while (inp < sym->inp_len) {
+    // Pop in backward order.
+    const auto ind = sym->inp_len - 1 - inp;
+    try(int_stack_pop(ints, &inps[ind]));
+    inp++;
   }
 
-  Sint x0 = args[0];
-  Sint x1 = args[1];
-  Sint x2 = args[2];
-  Sint x3 = args[3];
-  Sint x4 = args[4];
-  Sint x5 = args[5];
-  Sint x6 = args[6];
-  Sint x7 = args[7];
+  aver(inp < ARCH_INP_PARAM_REG_LEN);
+  inps[inp++] = (Sint)interp;
 
-  /*
-  So we've just prepared the inputs, where are the outputs?
-  For now, intrinsics push outputs into the Forth data stack,
-  just like in the purely stack-based callvention.
+  Ind out = 0;
+  while (out < sym->out_len) {
+    aver((inp + out) < ARCH_INP_PARAM_REG_LEN);
+    inps[inp + out] = (Sint)&outs[out];
+    out++;
+  }
 
-  TODO: revise the convention; use callee-allocated stack pointers.
-  */
   typedef Err(Fun)(Sint, Sint, Sint, Sint, Sint, Sint, Sint, Sint);
-  const auto fun = (Fun *)sym->intrin;
-  const auto err = fun(x0, x1, x2, x3, x4, x5, x6, x7);
 
-  if (sym->err == ERR_MODE_THROW) return err;
+  const auto fun = (Fun *)sym->intrin;
+  const auto err = fun(
+    inps[0], inps[1], inps[2], inps[3], inps[4], inps[5], inps[6], inps[7]
+  );
+
+  if (throw) try(err);
+
+  out = 0;
+  while (out < sym->out_len) {
+    try(int_stack_push(ints, outs[out++]));
+  }
   return nullptr;
 }
 
@@ -277,72 +285,83 @@ static void asm_append_catch(Comp *comp, const Sym *caller, const Sym *callee) {
   IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
 }
 
-static void asm_append_call_intrin_output(Comp *comp, const Sym *callee) {
-  const auto len = callee->out_len;
-  if (!len) return;
+/*
+We use a custom calling convention for interpreter / compiler intrinsics.
+They're implemented in C and some of them want to return multiple outputs.
+The Arm64 ABI supports multiple outputs in general-purpose registers, but
+the C ABI is limited to 2 GPR outputs, using a two-field struct; for us,
+this means 1 output and 1 error. We have intrinsics with 2 outputs and 1
+error, which doesn't fit into the C ABI.
 
-  /*
-  We have many intrinsics which want to return `(val err)` in parameter
-  GPRs, which is possible in C under Arm64, using an output struct with
-  two fields. Unfortunately, we also have comp intrinsics which want to
-  return `(val0 val1 err)` in GPRs, which is not supported in C or C++;
-  compilers fall back on vector registers, even when using C++ tuples,
-  which count as structs.
+So instead, we stack-allocate outputs and pass pointers to them.
+The interpreter pointer is placed between inputs and outputs.
 
-  So for now, intrinsic outputs are just pushed into the Forth data stack.
-  This also makes it easier to reuse them between CC.
+Example call of `intrin_parse`:
 
-    ldr x8, [x28, INTERP_INTS_TOP]
-    ... ldr xN, [x8, -8]! ...
-    str x8, [x28, INTERP_INTS_TOP]
+  mov x0, <char>           -- input
+  mov x1, x28              -- interp
+  sub sp, sp, 16
+  add x2, sp, 0            -- out_buf
+  add x3, sp, 8            -- out_len
+  adrp & add & blr <parse>
+  add sp, sp, 16
+  cbnz x0, <epi_err>
+  ldur x0, [sp, -16]       -- out_buf
+  ldur x1, [sp, -8]        -- out_len
 
-  This obviously violates the idea of native-only calls and avoiding the use
-  of the data stack in compiled code. Our feeble excuse is that compiler
-  intrinsics are meant only for compile-only words, which are run only when
-  the interpreter actually exists. When / if we implement AOT compilation,
-  we can prove that interp-only words are not called from `main`, directly
-  or indirectly. So it should be both safe and not costly.
-  */
-  constexpr auto stack_reg = ARCH_SCRATCH_REG_8;
-  auto           out_reg   = len;
-  aver(out_reg < ARCH_OUT_PARAM_REG_LEN);
-
-  asm_append_load_unscaled_offset(
-    comp, stack_reg, ARCH_REG_INTERP, INTERP_INTS_TOP
-  );
-  while (out_reg) {
-    out_reg--;
-    asm_append_load_pre_post(comp, out_reg, stack_reg, -8);
-  }
-  asm_append_store_unscaled_offset(
-    comp, stack_reg, ARCH_REG_INTERP, INTERP_INTS_TOP
-  );
-}
-
-static Err asm_append_call_intrin_after(
-  Comp *comp, Sym *caller, const Sym *callee, bool catch
-) {
-  try(asm_append_try_catch(comp, caller, callee, catch));
-  asm_append_call_intrin_output(comp, callee);
-  return nullptr;
-}
-
+This comes with some ABI problems. The calling code always uses word-sized
+values and addressing. We need values to be loaded and stored in word-sized
+chunks. For example, when an output of an intrinsic describes a register and
+is `U8` in C, using `U8*` for the output is wrong; C would compile to `strb`
+when storing the output, resulting in the 7 upper bytes of the receiving
+address (under little endian) to be garbage. We need ALL stores of output
+values to be word-sized. Intrinsic procedures must define their output
+pointers appropriately.
+*/
 static Err asm_append_call_intrin(
   Comp *comp, Sym *caller, const Sym *callee, bool catch
 ) {
   aver(callee->type == SYM_INTRIN);
 
-  // Free to use because intrin calls clobber everything anyway.
-  constexpr auto reg = ARCH_SCRATCH_REG_8;
+  const auto inps   = callee->inp_len;
+  const auto outs   = callee->out_len;
+  const auto size   = sizeof(Sint);
+  const auto sp_off = asm_align_sp_off(size * outs);
 
-  // Under this callvention, our intrinsics always take `Interp*`
-  // as an additional "secret" parameter following immediately
-  // after the "official" parameters.
   asm_append_mov_reg(comp, callee->inp_len, ARCH_REG_INTERP);
-  asm_append_dysym_load(comp, callee->name.buf, reg);
-  asm_append_branch_link_to_reg(comp, reg);
+
+  if (sp_off) {
+    asm_append_sub_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
+
+    U8 out = 0;
+    while (out < outs) {
+      U8 reg = inps + 1 + out;
+      aver(reg < ARCH_INP_PARAM_REG_LEN);
+      asm_append_add_imm(comp, reg, ARCH_REG_SP, out * size);
+      out++;
+    }
+  }
+
+  // Free to use because intrin calls clobber everything anyway.
+  constexpr auto fun = ARCH_SCRATCH_REG_8;
+
+  asm_append_dysym_load(comp, callee->name.buf, fun);
+  asm_append_branch_link_to_reg(comp, fun);
+  if (sp_off) asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
+  try(asm_append_try_catch(comp, caller, callee, catch));
+
+  if (sp_off) {
+    U8 reg = 0;
+    while (reg < outs) {
+      const auto out_off = (Sint)(reg * size) - (Sint)sp_off;
+      aver(reg < ARCH_OUT_PARAM_REG_LEN);
+      aver(out_off < 0);
+      asm_append_load_unscaled_offset(comp, reg, ARCH_REG_SP, out_off);
+      reg++;
+    }
+  }
+
   asm_register_call(comp, caller);
-  try(asm_append_call_intrin_after(comp, caller, callee, catch));
   return nullptr;
 }
 

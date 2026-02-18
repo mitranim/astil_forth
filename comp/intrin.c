@@ -143,17 +143,6 @@ static Err intrin_redefine(Interp *interp) {
 }
 
 /*
-Caution: unlike in other Forth systems, `here` is not an executable address.
-Executable code is copied to a different memory page when finalizing a word.
-*/
-static Err intrin_here(Interp *interp) {
-  try(int_stack_push(
-    &interp->ints, (Sint)(comp_code_next_writable_instr(&interp->comp.code))
-  ));
-  return nullptr;
-}
-
-/*
 This intrinsic is unnecessary for most programs, as they can simply
 call the libc function `exit` or do a raw exit syscall. However, on
 the slim chance a C program wants to embed this interpreter and run
@@ -172,25 +161,21 @@ static Err err_char_eof() {
   return err_str("EOF where a character was expected");
 }
 
-static Err intrin_char(Interp *interp) {
+static Err interp_char(Interp *interp, char *out) {
   const auto read = interp->reader;
   U8         byte;
 
   try(read_ascii_printable(read, &byte));
   if (!byte) return err_char_eof();
-  try(int_stack_push(&interp->ints, byte));
+  if (out) *out = byte;
   return nullptr;
 }
 
-// Technically not fundamental. TODO implement in Forth via intrinsic `char`.
-static Err intrin_parse_word(Interp *interp) {
+static Err interp_parse_word(Interp *interp, const char **out_buf, Ind *out_len) {
   try(interp_read_word(interp));
-
   const auto word = &interp->reader->word;
-  const auto ints = &interp->ints;
-
-  try(int_stack_push(ints, (Sint)word->buf));
-  try(int_stack_push(ints, (Sint)word->len));
+  if (out_buf) *out_buf = word->buf;
+  if (out_len) *out_len = word->len;
   return nullptr;
 }
 

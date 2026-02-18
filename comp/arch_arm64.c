@@ -262,6 +262,7 @@ static Err arch_call_extern(Sint_stack *stack, const Sym *sym) {
   if (inp_len > 1) try(int_stack_pop(stack, &x1));
   if (inp_len > 0) try(int_stack_pop(stack, &x0));
 
+  // Unused inputs are harmless.
   const Sint out = fun(x0, x1, x2, x3, x4, x5, x6, x7);
   if (out_len) try(int_stack_push(stack, out));
   return nullptr;

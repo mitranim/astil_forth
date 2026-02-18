@@ -416,7 +416,9 @@ static Err interp_validate_sym_ptr(Interp *interp, Sym *sym) {
   return err_sym_out_bounds(syms->floor, syms->ceil, sym);
 }
 
-static Err interp_parse_until(Interp *interp, U8 delim) {
+static Err interp_parse_until(
+  Interp *interp, U8 delim, const char **out_buf, Ind *out_len
+) {
   const auto read = interp->reader;
   read_skip_space(read);
   try(read_until(read, (U8)delim));
@@ -430,8 +432,8 @@ static Err interp_parse_until(Interp *interp, U8 delim) {
   // ));
 
   const auto ints = &interp->ints;
-  try(int_stack_push(ints, (Sint)read->buf.buf));
-  try(int_stack_push(ints, (Sint)read->buf.len));
+  if (out_buf) *out_buf = read->buf.buf;
+  if (out_len) *out_len = read->buf.len;
 
   // IF_DEBUG({
   //   eprintf(
@@ -465,7 +467,9 @@ points to an entry in the GOT (global offset table), and must be used with
 intrinsics `intrin_comp_page_addr` or `intrin_comp_page_load` which compile
 instructions for accessing that entry.
 */
-static Err interp_extern_got(Interp *interp, const char *name, Ind len) {
+static Err interp_extern_got(
+  Interp *interp, const char *name, Ind len, const U64 **out_addr
+) {
   IF_DEBUG(aver((Sint)strlen(name) == len));
 
   const auto comp     = &interp->comp;
@@ -478,7 +482,7 @@ static Err interp_extern_got(Interp *interp, const char *name, Ind len) {
     IF_DEBUG(aver(*got_addr == (Uint)ext_addr));
   }
 
-  try(int_stack_push(&interp->ints, (Sint)got_addr));
+  if (out_addr) *out_addr = got_addr;
   return nullptr;
 }
 
@@ -525,7 +529,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
 }
 
 static Err interp_find_word(
-  Interp *interp, const char *name, Ind len, Wordlist wordlist
+  Interp *interp, const char *name, Ind len, Wordlist wordlist, const Sym **out
 ) {
   IF_DEBUG(aver((Sint)strlen(name) == len));
 
@@ -535,18 +539,6 @@ static Err interp_find_word(
   const auto sym = dict_get(dict, name);
   if (!sym) return err_word_undefined(name);
 
-  // For later. We don't want this as a default behavior,
-  // but we might need another intrinsic with this.
-  //
-  // if (!sym) {
-  //   IF_DEBUG(eprintf(
-  //     "[system] did not find " FMT_QUOTED " in wordlist %d\n", name, wordlist
-  //   ));
-  //
-  //   try(int_stack_push(&interp->ints, 0));
-  //   return nullptr;
-  // }
-
   IF_DEBUG(eprintf(
     "[system] found " FMT_QUOTED " in wordlist %d; address: %p\n",
     name,
@@ -554,7 +546,7 @@ static Err interp_find_word(
     sym
   ));
 
-  try(int_stack_push(&interp->ints, (Sint)sym));
+  if (out) *out = sym;
   return nullptr;
 }
 

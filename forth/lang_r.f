@@ -34,7 +34,7 @@
 
 : next_word { wlist -- XT } ( "word" -- XT ) parse_word wlist find_word ;
 
-:  tick_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push ;
+: tick_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push ;
 :  '  {    -- XT } (    "word" -- ) 1 next_word ; \ WORDLIST_EXEC
 :  '' {    -- XT } (    "word" -- ) 2 next_word ; \ WORDLIST_COMP
 :: '  ( E: -- XT ) ( C: "word" -- ) 1 tick_next ; \ WORDLIST_EXEC

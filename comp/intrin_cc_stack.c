@@ -156,6 +156,17 @@ static Err intrin_comp_only(Interp *interp) {
   return nullptr;
 }
 
+/*
+Caution: unlike in other Forth systems, `here` is not an executable address.
+Executable code is copied to a different memory page when finalizing a word.
+*/
+static Err intrin_here(Interp *interp) {
+  try(int_stack_push(
+    &interp->ints, (Sint)(comp_code_next_writable_instr(&interp->comp.code))
+  ));
+  return nullptr;
+}
+
 static Err intrin_comp_instr(Interp *interp) {
   Sint val;
   try(int_stack_pop(&interp->ints, &val));
@@ -228,6 +239,13 @@ static Err intrin_comp_call(Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_char(Interp *interp) {
+  char out;
+  try(interp_char(interp, &out));
+  try(int_stack_push(&interp->ints, out));
+  return nullptr;
+}
+
 /*
 Technically not fundamental and possible to write in Forth with `intrin_char`,
 but requires conditionals, character comparison, and a loop, none of which are
@@ -238,10 +256,28 @@ TODO: use `intrin_char` in Forth to implement a more powerful version
 which uses a string rather than a char as a delimiter.
 */
 static Err intrin_parse(Interp *interp) {
+  const auto ints = &interp->ints;
+
   Sint delim;
-  try(int_stack_pop(&interp->ints, &delim));
+  try(int_stack_pop(ints, &delim));
   try(validate_char_ascii_printable(delim));
-  try(interp_parse_until(interp, (U8)delim));
+
+  const char *buf;
+  Ind         len;
+  try(interp_parse_until(interp, (U8)delim, &buf, &len));
+  try(int_stack_push(ints, (Sint)buf));
+  try(int_stack_push(ints, (Sint)len));
+  return nullptr;
+}
+
+// Technically not fundamental. TODO implement in Forth via intrinsic `char`.
+static Err intrin_parse_word(Interp *interp) {
+  const auto  ints = &interp->ints;
+  const char *buf;
+  Ind         len;
+  try(interp_parse_word(interp, &buf, &len));
+  try(int_stack_push(ints, (Sint)buf));
+  try(int_stack_push(ints, (Sint)len));
   return nullptr;
 }
 
@@ -261,7 +297,10 @@ static Err intrin_extern_got(Interp *interp) {
   Ind         len;
   try(interp_pop_data_len(interp, &len));
   try(interp_pop_data_ptr(interp, (const U8 **)&name));
-  try(interp_extern_got(interp, name, len));
+
+  const U64 *got_addr;
+  try(interp_extern_got(interp, name, len, &got_addr));
+  try(int_stack_push(&interp->ints, (Sint)got_addr));
   return nullptr;
 }
 
@@ -282,7 +321,10 @@ static Err intrin_find_word(Interp *interp) {
   try(interp_pop_data_len(interp, &len));
   try(interp_pop_data_ptr(interp, &buf));
   try(int_stack_pop(&interp->ints, &wordlist));
-  try(interp_find_word(interp, (const char *)buf, len, (Wordlist)wordlist));
+
+  const Sym *sym;
+  try(interp_find_word(interp, (const char *)buf, len, (Wordlist)wordlist, &sym));
+  try(int_stack_push(&interp->ints, (Sint)sym));
   return nullptr;
 }
 
