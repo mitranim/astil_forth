@@ -349,6 +349,36 @@ test_loop_countup_nested
 ;
 test_loop_countdown
 
+: test_cont_loop
+  T{
+    -1
+    loop
+      inc dup
+      dup 7 < if cont end
+      leave
+    end
+    drop
+    <T>
+    0 1 2 3 4 5 6 7
+  }T
+;
+test_cont_loop
+
+: test_cont_for
+  T{
+    -1
+    7 for
+      inc dup
+      cont
+      leave
+    end
+    drop
+    <T>
+    0 1 2 3 4 5 6
+  }T
+;
+test_cont_for
+
 : test_sc 10 20 30 stack_len .sc ;
 \ test_sc
 

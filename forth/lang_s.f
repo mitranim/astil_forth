@@ -1073,21 +1073,21 @@
 0 var: COND_HAS
 
 \ cbz x1, <else|end>
-: if_patch ( adr_if -- ) dup off_to_pc 1 swap asm_cmp_branch_zero swap !32 ;
+: if_patch ( if_adr -- ) dup off_to_pc 1 swap asm_cmp_branch_zero swap !32 ;
 
 \ cbnz x1, <else|end>
-: ifn_patch ( adr_ifn -- ) dup off_to_pc 1 swap asm_cmp_branch_not_zero swap !32 ;
+: ifn_patch ( ifn_adr -- ) dup off_to_pc 1 swap asm_cmp_branch_not_zero swap !32 ;
 
 : if_done ( cond_prev -- ) COND_HAS ! ;
-: if_pop  ( fun_prev adr_if  -- ) if_patch execute ;
-: ifn_pop ( fun_prev adr_ifn  -- ) ifn_patch execute ;
+: if_pop  ( prev_fun if_adr  -- ) if_patch execute ;
+: ifn_pop ( prev_fun ifn_adr  -- ) ifn_patch execute ;
 : if_init COND_HAS @ COND_HAS on! ' if_done ;
 
-:: elif ( C: -- fun_exec adr_elif fun_elif ) ( E: pred -- )
+:: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
   ' execute reserve_cond ' if_pop
 ;
 
-:: elifn ( C: -- fun_exec adr_elif fun_elif ) ( E: pred -- )
+:: elifn ( C: -- exec_fun elifn_adr elifn_fun ) ( E: pred -- )
   ' execute reserve_cond ' ifn_pop
 ;
 
@@ -1095,20 +1095,20 @@
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `end`.
 \ Prepending `if_done` terminates this chain.
-:: if ( C: -- prev fun_done fun_exec adr_if fun_if ) ( E: pred -- )
+:: if ( C: -- prev done_fun exec_fun if_adr if_fun ) ( E: pred -- )
   if_init execute'' elif
 ;
 
-:: ifn ( C: -- prev fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
+:: ifn ( C: -- prev done_fun exec_fun ifn_adr ifn_fun ) ( E: pred -- )
   if_init execute'' elifn
 ;
 
-: else_pop ( fun_prev adr_else -- ) patch_branch_forward execute ;
+: else_pop ( prev_fun else_adr -- ) patch_branch_forward execute ;
 
 :: else
-  ( C: fun_exec adr_if fun_if -- adr_else fun_else )
+  ( C: exec_fun if_adr if_fun -- else_adr else_fun )
   here to: adr reserve_instr
-  ' nop 2 bury \ Disable `fun_exec` to prevent "if" from chaining.
+  ' nop 2 bury \ Disable `exec_fun` to prevent "if" from chaining.
   execute      \ Pop just the top frame.
   adr ' else_pop
 ;
@@ -1134,9 +1134,9 @@
 \ such as `leave` place their own control frames.
 0 var: LOOP_FRAME
 
-: loop_frame! ( frame_ind -- ) LOOP_FRAME ! ;
+: loop_frame! ( C: frame_ind -- ) LOOP_FRAME ! ;
 
-: loop_frame_init ( -- frame_ind fun )
+: loop_frame_init ( C: -- frame_ind fun )
   LOOP_FRAME @ ' loop_frame! stack_len LOOP_FRAME !
 ;
 
@@ -1144,7 +1144,8 @@
 \ to insert their control frame before a loop control frame.
 \ This allows to pop the control frames in the right order
 \ with a single "end" word.
-: loop_aux ( prev… <loop> …rest… <frame> stack_len -- prev… <frame> <loop> …rest )
+: loop_aux
+  ( C: … <loop> … <aux> stack_len -- … <aux> <loop> … )
             to: stack_len_0
   stack_len to: stack_len_1
 
@@ -1178,29 +1179,29 @@
   LOOP_FRAME @ frame_len + LOOP_FRAME !
 ;
 
-: loop_end ( adr_beg -- ) off_from_pc asm_branch comp_instr ; \ b <begin>
-: loop_pop ( fun_prev …aux… adr_beg -- ) loop_end execute'' end ;
+: loop_end ( C: loop_adr -- ) off_from_pc asm_branch comp_instr ; \ b <begin>
+: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end execute'' end ;
 
 \ Implementation note. Each loop frame is "split" in two sub-frames:
 \ the "prev frame" and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
 :: loop
-  ( C: -- ind_frame fun_frame … adr_beg fun[loop] )
-  \ Control frame is split: ↑ auxiliary constructs like "leave" go here.
+  ( C: -- frame_ind frame_fun … loop_adr loop_fun )
+  \ Control frame is split:   ↑ auxiliary constructs like "leave" go here.
   loop_frame_init here ' loop_pop
 ;
 
 \ Breaks out of any loop.
 :: leave
-  ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
+  ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
   stack_len to: len
   here reserve_instr ' else_pop len loop_aux
 ;
 
 \ Breaks out of any loop.
 :: while
-  ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
+  ( C: prev… <loop> …rest -- prev… while_adr while_fun <loop> …rest )
   stack_len to: len
   reserve_cond ' if_pop len loop_aux
 ;
@@ -1212,34 +1213,42 @@
   execute
 ;
 
-: count_loop_pop ( fun_prev …aux… adr_cond adr_beg cond -- )
+\ Goes back to loop start. Requires EVERY loop frame to begin with `loop_adr`:
+\ the address of the first instruction inside the loop.
+:: cont
+  LOOP_FRAME @ dup
+  ifn throw" `cont` requires an ancestor loop frame" end
+  sp_at @ loop_end \ b <beg>
+;
+
+: count_loop_pop ( prev_fun …aux… loop_adr cond_adr cond -- )
   to: cond
-  loop_end    \ b <beg>
   to: adr
+  loop_end \ b <beg>
   adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
   execute \ Pop auxiliaries; restore the previous loop frame.
 ;
 
-: for_countdown_loop_pop ( fun_prev …aux… adr_cond adr_beg )
+: for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr )
   ASM_LE count_loop_pop
 ;
 
 : for_countdown_loop_init
-  ( C: cur_loc -- ind_frame fun_frame … adr_cond adr_beg fun_for )
+  ( C: cur_loc -- frame_ind frame_fun … loop_adr cond_adr fun_for )
   ( E: ceil -- )
 
   to: cur                \ We'll reuse ceiling as index.
   loop_frame_init
   cur comp_pop_local_set \ Grab the initial ceiling value.
 
-  here to: adr_beg
+  here to: loop_adr
   1 cur asm_local_get comp_instr    \ ldur x1, [FP, <cur>]
   1     asm_cmp_zero  comp_instr    \ cmp x1, 0
-  here to: adr_cond   reserve_instr \ b.<cond> <end>
+  here to: cond_adr   reserve_instr \ b.<cond> <end>
   1 1 1 asm_sub_imm   comp_instr    \ sub x1, x1, 1
   1 cur asm_local_set comp_instr    \ stur x1, [FP, <cur>]
 
-  adr_cond adr_beg ' for_countdown_loop_pop
+  loop_adr cond_adr ' for_countdown_loop_pop
 ;
 
 \ A count-down-by-one loop. Analogue of the non-standard
@@ -1255,7 +1264,7 @@
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
 :: for
-  ( C: -- ind_frame fun_frame … adr_cond adr_beg fun_pop )
+  ( C: -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
   comp_anon_local for_countdown_loop_init
 ;
@@ -1268,12 +1277,12 @@
 \     ind .
 \   end
 :: -for:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
   parse_word comp_named_local for_countdown_loop_init
 ;
 
-: for_countup_loop_pop ( fun_prev …aux… adr_cond adr_beg loc_cur -- )
+: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_cur -- )
   to: cur
   1 cur asm_local_get comp_instr \ ldur x1, [FP, <loc>]
   1 1 1 asm_add_imm   comp_instr \ add x1, x1, 1
@@ -1286,18 +1295,18 @@
 \
 \ The meaning of "cursor" and "limit" may differ between loop words.
 \ The cursor is often a pointer.
-: comp_count_loop_init ( loc_cur loc_lim -- adr_cond adr_beg loc_cur )
+: comp_count_loop_init ( loc_cur loc_lim -- loop_adr cond_adr loc_cur )
   to: lim
   to: cur
 
-  here to: adr_beg
+  here to: loop_adr
   1 cur asm_local_get comp_instr \ ldr x1, [FP, <loc>]
   2 lim asm_local_get comp_instr \ ldr x2, [FP, <loc>]
   1 2   asm_cmp_reg   comp_instr \ cmp x1, x2
 
-  here to: adr_cond
+  here to: cond_adr
   reserve_instr \ b.<cond> <end>
-  adr_cond adr_beg cur
+  loop_adr cond_adr cur
 ;
 
 \ A count-up-by-one loop. Analogue of the standard `?do … loop` idiom.
@@ -1308,7 +1317,7 @@
 \     ind .
 \   end
 :: +for:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loop_fun )
   ( E: ceil floor -- )
   loop_frame_init
 
@@ -1321,7 +1330,7 @@
   ' for_countup_loop_pop
 ;
 
-: loop_countup_pop ( fun_prev …aux… adr_cond adr_beg loc_cur loc_step )
+: loop_countup_pop ( prev_fun …aux… loop_adr cond_adr loc_cur loc_step )
   to: step to: cur
 
   1 cur  asm_local_get comp_instr \ ldr x1, [FP, <loc>]
@@ -1337,7 +1346,7 @@
 \   ceil floor step +loop: ind ind . end
 \   123  23    3    +loop: ind ind . end
 :: +loop:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
   ( E: ceil floor step -- )
   loop_frame_init
 
@@ -1356,7 +1365,7 @@
 
 \ Like in `+loop:`, the range is `[floor,ceil)`.
 :: -loop:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil floor step -- )
   loop_frame_init
 
@@ -1368,7 +1377,7 @@
   lim  comp_pop_local_set
   cur  comp_pop_local_set
 
-  here to: adr_beg
+  here to: loop_adr
 
   \ We can almost use `comp_count_loop_init` here,
   \ but this loop wants subtraction at the start.
@@ -1378,10 +1387,10 @@
   3 step asm_local_get comp_instr    \ ldur x3, [FP, <step_off>]
   1 1 3  asm_sub_reg   comp_instr    \ sub x1, x1, x3
   1 2    asm_cmp_reg   comp_instr    \ cmp x1, x2
-  here to: adr_cond    reserve_instr \ b.lt <end>
+  here to: cond_adr    reserve_instr \ b.lt <end>
   1 cur  asm_local_set comp_instr    \ stur x1, [FP, <ceil_off>]
 
-  adr_cond adr_beg ' loop_countdown_pop
+  loop_adr cond_adr ' loop_countdown_pop
 ;
 
 : ?dup ( val bool -- val ?val ) if dup end ;

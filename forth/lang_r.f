@@ -676,6 +676,17 @@
   1                  comp_args_set
 ] ;
 
+\ \ Allows to use `@` inside argument lists without consuming all prior
+\ \ arguments. This violates the idea that every verb should consume all
+\ \ pending arguments, but can be convenient at times. TODO reconsider.
+\ \
+\ \ TODO validate there's an input.
+\ :: @ ( E: adr -- val )
+\   comp_args_get dec { reg }
+\   reg comp_clobber
+\   reg reg 0 asm_load_off comp_instr \ ldur <reg>, [<reg>]
+\ ;
+
 : ! { val adr } [
   0 1 0 asm_store_off comp_instr \ stur x0, [x1]
 ] ;
@@ -1150,22 +1161,22 @@ extern_val: stderr __stderrp
 ;
 
 : if_done ( C: cond_prev        -- ) stack> COND_HAS ! ;
-: if_pop  ( C: fun_prev adr_if  -- ) if_patch  stack> execute ;
-: ifn_pop ( C: fun_prev adr_ifn -- ) ifn_patch stack> execute ;
+: if_pop  ( C: prev_fun if_adr  -- ) if_patch  stack> execute ;
+: ifn_pop ( C: prev_fun ifn_adr -- ) ifn_patch stack> execute ;
 
-: elif_init ( C: -- fun_exec adr_if ) ( E: pred -- )
+: elif_init ( C: -- exec_fun elif_adr ) ( E: pred -- )
   comp_barrier \ Clobber / relocate locals.
   reserve_here { adr }
   ' pop_execute >stack
   adr           >stack
 ;
 
-:: elif ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
+:: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
   c" when calling `elif`" 1 comp_args_valid 0 comp_args_set
   elif_init ' if_pop >stack
 ;
 
-:: elifn ( C: -- fun_exec adr_if fun_if ) ( E: pred -- )
+:: elifn ( C: -- exec_fun elifn_adr elifn_fun ) ( E: pred -- )
   c" when calling `elifn`" 1 comp_args_valid 0 comp_args_set
   elif_init ' ifn_pop >stack
 ;
@@ -1182,38 +1193,38 @@ extern_val: stderr __stderrp
 \ Prepending `if_done` terminates this chain.
 \
 \ TODO: define more variants like `=if` with fewer instructions.
-:: if ( C: -- cond fun_done fun_exec adr_if fun_if ) ( E: pred -- )
+:: if ( C: -- cond done_fun exec_fun if_adr if_fun ) ( E: pred -- )
   c" when calling `if`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' if_pop >stack
 ;
 
-:: ifn ( C: -- cond fun_done fun_exec adr_ifn fun_ifn ) ( E: pred -- )
+:: ifn ( C: -- cond done_fun exec_fun ifn_adr ifn_fun ) ( E: pred -- )
   c" when calling `ifn`" 1 comp_args_valid 0 comp_args_set
   if_init elif_init ' ifn_pop >stack
 ;
 
-: else_pop ( C: fun_prev adr_else -- )
+: else_pop ( C: prev_fun else_adr -- )
   stack> patch_branch_forward stack> execute
 ;
 
-:: else ( C: fun_exec adr_if fun_if -- adr_else fun_else )
-  stack> stack> stack> { fun_if adr_if fun_exec }
+:: else ( C: exec_fun if_adr if_fun -- else_adr else_fun )
+  stack> stack> stack> { if_fun if_adr exec_fun }
 
   c" when calling `else`" 0 comp_args_valid
   comp_barrier \ Clobber / relocate locals.
-  reserve_here { adr_else }
+  reserve_here { else_adr }
 
-  ' nop      >stack \ Replace `fun_exec` to prevent further chaining.
-  adr_if     >stack
-  fun_if     execute
-  adr_else   >stack
+  ' nop      >stack \ Replace `exec_fun` to prevent further chaining.
+  if_adr     >stack
+  if_fun     execute
+  else_adr   >stack
   ' else_pop >stack
 ;
 
 \ TODO: use raw instruction addresses and `blr`
 \ instead of execution tokens and `execute`.
-:: end ( C: fun -- ) comp_barrier pop_execute ;
 :  end { fun }       fun          execute ;
+:: end ( C: fun -- ) comp_barrier pop_execute ;
 
 \ ## Loops
 \
@@ -1244,8 +1255,7 @@ extern_val: stderr __stderrp
 \ to insert their control frame before a loop control frame.
 \ This allows to pop the control frames in the right order
 \ with a single "end" word.
-: loop_aux
-  ( C: prev… <loop> …rest… <frame> stack_len -- prev… <frame> <loop> …rest )
+: loop_aux ( C: … <loop> … <aux> stack_len -- … <aux> <loop> … )
   stack>    { stack_len_0 }
   stack_len { stack_len_1 }
 
@@ -1280,17 +1290,17 @@ extern_val: stderr __stderrp
 ;
 
 : loop_end ( C: adr -- )
-  stack> off_from_pc asm_branch comp_instr \ b <beg>
   comp_barrier                             \ Clobber / relocate locals.
+  stack> off_from_pc asm_branch comp_instr \ b <beg>
 ;
 
-: loop_pop ( C: fun_prev …aux… adr_beg -- ) loop_end pop_execute ;
+: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end pop_execute ;
 
 \ Implementation note. Each loop frame is "split" in two sub-frames:
 \ the "prev frame" and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
-:: loop ( C: -- ind_frame fun_frame adr_loop fun_loop )
+:: loop ( C: -- frame_ind frame_fun loop_adr loop_fun )
   comp_barrier \ Clobber / relocate locals.
   here { adr }
   loop_frame_init adr >stack
@@ -1298,7 +1308,7 @@ extern_val: stderr __stderrp
 ;
 
 \ Breaks out of any loop.
-:: leave ( C: prev… <loop> …rest -- prev… adr[leave] fun[leave] <loop> …rest )
+:: leave ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
   comp_barrier \ Clobber / relocate locals.
   stack_len    { len }
   reserve_here >stack
@@ -1308,7 +1318,7 @@ extern_val: stderr __stderrp
 ;
 
 \ Breaks out of any loop.
-:: while ( C: prev… <loop> …rest -- prev… adr[while] fun[while] <loop> …rest )
+:: while ( C: prev… <loop> …rest -- prev… while_adr while_fun <loop> …rest )
   c" when calling `while`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   stack_len    { len }
@@ -1316,6 +1326,14 @@ extern_val: stderr __stderrp
   ' if_pop     >stack
   len          >stack
   loop_aux
+;
+
+\ Goes back to loop start. Requires EVERY loop frame to begin with `loop_adr`:
+\ the address of the first instruction inside the loop.
+:: cont
+  LOOP_FRAME @ { frame }
+  frame ifn throw" `cont` requires an ancestor loop frame" end
+  frame stack_at @ >stack loop_end \ b <beg>
 ;
 
 \ Assumes that the top control frame is from `loop`.
@@ -1326,14 +1344,14 @@ extern_val: stderr __stderrp
   stack> execute
 ;
 
-: count_loop_pop { cond } ( fun_prev …aux… adr_cond adr_beg -- )
-  loop_end    \ b <beg>; clobber / relocate locals.
+: count_loop_pop { cond } ( prev_fun …aux… loop_adr cond_adr -- )
   stack> { adr }
+  loop_end \ b <beg>; clobber / relocate locals.
   adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
   pop_execute \ Pop auxiliaries; restore the previous loop frame.
 ;
 
-: for_countdown_loop_pop ( fun_prev …aux… adr_cond adr_beg cur_loc -- )
+: for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr cur_loc -- )
   stack> { cur }
   ASM_LE count_loop_pop  \ b <beg>; retropatch b.<cond> <end>
   cur    comp_local_free \ Don't need a register for this local anymore.
@@ -1341,21 +1359,21 @@ extern_val: stderr __stderrp
 
 : for_countdown_loop_init
   { cur }
-  ( C: cur_loc -- ind_frame fun_frame adr_cond adr_beg fun_for cur_loc )
+  ( C: cur_loc -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
   ( E: ceil -- )
-  loop_frame_init ( -- ind_frame fun_frame )
+  loop_frame_init ( -- frame_ind frame_fun )
 
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { adr_beg }                 \ Skip above instr when repeating.
+  here { loop_adr }                \ Skip above instr when repeating.
   0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
   0 asm_cmp_zero    comp_instr     \ cmp x0, 0
-  here { adr_cond } reserve_instr  \ b.<cond> <end>
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
   0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
 
-  adr_cond                 >stack
-  adr_beg                  >stack
+  loop_adr                 >stack
+  cond_adr                 >stack
   cur                      >stack
   ' for_countdown_loop_pop >stack
 ;
@@ -1373,7 +1391,7 @@ extern_val: stderr __stderrp
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
 :: for
-  ( C: -- ind_frame fun_frame … adr_cond adr_beg fun_for cur_loc )
+  ( C: -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
   ( E: ceil -- )
   c" when calling `for`" 1 comp_args_valid 0 comp_args_set
   comp_anon_local for_countdown_loop_init
@@ -1387,13 +1405,13 @@ extern_val: stderr __stderrp
 \     ind .
 \   end
 :: -for:
-  ( C: "name" -- frame fun_frame … loc adr_cond adr_beg fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
   ( E: ceil -- )
   c" when calling `+for:`" 1 comp_args_valid 0 comp_args_set
   parse_word comp_named_local for_countdown_loop_init
 ;
 
-: for_countup_loop_pop ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur -- )
+: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur -- )
   stack> stack> { cur lim }
 
   0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
@@ -1405,31 +1423,31 @@ extern_val: stderr __stderrp
 ;
 
 :: +for:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_lim loc_cur fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_lim loc_cur loop_fun )
   ( E: ceil floor -- )
   c" when calling `+for:`" 2 comp_args_valid 0 comp_args_set
 
-  loop_frame_init             ( -- ind_frame fun_frame )
+  loop_frame_init             ( -- frame_ind frame_fun )
   comp_anon_local             { lim } \ ceil  = limit
   parse_word comp_named_local { cur } \ floor = cursor
 
   0 lim             comp_local_set \ mov <lim>, x0 | str x0, [FP, <lim>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { adr_beg }                 \ Skip above instr when repeating.
+  here { loop_adr }                \ Skip above instr when repeating.
   1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
   comp_barrier                     \ Tell lazy-ass compiler to commit local set.
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
-  here { adr_cond } reserve_instr  \ b.<cond> <end>
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
 
-  adr_cond               >stack
-  adr_beg                >stack
+  loop_adr               >stack
+  cond_adr               >stack
   lim                    >stack
   cur                    >stack
   ' for_countup_loop_pop >stack
 ;
 
 : loop_countup_pop
-  ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur loc_step )
+  ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur loc_step )
   stack> stack> stack> { step cur lim }
 
   0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
@@ -1449,7 +1467,7 @@ extern_val: stderr __stderrp
 \   ceil floor step +loop: ind ind . end
 \   123  23    3    +loop: ind ind . end
 :: +loop:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
   ( E: ceil floor step -- )
   c" when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
   loop_frame_init
@@ -1461,14 +1479,14 @@ extern_val: stderr __stderrp
   0 lim             comp_local_set \ mov <lim>,  x0 | str x0, [FP, <lim>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { adr_beg }                 \ Skip above instrs when repeating.
+  here { loop_adr }                \ Skip above instrs when repeating.
   1 cur             comp_local_set \ mov <cur>,  x1 | str x1, [FP, <cur>]
   comp_barrier                     \ Tell lazy-ass compiler to commit local set.
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
-  here { adr_cond } reserve_instr  \ b.<cond> <end>
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
 
-  adr_cond           >stack
-  adr_beg            >stack
+  loop_adr           >stack
+  cond_adr           >stack
   lim                >stack
   cur                >stack
   step               >stack
@@ -1476,7 +1494,7 @@ extern_val: stderr __stderrp
 ;
 
 : loop_countdown_pop
-  ( fun_prev …aux… adr_cond adr_beg loc_lim loc_cur loc_step )
+  ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur loc_step )
   stack> stack> stack> { step cur lim }
   ASM_LT count_loop_pop \ b <beg>; retropatch b.<cond> <end>
 
@@ -1487,7 +1505,7 @@ extern_val: stderr __stderrp
 
 \ Like in `+loop:`, the range is `[floor,ceil)`.
 :: -loop:
-  ( C: "name" -- ind_frame fun_frame … adr_cond adr_beg loc_cur loc_step fun_pop )
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
   ( E: ceil floor step -- )
   c" when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
   loop_frame_init
@@ -1500,17 +1518,17 @@ extern_val: stderr __stderrp
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { adr_beg }                 \ Skip above instrs when repeating.
+  here { loop_adr }                \ Skip above instrs when repeating.
   0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
   1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
   0 0 2 asm_sub_reg comp_instr     \ sub x0, x0, x2
   0 1   asm_cmp_reg comp_instr     \ cmp x0, x1
-  here { adr_cond } reserve_instr  \ b.<cond> <end>
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
 
-  adr_cond             >stack
-  adr_beg              >stack
+  loop_adr             >stack
+  cond_adr             >stack
   lim                  >stack
   cur                  >stack
   step                 >stack
@@ -1636,7 +1654,7 @@ extern_val: errno __error
 \   0 1 extern: some_proc
 \   some_proc try_errno" unable to do X"
 \
-\ TODO: define a `:` (interpretation-time) version.
+\ TODO: define a `:` version (interpretation-time).
 :: try_errno" ( C: "context" -- ) ( E: code -- )
   comp_cstr compile' try_errno_run
 ;

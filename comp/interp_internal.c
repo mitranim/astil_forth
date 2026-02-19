@@ -431,11 +431,11 @@ static Err interp_parse_until(
   //   read->buf.buf
   // ));
 
-  const auto ints = &interp->ints;
   if (out_buf) *out_buf = read->buf.buf;
   if (out_len) *out_len = read->buf.len;
 
   // IF_DEBUG({
+  //   const auto ints = &interp->ints;
   //   eprintf(
   //     "[system] stack_len(ints) after parsing: " FMT_SINT "\n", stack_len(ints)
   //   );

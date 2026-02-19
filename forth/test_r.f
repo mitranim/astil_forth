@@ -444,6 +444,28 @@ test_loop_countup_nested
 ;
 test_loop_countdown
 
+: test_cont_loop
+  -1 { ind }
+  loop
+    ind inc { ind }
+    ind 7 < if cont end
+    leave
+  end
+  T{ ind <T> 7 }T
+;
+test_cont_loop
+
+: test_cont_for
+  0 { ind }
+  7 for
+    ind inc { ind }
+    cont
+    leave
+  end
+  T{ ind <T> 7 }T
+;
+test_cont_for
+
 \ Used internally by testing utils. The test is kinda cyclic.
 123 var: VAR
 T{ VAR @     <T> 123 }T

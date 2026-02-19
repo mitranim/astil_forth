@@ -223,6 +223,15 @@ Operations which would normally use the return stack for scratch space just use 
 
 Because I was learning and experimenting. Some of the code is generalized library stuff (would this logic translate into another project?), checks and error messages (safety and UX), debug logging, code which is relevant but currently unused, and the code-split of supporting two calling conventions.
 
+## Lessons
+
+- Partial self-assembly is possible.
+- Single-pass assembly is possible (with fixups 😔).
+- Single-pass assembly is incompatible with many optimizations.
+- Single-pass assembly with fixups scales to a point.
+
+When the system is simple, single-pass compilation (with fixups) seems to be a simpler choice. After a certain level of complexity, an IR-based multi-pass approach starts to look simpler. I feel like this system is just before that threshold.
+
 ## What is compilation
 
 "Compilation" and especially "JIT compilation" are muddy terms. Many interpreters convert text to bytecode, which qualifies as JIT compilation, even if the bytecode remains interpreted. In the Java world, generating bytecode files is considered "compilation".
