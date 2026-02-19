@@ -33,7 +33,7 @@ variables:
       ret|recur|
       if|ifn|else|elif|elifn|end|
       loop|for|while|until|leave|cont|
-      throw|throw[_]{{word}}|{{word}}[_]throw|
+      throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
       try|try[_]{{word}}|{{word}}[_]try|
       abort|quit|exit
     )

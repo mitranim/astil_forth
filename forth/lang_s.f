@@ -828,7 +828,14 @@
   1 2 3 0 asm_store_pair_off comp_instr \ stp x1, x2, [x3]
 ] ;
 
-\ 32-bit version of `!`. Used for patching instructions.
+\ 32-bit version of `@`. Used for C ints.
+: @32 ( adr -- val ) [
+        asm_pop_x1      comp_instr \ ldr  x1, [x27, -8]!
+  1 1 0 asm_load_off_32 comp_instr \ ldur w1, [x1]
+        asm_push_x1     comp_instr \ str  x1, [x27], 8
+] ;
+
+\ 32-bit version of `!`. Used for instructions and C ints.
 : !32 ( val adr -- ) [
         asm_pop_x1_x2    comp_instr \ ldp x1, x2, [x27, -16]!
   1 2 0 asm_store_off_32 comp_instr \ str w1, x2
@@ -1709,8 +1716,10 @@ extern_val: stderr __stderrp
 
 \ ## More memory stuff
 
-extern_val: errno __error
+0 1 extern: __error
 1 1 extern: strerror
+
+: errno ( -- err ) __error @32 ;
 
 6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
 3 1 extern: mprotect ( adr len pflag -- err )

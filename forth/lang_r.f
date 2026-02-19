@@ -676,16 +676,16 @@
   1                  comp_args_set
 ] ;
 
-\ \ Allows to use `@` inside argument lists without consuming all prior
-\ \ arguments. This violates the idea that every verb should consume all
-\ \ pending arguments, but can be convenient at times. TODO reconsider.
-\ \
-\ \ TODO validate there's an input.
-\ :: @ ( E: adr -- val )
-\   comp_args_get dec { reg }
-\   reg comp_clobber
-\   reg reg 0 asm_load_off comp_instr \ ldur <reg>, [<reg>]
-\ ;
+\ Allows to use `@` inside argument lists without consuming all prior
+\ arguments. This violates the idea that every verb should consume all
+\ pending arguments, but can be convenient at times. TODO reconsider.
+\
+\ TODO validate there's an input.
+:: @ ( E: adr -- val )
+  comp_args_get dec { reg }
+  reg comp_clobber
+  reg reg 0 asm_load_off comp_instr \ ldur <reg>, [<reg>]
+;
 
 : ! { val adr } [
   0 1 0 asm_store_off comp_instr \ stur x0, [x1]
@@ -700,9 +700,15 @@
   0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
 ] ;
 
-\ 32-bit version of `!`. Used for patching instructions.
+\ 32-bit version of `@`. Used for C ints.
+: @32 { adr -- val } [
+  0 0 0 asm_load_off_32 comp_instr \ ldr w0, [x1]
+  1                     comp_args_set
+] ;
+
+\ 32-bit version of `!`. Used for instructions and C ints.
 : !32 { val adr } [
-  0 1 0 asm_store_off_32 comp_instr \ str w0, x1
+  0 1 0 asm_store_off_32 comp_instr \ str w0, [x1]
 ] ;
 
 : off! { adr } false adr ! ;
@@ -1639,13 +1645,16 @@ extern_val: stderr __stderrp
   execute'' end
 ;
 
-extern_val: errno __error
+0 1 extern: __error
 1 1 extern: strerror
 
+: errno { -- err } __error @32 ;
+
 : try_errno_run { code cstr }
-  code -1 <> if ret end
-  code strerror { msg }
-  cstr code msg throwf" %s; code: %zd; message: %s"
+  code -1 = ifn ret end
+  errno        { err }
+  err strerror { msg }
+  cstr err msg throwf" %s; err: %zd; message: %s"
 ;
 
 \ Shortcut for calling `libc` functions which return
