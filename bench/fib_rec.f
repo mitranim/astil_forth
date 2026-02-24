@@ -1,4 +1,4 @@
-import' ../forth/lang_r.f
+import' ../forth/lang.f
 
 : fib { ind -- out }
   ind 1 <= if 1 ret end

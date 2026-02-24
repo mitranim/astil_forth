@@ -1,4 +1,4 @@
-import' ../forth/lang_r.f
+import' ../forth/lang.f
 
 \ Translated from Gforth's `bubble.fs`.
 

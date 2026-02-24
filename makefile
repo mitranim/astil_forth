@@ -21,7 +21,7 @@ MACH_GEN_OUT ?= $(GEN)/mach_exc.c
 ALL_SRC ?= $(wildcard *.s *.c *.h **/*.c **/*.h) $(ASM_GEN_SRC)
 MAIN_SRC ?= $(SRC)/main.c
 MAIN_S ?= astil_s.exe
-MAIN_R ?= astil_r.exe
+MAIN ?= astil.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
 INSTALL_DIR ?= /usr/local/bin
@@ -33,7 +33,7 @@ WATCH_PROG ?= $(WATCH) -e=f
 WATCH_ALL ?= $(WATCH) -e=c,h,s,f
 WATCH_IMM ?= $(WATCH) -e=f,exe --no-vcs-ignore
 
-ARTIF ?= $(MAIN_S) $(MAIN_R) *.o *.exe *.dSYM *.plist *.elf *.dbg \
+ARTIF ?= $(MAIN_S) $(MAIN) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg
 
 # Disables some dangerous behaviors. Without this, `$@` sometimes changes from
@@ -42,57 +42,57 @@ ARTIF ?= $(MAIN_S) $(MAIN_R) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 .SUFFIXES:
 
 # Auto-delete intermediary executables if any.
-# Automatically affects `run_file`.
+# Automatically affects `run_c`.
 .INTERMEDIATE: $(FILE_EXE)
 
 .PHONY: build
-build: $(MAIN_S) $(MAIN_R)
+build: $(MAIN_S) $(MAIN)
 
 .PHONY: build_w
 build_w:
 	$(WATCH_COMP) -- $(MAKE) clean build
 
+.PHONY: run_file
+run_file:
+	rlwrap -n sandbox-exec -f sandbox.sb -D MAIN="$(PWD)/$(file)" ./$(file) $(args)
+
+# Register-CC version.
 .PHONY: run
 run:
-	rlwrap -n sandbox-exec -f sandbox.sb -D MAIN="$(PWD)/$(file)" ./$(file) $(args)
+	$(MAKE) run_file file=$(MAIN)
 
 # Stack-CC version.
 .PHONY: run_s
 run_s:
-	$(MAKE) run file=$(MAIN_S)
-
-# Register-CC version.
-.PHONY: run_r
-run_r:
-	$(MAKE) run file=$(MAIN_R)
+	$(MAKE) run_file file=$(MAIN_S)
 
 # Usage example:
 #
-#   make run_s_w args='forth/lang_s.f forth/test_s.f -'
+#   make run_w args='forth/test.f -'
+.PHONY: run_w
+run_w:
+	$(WATCH_IMM) -- $(MAKE) run
+
 .PHONY: run_s_w
 run_s_w:
 	$(WATCH_IMM) -- $(MAKE) run_s
 
-.PHONY: run_r_w
-run_r_w:
-	$(WATCH_IMM) -- $(MAKE) run_r
+$(MAIN): $(ALL_SRC) $(ASM_GEN_OUT)
+	$(CC) $(CFLAGS) -DNATIVE_CALL_CONV $(MAIN_SRC) -o $@
 
 $(MAIN_S): $(ALL_SRC) $(ASM_GEN_OUT)
 	$(CC) $(CFLAGS) $(MAIN_SRC) -o $@
 
-$(MAIN_R): $(ALL_SRC) $(ASM_GEN_OUT)
-	$(CC) $(CFLAGS) -DNATIVE_CALL_CONV $(MAIN_SRC) -o $@
-
 # Usage example:
 #
-#   make run_file file=some_file.c
-.PHONY: run_file
-run_file: $(FILE_EXE) $(ALL_SRC)
+#   make run_c file=some_file.c
+.PHONY: run_c
+run_c: $(FILE_EXE) $(ALL_SRC)
 	./$(FILE_EXE)
 
-.PHONY: run_file_w
-run_file_w:
-	$(WATCH_COMP) -- $(MAKE) run_file
+.PHONY: run_c_w
+run_c_w:
+	$(WATCH_COMP) -- $(MAKE) run_c
 
 # For executables from arbitrary C files. This is possible because our C files
 # specify all their dependencies with `#include`, without needing the build
@@ -162,11 +162,11 @@ asm:
 .PHONY: disasm
 disasm:
 	mkdir -p $(LOCAL)
-	llvm-objdump $(DISASM) $(or $(file),$(MAIN_R)) > $(LOCAL)/out.s
+	llvm-objdump $(DISASM) $(or $(file),$(MAIN)) > $(LOCAL)/out.s
 
 # .PHONY: install
 # install: build
-# 	ln -sf $(MAIN_R) "$(INSTALL_DIR)/astil"
+# 	ln -sf $(MAIN) "$(INSTALL_DIR)/astil"
 
 .PHONY: clean
 clean:

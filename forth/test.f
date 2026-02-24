@@ -1,5 +1,5 @@
-import' ./lang_r.f
-import' ./testing_r.f
+import' ./lang.f
+import' ./testing.f
 
 \ This test suite for reg-CC is written differently from the test suite for
 \ stack-CC, because of the various checks and restrictions in the compiler.

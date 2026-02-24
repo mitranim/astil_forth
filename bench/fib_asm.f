@@ -1,4 +1,4 @@
-import' ../forth/lang_r.f
+import' ../forth/lang.f
 
 : fib { src -- out } [
   0 1        asm_cmp_imm     comp_instr \ cmp x0, 1

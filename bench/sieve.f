@@ -1,4 +1,4 @@
-import' ../forth/lang_r.f
+import' ../forth/lang.f
 
 \ Adapted from Gforth's `sieve.fs`.
 

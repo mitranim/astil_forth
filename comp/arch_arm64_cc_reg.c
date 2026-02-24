@@ -7,7 +7,7 @@ Compare `./arch_arm64_cc_stack.c` which uses a stack-based callvention.
 Special registers:
 - `x28` = pointer to interpreter / compiler.
 
-The special registers must be kept in sync with `lang_r.f`.
+The special registers must be kept in sync with `lang.f`.
 */
 #pragma once
 #include "./arch_arm64.h"

@@ -1,4 +1,4 @@
-import' ../forth/lang_r.f
+import' ../forth/lang.f
 
 : fib { ind -- out }
   0 1 { prev next }

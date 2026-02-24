@@ -23,11 +23,11 @@ This is possible because of direct access to compilation. Outside the Forth worl
 
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
 
-The system comes in two variants which use different call conventions: stack-based and register-based. For code maintenance reasons, they compile separately from differently selected C files. The stack-CC version is considered legacy and has fewer features implemented.
+The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately from differently selected C files. The stack-CC version is legacy and has fewer features.
 
 The outer interpreter / compiler, which is written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
-- Stack-CC: boots via `lang_s.f`.
-- Register-CC: boots via `lang_r.f`.
+- Register-CC: boots via `forth/lang.f`.
+- Stack-CC: boots via `forth/lang_s.f`.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
@@ -36,7 +36,7 @@ All of the code is authored by me. None is bot-generated.
 ## Show me the code!
 
 ```forth
-import' forth/lang_r.f
+import' forth/lang.f
 
 : main
   log" hello world!" lf
@@ -63,13 +63,13 @@ main
 ```sh
 make
 
-# Stack-based calling convention.
-./astil_s.exe forth/lang_s.f -   # REPL mode.
-./astil_s.exe forth/test_s.f     # One-shot run.
-
 # Register-based calling convention.
-./astil_r.exe forth/lang_r.f -   # REPL mode.
-./astil_r.exe forth/test_r.f     # One-shot run.
+./astil.exe forth/lang.f - # REPL mode.
+./astil.exe forth/test.f   # One-shot run.
+
+# Stack-based calling convention.
+./astil_s.exe forth/lang_s.f - # REPL mode.
+./astil_s.exe forth/test_s.f   # One-shot run.
 ```
 
 Rebuild continuously while hacking:
@@ -106,7 +106,7 @@ Many procedure names are "namespaced", but many other symbols are not; you may n
 
 ## Easy C interop
 
-It's trivial to declare and call extern procedures. Examples can be found in the core files `forth/lang_s.f` and `forth/lang_r.f`. Should work for any linked library, such as libc.
+It's trivial to declare and call extern procedures. Examples can be found in the core files `forth/lang_s.f` and `forth/lang.f`. Should work for any linked library, such as libc.
 
 ```forth
 \ The numbers describe input and output parameters.

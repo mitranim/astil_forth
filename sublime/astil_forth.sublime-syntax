@@ -1,7 +1,7 @@
 %YAML 1.2
 ---
 version: 2
-scope: source.forth
+scope: source.forth meta.astil.forth
 file_extensions: [f, af]
 
 variables:

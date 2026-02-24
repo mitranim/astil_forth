@@ -1,4 +1,4 @@
-\ Copy of Gforth's `bubble.fs`.
+\ Copy of Gforth's `bubble.fs` with cosmetic changes.
 
 \ .( Loading Bubble Sort benchmark...) cr
 
@@ -11,7 +11,7 @@
 \ MM forth2c doesn't have it !
 : mybounds  over + swap ;
 
-1 cells Constant cell
+\ 1 cells Constant cell
 
 variable seed ( -- addr )
 
@@ -20,18 +20,18 @@ variable seed ( -- addr )
 
 8192 constant elements ( -- int)
 
-align create list elements cells allot
+align create ELEMS elements cells allot
 
 : initiate-list ( -- )
-  list elements cells + list do random i ! cell +loop
+  ELEMS elements cells + ELEMS do random i ! cell +loop
 ;
 
 : dump-list ( -- )
-  list elements cells + list do i @ . cell +loop cr
+  ELEMS elements cells + ELEMS do i @ . cell +loop cr
 ;
 
 : verify-list ( -- )
-  list elements 1- cells mybounds do
+  ELEMS elements 1- cells mybounds do
     i 2@ > abort" bubble-sort: not sorted"
   cell +loop
 ;
@@ -39,7 +39,7 @@ align create list elements cells allot
 : bubble ( -- )
   \ ." bubbling..." cr
   elements 1 do
-    list elements i - cells mybounds do
+    ELEMS elements i - cells mybounds do
       i 2@ > if i 2@ swap i 2! then
     cell +loop
   loop
@@ -54,7 +54,7 @@ align create list elements cells allot
 
 : bubble-with-flag ( -- )
   1 elements 1 do
-    -1 list elements i - cells mybounds do
+    -1 ELEMS elements i - cells mybounds do
       i 2@ > if i 2@ swap i 2! drop 0 then
     cell +loop
     if leave then
