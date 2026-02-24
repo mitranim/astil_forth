@@ -594,6 +594,15 @@ T{ c" one" strdup c" two" cstr< <T> true  }T
 T{ c" two" strdup c" one" cstr< <T> false }T
 T{ c" one" strdup c" one" cstr< <T> false }T
 
+: int32_negative { -- val } [
+  0b0_00_100101_00_0000000000000000_00000 comp_instr \ mov w0, -1
+  1 comp_args_set
+] ;
+
+T{ int32_negative     <T> 0xffff_ffff           }T
+T{ int32_negative int <T> 0xffff_ffff_ffff_ffff }T
+T{ int32_negative int <T> -1                    }T
+
 : test_varargs
   10 20 30 va{ c" numbers (should be 10 20 30): %zd %zd %zd" printf }va lf
 ;
@@ -749,7 +758,7 @@ test_to_stack_variadic
 test_stack_braces
 
 : test_alloca_cell
-  cell alloca { ptr }
+  Cell alloca { ptr }
 
   T{ ptr @ <T> ptr @ }T \ Should not segfault. The value is undefined.
 

@@ -599,11 +599,13 @@
 : align_down { len wid -- len } wid negate len and ;
 : align_up   { len wid -- len } wid dec len + wid align_down ;
 
-8 let: cell
+\ Named in title case for consistency with pretend "types" we define later,
+\ such as `U8`, `S64`, `Cint`, and so on.
+8 let: Cell
 : cells  { len  -- size } len 3 lsl ;
 : /cells { size -- len  } size 3 asr ;
-: +cell  { adr  -- adr  } adr cell + ;
-: -cell  { adr  -- adr  } adr cell - ;
+: +cell  { adr  -- adr  } adr Cell + ;
+: -cell  { adr  -- adr  } adr Cell - ;
 
 \ ## Assembler continued
 
@@ -646,6 +648,22 @@
   0 cond asm_cset     comp_instr \ cset x0, <cond>
   1                   comp_args_set
 ;
+
+\ sbfm Xd, Xn, immr, imms
+: asm_bitfield_move { Xd Xn immr imms -- instr }
+  imms 10 lsl { imms }
+  immr 16 lsl { immr }
+  Xn   5  lsl { Xn }
+
+  0b1_00_100110_1_000000_000000_00000_00000
+  Xd   or
+  Xn   or
+  immr or
+  imms or
+;
+
+\ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
+: asm_sign_extend_32 { Xd Xn -- instr } Xd Xn 0 31 asm_bitfield_move ;
 
 \ ## Numeric comparison
 
@@ -973,7 +991,7 @@
 \ Similar to standard `variable`, but takes an initial value like `let:`.
 : var: { val } ( C: "name" -- ) ( E: -- ptr )
   parse_word { str len }
-  nil cell alloc_data { adr }
+  nil Cell alloc_data { adr }
   val adr !
   str len adr init_data_word
   [ false comp_only ]
@@ -1091,6 +1109,14 @@ extern_val: stderr __stderrp
 
 :  elog" parse_cstr eputs ;
 :: elog" comp_cstr compile' eputs ;
+
+\ Bandaid for C functions which return `int`, which may be negative,
+\ often -1. C `int` is now 32-bit while we use 64-bit machine words,
+\ so -1 appears to be a positive number. This word sign-extends it.
+: int { int32 -- cell } [
+  0 0 asm_sign_extend_32 comp_instr \ sxtw x0, x0
+  1 comp_args_set
+] ;
 
 \ ## Exceptions — basic
 \
@@ -1858,7 +1884,8 @@ extern_val: stderr __stderrp
 \
 \ We don't have a real type system, but it can still be useful
 \ to use type names, which simply return sizes, similar to the
-\ existing practice of `cell` / `cells`.
+\ existing practice of `cell`/`cells`. The pretend type `Cell`
+\ is defined earlier.
 
 \ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
 1 let: S8
