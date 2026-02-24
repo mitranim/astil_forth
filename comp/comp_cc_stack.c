@@ -99,7 +99,7 @@ track the one we care about: the error reg.
 */
 static void comp_add_clobbers(Sym *caller, const Sym *callee) {
   IF_DEBUG(aver(caller->type == SYM_NORM));
-  const auto reg = ARCH_REG_ERR;
+  const auto reg = ASM_REG_ERR;
   if (bits_has(callee->clobber, reg)) bits_add_to(&caller->clobber, reg);
 }
 

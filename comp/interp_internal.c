@@ -141,7 +141,7 @@ static Err interp_call_norm(Interp *interp, const Sym *sym) {
     READ_POS_ARGS(interp->reader)
   ));
 
-  const auto err = arch_call_norm(interp, sym);
+  const auto err = asm_call_norm(interp, sym);
 
   IF_DEBUG(eprintf(
     "[system] done called word " FMT_QUOTED "; error: %p\n", sym->name.buf, err
@@ -180,7 +180,7 @@ static Err interp_call_extern(Interp *interp, const Sym *sym) {
     sym->out_len
   ));
 
-  const auto err = arch_call_extern(&interp->ints, sym);
+  const auto err = asm_call_extern(&interp->ints, sym);
 
   IF_DEBUG(eprintf(
     "[system] done called extern procedure " FMT_QUOTED "\n", sym->name.buf
@@ -500,7 +500,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
   if (inp_len < 0) {
     return err_str("negative input parameter count");
   }
-  if (inp_len > ARCH_INP_PARAM_REG_LEN) {
+  if (inp_len > ASM_INP_PARAM_REG_LEN) {
     return err_str("too many input parameters");
   }
   if (out_len < 0) {
@@ -519,7 +519,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
       .exter    = addr,
       .inp_len  = (U8)inp_len,
       .out_len  = (U8)out_len,
-      .clobber  = ARCH_VOLATILE_REGS, // Only used in reg-based call-conv.
+      .clobber  = ASM_VOLATILE_REGS, // Only used in reg-based call-conv.
     }
   );
 

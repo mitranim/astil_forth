@@ -134,7 +134,7 @@ static Err intrin_ret(Interp *interp) {
 static Err intrin_recur(Interp *interp) {
   const auto comp = &interp->comp;
   try(comp_validate_recur_args(comp));
-  try(comp_clobber_regs(comp, ARCH_VOLATILE_REGS));
+  try(comp_clobber_regs(comp, ASM_VOLATILE_REGS));
   try(comp_append_recur(comp));
   return nullptr;
 }
@@ -182,7 +182,7 @@ static Err intrin_comp_instr(Instr instr, Interp *interp) {
 static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
 
   bool has_load = true;
   try(comp_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load));
@@ -199,14 +199,14 @@ static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp, const U8 **adr)
 
 static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
   try(comp_append_page_addr(&interp->comp, (Uint)adr, (U8)reg));
   return nullptr;
 }
 
 static Err intrin_comp_page_load(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
   try(comp_append_page_load(&interp->comp, (Uint)adr, (U8)reg));
   return nullptr;
 }
@@ -322,8 +322,8 @@ not available when meta-programming.
 static Err intrin_comp_signature_set(Sint inp_len, Sint out_len, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  try(arch_validate_input_param_reg(inp_len));
-  try(arch_validate_output_param_reg(inp_len));
+  try(asm_validate_input_param_reg(inp_len));
+  try(asm_validate_output_param_reg(inp_len));
   sym->inp_len = (U8)inp_len;
   sym->out_len = (U8)out_len;
   return nullptr;
@@ -341,7 +341,7 @@ static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
 }
 
 static Err intrin_comp_args_set(Sint len, Interp *interp) {
-  try(arch_validate_input_param_reg(len));
+  try(asm_validate_input_param_reg(len));
   interp->comp.ctx.arg_len = (U8)len;
   interp->comp.ctx.arg_low = 0;
   return nullptr;
@@ -378,7 +378,7 @@ static Err intrin_comp_barrier(Interp *interp) {
 }
 
 static Err intrin_comp_clobber(Sint reg, Interp *interp) {
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
   try(comp_clobber_reg(&interp->comp, (U8)reg));
   return nullptr;
 }
@@ -404,7 +404,7 @@ static Err intrin_comp_anon_local(Interp *interp, const Local **out) {
 static Err intrin_comp_local_get(Sint reg, Sint loc_ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
   try(comp_validate_local(comp, loc_ptr, &loc));
   try(comp_append_local_get(comp, loc, (U8)reg));
   return nullptr;
@@ -413,7 +413,7 @@ static Err intrin_comp_local_get(Sint reg, Sint loc_ptr, Interp *interp) {
 static Err intrin_comp_local_set(Sint reg, Sint loc_ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
   try(comp_validate_local(comp, loc_ptr, &loc));
   try(comp_append_local_set(comp, loc, (U8)reg));
   return nullptr;

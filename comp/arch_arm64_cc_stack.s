@@ -27,7 +27,7 @@ Registers x19-x28 are callee-saved, which means we can consider them stable
 and allocate them for special values, at the cost of having to store and load
 them when switching between C and Forth.
 
-SYNC[arch_arm64_cc_stack_special_regs].
+SYNC[asm_arm64_cc_stack_special_regs].
 */
 asm_call_forth:
   stp x29, x30, [sp, -16]! // Frame record.

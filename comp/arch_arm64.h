@@ -43,59 +43,59 @@ For example, `x31` and `q31` are `0b11111`.
 */
 
 // 0x0 ... x15
-static constexpr Bits ARCH_VOLATILE_REGS = 0b11111111'11111111;
+static constexpr Bits ASM_VOLATILE_REGS = 0b11111111'11111111;
 
 // x0 ... x7
-static constexpr Bits ARCH_ALL_PARAM_REGS = 0b11111111;
+static constexpr Bits ASM_ALL_PARAM_REGS = 0b11111111;
 
-static constexpr U8 ARCH_REG_LEN           = 32;
-static constexpr U8 ARCH_VOLATILE_REG_LEN  = 16;
-static constexpr U8 ARCH_INP_PARAM_REG_LEN = 8;
-static constexpr U8 ARCH_OUT_PARAM_REG_LEN = 8;
-static constexpr U8 ARCH_ALL_PARAM_REG_LEN = 8;
+static constexpr U8 ASM_REG_LEN           = 32;
+static constexpr U8 ASM_VOLATILE_REG_LEN  = 16;
+static constexpr U8 ASM_INP_PARAM_REG_LEN = 8;
+static constexpr U8 ASM_OUT_PARAM_REG_LEN = 8;
+static constexpr U8 ASM_ALL_PARAM_REG_LEN = 8;
 
-static constexpr U8 ARCH_PARAM_REG_0 = 0;
-static constexpr U8 ARCH_PARAM_REG_1 = 1;
-static constexpr U8 ARCH_PARAM_REG_2 = 2;
-static constexpr U8 ARCH_PARAM_REG_3 = 3;
-static constexpr U8 ARCH_PARAM_REG_4 = 4;
-static constexpr U8 ARCH_PARAM_REG_5 = 5;
-static constexpr U8 ARCH_PARAM_REG_6 = 6;
-static constexpr U8 ARCH_PARAM_REG_7 = 7;
+static constexpr U8 ASM_PARAM_REG_0 = 0;
+static constexpr U8 ASM_PARAM_REG_1 = 1;
+static constexpr U8 ASM_PARAM_REG_2 = 2;
+static constexpr U8 ASM_PARAM_REG_3 = 3;
+static constexpr U8 ASM_PARAM_REG_4 = 4;
+static constexpr U8 ASM_PARAM_REG_5 = 5;
+static constexpr U8 ASM_PARAM_REG_6 = 6;
+static constexpr U8 ASM_PARAM_REG_7 = 7;
 
-static constexpr U8 ARCH_SCRATCH_REG_8  = 8;
-static constexpr U8 ARCH_SCRATCH_REG_9  = 9;
-static constexpr U8 ARCH_SCRATCH_REG_10 = 10;
-static constexpr U8 ARCH_SCRATCH_REG_11 = 11;
-static constexpr U8 ARCH_SCRATCH_REG_12 = 12;
-static constexpr U8 ARCH_SCRATCH_REG_13 = 13;
-static constexpr U8 ARCH_SCRATCH_REG_14 = 14;
-static constexpr U8 ARCH_SCRATCH_REG_15 = 15;
+static constexpr U8 ASM_SCRATCH_REG_8  = 8;
+static constexpr U8 ASM_SCRATCH_REG_9  = 9;
+static constexpr U8 ASM_SCRATCH_REG_10 = 10;
+static constexpr U8 ASM_SCRATCH_REG_11 = 11;
+static constexpr U8 ASM_SCRATCH_REG_12 = 12;
+static constexpr U8 ASM_SCRATCH_REG_13 = 13;
+static constexpr U8 ASM_SCRATCH_REG_14 = 14;
+static constexpr U8 ASM_SCRATCH_REG_15 = 15;
 
 // Frame pointer register; holds address of `{x29, x30}`.
-static constexpr U8 ARCH_REG_FP = 29;
+static constexpr U8 ASM_REG_FP = 29;
 
 // Link register: return address; updated by `bl`/`blr` and used by `ret`.
-static constexpr U8 ARCH_REG_LINK = 30;
+static constexpr U8 ASM_REG_LINK = 30;
 
 // System stack pointer; also treated as a null register by many instructions.
-static constexpr U8 ARCH_REG_SP = 31;
+static constexpr U8 ASM_REG_SP = 31;
 
 // Extremely primitive heuristic.
-static constexpr U8 ARCH_INLINABLE_INSTR_LEN = 4;
+static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 
-static constexpr U8 ARCH_REG_INTERP = 28;
+static constexpr U8 ASM_REG_INTERP = 28;
 
 #ifndef NATIVE_CALL_CONV
 
 /*
 Using `x0` as the error register exactly matches how we return errors in C.
 
-SYNC[arch_arm64_cc_stack_special_regs].
+SYNC[asm_arm64_cc_stack_special_regs].
 */
-static constexpr U8 ARCH_REG_ERR       = ARCH_PARAM_REG_0;
-static constexpr U8 ARCH_REG_INT_TOP   = 27; // Interp.ints.top
-static constexpr U8 ARCH_REG_INT_FLOOR = 26; // Interp.ints.floor
+static constexpr U8 ASM_REG_ERR       = ASM_PARAM_REG_0;
+static constexpr U8 ASM_REG_INT_TOP   = 27; // Interp.ints.top
+static constexpr U8 ASM_REG_INT_FLOOR = 26; // Interp.ints.floor
 
 #endif // NATIVE_CALL_CONV
 

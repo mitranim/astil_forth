@@ -62,7 +62,7 @@ static Err interp_pop_data_len(Interp *interp, Ind *out) {
 static Err interp_pop_reg(Interp *interp, U8 *out) {
   Sint reg;
   try(int_stack_pop(&interp->ints, &reg));
-  try(arch_validate_reg(reg));
+  try(asm_validate_reg(reg));
   if (out) *out = (U8)reg;
   return nullptr;
 }

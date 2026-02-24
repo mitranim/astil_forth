@@ -262,7 +262,7 @@ static Err mach_unwind_thread(
   assign_cast(&state->lr, frame->caller);
   assign_cast(&state->sp, sp_new);
   assign_cast(&state->pc, pc_new);
-  assign_cast(&state->x[ARCH_REG_ERR], msg);
+  assign_cast(&state->x[ASM_REG_ERR], msg);
   return nullptr;
 
   /*
@@ -320,7 +320,7 @@ kern_return_t catch_mach_exception_raise_state(
   if (state_prev_len != state_len) return MIG_BAD_ARGUMENTS;
 
   const auto state  = (Thread_state *)state_prev_ptr;
-  const auto interp = (Interp *)state->x[ARCH_REG_INTERP];
+  const auto interp = (Interp *)state->x[ASM_REG_INTERP];
 
   IF_DEBUG({
     eprintf(SYS_REC_FMT "bad thread state: ");
@@ -337,7 +337,7 @@ kern_return_t catch_mach_exception_raise_state(
         SYS_REC_FMT
         "address %p recovered from register %d does not appear to reference valid interpreter state\n",
         interp,
-        ARCH_REG_INTERP
+        ASM_REG_INTERP
       );
       fflush(stderr);
     });

@@ -135,27 +135,27 @@ static Err comp_code_ensure_sym_ready(Comp_code *code, const Sym *sym) {
   return err_sym_not_ready(sym->name.buf);
 }
 
-static Err arch_validate_reg(Sint reg) {
-  if (reg >= 0 && reg < ARCH_REG_LEN) return nullptr;
+static Err asm_validate_reg(Sint reg) {
+  if (reg >= 0 && reg < ASM_REG_LEN) return nullptr;
   return errf("invalid register value " FMT_SINT, reg);
 }
 
-static Err arch_validate_input_param_reg(Sint reg) {
-  if (reg >= 0 && reg < ARCH_INP_PARAM_REG_LEN) return nullptr;
+static Err asm_validate_input_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ASM_INP_PARAM_REG_LEN) return nullptr;
   return errf(
     "too many input parameters: %d registers available, " FMT_SINT
     " parameters requested",
-    ARCH_INP_PARAM_REG_LEN,
+    ASM_INP_PARAM_REG_LEN,
     reg + 1
   );
 }
 
-static Err arch_validate_output_param_reg(Sint reg) {
-  if (reg >= 0 && reg < ARCH_OUT_PARAM_REG_LEN) return nullptr;
+static Err asm_validate_output_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ASM_OUT_PARAM_REG_LEN) return nullptr;
   return errf(
     "too many output parameters: %d registers available, " FMT_SINT
     " parameters requested",
-    ARCH_OUT_PARAM_REG_LEN,
+    ASM_OUT_PARAM_REG_LEN,
     reg + 1
   );
 }
@@ -235,14 +235,14 @@ any procedures with multiple outputs.
 
 Note: this works identically for both of our callventions.
 */
-static Err arch_call_extern(Sint_stack *stack, const Sym *sym) {
+static Err asm_call_extern(Sint_stack *stack, const Sym *sym) {
   aver(sym->type == SYM_EXTERN);
 
   const auto fun     = (Extern_fun *)sym->exter;
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  aver(inp_len <= ARCH_INP_PARAM_REG_LEN);
+  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
   aver(out_len <= 1);
 
   Sint x0 = 0;
@@ -303,8 +303,8 @@ static void asm_append_load_store_pre_post(
   Instr mod_val;
 
   averr(imm_signed(mod, 9, &mod_val));
-  averr(arch_validate_reg(val_reg));
-  averr(arch_validate_reg(addr_reg));
+  averr(asm_validate_reg(val_reg));
+  averr(asm_validate_reg(addr_reg));
 
   asm_append_instr(
     comp,
@@ -343,8 +343,8 @@ static Instr asm_instr_load_store_scaled_offset(
   off /= 8;
 
   averr(imm_unsigned(off, 12));
-  averr(arch_validate_reg(val_reg));
-  averr(arch_validate_reg(addr_reg));
+  averr(asm_validate_reg(val_reg));
+  averr(asm_validate_reg(addr_reg));
 
   return (Instr)0b11'111'0'01'00'000000000000'00000'00000 |
     ((Instr)is_load << 22) | ((Instr)off << 10) | ((Instr)addr_reg << 5) |
@@ -385,8 +385,8 @@ static Instr asm_instr_load_store_unscaled_offset(
 ) {
   Instr imm;
   averr(imm_signed(off, 9, &imm));
-  averr(arch_validate_reg(val_reg));
-  averr(arch_validate_reg(addr_reg));
+  averr(asm_validate_reg(val_reg));
+  averr(asm_validate_reg(addr_reg));
 
   return (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) |
     ((Instr)imm << 12) | ((Instr)addr_reg << 5) | val_reg;
@@ -415,7 +415,7 @@ static void asm_append_store_unscaled_offset(
 }
 
 static void asm_append_load_literal_offset(Comp *comp, U8 reg, Sint off) {
-  averr(arch_validate_reg(reg));
+  averr(asm_validate_reg(reg));
 
   Instr imm;
   averr(imm_signed(off, 19, &imm));
@@ -509,9 +509,9 @@ static Instr asm_instr_load_store_pair(
 
   Instr off_val;
   averr(imm_signed(off, 7, &off_val));
-  averr(arch_validate_reg(reg0));
-  averr(arch_validate_reg(reg1));
-  averr(arch_validate_reg(addr_reg));
+  averr(asm_validate_reg(reg0));
+  averr(asm_validate_reg(reg1));
+  averr(asm_validate_reg(addr_reg));
 
   return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (opc << 22) |
     (off_val << 15) | ((Instr)reg1 << 10) | ((Instr)addr_reg << 5) | reg0;
@@ -559,13 +559,13 @@ static void asm_append_branch_link_to_offset(Comp *comp, Sint pc_off) {
 }
 
 static void asm_append_branch_link_to_reg(Comp *comp, U8 reg) {
-  averr(arch_validate_reg(reg));
+  averr(asm_validate_reg(reg));
   const auto base = (Instr)0b110'101'1'0'0'01'11111'0000'0'0'00000'00000;
   asm_append_instr(comp, base | ((Instr)reg << 5));
 }
 
 static Instr asm_instr_compare_branch(U8 reg, Sint off, bool non_zero) {
-  averr(arch_validate_reg(reg));
+  averr(asm_validate_reg(reg));
 
   Instr imm;
   averr(imm_signed(off, 19, &imm));
@@ -704,8 +704,8 @@ static void asm_fixup_try(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
 
 static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
   averr(imm_unsigned(imm12, 12));
-  averr(arch_validate_reg(src_reg));
-  averr(arch_validate_reg(tar_reg));
+  averr(asm_validate_reg(src_reg));
+  averr(asm_validate_reg(tar_reg));
   return ((Instr)imm12 << 10) | ((Instr)src_reg << 5) | tar_reg;
 }
 
@@ -745,9 +745,9 @@ static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm) {
 }
 
 static Instr asm_pattern_arith_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
-  averr(arch_validate_reg(src_reg));
-  averr(arch_validate_reg(tar_reg));
-  averr(arch_validate_reg(mod_reg));
+  averr(asm_validate_reg(src_reg));
+  averr(asm_validate_reg(tar_reg));
+  averr(asm_validate_reg(mod_reg));
   return ((Instr)mod_reg << 16) | ((Instr)src_reg << 5) | tar_reg;
 }
 
@@ -774,7 +774,7 @@ static Ind asm_align_sp_off(Ind off) { return __builtin_align_up(off, 16); }
 
 // and <reg>, <reg>, 0xfffffffffffffff0
 static void asm_append_sp_align(Comp *comp, U8 reg) {
-  averr(arch_validate_reg(reg));
+  averr(asm_validate_reg(reg));
   asm_append_instr(comp, (Instr)0b1'00'100100'1'111100'111011'00000'00000 | reg);
 }
 
@@ -857,21 +857,21 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
     const auto off = sp_off ? sp_off : ASM_FRAME_RECORD_SIZE;
 
     // mov x29, sp
-    *--floor = asm_instr_add_imm(ARCH_REG_FP, ARCH_REG_SP, 0);
+    *--floor = asm_instr_add_imm(ASM_REG_FP, ASM_REG_SP, 0);
 
     if (off <= ASM_MAX_LOAD_STORE_PAIR_OFF) {
       // stp x29, x30, [sp, -<off>]!
       *--floor = asm_instr_load_store_pair(
-        ASM_STORE_PAIR_PRE, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, -(Sint)off
+        ASM_STORE_PAIR_PRE, ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, -(Sint)off
       );
     }
     else {
       // stp x29, x30, [sp]
       *--floor = asm_instr_load_store_pair(
-        ASM_STORE_PAIR_OFF, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, 0
+        ASM_STORE_PAIR_OFF, ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, 0
       );
       // sub sp, sp, <off>
-      *--floor = asm_instr_sub_imm(ARCH_REG_SP, ARCH_REG_SP, off);
+      *--floor = asm_instr_sub_imm(ASM_REG_SP, ASM_REG_SP, off);
     }
   }
 
@@ -915,7 +915,7 @@ static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
   if (frame) {
     if (sym->norm.has_alloca) {
       // mov sp, x29
-      asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_FP, 0);
+      asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_FP, 0);
     }
 
     const auto off = sp_off ? sp_off : ASM_FRAME_RECORD_SIZE;
@@ -923,16 +923,16 @@ static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
     if (off <= ASM_MAX_LOAD_STORE_PAIR_OFF) {
       // ldp x29, x30, [sp], <off>
       asm_append_load_store_pair(
-        comp, ASM_LOAD_PAIR_POST, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, off
+        comp, ASM_LOAD_PAIR_POST, ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, off
       );
     }
     else {
       // add sp, sp, <off>
-      asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, off);
+      asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_SP, off);
 
       // ldp x29, x30, [sp], <off>
       asm_append_load_store_pair(
-        comp, ASM_LOAD_PAIR_OFF, ARCH_REG_FP, ARCH_REG_LINK, ARCH_REG_SP, 0
+        comp, ASM_LOAD_PAIR_OFF, ASM_REG_FP, ASM_REG_LINK, ASM_REG_SP, 0
       );
     }
   }
@@ -954,8 +954,8 @@ metadata for every return address and create backtraces when unwinding.
 static void asm_register_call(Comp *, const Sym *) {}
 
 static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
-  averr(arch_validate_reg(tar_reg));
-  averr(arch_validate_reg(src_reg));
+  averr(asm_validate_reg(tar_reg));
+  averr(asm_validate_reg(src_reg));
 
   return (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 |
     ((Instr)src_reg << 16) | (Instr)tar_reg;
@@ -1056,7 +1056,7 @@ static void asm_append_add(Comp *comp, U8 tar_reg, U8 src_reg, Sint imm) {
 }
 
 static void asm_append_zero_reg(Comp *comp, U8 reg) {
-  averr(arch_validate_reg(reg));
+  averr(asm_validate_reg(reg));
 
   // eor <reg>, <reg>, <reg>
   const auto ireg  = (Instr)reg;
@@ -1281,7 +1281,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   const auto spans = &sym->norm.spans;
 
   if (sym->err == ERR_MODE_THROW) {
-    const auto reg = arch_sym_err_reg(sym);
+    const auto reg = asm_sym_err_reg(sym);
     if (reg >= 0) bits_add_to(&sym->clobber, (U8)reg);
   }
 

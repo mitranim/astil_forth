@@ -150,7 +150,7 @@ typedef struct {
   Local_dict  local_dict; // So we can find locals by name.
   Ind         anon_locs;  // For auto-naming of anonymous locals.
   Ind         fp_off;     // Stack space reserved for locals.
-  Reg_val     reg_vals[ARCH_ALL_PARAM_REG_LEN]; // Values in registers.
+  Reg_val     reg_vals[ASM_ALL_PARAM_REG_LEN]; // Values in registers.
   Bits        vol_regs;   // Volatile registers available for locals.
   U8          arg_low;    // How many args got consumed by assignments.
   U8          arg_len;    // Available args for the next call or assign.

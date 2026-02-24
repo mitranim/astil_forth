@@ -29,13 +29,13 @@ static Err err_call_arity_mismatch(const char *name, U8 inp_len, Sint ints_len) 
   );
 }
 
-static Err arch_call_norm(Interp *interp, const Sym *sym) {
+static Err asm_call_norm(Interp *interp, const Sym *sym) {
   const auto fun     = comp_sym_exec_instr(&interp->comp, sym);
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  aver(inp_len <= ARCH_INP_PARAM_REG_LEN);
-  aver(out_len <= ARCH_OUT_PARAM_REG_LEN);
+  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
+  aver(out_len <= ASM_OUT_PARAM_REG_LEN);
 
   const auto ints     = &interp->ints;
   const auto ints_len = stack_len(ints);
@@ -154,17 +154,17 @@ static Err arch_call_norm(Interp *interp, const Sym *sym) {
 }
 
 // See `asm_append_call_intrin` for the explanation of the calling convention.
-static Err arch_call_intrin(Interp *interp, const Sym *sym) {
+static Err asm_call_intrin(Interp *interp, const Sym *sym) {
   aver(sym->type == SYM_INTRIN);
 
   const auto ints  = &interp->ints;
   const auto throw = sym->err == ERR_MODE_THROW;
 
-  Sint inps[ARCH_INP_PARAM_REG_LEN] = {};
-  Sint outs[ARCH_OUT_PARAM_REG_LEN] = {};
+  Sint inps[ASM_INP_PARAM_REG_LEN] = {};
+  Sint outs[ASM_OUT_PARAM_REG_LEN] = {};
 
-  aver(sym->inp_len < ARCH_INP_PARAM_REG_LEN);
-  aver(sym->out_len < ARCH_OUT_PARAM_REG_LEN);
+  aver(sym->inp_len < ASM_INP_PARAM_REG_LEN);
+  aver(sym->out_len < ASM_OUT_PARAM_REG_LEN);
 
   Ind inp = 0;
   while (inp < sym->inp_len) {
@@ -174,12 +174,12 @@ static Err arch_call_intrin(Interp *interp, const Sym *sym) {
     inp++;
   }
 
-  aver(inp < ARCH_INP_PARAM_REG_LEN);
+  aver(inp < ASM_INP_PARAM_REG_LEN);
   inps[inp++] = (Sint)interp;
 
   Ind out = 0;
   while (out < sym->out_len) {
-    aver((inp + out) < ARCH_INP_PARAM_REG_LEN);
+    aver((inp + out) < ASM_INP_PARAM_REG_LEN);
     inps[inp + out] = (Sint)&outs[out];
     out++;
   }
@@ -200,12 +200,12 @@ static Err arch_call_intrin(Interp *interp, const Sym *sym) {
   return nullptr;
 }
 
-static S8 arch_sym_err_reg(const Sym *sym) {
+static S8 asm_sym_err_reg(const Sym *sym) {
   if (sym->err != ERR_MODE_THROW) return -1;
 
   switch (sym->type) {
     case SYM_NORM:   return (S8)sym->out_len;
-    case SYM_INTRIN: return ARCH_PARAM_REG_0;
+    case SYM_INTRIN: return ASM_PARAM_REG_0;
     case SYM_EXTERN: unreachable();
     default:         unreachable();
   }
@@ -213,7 +213,7 @@ static S8 arch_sym_err_reg(const Sym *sym) {
 
 static void asm_append_sym_epilogue_ok(Comp *comp, Sym *sym) {
   if (sym->err != ERR_MODE_THROW) return;
-  const auto reg = arch_sym_err_reg(sym);
+  const auto reg = asm_sym_err_reg(sym);
   aver(reg >= 0);
   asm_append_zero_reg(comp, (U8)reg);
 }
@@ -229,7 +229,7 @@ static void asm_append_try(Comp *comp, const Sym *caller, const Sym *callee) {
   IF_DEBUG(aver(caller->err == ERR_MODE_THROW));
   IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
 
-  const auto reg = arch_sym_err_reg(callee);
+  const auto reg = asm_sym_err_reg(callee);
   IF_DEBUG(aver(reg >= 0));
 
   const auto callee_err = (U8)reg;
@@ -328,35 +328,35 @@ static Err asm_append_call_intrin(
   const auto size   = sizeof(Sint);
   const auto sp_off = asm_align_sp_off(size * outs);
 
-  asm_append_mov_reg(comp, callee->inp_len, ARCH_REG_INTERP);
+  asm_append_mov_reg(comp, callee->inp_len, ASM_REG_INTERP);
 
   if (sp_off) {
-    asm_append_sub_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
+    asm_append_sub_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);
 
     U8 out = 0;
     while (out < outs) {
       U8 reg = inps + 1 + out;
-      aver(reg < ARCH_INP_PARAM_REG_LEN);
-      asm_append_add_imm(comp, reg, ARCH_REG_SP, out * size);
+      aver(reg < ASM_INP_PARAM_REG_LEN);
+      asm_append_add_imm(comp, reg, ASM_REG_SP, out * size);
       out++;
     }
   }
 
   // Free to use because intrin calls clobber everything anyway.
-  constexpr auto fun = ARCH_SCRATCH_REG_8;
+  constexpr auto fun = ASM_SCRATCH_REG_8;
 
   asm_append_dysym_load(comp, callee->name.buf, fun);
   asm_append_branch_link_to_reg(comp, fun);
-  if (sp_off) asm_append_add_imm(comp, ARCH_REG_SP, ARCH_REG_SP, sp_off);
+  if (sp_off) asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);
   try(asm_append_try_catch(comp, caller, callee, catch));
 
   if (sp_off) {
     U8 reg = 0;
     while (reg < outs) {
       const auto out_off = (Sint)(reg * size) - (Sint)sp_off;
-      aver(reg < ARCH_OUT_PARAM_REG_LEN);
+      aver(reg < ASM_OUT_PARAM_REG_LEN);
       aver(out_off < 0);
-      asm_append_load_unscaled_offset(comp, reg, ARCH_REG_SP, out_off);
+      asm_append_load_unscaled_offset(comp, reg, ASM_REG_SP, out_off);
       reg++;
     }
   }
@@ -369,7 +369,7 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
   aver(callee->type == SYM_EXTERN);
 
   // Free to use because extern calls clobber everything anyway.
-  constexpr auto reg = ARCH_SCRATCH_REG_8;
+  constexpr auto reg = ASM_SCRATCH_REG_8;
 
   asm_append_dysym_load(comp, callee->name.buf, reg);
   asm_append_branch_link_to_reg(comp, reg);
@@ -396,7 +396,7 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
     case LOC_MEM: {
       const auto off = loc->fp_off;
       asm_validate_local_off(off);
-      return asm_instr_load_scaled_offset(tar_reg, ARCH_REG_FP, off);
+      return asm_instr_load_scaled_offset(tar_reg, ASM_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
     default:          unreachable();
@@ -414,7 +414,7 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
     case LOC_MEM: {
       const auto off = loc->fp_off;
       asm_validate_local_off(off);
-      return asm_instr_store_scaled_offset(src_reg, ARCH_REG_FP, off);
+      return asm_instr_store_scaled_offset(src_reg, ASM_REG_FP, off);
     }
     case LOC_UNKNOWN: [[fallthrough]];
     default:          unreachable();
@@ -428,12 +428,12 @@ the procedure receive them as their locations, even when their lifetimes do
 not overlap with clobbers. Dirty but simple way of avoiding an additional IR
 and data flow analysis.
 */
-static void arch_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
+static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
   if (loc->location != LOC_UNKNOWN) return;
 
   const auto reg = bits_pop_low(&comp->ctx.vol_regs);
 
-  if (bits_has(ARCH_VOLATILE_REGS, reg)) {
+  if (bits_has(ASM_VOLATILE_REGS, reg)) {
     loc->location = LOC_REG;
     loc->reg      = reg;
     bits_add_to(&sym->clobber, reg);
@@ -450,7 +450,7 @@ static void asm_fixup_loc_read(Comp *comp, Loc_fixup *fix, Sym *sym) {
   const auto read = &fix->read;
   const auto loc  = read->loc;
 
-  arch_resolve_local_location(comp, loc, sym);
+  asm_resolve_local_location(comp, loc, sym);
   *read->instr = asm_instr_local_read(loc, read->reg);
 }
 
@@ -471,7 +471,7 @@ static void asm_fixup_loc_write(Comp *comp, Loc_fixup *fix, Sym *sym) {
   }
 
   const auto loc = write->loc;
-  arch_resolve_local_location(comp, loc, sym);
+  asm_resolve_local_location(comp, loc, sym);
   *write->instr = asm_instr_local_write(loc, write->reg);
 }
 
@@ -480,7 +480,7 @@ static void asm_fixup_locals(Comp *comp, Sym *sym) {
 
   // Remaining volatile registers available for locals.
   aver(ctx->vol_regs == BITS_ALL);
-  ctx->vol_regs = bits_del_all(ARCH_VOLATILE_REGS, sym->clobber);
+  ctx->vol_regs = bits_del_all(ASM_VOLATILE_REGS, sym->clobber);
 
   for (stack_range(auto, fix, &ctx->loc_fix)) {
     switch (fix->type) {

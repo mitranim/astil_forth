@@ -117,14 +117,14 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
 static Local *local_token(Local *loc) { return loc; }
 
 static void validate_volatile_reg(U8 reg) {
-  aver(bits_has(ARCH_VOLATILE_REGS, reg));
+  aver(bits_has(ASM_VOLATILE_REGS, reg));
 }
 
 static void validate_param_reg(U8 reg) {
-  aver(bits_has(ARCH_ALL_PARAM_REGS, reg));
+  aver(bits_has(ASM_ALL_PARAM_REGS, reg));
 }
 
-static bool is_param_reg(U8 reg) { return bits_has(ARCH_ALL_PARAM_REGS, reg); }
+static bool is_param_reg(U8 reg) { return bits_has(ASM_ALL_PARAM_REGS, reg); }
 
 static const char *comp_local_name(Local *loc) {
   if (!loc) return "(nil)";
@@ -245,11 +245,11 @@ static Err comp_validate_ret_args(Comp *comp) {
   try(comp_validate_args(comp, "unable to compile return", sym->out_len));
 
   if (sym->err != ERR_MODE_THROW) return nullptr;
-  if (sym->out_len < ARCH_OUT_PARAM_REG_LEN) return nullptr;
+  if (sym->out_len < ASM_OUT_PARAM_REG_LEN) return nullptr;
 
   return errf(
     "unable to compile return: too many output parameters: %d registers are available, %d are used, but 1 more is required for implicitly returned exception values",
-    ARCH_OUT_PARAM_REG_LEN,
+    ASM_OUT_PARAM_REG_LEN,
     sym->out_len
   );
 }
@@ -363,7 +363,7 @@ static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
 
 // Lower-level, unsafe analogue of `comp_append_local_set_next`.
 static Err comp_append_local_set(Comp *comp, Local *loc, U8 reg) {
-  try(arch_validate_output_param_reg(reg));
+  try(asm_validate_output_param_reg(reg));
   try(comp_local_reg_reset(comp, loc, reg));
 
   IF_DEBUG(eprintf(
@@ -403,7 +403,7 @@ static Err comp_next_inp_param_reg(Comp *comp, U8 *out) {
   try(comp_require_current_sym(comp, &sym));
 
   const auto reg = sym->inp_len++;
-  try(arch_validate_input_param_reg(reg));
+  try(asm_validate_input_param_reg(reg));
   bits_add_to(&sym->clobber, reg);
 
   if (out) *out = reg;
@@ -415,7 +415,7 @@ static Err comp_next_out_param_reg(Comp *comp, U8 *out) {
   try(comp_require_current_sym(comp, &sym));
 
   const auto reg = sym->out_len++;
-  try(arch_validate_output_param_reg(reg));
+  try(asm_validate_output_param_reg(reg));
   bits_add_to(&sym->clobber, reg);
 
   if (out) *out = reg;
@@ -424,7 +424,7 @@ static Err comp_next_out_param_reg(Comp *comp, U8 *out) {
 
 static Err comp_next_arg_reg(Comp *comp, U8 *out) {
   const auto reg = comp->ctx.arg_len++;
-  try(arch_validate_input_param_reg(reg));
+  try(asm_validate_input_param_reg(reg));
   try(comp_clobber_reg(comp, reg));
   if (out) *out = reg;
   return nullptr;
@@ -433,7 +433,7 @@ static Err comp_next_arg_reg(Comp *comp, U8 *out) {
 // TODO: support asking for multiple scratch regs (when we need that).
 static Err comp_scratch_reg(Comp *comp, U8 *out) {
   const auto reg = comp->ctx.arg_len;
-  try(arch_validate_input_param_reg(reg));
+  try(asm_validate_input_param_reg(reg));
   try(comp_clobber_reg(comp, reg));
   if (out) *out = reg;
   return nullptr;
@@ -473,7 +473,7 @@ static Err err_local_get_not_inited(const char *name) {
 
 // Lower-level, unsafe analogue of `comp_append_local_get_next`.
 static Err comp_append_local_get(Comp *comp, Local *loc, U8 reg) {
-  try(arch_validate_input_param_reg(reg));
+  try(asm_validate_input_param_reg(reg));
   if (comp_local_has_reg(comp, loc, reg)) return nullptr;
 
   if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
@@ -493,7 +493,7 @@ with other locals. The clobbers are handled in that logic.
 */
 static Err comp_append_local_get_next(Comp *comp, Local *loc) {
   auto reg = comp->ctx.arg_len;
-  try(arch_validate_input_param_reg(reg));
+  try(asm_validate_input_param_reg(reg));
 
   if (comp_local_has_reg(comp, loc, reg)) {
     comp->ctx.arg_len++;
@@ -544,7 +544,7 @@ static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
 }
 
 static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) {
-  try(arch_validate_input_param_reg(reg));
+  try(asm_validate_input_param_reg(reg));
   try(comp_clobber_reg(comp, reg));
 
   const auto instrs = &comp->code.code_write;
@@ -575,7 +575,7 @@ static Err comp_append_push_imm(Comp *comp, Sint imm) {
 }
 
 static Err comp_call_intrin(Interp *interp, const Sym *sym) {
-  try(arch_call_intrin(interp, sym));
+  try(asm_call_intrin(interp, sym));
   return nullptr;
 }
 
@@ -722,8 +722,8 @@ static Err comp_alloca_const(Comp *comp, Reg_val val) {
 
   // sub x0, sp, <off>
   // mov sp, x0
-  asm_append_sub_imm(comp, ARCH_PARAM_REG_0, ARCH_REG_SP, off);
-  asm_append_add_imm(comp, ARCH_REG_SP, ARCH_PARAM_REG_0, 0);
+  asm_append_sub_imm(comp, ASM_PARAM_REG_0, ASM_REG_SP, off);
+  asm_append_add_imm(comp, ASM_REG_SP, ASM_PARAM_REG_0, 0);
   return nullptr;
 }
 
@@ -731,9 +731,9 @@ static Err comp_alloca_const(Comp *comp, Reg_val val) {
 // and x0, x0, 0xfffffffffffffff0
 // mov sp, x0
 static Err comp_alloca_dynamic(Comp *comp) {
-  asm_append_sub_reg(comp, ARCH_PARAM_REG_0, ARCH_REG_SP, ARCH_PARAM_REG_0);
-  asm_append_sp_align(comp, ARCH_PARAM_REG_0);
-  asm_append_add_imm(comp, ARCH_REG_SP, ARCH_PARAM_REG_0, 0);
+  asm_append_sub_reg(comp, ASM_PARAM_REG_0, ASM_REG_SP, ASM_PARAM_REG_0);
+  asm_append_sp_align(comp, ASM_PARAM_REG_0);
+  asm_append_add_imm(comp, ASM_REG_SP, ASM_PARAM_REG_0, 0);
   return nullptr;
 }
 
@@ -761,8 +761,8 @@ static Err comp_append_throw(Comp *comp, const Sym *sym) {
   try(comp_validate_args(comp, "unable to throw", 1));
   comp_clear_args(comp);
 
-  const auto src_reg = ARCH_PARAM_REG_0;
-  const auto tar_reg = arch_sym_err_reg(sym);
+  const auto src_reg = ASM_PARAM_REG_0;
+  const auto tar_reg = asm_sym_err_reg(sym);
   aver(tar_reg >= 0);
 
   if (tar_reg != src_reg) {
