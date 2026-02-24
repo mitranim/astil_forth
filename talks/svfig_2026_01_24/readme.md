@@ -142,7 +142,7 @@ Programming without a compiler holding your hand about variables, arguments, par
 
 ## Breaking changes and why
 
-See the slide `./9_changes.md`.
+See the slide `./10_changes.md`.
 
 ## Future plans
 
@@ -215,12 +215,9 @@ I want to hear from the audience!
 <!--
 Votes:
 
-  Joseph O'Connor (Jan 24, 2026, 20:28)
-  1, 4
-  andreas (Jan 24, 2026, 20:28)
-  3
-  Brad Nelson (Jan 24, 2026, 20:31)
-  1, 4
+  Joseph O'Connor: 1, 4
+  andreas: 3
+  Brad Nelson: 1, 4
 
 TODO check chat for contact: Stephen Adels
 -->

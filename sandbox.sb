@@ -9,6 +9,8 @@
 (allow file-map-executable)
 (allow dynamic-code-generation)
 (allow sysctl-read)
+(allow network* (remote ip "localhost:*"))
+(allow network* (local ip "localhost:*"))
 
 ; The bot-suggested stuff below is supposed to allow sanitizers
 ; to spawn a symbolizer (to stop it complaining). Doesn't work.
