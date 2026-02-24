@@ -68,10 +68,7 @@ import' ./lang.f
 
 \ ## Compilation-mode test routines (inside words)
 
-\ Uses "abort" instead of "throw" to allow us to test the "no-throw" mode.
-\ `}T` compiles a call to this word into the current word. If this threw,
-\ testing "no-throw" words would be very cumbersome.
-: T_end_comp { len } [ false throws ]
+: T_end_comp { len } [ true catches ]
   stack_len  { len2 }
   len2 len - { len1 }
   len1 len - { len0 }
@@ -86,7 +83,7 @@ import' ./lang.f
   elog" }T" elf
 
   len0 stack_set_len
-  abort" test failure"
+  throw" test failure"
   unreachable
 ;
 
@@ -113,5 +110,11 @@ import' ./lang.f
   len comp_args_to_stack
   0   comp_args_set
   len comp_push
+
+  \ Disabling auto-catch just for this call allows test utils to work
+  \ seamlessly when testing words which specify `[ true catches ]`.
+  get_catches { ok }
+  ok if false catches end
   compile' T_end_comp
+  ok if true catches end
 ;

@@ -112,7 +112,7 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
 
   Err err = nullptr;
 
-  if (sym->err == ERR_MODE_THROW) {
+  if (sym->throws) {
     switch (out_len) {
       case 0: {
         err = (Err)x0;
@@ -157,8 +157,7 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
 static Err asm_call_intrin(Interp *interp, const Sym *sym) {
   aver(sym->type == SYM_INTRIN);
 
-  const auto ints  = &interp->ints;
-  const auto throw = sym->err == ERR_MODE_THROW;
+  const auto ints = &interp->ints;
 
   Sint inps[ASM_INP_PARAM_REG_LEN] = {};
   Sint outs[ASM_OUT_PARAM_REG_LEN] = {};
@@ -191,7 +190,7 @@ static Err asm_call_intrin(Interp *interp, const Sym *sym) {
     inps[0], inps[1], inps[2], inps[3], inps[4], inps[5], inps[6], inps[7]
   );
 
-  if (throw) try(err);
+  if (sym->throws) try(err);
 
   out = 0;
   while (out < sym->out_len) {
@@ -201,7 +200,7 @@ static Err asm_call_intrin(Interp *interp, const Sym *sym) {
 }
 
 static S8 asm_sym_err_reg(const Sym *sym) {
-  if (sym->err != ERR_MODE_THROW) return -1;
+  if (!sym->throws) return -1;
 
   switch (sym->type) {
     case SYM_NORM:   return (S8)sym->out_len;
@@ -212,22 +211,39 @@ static S8 asm_sym_err_reg(const Sym *sym) {
 }
 
 static void asm_append_sym_epilogue_ok(Comp *comp, Sym *sym) {
-  if (sym->err != ERR_MODE_THROW) return;
+  if (!sym->throws) return;
   const auto reg = asm_sym_err_reg(sym);
   aver(reg >= 0);
   asm_append_zero_reg(comp, (U8)reg);
 }
 
 /*
-Procedures which "throw" actually return an error in the next output GPR,
-immediately after the last non-error result. This allows us to support the
-no-throw mode, where the error is revealed as one of the outputs, and makes
-"catch" completely free. The no-throw mode allows two-way ABI compatibility
-with C, which is also entirely no-throw.
+Procedures which "throw" actually return the exception in the
+next output GPR, immediately after the last non-error result.
+An alternative, which we tried earlier, is to use a dedicated
+callee-saved register for all exceptions.
+
+When using a dedicated exception register:
+- "try" is always 1 instruction: `cbnz <err>, <epi>`.
+- "catch" is always 2 instructions: `mov` and `eor`.
+- ABI incompatibility: have to stash and restore the register
+  at the boundaries between external and internal procedures,
+  which requires KNOWING where the boundaries are.
+
+When using a regular output register:
+- "try" is between 1 and 3 instructions.
+- "catch" is completely free.
+- Perfect ABI compatibility: no clobbering of callee-saved registers.
+
+Using a regular output register ultimately wins out by making it possible
+to pass arbitrary procedures as callbacks to libc, without having to tell
+the compiler to stash and restore the error register, which would be easy
+to forget. That said, we also recommend using `catches` in such callbacks
+to ensure exceptions are not ignored, which is also easy to forget...
 */
 static void asm_append_try(Comp *comp, const Sym *caller, const Sym *callee) {
-  IF_DEBUG(aver(caller->err == ERR_MODE_THROW));
-  IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
+  IF_DEBUG(aver(caller->throws));
+  IF_DEBUG(aver(callee->throws));
 
   const auto reg = asm_sym_err_reg(callee);
   IF_DEBUG(aver(reg >= 0));
@@ -270,19 +286,28 @@ static void asm_append_try(Comp *comp, const Sym *caller, const Sym *callee) {
 }
 
 /*
-Used in no-throw words to "catch" errors from yes-throw words.
+Must be used after compiling every call to a non-extern procedure.
 
-Defined to mirror the stack-CC implementation. Don't need to do
-anything here, because all values are already in the expected
-registers. The effect of "catch" in reg-CC is to append the
-callee's error to the list of outputs, which is handled in
-`comp_cc_reg.c`.
+When "catching", we don't need to do anything, because all values are already
+in the expected registers. The effect of "catch" is to append the "exception"
+to the list of outputs, which is handled in `comp_cc_reg.c`.
 */
-static void asm_append_catch(Comp *comp, const Sym *caller, const Sym *callee) {
-  (void)comp;
-  (void)caller;
-  (void)callee;
-  IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
+static Err asm_append_try_catch(
+  Comp *comp, Sym *caller, const Sym *callee, bool force_catch
+) {
+  if (force_catch) {
+    if (!callee->throws) {
+      return err_catch_no_throw(callee->name.buf);
+    }
+    return nullptr;
+  }
+
+  if (!callee->throws) return nullptr;
+  if (caller->catches) return nullptr;
+
+  caller->throws = true;
+  asm_append_try(comp, caller, callee);
+  return nullptr;
 }
 
 /*

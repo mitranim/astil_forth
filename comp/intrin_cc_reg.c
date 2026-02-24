@@ -139,21 +139,39 @@ static Err intrin_recur(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_catch(Sint wordlist, Interp *interp) {
-  try(interp_catch(interp, (Wordlist)wordlist));
+static Err intrin_try(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->throws = true;
+  try(comp_append_try(&interp->comp, sym));
   return nullptr;
 }
 
 static Err intrin_throw(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  try(sym_throws(sym, true));
+  sym->throws = true;
   try(comp_append_throw(&interp->comp, sym));
   return nullptr;
 }
 
-static Err intrin_throws(bool val, Interp *interp) {
-  return interp_throws(interp, val);
+static Err intrin_catch(Sint wordlist, Interp *interp) {
+  try(interp_catch(interp, (Wordlist)wordlist));
+  return nullptr;
+}
+
+static Err intrin_catches(bool val, Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->catches = val;
+  return nullptr;
+}
+
+static Err intrin_get_catches(Interp *interp, Sint *out) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  if (out) *out = sym->catches;
+  return nullptr;
 }
 
 static Err intrin_comp_only(bool val, Interp *interp) {
@@ -561,7 +579,7 @@ static constexpr USED auto INTRIN_BRACE = (Sym){
   .name.buf  = "{",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_brace,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -570,7 +588,7 @@ static constexpr USED auto INTRIN_COMP_SIGNATURE_GET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_signature_get,
   .out_len   = 2,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -579,7 +597,7 @@ static constexpr USED auto INTRIN_COMP_SIGNATURE_SET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_signature_set,
   .inp_len   = 2,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -588,7 +606,7 @@ static constexpr USED auto INTRIN_COMP_ARGS_VALID = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_valid,
   .inp_len   = 2,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -597,7 +615,7 @@ static constexpr USED auto INTRIN_COMP_ARGS_GET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_get,
   .out_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -606,7 +624,7 @@ static constexpr USED auto INTRIN_COMP_ARGS_SET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_set,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -615,7 +633,7 @@ static constexpr USED auto INTRIN_COMP_NEXT_ARG_REG = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_next_arg_reg,
   .out_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -624,7 +642,7 @@ static constexpr USED auto INTRIN_COMP_SCRATCH_REG = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_scratch_reg,
   .out_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -632,7 +650,7 @@ static constexpr USED auto INTRIN_COMP_BARRIER = (Sym){
   .name.buf  = "comp_barrier",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_barrier,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -641,7 +659,7 @@ static constexpr USED auto INTRIN_COMP_CLOBBER = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_clobber,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -650,7 +668,7 @@ static constexpr USED auto INTRIN_COMP_LOCAL_GET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_get,
   .inp_len   = 2,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -659,7 +677,7 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_set,
   .inp_len   = 2,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -668,7 +686,7 @@ static constexpr auto INTRIN_COMP_LOCAL_FREE = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_free,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -676,7 +694,7 @@ static constexpr auto INTRIN_ALLOCA = (Sym){
   .name.buf  = "alloca",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_alloca,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 

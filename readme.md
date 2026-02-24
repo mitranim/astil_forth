@@ -122,10 +122,10 @@ main
 
 ## Exceptions done right: ABI compatibility
 
-When using the register-based calling convention, you can _out of exceptions_ for individual words. Every call is "caught", and error values are always explicit.
+When using the register-based calling convention, you can _opt out of exceptions_ for individual words. Every call is "caught", and error values are always explicit.
 
-```
-: word [ false throws ]
+```forth
+: word [ true catches ]
   word0 {           err }
   word1 { val0      err }
   word2 { val1 val2 err }

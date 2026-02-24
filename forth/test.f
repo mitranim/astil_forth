@@ -987,35 +987,39 @@ T{ 123 Typ11_field1 <T> 139 }T
   \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
 ;
 
-: test_catch0_val { -- val } [ true throws ] 123 ;
-: test_catch0_err throw" test_err" ;
+: test_throw throw" test_err" ;
 
-: test_catch0
-  T{ test_catch0_val                <T> 123     }T
-  T{ catch' test_catch0_val         <T> 123 nil }T
-  T{ catch' test_catch0_err { err } <T>         }T
-  T{ c" test_err" err cstr=         <T> true    }T
+: test_catch_0_val { -- val }
+  false if test_throw end
+  123
 ;
-test_catch0
 
-: test_catch1_cond { one -- two }
+: test_catch_0
+  T{ test_catch_0_val          <T> 123     }T
+  T{ catch' test_catch_0_val   <T> 123 nil }T
+  T{ catch' test_throw { err } <T>         }T
+  T{ c" test_err" err cstr=    <T> true    }T
+;
+test_catch_0
+
+: test_catch_1_cond { one -- two }
   one if one 2 * ret end
   throw" test_err"
   unreachable
   nil
 ;
 
-: test_catch1
-  T{ 123 test_catch1_cond                    <T> 246     }T
-  T{ 123 catch' test_catch1_cond             <T> 246 nil }T
-  T{ 0   catch' test_catch1_cond { val err } <T>         }T
-  T{ c" test_err" err cstr=                  <T> true    }T
+: test_catch_1
+  T{ 123 test_catch_1_cond                    <T> 246     }T
+  T{ 123 catch' test_catch_1_cond             <T> 246 nil }T
+  T{ 0   catch' test_catch_1_cond { val err } <T>         }T
+  T{ c" test_err" err cstr=                   <T> true    }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
 ;
 
-: test_catch2_cond { one two -- three four }
+: test_catch_2_cond { one two -- three four }
   one <>0 { ok0 }
   two <>0 { ok1 }
 
@@ -1030,180 +1034,196 @@ test_catch0
   nil nil
 ;
 
-: test_catch2
-  T{ 13 25 test_catch2_cond        <T> 38 12     }T
-  T{ 13 25 catch' test_catch2_cond <T> 38 12 nil }T
+: test_catch_2
+  T{ 13 25 test_catch_2_cond        <T> 38 12     }T
+  T{ 13 25 catch' test_catch_2_cond <T> 38 12 nil }T
 
-  T{ 0  13 catch' test_catch2_cond { one two err } <T>      }T
-  T{ c" test_err" err cstr=                        <T> true }T
+  T{ 0  13 catch' test_catch_2_cond { one two err } <T>      }T
+  T{ c" test_err" err cstr=                         <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err true }T
 
-  T{ 12 0  catch' test_catch2_cond { one two err } <T>      }T
-  T{ c" test_err" err cstr=                        <T> true }T
+  T{ 12 0  catch' test_catch_2_cond { one two err } <T>      }T
+  T{ c" test_err" err cstr=                         <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err 0 }T
 ;
-test_catch2
+test_catch_2
 
-: test_no_throw0
-  [ false throws ]
+\ Procedures with `catches` never throw IMPLICITLY, but we allow to throw
+\ EXPLICITLY. The compiler marks the procedure as "throwing", in addition
+\ to "catching". Callers handle its exception as usual.
+: test_catches_and_throws_fun [ true catches ]
+  test_throw { err_ignore }
+  throw" different_test_err"
+;
 
-  \ throw" test_err" \ Must fail to compile.
+\ Note: when testing `catches`, we have to replace `}T` with `}T`
+\ because `}T` throws on test failures, and `catches` reveals those
+\ exceptions as values. The code wouldn't compile without `try` due
+\ to arity mismatch.
+: test_catches_and_throws [ true catches ]
+  test_catches_and_throws_fun { err }
+  T{ c" different_test_err" err cstr= <T> true }T
+;
+test_catches_and_throws
 
-  c" test_err" { err0 }
+: test_catches_0
+  [ true catches ]
+
+  test_throw   { err0 }
   c" test_err" { err1 }
 
   T{ err0 err1 =     <T> false }T
   T{ err0 err1 cstr= <T> true  }T
 ;
-test_no_throw0
+test_catches_0
 
-: test_no_throw1_fun { one -- two }
-  one ifn c" test_err" throw end
+: test_catches_1_fun { one -- two }
+  one ifn test_throw end
   one 2 *
 ;
 
-\ Compare with `test_no_throw1` which is the actual test.
-: test_no_throw1_fun_throwing
-  \ 0 test_no_throw1_fun { -- } \ Must throw.
+\ Compare with `test_catches_1` which is the actual test.
+: test_catches_1_fun_throwing
+  \ 0 test_catches_1_fun { -- } \ Must throw.
 
-  T{ 123 test_no_throw1_fun { val } <T>     }T
+  T{ 123 test_catches_1_fun { val } <T>     }T
   T{ val                            <T> 246 }T
-  T{ 123 test_no_throw1_fun         <T> 246 }T
+  T{ 123 test_catches_1_fun         <T> 246 }T
 ;
-test_no_throw1_fun_throwing
+test_catches_1_fun_throwing
 
-: test_no_throw1
-  [ false throws ]
+: test_catches_1
+  [ true catches ]
 
-  T{ 0 test_no_throw1_fun { val err } <T>      }T
+  T{ 0 test_catches_1_fun { val err } <T>      }T
   T{ c" test_err" err cstr=           <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
 
-  T{ 123 test_no_throw1_fun { val err } <T>         }T
+  T{ 123 test_catches_1_fun { val err } <T>         }T
   T{ val err                            <T> 246 nil }T
-  T{ 123 test_no_throw1_fun             <T> 246 nil }T
+  T{ 123 test_catches_1_fun             <T> 246 nil }T
 ;
-test_no_throw1
+test_catches_1
 
-: test_no_throw2_fun { one two -- three }
-  one ifn c" test_err" throw end
+: test_catches_2_fun { one two -- three }
+  one ifn test_throw end
   one two +
 ;
 
-\ Compare with `test_no_throw2` which is the actual test.
-: test_no_throw2_fun_throwing
-  \ 0 123 test_no_throw2_fun { -- } \ Must throw.
+\ Compare with `test_catches_2` which is the actual test.
+: test_catches_2_fun_throwing
+  \ 0 123 test_catches_2_fun { -- } \ Must throw.
 
-  T{ 11 22 test_no_throw2_fun { val } <T>    }T
+  T{ 11 22 test_catches_2_fun { val } <T>    }T
   T{ val                              <T> 33 }T
-  T{ 11 22 test_no_throw2_fun         <T> 33 }T
+  T{ 11 22 test_catches_2_fun         <T> 33 }T
 
-  T{ 11 0 test_no_throw2_fun { val } <T>    }T
+  T{ 11 0 test_catches_2_fun { val } <T>    }T
   T{ val                             <T> 11 }T
-  T{ 11 0 test_no_throw2_fun         <T> 11 }T
+  T{ 11 0 test_catches_2_fun         <T> 11 }T
 ;
-test_no_throw2_fun_throwing
+test_catches_2_fun_throwing
 
-: test_no_throw2
-  [ false throws ]
+: test_catches_2
+  [ true catches ]
 
-  T{ 0 11 test_no_throw2_fun { val err } <T>      }T
+  T{ 0 11 test_catches_2_fun { val err } <T>      }T
   T{ c" test_err" err cstr=              <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
 
-  T{ 11 22 test_no_throw2_fun { val err } <T>        }T
+  T{ 11 22 test_catches_2_fun { val err } <T>        }T
   T{ val err                              <T> 33 nil }T
-  T{ 11 22 test_no_throw2_fun             <T> 33 nil }T
+  T{ 11 22 test_catches_2_fun             <T> 33 nil }T
 
-  T{ 11 0 test_no_throw2_fun { val err } <T>        }T
+  T{ 11 0 test_catches_2_fun { val err } <T>        }T
   T{ val err                             <T> 11 nil }T
-  T{ 11 0 test_no_throw2_fun             <T> 11 nil }T
+  T{ 11 0 test_catches_2_fun             <T> 11 nil }T
 ;
-test_no_throw2
+test_catches_2
 
-: test_no_throw3_fun { one -- two three }
-  one ifn c" test_err" throw end
+: test_catches_3_fun { one -- two three }
+  one ifn test_throw end
   one 2 *    { two }
   one negate { three }
   two three
 ;
 
-\ Compare with `test_no_throw3` which is the actual test.
-: test_no_throw3_fun_throwing
-  \ 0 test_no_throw3_fun { -- } \ Must throw.
+\ Compare with `test_catches_3` which is the actual test.
+: test_catches_3_fun_throwing
+  \ 0 test_catches_3_fun { -- } \ Must throw.
 
   T{ 123 negate <T> -123 }T
 
-  T{ 123 test_no_throw3_fun { one two } <T>          }T
+  T{ 123 test_catches_3_fun { one two } <T>          }T
   T{ one two                            <T> 246 -123 }T
-  T{ 123 test_no_throw3_fun             <T> 246 -123 }T
+  T{ 123 test_catches_3_fun             <T> 246 -123 }T
 ;
-test_no_throw3_fun_throwing
+test_catches_3_fun_throwing
 
-: test_no_throw3
-  [ false throws ]
+: test_catches_3
+  [ true catches ]
 
-  T{ 0 test_no_throw3_fun { one two err } <T>      }T
+  T{ 0 test_catches_3_fun { one two err } <T>      }T
   T{ c" test_err" err cstr=               <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
   T{ two <T> 0   }T
 
-  T{ 123 test_no_throw3_fun { one two err } <T>              }T
+  T{ 123 test_catches_3_fun { one two err } <T>              }T
   T{ one two err                            <T> 246 -123 nil }T
-  T{ 123 test_no_throw3_fun                 <T> 246 -123 nil }T
+  T{ 123 test_catches_3_fun                 <T> 246 -123 nil }T
 ;
-test_no_throw3
+test_catches_3
 
-: test_no_throw4_fun { one two -- three four }
-  one ifn c" test_err" throw end
+: test_catches_4_fun { one two -- three four }
+  one ifn test_throw end
   one two + { three }
   two one - { four }
   three four
 ;
 
-\ Compare with `test_no_throw4` which is the actual test.
-: test_no_throw4_fun_throwing
-  \ 0 123 test_no_throw4_fun { -- } \ Must throw.
+\ Compare with `test_catches_4` which is the actual test.
+: test_catches_4_fun_throwing
+  \ 0 123 test_catches_4_fun { -- } \ Must throw.
 
-  T{ 13 25 test_no_throw4_fun { one two } <T>       }T
+  T{ 13 25 test_catches_4_fun { one two } <T>       }T
   T{ one two                              <T> 38 12 }T
-  T{ 13 25 test_no_throw4_fun             <T> 38 12 }T
+  T{ 13 25 test_catches_4_fun             <T> 38 12 }T
 
-  T{ 13 0 test_no_throw4_fun { one two } <T>        }T
+  T{ 13 0 test_catches_4_fun { one two } <T>        }T
   T{ one two                             <T> 13 -13 }T
-  T{ 13 0 test_no_throw4_fun             <T> 13 -13 }T
+  T{ 13 0 test_catches_4_fun             <T> 13 -13 }T
 ;
-test_no_throw4_fun_throwing
+test_catches_4_fun_throwing
 
-: test_no_throw4
-  [ false throws ]
+: test_catches_4
+  [ true catches ]
 
-  T{ 0 13 test_no_throw4_fun { one two err } <T>      }T
+  T{ 0 13 test_catches_4_fun { one two err } <T>      }T
   T{ c" test_err" err cstr=                  <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
   T{ two <T> 13  }T
 
-  T{ 13 25 test_no_throw4_fun { one two err } <T>           }T
+  T{ 13 25 test_catches_4_fun { one two err } <T>           }T
   T{ one two err                              <T> 38 12 nil }T
-  T{ 13 25 test_no_throw4_fun                 <T> 38 12 nil }T
+  T{ 13 25 test_catches_4_fun                 <T> 38 12 nil }T
 
-  T{ 13 0 test_no_throw4_fun { one two err } <T>            }T
+  T{ 13 0 test_catches_4_fun { one two err } <T>            }T
   T{ one two err                             <T> 13 -13 nil }T
-  T{ 13 0 test_no_throw4_fun                 <T> 13 -13 nil }T
+  T{ 13 0 test_catches_4_fun                 <T> 13 -13 nil }T
 ;
-test_no_throw4
+test_catches_4
 
 \ Must compile.
 : test_max_input_regs { A B C D E F G H -- } ;
@@ -1219,13 +1239,13 @@ test_no_throw4
 
 \ Must compile.
 : test_max_output_regs_throw { -- A B C D E F G }
-  [ true throws ]
+  false if test_throw end
   0 1 2 3 4 5 6
 ;
 
 \ Must fail to compile: error takes up 1 more reg.
 \ : test_too_many_output_regs_throw { -- A B C D E F G H }
-\   [ true throws ]
+\   false if test_throw end
 \   0 1 2 3 4 5 6 7
 \ ;
 

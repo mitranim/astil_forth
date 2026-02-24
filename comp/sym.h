@@ -15,12 +15,6 @@ typedef enum : U8 {
   WORDLIST_COMP = 2,
 } Wordlist;
 
-typedef enum : U8 {
-  ERR_MODE_NONE = 0,
-  ERR_MODE_THROW,
-  ERR_MODE_NO_THROW,
-} Err_mode;
-
 /*
 Metadata for a word in a Forth dictionary / wordset.
 - "Norm" words are defined in Forth code.
@@ -54,14 +48,15 @@ typedef struct Sym {
     void *exter;  // Pointer to extern procedure; obtained from `dlsym`.
   };
 
-  Sym_set  callees;     // Dependencies in compiled code.
-  Sym_set  callers;     // Dependents in compiled code.
-  U8       inp_len;     // Input parameter count.
-  U8       out_len;     // Output parameter count.
-  Bits     clobber;     // Clobbers these registers; must include inps and outs.
-  Err_mode err;         // Whether errors are exceptions in this procedure.
-  bool     comp_only;   // Can only be used between `:` and `;`.
-  bool     interp_only; // Forbidden in AOT executables.
+  Sym_set callees;     // Dependencies in compiled code.
+  Sym_set callers;     // Dependents in compiled code.
+  U8      inp_len;     // Input parameter count.
+  U8      out_len;     // Output parameter count.
+  Bits    clobber;     // Clobbers these registers; must include inps and outs.
+  bool    throws;      // Requires exception handling in callers.
+  bool    catches;     // Automatically catches exceptions from callees.
+  bool    comp_only;   // Can only be used between `:` and `;`.
+  bool    interp_only; // Forbidden in AOT executables.
 } Sym;
 
 typedef stack_of(Sym)  Sym_stack;

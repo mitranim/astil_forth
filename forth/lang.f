@@ -1120,16 +1120,26 @@ extern_val: stderr __stderrp
 
 \ ## Exceptions — basic
 \
-\ Exception definitions are split. See additional words below
-\ which support message formatting via the C "printf" family.
+\ The compiler provides the following exception intrinsics:
+\ - `try`
+\ - `throw`
+\ - `catch`
+\ - `catches`
+\
+\ Here, we define proper usable "catch" variants and some additional shortcuts.
+\ The definitions are split; words with support for message formatting via the
+\ C "printf" family are defined later, when we have access to variadic calls
+\ into `libc` procedures.
 \
 \ At the ABI level, we return errors as the last output parameter,
 \ similar to Go. However, the error is appended implicitly, and by
 \ default is treated as an exception.
 \
-\ We support switching into no-throw mode, which disables exceptions and makes
-\ errors explicit. This mode behaves like C: control flow is entirely manual.
-\ It's mainly meant for callbacks which are passed to C.
+\ We also support blanket implicit catch via the `catches` annotation.
+\ It disables implicit rethrow and reveals exceptions as error values.
+\ This mode looks superficially like Go, but is actually closer to C,
+\ because there is NO support for panics and no hidden stack unwinder.
+\ In such words, control flow is entirely local and obvious from code.
 \
 \ Example:
 \
@@ -1140,7 +1150,7 @@ extern_val: stderr __stderrp
 \     catch' word { one two err }
 \   ;
 \
-\   : non_throwing [ false throws ]
+\   : non_throwing [ true catches ]
 \     word { one two err } \ Implicit catch.
 \   ;
 

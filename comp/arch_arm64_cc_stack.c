@@ -71,7 +71,7 @@ static void asm_append_local_write(Comp *comp, Ind off) {
 }
 
 static S8 asm_sym_err_reg(const Sym *sym) {
-  if (sym->err != ERR_MODE_THROW) return -1;
+  if (!sym->throws) return -1;
   return ASM_REG_ERR;
 }
 
@@ -86,27 +86,51 @@ static void asm_append_sym_epilogue_ok(Comp *comp, Sym *sym) {
   asm_append_zero_reg(comp, ASM_REG_ERR);
 }
 
-static void asm_append_throw(Comp *comp) {
+static void asm_append_pop_try(Comp *comp) {
+  asm_append_stack_pop_into(comp, ASM_REG_ERR);
+  asm_append_fixup_try(comp, ASM_REG_ERR); // cbnz <err>, <err_epi>
+}
+
+static void asm_append_pop_throw(Comp *comp) {
   asm_append_stack_pop_into(comp, ASM_REG_ERR);
   asm_append_fixup_throw(comp); // b <err_epi>
 }
 
-static void asm_append_try(Comp *comp, const Sym *caller, const Sym *callee) {
-  IF_DEBUG(aver(caller->err == ERR_MODE_THROW));
-  IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
-  asm_append_fixup_try(comp, ASM_REG_ERR); // cbnz <err>, <err_epi>
-}
+// Must be used after compiling every call to a non-extern procedure.
+static Err asm_append_try_catch(
+  Comp *comp, Sym *caller, const Sym *callee, bool force_catch
+) {
+  if (force_catch) {
+    if (!callee->throws) {
+      return err_catch_no_throw(callee->name.buf);
+    }
 
-static void asm_append_catch(Comp *comp, const Sym *caller, const Sym *callee) {
-  (void)caller;
-  (void)callee;
+    // Don't need to zero the error register here,
+    // because that's done in the word epilogue in
+    // the success case.
+    asm_append_stack_push_from(comp, ASM_REG_ERR);
+    return nullptr;
+  }
 
-  IF_DEBUG(aver(callee->err == ERR_MODE_THROW));
+  if (callee->throws) {
+    caller->throws = true;
+    asm_append_fixup_try(comp, ASM_REG_ERR); // cbnz <err>, <err_epi>
+    return nullptr;
+  }
 
-  // Don't need to zero the error register here,
-  // because that's done in the word epilogue in
-  // the success case.
-  asm_append_stack_push_from(comp, ASM_REG_ERR);
+  /*
+  In stack-CC, `catches` makes EVERY call return an error value.
+  If the callee doesn't throw, the error is always nil but it's
+  on the stack regardless. This avoids having to remember which
+  words throw and which ones don't; check error after each call.
+  */
+  if (caller->catches) {
+    // `sp` acts as a zero value here.
+    asm_append_stack_push_from(comp, ASM_REG_SP);
+    return nullptr;
+  }
+
+  return nullptr;
 }
 
 static void asm_append_call_intrin_before(Comp *comp) {

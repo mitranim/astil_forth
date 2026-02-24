@@ -149,9 +149,9 @@ static char *fmt_chars_signed(const char signed *src, Uint len) {
   return fmt_bytes((const U8 *)src, len);
 }
 
-static const char *fmt_bool(bool val) { return val ? "true" : "false"; }
+static const char *bool_str(bool val) { return val ? "true" : "false"; }
 
-static Err decode_bool(const char *src, bool *out) {
+static Err bool_decode(const char *src, bool *out) {
   if (!src) {
     *out = false;
     return nullptr;

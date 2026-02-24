@@ -63,50 +63,9 @@ static void sym_auto_interp_only(Sym *caller, const Sym *callee) {
   ));
 }
 
-static const char *err_mode_str(Err_mode val) {
-  switch (val) {
-    case ERR_MODE_NONE:     return "none";
-    case ERR_MODE_THROW:    return "throw";
-    case ERR_MODE_NO_THROW: return "no_throw";
-    default:                unreachable();
-  }
-}
-
-static Err sym_throws(Sym *sym, bool throws) {
-  switch (sym->err) {
-    case ERR_MODE_NONE: {
-      sym->err = throws ? ERR_MODE_THROW : ERR_MODE_NO_THROW;
-      return nullptr;
-    }
-
-    case ERR_MODE_THROW: {
-      if (throws) return nullptr;
-
-      return errf(
-        "word " FMT_QUOTED
-        " is already known to throw, and can't be switched into non-throwing mode",
-        sym->name.buf
-      );
-    }
-
-    case ERR_MODE_NO_THROW: {
-      if (!throws) return nullptr;
-
-      return errf(
-        "word " FMT_QUOTED
-        " is already known to not throw, and can't be switched into throwing mode",
-        sym->name.buf
-      );
-    }
-
-    default: unreachable();
-  }
-}
-
 static Err sym_auto_throws(Sym *caller, const Sym *callee) {
-  if (callee->err != ERR_MODE_THROW) return nullptr;
-  if (caller->err == ERR_MODE_NO_THROW) return nullptr;
-  return sym_throws(caller, true);
+  if (callee->throws) caller->throws = true;
+  return nullptr;
 }
 
 static Err err_inline_not_norm(const Sym *sym) {

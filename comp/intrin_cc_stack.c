@@ -108,6 +108,22 @@ static Err intrin_recur(Interp *interp) {
   return comp_append_recur(&interp->comp);
 }
 
+static Err intrin_try(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->throws = true;
+  asm_append_pop_try(&interp->comp);
+  return nullptr;
+}
+
+static Err intrin_throw(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->throws = true;
+  asm_append_pop_throw(&interp->comp);
+  return nullptr;
+}
+
 static Err intrin_catch(Interp *interp) {
   Sint wordlist;
   try(int_stack_pop(&interp->ints, &wordlist));
@@ -115,33 +131,21 @@ static Err intrin_catch(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_throw(Interp *interp) {
+static Err intrin_catches(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  try(sym_throws(sym, true));
-  asm_append_throw(&interp->comp);
-  return nullptr;
-}
 
-static Err intrin_throws(Interp *interp) {
   Sint val;
   try(int_stack_pop(&interp->ints, &val));
 
-  /*
-  Implicit "catch" via the "no-throw" mode is not viable in stack-CC
-  because the programmer would have to remember which functions throw
-  and which don't, the compiler doesn't bother to help.
+  sym->catches = !!val;
+  return nullptr;
+}
 
-  In reg-CC, implicit catch is viable because it changes the arity
-  of the callee, and the compiler warns about arity mismatches.
-  */
-  if (!val) {
-    return err_str(
-      "unsupported use of no-throw mode under the stack calling convention; use explicit `catch` instead"
-    );
-  }
-
-  try(interp_throws(interp, !!val));
+static Err intrin_get_catches(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  try(int_stack_push(&interp->ints, sym->catches));
   return nullptr;
 }
 

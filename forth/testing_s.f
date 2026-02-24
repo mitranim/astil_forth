@@ -62,3 +62,17 @@ import' ./lang_s.f
   throw" test failure"
   unreachable
 ;
+
+\ When testing words which specify `[ true catches ]`,
+\ we need to disable auto-catch for every testing word,
+\ otherwise we'd have to pepper test code with `try`.
+: T_compile_without_catch ( C: XT -- )
+  get_catches { ok }
+  ok if false catches end
+  comp_call
+  ok if true catches end
+;
+
+:: T{  ' T{  T_compile_without_catch ;
+:: <T> ' <T> T_compile_without_catch ;
+:: }T  ' }T  T_compile_without_catch ;

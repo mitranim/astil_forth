@@ -122,13 +122,6 @@ static Err interp_require_current_sym(const Interp *interp, Sym **out) {
   return comp_require_current_sym(&interp->comp, out);
 }
 
-static Err interp_throws(Interp *interp, bool val) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  try(sym_throws(sym, val));
-  return nullptr;
-}
-
 static Err interp_call_norm(Interp *interp, const Sym *sym) {
   try(comp_code_ensure_sym_ready(&interp->comp.code, sym));
   const auto fun = comp_sym_exec_instr(&interp->comp, sym);

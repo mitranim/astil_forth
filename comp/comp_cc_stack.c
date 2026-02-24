@@ -88,7 +88,7 @@ static Err comp_call_intrin(Interp *interp, const Sym *callee) {
   typedef Err(Fun)(Interp *);
   const auto fun = (Fun *)callee->intrin;
   const auto err = fun(interp);
-  if (callee->err == ERR_MODE_THROW) return err;
+  if (callee->throws) return err;
   return nullptr;
 }
 

@@ -606,52 +606,220 @@ test_to
 ;
 test_locals
 
-: test_catch_invalid
+: test_catch__invalid
   \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
   \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
 ;
 
-: test_catch0_val [ true throws ] 123 ;
-: test_catch0_err throw" test_err" ;
+: test_throw throw" test_err" ;
 
-: test_catch0
-  T{ test_catch0_val                <T> 123     }T
-  T{ catch' test_catch0_val         <T> 123 nil }T
-  T{ catch' test_catch0_err { err } <T>         }T
-  T{ c" test_err" err cstr=         <T> true    }T
+: test_catch_0_val
+  false if test_throw end
+  123
 ;
-test_catch0
 
-: test_catch1_cond ( one -- two )
+: test_catch_0
+  T{ test_catch_0_val          <T> 123     }T
+  T{ catch' test_catch_0_val   <T> 123 nil }T
+  T{ catch' test_throw { err } <T>         }T
+  T{ c" test_err" err cstr=    <T> true    }T
+;
+test_catch_0
+
+: test_catch_1_cond ( one -- two )
   dup if 2 * ret end
   drop
   throw" test_err"
 ;
 
-: test_catch1
-  T{ 123 test_catch1_cond                <T> 246     }T
-  T{ 123 catch' test_catch1_cond         <T> 246 nil }T
-  T{ 0   catch' test_catch1_cond { err } <T>         }T
-  T{ c" test_err" err cstr=              <T> true    }T
+: test_catch_1
+  T{ 123 test_catch_1_cond                <T> 246     }T
+  T{ 123 catch' test_catch_1_cond         <T> 246 nil }T
+  T{ 0   catch' test_catch_1_cond { err } <T>         }T
+  T{ c" test_err" err cstr=               <T> true    }T
 ;
-test_catch1
+test_catch_1
 
-: test_catch2_cond ( one two -- three four )
+: test_catch_2_cond ( one two -- three four )
   dup2 <>0 swap <>0 and if * dup ret end
   drop2
   throw" test_err"
 ;
 
-: test_catch2
-  T{ 11 22 test_catch2_cond                <T> 242 242     }T
-  T{ 11 22 catch' test_catch2_cond         <T> 242 242 nil }T
+: test_catch_2
+  T{ 11 22 test_catch_2_cond                <T> 242 242     }T
+  T{ 11 22 catch' test_catch_2_cond         <T> 242 242 nil }T
 
-  T{ 0  22 catch' test_catch2_cond { err } <T>             }T
-  T{ c" test_err" err cstr=                <T> true        }T
+  T{ 0  22 catch' test_catch_2_cond { err } <T>             }T
+  T{ c" test_err" err cstr=                 <T> true        }T
 
-  T{ 11 0  catch' test_catch2_cond { err } <T>             }T
-  T{ c" test_err" err cstr=                <T> true        }T
+  T{ 11 0  catch' test_catch_2_cond { err } <T>             }T
+  T{ c" test_err" err cstr=                 <T> true        }T
 ;
-test_catch2
+test_catch_2
+
+\ Procedures with `catches` never throw IMPLICITLY, but we allow to throw
+\ EXPLICITLY. The compiler marks the procedure as "throwing", in addition
+\ to "catching". Callers handle its exception as usual.
+: test_catches_and_throws_fun [ true catches ]
+  test_throw { err_ignore }
+  throw" different_test_err"
+;
+
+\ Note: in stack-CC, when using `catches`, EVERY call to EVERY word
+\ pushes an error to the stack. When the callee doesn't throw, the
+\ error is nil. This way, we don't have to remember which words do
+\ and do not throw, but we have to remember to use `try`.
+: test_catches_and_throws [ true catches ]
+  test_catches_and_throws_fun { err }
+  T{ c" different_test_err" err cstr= try <T> 1 }T
+;
+test_catches_and_throws
+
+: test_catches_0
+  [ true catches ]
+
+  test_throw   { err0 }
+  c" test_err" { err1 }
+
+  T{ err0 err1     = try <T> 0 }T
+  T{ err0 err1 cstr= try <T> 1 }T
+;
+test_catches_0
+
+: test_catches_1_fun { one -- two }
+  one ifn test_throw end
+  one 2 *
+;
+
+\ Compare with `test_catches_1` which is the actual test.
+: test_catches_1_fun_throwing
+  \ 0 test_catches_1_fun { -- } \ Must throw.
+
+  T{ 123 test_catches_1_fun { val } <T>     }T
+  T{ val                            <T> 246 }T
+  T{ 123 test_catches_1_fun         <T> 246 }T
+;
+test_catches_1_fun_throwing
+
+: test_catches_1
+  [ true catches ]
+
+  \ Note: when the callee throws, it fails to push a return value
+  \ to the stack. We can't `{ val err }` because of stack underflow.
+  \ After catching, the stack is in a partially undefined state: the
+  \ error is definitely there, but what else was pushed, is unknown.
+  \ This is a problem with stack-CC in general. Compare reg-CC tests.
+  T{ 0 test_catches_1_fun { err } <T>   }T
+  T{ c" test_err" err cstr= try   <T> 1 }T
+
+  T{ 123 test_catches_1_fun { val err } <T>       }T
+  T{ val err                            <T> 246 0 }T
+  T{ 123 test_catches_1_fun             <T> 246 0 }T
+;
+test_catches_1
+
+: test_catches_2_fun { one two -- three }
+  one ifn test_throw end
+  one two +
+;
+
+\ Compare with `test_catches_2` which is the actual test.
+: test_catches_2_fun_throwing
+  \ 0 123 test_catches_2_fun { -- } \ Must throw.
+
+  T{ 11 22 test_catches_2_fun { val } <T>    }T
+  T{ val                              <T> 33 }T
+  T{ 11 22 test_catches_2_fun         <T> 33 }T
+
+  T{ 11 0 test_catches_2_fun { val } <T>    }T
+  T{ val                             <T> 11 }T
+  T{ 11 0 test_catches_2_fun         <T> 11 }T
+;
+test_catches_2_fun_throwing
+
+: test_catches_2
+  [ true catches ]
+
+  T{ 0 11 test_catches_2_fun { err } <T>   }T
+  T{ c" test_err" err cstr= try      <T> 1 }T
+
+  T{ 11 22 test_catches_2_fun { val err } <T>      }T
+  T{ val err                              <T> 33 0 }T
+  T{ 11 22 test_catches_2_fun             <T> 33 0 }T
+
+  T{ 11 0 test_catches_2_fun { val err } <T>      }T
+  T{ val err                             <T> 11 0 }T
+  T{ 11 0 test_catches_2_fun             <T> 11 0 }T
+;
+test_catches_2
+
+: test_catches_3_fun { one -- two three }
+  one ifn test_throw end
+  one 2 *    { two }
+  one negate { three }
+  two three
+;
+
+\ Compare with `test_catches_3` which is the actual test.
+: test_catches_3_fun_throwing
+  \ 0 test_catches_3_fun { -- } \ Must throw.
+
+  T{ 123 negate <T> -123 }T
+
+  T{ 123 test_catches_3_fun { one two } <T>          }T
+  T{ one two                            <T> 246 -123 }T
+  T{ 123 test_catches_3_fun             <T> 246 -123 }T
+;
+test_catches_3_fun_throwing
+
+: test_catches_3
+  [ true catches ]
+
+  T{ 0 test_catches_3_fun { err } <T>   }T
+  T{ c" test_err" err cstr= try   <T> 1 }T
+
+  T{ 123 test_catches_3_fun { one two err } <T>            }T
+  T{ one two err                            <T> 246 -123 0 }T
+  T{ 123 test_catches_3_fun                 <T> 246 -123 0 }T
+;
+test_catches_3
+
+: test_catches_4_fun { one two -- three four }
+  one ifn test_throw end
+  one two + { three }
+  two one - { four }
+  three four
+;
+
+\ Compare with `test_catches_4` which is the actual test.
+: test_catches_4_fun_throwing
+  \ 0 123 test_catches_4_fun { -- } \ Must throw.
+
+  T{ 13 25 test_catches_4_fun { one two } <T>       }T
+  T{ one two                              <T> 38 12 }T
+  T{ 13 25 test_catches_4_fun             <T> 38 12 }T
+
+  T{ 13 0 test_catches_4_fun { one two } <T>        }T
+  T{ one two                             <T> 13 -13 }T
+  T{ 13 0 test_catches_4_fun             <T> 13 -13 }T
+;
+test_catches_4_fun_throwing
+
+: test_catches_4
+  [ true catches ]
+
+  T{ 0 13 test_catches_4_fun { err } <T>   }T
+  T{ c" test_err" err cstr= try      <T> 1 }T
+
+  T{ 13 25 test_catches_4_fun { one two err } <T>         }T
+  T{ one two err                              <T> 38 12 0 }T
+  T{ 13 25 test_catches_4_fun                 <T> 38 12 0 }T
+
+  T{ 13 0 test_catches_4_fun { one two err } <T>          }T
+  T{ one two err                             <T> 13 -13 0 }T
+  T{ 13 0 test_catches_4_fun                 <T> 13 -13 0 }T
+;
+test_catches_4
 
 log" [test] ok" lf

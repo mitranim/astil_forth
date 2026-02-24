@@ -1087,10 +1087,41 @@ static void asm_append_fixup_throw(Comp *comp) {
   );
 }
 
-// TODO restructure to avoid the need for forward declarations.
-static Err asm_append_try_catch(
-  Comp *comp, Sym *caller, const Sym *callee, bool catch
-);
+static void asm_append_page_addr(Comp *comp, U8 reg, Uint adr) {
+  const auto pageoff = asm_append_adrp(comp, reg, adr);
+  if (pageoff) asm_append_add_imm(comp, reg, reg, pageoff);
+}
+
+static void asm_append_page_load(Comp *comp, U8 reg, Uint adr) {
+  const auto pageoff = asm_append_adrp(comp, reg, adr);
+  asm_append_load_scaled_offset(comp, reg, reg, pageoff);
+}
+
+static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
+  const auto code = &comp->code;
+  const auto inds = &code->gots.inds;
+  aver(dict_has(inds, name));
+
+  const auto got_ind = dict_get(&code->gots.inds, name);
+  aver(ind_valid(got_ind));
+
+  const auto got_addr = comp->code.heap->got + got_ind;
+  asm_append_page_load(comp, reg, (Uint)got_addr);
+}
+
+static Err err_catch_no_throw(const char *callee) {
+  return errf(
+    "useless attempt to catch an error when calling word " FMT_QUOTED
+    " which does not throw",
+    callee
+  );
+}
+
+#ifdef NATIVE_CALL_CONV
+#include "./arch_arm64_cc_reg.c" // IWYU pragma: export
+#else
+#include "./arch_arm64_cc_stack.c" // IWYU pragma: export
+#endif
 
 static Err asm_append_call_norm(
   Comp *comp, Sym *caller, const Sym *callee, bool catch
@@ -1116,28 +1147,6 @@ static Err asm_append_call_norm(
     pc_off
   ));
   return nullptr;
-}
-
-static void asm_append_page_addr(Comp *comp, U8 reg, Uint adr) {
-  const auto pageoff = asm_append_adrp(comp, reg, adr);
-  if (pageoff) asm_append_add_imm(comp, reg, reg, pageoff);
-}
-
-static void asm_append_page_load(Comp *comp, U8 reg, Uint adr) {
-  const auto pageoff = asm_append_adrp(comp, reg, adr);
-  asm_append_load_scaled_offset(comp, reg, reg, pageoff);
-}
-
-static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
-  const auto code = &comp->code;
-  const auto inds = &code->gots.inds;
-  aver(dict_has(inds, name));
-
-  const auto got_ind = dict_get(&code->gots.inds, name);
-  aver(ind_valid(got_ind));
-
-  const auto got_addr = comp->code.heap->got + got_ind;
-  asm_append_page_load(comp, reg, (Uint)got_addr);
 }
 
 // Simple, naive inlining without support for relocation.
@@ -1173,55 +1182,6 @@ static Err asm_inline_sym(Comp *comp, Sym *caller, const Sym *callee, bool catch
     }
   });
   return nullptr;
-}
-
-#ifdef NATIVE_CALL_CONV
-#include "./arch_arm64_cc_reg.c" // IWYU pragma: export
-#else
-#include "./arch_arm64_cc_stack.c" // IWYU pragma: export
-#endif
-
-static Err err_catch_no_throw(const char *callee) {
-  return errf(
-    "useless attempt to catch an error when calling word " FMT_QUOTED
-    " which does not throw",
-    callee
-  );
-}
-
-// Must be used after compiling every call to a non-extern procedure.
-static Err asm_append_try_catch(
-  Comp *comp, Sym *caller, const Sym *callee, bool force_catch
-) {
-  if (force_catch) {
-    if (callee->err != ERR_MODE_THROW) {
-      return err_catch_no_throw(callee->name.buf);
-    }
-    asm_append_catch(comp, caller, callee);
-    return nullptr;
-  }
-
-  if (callee->err != ERR_MODE_THROW) return nullptr;
-
-  switch (caller->err) {
-    case ERR_MODE_NONE: {
-      caller->err = ERR_MODE_THROW;
-      asm_append_try(comp, caller, callee);
-      return nullptr;
-    }
-
-    case ERR_MODE_THROW: {
-      asm_append_try(comp, caller, callee);
-      return nullptr;
-    }
-
-    case ERR_MODE_NO_THROW: {
-      asm_append_catch(comp, caller, callee);
-      return nullptr;
-    }
-
-    default: unreachable();
-  }
 }
 
 static void asm_fixup_throw(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
@@ -1280,7 +1240,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   const auto write = &code->code_write;
   const auto spans = &sym->norm.spans;
 
-  if (sym->err == ERR_MODE_THROW) {
+  if (sym->throws) {
     const auto reg = asm_sym_err_reg(sym);
     if (reg >= 0) bits_add_to(&sym->clobber, (U8)reg);
   }

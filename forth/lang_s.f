@@ -1035,8 +1035,16 @@
 
 \ ## Exceptions — basic
 \
-\ Exception definitions are split. See additional words below
-\ which support message formatting via the C "printf" family.
+\ The compiler provides the following exception intrinsics:
+\ - `try`
+\ - `throw`
+\ - `catch`
+\ - `catches`
+\
+\ Here, we define proper usable "catch" variants and some additional shortcuts.
+\ The definitions are split; words with support for message formatting via the
+\ C "printf" family are defined later, when we have access to variadic calls
+\ into `libc` procedures.
 \
 \ In this system, "exceptions" are simply return values.
 \ Since in stack-CC all internal functions are "nullary"

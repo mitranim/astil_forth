@@ -282,7 +282,8 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   out_len:         %d\n"
         "[debug]   clobber:         0b%s\n"
 #endif
-        "[debug]   err:             %d (%s)\n"
+        "[debug]   throws:          %s\n"
+        "[debug]   catches:         %s\n"
         "[debug]   comp_only:       %s\n"
         "[debug]   interp_only:     %s\n"
         "[debug]   inlinable:       %s\n"
@@ -304,17 +305,17 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         sym->out_len,
         uint32_to_bit_str((U32)sym->clobber),
 #endif
-        sym->err,
-        err_mode_str(sym->err),
-        fmt_bool(sym->comp_only),
-        fmt_bool(sym->interp_only),
-        fmt_bool(sym->norm.inlinable),
-        fmt_bool(sym->norm.has_loads),
-        fmt_bool(sym->norm.has_rets),
-        fmt_bool(sym->norm.has_alloca),
+        bool_str(sym->throws),
+        bool_str(sym->catches),
+        bool_str(sym->comp_only),
+        bool_str(sym->interp_only),
+        bool_str(sym->norm.inlinable),
+        bool_str(sym->norm.has_loads),
+        bool_str(sym->norm.has_rets),
+        bool_str(sym->norm.has_alloca),
         sym->callers.len,
         sym->callees.len,
-        fmt_bool(is_sym_leaf(sym)),
+        bool_str(is_sym_leaf(sym)),
         sym
       );
       comp_debug_print_sym_instrs(&interp->comp, sym, "[debug]   ");
@@ -334,7 +335,8 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   type:               intrinsic\n"
         "[debug]   inp_len:            %d\n"
         "[debug]   out_len:            %d\n"
-        "[debug]   err:                %d (%s)\n"
+        "[debug]   throws:             %s\n"
+        "[debug]   catches:            %s\n"
         "[debug]   execution token:    %p\n"
         "[debug]   executable address: %p\n",
         sym,
@@ -343,8 +345,8 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         list_name,
         sym->inp_len,
         sym->out_len,
-        sym->err,
-        err_mode_str(sym->err),
+        bool_str(sym->throws),
+        bool_str(sym->catches),
         sym,
         sym->intrin
       );
@@ -476,14 +478,14 @@ static constexpr auto INTRIN_COLON = (Sym){
   .name.buf = ":",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_COLON_COLON = (Sym){
   .name.buf = "::",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon_colon,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_COLON_NAMED = (Sym){
@@ -491,7 +493,7 @@ static constexpr auto INTRIN_COLON_NAMED = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon_named,
   .inp_len  = 2,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_COLON_COLON_NAMED = (Sym){
@@ -499,14 +501,14 @@ static constexpr auto INTRIN_COLON_COLON_NAMED = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon_colon_named,
   .inp_len  = 2,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_SEMICOLON = (Sym){
   .name.buf  = ";",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_semicolon,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -527,7 +529,7 @@ static constexpr auto INTRIN_RET = (Sym){
   .name.buf  = "ret",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_ret,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -535,8 +537,22 @@ static constexpr auto INTRIN_RECUR = (Sym){
   .name.buf  = "recur",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_recur,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
+};
+
+static constexpr USED auto INTRIN_TRY = (Sym){
+  .name.buf = "try",
+  .wordlist = WORDLIST_COMP,
+  .intrin   = (void *)intrin_try,
+  .throws   = true,
+};
+
+static constexpr USED auto INTRIN_THROW = (Sym){
+  .name.buf = "throw",
+  .wordlist = WORDLIST_COMP,
+  .intrin   = (void *)intrin_throw,
+  .throws   = true,
 };
 
 static constexpr USED auto INTRIN_CATCH = (Sym){
@@ -544,22 +560,24 @@ static constexpr USED auto INTRIN_CATCH = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_catch,
   .inp_len  = 1,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
-static constexpr USED auto INTRIN_THROW = (Sym){
-  .name.buf = "throw",
-  .wordlist = WORDLIST_COMP,
-  .intrin   = (void *)intrin_throw,
-  .err      = ERR_MODE_THROW,
-};
-
-static constexpr auto INTRIN_THROWS = (Sym){
-  .name.buf  = "throws",
+static constexpr auto INTRIN_CATCHES = (Sym){
+  .name.buf  = "catches",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_throws,
+  .intrin    = (void *)intrin_catches,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr auto INTRIN_GET_CATCHES = (Sym){
+  .name.buf  = "get_catches",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_get_catches,
+  .out_len   = 1,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -568,7 +586,7 @@ static constexpr auto INTRIN_COMP_ONLY = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_only,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -576,7 +594,7 @@ static constexpr auto INTRIN_INLINE = (Sym){
   .name.buf  = "inline",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -584,7 +602,7 @@ static constexpr auto INTRIN_REDEFINE = (Sym){
   .name.buf  = "redefine",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_redefine,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -593,7 +611,7 @@ static constexpr auto INTRIN_HERE = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_here,
   .out_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -602,7 +620,7 @@ static constexpr auto INTRIN_COMP_INSTR = (Sym){
   .wordlist    = WORDLIST_EXEC,
   .intrin      = (void *)intrin_comp_instr,
   .inp_len     = 1,
-  .err         = ERR_MODE_THROW,
+  .throws      = true,
   .comp_only   = true,
   .interp_only = true,
 };
@@ -612,7 +630,7 @@ static constexpr auto INTRIN_COMP_LOAD = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_load,
   .inp_len   = 2,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -622,7 +640,7 @@ static constexpr auto INTRIN_ALLOC_DATA = (Sym){
   .intrin   = (void *)intrin_alloc_data,
   .inp_len  = 2, // ( buf len -- addr ) ; buffer address may be nil
   .out_len  = 1,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
@@ -631,7 +649,7 @@ static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
   .intrin    = (void *)intrin_comp_page_addr,
   .inp_len   = 2, // ( adr reg -- )
   .out_len   = 0,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -641,7 +659,7 @@ static constexpr auto INTRIN_COMP_PAGE_LOAD = (Sym){
   .intrin    = (void *)intrin_comp_page_load,
   .inp_len   = 2, // ( adr reg -- )
   .out_len   = 0,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -650,7 +668,7 @@ static constexpr auto INTRIN_COMP_CALL = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_call,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -658,14 +676,14 @@ static constexpr auto INTRIN_QUIT = (Sym){
   .name.buf = "quit",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_quit,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_CHAR = (Sym){
   .name.buf = "char",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_char,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_PARSE = (Sym){
@@ -674,7 +692,7 @@ static constexpr auto INTRIN_PARSE = (Sym){
   .intrin   = (void *)intrin_parse,
   .inp_len  = 1,
   .out_len  = 2,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_PARSE_WORD = (Sym){
@@ -682,7 +700,7 @@ static constexpr auto INTRIN_PARSE_WORD = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_parse_word,
   .out_len  = 2,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_IMPORT = (Sym){
@@ -690,21 +708,21 @@ static constexpr auto INTRIN_IMPORT = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import,
   .inp_len  = 2,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_IMPORT_QUOTE = (Sym){
   .name.buf = "import\"",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import_quote,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_IMPORT_TICK = (Sym){
   .name.buf = "import'",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import_tick,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_EXTERN_GOT = (Sym){
@@ -713,7 +731,7 @@ static constexpr auto INTRIN_EXTERN_GOT = (Sym){
   .intrin   = (void *)intrin_extern_got,
   .inp_len  = 2,
   .out_len  = 1,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_EXTERN_PROC = (Sym){
@@ -721,7 +739,7 @@ static constexpr auto INTRIN_EXTERN_PROC = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_extern_proc,
   .inp_len  = 2,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_FIND_WORD = (Sym){
@@ -730,7 +748,7 @@ static constexpr auto INTRIN_FIND_WORD = (Sym){
   .intrin   = (void *)intrin_find_word,
   .inp_len  = 3,
   .out_len  = 1,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_INLINE_WORD = (Sym){
@@ -738,7 +756,7 @@ static constexpr auto INTRIN_INLINE_WORD = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline_word,
   .inp_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -747,7 +765,7 @@ static constexpr auto INTRIN_EXECUTE = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_execute,
   .inp_len  = 1,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_COMP_NAMED_LOCAL = (Sym){
@@ -756,7 +774,7 @@ static constexpr auto INTRIN_COMP_NAMED_LOCAL = (Sym){
   .intrin    = (void *)intrin_comp_named_local,
   .inp_len   = 2,
   .out_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -765,7 +783,7 @@ static constexpr auto INTRIN_COMP_ANON_LOCAL = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_anon_local,
   .out_len   = 1,
-  .err       = ERR_MODE_THROW,
+  .throws    = true,
   .comp_only = true,
 };
 
@@ -791,7 +809,7 @@ static constexpr auto INTRIN_DEBUG_THROW = (Sym){
   .name.buf = "debug_throw",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_throw,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_STACK_LEN = (Sym){
@@ -835,28 +853,28 @@ static constexpr auto INTRIN_DEBUG_MEM = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_mem,
   .inp_len  = 1,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_WORD = (Sym){
   .name.buf = "debug'",
   .wordlist = WORDLIST_COMP,
   .intrin   = (void *)debug_word,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_DIS = (Sym){
   .name.buf = "dis'",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_dis,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 static constexpr auto INTRIN_DEBUG_SYNC_CODE = (Sym){
   .name.buf = "debug_sync_code",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_sync_code,
-  .err      = ERR_MODE_THROW,
+  .throws   = true,
 };
 
 #ifdef NATIVE_CALL_CONV

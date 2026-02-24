@@ -244,7 +244,7 @@ static Err comp_validate_ret_args(Comp *comp) {
   try(comp_require_current_sym(comp, &sym));
   try(comp_validate_args(comp, "unable to compile return", sym->out_len));
 
-  if (sym->err != ERR_MODE_THROW) return nullptr;
+  if (!sym->throws) return nullptr;
   if (sym->out_len < ASM_OUT_PARAM_REG_LEN) return nullptr;
 
   return errf(
@@ -324,8 +324,8 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   */
   try(comp_clobber_regs(comp, callee->clobber));
 
-  if (callee->err == ERR_MODE_THROW) {
-    // Exceptions implicitly use an additional output register.
+  // Exceptions implicitly use an additional output register.
+  if (callee->throws) {
     try(comp_clobber_reg(comp, callee->out_len));
   }
   return nullptr;
@@ -602,14 +602,13 @@ static Err comp_after_append_call(
   const auto ctx = &comp->ctx;
 
   /*
-  An error / exception, if any, is always returned in the last output
-  register. `asm_append_call_norm` decides how to handle it depending
-  on the caller's throw / no-throw mode; we can also force a "catch".
-  Here we just need to adjust the argument count for no-throw callers
-  by appending the error.
+  An exception, if any, is always returned in the last output register.
+  `asm_append_call_norm` decides how to handle it depending on whether
+  the caller prefers automatic "catch"; we can also force a "catch".
+  Here we only need to adjust the argument count when "catching".
   */
   if (catch) {
-    aver(callee->err == ERR_MODE_THROW);
+    aver(callee->throws);
     ctx->arg_len = callee->out_len + 1;
   }
   else {
@@ -756,9 +755,11 @@ static Err comp_alloca(Comp *comp) {
   return nullptr;
 }
 
-static Err comp_append_throw(Comp *comp, const Sym *sym) {
-  aver(sym->err == ERR_MODE_THROW);
-  try(comp_validate_args(comp, "unable to throw", 1));
+static Err comp_append_try_or_throw(
+  Comp *comp, const Sym *sym, const char *msg, void(asm_append)(Comp *)
+) {
+  aver(sym->throws);
+  try(comp_validate_args(comp, msg, 1));
   comp_clear_args(comp);
 
   const auto src_reg = ASM_PARAM_REG_0;
@@ -770,8 +771,24 @@ static Err comp_append_throw(Comp *comp, const Sym *sym) {
     asm_append_mov_reg(comp, (U8)tar_reg, (U8)src_reg);
   }
 
-  asm_append_fixup_throw(comp); // b <err_epi>
+  asm_append(comp);
   return nullptr;
+}
+
+static void comp_asm_append_try(Comp *comp) {
+  asm_append_fixup_try(comp, ASM_PARAM_REG_0);
+}
+
+static Err comp_append_try(Comp *comp, const Sym *sym) {
+  return comp_append_try_or_throw(
+    comp, sym, "unable to `try`", comp_asm_append_try
+  );
+}
+
+static Err comp_append_throw(Comp *comp, const Sym *sym) {
+  return comp_append_try_or_throw(
+    comp, sym, "unable to `throw`", asm_append_fixup_throw
+  );
 }
 
 static const char *loc_fixup_fmt(Loc_fixup *fix) {
@@ -799,7 +816,7 @@ static const char *loc_fixup_fmt(Loc_fixup *fix) {
         val->instr,
         val->reg,
         val->prev,
-        fmt_bool(val->confirmed)
+        bool_str(val->confirmed)
       );
     }
     default: unreachable();

@@ -286,10 +286,8 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   sym_auto_interp_only(caller, callee);
   try(sym_auto_throws(caller, callee));
 
-  const auto catch = caller->err == ERR_MODE_NO_THROW &&
-    callee->err == ERR_MODE_THROW;
-
-  bool inlined = false;
+  const auto catch = caller->catches && callee->throws;
+  bool inlined     = false;
 
   switch (callee->type) {
     case SYM_NORM: {
