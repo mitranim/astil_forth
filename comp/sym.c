@@ -176,3 +176,11 @@ static void sym_auto_inlinable(Sym *sym) {
     eprintf("[system] symbol " FMT_QUOTED " is auto-inlinable\n", sym->name.buf)
   );
 }
+
+static const char *wordlist_name(Wordlist val) {
+  switch (val) {
+    case WORDLIST_EXEC: return "execution-time words";
+    case WORDLIST_COMP: return "compile-time words";
+    default:            return "unknown wordlist";
+  }
+}

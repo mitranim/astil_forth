@@ -219,6 +219,10 @@ static Err err_word_undefined_in_wordlist(const char *name, Wordlist list) {
   return errf("word " FMT_QUOTED " not found in wordlist %d", name, list);
 }
 
+static Err err_word_undefined_in_each_wordlist(const char *name) {
+  return errf("word " FMT_QUOTED " not found in any wordlist", name);
+}
+
 static Err err_word_comp_only(const char *name) {
   return errf("word " FMT_QUOTED " is compile-time only", name);
 }

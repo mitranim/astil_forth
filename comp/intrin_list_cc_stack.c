@@ -53,5 +53,6 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_DEBUG_TOP_STR,     // debug_top_str
   INTRIN_DEBUG_MEM,         // debug_mem
   INTRIN_DEBUG_WORD,        // debug'
+  INTRIN_DEBUG_DIS,         // dis'
   INTRIN_DEBUG_SYNC_CODE,   // debug_sync_code
 };

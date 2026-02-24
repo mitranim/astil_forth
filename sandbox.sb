@@ -12,14 +12,9 @@
 (allow network* (remote ip "localhost:*"))
 (allow network* (local ip "localhost:*"))
 
-; The bot-suggested stuff below is supposed to allow sanitizers
-; to spawn a symbolizer (to stop it complaining). Doesn't work.
-; Wouldn't make a difference anyway.
-
-; (allow process-fork)
-
-; ; xcrun --find llvm-symbolizer
-; (allow process-exec (literal "/opt/homebrew/opt/llvm/bin/llvm-symbolizer"))
-
-; ; xcrun --find atos
-; (allow process-exec (literal "/Applications/Xcode.app/Contents/Developer/usr/bin/atos"))
+; We whitelist a few executables for debugging: disassembler,
+; symbolizer, etc. See the makefile for the listing.
+(allow process-fork)
+(allow process-exec (literal (param "EXE0")))
+(allow process-exec (literal (param "EXE1")))
+(allow process-exec (literal (param "EXE2")))

@@ -52,9 +52,22 @@ build: $(MAIN_S) $(MAIN)
 build_w:
 	$(WATCH_COMP) -- $(MAKE) clean build
 
+# We use sandboxing to prevent buggy JIT-ted code from accidentally
+# deleting the entire filesystem, launching nuclear missiles, etc..
+# However, we whitelist a few child executables used for debugging.
+EXE0 = $(shell realpath $$(which llvm-mc))
+EXE1 = $(shell realpath $$(xcrun --find llvm-symbolizer))
+EXE2 = $(shell realpath $$(xcrun --find atos))
+
 .PHONY: run_file
 run_file:
-	rlwrap -n sandbox-exec -f sandbox.sb -D MAIN="$(PWD)/$(file)" ./$(file) $(args)
+	rlwrap -n sandbox-exec \
+	  -f sandbox.sb \
+		-D MAIN="$(PWD)/$(file)" \
+		-D EXE0=$(EXE0) \
+		-D EXE1=$(EXE1) \
+		-D EXE2=$(EXE2) \
+		./$(file) $(args)
 
 # Register-CC version.
 .PHONY: run

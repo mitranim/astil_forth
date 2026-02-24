@@ -182,6 +182,34 @@ static const char *file_path_stdio(const char *path) {
   return nullptr;
 }
 
+static Err write_all(int file, const U8 *buf, Ind len, int *out_err) {
+  while (len) {
+    auto wrote = write(file, buf, len);
+
+    if (wrote > 0) {
+      aver(wrote <= len);
+      buf += wrote;
+      len -= wrote;
+      continue;
+    }
+
+    const auto err = errno;
+    if (err == EINTR) continue;
+    if (err == EPIPE) return nullptr; // File closed early.
+
+    if (out_err) *out_err = err;
+    const auto msg = strerror(err);
+
+    if (!msg) {
+      return errf("unable to fully write to file %d; code: %d", file, err);
+    }
+    return errf(
+      "unable to fully write to file %d; code: %d; msg: %s", file, err, msg
+    );
+  }
+  return nullptr;
+}
+
 /*
 #include "./mem.c"
 

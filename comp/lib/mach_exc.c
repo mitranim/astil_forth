@@ -150,9 +150,11 @@ static Err mach_exception_init(exception_mask_t exception_types) {
 static Err mach_exception_server_init(pthread_t *out) {
   pthread_t tmp;
   if (!out) out = &tmp;
-  return err_direct(pthread_create(out, nullptr, mach_on_exceptions, nullptr));
+  return err_errno_posix(
+    pthread_create(out, nullptr, mach_on_exceptions, nullptr)
+  );
 }
 
 static Err mach_exception_server_deinit(pthread_t val) {
-  return err_direct(pthread_kill(val, SIGTERM));
+  return err_errno_posix(pthread_kill(val, SIGTERM));
 }

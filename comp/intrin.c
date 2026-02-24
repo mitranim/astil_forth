@@ -11,6 +11,7 @@ convention. Intrinsics which do are located in dedicated files.
 #pragma once
 #include "./comp.c"
 #include "./interp_internal.c"
+#include "./lib/spawn.c"
 
 static Err err_nested_definition(const Interp *interp) {
   Sym *sym;
@@ -265,6 +266,8 @@ static void debug_top_str(Interp *interp) {
 }
 
 static void interp_repr_sym(const Interp *interp, const Sym *sym) {
+  const auto list_name = wordlist_name(sym->wordlist);
+
   switch (sym->type) {
     case SYM_NORM: {
       fprintf(
@@ -272,7 +275,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug] word:\n"
         "[debug]   addr:            %p\n"
         "[debug]   name:            %s\n"
-        "[debug]   wordlist:        %d\n"
+        "[debug]   wordlist:        %d (%s)\n"
         "[debug]   type:            normal\n"
 #ifdef NATIVE_CALL_CONV
         "[debug]   inp_len:         %d\n"
@@ -295,6 +298,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         sym,
         sym->name.buf,
         sym->wordlist,
+        list_name,
 #ifdef NATIVE_CALL_CONV
         sym->inp_len,
         sym->out_len,
@@ -324,9 +328,9 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
     case SYM_INTRIN: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   addr:            %p\n"
+        "[debug]   addr:               %p\n"
         "[debug]   name:               %s\n"
-        "[debug]   wordlist:           %d\n"
+        "[debug]   wordlist:           %d (%s)\n"
         "[debug]   type:               intrinsic\n"
         "[debug]   inp_len:            %d\n"
         "[debug]   out_len:            %d\n"
@@ -336,6 +340,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         sym,
         sym->name.buf,
         sym->wordlist,
+        list_name,
         sym->inp_len,
         sym->out_len,
         sym->err,
@@ -351,12 +356,13 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug] word:\n"
         "[debug]   addr:           %p\n"
         "[debug]   name:           %s\n"
-        "[debug]   wordlist:       %d\n"
+        "[debug]   wordlist:       %d (%s)\n"
         "[debug]   type:           extern\n"
         "[debug]   extern address: %p\n",
         sym,
         sym->name.buf,
         sym->wordlist,
+        list_name,
         sym->exter
       );
       return;
@@ -364,6 +370,49 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
 
     default: unreachable();
   }
+}
+
+static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
+  if (sym->type != SYM_NORM) {
+    return errf(
+      "unable to disassemble " FMT_QUOTED ": not a Forth word", sym->name.buf
+    );
+  }
+
+  const auto comp = &interp->comp;
+  const U8  *floor;
+  const U8  *ceil;
+  try(comp_sym_instr_range(
+    comp, sym, (const Instr **)&floor, (const Instr **)&ceil
+  ));
+
+  eprintf(
+    "[debug] dissassembly of " FMT_QUOTED " in wordlist %d (%s):\n",
+    sym->name.buf,
+    sym->wordlist,
+    wordlist_name(sym->wordlist)
+  );
+
+  /*
+  Sadly `llvm-mc` doesn't seem to support disassembling actual raw bytes,
+  so we have to convert them to hex first.
+  */
+  const auto              src_len = (Ind)(ceil - floor);
+  const auto              len     = src_len * 2;
+  defer(mem_deinit) void *buf     = malloc(len);
+  fmt_bytes_hex_into(buf, len, floor, src_len);
+
+  const auto  proc   = "llvm-mc";
+  char *const argv[] = {proc, "--disassemble", "--hex", nullptr};
+  pid_t       pid;
+  int         status;
+  try(spawn_with_stdin(argv, buf, len, &pid));
+  try_errno(waitpid(pid, &status, 0));
+
+  if (status || DEBUG) {
+    eprintf("[debug] %s exited with code %d\n", proc, status);
+  }
+  return nullptr;
 }
 
 static Err debug_word(Interp *interp) {
@@ -377,7 +426,21 @@ static Err debug_word(Interp *interp) {
   if (comp) interp_repr_sym(interp, comp);
 
   if (exec || comp) return nullptr;
-  return errf("word " FMT_QUOTED " is not present in any wordlist\n", name);
+  return err_word_undefined_in_each_wordlist(name);
+}
+
+static Err debug_dis(Interp *interp) {
+  try(interp_read_word(interp));
+  const auto name = interp->reader->word.buf;
+
+  const auto exec = dict_get(&interp->dict_exec, name);
+  if (exec) try(interp_disasm_sym(interp, exec));
+
+  const auto comp = dict_get(&interp->dict_comp, name);
+  if (comp) try(interp_disasm_sym(interp, comp));
+
+  if (exec || comp) return nullptr;
+  return err_word_undefined_in_each_wordlist(name);
 }
 
 static Err debug_sync_code(Interp *interp) {
@@ -779,6 +842,13 @@ static constexpr auto INTRIN_DEBUG_WORD = (Sym){
   .name.buf = "debug'",
   .wordlist = WORDLIST_COMP,
   .intrin   = (void *)debug_word,
+  .err      = ERR_MODE_THROW,
+};
+
+static constexpr auto INTRIN_DEBUG_DIS = (Sym){
+  .name.buf = "dis'",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)debug_dis,
   .err      = ERR_MODE_THROW,
 };
 

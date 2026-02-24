@@ -50,7 +50,10 @@ value may be either useful, or the -1 sentinel.
   ((expr) == -1 ? err_from_errno(errno, #expr, __func__, __FILE__, __LINE__) \
                 : nullptr)
 
-#define err_direct(expr)                                                   \
+// For procedures which directly return errno or 0.
+#define try_errno_posix(expr) try(err_errno_posix(expr))
+
+#define err_errno_posix(expr)                                              \
   ({                                                                       \
     const auto tmp_err = expr;                                             \
     tmp_err ? err_from_errno(tmp_err, #expr, __func__, __FILE__, __LINE__) \

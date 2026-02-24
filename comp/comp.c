@@ -336,6 +336,8 @@ Prints instructions as hexpairs in the system's endian order,
 which is usually little endian. How to disassemble:
 
   echo <hex> | llvm-mc --disassemble --hex
+
+Note that we also provide intrinsic `dis'` which prints disassembly.
 */
 static void comp_debug_print_sym_instrs(
   const Comp *comp, const Sym *sym, const char *prefix
@@ -378,6 +380,21 @@ static void comp_debug_print_sym_instrs(
     eprint_byte_range_hex((U8 *)floor, (U8 *)ceil);
     fputc('\n', stderr);
   }
+}
+
+static Err comp_sym_instr_range(
+  Comp *comp, const Sym *sym, const Instr **floor, const Instr **ceil
+) {
+  const auto code   = &comp->code;
+  const auto instrs = &code->code_exec;
+  const auto spans  = &sym->norm.spans;
+
+  try(comp_code_ensure_sym_ready(code, sym));
+  aver(spans->ceil > spans->prologue);
+
+  if (floor) *floor = &instrs->dat[spans->prologue];
+  if (ceil) *ceil = &instrs->dat[spans->ceil];
+  return nullptr;
 }
 
 static Err comp_append_ret(Comp *comp) {
