@@ -138,8 +138,8 @@ static void sym_auto_inlinable(Sym *sym) {
 
 static const char *wordlist_name(Wordlist val) {
   switch (val) {
-    case WORDLIST_EXEC: return "execution-time words";
-    case WORDLIST_COMP: return "compile-time words";
+    case WORDLIST_EXEC: return "WORDLIST_EXEC";
+    case WORDLIST_COMP: return "WORDLIST_COMP";
     default:            return "unknown wordlist";
   }
 }

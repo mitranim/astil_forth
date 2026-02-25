@@ -336,7 +336,7 @@ static Err err_read_buf_over(U8 delim) {
   );
 }
 
-static Err read_until(Reader *read, U8 delim) {
+static Err read_until_char(Reader *read, U8 delim) {
   const auto buf = &read->buf;
   str_trunc(buf);
 
@@ -356,4 +356,13 @@ static Err read_until(Reader *read, U8 delim) {
   }
 
   return err_read_buf_over(delim);
+}
+
+// TODO: expose an intrinsic with this.
+static Err read_until_word(Reader *read, const char *delim) {
+  for (;;) {
+    try(read_word(read));
+    if (str_eq(&read->word, delim)) break;
+  }
+  return nullptr;
 }

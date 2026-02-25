@@ -18,6 +18,7 @@ typedef stack_of(Local)  Local_stack;
 typedef dict_of(Local *) Local_dict;
 
 // Transient context used in compilation of a single word.
+// SYNC[comp_ctx_rewind].
 typedef struct {
   Sym        *sym;
   Asm_fixups  asm_fix;

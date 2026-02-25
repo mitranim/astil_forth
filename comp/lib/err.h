@@ -67,7 +67,7 @@ value may be either useful, or the -1 sentinel.
     Err tmp_err = (expr);                      \
     if (tmp_err) {                             \
       fprintf(stderr, "error: %s\n", tmp_err); \
-      backtrace_print();                       \
+      if (TRACE) backtrace_print();            \
       if (DEBUG) abort();                      \
       return 1;                                \
     }                                          \

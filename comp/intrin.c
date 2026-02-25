@@ -183,7 +183,7 @@ static Err interp_parse_word(Interp *interp, const char **out_buf, Ind *out_len)
 static Err intrin_import_quote(Interp *interp) {
   const auto read = interp->reader;
   read_skip_whitespace(read);
-  try(read_until(read, '"'));
+  try(read_until_char(read, '"'));
   try(interp_import(interp, (const char *)read->buf.buf));
   return nullptr;
 }

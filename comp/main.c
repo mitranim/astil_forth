@@ -41,7 +41,6 @@ static void print_help(void) {
 
 static Err run(int argc, const char **argv) {
   bool timing = false;
-  try(env_bool("DEBUG", &DEBUG));
   try(env_bool("TIMING", &timing));
 
   Interp interp = {};
@@ -65,14 +64,14 @@ int main(int argc, const char **argv) {
     return 0;
   }
 
-  bool trace = false;
-  try_main(env_bool("TRACE", &trace));
+  try_main(env_bool("DEBUG", &DEBUG));
+  try_main(env_bool("TRACE", &TRACE));
 
   const auto err = run(argc, argv);
   if (!err || err == ERR_QUIT) return 0;
 
   fprintf(stderr, "error: %s\n", err);
-  if (trace) backtrace_print();
+  if (TRACE) backtrace_print();
   if (DEBUG) abort();
   return 1;
 }

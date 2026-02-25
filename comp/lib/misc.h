@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 static thread_local bool DEBUG = false;
+static thread_local bool TRACE = false;
 
 #ifdef PROD
 #define IF_DEBUG(code)

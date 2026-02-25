@@ -143,6 +143,8 @@ When invoking an immediate word, its arguments come from the data stack,
 and its outputs go back into the data stack. All of this happens without
 any effects on the compile-time context by default. Some immediate words
 choose to affect compilation by invoking various compiler intrinsics.
+
+SYNC[comp_ctx_rewind].
 */
 typedef struct {
   Sym        *sym;        // What we're currently compiling.

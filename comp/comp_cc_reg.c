@@ -112,6 +112,28 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->redefining);
 }
 
+// SYNC[comp_ctx_rewind].
+static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
+  tar->sym        = snap->sym;
+  tar->anon_locs  = snap->anon_locs;
+  tar->fp_off     = snap->fp_off;
+  tar->vol_regs   = snap->vol_regs;
+  tar->arg_low    = snap->arg_low;
+  tar->arg_len    = snap->arg_len;
+  tar->redefining = snap->redefining;
+  tar->compiling  = snap->compiling;
+  tar->has_alloca = snap->has_alloca;
+
+  stack_rewind(&snap->locals, &tar->locals);
+  dict_rewind(&snap->local_dict, &tar->local_dict);
+  stack_rewind(&snap->asm_fix, &tar->asm_fix);
+  stack_rewind(&snap->loc_fix, &tar->loc_fix);
+
+  for (Ind ind = 0; ind < arr_cap(tar->reg_vals); ind++) {
+    tar->reg_vals[ind] = snap->reg_vals[ind];
+  }
+}
+
 // Returns a token representing a local which can be given to Forth code.
 // In the stack-based calling convention, this returns a different value.
 static Local *local_token(Local *loc) { return loc; }

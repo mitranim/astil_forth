@@ -20,10 +20,11 @@ Should be used when handling errors in REPL mode.
 TODO: drop currently being defined symbol from list and dict.
 Our dicts don't support deletion at the moment.
 */
-static void interp_rewind(Interp *interp) {
+static Err interp_rewind(Interp *interp) {
   const auto snap = &interp->snap;
+  const auto sym  = interp->comp.ctx.sym;
 
-  interp->comp = comp_rewind(snap->comp, interp->comp);
+  comp_rewind(&interp->comp, &snap->comp);
   stack_trunc_to(&interp->ints, snap->ints_len);
 
   const auto syms     = &interp->syms;
@@ -43,6 +44,27 @@ static void interp_rewind(Interp *interp) {
   */
 
   stack_trunc_to(syms, len_prev);
+
+  if (!sym) {
+    IF_DEBUG(eprintf("[debug] rewound interpreter state\n"));
+    return nullptr;
+  }
+
+  /*
+  A hack which should be good enough. When compilation of a word fails,
+  parse until `;` to exit the definition. Without this, when we continue
+  interpretation, we would keep reading buffered text INSIDE that word,
+  but without its compilation context, which would be broken anyway.
+  */
+  try(read_until_word(interp->reader, ";"));
+
+  IF_DEBUG(eprintf(
+    "[debug] rewound interpreter state and exited the definition of " FMT_QUOTED
+    "\n",
+    sym->name.buf
+  ));
+
+  return nullptr;
 }
 
 /*
@@ -71,10 +93,10 @@ Chuck circa June 1970 (PPOL): "type the offending word"; "reset all stacks".
 
 We can afford slightly more informative error messages.
 */
-static void interp_handle_err(Interp *interp, Err err) {
+static Err interp_handle_err(Interp *interp, Err err) {
   eprintf(TTY_RED_BEG "error:" TTY_RED_END " %s\n", err);
-  backtrace_print();
-  interp_rewind(interp);
+  if (TRACE) backtrace_print();
+  return interp_rewind(interp);
 }
 
 static Err err_unrecognized_wordlist(Wordlist val) {
@@ -348,7 +370,7 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
   for (;;) {
     const auto err = interp_err(read, interp_loop(interp));
     if (!err) return nullptr;
-    interp_handle_err(interp, err);
+    try(interp_handle_err(interp, err));
   }
   return nullptr;
 }
@@ -472,7 +494,7 @@ static Err interp_parse_until(
 ) {
   const auto read = interp->reader;
   read_skip_space(read);
-  try(read_until(read, (U8)delim));
+  try(read_until_char(read, (U8)delim));
 
   // IF_DEBUG(eprintf(
   //   "[system] parsed until delim " FMT_CHAR "; length: " FMT_UINT

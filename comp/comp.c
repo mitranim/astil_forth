@@ -231,15 +231,8 @@ static Err comp_deinit(Comp *comp) {
   return nullptr;
 }
 
-static Comp_ctx comp_ctx_rewind(Comp_ctx prev, Comp_ctx next) {
-  stack_rewind(&next.locals, &prev.locals);
-  dict_rewind(&next.local_dict, &prev.local_dict);
-  return next;
-}
-
-static Comp comp_rewind(Comp prev, Comp next) {
-  next.ctx = comp_ctx_rewind(prev.ctx, next.ctx);
-  return next;
+static void comp_rewind(Comp *tar, Comp *snap) {
+  comp_ctx_rewind(&tar->ctx, &snap->ctx);
 }
 
 static const U64 *comp_find_dysym(Comp *comp, const char *name) {

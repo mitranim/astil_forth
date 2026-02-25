@@ -21,7 +21,8 @@ The special registers must be kept in sync with `lang.f`.
 
 static Err err_call_arity_mismatch(const char *name, U8 inp_len, Sint ints_len) {
   return errf(
-    "unable to call symbol %s: %d input parameters required, but only " FMT_SINT
+    "unable to call " FMT_QUOTED
+    ": %d input parameters required, but only " FMT_SINT
     " are available on the data stack\n",
     name,
     inp_len,
