@@ -73,7 +73,7 @@ static Err comp_inline_sym(
   return nullptr;
 }
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
 #include "./comp_cc_reg.c"
 #else
 #include "./comp_cc_stack.c"

@@ -63,7 +63,7 @@ static Err intrin_semicolon(Interp *interp) {
   const auto comp  = &interp->comp;
   const auto redef = interp->comp.ctx.redefining; // Snapshot before clearing.
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
   try(comp_validate_ret_args(comp));
 #endif
 
@@ -277,7 +277,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   name:            %s\n"
         "[debug]   wordlist:        %d (%s)\n"
         "[debug]   type:            normal\n"
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
         "[debug]   inp_len:         %d\n"
         "[debug]   out_len:         %d\n"
         "[debug]   clobber:         0b%s\n"
@@ -300,7 +300,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         sym->name.buf,
         sym->wordlist,
         list_name,
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
         sym->inp_len,
         sym->out_len,
         uint32_to_bit_str((U32)sym->clobber),
@@ -451,7 +451,7 @@ static Err debug_sync_code(Interp *interp) {
   return nullptr;
 }
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
 #include "./intrin_cc_reg.c"
 #else
 #include "./intrin_cc_stack.c"
@@ -877,7 +877,7 @@ static constexpr auto INTRIN_DEBUG_SYNC_CODE = (Sym){
   .throws   = true,
 };
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
 #include "./intrin_list_cc_reg.c" // IWYU pragma: export
 #else
 #include "./intrin_list_cc_stack.c" // IWYU pragma: export

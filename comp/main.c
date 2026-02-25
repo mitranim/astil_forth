@@ -7,7 +7,7 @@
 
 // #include "./mach_exec.c"
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
 static Err init_exception_handling(void) { return nullptr; }
 #else
 #include "./mach_exc.c"

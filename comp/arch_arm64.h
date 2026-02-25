@@ -86,7 +86,7 @@ static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 
 static constexpr U8 ASM_REG_INTERP = 28;
 
-#ifndef NATIVE_CALL_CONV
+#ifdef CALL_CONV_STACK
 
 /*
 Using `x0` as the error register exactly matches how we return errors in C.
@@ -97,7 +97,7 @@ static constexpr U8 ASM_REG_ERR       = ASM_PARAM_REG_0;
 static constexpr U8 ASM_REG_INT_TOP   = 27; // Interp.ints.top
 static constexpr U8 ASM_REG_INT_FLOOR = 26; // Interp.ints.floor
 
-#endif // NATIVE_CALL_CONV
+#endif // CALL_CONV_STACK
 
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {

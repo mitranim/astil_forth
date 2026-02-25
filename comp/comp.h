@@ -46,7 +46,7 @@ typedef struct {
 
 typedef stack_of(Asm_fixup) Asm_fixups;
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
 #include "./comp_cc_reg.h"
 #else
 #include "./comp_cc_stack.h"

@@ -1117,7 +1117,7 @@ static Err err_catch_no_throw(const char *callee) {
   );
 }
 
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
 #include "./arch_arm64_cc_reg.c" // IWYU pragma: export
 #else
 #include "./arch_arm64_cc_stack.c" // IWYU pragma: export
@@ -1246,7 +1246,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   }
 
 // TODO organize better, preferably by ripping out stack-CC.
-#ifdef NATIVE_CALL_CONV
+#ifndef CALL_CONV_STACK
   asm_fixup_locals(comp, sym);
 #endif
 

@@ -90,10 +90,10 @@ run_s_w:
 	$(WATCH_IMM) -- $(MAKE) run_s
 
 $(MAIN): $(ALL_SRC) $(ASM_GEN_OUT)
-	$(CC) $(CFLAGS) -DNATIVE_CALL_CONV $(MAIN_SRC) -o $@
+	$(CC) $(CFLAGS) $(MAIN_SRC) -o $@
 
 $(MAIN_S): $(ALL_SRC) $(ASM_GEN_OUT)
-	$(CC) $(CFLAGS) $(MAIN_SRC) -o $@
+	$(CC) $(CFLAGS) -DCALL_CONV_STACK $(MAIN_SRC) -o $@
 
 # Usage example:
 #
