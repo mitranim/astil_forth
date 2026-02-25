@@ -36,7 +36,7 @@ All of the code is authored by me. None is bot-generated.
 ## Show me the code!
 
 ```forth
-import' forth/lang.f
+import' std:lang.f
 
 : main
   log" hello world!" lf
@@ -60,30 +60,52 @@ main
 
 ## Usage
 
+With global installation:
+
+```sh
+make install
+
+# Register-based calling convention.
+astil std:lang.f -  # REPL mode.
+astil some_file.f   # One-shot run.
+astil some_file.f - # Run file, then REPL.
+
+# Stack-based calling convention.
+astil_s std:lang_s.f - # REPL mode.
+astil_s some_file.f    # One-shot run.
+astil_s some_file.f -  # Run file, then REPL.
+```
+
+Don't forget to `import' std:lang.f` (or `lang_s.f` for stack-CC) inside your program, or on the command line. Without it, the language does not exist.
+
+Local-only usage inside this repo:
+
 ```sh
 make
 
 # Register-based calling convention.
 ./astil.exe forth/lang.f - # REPL mode.
-./astil.exe forth/test.f   # One-shot run.
+./astil.exe some_file.f    # One-shot run.
+./astil.exe some_file.f -  # Run file, then REPL.
 
 # Stack-based calling convention.
 ./astil_s.exe forth/lang_s.f - # REPL mode.
-./astil_s.exe forth/test_s.f   # One-shot run.
+./astil_s.exe some_file.f      # One-shot run.
+./astil_s.exe some_file.f -    # Run file, then REPL.
 ```
 
 Rebuild continuously while hacking:
 
 ```sh
-make build_w
+make clean build_w
 ```
 
-When debugging weird crashes, the following are useful:
+When debugging weird crashes, the following commands are useful:
 
 ```sh
 make debug_run '<file>'
-make debug_run '<file>' RECOVERY=false
 make debug_run '<file>' DEBUG=true
+make debug_run '<file>' RECOVERY=false
 ```
 
 ## Sublime Text
@@ -91,7 +113,7 @@ make debug_run '<file>' DEBUG=true
 Due to divergence from the standard, this dialect wants its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
 
 ```sh
-ln -sf "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
+ln -sfn "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
 ```
 
 Note that for standard-adjacent Forths, you should use the [sublime-forth](https://github.com/mitranim/sublime-forth) package, which is available on Package Control.
