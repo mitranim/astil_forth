@@ -5,6 +5,7 @@
 -Wunused-variable
 -Werror=return-type
 -Werror=format-insufficient-args
+-Wno-format-non-iso
 -Wno-pre-c23-compat
 -Wno-pre-c2y-compat
 -Wno-c++98-compat

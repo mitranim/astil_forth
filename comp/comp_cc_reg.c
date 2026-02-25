@@ -3,7 +3,7 @@ This file contains compilation logic for the register-based callvention
 which is mutually exclusive with the stack-based callvention.
 
 Ideally, this logic should be arch-independent, while arch-specific logic
-should be placed in `c_arch_*` files. However, currently it hardcodes the
+should be placed in `arch_*.c` files. However, currently it hardcodes the
 assumption that input and output registers match 1-to-1, which holds when
 targeting Arm64 and Risc-V, and maybe some other arches, but not for x64.
 
@@ -752,7 +752,7 @@ static Err comp_alloca_const(Comp *comp, Reg_val val) {
 // and x0, x0, 0xfffffffffffffff0
 // mov sp, x0
 static Err comp_alloca_dynamic(Comp *comp) {
-  asm_append_sub_reg(comp, ASM_PARAM_REG_0, ASM_REG_SP, ASM_PARAM_REG_0);
+  asm_append_sub_reg_ext(comp, ASM_PARAM_REG_0, ASM_REG_SP, ASM_PARAM_REG_0);
   asm_append_sp_align(comp, ASM_PARAM_REG_0);
   asm_append_add_imm(comp, ASM_REG_SP, ASM_PARAM_REG_0, 0);
   return nullptr;

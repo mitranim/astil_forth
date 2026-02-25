@@ -31,10 +31,11 @@ static Err spawn_with_stdin(
   posix_spawn_file_actions_addclose(&act, fd_read);
   posix_spawn_file_actions_addclose(&act, fd_write);
 
+  const auto               cmd  = argv[0];
   const posix_spawnattr_t *attr = nullptr;
   char *const             *env  = nullptr;
 
-  err = err_errno_posix(posix_spawnp(pid, argv[0], &act, attr, argv, env));
+  err = err_errno_posix(posix_spawnp(pid, cmd, &act, attr, argv, env));
   posix_spawn_file_actions_destroy(&act);
 
   // Parent doesn't need the read pipe.
@@ -42,7 +43,7 @@ static Err spawn_with_stdin(
 
   if (err) {
     close(fd_write);
-    return err;
+    return err_wrapf("unable to spawn `%2$s`: %1$s", err, cmd);
   }
 
   err = write_all(fd_write, buf, len, nullptr);

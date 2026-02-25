@@ -812,6 +812,19 @@ test_alloca_align
 ;
 test_alloca_big
 
+: test_alloca_dynamic { size0 size1 }
+  systack_ptr  { SP   }
+  size0 alloca { adr0 }
+  size1 alloca { adr1 }
+
+  T{ SP   adr0 - <T> size0 }T
+  T{ adr0 adr1 - <T> size1 }T
+
+  adr0 @ { -- } \ Should not segfault.
+  adr1 @ { -- } \ Should not segfault.
+;
+32 64 test_alloca_dynamic
+
 1 1 arr: Arr0
 2 1 arr: Arr1
 3 1 arr: Arr2

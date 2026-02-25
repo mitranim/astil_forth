@@ -2,9 +2,9 @@
 .include "comp/asm_generated.s"
 
 /*
-TODO find out if we can move this to `c_asm_gen.c` and share the number
-between C and asm without duplication. Adding this directive to the gen
-file doesn't seem to do anything; Clang ignores it.
+TODO find out if we can move this to `asm_gen.c` and share the number
+between C and asm without duplication. Moving this directive to the C
+gen file breaks it; Clang seems to ignore it in C.
 
 SYNC[asm_magic].
 */
@@ -35,7 +35,7 @@ asm_call_forth:
   stp x27, x28, [sp, -16]!
   mov x28, x2
 
-  // See comments in `c_mach_exc.c`.
+  // See comments in `mach_exc.c`.
   adrp x2, ASM_MAGIC@page
   add x2, x2, ASM_MAGIC@pageoff
   ldr x2, [x2]

@@ -706,7 +706,7 @@ static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
   averr(imm_unsigned(imm12, 12));
   averr(asm_validate_reg(src_reg));
   averr(asm_validate_reg(tar_reg));
-  return ((Instr)imm12 << 10) | ((Instr)src_reg << 5) | tar_reg;
+  return (Instr)tar_reg | ((Instr)src_reg << 5) | ((Instr)imm12 << 10);
 }
 
 static constexpr Uint ASM_ADD_SUB_SCALE = 12;
@@ -744,20 +744,29 @@ static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm) {
   asm_append_instr(comp, asm_instr_sub_imm(tar_reg, src_reg, imm));
 }
 
+// Shared by some integer arithmetic instructions.
 static Instr asm_pattern_arith_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
   averr(asm_validate_reg(src_reg));
   averr(asm_validate_reg(tar_reg));
   averr(asm_validate_reg(mod_reg));
-  return ((Instr)mod_reg << 16) | ((Instr)src_reg << 5) | tar_reg;
+  return (Instr)tar_reg | ((Instr)src_reg << 5) | ((Instr)mod_reg << 16);
 }
 
+// add Xd, Xt|sp, Xm
 static Instr asm_instr_add_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
   return (Instr)0b1'0'0'01011'00'0'00000'000000'00000'00000 |
     asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
 }
 
-static Instr asm_instr_sub_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
+// sub Xd, Xt|xzr, Xm
+static Instr asm_instr_sub_reg_lsl(U8 tar_reg, U8 src_reg, U8 mod_reg) {
   return (Instr)0b1'1'0'01011'00'0'00000'000000'00000'00000 |
+    asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
+}
+
+// sub Xd, Xt|sp, Xm
+static Instr asm_instr_sub_reg_ext(U8 tar_reg, U8 src_reg, U8 mod_reg) {
+  return (Instr)0b1'1'0'01011'00'1'00000'011'000'00000'00000 |
     asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
 }
 
@@ -765,8 +774,16 @@ static void asm_append_add_reg(Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg) {
   asm_append_instr(comp, asm_instr_add_reg(tar_reg, src_reg, mod_reg));
 }
 
-static void asm_append_sub_reg(Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg) {
-  asm_append_instr(comp, asm_instr_sub_reg(tar_reg, src_reg, mod_reg));
+static void asm_append_sub_reg_lsl(
+  Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg
+) {
+  asm_append_instr(comp, asm_instr_sub_reg_lsl(tar_reg, src_reg, mod_reg));
+}
+
+static void asm_append_sub_reg_ext(
+  Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg
+) {
+  asm_append_instr(comp, asm_instr_sub_reg_ext(tar_reg, src_reg, mod_reg));
 }
 
 // Arm64 requires the SP to be aligned to 16 when loading or storing.
