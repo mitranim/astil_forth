@@ -8,10 +8,36 @@
 // #include "./mach_exec.c"
 
 #ifdef NATIVE_CALL_CONV
-static Err init_exception_handling() { return nullptr; }
+static Err init_exception_handling(void) { return nullptr; }
 #else
 #include "./mach_exc.c"
 #endif
+
+static void print_help(void) {
+  eputs(
+    "Astil Forth — an experimental Forth implementation.\n"
+    "\n"
+    "Usage:\n"
+    "\n"
+    "  astil <file0> <file1> ...\n"
+    "\n"
+    "For interactive REPL mode, specify \"/dev/stdin\" or \"-\":\n"
+    "\n"
+    "  astil -\n"
+    "  astil <file0> -\n"
+    "  astil <file0> <file1> -\n"
+    "\n"
+    "Hint: a program must first import \"std:lang.f\" to bootstrap the language.\n"
+    "\n"
+    "An \"std:\" import searches the following locations:\n"
+    "- Directory \"./forth\" relative to the executable.\n"
+    "- Directory \"$HOME/.local/share/astil\" (`make install`).\n"
+    "\n"
+    "Hint: for a better REPL experience, install and use `rlwrap`:\n"
+    "\n"
+    "  rlwrap astil std:lang.f -\n"
+  );
+}
 
 static Err run(int argc, const char **argv) {
   bool timing = false;
@@ -25,9 +51,7 @@ static Err run(int argc, const char **argv) {
   for (int ind = 1; ind < argc; ind++) {
     Timing time = {.prefix = "[import] "};
     if (timing) timing_beg(&time);
-
     try(interp_import(&interp, argv[ind]));
-
     if (timing) timing_end(&time);
   }
 
@@ -36,11 +60,19 @@ static Err run(int argc, const char **argv) {
 }
 
 int main(int argc, const char **argv) {
+  if (argc <= 1) {
+    print_help();
+    return 0;
+  }
+
+  bool trace = false;
+  try_main(env_bool("TRACE", &trace));
+
   const auto err = run(argc, argv);
   if (!err || err == ERR_QUIT) return 0;
 
   fprintf(stderr, "error: %s\n", err);
-  backtrace_print();
+  if (trace) backtrace_print();
   if (DEBUG) abort();
   return 1;
 }

@@ -1,5 +1,5 @@
-import' ../src_f/lang_s.f
-import' ../src_f/testing_s.f
+import' std:lang_s.f
+import' std:testing_s.f
 
 \ Basic arithmetic.
 

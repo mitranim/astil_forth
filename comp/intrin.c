@@ -401,14 +401,14 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
   */
   const auto              src_len = (Ind)(ceil - floor);
   const auto              len     = src_len * 2;
-  defer(mem_deinit) void *buf     = malloc(len);
+  defer(str_deinit) char *buf     = malloc(len);
   fmt_bytes_hex_into(buf, len, floor, src_len);
 
   const auto  proc   = "llvm-mc";
   char *const argv[] = {proc, "--disassemble", "--hex", nullptr};
   pid_t       pid;
   int         status;
-  try(spawn_with_stdin(argv, buf, len, &pid));
+  try(spawn_with_stdin(argv, (U8 *)buf, len, &pid));
   try_errno(waitpid(pid, &status, 0));
 
   if (status || DEBUG) {

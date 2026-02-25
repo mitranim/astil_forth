@@ -1,4 +1,4 @@
-import' ../../forth/lang_s.f
+import' std:lang_s.f
 
 \ Self-asm makes it easy to directly invoke syscalls.
 \

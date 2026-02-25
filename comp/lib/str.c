@@ -45,3 +45,16 @@ static Err valid_word(const char *buf, Ind len, Word_str *word) {
   if (word->len == len) return nullptr;
   return err_word_len_mismatch(word, len);
 }
+
+static bool is_char_alnum(char val) {
+  return (
+    (val >= '0' && val <= '9') || (val >= 'A' && val <= 'Z') ||
+    (val >= 'a' && val <= 'z')
+  );
+}
+
+static const char *str_without_prefix(const char *str, const char *pre) {
+  const auto len = strlen(pre);
+  if (strncmp(str, pre, len)) return nullptr;
+  return str + len;
+}

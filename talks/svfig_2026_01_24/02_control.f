@@ -1,24 +1,24 @@
-import' ../src_f/lang_s.f
+import' std:lang_s.f
 
 \ Nicer control flow structures.
 
 : main { val }
   val 0 =
-  #if
+  if
     log" branch: 0" lf
-  #else
+  else
 
   val 1 =
-  #elif
+  elif
     log" branch: 1" lf
-  #else
+  else
 
   val 2 =
-  #elif
+  elif
     log" branch: 2" lf
-  #else
+  else
     log" branch: none" lf
-  #end \ Terminates everything.
+  end \ Terminates everything.
 ;
 
 log" run 0: " 0 main

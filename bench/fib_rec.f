@@ -1,4 +1,4 @@
-import' ../forth/lang.f
+import' std:lang.f
 
 : fib { ind -- out }
   ind 1 <= if 1 ret end

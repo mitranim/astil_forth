@@ -1,5 +1,5 @@
 #pragma once
-#include "./err.c" // IWYU pragma: export
+#include "./err.c"
 #include "./fmt.c"
 #include "./misc.h"
 #include "./num.h"
@@ -125,61 +125,6 @@ static Err file_stream_write(
   const auto out = fwrite(vals, val_size, vals_len, file);
   if (out == vals_len) return nullptr;
   return err_file_write(vals_len, out);
-}
-
-// ultra lazy ass code
-static char *path_join(const char *one, const char *two) {
-  static constexpr Uint    LEN = 4096;
-  static thread_local char BUF[LEN];
-
-  Uint rem = LEN;
-  auto ptr = BUF;
-
-  auto len = strlcpy(ptr, one, rem);
-  ptr += len;
-  aver(rem >= len);
-  rem -= len;
-
-  len = strlcpy(ptr, "/../", rem);
-  ptr += len;
-  aver(rem >= len);
-  rem -= len;
-
-  len = strlcpy(ptr, two, rem);
-  ptr += len;
-  aver(rem >= len);
-  rem -= len;
-
-  if (!rem) {
-    eprintf(
-      "out of buffer space when joining paths " FMT_QUOTED " and " FMT_QUOTED
-      "\n",
-      one,
-      two
-    );
-    abort();
-  }
-
-  return BUF;
-}
-
-static bool is_file_path_stdin(const char *path) {
-  return !strcmp(path, "-") || !strcmp(path, "/dev/stdin");
-}
-
-// Normalizes the path so the file can be opened,
-// and returns a statically allocated string.
-static const char *file_path_stdio(const char *path) {
-  if (is_file_path_stdin(path)) {
-    return "/dev/stdin";
-  }
-  if (!strcmp(path, "/dev/stdout")) {
-    return "/dev/stdout";
-  }
-  if (!strcmp(path, "/dev/stderr")) {
-    return "/dev/stderr";
-  }
-  return nullptr;
 }
 
 static Err write_all(int file, const U8 *buf, Ind len, int *out_err) {

@@ -1,6 +1,7 @@
 #pragma once
 #include "./err.h"
 #include "./num.h"
+#include <string.h>
 
 #define str_buf(buf_len) \
   struct {               \
@@ -69,3 +70,12 @@ typedef str_buf(256) Path_str;
     aver((Uint)tmp_len < arr_cap(tmp_str->buf));                          \
     tmp_str->len = (Ind)tmp_len;                                          \
   })
+
+// For literal string prefixes; skips `strlen`.
+#define str_has_prefix(str, pre) (!strncmp(str, pre, (arr_cap(pre) - 1)))
+
+/*
+static bool str_has_prefix(const char *str, const char *pre) {
+  return !strncmp(str, pre, strlen(pre));
+}
+*/

@@ -3,6 +3,7 @@
 #include "./comp.c"
 #include "./lib/cli.h"
 #include "./lib/io.c"
+#include "./lib/path.c"
 #include "./read.c"
 #include <dlfcn.h>
 
@@ -315,6 +316,21 @@ static Err interp_loop(Interp *interp) {
   return nullptr;
 }
 
+#ifdef __APPLE__
+#include <limits.h>
+#include <mach-o/dyld.h>
+
+static const char *get_exec_path(void) {
+  static thread_local char path[PATH_MAX];
+  uint32_t                 size = arr_cap(path);
+  if (_NSGetExecutablePath(path, &size)) return nullptr;
+  return path;
+}
+
+#else  // __APPLE__
+static const char *get_exec_path(void) { return nullptr; }
+#endif // __APPLE__
+
 static Err interp_import_stdio(Interp *interp, const char *path) {
   defer(file_deinit) FILE *file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
@@ -337,16 +353,54 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
   return nullptr;
 }
 
+static char *resolve_import_path(const char *prev, const char *next) {
+  {
+    defer(str_deinit) char *path = path_join(prev, next, false);
+    const auto              out  = realpath(path, nullptr);
+    if (out) return out;
+  }
+
+  // Imports with the scheme `std:` are resolved magically.
+  next = str_without_prefix(next, "std:");
+  if (!next || !next[0]) return nullptr;
+
+  // Try relative to the interpreter executable.
+  const auto exec = get_exec_path();
+  if (exec && is_path_abs(exec)) {
+    defer(str_deinit) char *base = path_join(exec, "forth", false);
+    defer(str_deinit) char *full = path_join(base, next, true);
+    const auto              path = realpath(full, nullptr);
+    if (path) return path;
+  }
+
+  // Try in `~/.local/share/astil`.
+  // SYNC[install_path].
+  const auto home = getenv("HOME");
+  if (home) {
+    defer(str_deinit) char *base = path_join(home, ".local/share/astil", true);
+    defer(str_deinit) char *full = path_join(base, next, false);
+    const auto              path = realpath(full, nullptr);
+    if (path) return path;
+  }
+
+  return nullptr;
+}
+
 static Err interp_import_inner(
   Interp *interp, const char *prev, const char *next
 ) {
-  if (prev) next = path_join(prev, next);
-  const auto path = realpath(next, nullptr);
+  // Owned by `interp.imports`, freed in `interp_deinit`.
+  const auto path = resolve_import_path(prev, next);
 
   if (!path) {
     const auto code = errno;
     return errf(
-      "unable to realpath %s; code: %d; msg: %s", next, code, strerror(code)
+      "unable to resolve import path " FMT_QUOTED " (from " FMT_QUOTED
+      "); code: %d; msg: %s",
+      next,
+      prev,
+      code,
+      strerror(code)
     );
   }
 

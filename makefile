@@ -24,7 +24,6 @@ MAIN_S ?= astil_s.exe
 MAIN ?= astil.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
-INSTALL_DIR ?= /usr/local/bin
 WATCH_IGNORE ?= -i=$(GEN) -i=$(ASM_GEN_OUT)
 WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 # WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q --no-vcs-ignore
@@ -177,10 +176,6 @@ disasm:
 	mkdir -p $(LOCAL)
 	llvm-objdump $(DISASM) $(or $(file),$(MAIN)) > $(LOCAL)/out.s
 
-# .PHONY: install
-# install: build
-# 	ln -sf $(MAIN) "$(INSTALL_DIR)/astil"
-
 .PHONY: clean
 clean:
 	rm -rf $(GEN) $(wildcard $(ARTIF))
@@ -194,3 +189,31 @@ $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 			| clang-format \
 			> $(MACH_GEN_OUT) \
 		; rm -rf $(GEN)/tmp.c
+
+# Non-configurable for now; usage of `~/.local`
+# is also hardcoded in the interpreter.
+# SYNC[install_path].
+INSTALL_ROOT := $(HOME)/.local
+INSTALL_BIN  := $(INSTALL_ROOT)/bin
+INSTALL_DAT  := $(INSTALL_ROOT)/share
+
+# Assumes that the "bin" path is already in the `$PATH`.
+# By default uses `~/.local/bin`, which is cleaner than
+# `/usr/...`, but `~/.local/bin` is NOT in the `$PATH`
+# by default, and needs to be added there manually.
+.PHONY: install
+install: build
+	mkdir -p "$(INSTALL_BIN)"
+	mkdir -p "$(INSTALL_DAT)"
+	ln -sf $(shell realpath $(MAIN)) "$(INSTALL_BIN)/astil"
+	ln -sf $(shell realpath $(MAIN_S)) "$(INSTALL_BIN)/astil_s"
+	ln -sfn $(shell realpath ./forth) "$(INSTALL_DAT)/astil"
+	@echo "Symlinked the reg-CC   executable to: \"$(INSTALL_BIN)/astil\"."
+	@echo "Symlinked the stack-CC executable to: \"$(INSTALL_BIN)/astil_s\"."
+	@echo "Symlinked the built-in modules    to: \"$(INSTALL_DAT)/astil\"."
+	@echo "Hint: make sure \"$(INSTALL_BIN)\" is in your PATH."
+
+.PHONY: uninstall
+uninstall:
+	rm -f "$(INSTALL_BIN)/astil"
+	rm -f "$(INSTALL_DAT)/astil"

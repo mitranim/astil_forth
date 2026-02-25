@@ -1,4 +1,4 @@
-import' ../forth/lang.f
+import' std:lang.f
 
 : fib { ind -- out }
   0 1 { prev next }

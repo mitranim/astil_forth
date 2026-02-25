@@ -402,7 +402,7 @@ kern_return_t catch_mach_exception_raise_state(
   return KERN_SUCCESS;
 }
 
-static Err init_exception_handling() {
+static Err init_exception_handling(void) {
   bool recovery = true;
   try(env_bool("RECOVERY", &recovery));
   if (!recovery) return nullptr;

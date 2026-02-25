@@ -1,4 +1,4 @@
-import' ../../forth/lang_s.f
+import' std:lang_s.f
 
 1 1 extern: strdup
 2 1 extern: fopen
@@ -9,11 +9,11 @@ import' ../../forth/lang_s.f
   c" r"           { mode }
   path mode fopen { file }
 
-  #loop
+  loop
     file fgetc { char }
-    char 256 < #while
+    char 256 < while
     char putchar
-  #end
+  end
 
   path free
 ;

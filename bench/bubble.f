@@ -1,4 +1,4 @@
-import' ../forth/lang.f
+import' std:lang.f
 
 \ Translated from Gforth's `bubble.fs`.
 
@@ -14,14 +14,14 @@ LEN cells LIST + let:   CEIL
 ;
 
 : list_init
-  CEIL LIST cell
+  CEIL LIST Cell
   +loop: ptr
     pseudo_random ptr !
   end
 ;
 
 : list_dump
-  CEIL LIST cell
+  CEIL LIST Cell
   +loop: ptr
     ptr @ .
   end
@@ -29,16 +29,16 @@ LEN cells LIST + let:   CEIL
 
 : list_verify
   CEIL -cell
-  LIST cell
+  LIST Cell
   +loop: ptr
     ptr @2 > throw_if" bubble_sort: not sorted"
   end
 ;
 
 : bubble
-  CEIL LIST cell
+  CEIL LIST Cell
   -loop: ceil_ptr
-    ceil_ptr LIST cell
+    ceil_ptr LIST Cell
     +loop: ptr
       ptr @2 > if
         ptr @2 { one two }
