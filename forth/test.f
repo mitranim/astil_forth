@@ -684,7 +684,7 @@ T{ int32_negative int <T> -1                    }T
 test_locals
 
 : test_local_ref
-  ref: val0 ref: val1 ref: val2 { adr0 adr1 adr2 }
+  ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
   sysstack_frame_ptr { FP }
 
   T{ FP   <T> sysstack_frame_ptr }T
@@ -708,18 +708,18 @@ test_local_ref
 
 : test_local_ref_volatile_immediate_read
   123                 \ mov x0, 123
-  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref:`.
-  ref: val { adr }    \ add x0, x29, 16
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
+  ref' val { adr }    \ add x0, x29, 16
   T{ adr @ <T> 123 }T \ no junk data
 ;
 test_local_ref_volatile_immediate_read
 
 : test_local_ref_volatile_delayed_read
   123                 \ mov x0, 123
-  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref:`.
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
   234                 \ Clobber x0; compiler emits a fixup.
   { -- }
-  ref: val { adr }    \ add x0, x29, 16
+  ref' val { adr }    \ add x0, x29, 16
   T{ adr @ <T> 123 }T \ no junk data
 ;
 test_local_ref_volatile_delayed_read
@@ -730,7 +730,7 @@ test_local_ref_volatile_delayed_read
 \ may be silently invalidated by `!`, with the compiler none the wiser.
 : test_local_ref_volatile_with_inputs
   123      { val } \ mov x0, 123 ; str x0, [x29, #16]
-  ref: val { adr } \ add x0, x29, 16
+  ref' val { adr } \ add x0, x29, 16
 
   T{ adr @ <T> 123 }T
 
@@ -754,7 +754,7 @@ test_local_ref_volatile_with_inputs
 
 : test_local_ref_volatile_with_outputs
   123      { val } \ mov x0, 123 ; str x0, [x29, #16]
-  ref: val { adr } \ add x0, x29, 16
+  ref' val { adr } \ add x0, x29, 16
 
   T{ adr @ <T> 123 }T
 
@@ -767,8 +767,8 @@ test_local_ref_volatile_with_inputs
   \ mov  x2, 34
   234 adr 345 bang_with_outputs
 
-  \ Without `ref:`, `val` would be temp-associated with `x0 x1 x2`
-  \ without immediately storing to memory. With `ref:`, this should
+  \ Without `ref'`, `val` would be temp-associated with `x0 x1 x2`
+  \ without immediately storing to memory. With `ref'`, this should
   \ repeatedly store to memory.
   { val val val }
 

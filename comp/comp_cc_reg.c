@@ -247,7 +247,7 @@ static void comp_local_evict(Comp *comp, Local *loc) {
 
     123      \ mov x0, 123
     { val }  \ nop
-    ref: val \ add x0, x29, 16
+    ref' val \ add x0, x29, 16
     @        \ (junk data)
 
   If we only confirm subsequent writes, but not prior writes:
@@ -255,7 +255,7 @@ static void comp_local_evict(Comp *comp, Local *loc) {
     123      \ mov x0, 123
     { val }  \ nop
     234      \ Clobber x0; write is never confirmed.
-    ref: val \ add x0, x29, 16
+    ref' val \ add x0, x29, 16
     @        \ (junk data)
 
   Correct behavior if we confirm prior and future writes:
@@ -407,7 +407,7 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   some later point.
 
   Including inputs in the clobbers has a positive side effect.
-  Taking the address of a local via `ref:` technically makes a
+  Taking the address of a local via `ref'` technically makes a
   local "volatile": temporary associations between that local
   and parameter registers may be secretly invalidated by a `!`
   or an equivalent store operation invisible to the compiler.

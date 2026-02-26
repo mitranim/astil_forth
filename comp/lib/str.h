@@ -9,6 +9,7 @@
     char buf[buf_len];   \
   }
 
+// SYNC[word_str].
 typedef str_buf(128) Word_str;
 typedef str_buf(256) Path_str;
 
