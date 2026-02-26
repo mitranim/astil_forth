@@ -211,6 +211,64 @@ static Bits comp_local_reg_bits(Comp *comp, const Local *loc) {
   return out;
 }
 
+static void comp_local_confirm_writes(Local *loc) {
+  auto write = loc->write;
+  loc->write = nullptr;
+
+  while (write) {
+    write->confirmed = true;
+    write            = write->prev;
+  }
+
+  loc->read = true; // Also confirm all subsequent writes.
+}
+
+/*
+Used for code which takes a local's address. Evicts the local to memory and
+makes it "volatile": the compiler can no longer form temporary associations
+between such a local and output parameter registers, because the value may be
+read "out of band" through the address.
+*/
+static void comp_local_evict(Comp *comp, Local *loc) {
+  const auto type = loc->location;
+  if (type == LOC_MEM) return;
+
+  // Locations are undecided until finalizing the procedure at the semicolon.
+  aver(type == LOC_UNKNOWN);
+
+  comp_local_alloc_mem(comp, loc);
+  loc->location = LOC_MEM;
+
+  /*
+  The caller may now load data from the address in ways invisible to the
+  compiler. So the compiler must assume the value is read at some point.
+
+  Incorrect behavior if we don't do this:
+
+    123      \ mov x0, 123
+    { val }  \ nop
+    ref: val \ add x0, x29, 16
+    @        \ (junk data)
+
+  If we only confirm subsequent writes, but not prior writes:
+
+    123      \ mov x0, 123
+    { val }  \ nop
+    234      \ Clobber x0; write is never confirmed.
+    ref: val \ add x0, x29, 16
+    @        \ (junk data)
+
+  Correct behavior if we confirm prior and future writes:
+
+    123     \ mov x0, 123
+    { val } \ str x0, [x29, #16]
+  */
+  comp_local_confirm_writes(loc);
+
+  // Invalidates all register associations for this local.
+  loc->vol = true;
+}
+
 static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
   return uint32_to_bit_str((U32)comp_local_reg_bits(comp, loc));
 }
@@ -289,7 +347,9 @@ static Err err_assign_no_args(const char *name) {
   );
 }
 
-static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
+static Local_write *comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
+  const auto confirm = loc->read || loc->vol;
+
   const auto fix = stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
@@ -299,16 +359,18 @@ static void comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
         .prev      = loc->write,
         .loc       = loc,
         .reg       = reg,
-        .confirmed = loc->read,
+        .confirmed = confirm,
       }
     }
   );
-  loc->write = &fix->write;
+
+  return loc->write = &fix->write;
 }
 
 /*
 Must be invoked whenever a register needs to be used for ANYTHING
-other than the current procedure's input parameters. Examples:
+other than the current procedure's input or output parameters.
+Examples:
 
 - An input argument for the next call.
 - Side-effect clobbers in some call.
@@ -343,6 +405,23 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   and auxiliary clobbers. We end up checking input clobbers twice:
   here and when building the arguments. Might consider deduping at
   some later point.
+
+  Including inputs in the clobbers has a positive side effect.
+  Taking the address of a local via `ref:` technically makes a
+  local "volatile": temporary associations between that local
+  and parameter registers may be secretly invalidated by a `!`
+  or an equivalent store operation invisible to the compiler.
+  Such potentially invalid temporary associations are formed
+  only by listing that local as one of the input parameters
+  to some procedure. If inputs are considered to be clobbers
+  at the callsite in addition to when building the arguments,
+  every call disassociates locals from input registers; these
+  associations only exist while building the argument list,
+  and their only effect is a small optimization when a local
+  is repeated among the inputs, sometimes replacing a memory
+  load with a `mov`. This is distinct from local-to-register
+  associations formed by assignment via `{ }` or equivalent,
+  which are simply disabled for volatile locals.
   */
   try(comp_clobber_regs(comp, callee->clobber));
 
@@ -398,11 +477,17 @@ static Err comp_append_local_set(Comp *comp, Local *loc, U8 reg) {
 }
 
 /*
-Abstract "set" operation invoked via `{}` braces. Used both for parameter
-declarations and regular assignments. Does not immediately create a "write";
-those are added lazily on clobbers. Does not check, confirm, or invalidate
-the latest pending "write" if any; writes are confirmed by "reads", and link
-with each other for a chain confirmation.
+Abstract "set" operation invoked via `{ }` braces. Used both for parameter
+declarations and regular assignments.
+
+For regular locals, this does not immediately create a "write", as those are
+added lazily on clobbers. Does not check, confirm, or invalidate the latest
+pending "write" if any; writes are confirmed by "reads", and link with each
+other for a chain confirmation.
+
+For volatile locals whose address is available to the code we're compiling,
+this has to immediately store the value because it may be read out-of-band
+through the local's address.
 */
 static Err comp_append_local_set_next(Comp *comp, Local *loc) {
   const auto ctx = &comp->ctx;
@@ -411,7 +496,14 @@ static Err comp_append_local_set_next(Comp *comp, Local *loc) {
   if (!(rem > 0)) return err_assign_no_args(loc->name.buf);
 
   const auto reg = ctx->arg_low++;
-  try(comp_local_reg_reset(comp, loc, reg));
+  if (loc->vol) {
+    const auto write = comp_append_local_write(comp, loc, reg);
+    write->confirmed = true;
+    loc->stable      = true;
+  }
+  else {
+    try(comp_local_reg_reset(comp, loc, reg));
+  }
 
   if (ctx->arg_len == ctx->arg_low) {
     ctx->arg_len = 0;
@@ -464,14 +556,8 @@ static Err comp_scratch_reg(Comp *comp, U8 *out) {
 // Concrete "read" operation used as a fallback by "get".
 static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   (void)comp;
-  auto write = loc->write;
-  loc->write = nullptr;
-  loc->read  = true; // Confirm subsequent writes.
 
-  while (write) {
-    write->confirmed = true;
-    write            = write->prev;
-  }
+  comp_local_confirm_writes(loc);
 
   stack_push(
     &comp->ctx.loc_fix,

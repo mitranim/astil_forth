@@ -58,13 +58,13 @@ static void asm_append_stack_push_imm(Comp *comp, Sint imm) {
   asm_append_stack_push_from(comp, ASM_SCRATCH_REG_8);
 }
 
-// SYNC[asm_local_read].
+// SYNC[asm_local_addressing].
 static void asm_append_local_read(Comp *comp, Ind off) {
   asm_append_load_scaled_offset(comp, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
   asm_append_stack_push_from(comp, ASM_SCRATCH_REG_8);
 }
 
-// SYNC[asm_local_write].
+// SYNC[asm_local_addressing].
 static void asm_append_local_write(Comp *comp, Ind off) {
   asm_append_stack_pop_into(comp, ASM_SCRATCH_REG_8);
   asm_append_store_scaled_offset(comp, ASM_SCRATCH_REG_8, ASM_REG_FP, off);

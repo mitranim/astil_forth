@@ -411,7 +411,7 @@ insufficient when abusing `alloca`.
 */
 static void asm_validate_local_off(Ind off) { aver(off > 0 && off <= 32'760); }
 
-// SYNC[asm_local_read].
+// SYNC[asm_local_addressing].
 static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
   IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
 
@@ -429,7 +429,7 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
   }
 }
 
-// SYNC[asm_local_write].
+// SYNC[asm_local_addressing].
 static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
   IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
 
@@ -448,10 +448,10 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
 }
 
 /*
-We accumulate volatile clobbers from ALL sources across the entire procedure
-and always treat these registers as temporary, meaning that no locals across
-the procedure receive them as their locations, even when their lifetimes do
-not overlap with clobbers. Dirty but simple way of avoiding an additional IR
+We accumulate clobbers of volatile registers from ALL sources across the entire
+procedure and always treat these registers as temporary, meaning that no locals
+across the procedure receive them as their locations, even when their lifetimes
+do not overlap with clobbers. Dirty but simple way of avoiding an additional IR
 and data flow analysis.
 */
 static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {

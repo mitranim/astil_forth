@@ -983,23 +983,35 @@
 \ When we ask for a local, the compiler returns an FP offset.
 \ We can compile load/store and push/pop as we like.
 
+\ SYNC[asm_local_addressing].
 : asm_local_get ( reg fp_off -- instr ) ASM_REG_FP swap asm_load_scaled_off ;
 : asm_local_set ( reg fp_off -- instr ) ASM_REG_FP swap asm_store_scaled_off ;
 
-\ SYNC[asm_local_read].
+\ SYNC[asm_local_addressing].
 : comp_local_get_push ( C: fp_off -- ) ( E: -- val )
   1 swap asm_local_get comp_instr \ ldr x1, [FP, <loc>]
   1      asm_push1     comp_instr \ str x1, [x27], 8
 ;
 
-\ SYNC[asm_local_write].
+\ SYNC[asm_local_addressing].
 : comp_pop_local_set ( C: fp_off -- ) ( E: val -- )
   1      asm_pop1      comp_instr \ ldr x1, [x27, -8]!
   1 swap asm_local_set comp_instr \ str x1, [FP, <loc>]
 ;
 
+\ Stores a value to a local, declaring the local if necessary.
 :: to: ( C: "name" -- ) ( E: val -- )
   parse_word comp_named_local comp_pop_local_set
+;
+
+\ Returns the address of a local (on the system stack),
+\ declaring the local if necessary.
+\
+\ SYNC[asm_local_addressing].
+:: ref: ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_named_local
+  1 swap ASM_REG_FP swap asm_add_imm comp_instr \ add x1, FP, <loc>
+  1                      asm_push1   comp_instr \ str x1, [x27], 8
 ;
 
 \ ## Memory

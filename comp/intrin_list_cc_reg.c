@@ -19,6 +19,7 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_COMP_LOCAL_GET,     // comp_local_get
   INTRIN_COMP_LOCAL_SET,     // comp_local_set
   INTRIN_COMP_LOCAL_FREE,    // comp_local_free
+  INTRIN_COMP_LOCAL_OFF,     // comp_local_off
   INTRIN_ALLOCA,             // alloca
   INTRIN_DEBUG_CTX,          // debug_ctx
   INTRIN_DEBUG_CTX_IMM,      // #debug_ctx

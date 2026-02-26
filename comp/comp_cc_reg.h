@@ -75,6 +75,7 @@ typedef struct {
   Local_write *write;  // Latest unconfirmed "write"; confirmed by "reads".
   bool         stable; // Has up-to-date value in assigned stable location.
   bool         read;   // Has a read; auto-confirm all subsequent writes.
+  bool         vol;    // Volatile: address taken.
 
   // Final stable location used for writes and reads.
   // Locals which are never "read" are not considered.

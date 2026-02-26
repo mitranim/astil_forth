@@ -683,6 +683,105 @@ T{ int32_negative int <T> -1                    }T
 ;
 test_locals
 
+: test_local_ref
+  ref: val0 ref: val1 ref: val2 { adr0 adr1 adr2 }
+  sysstack_frame_ptr { FP }
+
+  T{ FP   <T> sysstack_frame_ptr }T
+  T{ adr0 <T> FP 16 +            }T
+  T{ adr1 <T> FP 24 +            }T
+  T{ adr2 <T> FP 32 +            }T
+
+  12 23 34 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> 12 23 34 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
+
+  -34 -23 -12 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> -34 -23 -12 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
+
+  21 adr0 ! 32 adr1 ! 43 adr2 !
+  T{ val0   val1   val2   <T> 21 32 43 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
+;
+test_local_ref
+
+: test_local_ref_volatile_immediate_read
+  123                 \ mov x0, 123
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref:`.
+  ref: val { adr }    \ add x0, x29, 16
+  T{ adr @ <T> 123 }T \ no junk data
+;
+test_local_ref_volatile_immediate_read
+
+: test_local_ref_volatile_delayed_read
+  123                 \ mov x0, 123
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref:`.
+  234                 \ Clobber x0; compiler emits a fixup.
+  { -- }
+  ref: val { adr }    \ add x0, x29, 16
+  T{ adr @ <T> 123 }T \ no junk data
+;
+test_local_ref_volatile_delayed_read
+
+: bang_with_more_inputs { val adr x2 x3 x4 } val adr ! ;
+
+\ Taking a local's address makes it volatile. Temporary register associations
+\ may be silently invalidated by `!`, with the compiler none the wiser.
+: test_local_ref_volatile_with_inputs
+  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
+  ref: val { adr } \ add x0, x29, 16
+
+  T{ adr @ <T> 123 }T
+
+  \ mov  x5, x0        -- relocate `adr`
+  \ mov  x0, 234
+  \ mov  x1, x5
+  \ ldr  x2, [x29, 16]
+  \ mov  x3, x2        -- temp register assoc for `val`
+  \ mov  x4, x2        -- temp register assoc for `val`
+  \ stur x0, [x1]
+  234 adr val val val bang_with_more_inputs
+
+  \ Invalid: `mov x0, x4`.
+  \ Valid:   `ldr x0, [x29, 16]`.
+  T{ val   <T> 234 }T
+  T{ adr @ <T> 234 }T
+;
+test_local_ref_volatile_with_inputs
+
+: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next ;
+
+: test_local_ref_volatile_with_outputs
+  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
+  ref: val { adr } \ add x0, x29, 16
+
+  T{ adr @ <T> 123 }T
+
+  \ mov  x5, x0 -- relocate `adr`
+  \ mov  x0, 234
+  \ mov  x1, x5
+  \ stur x0, [x1]
+  \ mov  x0, 12
+  \ mov  x1, 23
+  \ mov  x2, 34
+  234 adr 345 bang_with_outputs
+
+  \ Without `ref:`, `val` would be temp-associated with `x0 x1 x2`
+  \ without immediately storing to memory. With `ref:`, this should
+  \ repeatedly store to memory.
+  { val val val }
+
+  T{ adr @ <T> 345 }T
+
+  456 adr 567 bang_with_outputs { val val val }
+
+  \ Invalid: `mov x0, x2`.
+  \ Valid:   `ldr x0, [x29, 16]`.
+  T{ val <T> 567 }T
+;
+test_local_ref_volatile_with_outputs
+
 : test_stack_primitives
   T{ stack_len <T> 0 }T
 

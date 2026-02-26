@@ -606,7 +606,30 @@ test_to
 ;
 test_locals
 
-: test_catch__invalid
+: test_local_ref
+  ref: val0 ref: val1 ref: val2 { adr0 adr1 adr2 }
+  sysstack_frame_ptr { FP }
+
+  T{ FP   <T> sysstack_frame_ptr }T
+  T{ adr0 <T> FP 16 +            }T
+  T{ adr1 <T> FP 24 +            }T
+  T{ adr2 <T> FP 32 +            }T
+
+  12 23 34 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> 12 23 34 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
+
+  -34 -23 -12 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> -34 -23 -12 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
+
+  21 adr0 ! 32 adr1 ! 43 adr2 !
+  T{ val0   val1   val2   <T> 21 32 43 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
+;
+test_local_ref
+
+: test_catch_invalid
   \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
   \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
 ;

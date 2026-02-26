@@ -454,6 +454,15 @@ static Err intrin_comp_local_free(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_comp_local_off(Sint ptr, Interp *interp, Sint *out) {
+  const auto comp = &interp->comp;
+  Local     *loc;
+  try(comp_validate_local(comp, ptr, &loc));
+  comp_local_evict(comp, loc);
+  *out = loc->fp_off;
+  return nullptr;
+}
+
 static Err intrin_alloca(Interp *interp) { return comp_alloca(&interp->comp); }
 
 static void intrin_debug_ctx(Interp *interp) {
@@ -686,6 +695,16 @@ static constexpr auto INTRIN_COMP_LOCAL_FREE = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_free,
   .inp_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static constexpr auto INTRIN_COMP_LOCAL_OFF = (Sym){
+  .name.buf  = "comp_local_off",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_local_off,
+  .inp_len   = 1,
+  .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };

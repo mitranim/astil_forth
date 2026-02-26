@@ -948,6 +948,16 @@
 : str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 ;
 : str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
 
+\ Returns the address of a local (on the system stack), declaring
+\ the local if necessary. Often avoids the need for `alloca`.
+\
+\ SYNC[asm_local_addressing].
+:: ref: ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_named_local comp_local_off { off }
+  comp_next_arg_reg { reg }
+  reg ASM_REG_FP off asm_add_imm comp_instr \ add <reg>, FP, <off>
+;
+
 \ ## Variables, buffers, extern vars
 
 \ Asks for a register and compiles this idiom:
