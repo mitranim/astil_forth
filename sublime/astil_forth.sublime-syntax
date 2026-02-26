@@ -9,7 +9,7 @@ variables:
   comment_line_begin: (?:\\+)
   comment_block_begin: \(
   comment_block_end: \)
-  md_heading: (?:\s*((#+)\s+.*?)(?={{eol}}|{{comment_block_end}}))
+  md_heading: (?:\s*((#+)\s+.*?)(?={{eol}}))
   delim: \(\)\[\]\{\}
   num_begin: '{{word_begin}}'
   num_end: '{{word_end}}'
