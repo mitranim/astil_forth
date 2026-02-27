@@ -288,7 +288,6 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   interp_only:     %s\n"
         "[debug]   inlinable:       %s\n"
         "[debug]   has_loads:       %s\n"
-        "[debug]   has_rets:        %s\n"
         "[debug]   has_alloca:      %s\n"
         "[debug]   callers:         " FMT_IND
         "\n"
@@ -311,7 +310,6 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         bool_str(sym->interp_only),
         bool_str(sym->norm.inlinable),
         bool_str(sym->norm.has_loads),
-        bool_str(sym->norm.has_rets),
         bool_str(sym->norm.has_alloca),
         sym->callers.len,
         sym->callees.len,
@@ -375,10 +373,20 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
 }
 
 static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
-  if (sym->type != SYM_NORM) {
-    return errf(
-      "unable to disassemble " FMT_QUOTED ": not a Forth word", sym->name.buf
-    );
+  switch (sym->type) {
+    case SYM_NORM: break;
+    case SYM_INTRIN:
+      return errf(
+        "unable to disassemble " FMT_QUOTED " which is a compiler intrinsic",
+        sym->name.buf
+      );
+    case SYM_EXTERN:
+      return errf(
+        "unable to disassemble " FMT_QUOTED
+        " which is a dynamically-linked external symbol",
+        sym->name.buf
+      );
+    default: unreachable();
   }
 
   const auto comp = &interp->comp;
@@ -409,7 +417,7 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
   pid_t       pid;
   int         status;
   try(spawn_with_stdin(argv, (U8 *)buf, len, &pid));
-  try_errno(waitpid(pid, &status, 0));
+  try(wait_pid(pid, &status));
 
   if (status || DEBUG) {
     eprintf("[debug] %s exited with code %d\n", proc, status);

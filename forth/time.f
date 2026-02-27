@@ -1,4 +1,4 @@
-import' std:lang.f
+import' ./lang.f
 
 \ ## Libc time
 \
@@ -6,28 +6,28 @@ import' std:lang.f
 \
 \ Translated from C definitions and only partially tested.
 
-Clong let: Clock \ clock_t
-Clong let: Time  \ time_t
+S64 let: Clock \ clock_t
+S64 let: Time  \ time_t
 
 \ `struct timespec`. Used by reference.
 struct: Timespec
-  Clong 1 field: Timespec_sec
-  Clong 1 field: Timespec_nsec
+  S64 1 field: Timespec_sec
+  S64 1 field: Timespec_nsec
 end
 
 \ `struct tm`. Used by reference.
 struct: Date
-  Cint  1 field: Time_sec    \ seconds after the minute [0-60]
-  Cint  1 field: Time_min    \ minutes after the hour [0-59]
-  Cint  1 field: Time_hour   \ hours since midnight [0-23]
-  Cint  1 field: Time_mday   \ day of the month [1-31]
-  Cint  1 field: Time_mon    \ months since January [0-11]
-  Cint  1 field: Time_year   \ years since 1900
-  Cint  1 field: Time_wday   \ days since Sunday [0-6]
-  Cint  1 field: Time_yday   \ days since January 1 [0-365]
-  Cint  1 field: Time_isdst  \ Daylight Savings Time flag
-  Clong 1 field: Time_gmtoff \ offset from UTC in seconds
-  Cstr  1 field: Time_zone   \ timezone abbreviation
+  S32  1 field: Time_sec    \ seconds after the minute [0-60]
+  S32  1 field: Time_min    \ minutes after the hour [0-59]
+  S32  1 field: Time_hour   \ hours since midnight [0-23]
+  S32  1 field: Time_mday   \ day of the month [1-31]
+  S32  1 field: Time_mon    \ months since January [0-11]
+  S32  1 field: Time_year   \ years since 1900
+  S32  1 field: Time_wday   \ days since Sunday [0-6]
+  S32  1 field: Time_yday   \ days since January 1 [0-365]
+  S32  1 field: Time_isdst  \ Daylight Savings Time flag
+  S64  1 field: Time_gmtoff \ offset from UTC in seconds
+  Cstr 1 field: Time_zone   \ timezone abbreviation
 end
 
 1000000 let: CLOCKS_PER_SEC

@@ -105,7 +105,6 @@ static Err err_inline_has_data(const Sym *sym) {
 static Err validate_sym_inlinable(const Sym *sym) {
   if (sym->type != SYM_NORM) return err_inline_not_norm(sym);
   if (sym->norm.has_loads) return err_inline_pc_rel(sym);
-  if (sym->norm.has_rets) return err_inline_early_ret(sym);
   if (!is_sym_leaf(sym)) return err_inline_not_leaf(sym);
 
   // Same as `err_inline_pc_rel`. Redundant check for safety.
@@ -120,7 +119,6 @@ static void sym_auto_inlinable(Sym *sym) {
   // SYNC[sym_inlinable].
   if (sym->type != SYM_NORM) return;
   if (sym->norm.has_loads) return;
-  if (sym->norm.has_rets) return;
   if (!is_sym_leaf(sym)) return;
 
   const auto spans = &sym->norm.spans;

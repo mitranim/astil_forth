@@ -1,16 +1,21 @@
-import' std:lang.f
+import' ./lang.f
 
 \ ## Posix threads
 \
 \ MacOS 15.3 (24D60), <pthread.h>.
 \
 \ Translated from C definitions and only partially tested.
+\
+\ Posix words directly return an `errno` code on failure.
+\ They should usually be followed by `try_errno_posix"`:
+\
+\   some_proc try_errno_posix" unable to do X"
 
 \ ## Types
 
 \ `pthread_t`. Used by value except in "create".
 \ Can be used as a local addressed via `ref'`.
-\ See usage in `examples/threads.f`.
+\ See usage in `examples/threads_*.f`.
 Adr let: Pthread
 
 \ Opaque `sizeof(pthread_attr_t)`. Used by reference.
@@ -44,7 +49,7 @@ Cell let: Pthread_key
 200 let: Pthread_rwlock
 
 \ `sigset_t`. Sometimes used by reference.
-Cuint let: Sigset
+U32 let: Sigset
 
 \ ## Constants
 

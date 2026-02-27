@@ -14,19 +14,19 @@ typedef struct {
   bool     inited; // True if `fp_off` has been assigned.
 } Local;
 
-typedef stack_of(Local)  Local_stack;
-typedef dict_of(Local *) Local_dict;
+typedef stack_of(Local)  Loc_stack;
+typedef dict_of(Local *) Loc_dict;
 
 // Transient context used in compilation of a single word.
 // SYNC[comp_ctx_rewind].
 typedef struct {
-  Sym        *sym;
-  Asm_fixups  asm_fix;
-  Local_stack locals;
-  Local_dict  local_dict;
-  Ind         anon_locs;  // For auto-naming of anonymous locals.
-  Ind         fp_off;     // Stack space reserved for locals.
-  bool        redefining; // Temporarily suppress "redefined" diagnostic.
-  bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
-  bool        has_alloca; // True if SP is dynamically adjusted in the body.
+  Sym       *sym;
+  Asm_fixups asm_fix;
+  Loc_stack  locals;
+  Loc_dict   local_dict;
+  Ind        anon_locs;  // For auto-naming of anonymous locals.
+  Ind        fp_off;     // Stack space reserved for locals.
+  bool       redefining; // Temporarily suppress "redefined" diagnostic.
+  bool       compiling;  // Turned on by `:` and `]`, turned off by `[`.
+  bool       has_alloca; // True if SP is dynamically adjusted in the body.
 } Comp_ctx;

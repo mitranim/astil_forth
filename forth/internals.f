@@ -1,4 +1,4 @@
-import' std:lang.f
+import' ./lang.f
 
 \ ## Internal interpreter structures
 \

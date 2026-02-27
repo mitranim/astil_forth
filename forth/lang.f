@@ -667,6 +667,16 @@
 \ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
 : asm_sign_extend_32 { Xd Xn -- instr } Xd Xn 0 31 asm_bitfield_move ;
 
+\ Since we don't have a real type system, the compiler
+\ doesn't support automatically sign-extending integers
+\ when converting between types. Sometimes it has to be
+\ done manually, particularly when dealing with C words
+\ which return `(int)-1` which ends up being 0xffffffff.
+: int_to_cell { int32 -- cell } [
+  0 0 asm_sign_extend_32 comp_instr \ sxtw x0, x0
+  1 comp_args_set
+] ;
+
 \ ## Numeric comparison
 
 \ https://gforth.org/manual/Numeric-comparison.html
@@ -1054,7 +1064,7 @@
 \ Shortcut for the standard idiom `create <name> N cells allot`.
 : cells: { len } ( C: "name" -- ) ( E: -- adr ) len cells execute' mem: ;
 
-4096 buf: BUF
+4096 buf: EXTERN_VAL_BUF
 
 \ Analogous to `extern:`, but for external variables rather than procedures.
 : extern_val: ( C: "ours" "extern" -- ) ( E: -- val )
@@ -1062,7 +1072,7 @@
 
   \ Get a stable name location because we're about
   \ to parse one more word, which overwrites `str`.
-  BUF { buf cap } buf str cap strlcpy
+  EXTERN_VAL_BUF { buf cap } buf str cap strlcpy
 
   parse_word extern_got { adr }
 
@@ -1078,17 +1088,12 @@
   [ false comp_only ]
 ;
 
-10 let: LF
-13 let: CR
-
-3 mem: CRLF    \ \r\n\0
-CR CRLF c!     \ \r
-LF CRLF inc c! \ \n
-
 \ ## IO
 \
 \ Having access to `libc` spares us from having to implement
 \ these procedures or provide them as intrinsics.
+\
+\ This is a partial interface. More is defined in `./io.f`.
 
 0 let: STDIN
 1 let: STDOUT
@@ -1098,42 +1103,52 @@ extern_val: stdin  __stdinp
 extern_val: stdout __stdoutp
 extern_val: stderr __stderrp
 
-4 0 extern: fwrite   ( src size len file -- )
-1 0 extern: putchar  ( char -- )
-2 0 extern: fputc    ( char file -- )
-2 0 extern: fputs    ( cstr file -- )
-1 0 extern: printf   ( … fmt -- )
-2 0 extern: fprintf  ( … file fmt -- )
-3 0 extern: snprintf ( … buf cap fmt -- )
-1 0 extern: fflush   ( file -- )
+4 1 extern: fread            ( buf size len file -- len        )
+4 1 extern: fwrite           ( buf size len file -- len        )
+2 1 extern: fputs            ( buf file          -- junk|eof32 )
+2 1 extern: fputc            ( char file         -- char|eof32 )
+2 1 extern: putc             ( char file         -- char|eof32 )
+2 1 extern: putc_unlocked    ( char file         -- char|eof32 )
+1 1 extern: putchar          ( char              -- char|eof32 )
+1 1 extern: putchar_unlocked ( char              -- char|eof32 )
+2 1 extern: putw             ( char file         -- zero|eof32 )
+1 1 extern: fflush           ( file              -- err        )
+1 1 extern: fpurge           ( file              -- err        )
 
-: emit     { char }       char putchar ;
-: eputchar { char }       char stderr fputc ;
-: puts     { cstr }       cstr stdout fputs ;
-: eputs    { cstr }       cstr stderr fputs ;
-: flush                   stdout fflush ;
-: eflush                  stderr fflush ;
-: type  { str len }       str 1 len stdout fwrite ;
-: etype { str len }       str 1 len stderr fwrite ;
-: lf                      10 putchar ; \ Renamed from `cr`.
-: elf                     10 eputchar ;
-: space                   32 putchar ;
-: espace                  32 eputchar ;
-: fprint { str len file } str 1 len file fwrite ;
+\ Variadic formatting words; see vararg support below.
+1 1 extern: printf   ( … fmt         -- len|err )
+2 1 extern: fprintf  ( … file fmt    -- len|err )
+2 1 extern: sprintf  ( … buf fmt     -- len|err )
+3 1 extern: snprintf ( … buf cap fmt -- len|err )
+2 1 extern: asprintf ( … buf_adr fmt -- len|err )
+2 1 extern: dprintf  ( … fd fmt      -- len|err )
+
+10 let: LF
+13 let: CR
+
+3 mem: CRLF    \ \r\n\0
+CR CRLF c!     \ \r
+LF CRLF inc c! \ \n
+
+: emit     { char }       char putchar            { -- } ;
+: eputchar { char }       char stderr fputc       { -- } ;
+: puts     { cstr }       cstr stdout fputs       { -- } ; \ Doesn't append LF.
+: eputs    { cstr }       cstr stderr fputs       { -- } ;
+: flush                   stdout fflush           { -- } ;
+: eflush                  stderr fflush           { -- } ;
+: type  { str len }       str 1 len stdout fwrite { -- } ;
+: etype { str len }       str 1 len stderr fwrite { -- } ;
+: lf                      LF putchar              { -- } ; \ Renamed from `cr`.
+: elf                     LF eputchar             { -- } ;
+: space                   32 putchar              { -- } ;
+: espace                  32 eputchar             { -- } ;
+: fprint { str len file } str 1 len file fwrite   { -- } ;
 
 :  log" parse_cstr puts ;
 :: log" comp_cstr compile' puts ;
 
 :  elog" parse_cstr eputs ;
 :: elog" comp_cstr compile' eputs ;
-
-\ Bandaid for C functions which return `int`, which may be negative,
-\ often -1. C `int` is now 32-bit while we use 64-bit machine words,
-\ so -1 appears to be a positive number. This word sign-extends it.
-: int { int32 -- cell } [
-  0 0 asm_sign_extend_32 comp_instr \ sxtw x0, x0
-  1 comp_args_set
-] ;
 
 \ ## Exceptions — basic
 \
@@ -1674,18 +1689,21 @@ extern_val: stderr __stderrp
 \ TODO define a `:` variant.
 :: logf" ( C: i0 … iN -- ) ( E: i0 … iN -- )
   comp_va{ comp_cstr compile' printf }va_comp
+  0 comp_args_set \ Drop output of `printf`.
 ;
 
 \ Format-prints to stderr. TODO define a `:` variant.
 :: elogf" ( C: N -- ) ( E: i1 … iN -- )
   comp_va{ compile' stderr comp_cstr compile' fprintf }va_comp
+  0 comp_args_set \ Drop output of `fprintf`.
 ;
 
 \ TODO: port `sf"` from stack-CC.
 
 \ ## Exceptions — continued
 
-4096 buf: ERR_BUF
+4096    let: ERR_CAP
+ERR_CAP mem: ERR_BUF
 
 \ Like `sthrowf"` but easier to use. Example:
 \
@@ -1694,12 +1712,13 @@ extern_val: stderr __stderrp
 \ TODO: port `sthrowf"` from stack-CC.
 :: throwf" ( C: len -- ) ( E: i1 … iN -- )
   comp_va{
-    compile'  ERR_BUF
+    execute'' ERR_BUF
+    execute'' ERR_CAP
     comp_cstr
     compile'  snprintf
   }va_comp
-  compile' ERR_BUF
-  1 comp_args_set \ Drop buffer length.
+  0 comp_args_set \ Ignore output of `snprintf`.
+  execute'' ERR_BUF
   execute'' throw
 ;
 
@@ -1714,14 +1733,29 @@ extern_val: stderr __stderrp
 0 1 extern: __error
 1 1 extern: strerror
 
-: errno { -- err } __error @32 ;
+: errno { -- code } __error @32 ;
 
-: try_errno_run { code cstr }
-  code -1 = ifn ret end
-  errno        { err }
-  err strerror { msg }
-  cstr err msg throwf" %s; err: %zd; message: %s"
+\ `code` comes from from `errno`, `ferror`, Posix procedures, etc.
+: os_err { code ctx }
+  code strerror { msg }
+  msg if
+    ctx code msg throwf" %s; code: %zd; msg: %s"
+  else
+    ctx code msg throwf" %s; code: %zd"
+  end
 ;
+
+\ Some `libc` procedures return -1 as 32-bit `0xffff_ffff` while some others,
+\ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
+\ the kernel. Since there's no way to know this generically, we must always
+\ sign-extend `int` before testing for -1.
+\
+\ Should ONLY be used for `int` and avoided for procedures which return a wider
+\ type, like the `mmap` family, which return a pointer or -1. Their outputs
+\ should be checked against -1 as-is.
+: int_err { int -- bool } int int_to_cell -1 = ;
+
+: try_errno { int ctx } int int_err if errno ctx os_err end ;
 
 \ Shortcut for calling `libc` functions which return
 \ `-1` and set `errno` on failure. Usage:
@@ -1730,8 +1764,16 @@ extern_val: stderr __stderrp
 \   some_proc try_errno" unable to do X"
 \
 \ TODO: define a `:` version (interpretation-time).
-:: try_errno" ( C: "context" -- ) ( E: code -- )
-  comp_cstr compile' try_errno_run
+:: try_errno" ( C: "context" -- ) ( E: val -- )
+  comp_cstr compile' try_errno
+;
+
+: try_errno_posix { code ctx } code if code ctx os_err end ;
+
+\ Like `try_errno"` but for Posix procedures which directly
+\ return an `errno` code on failure and zero on success.
+:: try_errno_posix" ( C: "context" -- ) ( E: code -- )
+  comp_cstr compile' try_errno_posix
 ;
 
 : elog_errno_run { code cstr }
@@ -1915,6 +1957,14 @@ extern_val: stderr __stderrp
 \ is defined earlier.
 
 \ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
+\
+\ "S" stands for "signed integer", "U" for "unsigned integer".
+\
+\ Note: when converting shorter negative numbers to our `Cell`,
+\ they must be sign-extended. See `int_to_cell` for `S32`.
+\
+\ When accessing memory, use the appropriately sized
+\ load / store operators such as `@32` / `!32`.
 1 let: S8
 1 let: U8
 2 let: S16
@@ -1932,31 +1982,43 @@ extern_val: stderr __stderrp
 
 \ Defines a pretend "array type" which is really just capacity. Usage:
 \
-\   234      let: LEN
-\   123      let: SIZE
-\   LEN SIZE arr: Type
-\   Type     mem: BUF
-\
-\   U8 128   arr: Type
-\   Type     mem: BUF
+\   U8 128    arr: Some_type
+\   Some_type mem: SOME_BUF
 : arr: { size len -- } ( C: "name" -- ) ( E: -- cap )
   size len * execute' let:
 ;
 
 \ ## Pretend struct types
 \
+\ Structs allow C interop. Fields are aligned and padded to match the C ABI.
+\
+\ The name of a struct "type" returns its size. The name of a "field"
+\ is a compile-time word which computes its offset from an address.
+\ To get an offset from zero, provide zero.
+\
 \ Basic usage:
 \
 \   struct: Type
-\     1  S32 field: Type_number
-\     32 U8  field: Type_buffer
+\     S32 1  field: Type_field0
+\     U8  32 field: Type_field1
 \   end
 \
-\   Type alloca { val }
+\   Type alloca { adr }
 \
-\       val Type_number @
-\   123 val Type_number !
+\       adr Type_field0 @
+\   123 adr Type_field0 !
+\
+\ Normally, a verb consumes all arguments; a field appears to have arity 1.
+\ But these fields are not exactly verbs; multiple fields can be accessed in
+\ one argument list. The load operator `@` behaves the same way, so they can
+\ be all used inside a longer argument list, exactly like verbs behave in
+\ stack-based programming:
+\
+\   adr Type_field0 @ \ arg0
+\   adr Type_field1 @ \ arg1
+\   some_verb
 
+\ Used internally.
 : struct_pop ( C: str len align off -- )
   stack{ str len align off }
   off align align_up { size }
@@ -1965,6 +2027,7 @@ extern_val: stderr __stderrp
   [ false comp_only ]
 ;
 
+\ Begins a definition; terminate with `end`.
 : struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
   parse_word   { str len }
   str strdup   { str }
@@ -1972,16 +2035,21 @@ extern_val: stderr __stderrp
   str len 0 0 fun
 ;
 
+\ Compile field access: compute offset from address.
 : struct_field_comp { off }
   comp_args_get { len }
   len ifn throw" struct field must be preceded by struct pointer" end
 
+  \ Offset is computed into the same register that held the address.
   len dec { reg }
   reg                     comp_clobber \ Disassociate locals from this reg.
   reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
 ;
 
-\ For alignment reasons, every field is considered an array.
+\ Every field requires both type width and array length.
+\ Most fields have length 1, but any length can be used.
+\ This allows us to align fields to element size, rather
+\ than total size.
 : field: { align off fun size len -- align off_next fun }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )

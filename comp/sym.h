@@ -40,7 +40,6 @@ typedef struct Sym {
       Sym_instrs spans;      // Instruction ranges; used by the assembler.
       bool       inlinable;  // Inner code is safe to copy-paste.
       bool       has_loads;  // Has PC-relative data access.
-      bool       has_rets;   // Has explicit early returns.
       bool       has_alloca; // Has dynamic stack allocation, modifies SP.
     } norm;
 

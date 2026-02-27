@@ -319,6 +319,11 @@ static void comp_sym_beg(Comp *comp, Sym *sym) {
 static void comp_sym_end(Comp *comp, Sym *sym) {
   asm_sym_end(comp, sym);
   sym_auto_inlinable(sym);
+
+#ifndef CALL_CONV_STACK
+  comp_warn_unused_locals(&comp->ctx);
+#endif
+
   comp_ctx_trunc(&comp->ctx);
 }
 
@@ -391,8 +396,6 @@ static Err comp_sym_instr_range(
 static Err comp_append_ret(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-
-  sym->norm.has_rets = true;
 
   stack_push(
     &comp->ctx.asm_fix,

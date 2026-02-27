@@ -316,7 +316,12 @@ static Err comp_validate_args(Comp *comp, const char *action, Sint req) {
 }
 
 static Err comp_validate_call_args(Comp *comp, const Sym *callee) {
-  return comp_validate_args(comp, "unable to compile call", callee->inp_len);
+  const auto               name = &callee->name;
+  static constexpr auto    cap  = 36 + arr_cap(name->buf);
+  static thread_local char buf[cap];
+
+  snprintf(buf, cap, "unable to compile call to " FMT_QUOTED, name->buf);
+  return comp_validate_args(comp, buf, callee->inp_len);
 }
 
 static Err comp_validate_ret_args(Comp *comp) {
@@ -347,14 +352,14 @@ static Err err_assign_no_args(const char *name) {
   );
 }
 
-static Local_write *comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
+static Loc_write *comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
   const auto confirm = loc->read || loc->vol;
 
   const auto fix = stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
       .type  = LOC_FIX_WRITE,
-      .write = (Local_write){
+      .write = (Loc_write){
         .instr     = asm_append_breakpoint(comp, ASM_CODE_LOC_WRITE),
         .prev      = loc->write,
         .loc       = loc,
@@ -563,7 +568,7 @@ static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
     &comp->ctx.loc_fix,
     (Loc_fixup){
       .type = LOC_FIX_READ,
-      .read = (Local_read){
+      .read = (Loc_read){
         .instr = asm_append_breakpoint(comp, ASM_CODE_LOC_READ),
         .loc   = loc,
         .reg   = reg,
@@ -664,6 +669,7 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) 
   const auto ctx  = &comp->ctx;
 
   aver(!ctx->reg_vals[reg].type);
+
   ctx->reg_vals[reg] = (Reg_val){
     .type        = REG_VAL_IMM,
     .imm         = imm,
@@ -897,6 +903,28 @@ static Err comp_append_throw(Comp *comp, const Sym *sym) {
   return comp_append_try_or_throw(
     comp, sym, "unable to `throw`", asm_append_fixup_throw
   );
+}
+
+/*
+TODO needs additional heuristics. Has way too many false positives.
+In addition, the user doesn't always want this. Some of our tests
+and examples use named locals which are intentionally ignored.
+*/
+static void comp_warn_unused_locals(Comp_ctx *) {
+  /*
+  const auto sym = ctx->sym;
+  aver(!!sym);
+
+  for (stack_range(auto, loc, &ctx->locals)) {
+    if (loc->location == LOC_UNKNOWN) {
+      eprintf(
+        "[warning] in " FMT_QUOTED ": unused local " FMT_QUOTED "\n",
+        sym->name.buf,
+        comp_local_name(loc)
+      );
+    }
+  }
+  */
 }
 
 static const char *loc_fixup_fmt(Loc_fixup *fix) {

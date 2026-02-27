@@ -50,3 +50,19 @@ static Err spawn_with_stdin(
   close(fd_write); // Deliver EOF to child process.
   return err;
 }
+
+static Err wait_pid(pid_t pid, int *status) {
+  for (;;) {
+    int code = waitpid(pid, status, 0);
+
+    if (!(code < 0)) break;
+
+    code = errno;
+    if (code == EINTR) continue;
+
+    return errf(
+      "unable to wait on PID %d; code: %d; msg: %s", pid, code, strerror(code)
+    );
+  }
+  return nullptr;
+}

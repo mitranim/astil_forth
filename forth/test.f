@@ -599,12 +599,17 @@ T{ c" one" strdup c" one" cstr< <T> false }T
   1 comp_args_set
 ] ;
 
-T{ int32_negative     <T> 0xffff_ffff           }T
-T{ int32_negative int <T> 0xffff_ffff_ffff_ffff }T
-T{ int32_negative int <T> -1                    }T
+T{ int32_negative             <T> 0xffff_ffff           }T
+T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
+T{ int32_negative int_to_cell <T> -1                    }T
 
 : test_varargs
-  10 20 30 va{ c" numbers (should be 10 20 30): %zd %zd %zd" printf }va lf
+  10 20 30 va{ c" numbers (should be 10 20 30): %zd %zd %zd" printf }va
+  { printed }
+  lf
+
+  " numbers (should be 10 20 30): 10 20 30" { str len }
+  T{ printed <T> len }T
 ;
 \ test_varargs
 

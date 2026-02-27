@@ -254,7 +254,9 @@ Because I was learning and experimenting. Some of the code is generalized librar
 
 - Partial self-assembly is possible.
 - Single-pass assembly is possible (with fixups 😔).
-- Single-pass assembly is incompatible with many optimizations.
+- Single-pass assembly is compatible with _basic_ optimizations,
+  such as simple register allocation and limited inlining.
+- Single-pass assembly is incompatible with _advanced_ optimizations.
 - Single-pass assembly with fixups scales to a point.
 
 When the system is simple, single-pass compilation (with fixups) seems to be a simpler choice. After a certain level of complexity, an IR-based multi-pass approach starts to look simpler. I feel like this system is just before that threshold.

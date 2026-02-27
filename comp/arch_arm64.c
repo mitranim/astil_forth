@@ -1172,7 +1172,7 @@ static Err asm_inline_sym(Comp *comp, Sym *caller, const Sym *callee, bool catch
 
   const auto spans  = &callee->norm.spans;
   const auto instrs = &comp->code.code_write;
-  const auto floor  = spans->inner;
+  const auto floor  = spans->prologue;
   const auto ceil   = spans->ret;
 
   for (Ind ind = floor; ind < ceil; ind++) {

@@ -10,7 +10,7 @@
 // #include "./comp.h"
 // #endif
 
-typedef struct Local_write Local_write;
+typedef struct Loc_write Loc_write;
 
 /*
 Book-keeping structure describing a local variable.
@@ -71,11 +71,11 @@ without "running out" and creating new "write" operations. However, the
 next "set" operation invalidates this state.
 */
 typedef struct {
-  Word_str     name;
-  Local_write *write;  // Latest unconfirmed "write"; confirmed by "reads".
-  bool         stable; // Has up-to-date value in assigned stable location.
-  bool         read;   // Has a read; auto-confirm all subsequent writes.
-  bool         vol;    // Volatile: address taken.
+  Word_str   name;
+  Loc_write *write;  // Latest unconfirmed "write"; confirmed by "reads".
+  bool       stable; // Has up-to-date value in assigned stable location.
+  bool       read;   // Has a read; auto-confirm all subsequent writes.
+  bool       vol;    // Volatile: address taken.
 
   // Final stable location used for writes and reads.
   // Locals which are never "read" are not considered.
@@ -91,22 +91,22 @@ typedef struct {
   };
 } Local;
 
-typedef stack_of(Local)  Local_stack;
-typedef dict_of(Local *) Local_dict;
+typedef stack_of(Local)  Loc_stack;
+typedef dict_of(Local *) Loc_dict;
 
 typedef struct {
   Local *loc;
   Instr *instr; // Retropatched with mov or load.
   U8     reg;   // Reg is immediately known; location is unknown.
-} Local_read;
+} Loc_read;
 
-typedef struct Local_write {
-  Local              *loc;
-  Instr              *instr;     // Retropatched with mov or store.
-  struct Local_write *prev;      // Prior "write" for chain-confirming.
-  U8                  reg;       // Reg is known; location is unknown.
-  bool                confirmed; // If not, turn this into a nop.
-} Local_write;
+typedef struct Loc_write {
+  Local            *loc;
+  Instr            *instr;     // Retropatched with mov or store.
+  struct Loc_write *prev;      // Prior "write" for chain-confirming.
+  U8                reg;       // Reg is known; location is unknown.
+  bool              confirmed; // If not, turn this into a nop.
+} Loc_write;
 
 typedef struct {
   enum {
@@ -114,8 +114,8 @@ typedef struct {
     LOC_FIX_WRITE,
   } type;
 
-  Local_read  read;
-  Local_write write;
+  Loc_read  read;
+  Loc_write write;
 } Loc_fixup;
 
 typedef stack_of(Loc_fixup) Loc_fixups;
@@ -148,18 +148,18 @@ choose to affect compilation by invoking various compiler intrinsics.
 SYNC[comp_ctx_rewind].
 */
 typedef struct {
-  Sym        *sym;        // What we're currently compiling.
-  Local_stack locals;     // Includes current word's input params.
-  Local_dict  local_dict; // So we can find locals by name.
-  Ind         anon_locs;  // For auto-naming of anonymous locals.
-  Ind         fp_off;     // Stack space reserved for locals.
-  Reg_val     reg_vals[ASM_ALL_PARAM_REG_LEN]; // Values in registers.
-  Bits        vol_regs;   // Volatile registers available for locals.
-  U8          arg_low;    // How many args got consumed by assignments.
-  U8          arg_len;    // Available args for the next call or assign.
-  Asm_fixups  asm_fix;    // For patching instructions in a post-pass.
-  Loc_fixups  loc_fix;    // For resolving stable locations for locals.
-  bool        redefining; // Temporarily suppress "redefined" diagnostic.
-  bool        compiling;  // Turned on by `:` and `]`, turned off by `[`.
-  bool        has_alloca; // True if SP is dynamically adjusted in the body.
+  Sym       *sym;        // What we're currently compiling.
+  Loc_stack  locals;     // Includes current word's input params.
+  Loc_dict   local_dict; // So we can find locals by name.
+  Ind        anon_locs;  // For auto-naming of anonymous locals.
+  Ind        fp_off;     // Stack space reserved for locals.
+  Reg_val    reg_vals[ASM_ALL_PARAM_REG_LEN]; // Values in registers.
+  Bits       vol_regs;   // Volatile registers available for locals.
+  U8         arg_low;    // How many args got consumed by assignments.
+  U8         arg_len;    // Available args for the next call or assign.
+  Asm_fixups asm_fix;    // For patching instructions in a post-pass.
+  Loc_fixups loc_fix;    // For resolving stable locations for locals.
+  bool       redefining; // Temporarily suppress "redefined" diagnostic.
+  bool       compiling;  // Turned on by `:` and `]`, turned off by `[`.
+  bool       has_alloca; // True if SP is dynamically adjusted in the body.
 } Comp_ctx;

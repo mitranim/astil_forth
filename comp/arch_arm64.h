@@ -81,7 +81,7 @@ static constexpr U8 ASM_REG_LINK = 30;
 // System stack pointer; also treated as a null register by many instructions.
 static constexpr U8 ASM_REG_SP = 31;
 
-// Extremely primitive heuristic.
+// Extremely primitive heuristic. 4 seems enough.
 static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 
 static constexpr U8 ASM_REG_INTERP = 28;
