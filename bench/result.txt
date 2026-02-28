@@ -1,0 +1,125 @@
+(On M3 Pro.)
+
+## BASELINE
+
+Benchmark 1: baseline_our
+  Time (mean ± σ):       5.5 ms ±   0.5 ms    [User: 4.6 ms, System: 0.4 ms]
+  Range (min … max):     4.7 ms …   7.8 ms    476 runs
+
+Benchmark 2: baseline_our_s
+  Time (mean ± σ):       4.2 ms ±   0.6 ms    [User: 3.3 ms, System: 0.4 ms]
+  Range (min … max):     3.6 ms …   8.9 ms    702 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 3: baseline_gforth
+  Time (mean ± σ):       3.5 ms ±   0.5 ms    [User: 1.3 ms, System: 0.4 ms]
+  Range (min … max):     2.4 ms …  12.2 ms    799 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Summary
+  baseline_gforth ran
+    1.20 ± 0.24 times faster than baseline_our_s
+    1.57 ± 0.28 times faster than baseline_our
+
+## BUBBLE
+
+Benchmark 1: bubble_our
+  Time (mean ± σ):      36.6 ms ±   4.4 ms    [User: 35.5 ms, System: 0.5 ms]
+  Range (min … max):    35.3 ms …  73.2 ms    80 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 2: bubble_our_s
+  Time (mean ± σ):      93.4 ms ±   0.2 ms    [User: 92.4 ms, System: 0.5 ms]
+  Range (min … max):    93.1 ms …  93.9 ms    32 runs
+
+Benchmark 3: bubble_gforth
+  Time (mean ± σ):     202.9 ms ±   9.8 ms    [User: 200.8 ms, System: 0.7 ms]
+  Range (min … max):   190.3 ms … 222.6 ms    14 runs
+
+Summary
+  bubble_our ran
+    2.55 ± 0.30 times faster than bubble_our_s
+    5.55 ± 0.71 times faster than bubble_gforth
+
+## PRIME SIEVE
+
+Benchmark 1: sieve_our
+  Time (mean ± σ):      63.1 ms ±   1.6 ms    [User: 62.1 ms, System: 0.5 ms]
+  Range (min … max):    62.0 ms …  70.2 ms    47 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 2: sieve_our_s
+  Time (mean ± σ):     160.3 ms ±   1.5 ms    [User: 159.3 ms, System: 0.5 ms]
+  Range (min … max):   158.5 ms … 164.2 ms    18 runs
+
+Benchmark 3: sieve_gforth
+  Time (mean ± σ):     417.2 ms ±   9.4 ms    [User: 414.1 ms, System: 1.1 ms]
+  Range (min … max):   404.9 ms … 433.4 ms    10 runs
+
+Summary
+  sieve_our ran
+    2.54 ± 0.07 times faster than sieve_our_s
+    6.61 ± 0.22 times faster than sieve_gforth
+
+## FIB_LOOP
+
+Benchmark 1: fib_loop_asm
+  Time (mean ± σ):       6.9 ms ±   0.2 ms    [User: 6.1 ms, System: 0.4 ms]
+  Range (min … max):     6.6 ms …   8.4 ms    434 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 2: fib_loop_our
+  Time (mean ± σ):       8.3 ms ±   0.2 ms    [User: 7.5 ms, System: 0.4 ms]
+  Range (min … max):     8.0 ms …  10.8 ms    359 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 3: fib_loop_our_s
+  Time (mean ± σ):      21.3 ms ±   0.5 ms    [User: 20.5 ms, System: 0.4 ms]
+  Range (min … max):    20.7 ms …  23.5 ms    141 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+
+Benchmark 4: fib_loop_gforth
+  Time (mean ± σ):      38.8 ms ±   1.2 ms    [User: 36.1 ms, System: 0.6 ms]
+  Range (min … max):    36.3 ms …  40.4 ms    82 runs
+
+Summary
+  fib_loop_asm ran
+    1.20 ± 0.04 times faster than fib_loop_our
+    3.11 ± 0.11 times faster than fib_loop_our_s
+    5.65 ± 0.23 times faster than fib_loop_gforth
+
+## FIB_RECURSIVE: fib(36) single run
+
+Benchmark 1: fib_rec_clang
+  Time (mean ± σ):      36.1 ms ±   0.4 ms    [User: 35.3 ms, System: 0.4 ms]
+  Range (min … max):    35.4 ms …  37.7 ms    81 runs
+
+Benchmark 2: fib_rec_our
+  Time (mean ± σ):      57.1 ms ±   0.4 ms    [User: 56.2 ms, System: 0.5 ms]
+  Range (min … max):    56.4 ms …  58.0 ms    52 runs
+
+Benchmark 3: fib_rec_our_s
+  Time (mean ± σ):     246.4 ms ±  10.6 ms    [User: 244.9 ms, System: 0.9 ms]
+  Range (min … max):   234.6 ms … 260.7 ms    12 runs
+
+Benchmark 4: fib_rec_gforth
+  Time (mean ± σ):     334.4 ms ±   6.2 ms    [User: 331.0 ms, System: 0.8 ms]
+  Range (min … max):   325.9 ms … 343.6 ms    10 runs
+
+Benchmark 5: fib_rec_js_bun
+  Time (mean ± σ):      67.1 ms ±   1.4 ms    [User: 63.6 ms, System: 2.3 ms]
+  Range (min … max):    64.7 ms …  71.0 ms    44 runs
+
+Summary
+  fib_rec_clang ran
+    1.58 ± 0.02 times faster than fib_rec_our
+    1.86 ± 0.04 times faster than fib_rec_js_bun
+    6.83 ± 0.30 times faster than fib_rec_our_s
+    9.26 ± 0.20 times faster than fib_rec_gforth
