@@ -21,7 +21,7 @@ typedef span_of(Instr) Instr_span;
 // All fields are offsets in the instruction heaps.
 typedef struct {
   Ind floor;    // Setup instructions; some may be skipped.
-  Ind prologue; // Actual start; somewhere in `[prologue,inner]`.
+  Ind prologue; // Actual start; somewhere in `[floor,inner]`.
   Ind inner;    // First useful instruction.
   Ind epi_ok;   // Cleanups the error register on success.
   Ind epi_err;  // Doesn't touch the error reg; may be `== .ret`.

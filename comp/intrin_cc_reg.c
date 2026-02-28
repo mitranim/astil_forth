@@ -482,14 +482,17 @@ static void intrin_debug_ctx(Interp *interp) {
     "[debug]   output param count: %d\n"
     "[debug]   arguments:          %d\n"
     "[debug]   arguments consumed: %d\n"
-    "[debug]   data stack len:     " FMT_SINT "\n",
+    "[debug]   data stack len:     " FMT_SINT
+    "\n"
+    "[debug]   clobber:            %s\n",
     name,
     sym,
     inp_len,
     out_len,
     ctx->arg_len,
     ctx->arg_low,
-    stack_len(&interp->ints)
+    stack_len(&interp->ints),
+    uint32_to_bit_str((U32)sym->clobber)
   );
 
   if (loc_len) {
@@ -516,9 +519,10 @@ static void intrin_debug_ctx(Interp *interp) {
     if (has_vals || args) {
       eprintf("[debug]   values in param registers:\n");
 
-      auto val_cap = cap;
-      val_cap      = min(val_cap, last_val);
-      val_cap      = max(val_cap, args); // Macro `min` is not nestable.
+      const auto last_val_ind = (U8)(last_val + 1);
+      auto       val_cap      = cap;
+      val_cap                 = min(val_cap, last_val_ind);
+      val_cap = max(val_cap, args); // Macro `min` is not nestable.
 
       for (U8 ind = 0; ind < val_cap; ind++) {
         const auto val = arr[ind];
