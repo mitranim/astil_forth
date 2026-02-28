@@ -13,11 +13,11 @@ FLAGS CAP + let: EFLAG
   0 3 { num step }
 
   EFLAG FLAGS +for: ptr0
-    ptr0 c@ if
+    ptr0 @u8 if
       ptr0 step + { ptr1 }
 
       EFLAG ptr0 step +loop: ptr1
-        0 ptr1 c!
+        0 ptr1 !8
       end
 
       num inc { num }

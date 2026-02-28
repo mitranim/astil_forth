@@ -19,8 +19,15 @@ static Err err_nested_definition(const Interp *interp) {
   return errf("unexpected \":\" in definition of " FMT_QUOTED, sym->name.buf);
 }
 
-static Err err_wordlist_at_capacity(const char *name) {
-  return errf("unable to create word " FMT_QUOTED ": wordlist at capacity", name);
+static Err err_wordlist_at_capacity(const char *name, Wordlist list, Sint cap) {
+  return errf(
+    "unable to create word " FMT_QUOTED
+    " in wordlist %d (%s): wordlist at capacity (" FMT_SINT " words)",
+    name,
+    list,
+    wordlist_name(list),
+    cap
+  );
 }
 
 static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
@@ -32,7 +39,10 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
   ));
 
   const auto syms = &interp->syms;
-  if (stack_rem(syms) <= 0) return err_wordlist_at_capacity(name.buf);
+
+  if (stack_rem(syms) <= 0) {
+    return err_wordlist_at_capacity(name.buf, wordlist, stack_cap(syms));
+  }
 
   /*
   Add to the symbol list, but not to the symbol dict.

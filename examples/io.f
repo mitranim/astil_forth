@@ -5,6 +5,8 @@ import' std:io.f
 \
 \   ./astil.exe examples/io.f
 
+\ ## Stat
+
 : example_file_stat
   c" examples/io.f" { path }
   Fstat alloca      { stat }
@@ -21,13 +23,19 @@ import' std:io.f
 ;
 example_file_stat
 
+\ [example0] path:        examples/io.f
+\ [example0] file size:   1348
+\ [example0] last change: 1772280472
+
+\ ## Seek
+
 128 mem: BUF
 
 : example_seek_and_thou_shall_find
   c" examples/io.f"    { path }
   path c" r" file_open { file }
 
-  \ Handle all exceptions from here, so we can close the file.
+  \ No exceptions from here, so we can close the file reliably.
   [ true catches ]
 
   37 91 { off cap }
@@ -53,3 +61,9 @@ example_file_stat
   BUF puts lf
 ;
 example_seek_and_thou_shall_find
+
+\ [example1] partial content of `examples/io.f`:
+\
+\ \ The paths assume the script is being run from repo root:
+\ \
+\ \   ./astil.exe examples/io.f

@@ -251,6 +251,8 @@
   0b11_111_0_00_00_0_000000000_00_00000_00000 or
 ;
 
+\ For unsigned ints only.
+\
 \ ldur Wt, [Xn, <imm>]
 : asm_load_off_32 ( Wt Xn imm9 -- instr )
   asm_pattern_load_store
@@ -265,7 +267,7 @@
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
-: asm_pattern_load_store_with_register ( Xt Xn Xm scale -- instr_mask )
+: asm_pattern_load_store_with_register_off ( Xt Xn Xm scale -- instr_mask )
   <>0  12 lsl    \ lsl 3
   swap 16 lsl or \ Xm
   swap 5  lsl or \ Xn
@@ -273,14 +275,14 @@
 ;
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
-: asm_load_with_register ( Xt Xn Xm scale -- instr )
-  asm_pattern_load_store_with_register
+: asm_load_with_register_off ( Xt Xn Xm scale -- instr )
+  asm_pattern_load_store_with_register_off
   0b11_111_0_00_01_1_00000_011_0_10_00000_00000 or
 ;
 
 \ str Xt, [Xn, Xm, lsl <scale>]
-: asm_store_with_register ( Xt Xn Xm scale -- instr )
-  asm_pattern_load_store_with_register
+: asm_store_with_register_off ( Xt Xn Xm scale -- instr )
+  asm_pattern_load_store_with_register_off
   0b11_111_0_00_00_1_00000_011_0_10_00000_00000 or
 ;
 
@@ -312,12 +314,16 @@
   0b11_111_0_01_00_000000000000_00000_00000 or
 ;
 
-: asm_load_byte_off ( Wt Wn imm12 -- instr )
+\ For unsigned bytes only.
+\
+\ ldrb Wt, [Xn, imm12]
+: asm_load_byte_off ( Wt Xn imm12 -- instr )
   asm_pattern_arith_imm
   0b00_11_1_0_0_1_01_000000000000_00000_00000 or
 ;
 
-: asm_store_byte_off ( Wt Wn imm12 -- instr )
+\ strb Wt, [Xn, imm12]
+: asm_store_byte_off ( Wt Xn imm12 -- instr )
   asm_pattern_arith_imm
   0b00_11_1_0_0_1_00_000000000000_00000_00000 or
 ;
@@ -646,24 +652,24 @@
 
 \ Pushes the stack item found at the given index, duplicating it.
 : pick ( … ind -- … [ind] ) [
-                       asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
-  1 1                  asm_mvn                comp_instr \ mvn x1, x1
-  1 ASM_REG_DAT_SP 1 1 asm_load_with_register comp_instr \ ldr x1, [x27, x1, lsl 3]
-                       asm_push_x1            comp_instr \ str x1, [x27], 8
+                       asm_pop_x1                 comp_instr \ ldr x1, [x27, -8]!
+  1 1                  asm_mvn                    comp_instr \ mvn x1, x1
+  1 ASM_REG_DAT_SP 1 1 asm_load_with_register_off comp_instr \ ldr x1, [x27, x1, lsl 3]
+                       asm_push_x1                comp_instr \ str x1, [x27], 8
 ] ;
 
 \ FIFO version of `pick`: starts from stack bottom.
 : pick0 ( … ind -- … [ind] ) [
-           asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
-  1 26 1 1 asm_load_with_register comp_instr \ ldr x1, [x26, x1, lsl 3]
-           asm_push_x1            comp_instr \ str x1, [x27], 8
+           asm_pop_x1                 comp_instr \ ldr x1, [x27, -8]!
+  1 26 1 1 asm_load_with_register_off comp_instr \ ldr x1, [x26, x1, lsl 3]
+           asm_push_x1                comp_instr \ str x1, [x27], 8
 ] ;
 
 \ Overwrite the cell at the given index with the given value.
 : bury ( … val ind -- … ) [
-                       asm_pop_x1_x2           comp_instr \ ldp x1, x2, [x27, -16]!
-  2 2                  asm_mvn                 comp_instr \ mvn x2, x2
-  1 ASM_REG_DAT_SP 2 1 asm_store_with_register comp_instr \ str x1, [x27, x2, lsl 3]
+                       asm_pop_x1_x2               comp_instr \ ldp x1, x2, [x27, -16]!
+  2 2                  asm_mvn                     comp_instr \ mvn x2, x2
+  1 ASM_REG_DAT_SP 2 1 asm_store_with_register_off comp_instr \ str x1, [x27, x2, lsl 3]
 ] ;
 
 : flip ( i1 i2 i3 -- i3 i2 i1 ) [
@@ -830,14 +836,14 @@
   1 2 3 0 asm_store_pair_off comp_instr \ stp x1, x2, [x3]
 ] ;
 
-\ 32-bit version of `@`. Used for C ints.
+\ 32-bit version of `@`. Used for C `uint`.
 : @32 ( adr -- val ) [
         asm_pop_x1      comp_instr \ ldr  x1, [x27, -8]!
   1 1 0 asm_load_off_32 comp_instr \ ldur w1, [x1]
         asm_push_x1     comp_instr \ str  x1, [x27], 8
 ] ;
 
-\ 32-bit version of `!`. Used for instructions and C ints.
+\ 32-bit version of `!`. Used for instructions and C `uint`.
 : !32 ( val adr -- ) [
         asm_pop_x1_x2    comp_instr \ ldp x1, x2, [x27, -16]!
   1 2 0 asm_store_off_32 comp_instr \ str w1, x2
@@ -1748,7 +1754,7 @@ extern_val: stderr __stderrp
 0 1 extern: __error
 1 1 extern: strerror
 
-: errno ( -- err ) __error @32 ;
+: errno ( -- err ) __error @32 ; \ TODO switch to `ldrsw`.
 
 6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
 3 1 extern: mprotect ( adr len pflag -- err )

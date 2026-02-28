@@ -7,7 +7,7 @@ Goals:
 - [x] Easy _self-assembly_ in user/lib code.
 - [x] Language features can be implemented in user/lib code.
 - [x] Enough language features (in user/lib code) to be usable for scripting.
-- [x] Support register-based calls.
+- [x] Support native register-based ABI.
 - [x] Avoid a VM or complex IR.
 - [x] Keep the code clear and educational for other compiler amateurs.
 - [ ] Rewrite in Forth to self-host.
@@ -242,9 +242,13 @@ Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word 
 
 ### No return stack
 
-Since we use native calls and don't target embedded systems, the role of the return stack is fulfilled by the system stack provided by the OS.
+Since we use native calls and don't target embedded systems, the role of the return stack is fulfilled by scratch registers and system stack space.
 
-Operations which would normally use the return stack for scratch space just use registers, locals, or globals.
+Reg-CC emphasizes named local variables. Locals are kept in registers when possible, and spilled to the system stack otherwise. The compiler figures out the locations.
+
+Stack-CC always spills locals to the system stack.
+
+Both conventions make use of temp registers for scratch space.
 
 ## Why so much C code
 

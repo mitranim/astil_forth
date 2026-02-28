@@ -273,32 +273,20 @@
 ;
 
 \ ldur Xt, [Xn, <imm>]
-: asm_load_off { Xt Xn imm9 -- instr }
+: asm_load_unscaled_off { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_01_0_000000000_00_00000_00000 or
 ;
 
 \ stur Xt, [Xn, <imm>]
-: asm_store_off { Xt Xn imm9 -- instr }
+: asm_store_unscaled_off { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_00_0_000000000_00_00000_00000 or
 ;
 
-\ ldur Wt, [Xn, <imm>]
-: asm_load_off_32 { Wt Xn imm9 -- instr }
-  Wt Xn imm9 asm_pattern_load_store
-  0b10_111_0_00_01_0_000000000_00_00000_00000 or
-;
-
-\ stur Wt, [Xn, <imm>]
-: asm_store_off_32 { Wt Xn imm9 -- instr }
-  Wt Xn imm9 asm_pattern_load_store
-  0b10_111_0_00_00_0_000000000_00_00000_00000 or
-;
-
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
-: asm_pattern_load_store_with_register { Xt Xn Xm scale -- instr_mask }
+: asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
   Xn        5  lsl { Xn }
   Xm        16 lsl { Xm }
   scale <>0 12 lsl \ lsl 3
@@ -306,14 +294,14 @@
 ;
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
-: asm_load_with_register { Xt Xn Xm scale -- instr }
-  Xt Xn Xm scale asm_pattern_load_store_with_register
+: asm_load_with_register_off { Xt Xn Xm scale -- instr }
+  Xt Xn Xm scale asm_pattern_load_store_with_register_off
   0b11_111_0_00_01_1_00000_011_0_10_00000_00000 or
 ;
 
 \ str Xt, [Xn, Xm, lsl <scale>]
-: asm_store_with_register { Xt Xn Xm scale -- instr }
-  Xt Xn Xm scale asm_pattern_load_store_with_register
+: asm_store_with_register_off { Xt Xn Xm scale -- instr }
+  Xt Xn Xm scale asm_pattern_load_store_with_register_off
   0b11_111_0_00_00_1_00000_011_0_10_00000_00000 or
 ;
 
@@ -331,14 +319,88 @@
   Xd or Xn or
 ;
 
-: asm_load_byte_off { Wt Wn imm12 -- instr }
-  Wt Wn imm12 asm_pattern_arith_imm
-  0b00_11_1_0_0_1_01_000000000000_00000_00000 or
+\ size:
+\
+\   0b00 -- 8  bit
+\   0b01 -- 16 bit
+\   0b10 -- 32 bit
+\   0b11 -- 64 bit
+\
+\ opc examples for size = 0b00:
+\
+\   0b01 -- ldrb  Wt
+\   0b11 -- ldrsb Wt
+\   0b10 -- ldrsb Xt
+\   0b00 -- strb  Wt
+\
+\ Base instruction variant: "immediate, unsigned offset". Offset is 0.
+: asm_load_store_imm { Rt Xn imm12 size opc -- instr }
+  size 30 lsl         { size }
+  opc  22 lsl size or { mask }
+  Rt Xn imm12 asm_pattern_arith_imm
+  mask or
+  0b00_111_0_01_00_000000000000_00000_00000 or
 ;
 
-: asm_store_byte_off { Wt Wn imm12 -- instr }
-  Wt Wn imm12 asm_pattern_arith_imm
-  0b00_11_1_0_0_1_00_000000000000_00000_00000 or
+\ Unsigned 8-bit.
+\
+\ ldrb Wt, [Xn, imm12]
+: asm_load_off_u8 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b00 0b01 asm_load_store_imm
+;
+
+\ Signed 8-bit.
+\
+\ ldrsb Xt, [Xn, imm12]
+: asm_load_off_s8 { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b00 0b10 asm_load_store_imm
+;
+
+\ Either unsigned or signed 8-bit.
+\
+\ strb Wt, [Xn, imm12]
+: asm_store_off_u8 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b00 0b00 asm_load_store_imm
+;
+
+\ ldrh Wt, [Xn, imm12]
+: asm_load_off_u16 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b01 0b01 asm_load_store_imm
+;
+
+\ ldrsh Xt, [Xn, imm12]
+: asm_load_off_s16 { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b01 0b10 asm_load_store_imm
+;
+
+\ strh Wt, [Xn, imm12]
+: asm_store_off_u16 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b01 0b00 asm_load_store_imm
+;
+
+\ ldr Wt, [Xn, imm12]
+: asm_load_off_u32 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b10 0b01 asm_load_store_imm
+;
+
+\ ldrsw Xt, [Xn, imm12]
+: asm_load_off_s32 { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b10 0b10 asm_load_store_imm
+;
+
+\ str Wt, [Xn, imm12]
+: asm_store_off_u32 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b10 0b00 asm_load_store_imm
+;
+
+\ ldr Xt, [Xn, imm12]
+: asm_load_off { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b11 0b01 asm_load_store_imm
+;
+
+\ str Xt, [Xn, imm12]
+: asm_store_off { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b11 0b00 asm_load_store_imm
 ;
 
 \ neg Xd, Xd
@@ -701,25 +763,81 @@
 
 \ ## Memory load / store
 
-: @ { adr -- val } [
-  0 0 0 asm_load_off comp_instr \ ldur x0, [x0]
-  1                  comp_args_set
-] ;
-
-\ Allows to use `@` inside argument lists without consuming all prior
-\ arguments. This violates the idea that every verb should consume all
-\ pending arguments, but can be convenient at times. TODO reconsider.
+\ We allow to load inside an argument list, replacing the latest argument,
+\ which is an address, with a value, without consuming all prior arguments.
+\ This violates the idea that every verb should consume all arguments, but
+\ can be convenient at times. TODO reconsider.
 \
 \ TODO validate there's an input.
-:: @ ( E: adr -- val )
+: comp_mem_load { size opc }
   comp_args_get dec { reg }
   reg comp_clobber
-  reg reg 0 asm_load_off comp_instr \ ldur <reg>, [<reg>]
+  \ ldr<size> <reg>, [<reg>]
+  reg reg 0 size opc asm_load_store_imm comp_instr
 ;
 
-: ! { val adr } [
-  0 1 0 asm_store_off comp_instr \ stur x0, [x1]
-] ;
+\ Generically defines a load word for the given size / type.
+: load: { size opc } ( C: "name" -- )  ( E: adr -- val )
+  parse_word { str len }
+
+  \ Execution-time semantics.
+  str len colon
+    1 1 comp_signature_set ( E: adr -- val )
+    0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
+    1 comp_args_set
+  semicolon
+
+  \ Compile-time semantics.
+  str len colon_colon
+    size     comp_push
+    opc      comp_push
+    compile' comp_mem_load
+  semicolon
+
+  [ false comp_only ]
+;
+
+\ Generically defines a store word for the given size / type.
+\ Execution-time semantics only. The compiler always inlines.
+: store: { size } ( C: "name" -- ) ( E: val adr -- )
+  parse_word colon
+    2 0 comp_signature_set
+    \ str<size> r0, [x1]
+    0 1 0 size 0b00 asm_load_store_imm comp_instr
+  semicolon
+
+  [ false comp_only ]
+;
+
+0b00 0b01 load:  @u8 \ Renamed from standard `c@`.
+0b00 0b10 load:  @s8
+0b00      store: !8  \ Renamed from standard `c!`.
+
+0b01 0b01 load:  @u16
+0b01 0b10 load:  @s16
+0b01      store: !16
+
+0b10 0b01 load:  @u32
+0b10 0b10 load:  @s32
+0b10      store: !32
+
+0b11 0b01 load:  @
+0b11      store: !
+
+\ Aliases for some C types, so the user
+\ doesn't have to remember their width.
+
+0b10 0b10 load:  @cint
+0b10      store: !cint
+
+0b10 0b01 load:  @cuint
+0b10      store: !cuint
+
+0b11 0b10 load:  @clong
+0b11      store: !clong
+
+0b11 0b01 load:  @culong
+0b11      store: !culong
 
 : @2 { adr -- val0 val1 } [
   0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
@@ -728,17 +846,6 @@
 
 : !2 { val0 val1 adr -- } [
   0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
-] ;
-
-\ 32-bit version of `@`. Used for C ints.
-: @32 { adr -- val } [
-  0 0 0 asm_load_off_32 comp_instr \ ldr w0, [x1]
-  1                     comp_args_set
-] ;
-
-\ 32-bit version of `!`. Used for instructions and C ints.
-: !32 { val adr } [
-  0 1 0 asm_store_off_32 comp_instr \ str w0, [x1]
 ] ;
 
 : off! { adr } false adr ! ;
@@ -774,7 +881,7 @@
 \ ldur <reg>, [x28, INTERP_INTS_FLOOR]
 :: stack_floor ( E: -- adr )
   comp_next_arg_reg
-  ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_off comp_instr
+  ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_unscaled_off comp_instr
 ;
 
 : stack_floor { -- adr } stack_floor ;
@@ -782,7 +889,7 @@
 \ ldur <reg>, [x28, INTERP_INTS_TOP]
 :: stack_top ( E: -- adr )
   comp_next_arg_reg
-  ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr
+  ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
 ;
 
 : stack_top { -- adr } stack_top ;
@@ -792,7 +899,7 @@
 \ Updates the stack top address in the interpreter.
 : stack! { adr } [
   \ stur x0, [x28, INTERP_INTS_TOP]
-  0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr
+  0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off comp_instr
 ] ;
 
 : stack_at      { ind  -- adr } ind cells stack_floor + ;
@@ -819,12 +926,12 @@
 
 \ ldur <top>, [x28, INTERP_INTS_TOP]
 : asm_stack_load { adr -- instr }
-  adr ASM_REG_INTERP INTERP_INTS_TOP asm_load_off
+  adr ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off
 ;
 
 \ stur <top>, [x28, INTERP_INTS_TOP]
 : asm_stack_store { adr -- instr }
-  adr ASM_REG_INTERP INTERP_INTS_TOP asm_store_off
+  adr ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off
 ;
 
 \ Usage:
@@ -873,16 +980,7 @@
 
 \ ## Characters and strings
 
-: c@ { str -- char } [
-  0 0 0 asm_load_byte_off comp_instr \ ldrb x0, [x0]
-  1                       comp_args_set
-] ;
-
-: c! { char str -- } [
-  0 1 0 asm_store_byte_off comp_instr \ strb x0, [x1]
-] ;
-
-: parse_char { -- char } parse_word { buf -- } buf c@ ;
+: parse_char { -- char } parse_word { buf -- } buf @u8 ;
 
 : char' { -- char } ( E: "str" -- char ) parse_char ;
 
@@ -1001,7 +1099,7 @@
 : comp_extern_load_load { adr } ( E: -- val )
   comp_next_arg_reg { reg }
   adr reg                comp_page_load \ adrp & ldr
-  reg reg 0 asm_load_off comp_instr     \ ldur x0, [x0]
+  reg reg 0 asm_load_off comp_instr     \ ldr x0, [x0]
 ;
 
 : init_data_word { name name_len adr }
@@ -1127,8 +1225,8 @@ extern_val: stderr __stderrp
 13 let: CR
 
 3 mem: CRLF    \ \r\n\0
-CR CRLF c!     \ \r
-LF CRLF inc c! \ \n
+CR CRLF !8     \ \r
+LF CRLF inc !8 \ \n
 
 : emit     { char }       char putchar            { -- } ;
 : eputchar { char }       char stderr fputc       { -- } ;
@@ -1733,7 +1831,7 @@ ERR_CAP mem: ERR_BUF
 0 1 extern: __error
 1 1 extern: strerror
 
-: errno { -- code } __error @32 ;
+: errno { -- code } __error @s32 ;
 
 \ `code` comes from from `errno`, `ferror`, Posix procedures, etc.
 : os_err { code ctx }
@@ -1849,11 +1947,15 @@ ERR_CAP mem: ERR_BUF
   len ifn ret end
   comp_scratch_reg { stack }
 
-  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_off comp_instr \ ldur <stack>
+  \ ldur <stack>
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
+
   len 0 +for: arg
     arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
   end
-  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_off comp_instr \ stur <stack>
+
+  \ stur <stack>
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off comp_instr
 ;
 
 \ ## Stack printing
@@ -1963,16 +2065,18 @@ ERR_CAP mem: ERR_BUF
 \ Note: when converting shorter negative numbers to our `Cell`,
 \ they must be sign-extended. See `int_to_cell` for `S32`.
 \
-\ When accessing memory, use the appropriately sized
-\ load / store operators such as `@32` / `!32`.
-1 let: S8
+\ When accessing memory, use the appropriately sized and typed memory operators.
+\ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
+\ Both are stored with `!32`. For `Cint` and so on, we define appropriate
+\ aliases. See memory ops above.
 1 let: U8
-2 let: S16
+1 let: S8
 2 let: U16
-4 let: S32
+2 let: S16
 4 let: U32
-8 let: S64
+4 let: S32
 8 let: U64
+8 let: S64
 8 let: Adr
 8 let: Cstr \ char*
 4 let: Cint
@@ -2017,6 +2121,9 @@ ERR_CAP mem: ERR_BUF
 \   adr Type_field0 @ \ arg0
 \   adr Type_field1 @ \ arg1
 \   some_verb
+\
+\ Note that load / store is typed. Fields which are't cell-sized
+\ must be loaded and stored using dedicated typed operators.
 
 \ Used internally.
 : struct_pop ( C: str len align off -- )

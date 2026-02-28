@@ -78,7 +78,7 @@ static Err interp_init_syms(Interp *interp) {
 
 static Err interp_init(Interp *interp) {
   *interp       = (Interp){};
-  Stack_opt opt = {.len = 1024};
+  Stack_opt opt = {.len = 4096};
 
   try(stack_init(&interp->ints, &opt));
   try(stack_init(&interp->syms, &opt));
