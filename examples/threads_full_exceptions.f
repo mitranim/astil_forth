@@ -40,6 +40,8 @@ import' std:internals.f
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
 : callback { inout -- }
+  ( E: -- err ) \ Real ABI signature.
+
   inout @ { path }
   path logf" [child] checking size of `%s`..." lf
 
@@ -64,7 +66,7 @@ import' std:internals.f
   instr ref' val1 thread_spawn { thread1 }
 
   log" [main] waiting on thread 0..." lf
-  thread0 thread_join try
+  thread0 thread_join try \ Rethrow returned error.
   path0 val0 logf" [main] result from thread 0: size of `%s`: %zd" lf
 
   log" [main] waiting on thread 1..." lf

@@ -41,7 +41,7 @@ import' std:internals.f
   path logf" [child] checking size of `%s`..." lf
 
   Fstat alloca        { stat }
-  path stat path_stat { err }
+  path stat path_stat { err } \ Automatic catch; zero-cost.
 
   err ifn
     \ Store the output back.

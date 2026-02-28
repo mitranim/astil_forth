@@ -35,7 +35,7 @@ example_file_stat
   c" examples/io.f"    { path }
   path c" r" file_open { file }
 
-  \ No exceptions from here, so we can close the file reliably.
+  \ Disable exceptions from here, so we can close the file reliably.
   [ true catches ]
 
   37 91 { off cap }

@@ -43,6 +43,8 @@ import' std:internals.f
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
 : callback { inout -- }
+  ( E: -- err ) \ Real ABI signature.
+
   inout @ { path }
   path logf" [child] checking size of `%s`..." lf
 

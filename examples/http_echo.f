@@ -37,7 +37,7 @@ import' ./http_util.f
   READ_BUF              { buf cap }
   conn buf cap read_req { len }
 
-  elf elogf" [srv] incoming request:" elf elf
+  elogf" [srv] incoming request:" elf elf
   STDERR buf len write_opt elf
 
   conn " HTTP/1.1 200 OK"   write_opt conn write_eol
@@ -49,14 +49,18 @@ import' ./http_util.f
   elogf" [srv] echoed request back to client" elf
 ;
 
-: handle_conn { conn } [ true catches ]
+: handle_conn { conn }
+  \ Switch into "C mode" where exceptions are disabled.
+  \ Words which "throw" really just return an error as the last output.
+  [ true catches ]
+
   conn respond_conn { err }
 
   err if
     err elogf" [srv] unable to respond; error: %s"
   end
 
-  elogf" [srv] closing connection" lf
+  elogf" [srv] closing connection" elf elf
   conn close is_err if errno_elog" [srv] unable to close connection" end
 ;
 
