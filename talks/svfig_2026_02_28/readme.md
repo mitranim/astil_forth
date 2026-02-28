@@ -1,4 +1,4 @@
-# Stackless Forth — progress update, design, details
+# Stackless Forth and cross-language ABI compatibility
 
 - Comparison with stack-based calls.
 - Breaking the mold: Forth is not about stacks.
@@ -58,6 +58,10 @@ Single-pass assembly and compiler simplicity is compatible with basic register a
 Single-pass assembly with fixups scales _to a point_. After a certain level of complexity, it stops being helpful, and starts asking for an IR-based multi-pass approach. I feel my system is near that threshold.
 
 ## Why do this?
+
+- ABI compatibility between languages.
+- Performance on register-oriented CPUs.
+- Usability.
 
 Forth has nothing to do with stacks.
 

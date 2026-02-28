@@ -1,3 +1,19 @@
+## TOC
+
+* [Overview](#overview)
+* [Show me the code!](#show-me-the-code)
+* [Easy C interop](#easy-c-interop)
+* [Exceptions done right](#exceptions-done-right-abi-compatibility)
+* [Usage](#usage)
+* [Structure](#structure)
+* [Sublime Text](#sublime-text)
+* [Library](#library)
+* [Limitations](#limitations)
+* [Non-standard](#non-standard)
+* [Lessons](#lessons)
+* [What is compilation](#what-is-compilation)
+* [Name](#name)
+
 ## Overview
 
 A native-code Forth system designed for self-bootstrapping. Currently supports only Arm64.
@@ -150,6 +166,16 @@ make debug_run '<file>' DEBUG=true
 make debug_run '<file>' RECOVERY=false
 ```
 
+## Structure
+
+- `./forth`:
+  - `lang.f` — language core.
+  - `testing.f` — simple testing utils.
+  - Other files — optional small libraries; mostly interfaces to libc IO.
+- `./examples` — how to use `libc` for IO, networking, threading.
+- `./comp` — outer interpreter / compiler in C. Mostly library code with a small "main" entry point.
+- `./sublime` — editor support for Sublime Text.
+
 ## Sublime Text
 
 Due to divergence from the standard, this dialect wants its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
@@ -159,15 +185,6 @@ ln -sfn "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Package
 ```
 
 Note that for standard-adjacent Forths, you should use the [sublime-forth](https://github.com/mitranim/sublime-forth) package, which is available on Package Control.
-
-## Structure
-
-- `./comp` — outer interpreter / compiler in C. Mostly library code with a small "main" entry point.
-- `./forth`:
-  - `lang.f` — core language.
-  - `testing.f` — simple testing utils.
-  - Other files — optional small libraries.
-- `./sublime` — editor support for Sublime Text.
 
 ## Library
 
@@ -278,3 +295,7 @@ Perhaps we should differentiate "JIT compilers" and "JIT assemblers". But at the
 ## Name
 
 The name Astil references a sentient magic grimoire from some anime I watched. A book of magic words. Fitting for a Forth, don't you think?
+
+## License
+
+https://unlicense.org

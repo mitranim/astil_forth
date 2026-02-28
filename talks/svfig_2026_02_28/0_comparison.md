@@ -1,6 +1,6 @@
 # Comparison of calling conventions
 
-Stack-CC versus reg-CC.
+Stack-CC versus reg-CC, as implemented in this system.
 
 ## Arithmetic
 

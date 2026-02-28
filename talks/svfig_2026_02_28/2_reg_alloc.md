@@ -14,6 +14,7 @@ Spoiler: the result is similar to how arguments and calls work in C. That's okay
 - Everything below is for _compiled_ code (inside words).
 - Top-level _interpretation_ keeps inputs and outputs in the data stack.
 - When _interpreting_ words, we pop from stack to registers, make the call, then push from registers to stack.
+- The data stack is also used for control information during compilation, but this could be replaced with custom allocation if the stack wasn't provided.
 
 Why:
 
@@ -101,7 +102,7 @@ Simplest solution:
 - Other values must be manually stashed to locals.
 - Compiler allocates locals to temp registers or memory in a fixup pass.
 
-This allows the compiler to place low-numbered stack items into low-numbered parameter registers right away.
+This allows the compiler to place low-numbered stack items into low-numbered parameter registers right away, perfectly matching the platform's native call ABI.
 
 Simple example:
 

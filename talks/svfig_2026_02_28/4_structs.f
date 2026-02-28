@@ -24,6 +24,8 @@ end
 
 : example_time_struct
   Timespec alloca { inst }
+
+  \ A `libc` API which takes a struct pointer.
   0 inst clock_gettime
 
   inst Timespec_sec  @ { secs }
