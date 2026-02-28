@@ -47,6 +47,7 @@
 :: inline'' 2 inline_next ;
 
 \ "execute" is renamed from standard "postpone".
+\ Also see `execute_raw` for raw instruction addresses.
 : execute_next { wlist } ( "word" -- ) ( E: <word> )
   wlist next_word comp_call
 ;
@@ -691,6 +692,12 @@
   0b0_01_101_1_0_00000_00000000000000_00000 or
 ;
 
+\ blr Xn
+: asm_branch_link_reg { Xn -- instr }
+  Xn 5 lsl
+  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or
+;
+
 \ orr Xd, Xn, #(1 << bit)
 \
 \ TODO add general-purpose `orr`.
@@ -1291,7 +1298,7 @@ LF CRLF inc !8 \ \n
 \
 \   throw" some_error_msg"
 \
-\ Also see `sthrowf"` for error message formatting.
+\ Also see `throwf"` for error message formatting.
 :  throw" ( E: "str" -- ) parse_cstr throw ;
 :: throw" ( C: "str" -- ) comp_cstr execute'' throw ;
 
@@ -1785,13 +1792,13 @@ LF CRLF inc !8 \ \n
 \   10 20 30 logf" numbers: %zd %zd %zd" lf
 \
 \ TODO define a `:` variant.
-:: logf" ( C: i0 … iN -- ) ( E: i0 … iN -- )
+:: logf" ( C: "fmt" -- ) ( E: i0 … iN -- )
   comp_va{ comp_cstr compile' printf }va_comp
   0 comp_args_set \ Drop output of `printf`.
 ;
 
 \ Format-prints to stderr. TODO define a `:` variant.
-:: elogf" ( C: N -- ) ( E: i1 … iN -- )
+:: elogf" ( C: "fmt" -- ) ( E: i1 … iN -- )
   comp_va{ compile' stderr comp_cstr compile' fprintf }va_comp
   0 comp_args_set \ Drop output of `fprintf`.
 ;
@@ -1803,12 +1810,10 @@ LF CRLF inc !8 \ \n
 4096    let: ERR_CAP
 ERR_CAP mem: ERR_BUF
 
-\ Like `sthrowf"` but easier to use. Example:
+\ Example:
 \
-\   10 20 30 throwf" error codes: %zd %zd %zd"
-\
-\ TODO: port `sthrowf"` from stack-CC.
-:: throwf" ( C: len -- ) ( E: i1 … iN -- )
+\   10 20 30 errf" error codes: %zd %zd %zd" throw
+:: errf"  ( C: "fmt" -- ) ( E: i1 … iN -- str )
   comp_va{
     execute'' ERR_BUF
     execute'' ERR_CAP
@@ -1817,11 +1822,18 @@ ERR_CAP mem: ERR_BUF
   }va_comp
   0 comp_args_set \ Ignore output of `snprintf`.
   execute'' ERR_BUF
+;
+
+\ Example:
+\
+\   10 20 30 throwf" error codes: %zd %zd %zd"
+:: throwf" ( C: "fmt" -- ) ( E: i1 … iN -- )
+  execute'' errf"
   execute'' throw
 ;
 
 \ Similar to standard `abort"`, with clearer naming.
-:: throw_if" ( C: "str" -- ) ( E: pred -- )
+:: throw_if" ( C: "fmt" -- ) ( E: pred -- )
   execute'' if
   comp_cstr
   execute'' throw
@@ -1834,26 +1846,28 @@ ERR_CAP mem: ERR_BUF
 : errno { -- code } __error @s32 ;
 
 \ `code` comes from from `errno`, `ferror`, Posix procedures, etc.
-: os_err { code ctx }
+: os_err { code ctx -- str }
   code strerror { msg }
   msg if
-    ctx code msg throwf" %s; code: %zd; msg: %s"
-  else
-    ctx code msg throwf" %s; code: %zd"
+    ctx code msg errf" %s; code: %zd; msg: %s" ret
   end
+  ctx code msg errf" %s; code: %zd"
 ;
+
+\ `code` comes from from `errno`, `ferror`, Posix procedures, etc.
+: os_throw { code ctx } code ctx os_err throw ;
 
 \ Some `libc` procedures return -1 as 32-bit `0xffff_ffff` while some others,
 \ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
 \ the kernel. Since there's no way to know this generically, we must always
 \ sign-extend `int` before testing for -1.
 \
-\ Should ONLY be used for `int` and avoided for procedures which return a wider
-\ type, like the `mmap` family, which return a pointer or -1. Their outputs
-\ should be checked against -1 as-is.
-: int_err { int -- bool } int int_to_cell -1 = ;
+\ Should NOT be used for addresses returned by the `mmap` family.
+\ Their error sentinel is actual 64-bit -1. Addresses they return
+\ may accidentally have the `int32` sign bit set.
+: is_err { int -- bool } int int_to_cell -1 = ;
 
-: try_errno { int ctx } int int_err if errno ctx os_err end ;
+: try_errno { int ctx } int is_err if errno ctx os_throw end ;
 
 \ Shortcut for calling `libc` functions which return
 \ `-1` and set `errno` on failure. Usage:
@@ -1866,7 +1880,7 @@ ERR_CAP mem: ERR_BUF
   comp_cstr compile' try_errno
 ;
 
-: try_errno_posix { code ctx } code if code ctx os_err end ;
+: try_errno_posix { code ctx } code if code ctx os_throw end ;
 
 \ Like `try_errno"` but for Posix procedures which directly
 \ return an `errno` code on failure and zero on success.
@@ -1874,16 +1888,13 @@ ERR_CAP mem: ERR_BUF
   comp_cstr compile' try_errno_posix
 ;
 
-: elog_errno_run { code cstr }
-  code -1 = ifn ret end
+: errno_elog { cstr }
   errno        { err }
   err strerror { msg }
   cstr err msg elogf" %s; err: %zd; message: %s" elf
 ;
 
-:: elog_errno" ( C: "context" -- ) ( E: code -- )
-  comp_cstr compile' elog_errno_run
-;
+:: errno_elog" ( C: "context" -- ) comp_cstr compile' errno_elog ;
 
 \ ## Stack manipulation — continued
 
@@ -2187,4 +2198,24 @@ ERR_CAP mem: ERR_BUF
   align next_off fun
 
   [ false comp_only ]
+;
+
+\ ## Misc
+
+: execute_raw { fun -- } [
+  0 asm_branch_link_reg comp_instr \ blr x0
+] ;
+
+\ Takes any amount of args, where the last arg is assumed to be a raw
+\ instruction address (procedure pointer). Invokes that procedure with
+\ the preceding args. Does not support output parameters.
+:: execute_raw ( C: …args fun -- ) ( E: …args fun -- )
+  comp_args_get { len }
+
+  len ifn
+    throwf" unable to compile `execute_raw`: at least 1 argument is required"
+  end
+
+  0 comp_args_set
+  len dec asm_branch_link_reg comp_instr \ blr <fun_reg>
 ;

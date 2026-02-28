@@ -1657,12 +1657,12 @@ extern_val: stderr __stderrp
 \   10 20 30 [ 3 ] logf" numbers: %zd %zd %zd" lf
 \
 \ TODO define a `:` variant.
-:: logf" ( C: N -- ) ( E: i1 … iN -- )
+:: logf" ( C: N "fmt" -- ) ( E: i1 … iN -- )
   comp_va{ comp_cstr compile' printf }va_comp
 ;
 
 \ Format-prints to stderr. TODO define a `:` variant.
-:: elogf" ( C: N -- ) ( E: i1 … iN -- )
+:: elogf" ( C: N "fmt" -- ) ( E: i1 … iN -- )
   comp_va{ compile' stderr comp_cstr compile' fprintf }va_comp
 ;
 

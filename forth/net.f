@@ -7,7 +7,7 @@ import' ./io.f
 \ translated from C definitions on MacOS 15.3 (24D60).
 \
 \ Procedures which return -1 on error should usually
-\ be followed by the test `int_err` or `try_errno"`:
+\ be followed by the test `is_err` or `try_errno"`:
 \
 \   some_word try_errno" unable to blah"
 
@@ -34,20 +34,20 @@ import' ./io.f
 4 1 extern: recv
 
 struct: Sockaddr
-  U8 1  field: sa_len
-  U8 1  field: sa_family
-  U8 14 field: sa_data
+  U8 1  field: Sockaddr_len
+  U8 1  field: Sockaddr_family
+  U8 14 field: Sockaddr_data
 end
 
 struct: Addrinfo
-  Cint  1 field: ai_flags
-  Cint  1 field: ai_family
-  Cint  1 field: ai_socktype
-  Cint  1 field: ai_protocol
-  Cuint 1 field: ai_addrlen
-  Cstr  1 field: ai_canonname
-  Adr   1 field: ai_addr      \ Sockaddr *
-  Adr   1 field: ai_next      \ Addrinfo *
+  Cint  1 field: Addrinfo_flags
+  Cint  1 field: Addrinfo_family
+  Cint  1 field: Addrinfo_socktype
+  Cint  1 field: Addrinfo_protocol
+  Cuint 1 field: Addrinfo_addrlen
+  Cstr  1 field: Addrinfo_canonname
+  Adr   1 field: Addrinfo_addr      \ Sockaddr *
+  Adr   1 field: Addrinfo_next      \ Addrinfo *
 end
 
 U8 128 arr: Sockaddr_storage

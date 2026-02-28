@@ -40,7 +40,7 @@ example_file_stat
 
   37 91 { off cap }
 
-  file off 0 fseek int_err if
+  file off 0 fseek is_err if
     file fclose { -- }
 
     \ Explicit inline `throw` is perfectly fine. It's just like `ret`,

@@ -13,7 +13,7 @@ import' ./time.f \ Defines `Timespec`.
 \ and some wrappers which throw descriptive errors.
 \
 \ Procedures which return -1 on error should usually
-\ be followed by the test `int_err` or `try_errno"`:
+\ be followed by the test `is_err` or `try_errno"`:
 \
 \   some_word try_errno" unable to blah"
 
@@ -79,7 +79,7 @@ end
 O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 
 \ In all definitions below, `code` means `(Cint)-1` on failure;
-\ should be tested with `int_err` or `try_errno`.
+\ should be tested with `is_err` or `try_errno`.
 2 1 extern: open  ( path flag -- fdes|code )
 1 1 extern: close ( fdes      -- code      )
 2 1 extern: fstat ( fdes stat -- code      )
@@ -126,34 +126,35 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 1 1 extern: fileno            ( file -- code )
 1 1 extern: fileno_unlocked   ( file -- code )
 
-: io_err { action path }
+: io_err { action path -- str }
   errno { code }
   code strerror { msg }
   msg if
-    action path code msg throwf" unable to %s `%s`; code: %d; msg: %s"
-  else
-    action path code throwf" unable to %s `%s`; code: %s"
+    action path code msg errf" unable to %s `%s`; code: %d; msg: %s" ret
   end
+  action path code errf" unable to %s `%s`; code: %s"
 ;
+
+: io_throw { action path } action path io_err throw ;
 
 : fd_stat { fd path stat_adr }
   fd stat_adr fstat
-  if c" stat" path io_err end
+  if c" stat" path io_throw end
 ;
 
 : path_stat { path stat_adr }
   path stat_adr stat
-  if c" stat" path io_err end
+  if c" stat" path io_throw end
 ;
 
 : fd_open { path mode -- fd }
   path mode open { out }
-  out int_err if c" open" path io_err end
+  out is_err if c" open" path io_throw end
   out
 ;
 
 : file_open { path mode -- file }
   path mode fopen { file }
-  file ifn c" open" path io_err end
+  file ifn c" open" path io_throw end
   file
 ;
