@@ -5,12 +5,12 @@ import' std:lang_s.f
 27  let:    ESC
 
 : now        nil time ;
-: del_line   ESC emit " [1A" type ESC emit " [2K" type ;
-: strike_beg ESC emit " [9m" type ;
-: strike_end ESC emit " [0m" type ;
+: del_line   ESC logc " [1A" log ESC logc " [2K" log ;
+: strike_beg ESC logc " [9m" log ;
+: strike_end ESC logc " [0m" log ;
 
 : log_time ( min sec -- )
-  [ 2 ] logf" elapsed time (mins:secs): %0.2lld:%0.2lld"
+  " elapsed time (mins:secs): %0.2lld:%0.2lld" -rot [ 2 ] logf
 ;
 
 : main
@@ -27,7 +27,7 @@ import' std:lang_s.f
     elapsed 60 /   { mins }
     elapsed 60 mod { secs }
     true           { printed }
-    mins secs [ 2 ] logf" elapsed time (mins:secs): %0.2lld:%0.2lld" lf
+    " elapsed time (mins:secs): %0.2lld:%0.2lld" mins secs [ 2 ] logf lf
     1 sleep
   end
 ;

@@ -591,6 +591,7 @@ static Err comp_append_local_get(Comp *comp, Local *loc, U8 reg) {
 
   if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
 
+  try(comp_clobber_reg(comp, reg));
   comp_append_local_read(comp, loc, reg);
   comp_local_reg_add(comp, loc, reg);
   return nullptr;
@@ -609,6 +610,13 @@ static Err comp_append_local_get_next(Comp *comp, Local *loc) {
   try(asm_validate_input_param_reg(reg));
 
   if (comp_local_has_reg(comp, loc, reg)) {
+    IF_DEBUG(eprintf(
+      "[debug] local " FMT_QUOTED
+      " already associated with register %d; skipping a \"get next\" operation\n",
+      loc->name.buf,
+      reg
+    ));
+
     comp->ctx.arg_len++;
     return nullptr;
   }

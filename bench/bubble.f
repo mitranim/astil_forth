@@ -31,7 +31,7 @@ LEN cells LIST + let:   CEIL
   CEIL -cell
   LIST Cell
   +loop: ptr
-    ptr @2 > throw_if" bubble_sort: not sorted"
+    ptr @2 > if " [bubble] not sorted" throw end
   end
 ;
 
@@ -57,6 +57,6 @@ LEN cells LIST + let:   CEIL
 
 : main
   bubble_sort
-  log" [bubble] done" lf
+  " [bubble] done" log lf
 ;
 main

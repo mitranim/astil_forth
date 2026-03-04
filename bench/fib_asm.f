@@ -32,6 +32,6 @@ import' std:lang.f
 
 : main
   1 16 lsl run
-  \ log" fib(91): " 91 fib log_int lf
+  \ " fib(91): " log 91 fib log_int lf
 ;
 main

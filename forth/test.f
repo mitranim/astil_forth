@@ -129,7 +129,7 @@ T{ 123 test_recursion <T> 13 }T
 
 1 0 extern: sleep
 
-: test_sleep_loop loop log" sleeping" lf 1 sleep end ;
+: test_sleep_loop loop " sleeping" log lf 1 sleep end ;
 \ test_sleep_loop
 
 : test_loop_leave
@@ -414,12 +414,52 @@ test_loop_for_countdown
 ;
 test_loop_for_countup
 
+\ When the loop terminates, the "ind" local should hold an out-of-range value.
+\ If the value is out of range at the start, it should remain unchanged.
 : test_loop_countup
-  T{ 8 0 1 +loop: ind end ind <T> 8  }T
-  T{ 8 0 2 +loop: ind end ind <T> 8  }T
-  T{ 8 0 3 +loop: ind end ind <T> 9  }T
-  T{ 8 0 4 +loop: ind end ind <T> 8  }T
-  T{ 8 0 5 +loop: ind end ind <T> 10 }T
+  0 { len }
+
+  T{
+    8 0 1
+    +loop: ind
+      ++: len
+    end
+    len ind
+  <T>
+    8 8
+  }T
+
+  0 { len }
+  T{ 8 0 2 +loop: ind ++: len end len ind <T> 4 8 }T
+
+  0 { len }
+  T{ 8 0 3 +loop: ind ++: len end len ind <T> 3 9 }T
+
+  0 { len }
+  T{ 8 0 4 +loop: ind ++: len end len ind <T> 2 8 }T
+
+  0 { len }
+  T{ 8 0 5 +loop: ind ++: len end len ind <T> 2 10 }T
+
+  0 { len }
+  T{ 8 0 6 +loop: ind ++: len end len ind <T> 2 12 }T
+
+  0 { len }
+  T{ 8 0 7 +loop: ind ++: len end len ind <T> 2 14 }T
+
+  0 { len }
+  T{ 8 0 8 +loop: ind ++: len end len ind <T> 1 8 }T
+
+  0 { len }
+  T{ 8 0 9 +loop: ind ++: len end len ind <T> 1 9 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 8 1 +loop: ind ++: len end len ind <T> 0 8 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 9 1 +loop: ind ++: len end len ind <T> 0 9 }T
 ;
 test_loop_countup
 
@@ -435,12 +475,51 @@ test_loop_countup
 ;
 test_loop_countup_nested
 
+\ Unlike `+loop:`, this decrements the index at the start of each iteration
+\ rather than at the end. Also, it commits the index update only when still
+\ in range. TODO figure out if we can consolidate the behavior with `+loop:`
+\ without wasting cycles in the common cases.
 : test_loop_countdown
-  T{ 8 0 1 -loop: ind end ind <T> 0 }T
-  T{ 8 0 2 -loop: ind end ind <T> 0 }T
-  T{ 8 0 3 -loop: ind end ind <T> 2 }T
-  T{ 8 0 4 -loop: ind end ind <T> 0 }T
-  T{ 8 0 5 -loop: ind end ind <T> 3 }T
+  0 { len }
+
+  T{
+    8 0 1
+    -loop: ind
+      ++: len
+    end
+    len ind
+  <T>
+    8 0
+  }T
+
+  0 { len }
+  T{ 8 0 2 -loop: ind ++: len end len ind <T> 4 0 }T
+
+  0 { len }
+  T{ 8 0 3 -loop: ind ++: len end len ind <T> 2 2 }T
+
+  0 { len }
+  T{ 8 0 4 -loop: ind ++: len end len ind <T> 2 0 }T
+
+  0 { len }
+  T{ 8 0 5 -loop: ind ++: len end len ind <T> 1 3 }T
+
+  0 { len }
+  T{ 8 0 6 -loop: ind ++: len end len ind <T> 1 2 }T
+
+  0 { len }
+  T{ 8 0 7 -loop: ind ++: len end len ind <T> 1 1 }T
+
+  0 { len }
+  T{ 8 0 8 -loop: ind ++: len end len ind <T> 1 0 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 9 -loop: ind ++: len end len ind <T> 0 8 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 10 -loop: ind ++: len end len ind <T> 0 8 }T
 ;
 test_loop_countdown
 
@@ -580,19 +659,19 @@ T{ -123  0   max <T>  0   }T
 T{ -123  234 max <T>  234 }T
 T{  234 -123 max <T>  234 }T
 
-T{ nil            nil     cstr= <T> true  }T
-T{ nil            c" one" cstr= <T> false }T
-T{ c" one"        nil     cstr= <T> false }T
-T{ c" one" strdup c" two" cstr= <T> false }T
-T{ c" two" strdup c" one" cstr= <T> false }T
-T{ c" one" strdup c" one" cstr= <T> true  }T
+T{ nil           nil    cstr= <T> true  }T
+T{ nil           " one" cstr= <T> false }T
+T{ " one"        nil    cstr= <T> false }T
+T{ " one" strdup " two" cstr= <T> false }T
+T{ " two" strdup " one" cstr= <T> false }T
+T{ " one" strdup " one" cstr= <T> true  }T
 
-T{ nil            nil     cstr< <T> false }T
-T{ nil            c" one" cstr< <T> true  }T
-T{ c" one"        nil     cstr< <T> false }T
-T{ c" one" strdup c" two" cstr< <T> true  }T
-T{ c" two" strdup c" one" cstr< <T> false }T
-T{ c" one" strdup c" one" cstr< <T> false }T
+T{ nil           nil    cstr< <T> false }T
+T{ nil           " one" cstr< <T> true  }T
+T{ " one"        nil    cstr< <T> false }T
+T{ " one" strdup " two" cstr< <T> true  }T
+T{ " two" strdup " one" cstr< <T> false }T
+T{ " one" strdup " one" cstr< <T> false }T
 
 : int32_negative { -- val } [
   0b0_00_100101_00_0000000000000000_00000 comp_instr \ mov w0, -1
@@ -603,45 +682,80 @@ T{ int32_negative             <T> 0xffff_ffff           }T
 T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
 T{ int32_negative int_to_cell <T> -1                    }T
 
-: test_varargs
-  10 20 30 va{ c" numbers (should be 10 20 30): %zd %zd %zd" printf }va
+: test_vargs_printf
+  10 20 30 va{ " numbers (should be 10 20 30): %zd %zd %zd" printf }va
   { printed }
   lf
 
-  " numbers (should be 10 20 30): 10 20 30" { str len }
+  s" numbers (should be 10 20 30): 10 20 30" { __ len }
   T{ printed <T> len }T
 ;
-\ test_varargs
+\ test_vargs_printf
 
-: test_fmt
-  10 20 30 logf" numbers: %zd %zd %zd" lf
+: test_logf
+  " numbers (should be 40 50 60): %zd %zd %zd" 40 50 60 logf lf
 ;
-\ test_fmt
+\ test_logf
 
-: test_efmt
-  10 20 30 elogf" numbers: %zd %zd %zd" lf
+: test_elogf
+  " numbers (should be 70 80 90): %zd %zd %zd" 70 80 90 elogf elf
 ;
-\ test_efmt
+\ test_elogf
 
 4096 buf: STR_BUF
 
-\ TODO: port this when we need this.
-\ : test_str_fmt
-\   STR_BUF 10 20 30 sf" numbers: %zd %zd %zd"
-\   STR_BUF drop puts
-\ ;
-\ test_str_fmt
-
-\ TODO: port this when we need this.
-\ : test_sthrowf
-\   STR_BUF 10 20 30 [ 3 ] sthrowf" codes: %zd %zd %zd"
-\ ;
-\ test_sthrowf
-
-: test_throwf
-  10 20 30 throwf" codes: %zd %zd %zd"
+: test_strf
+  STR_BUF " numbers: %zd %zd %zd" 10 20 30 strf
+  STR_BUF { str -- }
+  T{ str " numbers: 10 20 30" cstr= <T> true }T
 ;
-\ test_throwf
+
+: test_errf
+  T{ ERR_BUF_0 " " cstr= <T> true }T
+
+  T{
+    " codes: %zd %zd %zd" 10 20 30 errf
+    " codes: 10 20 30"
+    cstr=
+  <T>
+    true
+  }T
+
+  T{ ERR_BUF_0 " codes: 10 20 30" cstr= <T> true }T
+;
+test_errf
+
+: test_errf_throw
+  " codes: %zd %zd %zd" 10 20 30 errf throw
+;
+\ test_errf_throw
+
+: test_wrapf
+  " one" nil      wrapf { err0 }
+  " two: %s" err0 wrapf { err1 }
+
+  \ err0 logf lf
+  \ err1 logf lf
+
+  T{ err0 " one"      cstr= <T> true }T
+  T{ err1 " two: one" cstr= <T> true }T
+
+  " three: %s" err1 wrapf { err2 }
+
+  \ `wrapf` rotates two string buffers.
+  T{ err0 err2 = <T> true  }T
+  T{ err0 err1 = <T> false }T
+
+  T{ err2 " three: two: one" cstr= <T> true }T
+
+  " four: %zd: %s" 123 err2 wrapf { err3 }
+
+  T{ err3 err0 = <T> false }T
+  T{ err3 err1 = <T> true  }T
+  T{ err3 err2 = <T> false }T
+  T{ err3 " four: 123: three: two: one" cstr= <T> true }T
+;
+test_wrapf
 
 : test_locals
   T{          { }                                     <T>          }T
@@ -1104,7 +1218,7 @@ T{ 123 Typ11_field1 <T> 139 }T
   \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
 ;
 
-: test_throw throw" test_err" ;
+: test_throw " test_err" throw ;
 
 : test_catch_0_val { -- val }
   false if test_throw end
@@ -1115,13 +1229,13 @@ T{ 123 Typ11_field1 <T> 139 }T
   T{ test_catch_0_val          <T> 123     }T
   T{ catch' test_catch_0_val   <T> 123 nil }T
   T{ catch' test_throw { err } <T>         }T
-  T{ c" test_err" err cstr=    <T> true    }T
+  T{ " test_err" err cstr=    <T> true    }T
 ;
 test_catch_0
 
 : test_catch_1_cond { one -- two }
   one if one 2 * ret end
-  throw" test_err"
+  test_throw
   unreachable
   nil
 ;
@@ -1130,7 +1244,7 @@ test_catch_0
   T{ 123 test_catch_1_cond                    <T> 246     }T
   T{ 123 catch' test_catch_1_cond             <T> 246 nil }T
   T{ 0   catch' test_catch_1_cond { val err } <T>         }T
-  T{ c" test_err" err cstr=                   <T> true    }T
+  T{ " test_err" err cstr=                    <T> true    }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
@@ -1146,7 +1260,7 @@ test_catch_0
     three four ret
   end
 
-  throw" test_err"
+  test_throw
   unreachable
   nil nil
 ;
@@ -1156,13 +1270,13 @@ test_catch_0
   T{ 13 25 catch' test_catch_2_cond <T> 38 12 nil }T
 
   T{ 0  13 catch' test_catch_2_cond { one two err } <T>      }T
-  T{ c" test_err" err cstr=                         <T> true }T
+  T{ " test_err" err cstr=                          <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err true }T
 
   T{ 12 0  catch' test_catch_2_cond { one two err } <T>      }T
-  T{ c" test_err" err cstr=                         <T> true }T
+  T{ " test_err" err cstr=                          <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err 0 }T
@@ -1174,7 +1288,7 @@ test_catch_2
 \ to "catching". Callers handle its exception as usual.
 : test_catches_and_throws_fun [ true catches ]
   test_throw { err_ignore }
-  throw" different_test_err"
+  " different_test_err" throw
 ;
 
 \ Note: when testing `catches`, we have to replace `}T` with `}T`
@@ -1183,7 +1297,7 @@ test_catch_2
 \ to arity mismatch.
 : test_catches_and_throws [ true catches ]
   test_catches_and_throws_fun { err }
-  T{ c" different_test_err" err cstr= <T> true }T
+  T{ " different_test_err" err cstr= <T> true }T
 ;
 test_catches_and_throws
 
@@ -1191,7 +1305,7 @@ test_catches_and_throws
   [ true catches ]
 
   test_throw   { err0 }
-  c" test_err" { err1 }
+  " test_err" { err1 }
 
   T{ err0 err1 =     <T> false }T
   T{ err0 err1 cstr= <T> true  }T
@@ -1217,7 +1331,7 @@ test_catches_1_fun_throwing
   [ true catches ]
 
   T{ 0 test_catches_1_fun { val err } <T>      }T
-  T{ c" test_err" err cstr=           <T> true }T
+  T{ " test_err" err cstr=            <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
@@ -1251,7 +1365,7 @@ test_catches_2_fun_throwing
   [ true catches ]
 
   T{ 0 11 test_catches_2_fun { val err } <T>      }T
-  T{ c" test_err" err cstr=              <T> true }T
+  T{ " test_err" err cstr=               <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
@@ -1289,7 +1403,7 @@ test_catches_3_fun_throwing
   [ true catches ]
 
   T{ 0 test_catches_3_fun { one two err } <T>      }T
-  T{ c" test_err" err cstr=               <T> true }T
+  T{ " test_err" err cstr=                <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
@@ -1326,7 +1440,7 @@ test_catches_4_fun_throwing
   [ true catches ]
 
   T{ 0 13 test_catches_4_fun { one two err } <T>      }T
-  T{ c" test_err" err cstr=                  <T> true }T
+  T{ " test_err" err cstr=                   <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
@@ -1366,4 +1480,4 @@ test_catches_4
 \   0 1 2 3 4 5 6 7
 \ ;
 
-log" [test] ok" lf
+" [test] ok" log lf

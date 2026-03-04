@@ -22,8 +22,9 @@ import' ./http_util.f
     wrote ifn len ret end
 
     wrote is_err if
-      errno EINTR = if cont end
-      errno c" unable to read request" os_throw
+      errno { code }
+      code EINTR = if cont end
+      code " unable to read request" os_err throw
     end
 
     len wrote + { len }
@@ -37,16 +38,16 @@ import' ./http_util.f
   READ_BUF              { buf cap }
   conn buf cap read_req { len }
 
-  elogf" [srv] incoming request:" elf elf
+  " [srv] incoming request:" elog elf elf
   STDERR buf len write_opt elf
 
-  conn " HTTP/1.1 200 OK"   write_opt conn write_eol
-  conn " Connection: close" write_opt conn write_eol
-  conn                                     write_eol
-  conn " request echo:"     write_opt conn write_eol conn write_eol
-  conn buf len              write_opt conn write_eol
+  conn s" HTTP/1.1 200 OK"   write_opt conn write_eol
+  conn s" Connection: close" write_opt conn write_eol
+  conn                                      write_eol
+  conn s" request echo:"     write_opt conn write_eol conn write_eol
+  conn buf len               write_opt conn write_eol
 
-  elogf" [srv] echoed request back to client" elf
+  " [srv] echoed request back to client" elog elf
 ;
 
 : handle_conn { conn }
@@ -57,15 +58,18 @@ import' ./http_util.f
   conn respond_conn { err }
 
   err if
-    err elogf" [srv] unable to respond; error: %s"
+    " [srv] unable to respond; error: %s" err elogf elf
   end
 
-  elogf" [srv] closing connection" elf elf
-  conn close is_err if errno_elog" [srv] unable to close connection" end
+  " [srv] closing connection" elog elf elf
+
+  conn close is_err if
+    errno " [srv] unable to close connection" os_err elog elf
+  end
 ;
 
 : main
-  c" 2345"                 { port }
+  " 2345"                  { port }
   instr' handle_conn       { handler }
   port MAX_CONN net_listen { sock }
   sock handler net_accept_loop

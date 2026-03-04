@@ -53,7 +53,7 @@ Local references are handy for C interop:
 : thread_spawn { fun inp -- thread }
   nil { thread }
   ref' thread nil fun inp pthread_create
-  try_errno_posix" unable to spawn a thread"
+  " unable to spawn a thread" try_errno_posix
   thread \ Holds a valid pointer now.
 ;
 ```
@@ -100,8 +100,8 @@ This often eliminates globals and avoids heap allocation.
 
 \ C: `struct timespec`
 struct: Timespec
-  S64 1 field: Time_sec
-  S64 1 field: Time_nsec
+  S64 1 field: Timespec_sec
+  S64 1 field: Timespec_nsec
 end
 
 : example
@@ -111,8 +111,8 @@ end
   inst Timespec_sec  @ { secs }
   inst Timespec_nsec @ { nano }
 
-  secs logf" real seconds: %zd" lf
-  nano logf" real nanos:   %zd" lf
+  " real seconds: %zd" secs logf lf
+  " real nanos:   %zd" nano logf lf
 ;
 example
 

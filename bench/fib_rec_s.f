@@ -10,6 +10,6 @@ import' std:lang_s.f
 : main
   36 fib
 
-  \ log" fib(36): " log_int lf
+  \ " fib(36): " log log_int lf
 ;
 main

@@ -83,7 +83,7 @@ end
   inst Timespec_sec  @ { secs }
   inst Timespec_nsec @ { nano }
 
-  secs logf" real seconds: %zd" lf
-  nano logf" real nanos:   %zd" lf
+  " seconds: %zd" secs logf lf
+  " nanos:   %zd" nano logf lf
 ;
 \ example_alloca_time

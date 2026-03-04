@@ -27,6 +27,7 @@
 \ further down, after some stack-manipulation words.
 
 : ASM_INSTR_SIZE       4      ;
+: ASM_REG_ERR          0      ;
 : ASM_REG_DAT_SP_FLOOR 26     ;
 : ASM_REG_DAT_SP       27     ;
 : ASM_REG_INTERP       28     ;
@@ -772,6 +773,18 @@
   0b0_01_101_1_0_00000_00000000000000_00000 or
 ;
 
+\ br Xn
+: asm_branch_to_reg ( Xn -- instr )
+  5 lsl
+  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 or
+;
+
+\ blr Xn
+: asm_branch_link_reg ( Xn -- instr )
+  5 lsl
+  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or
+;
+
 \ orr Xd, Xn, #(1 << bit)
 \ TODO add general-purpose `orr`.
 : asm_orr_bit ( Xd Xn bit -- instr )
@@ -924,11 +937,19 @@
   asm_push_x1  comp_instr     \ str x1, [x27], 8
 ;
 
-:  " ( E: "str" -- cstr len )           parse_str ;
-:: " ( C: "str" -- ) ( E: -- cstr len ) comp_str ;
+\ Parses the input until the terminating quote, and returns the address and
+\ length of the resulting string. In interpretation mode, the string buffer
+\ is reused for each call to `parse`, so the resulting string is only valid
+\ until the next `parse` invocation. In compilation mode, the string buffer
+\ is statically allocated and unique. The string is always null-terminated,
+\ and can be safely passed to many `libc` procedures by pointer alone.
+:  s" ( E: "str" -- cstr len )           parse_str ;
+:: s" ( C: "str" -- ) ( E: -- cstr len ) comp_str ;
 
-:  c" ( E: "str" -- cstr )           parse_str drop ;
-:: c" ( C: "str" -- ) ( E: -- cstr ) comp_cstr ;
+\ C-style string literal. Like `s"` but returns only the address
+\ without the length. The string is always null-terminated.
+:  " ( E: "str" -- cstr )           parse_str drop ;
+:: " ( C: "str" -- ) ( E: -- cstr ) comp_cstr ;
 
 \ ## Variables
 \
@@ -1053,35 +1074,6 @@
 : str<    ( str0 len0 str1 len1 -- bool      ) compare <0 ;
 : str<>   ( str0 len0 str1 len1 -- bool      ) compare <>0 ;
 
-\ ## Exceptions — basic
-\
-\ The compiler provides the following exception intrinsics:
-\ - `try`
-\ - `throw`
-\ - `catch`
-\ - `catches`
-\
-\ Here, we define proper usable "catch" variants and some additional shortcuts.
-\ The definitions are split; words with support for message formatting via the
-\ C "printf" family are defined later, when we have access to variadic calls
-\ into `libc` procedures.
-\
-\ In this system, "exceptions" are simply return values.
-\ Since in stack-CC all internal functions are "nullary"
-\ in the ABI sense, the error register is always `x0`.
-\ The value held in this register, if any, is a string.
-\ This also matches the convention used by our C code.
-
-:: catch'  WORDLIST_EXEC catch ;
-:: catch'' WORDLIST_COMP catch ;
-
-\ Usage:
-\
-\   throw" some_error_msg"
-\
-\ Also see `sthrowf"` for error message formatting.
-:: throw" ( C: "str" -- ) comp_cstr execute'' throw ;
-
 \ ## Conditionals
 \
 \ General idea:
@@ -1189,7 +1181,7 @@
 
   LOOP_FRAME @
   ifn
-    throw" auxiliary loop constructs require an ancestor loop frame"
+    " auxiliary loop constructs require an ancestor loop frame" throw
   end
 
   stack_len_1  stack_len_0 - to: frame_len
@@ -1255,7 +1247,7 @@
 \ the address of the first instruction inside the loop.
 :: cont
   LOOP_FRAME @ dup
-  ifn throw" `cont` requires an ancestor loop frame" end
+  ifn " `cont` requires an ancestor loop frame" throw end
   sp_at @ loop_end \ b <beg>
 ;
 
@@ -1280,11 +1272,11 @@
   cur comp_pop_local_set \ Grab the initial ceiling value.
 
   here to: loop_adr
-  1 cur asm_local_get comp_instr    \ ldur x1, [FP, <cur>]
+  1 cur asm_local_get comp_instr    \ ldr x1, [FP, <cur>]
   1     asm_cmp_zero  comp_instr    \ cmp x1, 0
   here to: cond_adr   reserve_instr \ b.<cond> <end>
   1 1 1 asm_sub_imm   comp_instr    \ sub x1, x1, 1
-  1 cur asm_local_set comp_instr    \ stur x1, [FP, <cur>]
+  1 cur asm_local_set comp_instr    \ str x1, [FP, <cur>]
 
   loop_adr cond_adr ' for_countdown_loop_pop
 ;
@@ -1294,7 +1286,7 @@
 \
 \   123
 \   for
-\     log" looping"
+\     " looping" log lf
 \   end
 \
 \ Anton Ertl circa 1994:
@@ -1322,9 +1314,9 @@
 
 : for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_cur -- )
   to: cur
-  1 cur asm_local_get comp_instr \ ldur x1, [FP, <loc>]
+  1 cur asm_local_get comp_instr \ ldr x1, [FP, <loc>]
   1 1 1 asm_add_imm   comp_instr \ add x1, x1, 1
-  1 cur asm_local_set comp_instr \ stur x1, [FP, <loc>]
+  1 cur asm_local_set comp_instr \ str x1, [FP, <loc>]
   ASM_GE count_loop_pop          \ b <begin>; retropatch b.<cond> <end>
 ;
 
@@ -1420,13 +1412,13 @@
   \ We can almost use `comp_count_loop_init` here,
   \ but this loop wants subtraction at the start.
   \ TODO use `ldp` for adjacent offsets.
-  1 cur  asm_local_get comp_instr    \ ldur x1, [FP, <ceil_off>]
-  2 lim  asm_local_get comp_instr    \ ldur x2, [FP, <floor_off>]
-  3 step asm_local_get comp_instr    \ ldur x3, [FP, <step_off>]
+  1 cur  asm_local_get comp_instr    \ ldr x1, [FP, <ceil_off>]
+  2 lim  asm_local_get comp_instr    \ ldr x2, [FP, <floor_off>]
+  3 step asm_local_get comp_instr    \ ldr x3, [FP, <step_off>]
   1 1 3  asm_sub_reg   comp_instr    \ sub x1, x1, x3
   1 2    asm_cmp_reg   comp_instr    \ cmp x1, x2
   here to: cond_adr    reserve_instr \ b.lt <end>
-  1 cur  asm_local_set comp_instr    \ stur x1, [FP, <ceil_off>]
+  1 cur  asm_local_set comp_instr    \ str x1, [FP, <ceil_off>]
 
   loop_adr cond_adr ' loop_countdown_pop
 ;
@@ -1452,9 +1444,9 @@
 
 \ ## Extern variables
 
-\ Finds an extern symbol by name and creates a new word which loads the address
+\ Finds an extern symbol by name and creates a word which loads the address
 \ of that symbol. The extern symbol can be either a variable or a procedure.
-: extern_ptr: ( C: "ours" "extern" -- ) ( E: -- ptr )
+: extern_adr: ( C: "ours" "extern" -- ) ( E: -- ptr )
   #word_beg
   parse_word extern_got to: adr \ Addr of GOT entry holding extern addr.
   adr 1       comp_page_load    \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
@@ -1462,8 +1454,8 @@
   #word_end
 ;
 
-\ Like `extern_ptr:` but with an additional load instruction.
-\ Analogous to extern vars in C. Lets us access stdio files.
+\ Like `extern_adr:` but dereferences the external value.
+\ Used for external C variables such as stdio streams.
 : extern_val: ( C: "ours" "extern" -- ) ( E: -- val )
   #word_beg
   parse_word extern_got to: adr     \ Addr of GOT entry holding extern addr.
@@ -1483,10 +1475,16 @@
 1 let: STDOUT
 2 let: STDERR
 
+10 let: LF
+13 let: CR
+
 extern_val: stdin  __stdinp
 extern_val: stdout __stdoutp
 extern_val: stderr __stderrp
 
+\ These definitions ignore errors and sizes returned by `libc`.
+\ This is inconsistent with reg-CC where we define the outputs
+\ and sometimes handle them.
 4 0 extern: fwrite   ( src size len file -- )
 1 0 extern: putchar  ( char -- )
 2 0 extern: fputc    ( char file -- )
@@ -1496,24 +1494,18 @@ extern_val: stderr __stderrp
 3 0 extern: snprintf ( … buf cap fmt -- )
 1 0 extern: fflush   ( file -- )
 
-: emit                    putchar ;
-: eputchar ( char -- )    stderr fputc ;
-: puts     ( cstr -- )    stdout fputs ;
-: eputs    ( cstr -- )    stderr fputs ;
-: flush                   stdout fflush ;
-: eflush                  stderr fflush ;
-: type     ( str len -- ) 1 swap stdout fwrite ;
-: etype    ( str len -- ) 1 swap stderr fwrite ;
-: lf                      10 putchar ; \ Renamed from `cr` which would be a misnomer.
-: elf                     10 eputchar ;
-: space                   32 putchar ;
-: espace                  32 eputchar ;
-
-:  log" parse_str drop puts ;
-:: log" comp_cstr compile' puts ;
-
-:  elog" parse_str drop eputs ;
-:: elog" comp_cstr compile' eputs ;
+: logc     ( char    -- ) putchar              ; \ Renamed from `emit`.
+: elogc    ( char    -- ) stderr fputc         ;
+: log      ( cstr    -- ) stdout fputs         ;
+: elog     ( cstr    -- ) stderr fputs         ;
+: logs     ( str len -- ) 1 swap stdout fwrite ; \ Renamed from `type`.
+: elogs    ( str len -- ) 1 swap stderr fwrite ;
+: flush    (         -- ) stdout fflush        ;
+: eflush   (         -- ) stderr fflush        ;
+: lf       (         -- ) LF putchar           ; \ Renamed from `cr`.
+: elf      (         -- ) LF elogc             ;
+: space    (         -- ) 32 putchar           ;
+: espace   (         -- ) 32 elogc             ;
 
 \ ## Locals: braces
 
@@ -1529,10 +1521,10 @@ extern_val: stderr __stderrp
 
   loop
     parse_word to: len to: str
-    " }" str len str=
+    s" }" str len str=
     if loc_len } ret end
 
-    " --" str len str<> while \ `--` to `}` is a comment.
+    s" --" str len str<> while \ `--` to `}` is a comment.
 
     \ Resulting local token is used by `}` which we're about to call.
     str len comp_named_local ( -- loc_tok )
@@ -1541,29 +1533,22 @@ extern_val: stderr __stderrp
   end
 
   \ After `--`: skip all words which aren't `}`.
-  loop parse_word " }" str<> until
+  loop parse_word s" }" str<> until
 
   loc_len }
 ;
 
 \ For compiling words which modify a local by applying the given function.
-: mut_local ( C: fun "name" -- ) ( E: -- )
-  parse_word comp_named_local
-  { fun loc }
+: comp_loc_mut ( C: fun "name" -- ) ( E: -- )
+  parse_word comp_named_local { loc }
   loc comp_local_get_push
-  fun comp_call
+  comp_call
   loc comp_pop_local_set
 ;
 
-\ For compiling words which modify a local by applying the given function.
-:: mut_local' ( C: "name" fun -- ) ( E: -- )
-  execute'' '
-  compile' mut_local
-;
-
-\ Usage: `++: some_local`.
-:: ++: ( C: "name" -- ) ( E: -- ) mut_local' inc ;
-:: --: ( C: "name" -- ) ( E: -- ) mut_local' dec ;
+\ Usage: `++: some_val`.
+:: ++: ( C: "name" -- ) ( E: -- ) ' inc comp_loc_mut ;
+:: --: ( C: "name" -- ) ( E: -- ) ' dec comp_loc_mut ;
 
 : within { num one two -- bool }
   one num >
@@ -1609,9 +1594,15 @@ extern_val: stderr __stderrp
                asm_push_x1 comp_instr \ str x1, [x27], 8
 ] ;
 
-: asm_comp_systack_push ( len -- )
-  dup <=0 if drop ret end
-
+\ Short for "compile variadic arguments begin". Assumes the Apple Arm64 ABI
+\ where varargs always use the systack. Modifies the SP which must be later
+\ restored with `comp_va_end`. Doesn't clobber any registers.
+\
+\ The input is the amount of vargs.
+\
+\ Unlike in reg-CC, we don't just pop-push pairs, because we have to pop
+\ the precise `len` amount of items from the Forth integer stack.
+: comp_va_beg ( C: len -- )
   dup odd if
     ' dup>systack inline_word
     dec
@@ -1619,6 +1610,7 @@ extern_val: stderr __stderrp
 
   dup ifn drop ret end
 
+  \ Not odd = automatically aligned to 16.
   loop
     dup while
     ' pair>systack inline_word
@@ -1627,119 +1619,126 @@ extern_val: stderr __stderrp
   drop
 ;
 
-: asm_comp_systack_pop ( len -- )
-  dup <=0 if ret end
-  cells 16 align_up
-  \ add sp, sp, <size>
-  ASM_REG_SP ASM_REG_SP rot asm_add_imm comp_instr
+\ Short for "compile variadic arguments end".
+: comp_va_end ( C: len -- )
+  dup >=0 if
+    cells 16 align_up
+    ASM_REG_SP ASM_REG_SP rot asm_add_imm comp_instr \ add sp, sp, <off>
+  else
+    drop
+  end
 ;
 
 \ Short for "varargs". Sets up arguments for a variadic call.
-\ Assumes the Apple Arm64 ABI where varargs use the systack.
+\ Assumes the Apple Arm64 ABI, where varargs use the systack.
 \ Usage example:
 \
 \   : some_word
-\     10 20 30 [ 3 ] va{ c" numbers: %zd %zd %zd" printf }va lf
+\     10 20 30 [ 3 ] va{ " numbers: %zd %zd %zd" printf }va lf
 \   ;
 \
 \ Caution: varargs can only be used in direct calls to variadic procedures.
 \ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
-:: va{ ( C: N -- N ) ( E: <systack_push> ) dup asm_comp_systack_push ;
-:: }va ( C: N -- )   ( E: <systack_pop )       asm_comp_systack_pop  ;
+:: va{ ( C: len -- len ) ( E: <systack_push> ) dup comp_va_beg ;
+:: }va ( C: len --     ) ( E: <systack_pop   )     comp_va_end ;
 
-\ Short for "compile variadic args".
-: comp_va{ ( C: N -- N ) ( E: <systack_push> ) dup asm_comp_systack_push ;
-: }va_comp ( C: N -- )   ( E: <systack_pop> )      asm_comp_systack_pop ;
-
-\ Format-prints to stdout using `printf`. `N` is the variadic arg count,
-\ which must be available at compile time. Usage example:
-\
-\   10 20 30 [ 3 ] logf" numbers: %zd %zd %zd" lf
-\
-\ TODO define a `:` variant.
-:: logf" ( C: N "fmt" -- ) ( E: i1 … iN -- )
-  comp_va{ comp_cstr compile' printf }va_comp
+\ The given offset is how many non-vargs precede the vargs.
+\ The given function must have exactly that arity.
+: comp_varcall ( C: len fun -- ) ( E: …args… …vargs… -- )
+  over comp_va_beg
+       comp_call
+       comp_va_end
 ;
 
-\ Format-prints to stderr. TODO define a `:` variant.
-:: elogf" ( C: N "fmt" -- ) ( E: i1 … iN -- )
-  comp_va{ compile' stderr comp_cstr compile' fprintf }va_comp
+\ Format-print to stdio. `logf` prints to `stdout`. `elogf` prints to `stderr`.
+\ `len` is the count of variadic args, which must be available at compile time.
+\ Usage example:
+\
+\   " numbers: %zd %zd %zd" 10 20 30 [ 3 ] logf lf
+:: logf  ( C: len -- )  ( E: fmt …vargs… -- ) ' printf comp_varcall ;
+
+:: elogf ( C: len -- ) ( E: fmt …vargs… -- )
+  dup comp_va_beg
+  compile' stderr
+  compile' swap
+  compile' fprintf
+  comp_va_end
 ;
 
-\ Formats into the provided buffer using `snprintf`. Usage example:
+\ Formats into a given string buffer. `len` is the amount of variadic args,
+\ which must be available at compile time. Returns the same buffer address.
+\ String is null-terminated. Usage:
 \
-\   SOME_BUF 10 20 30 [ 3 ] sf" numbers: %zd %zd %zd" lf
-:: sf" ( C: N -- ) ( E: buf size i1 … iN -- )
-  comp_va{ comp_cstr compile' snprintf }va_comp
-;
+\   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] strf
+:: strf ( C: len -- ) ( E: buf cap fmt …vargs… -- buf ) ' snprintf comp_varcall ;
 
-\ ## Exceptions — continued
-
-:  abort" ( E: "str" -- ) execute'  log" elf abort ;
-:: abort" ( C: "str" -- ) execute'' log" compile' elf compile' abort ;
-
-4096 buf: ERR_BUF
-
-\ Like `sthrowf"` but easier to use. Example:
+\ ## Exceptions
 \
-\   10 20 30 [ 3 ] throwf" error codes: %zd %zd %zd"
-:: throwf" ( C: len -- ) ( E: i1 … iN -- )
-  comp_va{
-    compile'  ERR_BUF
-    comp_cstr
-    compile'  snprintf
-  }va_comp
+\ The compiler provides the following exception intrinsics:
+\ - `try`
+\ - `throw`
+\ - `catch`
+\ - `catches`
+\
+\ At the ABI level, each exception is an additional return value.
+\ An exception is placed into the next output parameter register
+\ immediately following the last regular output value, similarly
+\ to how errors are returned in Go. Unlike Go, we implicitly use
+\ exception semantics for errors. By default, when a word throws,
+\ the returned error is implicitly re-thrown in the caller. This
+\ behavior can be suppressed with `catch'`, which simply reveals
+\ the error value, and avoids emitting the "try" instructions.
+\
+\ Since in stack-CC all regular words are "nullary" in the ABI sense,
+\ the exception register is always `x0`. The exception value, if any,
+\ is a string address. This matches the ABI convention of our C code.
+\
+\ We also support blanket implicit catch via the `catches` annotation.
+\ It disables implicit rethrow and reveals exceptions as error values.
+\ This mode may look superficially like Go. It's actually closer to C,
+\ because there is NO support for panics and no hidden stack unwinder.
+\ In such words, control flow is entirely local and obvious from code.
+
+:: catch'  WORDLIST_EXEC catch ;
+:: catch'' WORDLIST_COMP catch ;
+
+4096    let: ERR_CAP
+ERR_CAP mem: ERR_BUF
+
+\ Formats an error message. `len` is the count of variadic args
+\ which must be available during compilation. Typical usage:
+\
+\   " unable to blah: %zd" err_code errf throw
+:: errf ( E: fmt …vargs… len -- err )
+  dup      comp_va_beg
   compile' ERR_BUF
-  compile' drop
-  execute'' throw
-;
-
-\ Formats an error message into the provided buffer using `snprintf`,
-\ then throws the buffer as the error value. The buffer must be zero
-\ terminated; `buf:` ensures this automatically. Usage example:
-\
-\   4096 buf: SOME_BUF
-\   SOME_BUF 10 20 30 [ 3 ] sthrowf" error codes: %zd %zd %zd"
-\
-\ Also see `throwf"` which comes with its own buffer.
-:: sthrowf" ( C: len -- ) ( E: buf size i1 … iN -- )
-  comp_va{
-    compile'  over
-    compile'  swap
-    comp_cstr
-    compile'  snprintf
-  }va_comp
-  execute'' throw
-;
-
-\ Similar to standard `abort"`, with clearer naming.
-:: throw_if" ( C: "str" -- ) ( E: pred -- )
-  execute'' if
-  comp_cstr
-  execute'' throw
-  execute'' end
+  compile' ERR_CAP  ( fmt buf cap )
+  compile' rot      ( buf cap fmt )
+  compile' snprintf ( buf cap fmt -- )
+  compile' ERR_BUF  ( -- buf )
+  comp_va_end
 ;
 
 \ ## Stack printing
 
-: log_int  ( num     -- ) [ 1 ] logf" %zd"  ;
-: log_cell ( num ind -- ) dup_over [ 3 ] logf" %zd 0x%zx <%zd>" ;
+: log_int  ( num     -- ) " %zd" swap [ 1 ] logf ;
+: log_cell { num ind -- } " %zd 0x%zx <%zd>" num num ind [ 3 ] logf ;
 : .        ( num     -- ) stack_len dec log_cell lf ;
 
 : .s
   stack_len to: len
 
   len ifn
-    log" stack is empty" lf
+    " stack is empty" log lf
     ret
   end
 
   len <0 if
-    log" stack length is negative: " len log_int lf
+    " stack length is negative: " log len log_int lf
     ret
   end
 
-  len [ 1 ] logf" stack <%zd>:" lf
+  " stack <%zd>:" len [ 1 ] logf lf
 
   len 0 +for: ind
     space space
@@ -1757,7 +1756,7 @@ extern_val: stderr __stderrp
 : errno ( -- err ) __error @32 ; \ TODO switch to `ldrsw`.
 
 6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
-3 1 extern: mprotect ( adr len pflag -- err )
+3 1 extern: mprotect ( adr len pflag              -- err )
 
 16384 let: PAGE_SIZE
 0     let: PROT_NONE
@@ -1767,24 +1766,25 @@ extern_val: stderr __stderrp
 4096  let: MAP_ANON
 
 : mem_map_err ( -- )
-  errno dup strerror
-  [ 2 ] throwf" unable to map memory; code: %zd; message: %s"
+  " unable to map memory; code: %zd; message: %s"
+  errno dup strerror [ 2 ] errf
 ;
 
 : mem_map { size pflag -- addr }
-  MAP_ANON MAP_PRIVATE or to: mflag
-  0 size pflag mflag -1 0 mmap
-  dup -1 = if drop mem_map_err end
+  MAP_ANON MAP_PRIVATE or      to: mflag
+  0 size pflag mflag -1 0 mmap to: addr
+  addr -1 = if mem_map_err throw end
+  addr
 ;
 
 : mem_unprot_err ( -- )
-  errno dup strerror
-  [ 2 ] throwf" unable to unprotect memory; code: %zd; message: %s"
+  " unable to unprotect memory; code: %zd; message: %s"
+  errno dup strerror [ 2 ] errf
 ;
 
 : mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE or mprotect
-  -1 = if throw" unable to mprotect" end
+  -1 = if mem_unprot_err throw end
 ;
 
 \ Allocates a guarded buffer: `guard|data|guard`.

@@ -16,7 +16,7 @@ import' std:lang_s.f
 ] ;
 
 : main
-  1 " hello world! (using direct syscall)" sys_write
+  STDOUT s" hello world! (using direct syscall)" sys_write
   lf
 ;
 main

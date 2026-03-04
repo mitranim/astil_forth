@@ -14,19 +14,23 @@ import' std:internals.f
 \
 \ See adjacent example files for different approaches to error handling.
 
+\ Throws if unable to join, but `main` automatically reveals all exceptions
+\ as additional error values, ensuring we have to handle the join error.
 : thread_spawn { fun inp -- thread }
   nil { attr }
   nil { thread }
 
   ref' thread attr fun inp pthread_create
-  try_errno_posix" unable to spawn thread"
+  " unable to spawn thread" posix_try
   thread
 ;
 
+\ Throws if unable to join, but `main` automatically reveals all exceptions
+\ as additional error values, ensuring we have to handle the join error.
 : thread_join { thread -- out }
   nil { out }
   thread ref' out pthread_join
-  try_errno_posix" unable to join with thread"
+  " unable to join with thread" posix_try
   out
 ;
 
@@ -38,7 +42,7 @@ import' std:internals.f
   [ true catches ]
 
   inout @ { path }
-  path logf" [child] checking size of `%s`..." lf
+  " [child] checking size of `%s`..." path logf lf
 
   Fstat alloca        { stat }
   path stat path_stat { err } \ Automatic catch; zero-cost.
@@ -56,49 +60,49 @@ import' std:internals.f
   \ No implicit exceptions here either.
   [ true catches ]
 
-  instr' callback  { instr } \ Raw instruction address.
-  c" missing/none" { path0 } \ Input for `thread0`: missing file.
-  c" forth/lang.f" { path1 } \ Input for `thread1`: existing file.
-  path0            { val0  } \ Input-output for `thread0`.
-  path1            { val1  } \ Input-output for `thread1`.
+  instr' callback { instr } \ Raw instruction address.
+  " missing/none" { path0 } \ Input for `thread0`: missing file.
+  " forth/lang.f" { path1 } \ Input for `thread1`: existing file.
+  path0           { val0  } \ Input-output for `thread0`.
+  path1           { val1  } \ Input-output for `thread1`.
 
-  log" [main] spawning thread 0..." lf
+  " [main] spawning thread 0..." log lf
   instr ref' val0 thread_spawn { thread0 err0 }
 
-  log" [main] spawning thread 1..." lf
+  " [main] spawning thread 1..." log lf
   instr ref' val1 thread_spawn { thread1 err1 }
 
   err0 if
-    err0 logf" [main] when spawning thread 0: `%s`"
+    " [main] when spawning thread 0: `%s`" err0 logf
   end
 
   err1 if
-    err1 logf" [main] when spawning thread 1: `%s`"
+    " [main] when spawning thread 1: `%s`" err1 logf
   end
 
   err0 ifn
-    log" [main] waiting on thread 0..." lf
+    " [main] waiting on thread 0..." log lf
     thread0 thread_join { err0 join_err }
 
     join_err if
-      join_err logf" [main] when joining with thread 0: %s" lf
+      " [main] when joining with thread 0: %s" join_err logf lf
     else err0 elif
-      err0 logf" [main] error from thread 0: %s" lf
+      " [main] error from thread 0: %s" err0 logf lf
     else
-      path0 val0 logf" [main] result from thread 0: size of `%s`: %zd" lf
+      " [main] result from thread 0: size of `%s`: %zd" path0 val0 logf lf
     end
   end
 
   err1 ifn
-    log" [main] waiting on thread 1..." lf
+    " [main] waiting on thread 1..." log lf
     thread1 thread_join { err1 join_err }
 
     join_err if
-      join_err logf" [main] when joining with thread 1: %s" lf
+      " [main] when joining with thread 1: %s" join_err logf lf
     else err1 elif
-      err1 logf" [main] error from thread 1: %s" lf
+      " [main] error from thread 1: %s" err1 logf lf
     else
-      path1 val1 logf" [main] result from thread 1: size of `%s`: %zd" lf
+      " [main] result from thread 1: size of `%s`: %zd" path1 val1 logf lf
     end
   end
 ;

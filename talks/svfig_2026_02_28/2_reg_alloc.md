@@ -289,6 +289,7 @@ Relevant C stuff:
 - `comp_after_append_call`: how verbs replace the "stack".
 - `asm_resolve_local_location`: how we decide where to place locals.
   - Locals go into registers when possible, but sometimes we have to evict them.
+  - Compiler doesn't yet use callee-saved registers.
 
 ## Side benefits
 

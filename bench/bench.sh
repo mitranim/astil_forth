@@ -8,6 +8,13 @@ make PROD=true clean build bench/fib_rec.exe &&
 OPTS='--warmup=4 --shell=none' &&
 
 echo
+echo "## NONE"
+echo
+hyperfine $OPTS                             \
+  --command-name none_our   './astil.exe'   \
+  --command-name none_our_s './astil_s.exe'
+
+echo
 echo "## BASELINE"
 echo
 hyperfine $OPTS                                                 \

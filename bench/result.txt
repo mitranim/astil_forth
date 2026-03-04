@@ -1,4 +1,9 @@
-(On M3 Pro.)
+Measurements on M3 Pro.
+
+Each Astil Forth benchmark includes the price of bootstrapping
+the entire language from scratch, in addition to JIT-compiling
+the program we're testing. The reg-CC variant takes marginally
+longer to bootstrap because it has more features in `lang.f`.
 
 ## BASELINE
 

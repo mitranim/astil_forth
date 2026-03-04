@@ -5,23 +5,23 @@ import' std:lang_s.f
 : main { val }
   val 0 =
   if
-    log" branch: 0" lf
+    " branch: 0" log lf
   else
 
   val 1 =
   elif
-    log" branch: 1" lf
+    " branch: 1" log lf
   else
 
   val 2 =
   elif
-    log" branch: 2" lf
+    " branch: 2" log lf
   else
-    log" branch: none" lf
+    " branch: none" log lf
   end \ Terminates everything.
 ;
 
-log" run 0: " 0 main
-log" run 1: " 1 main
-log" run 2: " 2 main
-log" run 3: " 3 main
+" run 0: " log 0 main
+" run 1: " log 1 main
+" run 2: " log 2 main
+" run 3: " log 3 main

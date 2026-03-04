@@ -101,7 +101,7 @@ value may be either useful, or the -1 sentinel.
 #define arr_cap(val) (sizeof(val) / sizeof(val[0]))
 #endif
 
-// Blame `clang-format` for the horrible ternary style.
+// Blame `clang-format` for the horrible ternary fmting.
 #define err_wrapf(fmt, err, ...)                           \
   ({                                                       \
     const auto err_wrapf_err = err;                        \

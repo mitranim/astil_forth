@@ -7,9 +7,9 @@ import' ./lang.f
 \ Translated from C definitions and only partially tested.
 \
 \ Posix words directly return an `errno` code on failure.
-\ They should usually be followed by `try_errno_posix"`:
+\ They should usually be followed by `posix_try"`:
 \
-\   some_proc try_errno_posix" unable to do X"
+\   some_proc " unable to do X" posix_try
 
 \ ## Types
 

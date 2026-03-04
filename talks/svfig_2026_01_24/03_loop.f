@@ -8,7 +8,7 @@ import' std:lang_s.f
     ind 5  < while
     ind 8  < while
     ind 12 < while
-    ind [ 1 ] logf" index: %zd" lf
+    " index: %zd" ind [ 1 ] logf lf
   end \ Terminates everything.
 
   loop

@@ -64,9 +64,9 @@ Separate wordlists for regular and compile-time words.
 Exceptions are strings (error messages) rather than numeric codes.
 
 ```forth
-throw" readable error message"
+" readable error message" throw
 
-10 20 [ 2 ] throwf" error codes: %lld %lld"
+" error codes: %zd %zd" 10 20 [ 2 ] errf throw
 ```
 
 Booleans are `0 1` rather than `0 -1`.

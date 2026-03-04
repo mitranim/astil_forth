@@ -41,7 +41,7 @@ T{ 123 test_recursion <T> 13 }T
 
 1 0 extern: sleep
 
-: test_sleep_loop loop log" sleeping" lf 1 sleep end ;
+: test_sleep_loop loop " sleeping" log lf 1 sleep end ;
 \ test_sleep_loop
 
 : test_loop_leave
@@ -501,53 +501,63 @@ T{ 10 20 30 swap_over <T> 20 10 30 }T
 T{ 123 0 ?dup <T> 123     }T
 T{ 234 1 ?dup <T> 234 234 }T
 
-T{ nil            nil     cstr= <T> true  }T
-T{ nil            c" one" cstr= <T> false }T
-T{ c" one"        nil     cstr= <T> false }T
-T{ c" one" strdup c" two" cstr= <T> false }T
-T{ c" two" strdup c" one" cstr= <T> false }T
-T{ c" one" strdup c" one" cstr= <T> true  }T
+T{ nil           nil    cstr= <T> true  }T
+T{ nil           " one" cstr= <T> false }T
+T{ " one"        nil    cstr= <T> false }T
+T{ " one" strdup " two" cstr= <T> false }T
+T{ " two" strdup " one" cstr= <T> false }T
+T{ " one" strdup " one" cstr= <T> true  }T
 
-T{ nil            nil     cstr< <T> false }T
-T{ nil            c" one" cstr< <T> true  }T
-T{ c" one"        nil     cstr< <T> false }T
-T{ c" one" strdup c" two" cstr< <T> true  }T
-T{ c" two" strdup c" one" cstr< <T> false }T
-T{ c" one" strdup c" one" cstr< <T> false }T
+T{ nil           nil    cstr< <T> false }T
+T{ nil           " one" cstr< <T> true  }T
+T{ " one"        nil    cstr< <T> false }T
+T{ " one" strdup " two" cstr< <T> true  }T
+T{ " two" strdup " one" cstr< <T> false }T
+T{ " one" strdup " one" cstr< <T> false }T
 
-: test_varargs
-  c" numbers (should be 10 20 30): %zd %zd %zd"
-  10 20 30 [ 3 ] va{ debug_stack printf }va lf
+: test_vargs_printf
+  " numbers (should be 10 20 30): %zd %zd %zd"
+  10 20 30 [ 3 ] va{ printf }va lf
 ;
-\ test_varargs
+\ test_vargs_printf
 
-: test_fmt
-  10 20 30 [ 3 ] logf" numbers: %zd %zd %zd" lf
+: test_logf
+  " numbers (should be 40 50 60): %zd %zd %zd" 40 50 60 [ 3 ] logf lf
 ;
-\ test_fmt
+\ test_logf
 
-: test_efmt
-  10 20 30 [ 3 ] elogf" numbers: %zd %zd %zd" lf
+: test_elogf
+  " numbers (should be 70 80 90): %zd %zd %zd" 70 80 90 [ 3 ] elogf elf
 ;
-\ test_efmt
+\ test_elogf
 
 4096 buf: STR_BUF
 
-: test_str_fmt
-  STR_BUF 10 20 30 [ 3 ] sf" numbers: %zd %zd %zd"
-  STR_BUF drop puts
+: test_strf
+  STR_BUF " numbers: %zd %zd %zd" 10 20 30 [ 3 ] strf
+  T{ STR_BUF s" numbers: 10 20 30" str= <T> true }T
 ;
-\ test_str_fmt
+test_strf
 
-: test_sthrowf
-  STR_BUF 10 20 30 [ 3 ] sthrowf" codes: %zd %zd %zd"
-;
-\ test_sthrowf
+: test_errf
+  T{ ERR_BUF " " cstr= <T> true }T
 
-: test_throwf
-  10 20 30 [ 3 ] throwf" codes: %zd %zd %zd"
+  T{
+    " codes: %zd %zd %zd" 10 20 30 [ 3 ] errf
+    " codes: 10 20 30"
+    cstr=
+  <T>
+    true
+  }T
+
+  T{ ERR_BUF " codes: 10 20 30" cstr= <T> true }T
 ;
-\ test_throwf
+test_errf
+
+: test_errf_throw
+  " codes: %zd %zd %zd" 10 20 30 [ 3 ] errf throw
+;
+\ test_errf_throw
 
 : test_to
   T{ 10 to: one <T>       }T
@@ -634,7 +644,7 @@ test_local_ref
   \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
 ;
 
-: test_throw throw" test_err" ;
+: test_throw " test_err" throw ;
 
 : test_catch_0_val
   false if test_throw end
@@ -645,28 +655,28 @@ test_local_ref
   T{ test_catch_0_val          <T> 123     }T
   T{ catch' test_catch_0_val   <T> 123 nil }T
   T{ catch' test_throw { err } <T>         }T
-  T{ c" test_err" err cstr=    <T> true    }T
+  T{ " test_err" err cstr=     <T> true    }T
 ;
 test_catch_0
 
 : test_catch_1_cond ( one -- two )
   dup if 2 * ret end
   drop
-  throw" test_err"
+  test_throw
 ;
 
 : test_catch_1
   T{ 123 test_catch_1_cond                <T> 246     }T
   T{ 123 catch' test_catch_1_cond         <T> 246 nil }T
   T{ 0   catch' test_catch_1_cond { err } <T>         }T
-  T{ c" test_err" err cstr=               <T> true    }T
+  T{ " test_err" err cstr=                <T> true    }T
 ;
 test_catch_1
 
 : test_catch_2_cond ( one two -- three four )
   dup2 <>0 swap <>0 and if * dup ret end
   drop2
-  throw" test_err"
+  test_throw
 ;
 
 : test_catch_2
@@ -674,10 +684,10 @@ test_catch_1
   T{ 11 22 catch' test_catch_2_cond         <T> 242 242 nil }T
 
   T{ 0  22 catch' test_catch_2_cond { err } <T>             }T
-  T{ c" test_err" err cstr=                 <T> true        }T
+  T{ " test_err" err cstr=                  <T> true        }T
 
   T{ 11 0  catch' test_catch_2_cond { err } <T>             }T
-  T{ c" test_err" err cstr=                 <T> true        }T
+  T{ " test_err" err cstr=                  <T> true        }T
 ;
 test_catch_2
 
@@ -686,7 +696,7 @@ test_catch_2
 \ to "catching". Callers handle its exception as usual.
 : test_catches_and_throws_fun [ true catches ]
   test_throw { err_ignore }
-  throw" different_test_err"
+  " different_test_err" throw
 ;
 
 \ Note: in stack-CC, when using `catches`, EVERY call to EVERY word
@@ -695,7 +705,7 @@ test_catch_2
 \ and do not throw, but we have to remember to use `try`.
 : test_catches_and_throws [ true catches ]
   test_catches_and_throws_fun { err }
-  T{ c" different_test_err" err cstr= try <T> 1 }T
+  T{ " different_test_err" err cstr= try <T> 1 }T
 ;
 test_catches_and_throws
 
@@ -703,7 +713,7 @@ test_catches_and_throws
   [ true catches ]
 
   test_throw   { err0 }
-  c" test_err" { err1 }
+  " test_err" { err1 }
 
   T{ err0 err1     = try <T> 0 }T
   T{ err0 err1 cstr= try <T> 1 }T
@@ -734,7 +744,7 @@ test_catches_1_fun_throwing
   \ error is definitely there, but what else was pushed, is unknown.
   \ This is a problem with stack-CC in general. Compare reg-CC tests.
   T{ 0 test_catches_1_fun { err } <T>   }T
-  T{ c" test_err" err cstr= try   <T> 1 }T
+  T{ " test_err" err cstr= try    <T> 1 }T
 
   T{ 123 test_catches_1_fun { val err } <T>       }T
   T{ val err                            <T> 246 0 }T
@@ -765,7 +775,7 @@ test_catches_2_fun_throwing
   [ true catches ]
 
   T{ 0 11 test_catches_2_fun { err } <T>   }T
-  T{ c" test_err" err cstr= try      <T> 1 }T
+  T{ " test_err" err cstr= try       <T> 1 }T
 
   T{ 11 22 test_catches_2_fun { val err } <T>      }T
   T{ val err                              <T> 33 0 }T
@@ -800,7 +810,7 @@ test_catches_3_fun_throwing
   [ true catches ]
 
   T{ 0 test_catches_3_fun { err } <T>   }T
-  T{ c" test_err" err cstr= try   <T> 1 }T
+  T{ " test_err" err cstr= try    <T> 1 }T
 
   T{ 123 test_catches_3_fun { one two err } <T>            }T
   T{ one two err                            <T> 246 -123 0 }T
@@ -833,7 +843,7 @@ test_catches_4_fun_throwing
   [ true catches ]
 
   T{ 0 13 test_catches_4_fun { err } <T>   }T
-  T{ c" test_err" err cstr= try      <T> 1 }T
+  T{ " test_err" err cstr= try       <T> 1 }T
 
   T{ 13 25 test_catches_4_fun { one two err } <T>         }T
   T{ one two err                              <T> 38 12 0 }T
@@ -845,4 +855,4 @@ test_catches_4_fun_throwing
 ;
 test_catches_4
 
-log" [test] ok" lf
+" [test] ok" log lf

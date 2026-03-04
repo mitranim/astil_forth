@@ -10,6 +10,6 @@ import' std:lang.f
 : main
   36 fib { val }
 
-  \ log" fib(36): " val log_int lf
+  \ " fib(36): " log val log_int lf
 ;
 main

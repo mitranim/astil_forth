@@ -19,14 +19,14 @@ import' std:internals.f
   nil { thread }
 
   ref' thread attr fun inp pthread_create
-  try_errno_posix" unable to spawn thread"
+  " unable to spawn thread" posix_try
   thread
 ;
 
 : thread_join { thread -- out }
   nil { out }
   thread ref' out pthread_join
-  try_errno_posix" unable to join with thread"
+  " unable to join with thread" posix_try
   out
 ;
 
@@ -43,10 +43,10 @@ import' std:internals.f
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
 : callback { inout -- }
-  ( E: -- err ) \ Real ABI signature.
+  ( E: val -- err ) \ Real ABI signature.
 
   inout @ { path }
-  path logf" [child] checking size of `%s`..." lf
+  " [child] checking size of `%s`..." path logf lf
 
   Fstat alloca { stat }
   path stat path_stat \ Throws if file is missing.
@@ -56,34 +56,34 @@ import' std:internals.f
 ;
 
 : main
-  instr' callback  { instr } \ Raw instruction address.
-  c" missing/none" { path0 } \ Input for `thread0`: missing file.
-  c" forth/lang.f" { path1 } \ Input for `thread1`: existing file.
-  path0            { val0  } \ Input-output for `thread0`.
-  path1            { val1  } \ Input-output for `thread1`.
+  instr' callback { instr } \ Raw instruction address.
+  " missing/none" { path0 } \ Input for `thread0`: missing file.
+  " forth/lang.f" { path1 } \ Input for `thread1`: existing file.
+  path0           { val0  } \ Input-output for `thread0`.
+  path1           { val1  } \ Input-output for `thread1`.
 
-  log" [main] spawning thread 0..." lf
+  " [main] spawning thread 0..." log lf
   instr ref' val0 thread_spawn { thread0 }
 
-  log" [main] spawning thread 1..." lf
+  " [main] spawning thread 1..." log lf
   instr ref' val1 thread_spawn { thread1 }
 
-  log" [main] waiting on thread 0..." lf
+  " [main] waiting on thread 0..." log lf
   thread0 thread_join { err0 }
 
-  log" [main] waiting on thread 1..." lf
+  " [main] waiting on thread 1..." log lf
   thread1 thread_join { err1 }
 
   err0 if
-    err0 logf" [main] error from thread 0: %s" lf
+    " [main] error from thread 0: %s" err0 logf lf
   else
-    path0 val0 logf" [main] result from thread 0: size of `%s`: %zd" lf
+    " [main] result from thread 0: size of `%s`: %zd" path0 val0 logf lf
   end
 
   err1 if
-    err1 logf" [main] error from thread 1: %s" lf
+    " [main] error from thread 1: %s" err1 logf lf
   else
-    path1 val1 logf" [main] result from thread 1: size of `%s`: %zd" lf
+    " [main] result from thread 1: size of `%s`: %zd" path1 val1 logf lf
   end
 ;
 main

@@ -5,7 +5,9 @@ import' std:errno.f
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
 : sock_close { sock }
-  sock close is_err if errno_elog" [srv] unable to close socket" end
+  sock close is_err if
+    errno " [srv] unable to close socket" os_err elog elf
+  end
 ;
 
 : sock_bind_opt { info max_conn -- sock }
@@ -23,21 +25,21 @@ import' std:errno.f
   sock SOL_SOCKET SO_REUSEADDR opt Cint setsockopt
   is_err if
     sock sock_close
-    errno_elog" [srv] unable to `setsockopt`"
+    errno " [srv] unable to `setsockopt`" os_err elog elf
     -1 ret
   end
 
   sock info Addrinfo_addr @ info Addrinfo_addrlen @ bind
   is_err if
     sock sock_close
-    errno_elog" [srv] unable to bind socket"
+    errno " [srv] unable to bind socket" os_err elog elf
     -1 ret
   end
 
   sock max_conn listen
   is_err if
     sock sock_close
-    errno_elog" [srv] unable to listen on socket"
+    errno " [srv] unable to listen on socket" os_err elog elf
     -1 ret
   end
 
@@ -57,7 +59,7 @@ import' std:errno.f
 
   code if
     code gai_strerror { msg }
-    port code msg throwf" [srv] unable to listen on port %s; code: %zd; msg; %s"
+    " [srv] unable to listen on port %s; code: %zd; msg; %s" port code msg errf throw
   end
 
   ainf
@@ -78,10 +80,10 @@ import' std:errno.f
   ainf freeaddrinfo
 
   sock is_err if
-    port throwf" [srv] unable to listen on :%s"
+    " [srv] unable to listen on :%s" port errf throw
   end
 
-  port elogf" [srv] listening on http://localhost:%s" elf
+  " [srv] listening on http://localhost:%s" port elogf elf
   sock
 ;
 
@@ -98,11 +100,11 @@ import' std:errno.f
       errno { code }
       code EINTR = if cont end
       code strerror { msg }
-      sock code msg elogf" [srv] unable to accept connection; code: %zd; msg: %s" elf
+      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg elogf elf
       cont
     end
 
-    elogf" [srv] accepted connection" elf
+    " [srv] accepted connection" elog elf
     conn handler execute_raw
   end
 ;

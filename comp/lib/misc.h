@@ -3,8 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 
-static thread_local bool DEBUG = false;
-static thread_local bool TRACE = false;
+static bool DEBUG = false;
+static bool TRACE = false;
 
 #ifdef PROD
 #define IF_DEBUG(code)

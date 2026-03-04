@@ -8,14 +8,14 @@ import' std:internals.f
   nil { thread }
 
   ref' thread attr fun inp pthread_create
-  try_errno_posix" unable to spawn thread"
+  " unable to spawn thread" posix_try
   thread
 ;
 
 : thread_join { thread -- out }
   nil { out }
   thread ref' out pthread_join
-  try_errno_posix" unable to join with thread"
+  " unable to join with thread" posix_try
   out
 ;
 
@@ -31,22 +31,22 @@ import' std:internals.f
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
 : callback { ignored -- }
-  ( E: -- err ) \ Real ABI signature.
+  ( E: val -- err ) \ Real ABI signature.
 
-  logf" [child] running and throwing" lf
+  " [child] running and throwing" log lf
 
-  throw" mock_error"
+  " mock_error" throw
 ;
 
 : main
   instr' callback { instr } \ Raw instruction address.
 
-  log" [main] spawning..." lf
+  " [main] spawning..." log lf
   instr nil thread_spawn { thread }
 
-  log" [main] joining..." lf
+  " [main] joining..." log lf
   thread thread_join { err }
 
-  err logf" [main] received error: %s" lf
+  " [main] received error: %s" err logf lf
 ;
 main

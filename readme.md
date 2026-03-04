@@ -16,7 +16,7 @@
 
 ## Overview
 
-A native-code Forth system designed for self-bootstrapping. Currently supports only Arm64.
+Astil Forth is a native-code Forth system designed for self-bootstrapping and self-assembling. Uses a custom assembler in both C and Forth code. Currently supports only Arm64.
 
 Goals:
 - [x] Simple JIT compilation to native code.
@@ -29,7 +29,12 @@ Goals:
 - [ ] Rewrite in Forth to self-host.
 - [ ] AOT compilation.
 
-Everything was written by me. This is not bot-generated.
+Everything was written by me. This is _not_ bot-generated.
+
+I gave talks about this system in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
+- 2026-Jan: intro to the system, self-assembly showcase, demos — https://www.youtube.com/watch?v=_4U1BR1U_oM
+- 2026-Feb: register allocation and proper ABI interop with C — https://www.youtube.com/watch?v=rCF7wAB2wFQ
+- [`./talks`](./talks) directory: presentation notes with more details.
 
 Most languages ship with a smart, powerful, all-knowing compiler with intrinsic knowledge of the entire language. I feel this approach is too inflexible. It makes the compiler a closed system. Modifying and improving the language requires changing the compiler's source code, which is usually over-complicated.
 
@@ -41,7 +46,7 @@ This is possible because of direct access to compilation. Outside the Forth worl
 
 Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
 
-The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately from differently selected C files. The stack-CC version is legacy and has fewer features.
+The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately, from differently selected C files. The stack-CC version is legacy and has fewer features.
 
 The outer interpreter / compiler, which is written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
 - Register-CC: boots via `forth/lang.f`.
@@ -51,32 +56,57 @@ Unlike other compiler writers, I focused on keeping the system clear and educati
 
 ## Show me the code!
 
+IO and conditionals:
+
 ```forth
 import' std:lang.f
 
 : main
-  log" hello world!" lf
+  " hello world!" log lf
 
   10
   if
-    log" branch 0" lf
+    " branch 0" log lf
   else 20 elif
-    log" branch 1" lf
+    " branch 1" log lf
   else
-    log" branch 2" lf
+    " branch 2" log lf
   end
 
   12 0 +for: ind
-    ind logf" current number: %zd" lf
+    " current number: %zd" ind logf lf
   end
 ;
 
 main
 ```
 
+Easy self-assembly:
+
+```forth
+\ add Xd, Xn, Xm
+: asm_add_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ add x0, x0, x1
+: + { i0 i1 -- i2 } [
+  0 0 1 asm_add_reg comp_instr
+  1                 comp_args_set
+] ;
+
+\ brk 666
+: abort [
+  0b110_101_00_001_0000001010011010_000_00 comp_instr
+] ;
+```
+
 ## Easy C interop
 
-It's trivial to declare and call extern procedures. Examples can be found in the core files `forth/lang_s.f` and `forth/lang.f`. Should work for any linked library, such as libc.
+It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files `forth/lang_s.f` and `forth/lang.f`.
+
+The reg-CC version of this system, which is the default, uses the same calling convention as C. The words can be passed to C by raw instruction addresses, and "just work". In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
 
 ```forth
 \ The numbers describe input and output parameters.
@@ -84,8 +114,8 @@ It's trivial to declare and call extern procedures. Examples can be found in the
 2 1 extern: strcmp
 
 : main
-  c" hello world!" puts
-  c" one" c" two" strcmp .
+  " hello world!" puts
+  " one" " two" strcmp .
 ;
 main
 ```
@@ -106,9 +136,9 @@ Under the hood, an exception is a Go-style error value, implicitly appended to t
 
 The resulting system is an exact inverse of Go (and Rust). By default, errors are exceptions and don't clutter the code. When you want explicit errors, it's _for real_, without hidden panics. There is no separate panic mechanism, no stack unwinder. At the ABI level, caller code always has local control.
 
-The best part is cross-language ABI compatibility. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to libc and guarantee no surprises, such as a panic handler unwinding the C stack.
+The best part is cross-language ABI compatibility. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to `libc` and guarantee no surprises, such as a panic handler unwinding the C stack.
 
-This is fairly easy to implement. Not aware of any other language with this feature, which is weird. I think it's the only reasonable way of doing error handling.
+This is easy to implement. Not aware of any other language taking this approach, which is strange. I think it's the only reasonable way of doing exceptions and errors in general.
 
 ## Usage
 
@@ -163,18 +193,20 @@ When debugging weird crashes, the following commands are useful:
 ```sh
 make debug_run '<file>'
 make debug_run '<file>' DEBUG=true
-make debug_run '<file>' RECOVERY=false
+make debug_run '<file>' RECOVERY=false # only for stack-CC
 ```
 
 ## Structure
 
-- `./forth`:
+- [`./forth`](./forth):
   - `lang.f` — language core.
   - `testing.f` — simple testing utils.
-  - Other files — optional small libraries; mostly interfaces to libc IO.
-- `./examples` — how to use `libc` for IO, networking, threading.
-- `./comp` — outer interpreter / compiler in C. Mostly library code with a small "main" entry point.
-- `./sublime` — editor support for Sublime Text.
+  - Other files — optional small libraries; mostly interfaces to `libc` IO.
+- [`./examples`](./examples) — how to use `libc` for IO, networking, threading.
+- [`./comp`](./comp) — outer interpreter / compiler in C. Mostly library-style code with a small "main" entry point.
+- [`./talks`](./talks) — presentation "slides" for the talks I gave in [SVFIG](https://www.meetup.com/sv-fig/) about this system.
+  - For now, this is the substitute for documentation, especially the February talk.
+- [`./sublime`](./sublime) — editor support for Sublime Text.
 
 ## Sublime Text
 
@@ -193,6 +225,25 @@ Should be usable as a library in another C/C++ program. The "main" file is only 
 In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to simply clone the repo into a submodule and include `comp/interp.c` which provides the top-level API and includes all other files it needs.
 
 Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every symbol is declared as `static`.
+
+## Optimizations and tricks
+
+I consider this a "mildly optimizing" compiler. It maintains the convenience of single-pass self-assembly while employing several optimization tricks compatible with it. Some are detailed in a ["slide"](talks/svfig_2026_02_28/6_tricks.md) for the February SVFIG presentation.
+
+In both reg-CC and stack-CC:
+- Avoid emitting unnecessary prologue and epilogue.
+- Inline small leaf procedures.
+- Delay undecidable instructions, patch them in a fixup pass.
+  - Used for prologue, `ret try throw recur`, and more.
+
+In reg-CC:
+- Place inputs and outputs in registers, matching the native call ABI.
+- Prefer to keep locals in registers.
+- Relocate locals lazily and only when necessary.
+- Elide relocations of parameter locals when possible.
+- Associate locals with param regs, reuse when possible.
+- Keep track of clobbers, preserve caller-saved registers when possible.
+- ...Other small tricks. Some are word-specific.
 
 ## Limitations
 
@@ -231,8 +282,8 @@ More ergonomic control flow structures:
 Because the system uses native procedure calls, there is no return stack; see below.
 
 There is no `state` or `does>`, or any form of state-smartness. Instead, the system uses two wordlists:
-- "exec" -- execution-time words; not immediate.
-- "comp" -- compile-time words; immediate.
+- "exec" — execution-time words; not immediate.
+- "comp" — compile-time words; immediate.
 
 Each word can be defined _twice_: an "exec" variant and a "comp" variant. In compilation mode, the "comp" variant is used first. In interpretation mode, the "exec" variant is used first. When finding a word by name, the caller must choose the wordlist, and thus the variant.
 

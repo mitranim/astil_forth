@@ -49,17 +49,17 @@ import' ./lang_s.f
     len0 len1 rel1 T_stack_eq
     if T_reset ret end
   else
-    rel0 rel1 [ 2 ] elogf" stack length mismatch: (%zd) <T> (%zd)" elf
+    " stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 [ 2 ] elogf elf
   end
 
-  elog" stack content mismatch: T{ "
-  len1 len0 +for: ind ind pick0 [ 1 ] elogf" %zd " end
-  elog" <T> "
-  len2 ind  +for: ind ind pick0 [ 1 ] elogf" %zd " end
-  elog" }T" elf
+  " stack content mismatch: T{ " elog
+  len1 len0 +for: ind " %zd " ind pick0 [ 1 ] elogf end
+  " <T> " elog
+  len2 ind  +for: ind " %zd " ind pick0 [ 1 ] elogf end
+  " }T" elog elf
 
   T_reset
-  throw" test failure"
+  " test failure" throw
   unreachable
 ;
 

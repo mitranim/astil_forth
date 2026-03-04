@@ -74,9 +74,9 @@ The best part is _cross-language ABI compatibility_. Having exceptions without a
 
 ```forth
 : some_forth_word
-  { some_input -- }      \ Parameter signature in Forth.
-  ( E: inp -- err )      \ Real ABI signature.
-  throw" mock exception" \ Returned in first output register.
+  { some_input -- }       \ Parameter signature in Forth.
+  ( E: inp -- err )       \ Real ABI signature.
+  " mock exception" throw \ Returned in first output register.
 ;
 ```
 

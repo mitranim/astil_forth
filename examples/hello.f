@@ -1,6 +1,6 @@
 import' std:lang.f
 
-log" hello world! (using libc IO)" lf
+" hello world! (using libc IO)" log lf
 
 \ Don't have to use libc for IO. Can just call into the kernel.
 : sys_write { fd str len } [
@@ -9,14 +9,19 @@ log" hello world! (using libc IO)" lf
 ] ;
 
 flush
-STDOUT " hello world! (using syscall)" sys_write lf
+STDOUT s" hello world! (using syscall)" sys_write lf
 
 : bool_str { val -- str }
-  val if c" true" ret end
-  c" false"
+  val
+  if " true" ret end
+  " false"
 ;
 
-log" bool_str(false): " false bool_str puts lf
-log" bool_str(true):  " true  bool_str puts lf
+" bool_str(false): " log false bool_str log lf
+" bool_str(true):  " log true  bool_str log lf
 
-64 putchar 65 putchar 66 putchar 67 putchar lf \ @ABC
+char' @ logc
+char' A logc
+char' B logc
+char' C logc
+lf \ @ABC

@@ -29,6 +29,24 @@ import' ./lang.f
   true
 ;
 
+: T_log_stack { len0 len1 len2 }
+  " T{ " elog
+
+  len1 len0 +for: ind
+    ind stack_at@ { val }
+    " %zd " val elogf
+  end
+
+  " <T> " elog
+
+  len2 ind +for: ind
+    ind stack_at@ { val }
+    " %zd " val elogf
+  end
+
+  " }T" elog elf
+;
+
 \ ## Interpretation-mode test routines (top level)
 
 : T{ stack_len T_ST_LEN_0 ! ;
@@ -52,17 +70,14 @@ import' ./lang.f
     len0 len1 rel1 T_stack_eq
     if T_reset ret end
   else
-    rel0 rel1 elogf" [test] stack length mismatch: (%zd) <T> (%zd)" elf
+    " [test] stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 elogf elf
   end
 
-  elog" [test] stack content mismatch: T{ "
-  len1 len0 +for: ind ind stack_at@ elogf" %zd " end
-  elog" <T> "
-  len2 ind  +for: ind ind stack_at@ elogf" %zd " end
-  elog" }T" elf
+  " [test] stack content mismatch: " elog
+  len0 len1 len2 T_log_stack
 
   T_reset
-  throw" test failure"
+  " test failure" throw
   unreachable
 ;
 
@@ -76,20 +91,17 @@ import' ./lang.f
   len0 len1 len T_stack_eq
   if len0 stack_set_len ret end
 
-  elog" [test] mismatch: T{ "
-  len1 len0 +for: ind ind stack_at@ elogf" %zd " end
-  elog" <T> "
-  len2 ind  +for: ind ind stack_at@ elogf" %zd " end
-  elog" }T" elf
+  " [test] mismatch: " elog
+  len0 len1 len2 T_log_stack
 
   len0 stack_set_len
-  throw" test failure"
+  " test failure" throw
   unreachable
 ;
 
 :: T{
   T{
-  c" when calling `T{`" 0 comp_args_valid
+  " when calling `T{`" 0 comp_args_valid
 ;
 
 :: <T>
@@ -105,7 +117,7 @@ import' ./lang.f
 
   T_ARGS_LEN @ { len }
   T_reset
-  c" when calling `}T`" len comp_args_valid
+  " when calling `}T`" len comp_args_valid
 
   len comp_args_to_stack
   0   comp_args_set

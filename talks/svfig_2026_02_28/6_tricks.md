@@ -326,7 +326,7 @@ dis' example_reloc_due_to_branching
 \ ret
 ```
 
-(We could also use callee-saved registers `x19 … x27`; `x28` is interpreter pointer; slightly more complex and hasn't been needed yet. In particular, it would bloat the reserved prologue size.)
+(We could also use callee-saved registers `x19 … x27`; `x28` is interpreter pointer. This is slightly more complex and hasn't been needed yet. In particular, it would bloat the reserved prologue size.)
 
 ## What is inlinable
 

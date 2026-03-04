@@ -2,19 +2,21 @@ import' std:lang.f
 import' std:time.f
 
 : main
+  \ Allocate a C-compatible struct on the system stack,
+  \ and get the address. We can now use it with `libc`.
   Timespec alloca { inst }
 
-  CLOCK_MONOTONIC inst clock_gettime try_errno" unable to get time"
+  CLOCK_MONOTONIC inst clock_gettime " unable to get time" os_try
 
-  log" mono seconds: " inst Timespec_sec  @ log_int lf
-  log" mono nanos:   " inst Timespec_nsec @ log_int lf
+  " mono seconds: " log inst Timespec_sec  @ log_int lf
+  " mono nanos:   " log inst Timespec_nsec @ log_int lf
 
-  CLOCK_REALTIME inst clock_gettime try_errno" unable to get time"
+  CLOCK_REALTIME inst clock_gettime " unable to get time" os_try
 
-  log" real seconds: " inst Timespec_sec  @ log_int lf
-  log" real nanos:   " inst Timespec_nsec @ log_int lf
+  " real seconds: " log inst Timespec_sec  @ log_int lf
+  " real nanos:   " log inst Timespec_nsec @ log_int lf
 
-  log" CPU  elapsed: " clock log_int lf
-  log" Unix seconds: " nil time log_int lf
+  " CPU  elapsed: " log clock log_int lf
+  " Unix seconds: " log nil time log_int lf
 ;
 main

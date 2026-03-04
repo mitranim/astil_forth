@@ -7,9 +7,9 @@ import' ./io.f
 \ translated from C definitions on MacOS 15.3 (24D60).
 \
 \ Procedures which return -1 on error should usually
-\ be followed by the test `is_err` or `try_errno"`:
+\ be followed by the test `is_err` or `os_try`:
 \
-\   some_word try_errno" unable to blah"
+\   some_word " unable to blah" os_try
 
 1      let: AI_PASSIVE   \ Any host IP is fine.
 0      let: AF_UNSPEC    \ Both IPv4 and IPv6.

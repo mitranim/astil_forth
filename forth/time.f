@@ -17,17 +17,17 @@ end
 
 \ `struct tm`. Used by reference.
 struct: Date
-  S32  1 field: Time_sec    \ seconds after the minute [0-60]
-  S32  1 field: Time_min    \ minutes after the hour [0-59]
-  S32  1 field: Time_hour   \ hours since midnight [0-23]
-  S32  1 field: Time_mday   \ day of the month [1-31]
-  S32  1 field: Time_mon    \ months since January [0-11]
-  S32  1 field: Time_year   \ years since 1900
-  S32  1 field: Time_wday   \ days since Sunday [0-6]
-  S32  1 field: Time_yday   \ days since January 1 [0-365]
-  S32  1 field: Time_isdst  \ Daylight Savings Time flag
-  S64  1 field: Time_gmtoff \ offset from UTC in seconds
-  Cstr 1 field: Time_zone   \ timezone abbreviation
+  S32  1 field: Date_sec    \ seconds after the minute [0-60]
+  S32  1 field: Date_min    \ minutes after the hour [0-59]
+  S32  1 field: Date_hour   \ hours since midnight [0-23]
+  S32  1 field: Date_mday   \ day of the month [1-31]
+  S32  1 field: Date_mon    \ months since January [0-11]
+  S32  1 field: Date_year   \ years since 1900
+  S32  1 field: Date_wday   \ days since Sunday [0-6]
+  S32  1 field: Date_yday   \ days since January 1 [0-365]
+  S32  1 field: Date_isdst  \ Daylight Savings Time flag
+  S64  1 field: Date_gmtoff \ offset from UTC in seconds
+  Cstr 1 field: Date_zone   \ timezone abbreviation
 end
 
 1000000 let: CLOCKS_PER_SEC

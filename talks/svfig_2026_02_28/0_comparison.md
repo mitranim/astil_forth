@@ -1,6 +1,6 @@
 # Comparison of calling conventions
 
-Stack-CC versus reg-CC, as implemented in this system.
+Stack-CC versus reg-CC, as implemented in this system, for the Arm64 CPU architecture.
 
 ## Arithmetic
 

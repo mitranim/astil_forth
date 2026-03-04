@@ -1,1 +1,2 @@
 *.f linguist-language=Forth
+*.h linguist-language=C

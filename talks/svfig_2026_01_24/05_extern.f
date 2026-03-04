@@ -6,13 +6,13 @@ import' std:lang_s.f
 
 \ ## Easy IO
 
-3 0 extern: write
-1 0 extern: putchar
+3 0 extern: write   \ Note: uses unbuffered kernel IO.
+1 0 extern: putchar \ Note: uses buffered `libc` IO.
 
-: type { str len } 1 str len write [ redefine ] ;
+: type { str len } STDOUT str len write ;
 : cr 10 putchar ;
 
-" hello world! (using libc I/O)" type cr
+s" hello world! (using libc IO)" type cr
 
 
 

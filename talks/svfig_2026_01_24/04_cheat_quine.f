@@ -1,13 +1,13 @@
 import' std:lang_s.f
 
-1 1 extern: strdup
 2 1 extern: fopen
 1 1 extern: fgetc
+1 0 extern: close
 
 : main
-  c" talks/svfig_2026_01_24/04_cheat_quine.f" strdup { path }
-  c" r"           { mode }
-  path mode fopen { file }
+  " talks/svfig_2026_01_24/04_cheat_quine.f" { path }
+  " r"                                       { mode }
+  path mode fopen                            { file }
 
   loop
     file fgetc { char }
@@ -15,6 +15,6 @@ import' std:lang_s.f
     char putchar
   end
 
-  path free
+  file close
 ;
 main
