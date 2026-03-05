@@ -95,7 +95,7 @@
 
 4      let: ASM_INSTR_SIZE
 8      let: ASM_REG_SCRATCH
-28     let: ASM_REG_INTERP
+28     let: ASM_REG_INTERP \ SYNC[asm_reg_interp].
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP

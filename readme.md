@@ -164,6 +164,9 @@ The REPL is barebones. For a better experience, using `rlwrap` is recommended:
 
 ```sh
 rlwrap astil std:lang.f -
+
+# Or use this shortcut from repo root:
+make repl
 ```
 
 Local-only usage inside this repo:

@@ -60,8 +60,9 @@ EXE2 = $(shell realpath $$(xcrun --find atos))
 
 .PHONY: run_file
 run_file:
-	rlwrap -n sandbox-exec \
-	  -f sandbox.sb \
+	rlwrap --no-warnings \
+		sandbox-exec \
+		-f sandbox.sb \
 		-D MAIN="$(PWD)/$(file)" \
 		-D EXE0=$(EXE0) \
 		-D EXE1=$(EXE1) \
@@ -105,6 +106,14 @@ run_c: $(FILE_EXE) $(ALL_SRC)
 .PHONY: run_c_w
 run_c_w:
 	$(WATCH_COMP) -- $(MAKE) run_c
+
+.PHONY: repl
+repl:
+	$(MAKE) run args='std:lang.f -'
+
+.PHONY: repl_s
+repl_s:
+	$(MAKE) run_s args='std:lang_s.f -'
 
 # For executables from arbitrary C files. This is possible because our C files
 # specify all their dependencies with `#include`, without needing the build

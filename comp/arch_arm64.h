@@ -84,6 +84,7 @@ static constexpr U8 ASM_REG_SP = 31;
 // Extremely primitive heuristic. 4 seems enough.
 static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 
+// SYNC[asm_reg_interp].
 static constexpr U8 ASM_REG_INTERP = 28;
 
 #ifdef CALL_CONV_STACK

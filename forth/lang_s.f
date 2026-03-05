@@ -28,9 +28,9 @@
 
 : ASM_INSTR_SIZE       4      ;
 : ASM_REG_ERR          0      ;
-: ASM_REG_DAT_SP_FLOOR 26     ;
-: ASM_REG_DAT_SP       27     ;
-: ASM_REG_INTERP       28     ;
+: ASM_REG_DAT_SP_FLOOR 26     ; \ SYNC[asm_arm64_cc_stack_special_regs].
+: ASM_REG_DAT_SP       27     ; \ SYNC[asm_arm64_cc_stack_special_regs].
+: ASM_REG_INTERP       28     ; \ SYNC[asm_reg_interp].
 : ASM_REG_FP           29     ;
 : ASM_REG_LR           30     ;
 : ASM_REG_SP           31     ;

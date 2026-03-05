@@ -1,49 +1,54 @@
+/*
+This file implements a Mach handler for "bad memory access" exceptions.
+It detects underflow and overflow of the Forth integer stack, replacing
+or augmenting cryptic segmentation faults with an actual error message.
+When `DEBUG` is enabled, it also displays part of the execution context
+of the faulting thread.
+
+In the stack-CC version of the system, this also unwinds Forth frames in the
+faulting thread, returning control to C-based interpreter code. This lets us
+improve REPL UX; in stack-CC, stack underflow / overflow is very common, and
+crashing the entire program every time would be very inconvenient.
+
+In reg-CC, we don't unwind, because:
+- The ABI has diverged.
+- Compiler validates arity at compile time.
+- Stack is used less often and underflow is rare.
+
+If we wanted to convert stack underflow / overflow into an exception
+that could be caught in program code, we would consider building CFI
+tables which associate instruction addresses with systack frames and
+catch handlers. But the complexity is not worth it.
+*/
 #pragma once
 #include "./arch.h"
 #include "./interp.c"
+#include "./lib/cli.c"
 #include "./lib/fmt.c"
 #include "./lib/mach_exc.c"
 #include "./lib/misc.h"
+#include "./mach_misc.h"
 #include <mach/mach.h>
 #include <stdio.h>
+
+#ifdef CALL_CONV_STACK
+#include "./mach_unwind.c"
+#endif
 
 extern const Instr asm_call_forth_epilogue __asm__("asm_call_forth_epilogue");
 extern const Instr asm_call_forth_trace __asm__("asm_call_forth_trace");
 
 #define SYS_REC_FMT "[system] [recovery] "
-#define UNWIND_CTX_FMT "; frame " FMT_UINT " = %p, callee = %p"
-#define UNWIND_CTX_INP frame_ind, frame, callee
-
-// Darwin-specific. TODO better segregation of CPU stuff vs OS stuff.
-typedef struct {
-  U64 x[29];
-  U64 fp;
-  U64 lr;
-  U64 sp;
-  U64 pc;
-  U32 cpsr;
-  U32 pad;
-} Thread_state;
-
-/*
-We redefine the fields using same-sized but differently-typed
-and differently-named integer types for better repr printing.
-*/
-static_assert(sizeof(Thread_state) == sizeof(arm_thread_state64_t));
-
-/*
-Used in unwinding. Reference:
-
-  https://github.com/ARM-software/abi-aa/blob/c51addc3dc03e73a016a1e4edf25440bcac76431/aapcs64/aapcs64.rst#646the-frame-pointer
-*/
-typedef struct Frame_record {
-  struct Frame_record *parent;
-  const Instr         *caller;
-} Frame_record;
 
 static void Thread_state_repr(const Thread_state *val) {
   eprint_struct_beg(val, const Thread_state);
+
+#ifdef CALL_CONV_STACK
   eprint_struct_field_hint(val, x[0], " // error register");
+#else
+  eprint_struct_field(val, x[0]);
+#endif
+
   eprint_struct_field(val, x[1]);
   eprint_struct_field(val, x[2]);
   eprint_struct_field(val, x[3]);
@@ -69,8 +74,21 @@ static void Thread_state_repr(const Thread_state *val) {
   eprint_struct_field(val, x[23]);
   eprint_struct_field(val, x[24]);
   eprint_struct_field(val, x[25]);
+
+#ifdef CALL_CONV_STACK
+
+  // SYNC[asm_arm64_cc_stack_special_regs].
   eprint_struct_field_hint(val, x[26], " // stack floor register");
   eprint_struct_field_hint(val, x[27], " // stack top register");
+
+#else // CALL_CONV_STACK
+
+  eprint_struct_field(val, x[26]);
+  eprint_struct_field(val, x[27]);
+
+#endif // CALL_CONV_STACK
+
+  // SYNC[asm_reg_interp].
   eprint_struct_field_hint(val, x[28], " // interpreter register");
   eprint_struct_field(val, fp);
   eprint_struct_field(val, lr);
@@ -79,211 +97,6 @@ static void Thread_state_repr(const Thread_state *val) {
   eprint_struct_field(val, cpsr);
   eprint_struct_field(val, pad);
   eprint_struct_end();
-}
-
-static Err err_unwind_no_frame() {
-  return err_str("unable to unwind: FP register is zero");
-}
-
-static Err err_unwind_empty_frame(const Frame_record *frame) {
-  return errf("unable to unwind: frame record at address %p is empty", frame);
-}
-
-static Err err_unwind_internal_no_parent(
-  const Frame_record *frame, Uint frame_ind, const void *callee
-) {
-  return errf(
-    "unable to unwind: internal error: frame record does not refer to a parent frame" UNWIND_CTX_FMT,
-    UNWIND_CTX_INP
-  );
-}
-
-static Err err_unwind_internal_no_caller(
-  const Frame_record *frame, Uint frame_ind, const void *callee
-) {
-  return errf(
-    "unable to unwind: internal error: frame record does not have a caller instruction to return to" UNWIND_CTX_FMT,
-    UNWIND_CTX_INP
-  );
-}
-
-static Err err_unwind_internal_direction(
-  const Frame_record *frame, Uint frame_ind, const void *callee
-) {
-  return errf(
-    "unable to unwind: internal error: frame record refers to a parent frame at a lower address" UNWIND_CTX_FMT,
-    UNWIND_CTX_INP
-  );
-}
-
-static Err err_unwind_no_epilogue(const Frame_record *frame, const void *pc_new) {
-  return errf(
-    "unable to unwind: outer PC %p doesn't match epilogue address %p; frame: %p; parent: %p; caller: %p",
-    pc_new,
-    &asm_call_forth_epilogue,
-    frame,
-    frame->parent,
-    frame->caller
-  );
-}
-
-static Err err_unwind_invalid_stack(
-  const Frame_record *frame, const void *sp_new, const void *pc_new
-) {
-  return errf(
-    "unable to unwind: memory at the deduced SP %p has unexpected values, indicating invalid SP after unwinding; PC: %p; frame: %p; parent: %p; caller: %p",
-    sp_new,
-    pc_new,
-    frame,
-    frame->parent,
-    frame->caller
-  );
-}
-
-/*
-We use this for Forth stack underflow / overflow exceptions which occur in
-machine code generated by Forth procedures on the fly. The exceptions are
-triggered by the CPU and delivered by Darwin to the handling thread.
-Regular Forth exceptions use local gotos and don't involve this at all.
-
-We get to "cheat" by making a few simplifying assumptions:
-
-- Forth doesn't have `catch` (yet).
-- Forth doesn't have `defer` (yet).
-- Resource cleanup is not necessary.
-- If the faulty PC is in Forth, one ancestor is `asm_call_forth`.
-*/
-static Err mach_unwind_thread(
-  const Interp *interp, const char *msg, Thread_state *state
-) {
-  const auto code   = &interp->comp.code;
-  auto       frame  = (Frame_record *)state->fp;
-  const auto pc_old = (const Instr *)state->pc;
-  auto       pc_new = pc_old;
-
-  if (!frame) return err_unwind_no_frame();
-  if (!frame->parent && !frame->caller) return err_unwind_empty_frame(frame);
-
-  const auto leaf_lr = (const Instr *)state->lr;
-
-  // Leaf procedure without its own frame record.
-  if (comp_code_is_instr_ours(code, pc_new) && frame->caller != leaf_lr) {
-    IF_DEBUG(eprintf(
-      "[system] [unwind] frame -1: leaf procedure without a frame; PC: %p -> %p; LR: %p -> %p\n",
-      pc_new,
-      leaf_lr,
-      (void *)state->lr,
-      frame->caller
-    ));
-
-    /*
-    Note: when doing this, we must also modify the LR;
-    we do this unconditionally at the end of unwinding,
-    using the last found frame.
-    */
-    pc_new = leaf_lr;
-  }
-
-  Uint frame_ind = 0;
-
-  while (comp_code_is_instr_ours(code, pc_new)) {
-    if (!frame->parent) {
-      return err_unwind_internal_no_parent(frame, frame_ind, pc_new);
-    }
-    if (!frame->caller) {
-      return err_unwind_internal_no_caller(frame, frame_ind, pc_new);
-    }
-    if (!(frame->parent > frame)) {
-      return err_unwind_internal_direction(frame, frame_ind, pc_new);
-    }
-
-    IF_DEBUG({
-      eprintf("[system] [unwind] frame " FMT_UINT " %p: ", frame_ind, frame);
-      repr_struct(frame);
-    });
-
-    pc_new = frame->caller;
-    frame  = frame->parent;
-    frame_ind++;
-  }
-
-  IF_DEBUG({
-    if (frame_ind) {
-      eprintf(
-        "[system] [unwind] final frame " FMT_UINT " %p: ", frame_ind, frame
-      );
-    }
-    else {
-      eprintf("[system] [unwind] frame %p: ", frame);
-    }
-    repr_struct(frame);
-  });
-
-  if (pc_new != &asm_call_forth_epilogue) {
-    return err_unwind_no_epilogue(frame, pc_new);
-  }
-
-  pc_new = &asm_call_forth_trace;
-
-  /*
-  Finally, we need to restore the SP. Since we're returning
-  to the trampoline, we can simply use its FP as the basis.
-  */
-  const auto sp_new = (const U64 *)frame - 4;
-
-  // SYNC[asm_magic].
-  const auto sp_ok = sp_new[1] == 0xABCD'FEED'ABCD'FACE;
-  if (!sp_ok) {
-    eprintf(
-      "[system] [unwind] memory at SP %p:\n"
-      "  %p: 0x%0.16llx 0x%0.16llx\n"
-      "  %p: 0x%0.16llx 0x%0.16llx\n"
-      "  %p: 0x%0.16llx 0x%0.16llx\n"
-      "  %p: 0x%0.16llx 0x%0.16llx\n",
-      sp_new,
-      sp_new,
-      sp_new[0],
-      sp_new[1],
-      sp_new + 2,
-      sp_new[2],
-      sp_new[3],
-      sp_new + 4,
-      sp_new[4],
-      sp_new[5],
-      sp_new + 6,
-      sp_new[6],
-      sp_new[7]
-    );
-    fflush(stderr);
-    return err_unwind_invalid_stack(frame, sp_new, pc_new);
-  }
-
-  assign_cast(&state->fp, frame);
-  assign_cast(&state->lr, frame->caller);
-  assign_cast(&state->sp, sp_new);
-  assign_cast(&state->pc, pc_new);
-  assign_cast(&state->x[ASM_REG_ERR], msg);
-  return nullptr;
-
-  /*
-  Partial sketch for returning to a catch handler.
-
-    const auto sym = find_sym_by_instr(&interp->syms, bad_pc);
-    if (!sym) {
-      eprintf(
-        SYS_REC_FMT "unable to find symbol for instruction %p\n", bad_pc
-      );
-      return KERN_FAILURE;
-    }
-
-    const auto epi   = asm_sym_epilogue_executable(&interp->asm, sym);
-    const auto under = bad_addr < (void *)ints->floor;
-    const auto dir   = under ? "underflow" : "overflow";
-
-    const auto err = errf(
-      "integer stack %s in word " FMT_QUOTED, dir, sym->name.buf
-    );
-  */
 }
 
 /*
@@ -372,9 +185,10 @@ kern_return_t catch_mach_exception_raise_state(
     return KERN_FAILURE;
   }
 
-  const auto bad_pc = (void *)state->pc;
-  const auto under  = bad_addr < (void *)ints->floor;
+  const auto under = bad_addr < (void *)ints->floor;
   const auto msg = under ? "integer stack underflow" : "integer stack overflow";
+
+#ifdef CALL_CONV_STACK
 
   IF_DEBUG({
     eprintf(SYS_REC_FMT "detected %s\n", msg);
@@ -388,6 +202,7 @@ kern_return_t catch_mach_exception_raise_state(
     return KERN_FAILURE;
   }
 
+  const auto bad_pc = (void *)state->pc;
   if (bad_pc == bad_addr) return KERN_FAILURE;
 
   memcpy(state_next_ptr, state, sizeof(*state));
@@ -400,6 +215,18 @@ kern_return_t catch_mach_exception_raise_state(
   // });
 
   return KERN_SUCCESS;
+
+#else // CALL_CONV_STACK
+
+  (void)state_next_ptr;
+  (void)state_next_len;
+
+  eprintf(SYS_REC_FMT "detected %s\n", msg);
+  fflush(stderr);
+
+#endif // CALL_CONV_STACK
+
+  return KERN_FAILURE;
 }
 
 static Err init_exception_handling(void) {

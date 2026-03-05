@@ -7,11 +7,7 @@
 
 // #include "./mach_exec.c"
 
-#ifndef CALL_CONV_STACK
-static Err init_exception_handling(void) { return nullptr; }
-#else
 #include "./mach_exc.c"
-#endif
 
 static void print_help(void) {
   eputs(

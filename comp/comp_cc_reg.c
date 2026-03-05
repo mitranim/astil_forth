@@ -379,7 +379,6 @@ static void comp_clear_param_reg(Comp *comp, U8 reg) {
   validate_param_reg(reg);
 
   const auto loc          = comp_local_get_for_reg(comp, reg);
-  const auto had          = comp_local_has_regs(comp, loc);
   comp->ctx.reg_vals[reg] = (Reg_val){};
 
   if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return;
