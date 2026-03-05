@@ -279,7 +279,8 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   sym_auto_interp_only(caller, callee);
   try(sym_auto_throws(caller, callee));
 
-  const auto catch = caller->catches && callee->throws;
+  const auto ctx   = &comp->ctx;
+  const auto catch = ctx->catches && callee->throws;
   bool inlined     = false;
 
   switch (callee->type) {

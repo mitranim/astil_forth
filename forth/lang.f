@@ -120,43 +120,51 @@
 \ Bitwise arithmetic needed for the early stages of the self-assembler.
 
 : or { i0 i1 -- i2 } [
+  0 comp_clobber
   0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
   1 comp_args_set
 ] ;
 
 : and { i0 i1 -- i2 } [
+  0 comp_clobber
   0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
   1 comp_args_set
 ] ;
 
 : xor { i0 i1 -- i2 } [
+  0 comp_clobber
   0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
   1 comp_args_set
 ] ;
 
 : lsl { i0 bits -- i1 } [
+  0 comp_clobber
   0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
   1 comp_args_set
 ] ;
 
 : lsr { i0 bits -- i1 } [
+  0 comp_clobber
   0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
   1 comp_args_set
 ] ;
 
 : invert { i0 -- i1 } [
+  0 comp_clobber
   0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
   1 comp_args_set
 ] ;
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
 : inc { i0 -- i1 } [
+  0 comp_clobber
   0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
   1 comp_args_set
 ] ;
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
 : dec { i0 -- i1 } [
+  0 comp_clobber
   0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
   1 comp_args_set
 ] ;
@@ -183,12 +191,14 @@
 ;
 
 : <>0 { int -- bool } [
+  0                     comp_clobber
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_NE asm_cset     comp_instr \ cset x0, ne
   1                     comp_args_set
 ] ;
 
 : =0 { int -- bool } [
+  0                     comp_clobber
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_EQ asm_cset     comp_instr \ cset x0, eq
   1                     comp_args_set
@@ -494,6 +504,7 @@
 
 \ Arithmetic (sign-preserving) right shift.
 : asr { i0 bits -- i1 } [
+  0                 comp_clobber
   0 0 1 asm_asr_reg comp_instr \ asr x0, x0, x1
   1                 comp_args_set
 ] ;
@@ -604,31 +615,37 @@
 \ ## Arithmetic
 
 : negate { i0 -- i1 } [
+  0         comp_clobber
   0 asm_neg comp_instr \ neg x0, x0
   1         comp_args_set
 ] ;
 
 : + { i0 i1 -- i2 } [
+  0                 comp_clobber
   0 0 1 asm_add_reg comp_instr \ add x0, x0, x1
   1                 comp_args_set
 ] ;
 
 : - { i0 i1 -- i2 } [
+  0                 comp_clobber
   0 0 1 asm_sub_reg comp_instr \ sub x0, x0, x1
   1                 comp_args_set
 ] ;
 
 : * { i0 i1 -- i2 } [
+  0             comp_clobber
   0 0 1 asm_mul comp_instr \ mul x0, x0, x1
   1             comp_args_set
 ] ;
 
 : / { i0 i1 -- i2 } [
+  0              comp_clobber
   0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
   1              comp_args_set
 ] ;
 
 : mod { i0 i1 -- i2 } [
+  0                comp_clobber
   2                comp_clobber
   2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
   0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
@@ -636,6 +653,8 @@
 ] ;
 
 : /mod { dividend divisor -- rem quo } [
+  0                   comp_clobber
+  1                   comp_clobber
   2                   comp_clobber
   2 1     asm_mov_reg comp_instr \ mov x2, x1
   1 0 2   asm_sdiv    comp_instr \ sdiv x1, x0, x2
@@ -644,18 +663,21 @@
 ] ;
 
 : abs { int -- +int } [
+  0                         comp_clobber
   0            asm_cmp_zero comp_instr \ cmp x0, 0
   0 0 0 ASM_PL asm_csneg    comp_instr \ cneg x0, x0, pl
   1                         comp_args_set
 ] ;
 
 : min { i0 i1 -- i0|i1 } [
+  0                        comp_clobber
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_LT asm_csel    comp_instr \ csel x0, x0, x1, lt
   1                        comp_args_set
 ] ;
 
 : max { i0 i1 -- i0|i1 } [
+  0                        comp_clobber
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
   1                        comp_args_set
@@ -715,12 +737,14 @@
 ;
 
 : asm_comp_cset_reg { cond } ( E: i0 i1 -- bool )
+  0                  comp_clobber
   0 1    asm_cmp_reg comp_instr \ cmp x0, x1
   0 cond asm_cset    comp_instr \ cset x0, <cond>
   1                  comp_args_set
 ;
 
 : asm_comp_cset_zero { cond } ( E: num -- bool )
+  0                   comp_clobber
   0      asm_cmp_zero comp_instr \ cmp x0, 0
   0 cond asm_cset     comp_instr \ cset x0, <cond>
   1                   comp_args_set
@@ -748,8 +772,9 @@
 \ done manually, particularly when dealing with C words
 \ which return `(int)-1` which ends up being 0xffffffff.
 : int_to_cell { int32 -- cell } [
+  0                      comp_clobber
   0 0 asm_sign_extend_32 comp_instr \ sxtw x0, x0
-  1 comp_args_set
+  1                      comp_args_set
 ] ;
 
 \ ## Numeric comparison
@@ -796,6 +821,7 @@
   \ Execution-time semantics.
   str len colon
     1 1 comp_signature_set ( E: adr -- val )
+    0 comp_clobber
     0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
     1 comp_args_set
   semicolon
@@ -853,6 +879,7 @@
 0b11      store: !culong
 
 : @2 { adr -- val0 val1 } [
+  0                         comp_clobber
   0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
   2                         comp_args_set
 ] ;
@@ -981,12 +1008,14 @@
 
 \ For debugging.
 : systack_ptr { -- sp } [
+  0 comp_clobber
   0 ASM_REG_SP 0 asm_add_imm comp_instr \ add x0, sp, 0 | mov x0, sp
   1 comp_args_set
 ] ;
 
 \ For debugging.
 : sysstack_frame_ptr { -- fp } [
+  0 comp_clobber
   0 ASM_REG_FP asm_mov_reg comp_instr \ mov x0, x29
   1 comp_args_set
 ] ;
@@ -1333,14 +1362,15 @@ extern_adr: fprintf_adr fprintf
 \ The hoops we jump through, just because libc doesn't provide `eprintf`.
 \ On the bright side, this does not have any meaningful runtime overhead.
 : eprintf { fmt } ( E: fmt …vargs… -- )
+  \ Relocate `fmt` before we clobber `x0` with `stderr`.
   [
     1 0 asm_mov_reg comp_instr    \ mov x1, x0 -- `fmt`
-    0               comp_args_set \ stderr = x0
+    0               comp_args_set \ Allow `stderr` to go in `x0`, below.
   ]
 
   stderr              \ adrp x0, <off> ; ldr x0, [x0, <off>] ; ldr x0, [x0]
-  [ 2 comp_args_set ] \ x1 = fmt
-  fprintf_adr         \ x2 = fprintf
+  [ 2 comp_args_set ] \ Reveal to the compiler that `x1` holds something.
+  fprintf_adr         \ adrp x2, <off> ; ldr x2, [x2, <off>]
 
   [
                         comp_clobber_volatile
@@ -1919,6 +1949,7 @@ ERR_CAP mem: ERR_BUF_1
   1             { off }
 
   len off    comp_va_beg
+  2          comp_clobber
   2 0        asm_mov_reg comp_instr \ mov x2, x0
   0          comp_args_set          \ Assume `x0` is used up.
   execute''  ERR_BUF_0              \ mov x0, <buf>
@@ -1956,7 +1987,12 @@ ERR_CAP mem: ERR_BUF_1
   1               { off     } \ Vargs begin after `fmt`.
 
   len off comp_va_beg
-  err_reg 1 <> if 1 err_reg asm_mov_reg comp_instr end \ mov x1, <err>
+
+  err_reg 1 <> if
+    1 comp_clobber
+    1 err_reg asm_mov_reg comp_instr \ mov x1, <err>
+  end
+
   2 comp_args_set
 
   compile' wrapf_args
@@ -2294,6 +2330,13 @@ ERR_CAP mem: ERR_BUF_1
 \ Most fields have length 1, but any length can be used.
 \ This allows us to align fields to element size, rather
 \ than total size.
+\
+\ A field becomes a word `( struct_adr -- field_adr )` which computes
+\ a field address from a struct address. Cell-sized fields are loaded
+\ and stored with `@ !`. Smaller fields require operators specific to
+\ their size and type. For example, signed 32-bit integers `S32` must
+\ be stored with `!32` and loaded with `@s32`, which sign-extends the
+\ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
 : field: { align off fun size len -- align off_next fun }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
@@ -2302,12 +2345,11 @@ ERR_CAP mem: ERR_BUF_1
   \ must match the C struct ABI of the target platform.
   \ The ABI compatibility seems to hold in many cases,
   \ but has NOT been thoroughly tested.
-  off size align_up      { field_off }
-  size len * field_off + { next_off }
-  parse_word             { name name_len }
+  off size align_up { field_off }
+  parse_word        { name_buf name_len }
 
   \ Execution-time semantics.
-  name name_len colon
+  name_buf name_len colon
     1 1 comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
     field_off comp_push
@@ -2315,12 +2357,13 @@ ERR_CAP mem: ERR_BUF_1
   semicolon
 
   \ Compile-time semantics.
-  name name_len colon_colon
+  name_buf name_len colon_colon
     field_off comp_push
     compile' struct_field_comp
   semicolon
 
-  align size max { align }
+  size len * field_off + { next_off }
+  align size max         { align }
   align next_off fun
 
   [ false comp_only ]

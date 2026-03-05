@@ -33,7 +33,7 @@ static char *str_alloc_copy(const char *src, Ind src_len) {
 
 static Err err_word_len_mismatch(Word_str *word, Ind len) {
   return errf(
-    "length mismatch for " FMT_QUOTED ": " FMT_IND " vs " FMT_IND,
+    "length mismatch in word " FMT_QUOTED ": " FMT_IND " vs " FMT_IND,
     word->buf,
     word->len,
     len

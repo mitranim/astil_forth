@@ -95,6 +95,7 @@ static Err comp_ctx_init(Comp_ctx *ctx) {
   return nullptr;
 }
 
+// SYNC[comp_ctx_trunc].
 static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->loc_fix);
   stack_trunc(&ctx->asm_fix);
@@ -110,6 +111,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
+  ptr_clear(&ctx->catches);
 }
 
 // SYNC[comp_ctx_rewind].
@@ -123,6 +125,7 @@ static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
   tar->redefining = snap->redefining;
   tar->compiling  = snap->compiling;
   tar->has_alloca = snap->has_alloca;
+  tar->catches    = snap->catches;
 
   stack_rewind(&snap->locals, &tar->locals);
   dict_rewind(&snap->local_dict, &tar->local_dict);
@@ -195,7 +198,7 @@ static void comp_local_regs_clear(Comp *comp, Local *loc) {
 
   for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
     if (comp_local_get_for_reg(comp, reg) != loc) continue;
-    ctx->reg_vals[reg] = (Reg_val){};
+    ptr_clear(&ctx->reg_vals[reg]);
   }
 }
 
@@ -372,6 +375,18 @@ static Loc_write *comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
   return loc->write = &fix->write;
 }
 
+static void comp_clear_param_reg(Comp *comp, U8 reg) {
+  validate_param_reg(reg);
+
+  const auto loc          = comp_local_get_for_reg(comp, reg);
+  const auto had          = comp_local_has_regs(comp, loc);
+  comp->ctx.reg_vals[reg] = (Reg_val){};
+
+  if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return;
+  comp_append_local_write(comp, loc, reg);
+  loc->stable = true;
+}
+
 /*
 Must be invoked whenever a register needs to be used for ANYTHING
 other than the current procedure's input or output parameters.
@@ -388,14 +403,7 @@ static Err comp_clobber_reg(Comp *comp, U8 reg) {
   try(comp_require_current_sym(comp, &sym));
   bits_add_to(&sym->clobber, reg);
 
-  if (!is_param_reg(reg)) return nullptr;
-
-  const auto loc          = comp_local_get_for_reg(comp, reg);
-  comp->ctx.reg_vals[reg] = (Reg_val){};
-
-  if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return nullptr;
-  comp_append_local_write(comp, loc, reg);
-  loc->stable = true;
+  if (is_param_reg(reg)) comp_clear_param_reg(comp, reg);
   return nullptr;
 }
 
@@ -406,27 +414,16 @@ static Err comp_clobber_regs(Comp *comp, Bits clob) {
 
 static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   /*
-  For now, we require the clobber list to include inputs, outputs,
-  and auxiliary clobbers. We end up checking input clobbers twice:
-  here and when building the arguments. Might consider deduping at
-  some later point.
+  The callee's clobber list must include all of its auxiliary side-effectful
+  clobbers and its exception register if any. But its inputs and outputs may
+  or may not be considered clobbers. For example, an unary identity function
+  which takes one value and returns it as-is doesn't really clobber anything.
+  Placing its input in `x0` before the call may have clobbered a local which
+  was previously in `x0`, but if the input came from another local, which is
+  now associated with `x0`, it should not be clobbered by the call.
 
-  Including inputs in the clobbers has a positive side effect.
-  Taking the address of a local via `ref'` technically makes a
-  local "volatile": temporary associations between that local
-  and parameter registers may be secretly invalidated by a `!`
-  or an equivalent store operation invisible to the compiler.
-  Such potentially invalid temporary associations are formed
-  only by listing that local as one of the input parameters
-  to some procedure. If inputs are considered to be clobbers
-  at the callsite in addition to when building the arguments,
-  every call disassociates locals from input registers; these
-  associations only exist while building the argument list,
-  and their only effect is a small optimization when a local
-  is repeated among the inputs, sometimes replacing a memory
-  load with a `mov`. This is distinct from local-to-register
-  associations formed by assignment via `{ }` or equivalent,
-  which are simply disabled for volatile locals.
+  In contrast, "intrin" and "extern" procedures always include
+  input and output parameter registers in their clobber lists.
   */
   try(comp_clobber_regs(comp, callee->clobber));
 
@@ -434,6 +431,35 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   if (callee->throws) {
     try(comp_clobber_reg(comp, callee->out_len));
   }
+
+  /*
+  Volatile locals may be modified by calls; our compiler is unable to detect
+  out-of-band loads and stores of locals by their address, because store and
+  load operations are implemented in program code via self-assembly.
+
+  So, we use a simple solution: every call evicts all volatile locals
+  from parameter registers, forcing subsequent access to use memory.
+  */
+  const auto ctx = &comp->ctx;
+
+  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+    const auto loc = comp_local_get_for_reg(comp, reg);
+
+    if (!loc) continue;
+    if (!loc->vol) continue;
+
+    ptr_clear(&ctx->reg_vals[reg]);
+
+    IF_DEBUG(eprintf(
+      "[debug] in " FMT_QUOTED ": evicted volatile local " FMT_QUOTED
+      " from parameter register %d before calling " FMT_QUOTED "\n",
+      ctx->sym->name.buf,
+      loc->name.buf,
+      reg,
+      callee->name.buf
+    ));
+  }
+
   return nullptr;
 }
 
@@ -523,7 +549,6 @@ static Err comp_next_inp_param_reg(Comp *comp, U8 *out) {
 
   const auto reg = sym->inp_len++;
   try(asm_validate_input_param_reg(reg));
-  bits_add_to(&sym->clobber, reg);
 
   if (out) *out = reg;
   return nullptr;
@@ -535,7 +560,6 @@ static Err comp_next_out_param_reg(Comp *comp, U8 *out) {
 
   const auto reg = sym->out_len++;
   try(asm_validate_output_param_reg(reg));
-  bits_add_to(&sym->clobber, reg);
 
   if (out) *out = reg;
   return nullptr;
@@ -556,6 +580,13 @@ static Err comp_scratch_reg(Comp *comp, U8 *out) {
   try(comp_clobber_reg(comp, reg));
   if (out) *out = reg;
   return nullptr;
+}
+
+// Used by `intrin_comp_args_set`.
+static void comp_args_set(Comp *comp, U8 next) {
+  const auto ctx = &comp->ctx;
+  ctx->arg_len   = next;
+  ctx->arg_low   = 0;
 }
 
 // Concrete "read" operation used as a fallback by "get".
@@ -621,11 +652,26 @@ static Err comp_append_local_get_next(Comp *comp, Local *loc) {
     return nullptr;
   }
 
-  try(comp_next_arg_reg(comp, &reg));
+  /*
+  Like `comp_next_arg_reg`, with a modification: when the register already has
+  the same local, this doesn't clobber the register. So for example, if a word
+  simply forwards its inputs to another word, the forwarding doesn't cause its
+  parameters to be added to its clobber list.
+  */
+  comp->ctx.arg_len++;
+  if (comp_local_get_for_reg(comp, reg) != loc) {
+    try(comp_clobber_reg(comp, reg));
+  }
 
+  /*
+  When a local is already associated with a parameter register,
+  we can immediately copy its value from that register into our
+  new argument register, and associate them.
+  */
   const auto any = comp_local_reg_any(comp, loc);
   if (any >= 0) {
     asm_append_mov_reg(comp, reg, (U8)any);
+    comp_local_reg_add(comp, loc, reg);
     return nullptr;
   }
 
@@ -792,6 +838,10 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
+/*
+Used at every branch point to evict locals from parameter
+registers to their "stable" locations.
+*/
 static Err comp_barrier(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
@@ -808,7 +858,7 @@ static Err comp_barrier(Comp *comp) {
     return err_args_arity(name, "in control flow", 0, arg_len);
   }
   for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
-    try(comp_clobber_reg(comp, reg));
+    comp_clear_param_reg(comp, reg);
   }
   return nullptr;
 }

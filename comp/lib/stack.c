@@ -36,7 +36,7 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Uint val_size) {
   const auto len = opt ? opt->len : 0;
   if (!len) return err_stack_no_len();
 
-  const auto page_size = (Uint)sysconf(_SC_PAGESIZE);
+  const auto page_size = (Uint)getpagesize();
   aver(page_size != (Uint)-1);
 
   const auto guard_size = page_size;

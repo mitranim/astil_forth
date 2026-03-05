@@ -8,11 +8,14 @@ import' std:lang.f
 \
 \ See `forth/time.f` and `forth/io.f` in repo root for more.
 \
-\ Struct fields return pointers which can be loaded and stored
-\ with `@` and `!`. This generates suboptimal machine code, but
-\ is good enough for IO-related code.
-\
 \ A struct "type" is a size. A struct "field" is an offset.
+\
+\ Struct fields return pointers which can be loaded and stored with memory
+\ operators such as `@` and `!`. This produces slightly suboptimal machine
+\ code, but is good enough for IO-related code.
+\
+\ Caution: non-cell-sized fields must be loaded and stored with appropriately
+\ sized and typed operators, such as `@s32` `!32` for signed 32-bit integers.
 
 \ C: `struct timespec`
 struct: Timespec

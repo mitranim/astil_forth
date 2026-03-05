@@ -303,8 +303,9 @@ static Err asm_append_try_catch(
     return nullptr;
   }
 
+  const auto ctx = &comp->ctx;
   if (!callee->throws) return nullptr;
-  if (caller->catches) return nullptr;
+  if (ctx->catches) return nullptr;
 
   caller->throws = true;
   asm_append_try(comp, caller, callee);
@@ -457,13 +458,20 @@ and data flow analysis.
 static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
   if (loc->location != LOC_UNKNOWN) return;
 
-  const auto reg = bits_pop_low(&comp->ctx.vol_regs);
+  /*
+  Note: in recursive procedures, we can't use caller-saved scratch registers
+  as "stable" local locations, and we currently don't use callee-saved regs.
+  So for now, when recursion is involved, we simply evict locals to memory.
+  */
+  if (!sym->norm.has_recur) {
+    const auto reg = bits_pop_low(&comp->ctx.vol_regs);
 
-  if (bits_has(ASM_VOLATILE_REGS, reg)) {
-    loc->location = LOC_REG;
-    loc->reg      = reg;
-    bits_add_to(&sym->clobber, reg);
-    return;
+    if (bits_has(ASM_VOLATILE_REGS, reg)) {
+      loc->location = LOC_REG;
+      loc->reg      = reg;
+      bits_add_to(&sym->clobber, reg);
+      return;
+    }
   }
 
   comp_local_alloc_mem(comp, loc);
@@ -501,12 +509,29 @@ static void asm_fixup_loc_write(Comp *comp, Loc_fixup *fix, Sym *sym) {
   *write->instr = asm_instr_local_write(loc, write->reg);
 }
 
+/*
+Figures out which remaining volatile registers are available for locals.
+
+Input parameters in general are not automatically considered clobbers.
+We have to exclude them here, because otherwise, locals would often be
+relocated to parameter registers before param values are actually used.
+*/
+static Bits asm_remaining_vol_regs(const Sym *sym) {
+  auto regs = bits_del_all(ASM_VOLATILE_REGS, sym->clobber);
+
+  for (U8 reg = 0; reg < sym->inp_len; reg++) {
+    bits_del_from(&regs, reg);
+  }
+
+  return regs;
+}
+
 static void asm_fixup_locals(Comp *comp, Sym *sym) {
   const auto ctx = &comp->ctx;
 
-  // Remaining volatile registers available for locals.
+  // Figure out which volatile registers are available for locals.
   aver(ctx->vol_regs == BITS_ALL);
-  ctx->vol_regs = bits_del_all(ASM_VOLATILE_REGS, sym->clobber);
+  ctx->vol_regs = asm_remaining_vol_regs(sym);
 
   for (stack_range(auto, fix, &ctx->loc_fix)) {
     switch (fix->type) {

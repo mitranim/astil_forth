@@ -105,7 +105,11 @@ static Err intrin_colon_colon_named(Interp *interp) {
 static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }
 
 static Err intrin_recur(Interp *interp) {
-  return comp_append_recur(&interp->comp);
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  try(comp_append_recur(&interp->comp));
+  sym->norm.has_recur = true;
+  return nullptr;
 }
 
 static Err intrin_try(Interp *interp) {
@@ -132,20 +136,15 @@ static Err intrin_catch(Interp *interp) {
 }
 
 static Err intrin_catches(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-
   Sint val;
   try(int_stack_pop(&interp->ints, &val));
 
-  sym->catches = !!val;
+  interp->comp.ctx.catches = !!val;
   return nullptr;
 }
 
 static Err intrin_get_catches(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  try(int_stack_push(&interp->ints, sym->catches));
+  try(int_stack_push(&interp->ints, interp->comp.ctx.catches));
   return nullptr;
 }
 

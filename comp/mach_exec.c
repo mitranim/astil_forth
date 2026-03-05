@@ -11,6 +11,7 @@ TODO:
   - Extern symbols.
 - Add a section for the Forth stack.
   - Prepend a prologue which sets up the stack registers.
+- Rewrite in Forth, move the code.
 */
 
 #pragma once

@@ -131,11 +131,19 @@ static Err intrin_ret(Interp *interp) {
   return nullptr;
 }
 
+/*
+Note: recursion affects register allocation.
+See `asm_resolve_local_location`.
+*/
 static Err intrin_recur(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+
   const auto comp = &interp->comp;
   try(comp_validate_recur_args(comp));
-  try(comp_clobber_regs(comp, ASM_VOLATILE_REGS));
   try(comp_append_recur(comp));
+
+  sym->norm.has_recur = true;
   return nullptr;
 }
 
@@ -160,18 +168,12 @@ static Err intrin_catch(Sint wordlist, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_catches(bool val, Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->catches = val;
-  return nullptr;
+static void intrin_catches(bool val, Interp *interp) {
+  interp->comp.ctx.catches = val;
 }
 
-static Err intrin_get_catches(Interp *interp, Sint *out) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  if (out) *out = sym->catches;
-  return nullptr;
+static void intrin_get_catches(Interp *interp, Sint *out) {
+  if (out) *out = interp->comp.ctx.catches;
 }
 
 static Err intrin_comp_only(bool val, Interp *interp) {
@@ -360,8 +362,7 @@ static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
 
 static Err intrin_comp_args_set(Sint len, Interp *interp) {
   try(asm_validate_input_param_reg(len));
-  interp->comp.ctx.arg_len = (U8)len;
-  interp->comp.ctx.arg_low = 0;
+  comp_args_set(&interp->comp, (U8)len);
   return nullptr;
 }
 

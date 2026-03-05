@@ -45,6 +45,7 @@ static Err comp_ctx_init(Comp_ctx *ctx) {
   return nullptr;
 }
 
+// SYNC[comp_ctx_trunc].
 static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->asm_fix);
   stack_trunc(&ctx->locals);
@@ -55,6 +56,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->fp_off);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
+  ptr_clear(&ctx->catches);
 }
 
 // SYNC[comp_ctx_rewind].
@@ -65,6 +67,7 @@ static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
   tar->redefining = snap->redefining;
   tar->compiling  = snap->compiling;
   tar->has_alloca = snap->has_alloca;
+  tar->catches    = snap->catches;
 
   stack_rewind(&snap->locals, &tar->locals);
   dict_rewind(&snap->local_dict, &tar->local_dict);

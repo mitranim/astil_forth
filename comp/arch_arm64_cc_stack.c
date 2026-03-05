@@ -123,8 +123,11 @@ static Err asm_append_try_catch(
   If the callee doesn't throw, the error is always nil but it's
   on the stack regardless. This avoids having to remember which
   words throw and which ones don't; check error after each call.
+  Note that when a word throws, it likely fails to push outputs
+  to the stack. After catching, the stack state below the error
+  is basically undefined.
   */
-  if (caller->catches) {
+  if (comp->ctx.catches) {
     // `sp` acts as a zero value here.
     asm_append_stack_push_from(comp, ASM_REG_SP);
     return nullptr;

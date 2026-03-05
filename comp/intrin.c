@@ -293,11 +293,11 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   clobber:         0b%s\n"
 #endif
         "[debug]   throws:          %s\n"
-        "[debug]   catches:         %s\n"
         "[debug]   comp_only:       %s\n"
         "[debug]   interp_only:     %s\n"
         "[debug]   inlinable:       %s\n"
         "[debug]   has_loads:       %s\n"
+        "[debug]   has_recur:       %s\n"
         "[debug]   has_alloca:      %s\n"
         "[debug]   callers:         " FMT_IND
         "\n"
@@ -315,11 +315,11 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         uint32_to_bit_str((U32)sym->clobber),
 #endif
         bool_str(sym->throws),
-        bool_str(sym->catches),
         bool_str(sym->comp_only),
         bool_str(sym->interp_only),
         bool_str(sym->norm.inlinable),
         bool_str(sym->norm.has_loads),
+        bool_str(sym->norm.has_recur),
         bool_str(sym->norm.has_alloca),
         sym->callers.len,
         sym->callees.len,
@@ -344,7 +344,6 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   inp_len:            %d\n"
         "[debug]   out_len:            %d\n"
         "[debug]   throws:             %s\n"
-        "[debug]   catches:            %s\n"
         "[debug]   execution token:    %p\n"
         "[debug]   executable address: %p\n",
         sym,
@@ -354,7 +353,6 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         sym->inp_len,
         sym->out_len,
         bool_str(sym->throws),
-        bool_str(sym->catches),
         sym,
         sym->intrin
       );
@@ -586,7 +584,6 @@ static constexpr auto INTRIN_CATCHES = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_catches,
   .inp_len   = 1,
-  .throws    = true,
   .comp_only = true,
 };
 
@@ -595,7 +592,6 @@ static constexpr auto INTRIN_GET_CATCHES = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_get_catches,
   .out_len   = 1,
-  .throws    = true,
   .comp_only = true,
 };
 

@@ -1,9 +1,10 @@
 #pragma once
 
 /*
-`sysconf(_SC_PAGESIZE)` exists, but we define some
-page-aligned arrays where size has to be hardcoded.
-This should be fine for about a decade maybe.
+`getpagesize()` and `sysconf(_SC_PAGESIZE)` exist,
+but we define some page-aligned arrays where size
+has to be hardcoded. This size should be fine for
+maybe about a decade.
 */
 static constexpr unsigned int MEM_PAGE = 1 << 14; // 16 KiB
 

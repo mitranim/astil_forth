@@ -40,6 +40,7 @@ typedef struct Sym {
       Sym_instrs spans;      // Instruction ranges; used by the assembler.
       bool       inlinable;  // Inner code is safe to copy-paste.
       bool       has_loads;  // Has PC-relative data access.
+      bool       has_recur;  // Recursion affects register allocation.
       bool       has_alloca; // Has dynamic stack allocation, modifies SP.
     } norm;
 
@@ -51,9 +52,8 @@ typedef struct Sym {
   Sym_set callers;     // Dependents in compiled code.
   U8      inp_len;     // Input parameter count.
   U8      out_len;     // Output parameter count.
-  Bits    clobber;     // Clobbers these registers; must include inps and outs.
+  Bits    clobber;     // Clobbers these regs; also includes inps, outs, err.
   bool    throws;      // Requires exception handling in callers.
-  bool    catches;     // Automatically catches exceptions from callees.
   bool    comp_only;   // Can only be used between `:` and `;`.
   bool    interp_only; // Forbidden in AOT executables.
 } Sym;

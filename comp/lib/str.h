@@ -28,6 +28,11 @@ typedef str_buf(256) Path_str;
     str_term_tmp->buf[str_term_tmp->len] = '\0'; \
   })
 
+/*
+Uses `strlcpy`. The source string must be null-terminated.
+The capacity of the source buffer is allowed to be smaller
+or larger than of the destination buffer.
+*/
 #define str_copy(out, src)                                                    \
   ({                                                                          \
     const auto tmp_str = out;                                                 \
