@@ -9,7 +9,7 @@ Symlink this `./sublime` directory to your Sublime packages directory. Example f
 ```sh
 git clone https://github.com/mitranim/astil_forth.git
 cd astil_forth
-ln -sf "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
+ln -sfn "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
 ```
 
 To find the packages directory on your system, use Sublime Text menu → Preferences → Browse Packages.

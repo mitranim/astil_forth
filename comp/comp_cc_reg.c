@@ -575,7 +575,7 @@ static Err comp_next_arg_reg(Comp *comp, U8 *out) {
 // TODO: support asking for multiple scratch regs (when we need that).
 static Err comp_scratch_reg(Comp *comp, U8 *out) {
   const auto reg = comp->ctx.arg_len;
-  try(asm_validate_input_param_reg(reg));
+  validate_volatile_reg(reg);
   try(comp_clobber_reg(comp, reg));
   if (out) *out = reg;
   return nullptr;

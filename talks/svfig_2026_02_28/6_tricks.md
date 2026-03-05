@@ -92,7 +92,7 @@ Simple solution: local assignments and relocations are _lazy_:
 - Compiler temporarily associates locals with param registers.
 - Reading a local into one of its associated registers is free.
 - When all param associations are clobbered, the last available one is copied to the local's _stable_ location.
-  - Compiler lazily emits a "write" operation;`mov` or `str`.
+  - Compiler lazily emits a "write" operation: `mov` or `str`.
   - Operation type is decided later.
   - Sometimes it becomes a `nop`.
 
@@ -344,7 +344,7 @@ What makes code non-relocatable? PC-relative addressing:
 
 A word can also have too many instructions to be worth copy-pasting. I picked a random threshold of 4 and haven't measured.
 
-This lets us easily copy-paste the remaining words. Simple arithmetic, loads, stores, and other tiny things. Little complexity, big value: ✕2-✕3 runtime decrease in some of our microbenchmarks.
+This lets us easily copy-paste the remaining words. Simple arithmetic, loads, stores, and other tiny things. Little complexity, big value: ×2-×3 runtime decrease in some of our microbenchmarks.
 
 ```forth
 : example_inlinable { one two three -- four } one two + three * ;

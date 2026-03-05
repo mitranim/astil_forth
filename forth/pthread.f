@@ -6,7 +6,7 @@ import' ./lang.f
 \
 \ Translated from C definitions and only partially tested.
 \
-\ Posix words directly return an `errno` code on failure.
+\ Posix words directly return an OS error code on failure.
 \ They should usually be followed by `posix_try"`:
 \
 \   some_proc " unable to do X" posix_try
@@ -201,3 +201,21 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 
 \ Not found via `dlsym`.
 \ 2 1 extern: pthread_jit_write_with_callback_np
+
+\ Wraps `pthread_create`, throwing a descriptive error on failure.
+: thread_spawn { fun inp -- thread }
+  nil { attr }
+  nil { thread }
+
+  ref' thread attr fun inp pthread_create
+  " unable to spawn thread" posix_try
+  thread
+;
+
+\ Wraps `pthread_join`, throwing a descriptive error on failure.
+: thread_join { thread -- out }
+  nil { out }
+  thread ref' out pthread_join
+  " unable to join with thread" posix_try
+  out
+;

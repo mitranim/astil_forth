@@ -87,6 +87,8 @@ import' std:errno.f
   sock
 ;
 
+\ This is single-threaded. A real server should handle clients concurrently.
+\ See adjacent example files `thread*.f` for using Posix threads from Forth.
 : net_accept_loop { sock handler }
   Sockaddr_storage alloca { addr }
   Cuint            alloca { size }

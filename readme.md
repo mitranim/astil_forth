@@ -8,6 +8,7 @@
 * [Structure](#structure)
 * [Sublime Text](#sublime-text)
 * [Library](#library)
+* [Tricks and optimizations](#tricks-and-optimizations)
 * [Limitations](#limitations)
 * [Non-standard](#non-standard)
 * [Lessons](#lessons)
@@ -42,15 +43,15 @@ On top of that, most languages isolate you from the CPU, or even from the OS, fr
 
 This system explores the opposite direction. The interpreter/compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
 
-This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Our system implements much nicer conditionals, but at the cost of more code.)
+This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth provides much nicer conditionals, also implemented in Forth, but at the cost of more code.)
 
-Unlike the system linked above, and mature systems such as Gforth, our implementation goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that.
+Unlike Frugal and mature systems such as Gforth, Astil Forth goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that, despite the non-portability.
 
 The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately, from differently selected C files. The stack-CC version is legacy and has fewer features.
 
 The outer interpreter / compiler, which is written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
-- Register-CC: boots via `forth/lang.f`.
-- Stack-CC: boots via `forth/lang_s.f`.
+- Register-CC: boots via [`./forth/lang.f`](./forth/lang.f).
+- Stack-CC: boots via [`forth/lang_s.f`](./forth/lang_s.f).
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
@@ -81,7 +82,7 @@ import' std:lang.f
 main
 ```
 
-Easy self-assembly:
+Easy self-assembly (Arm64):
 
 ```forth
 \ add Xd, Xn, Xm
@@ -92,6 +93,7 @@ Easy self-assembly:
 
 \ add x0, x0, x1
 : + { i0 i1 -- i2 } [
+  0                 comp_clobber
   0 0 1 asm_add_reg comp_instr
   1                 comp_args_set
 ] ;
@@ -104,9 +106,9 @@ Easy self-assembly:
 
 ## Easy C interop
 
-It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files `forth/lang_s.f` and `forth/lang.f`.
+It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang_s.f`](./forth/lang_s.f) and [`./forth/lang.f`](./forth/lang.f).
 
-The reg-CC version of this system, which is the default, uses the same calling convention as C. The words can be passed to C by raw instruction addresses, and "just work". In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
+The reg-CC version of this system, which is the default, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
 
 ```forth
 \ The numbers describe input and output parameters.
@@ -122,7 +124,7 @@ main
 
 ## Exceptions done right: ABI compatibility
 
-When using the register-based calling convention, you can _opt out of exceptions_ for individual words. Every call is "caught", and error values are always explicit.
+When using the register-based calling convention, you can _opt out of exceptions_ for individual words. Then, every exception is caught, and error values are always explicit.
 
 ```forth
 : word [ true catches ]
@@ -202,8 +204,8 @@ make debug_run '<file>' RECOVERY=false # only for stack-CC
 ## Structure
 
 - [`./forth`](./forth):
-  - `lang.f` — language core.
-  - `testing.f` — simple testing utils.
+  - [`lang.f`](./forth/lang.f) — language core.
+  - [`testing.f`](./forth/testing.f) — simple testing utils.
   - Other files — optional small libraries; mostly interfaces to `libc` IO.
 - [`./examples`](./examples) — how to use `libc` for IO, networking, threading.
 - [`./comp`](./comp) — outer interpreter / compiler in C. Mostly library-style code with a small "main" entry point.
@@ -229,9 +231,9 @@ In this codebase, all C files directly include each other by relative paths, wit
 
 Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every symbol is declared as `static`.
 
-## Optimizations and tricks
+## Tricks and optimizations
 
-I consider this a "mildly optimizing" compiler. It maintains the convenience of single-pass self-assembly while employing several optimization tricks compatible with it. Some are detailed in a ["slide"](talks/svfig_2026_02_28/6_tricks.md) for the February SVFIG presentation.
+I consider this a "mildly optimizing" compiler. It maintains the convenience of single-pass self-assembly while employing several tricks compatible with it. Some are detailed in a ["slide"](talks/svfig_2026_02_28/6_tricks.md) for the February SVFIG presentation.
 
 In both reg-CC and stack-CC:
 - Avoid emitting unnecessary prologue and epilogue.
@@ -313,7 +315,7 @@ Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word 
 
 ### No return stack
 
-Since we use native calls and don't target embedded systems, the role of the return stack is fulfilled by scratch registers and system stack space.
+Because Astil Forth uses native calls and doesn't target embedded systems, the role of the return stack is fulfilled by scratch registers and the system stack.
 
 Reg-CC emphasizes named local variables. Locals are kept in registers when possible, and spilled to the system stack otherwise. The compiler figures out the locations.
 
@@ -340,7 +342,7 @@ When the system is simple, single-pass compilation (with fixups) seems to be a s
 
 "Compilation" and especially "JIT compilation" are muddy terms. Many interpreters convert text to bytecode, which qualifies as JIT compilation, even if the bytecode remains interpreted. In the Java world, generating bytecode files is considered "compilation".
 
-Especially murky in the Forth world. Docs will often mention compilation, and sometimes decompilation, usually without saying what it compiles _to_ and decompiles _from_: VM code or machine code. Some Forth systems use both, some stop at VM code, ours uses only native code. Yet all these systems qualify as "compilers".
+Especially murky in the Forth world. Docs will often mention compilation, and sometimes decompilation, usually without saying what it compiles _to_ and decompiles _from_: VM code or machine code. Some Forth systems use both; some stop at VM code; Astil Forth uses only native code. Yet all these systems qualify as "compilers".
 
 Sometimes it's useful to describe a non-assembler as a "JIT compiler". For example, one of my Go libraries implements JIT-construction of data structures which, when subsequently interpreted, allow efficient deep traversal of complex Go data structures; it delegates setup to "compilation time" and eliminates many costs at "runtime", although both steps occur when the program runs, and the result is interpreted.
 

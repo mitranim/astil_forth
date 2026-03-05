@@ -3,7 +3,7 @@ import' std:io.f
 import' std:pthread.f
 import' std:internals.f
 
-\ ## Posix thread usage
+\ ## Posix thread API
 \
 \ Using the C thread APIs from Forth, natively.
 \
@@ -13,26 +13,6 @@ import' std:internals.f
 \ automatically catches all exceptions and guarantees local control flow.
 \
 \ See adjacent example files for different approaches to error handling.
-
-\ Throws if unable to join, but `main` automatically reveals all exceptions
-\ as additional error values, ensuring we have to handle the join error.
-: thread_spawn { fun inp -- thread }
-  nil { attr }
-  nil { thread }
-
-  ref' thread attr fun inp pthread_create
-  " unable to spawn thread" posix_try
-  thread
-;
-
-\ Throws if unable to join, but `main` automatically reveals all exceptions
-\ as additional error values, ensuring we have to handle the join error.
-: thread_join { thread -- out }
-  nil { out }
-  thread ref' out pthread_join
-  " unable to join with thread" posix_try
-  out
-;
 
 \ Passed to `pthread_spawn` by raw instruction address.
 \ There are no hidden adapters between Forth and libc.
