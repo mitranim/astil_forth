@@ -458,20 +458,32 @@ and data flow analysis.
 static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
   if (loc->location != LOC_UNKNOWN) return;
 
-  /*
-  Note: in recursive procedures, we can't use caller-saved scratch registers
-  as "stable" local locations, and we currently don't use callee-saved regs.
-  So for now, when recursion is involved, we simply evict locals to memory.
-  */
-  if (!sym->norm.has_recur) {
-    const auto reg = bits_pop_low(&comp->ctx.vol_regs);
+  const auto ctx = &comp->ctx;
 
-    if (bits_has(ASM_VOLATILE_REGS, reg)) {
+  /*
+  In recursive procedures, we can't use caller-saved scratch registers as
+  "stable" local locations because they get clobbered by recursive calls.
+  */
+  if (!sym->norm.has_recur && ctx->vol_regs) {
+    const auto reg = bits_pop_low(&ctx->vol_regs);
+
+    if (bits_has(ASM_REGS_VOLATILE, reg)) {
       loc->location = LOC_REG;
       loc->reg      = reg;
       bits_add_to(&sym->clobber, reg);
       return;
     }
+  }
+
+  // Can we assign a callee-saved register?
+  if (ctx->saved_reg < ASM_STABLE_REG_LAST) {
+    U8 reg;
+    if (ctx->saved_reg) reg = ++ctx->saved_reg;
+    else reg = (ctx->saved_reg = ASM_STABLE_REG_FIRST);
+
+    loc->location = LOC_REG;
+    loc->reg      = reg;
+    return;
   }
 
   comp_local_alloc_mem(comp, loc);
@@ -517,7 +529,7 @@ We have to exclude them here, because otherwise, locals would often be
 relocated to parameter registers before param values are actually used.
 */
 static Bits asm_remaining_vol_regs(const Sym *sym) {
-  auto regs = bits_del_all(ASM_VOLATILE_REGS, sym->clobber);
+  auto regs = bits_del_all(ASM_REGS_VOLATILE, sym->clobber);
 
   for (U8 reg = 0; reg < sym->inp_len; reg++) {
     bits_del_from(&regs, reg);
@@ -532,6 +544,8 @@ static void asm_fixup_locals(Comp *comp, Sym *sym) {
   // Figure out which volatile registers are available for locals.
   aver(ctx->vol_regs == BITS_ALL);
   ctx->vol_regs = asm_remaining_vol_regs(sym);
+
+  aver(!ctx->saved_reg);
 
   for (stack_range(auto, fix, &ctx->loc_fix)) {
     switch (fix->type) {

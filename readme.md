@@ -12,6 +12,7 @@
 * [Limitations](#limitations)
 * [Non-standard](#non-standard)
 * [Lessons](#lessons)
+* [What is JIT](#what-is-jit)
 * [What is compilation](#what-is-compilation)
 * [Name](#name)
 
@@ -315,7 +316,7 @@ Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word 
 
 ### No return stack
 
-Because Astil Forth uses native calls and doesn't target embedded systems, the role of the return stack is fulfilled by scratch registers and the system stack.
+Because Astil Forth uses native calls and doesn't target embedded systems, the role of the return stack is fulfilled by registers and the system stack.
 
 Reg-CC emphasizes named local variables. Locals are kept in registers when possible, and spilled to the system stack otherwise. The compiler figures out the locations.
 
@@ -337,6 +338,10 @@ Because I was learning and experimenting. Some of the code is generalized librar
 - Single-pass assembly with fixups scales to a point.
 
 When the system is simple, single-pass compilation (with fixups) seems to be a simpler choice. After a certain level of complexity, an IR-based multi-pass approach starts to look simpler. I feel like this system is just before that threshold.
+
+## What is JIT
+
+"JIT" is only here as a buzzword. It may even be a white lie. This doesn't assemble "just" in time; it assembles immediately. Saying "JIT" is just the most compact way to indicate on-the-fly assembly, rather than interpretation. In the Forth world this is common, usually without buzzwords.
 
 ## What is compilation
 

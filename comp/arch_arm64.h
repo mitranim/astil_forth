@@ -43,7 +43,7 @@ For example, `x31` and `q31` are `0b11111`.
 */
 
 // 0x0 ... x15
-static constexpr Bits ASM_VOLATILE_REGS = 0b11111111'11111111;
+static constexpr Bits ASM_REGS_VOLATILE = 0b11111111'11111111;
 
 // x0 ... x7
 static constexpr Bits ASM_ALL_PARAM_REGS = 0b11111111;
@@ -72,6 +72,24 @@ static constexpr U8 ASM_SCRATCH_REG_13 = 13;
 static constexpr U8 ASM_SCRATCH_REG_14 = 14;
 static constexpr U8 ASM_SCRATCH_REG_15 = 15;
 
+/*
+Registers x16 x17 are reserved for debuggers; x18 is reserved for the OS.
+MacOS uses x18 for syscall numbers. x19 … x28 are callee-saved registers,
+which must be stashed and restored when used by a callee. We also reserve
+some of these for special roles; see below.
+*/
+static constexpr U8 ASM_STABLE_REG_19    = 19;
+static constexpr U8 ASM_STABLE_REG_20    = 20;
+static constexpr U8 ASM_STABLE_REG_21    = 21;
+static constexpr U8 ASM_STABLE_REG_22    = 22;
+static constexpr U8 ASM_STABLE_REG_23    = 23;
+static constexpr U8 ASM_STABLE_REG_24    = 24;
+static constexpr U8 ASM_STABLE_REG_25    = 25;
+static constexpr U8 ASM_STABLE_REG_26    = 26;
+static constexpr U8 ASM_STABLE_REG_27    = 27;
+static constexpr U8 ASM_STABLE_REG_28    = 28;
+static constexpr U8 ASM_STABLE_REG_FIRST = ASM_STABLE_REG_19;
+
 // Frame pointer register; holds address of `{x29, x30}`.
 static constexpr U8 ASM_REG_FP = 29;
 
@@ -87,18 +105,30 @@ static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 // SYNC[asm_reg_interp].
 static constexpr U8 ASM_REG_INTERP = 28;
 
+// clang-format off
 #ifdef CALL_CONV_STACK
 
-/*
-Using `x0` as the error register exactly matches how we return errors in C.
+  /*
+  Using `x0` as the error register exactly matches how we return errors in C.
 
-SYNC[asm_arm64_cc_stack_special_regs].
-*/
-static constexpr U8 ASM_REG_ERR       = ASM_PARAM_REG_0;
-static constexpr U8 ASM_REG_INT_TOP   = 27; // Interp.ints.top
-static constexpr U8 ASM_REG_INT_FLOOR = 26; // Interp.ints.floor
+  SYNC[asm_arm64_cc_stack_special_regs].
+  */
+  static constexpr U8 ASM_REG_ERR         = ASM_PARAM_REG_0;
+  static constexpr U8 ASM_REG_INT_TOP     = 27; // Interp.ints.top
+  static constexpr U8 ASM_REG_INT_FLOOR   = 26; // Interp.ints.floor
+  static constexpr U8 ASM_STABLE_REG_LAST = 25;
+  static constexpr Bits ASM_REGS_STABLE   = 0b1111111'0000000000000000000;
+
+#else // CALL_CONV_STACK
+
+  static constexpr U8 ASM_STABLE_REG_LAST = ASM_REG_INTERP - 1;
+  static constexpr Bits ASM_REGS_STABLE   = 0b111111111'0000000000000000000;
 
 #endif // CALL_CONV_STACK
+
+static constexpr U8 ASM_STABLE_REG_LEN = ASM_STABLE_REG_LAST - ASM_STABLE_REG_FIRST + 1;
+
+// clang-format on
 
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {

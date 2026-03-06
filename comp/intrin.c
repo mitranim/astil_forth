@@ -478,7 +478,7 @@ Note: ALL intrinsics must have certain fields set the same way:
 
   .type        = SYM_INTRIN
   .name.len    = strlen(.name.buf)
-  .clobber     = ASM_VOLATILE_REGS
+  .clobber     = ASM_REGS_VOLATILE
   .interp_only = true
 
 Repetition is error-prone, so we set these fields in `sym_init_intrin`.

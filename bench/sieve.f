@@ -7,13 +7,11 @@ import' std:lang.f
 CAP         mem: FLAGS
 FLAGS CAP + let: EFLAG
 
-\ Calling this separately prevents this from evicting all locals to memory
-\ due to clobbering all volatile registers. The compiler needs better local
-\ allocation policies. Using callee-saved registers would be a simple way
-\ to solve this.
 : reset FLAGS CAP 1 fill ;
 
 : find_prime { -- num }
+  reset
+
   0 3 { num step }
 
   EFLAG FLAGS +for: ptr0
@@ -34,10 +32,9 @@ FLAGS CAP + let: EFLAG
 ;
 
 : main
-  \ reset find_prime .
+  \ find_prime .
 
   RUNS for
-    reset
     find_prime { -- }
   end
 ;

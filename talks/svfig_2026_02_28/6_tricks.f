@@ -71,37 +71,40 @@ dis' example_low_cost_locals
 
 1 0 extern: exit
 
-\ (The compiler doesn't use callee-saved registers yet.)
-: example_relocation_to_memory
+\ When running out of scratch registers, we place locals into caller-saved
+\ registers if any are available. Failing that, we evict locals to memory.
+: example_relocation_to_stable_regs
   10 20
-  { one }  \ str x0, [x29, #16] -- decided later
-  { two }  \ str x1, [x29, #24] -- decided later
+  { one }  \ mov x19, x0 -- decided later
+  { two }  \ mov x20, x1 -- decided later
   666 exit \ Clobbers scratch registers.
   one two { -- }
 ;
-dis' example_relocation_to_memory
-\ stp  x29, x30, [sp, #-32]!
+dis' example_relocation_to_stable_regs
+\ stp  x19, x20, [sp, #-16]!
+\ stp  x29, x30, [sp, #-16]!
 \ mov  x29, sp
 \ mov  x0, #10
 \ mov  x1, #20
-\ str  x0, [x29, #16] -- relocate `one`
+\ mov  x19, x0
 \ mov  x0, #666
-\ str  x1, [x29, #24] -- relocate `two`
-\ adrp x8, #4464640
-\ ldr  x8, [x8, #848] -- load `exit
-\ blr  x8             -- call `exit`
-\ ldr  x0, [x29, #16]
-\ ldr  x1, [x29, #24]
-\ ldp  x29, x30, [sp], #32
+\ mov  x20, x1
+\ adrp x8, #4452352
+\ ldr  x8, [x8, #848]
+\ blr  x8
+\ mov  x0, x19
+\ mov  x1, x20
+\ ldp  x29, x30, [sp], #16
+\ ldp  x19, x20, [sp], #16
 \ ret
 
-: example_skipping_memory_relocation
+: example_skipping_relocation
   10 20
   { one }  \ `nop` -- local is unused later
   { two }  \ `nop` -- local is unused later
   666 exit \ Clobbers scratch registers.
 ;
-dis' example_skipping_memory_relocation
+dis' example_skipping_relocation
 \ stp  x29, x30, [sp, #-16]!
 \ mov  x29, sp
 \ mov  x0, #10

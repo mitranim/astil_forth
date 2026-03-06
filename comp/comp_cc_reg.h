@@ -38,7 +38,7 @@ the dream of simplicity.
 Locals always begin in temp registers without a stable location.
 Locals used in "read" operations and thus in "write" operations,
 eventually get a stable location, which is either an unclobbered
-scratch register or an FP offset on the system stack.
+register or an FP offset on the system stack.
 
 "get" and "set" are abstract operations. An intrinsic for "set" is used by
 assignment via `to:`; this doesn't always produce a "write". "get" is used
@@ -156,6 +156,7 @@ typedef struct {
   Ind        fp_off;     // Stack space reserved for locals.
   Reg_val    reg_vals[ASM_ALL_PARAM_REG_LEN]; // Values in registers.
   Bits       vol_regs;   // Volatile registers available for locals.
+  U8         saved_reg;  // Lowest callee-saved register used for locals.
   U8         arg_low;    // How many args got consumed by assignments.
   U8         arg_len;    // Available args for the next call or assign.
   Asm_fixups asm_fix;    // For patching instructions in a post-pass.

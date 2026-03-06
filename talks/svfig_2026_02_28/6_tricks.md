@@ -136,32 +136,34 @@ dis' example_low_cost_locals
 \ ret
 ```
 
-The compiler doesn't use callee-saved registers yet. When all caller-saved registers are clobbered, locals are evicted to memory. All lazily emitted "writes" are confirmed, and later rewritten with either `str` or `nop` depending on usage:
+When we run out of caller-saved registers, often due to clobbers, we relocate locals to callee-saved registers. After running out of those, we place remaining locals in memory. All lazily emitted "writes" which happen to be later confirmed due to "reads" are rewritten with either `mov` or `str` depending on location.
 
 ```forth
 1 0 extern: exit
 
-: example_relocation_to_memory
+: example_relocation_to_stable_regs
   10 20
-  { one }  \ str x0, [x29, #16] -- decided later
-  { two }  \ str x1, [x29, #24] -- decided later
+  { one }  \ mov x19, x0 -- decided later
+  { two }  \ mov x20, x1 -- decided later
   666 exit \ Clobbers scratch registers.
   one two { -- }
 ;
-dis' example_relocation_to_memory
-\ stp  x29, x30, [sp, #-32]!
+dis' example_relocation_to_stable_regs
+\ stp  x19, x20, [sp, #-16]!
+\ stp  x29, x30, [sp, #-16]!
 \ mov  x29, sp
 \ mov  x0, #10
 \ mov  x1, #20
-\ str  x0, [x29, #16] -- relocate `one`
+\ mov  x19, x0
 \ mov  x0, #666
-\ str  x1, [x29, #24] -- relocate `two`
-\ adrp x8, #4464640
-\ ldr  x8, [x8, #848] -- load `exit
-\ blr  x8             -- call `exit`
-\ ldr  x0, [x29, #16]
-\ ldr  x1, [x29, #24]
-\ ldp  x29, x30, [sp], #32
+\ mov  x20, x1
+\ adrp x8, #4452352
+\ ldr  x8, [x8, #848]
+\ blr  x8
+\ mov  x0, x19
+\ mov  x1, x20
+\ ldp  x29, x30, [sp], #16
+\ ldp  x19, x20, [sp], #16
 \ ret
 ```
 
@@ -265,7 +267,7 @@ Our compiler _can't_ do this, because conditionals and loops are implemented in 
 Simple solutions:
 
 - Each local is live from prologue to epilogue.
-- Each local gets its own scratch register. (Or FP offset.)
+- Each local gets its own "stable" register or FP offset.
 - Some operations reuse a param reg, or grab a spare param reg for an "atomic" operation without affecting locals.
 - Association of locals and param regs is temporary.
 - "Stable" local locations use non-param regs.
@@ -309,7 +311,7 @@ dis' example_caller_with_locals
 \ ret
 ```
 
-Branching simply relocates locals from param to the "stable" non-parameter scratch registers. On Arm64 this is `x8 … x15`:
+Branching simply relocates locals from parameter registers to the other, more "stable", registers. On Arm64, this is `x8 … x15` (caller-saved) and `x19 … x28` (callee-saved); we reserve some of the callee-saved registers for special purposes.
 
 ```forth
 : example_reloc_due_to_branching
@@ -325,8 +327,6 @@ dis' example_reloc_due_to_branching
 \ mov  x0, x8  -- val
 \ ret
 ```
-
-(We could also use callee-saved registers `x19 … x27`; `x28` is interpreter pointer. This is slightly more complex and hasn't been needed yet. In particular, it would bloat the reserved prologue size.)
 
 ## What is inlinable
 

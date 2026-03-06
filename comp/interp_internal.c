@@ -592,7 +592,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
       .exter    = addr,
       .inp_len  = (U8)inp_len,
       .out_len  = (U8)out_len,
-      .clobber  = ASM_VOLATILE_REGS, // Only used in reg-based call-conv.
+      .clobber  = ASM_REGS_VOLATILE, // Only used in reg-based call-conv.
     }
   );
 

@@ -28,7 +28,7 @@ static void sym_deinit(Sym *sym) {
 static void sym_init_intrin(Sym *sym) {
   sym->type        = SYM_INTRIN;
   sym->name.len    = (Ind)strlen(sym->name.buf);
-  sym->clobber     = ASM_VOLATILE_REGS;
+  sym->clobber     = ASM_REGS_VOLATILE;
   sym->interp_only = true;
 }
 

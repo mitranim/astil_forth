@@ -296,8 +296,8 @@ Pre/post depends on the sign:
   str val_reg, [addr_reg], +post_mod // empty ascending
   ldr val_reg, [addr_reg, -pre_mod]! // empty ascending
 */
-static void asm_append_load_store_pre_post(
-  Comp *comp, bool is_load, U8 val_reg, U8 addr_reg, Sint mod
+static Instr asm_instr_load_store_pre_post(
+  bool is_load, U8 val_reg, U8 addr_reg, Sint mod
 ) {
   Instr order = mod < 0 ? 0b11 : 0b01;
   Instr mod_val;
@@ -306,10 +306,29 @@ static void asm_append_load_store_pre_post(
   averr(asm_validate_reg(val_reg));
   averr(asm_validate_reg(addr_reg));
 
+  return (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) | (mod_val << 12) |
+    (order << 10) | ((Instr)addr_reg << 5) | val_reg;
+}
+
+/*
+Variants:
+
+  opc 00 = str
+  opc 01 = ldr
+
+Pre/post depends on the sign:
+
+  str val_reg, [addr_reg, -pre_mod]! // full descending
+  ldr val_reg, [addr_reg], +post_mod // full descending
+
+  str val_reg, [addr_reg], +post_mod // empty ascending
+  ldr val_reg, [addr_reg, -pre_mod]! // empty ascending
+*/
+static void asm_append_load_store_pre_post(
+  Comp *comp, bool is_load, U8 val_reg, U8 addr_reg, Sint mod
+) {
   asm_append_instr(
-    comp,
-    (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) | (mod_val << 12) |
-      (order << 10) | ((Instr)addr_reg << 5) | val_reg
+    comp, asm_instr_load_store_pre_post(is_load, val_reg, addr_reg, mod)
   );
 }
 
@@ -485,9 +504,8 @@ static constexpr USED Instr ASM_STORE_PAIR_PRE  = 0b011'0;
 static constexpr USED Instr ASM_STORE_PAIR_OFF  = 0b010'0;
 
 /*
-All variants of the `ldp` / `stp` instructions.
-Variant is determined by the `opc` argument.
-See the `ASM_*_PAIR_*` constants.
+Several variants of the `ldp` / `stp` instructions (with scaled offsets).
+Variant is determined by the `opc` arg. See the `ASM_*_PAIR_*` constants.
 
   ldp reg0, reg1, [addr_reg], off
   ldp reg0, reg1, [addr_reg, off]!
@@ -835,6 +853,16 @@ the epilogue, at which point everything is known.
 SYNC[asm_prologue_epilogue].
 */
 static void asm_reserve_sym_prologue(Comp *comp) {
+#ifndef CALL_CONV_STACK
+
+  // Reserve space for `stp` of callee-saved registers.
+  auto len = __builtin_align_up(ASM_STABLE_REG_LEN, 2);
+  while ((len -= 2)) {
+    asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
+  }
+
+#endif // CALL_CONV_STACK
+
   asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
   asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
   asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
@@ -842,8 +870,10 @@ static void asm_reserve_sym_prologue(Comp *comp) {
 
 // SYNC[asm_prologue_epilogue].
 static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
-  const auto instrs = &comp->code.code_write;
-  const auto sp_off = asm_sp_off(comp->ctx.fp_off);
+  const auto code   = &comp->code;
+  const auto ctx    = &comp->ctx;
+  const auto instrs = &code->code_write;
+  const auto sp_off = asm_sp_off(ctx->fp_off);
   const auto spans  = &sym->norm.spans;
   const auto inner  = &instrs->dat[spans->inner];
   const bool frame  = !is_sym_leaf(sym) || sp_off || sym->norm.has_alloca;
@@ -891,6 +921,26 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
       *--floor = asm_instr_sub_imm(ASM_REG_SP, ASM_REG_SP, off);
     }
   }
+
+#ifndef CALL_CONV_STACK
+
+  // Stash callee-saved registers to memory.
+  auto saved = ctx->saved_reg;
+
+  while (saved > ASM_STABLE_REG_FIRST) {
+    // stp <reg0>, <reg1>, [sp, -16]!
+    *--floor = asm_instr_load_store_pair(
+      ASM_STORE_PAIR_PRE, saved - 1, saved, ASM_REG_SP, -16
+    );
+    saved -= 2;
+  }
+
+  if (saved == ASM_STABLE_REG_FIRST) {
+    // str <reg>, [sp, -16]!
+    *--floor = asm_instr_load_store_pre_post(false, saved, ASM_REG_SP, -16);
+  }
+
+#endif // CALL_CONV_STACK
 
   *instr_floor = (Ind)(floor - instrs->dat);
 }
@@ -953,6 +1003,28 @@ static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
       );
     }
   }
+
+#ifndef CALL_CONV_STACK
+
+  const auto ctx = &comp->ctx;
+
+  // Restore callee-saved registers from memory.
+  auto saved = ctx->saved_reg;
+
+  while (saved > ASM_STABLE_REG_FIRST) {
+    // ldp <reg0>, <reg1>, [sp], 16
+    asm_append_load_store_pair(
+      comp, ASM_LOAD_PAIR_POST, saved - 1, saved, ASM_REG_SP, 16
+    );
+    saved -= 2;
+  }
+
+  if (saved == ASM_STABLE_REG_FIRST) {
+    // ldr <reg>, [sp], 16
+    asm_append_load_store_pre_post(comp, true, saved, ASM_REG_SP, 16);
+  }
+
+#endif // CALL_CONV_STACK
 }
 
 /*

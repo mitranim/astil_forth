@@ -1,6 +1,7 @@
 import' std:lang.f
 
 : fib { src -- out } [
+  0 comp_clobber
   0 1        asm_cmp_imm     comp_instr \ cmp x0, 1
   12  ASM_GT asm_branch_cond comp_instr \ b.gt <init>
   0 1        asm_mov_imm     comp_instr \ mov x0, 1
@@ -19,11 +20,12 @@ import' std:lang.f
 
 : run { count -- }
   [
+    9 comp_clobber
     9 0 asm_mov_reg comp_instr \ mov x9, x0
   ]
-  91  \ mov x0, 91 -- <loop_beg>
-  fib \ bl <off>
-  { -- }
+  91     \ mov x0, 91 -- <loop_beg>
+  fib    \ bl <off>
+  { -- } \ drop result
   [
     9 9 1 asm_sub_imm             comp_instr \ sub x9, x9, 1
     9 -12 asm_cmp_branch_not_zero comp_instr \ cbnz x9, <loop_beg>

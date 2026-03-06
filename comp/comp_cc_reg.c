@@ -102,11 +102,13 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->locals);
   dict_trunc((Dict *)&ctx->local_dict);
   arr_clear(ctx->reg_vals);
+
   ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
   ptr_clear(&ctx->sym);
   ptr_clear(&ctx->anon_locs);
   ptr_clear(&ctx->fp_off);
+  ptr_clear(&ctx->saved_reg);
   ptr_clear(&ctx->arg_low);
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->compiling);
@@ -120,6 +122,7 @@ static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
   tar->anon_locs  = snap->anon_locs;
   tar->fp_off     = snap->fp_off;
   tar->vol_regs   = snap->vol_regs;
+  tar->saved_reg  = snap->saved_reg;
   tar->arg_low    = snap->arg_low;
   tar->arg_len    = snap->arg_len;
   tar->redefining = snap->redefining;
@@ -142,7 +145,7 @@ static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
 static Local *local_token(Local *loc) { return loc; }
 
 static void validate_volatile_reg(U8 reg) {
-  aver(bits_has(ASM_VOLATILE_REGS, reg));
+  aver(bits_has(ASM_REGS_VOLATILE, reg));
 }
 
 static void validate_param_reg(U8 reg) {

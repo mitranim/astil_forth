@@ -24,7 +24,7 @@ inserts an instruction which zeroes `x0`, since it's caller-saved.
 Registers x29-x30 are FP-LR and used for frame records and returns.
 
 Registers x19-x28 are callee-saved, which means we can consider them stable
-and allocate them for special values, at the cost of having to store and load
+and allocate them for special values, at the cost of having to store / load
 them when switching between C and Forth.
 
 SYNC[asm_arm64_cc_stack_special_regs].
