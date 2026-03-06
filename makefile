@@ -58,8 +58,8 @@ EXE0 = $(shell realpath $$(which llvm-mc))
 EXE1 = $(shell realpath $$(xcrun --find llvm-symbolizer))
 EXE2 = $(shell realpath $$(xcrun --find atos))
 
-.PHONY: run_file
-run_file:
+.PHONY: run_boxed
+run_boxed:
 	rlwrap --no-warnings \
 		sandbox-exec \
 		-f sandbox.sb \
@@ -72,12 +72,12 @@ run_file:
 # Register-CC version.
 .PHONY: run
 run:
-	$(MAKE) run_file file=$(MAIN)
+	$(MAKE) run_boxed file=$(MAIN)
 
 # Stack-CC version.
 .PHONY: run_s
 run_s:
-	$(MAKE) run_file file=$(MAIN_S)
+	$(MAKE) run_boxed file=$(MAIN_S)
 
 # Usage example:
 #

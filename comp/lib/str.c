@@ -58,3 +58,7 @@ static const char *str_without_prefix(const char *str, const char *pre) {
   if (strncmp(str, pre, len)) return nullptr;
   return str + len;
 }
+
+static bool streq(const char *one, const char *two) {
+  return (!one && !two) || (one && two && !strcmp(one, two));
+}

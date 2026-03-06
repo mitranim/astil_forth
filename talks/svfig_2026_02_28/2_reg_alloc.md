@@ -16,15 +16,11 @@ Spoiler: the result is similar to how arguments and calls work in C. That's okay
 - When _interpreting_ words, we pop from stack to registers, make the call, then push from registers to stack.
 - The data stack is also used for control information during compilation, but this could be replaced with custom allocation if the stack wasn't provided.
 
-Why:
+Why preserve the Forth stack in interpretation:
 
 - In interpretation, control alternates between interpreter code and program code _for each argument_.
 - Not possible to build up an argument list in registers while interpreting on the fly.
 - Intermediary book-keeping data structure is unavoidable.
-- That's the data stack.
-
-Interpreted code is executed once.
-Compiled code executes repeatedly.
 
 ## Greedy verbs
 
@@ -89,7 +85,7 @@ But the following is OK:
 
 Local names replace stack manipulation (see below).
 
-Why not infer arity by analyzing stack-based code? Because my system self-assembles, and the compiler can't detect every push / pop.
+Why not infer arity by analyzing stack-based code? Because my system self-assembles, and the compiler can't detect push / pop.
 
 ## Register allocation word-by-word
 
@@ -170,7 +166,7 @@ Assigning literals to names works the same:
 - How do we manipulate the "stack"?
 - Locals: both necessary and sufficient.
 
-The following stack-based code was BRUTAL for me. The stack state is not obvious. It's also invalid in reg-CC because there's no stack manipulation:
+The following stack-based code was BRUTAL for me. Manipulation words like `dup rot swap` make it harder to figure out the state of the stack. This is also invalid in reg-CC because there's no stack manipulation:
 
 ```forth
 : asm_lsl_imm ( Xd Xn imm6 -- instr )
@@ -182,7 +178,7 @@ The following stack-based code was BRUTAL for me. The stack state is not obvious
 ;
 ```
 
-Reg-CC doesn't support the above. The code needs to use locals. Note that this is equally valid in stack-CC:
+Reg-CC doesn't support the above. The code must use locals. Note that this is equally valid in stack-CC:
 
 ```forth
 : asm_lsl_imm { Xd Xn imm6 -- instr }
@@ -227,10 +223,11 @@ This partially surrenders concatenative properties of Forth. When forwarding to 
 : str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
 ```
 
-Concatenation is not entirely lost. You still write forward code. Outputs still flow into inputs:
+Concatenation is not entirely lost. You still write forward code. Outputs still flow into inputs. The following expressions are equally valid:
 
 ```forth
 10 20 + 30 *
+
 
 10 20 + { val }
 val 30 +
@@ -240,7 +237,7 @@ For me, the tradeoff is well worth it. Forward-execution is preserved, while err
 
 ## Control flow analysis (how to not)
 
-Control structures simply clobber the entire "stack" (parameter registers). This was sufficient for avoiding data flow analysis. The "stack" is only `x0 x1 x2 x3 x4 x5 x6 x7`, and the rest can be used for locals. Simplicity is nice:
+Control structures simply clobber the entire "stack" (parameter registers). This was sufficient for avoiding data flow analysis. The "stack" is only `x0 x1 x2 x3 x4 x5 x6 x7`, and the other registers can be used for locals. Simplicity is nice:
 
 ```forth
 : word { cond }    \ Assigned to x2: non-param location.

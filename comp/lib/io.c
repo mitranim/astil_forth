@@ -76,8 +76,8 @@ The variable MUST be zero-initialized.
 */
 static void file_deinit(FILE **var) { var_deinit(var, fclose); }
 
-static Err file_open(const char *path, FILE **out) {
-  const auto file = fopen(path, "r");
+static Err file_open(const char *path, const char *mode, FILE **out) {
+  const auto file = fopen(path, mode);
   if (!file) return err_file_unable_to_open(path);
   *out = file;
   return nullptr;
@@ -119,7 +119,7 @@ static Err err_file_write(Uint exp, Uint act) {
   );
 }
 
-static Err file_stream_write(
+static Err file_write(
   FILE *restrict file, const void *restrict vals, Uint val_size, Uint vals_len
 ) {
   const auto out = fwrite(vals, val_size, vals_len, file);

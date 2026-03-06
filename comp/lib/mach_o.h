@@ -9,6 +9,7 @@ Links:
 */
 
 #pragma once
+#include "./mach_misc.h"
 #include "./num.h"
 
 // #include <nlist.h>
@@ -155,6 +156,7 @@ typedef struct {
 } Mach_load_cmd_head;
 
 typedef enum : U32 {
+  MSF_FORBID              = 0x00,
   MSF_HIGHVM              = 0x01,
   MSF_FVMLIB              = 0x02,
   MSF_NORELOC             = 0x04,
@@ -445,3 +447,26 @@ typedef struct {
   U64                entryoff;  // Offset in "text" section.
   U64                stacksize; // Optional.
 } Mach_load_cmd_main;
+
+// Must be immediately followed by at least one `Mach_unixthread_state`
+// whose size must be included into `.cmdsize`.
+typedef struct {
+  Mach_load_cmd_head head; // .cmd must be MLC_THREAD or MLC_UNIXTHREAD
+} Mach_load_cmd_unixthread;
+
+// Flavors for `Mach_unixthread_state`.
+typedef enum : U32 {
+  MTF_ARM_THREAD_STATE      = 1, // ARM_THREAD_STATE
+  MTF_ARM_VFP_STATE         = 2, // ARM_VFP_STATE
+  MTF_ARM_EXCEPTION_STATE   = 3, // ARM_EXCEPTION_STATE
+  MTF_ARM_DEBUG_STATE       = 4, // ARM_DEBUG_STATE
+  MTF_THREAD_STATE_NONE     = 5, // THREAD_STATE_NONE
+  MTF_ARM_THREAD_STATE64    = 6, // ARM_THREAD_STATE64
+  MTF_ARM_EXCEPTION_STATE64 = 7, // ARM_EXCEPTION_STATE64
+} Mach_thread_flavor;
+
+typedef struct {
+  U32          flavor;
+  U32          count; // sizeof(Thread_state) / sizeof(U32)
+  Thread_state state;
+} Mach_unixthread_state;

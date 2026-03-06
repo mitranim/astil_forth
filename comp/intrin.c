@@ -411,25 +411,7 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
     wordlist_name(sym->wordlist)
   );
 
-  /*
-  Sadly `llvm-mc` doesn't seem to support disassembling actual raw bytes,
-  so we have to convert them to hex first.
-  */
-  const auto              src_len = (Ind)(ceil - floor);
-  const auto              len     = src_len * 2;
-  defer(str_deinit) char *buf     = malloc(len);
-  fmt_bytes_hex_into(buf, len, floor, src_len);
-
-  const auto  proc   = "llvm-mc";
-  char *const argv[] = {proc, "--disassemble", "--hex", nullptr};
-  pid_t       pid;
-  int         status;
-  try(spawn_with_stdin(argv, (U8 *)buf, len, &pid));
-  try(wait_pid(pid, &status));
-
-  if (status || DEBUG) {
-    eprintf("[debug] %s exited with code %d\n", proc, status);
-  }
+  try(print_disasm(floor, (Ind)(ceil - floor)));
   return nullptr;
 }
 

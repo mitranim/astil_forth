@@ -81,9 +81,7 @@ import' ./lang.f
   unreachable
 ;
 
-\ ## Compilation-mode test routines (inside words)
-
-: T_end_comp { len } [ true catches ]
+: T_end { len } [ true catches ]
   stack_len  { len2 }
   len2 len - { len1 }
   len1 len - { len0 }
@@ -98,6 +96,8 @@ import' ./lang.f
   " test failure" throw
   unreachable
 ;
+
+\ ## Compilation-mode test routines (inside words)
 
 :: T{
   T{
@@ -127,6 +127,6 @@ import' ./lang.f
   \ seamlessly when testing words which specify `[ true catches ]`.
   get_catches { ok }
   ok if false catches end
-  compile' T_end_comp
+  compile' T_end
   ok if true catches end
 ;

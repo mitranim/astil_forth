@@ -15,8 +15,8 @@ local "gotos" and don't involve this at all.
 #include "./interp.h"
 #include "./lib/fmt.c"
 #include "./lib/mach_exc.c"
+#include "./lib/mach_misc.h"
 #include "./lib/misc.h"
-#include "./mach_misc.h"
 #include <mach/mach.h>
 #include <stdio.h>
 

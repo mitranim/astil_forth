@@ -1,5 +1,5 @@
 #pragma once
-#include "./lib/num.h"
+#include "./num.h"
 #include <assert.h>
 #include <mach/mach.h>
 

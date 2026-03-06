@@ -66,3 +66,27 @@ static Err wait_pid(pid_t pid, int *status) {
   }
   return nullptr;
 }
+
+static Err print_disasm(const void *src, Ind len) {
+  const auto cap = len * 2;
+
+  /*
+  `llvm-mc` doesn't seem to support disassembling actual
+  raw bytes, so we have to convert them to hex first.
+  */
+  defer(str_deinit) char *buf = malloc(cap);
+  fmt_bytes_hex_into(buf, cap, src, len);
+
+  const auto  proc   = "llvm-mc";
+  char *const argv[] = {proc, "--disassemble", "--hex", nullptr};
+  pid_t       pid;
+  int         status;
+
+  try(spawn_with_stdin(argv, (U8 *)buf, cap, &pid));
+  try(wait_pid(pid, &status));
+
+  if (status || DEBUG) {
+    eprintf("[debug] %s exited with code %d\n", proc, status);
+  }
+  return nullptr;
+}

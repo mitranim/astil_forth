@@ -6,10 +6,25 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
+/*
+Usage example:
+
+  defer(mem_deinit) void * some_val = some_func();
+*/
 static void mem_deinit(void **var) { var_deinit(var, free); }
 
+/*
+Usage example:
+
+  defer(str_deinit) char * some_val = some_func();
+*/
 static void str_deinit(char **var) { mem_deinit((void **)var); }
 
+/*
+Usage example:
+
+  defer(bytes_deinit) U8 * some_val = some_func();
+*/
 static void bytes_deinit(U8 **var) { mem_deinit((void **)var); }
 
 [[noreturn]]

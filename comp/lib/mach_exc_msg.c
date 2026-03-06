@@ -28,7 +28,7 @@ routine mach_exception_raise_state(
 );
 */
 
-kern_return_t extern catch_mach_exception_raise_state(
+static kern_return_t catch_mach_exception_raise_state(
   mach_port_t                 exception_port,
   exception_type_t            exception,
   const mach_exception_data_t code,
@@ -97,7 +97,7 @@ static constexpr auto MACH_EXC_MSG_MAX_SIZE = sizeof(union {
 });
 
 /*
-The Mach kernel sets this id on `catch_exception_raise_state` messages,
+The Mach kernel sets this `id` on `catch_exception_raise_state` messages,
 which can be received on ports initialized via `task_set_exception_ports`
 with the `EXCEPTION_STATE` flag.
 */
@@ -127,10 +127,10 @@ boolean_t mach_on_exception(mach_msg_header_t *inp, mach_msg_header_t *out) {
   }
 
   /*
-  Inline arrays are variable-sized, which makes it impossible to define a struct
+  Inline arrays are variable-sized, which makes it impossible to make a struct
   which represents a message containing an array. MIG produces a "fake" struct
   definition, where array fields have the maximum allowed size, and uses weird
-  pointer arithmetic to adjust pointers in accordance with provided lengths.
+  pointer arithmetic to adjust pointers in accordance with the provided length.
   Using separate segments with trailing arrays seems clearer.
   */
   const auto ptr0 = (Mach_exc_inp_head *)inp + 1;

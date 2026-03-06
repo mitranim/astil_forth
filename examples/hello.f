@@ -3,9 +3,17 @@ import' std:lang.f
 " hello world! (using libc IO)" log lf
 
 \ Don't have to use libc for IO. Can just call into the kernel.
+\
+\ x8 = 64 -> Linux write syscall.
+\ x16 = 4 -> XNU write syscall.
+\
+\ Inspired by Cosmopolitan Libc: https://justine.lol/cosmopolitan.
 : sys_write { fd str len } [
-  16 4 asm_mov_imm comp_instr \ mov x16, 4
-       asm_svc     comp_instr \ svc 666
+  0                comp_clobber \ x0 clobber = kernel return value.
+  8                comp_clobber \ x8 clobber = Linux sysno.
+  8 64 asm_mov_imm comp_instr   \ mov x8, 64
+  16 4 asm_mov_imm comp_instr   \ mov x16, 4
+       asm_svc     comp_instr   \ svc 666
 ] ;
 
 flush

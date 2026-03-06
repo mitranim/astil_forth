@@ -79,7 +79,8 @@ static Err compile_mach_executable(Interp *interp) {
 
   defer(bytes_deinit) U8 *buf = nullptr;
   Uint                    len;
-  const auto              str = open_memstream((char **)&buf, &len);
+  const auto              file      = open_memstream((char **)&buf, &len);
+  static constexpr auto   BASE_ADDR = (U64)UINT32_MAX + 1;
 
   {
     const auto head = (Mach_head){
@@ -91,7 +92,7 @@ static Err compile_mach_executable(Interp *interp) {
       .cmd_count = 1,
       .cmd_size  = sizeof(Mach_load_cmd_seg), // TODO there's more
     };
-    try(file_stream_write(str, &head, sizeof(head), 1));
+    try(file_write(file, &head, sizeof(head), 1));
   }
 
   // Common trick; catches many invalid pointer derefs.
@@ -101,15 +102,14 @@ static Err compile_mach_executable(Interp *interp) {
       .head.cmdsize = sizeof(Mach_load_cmd_seg),
       .segname      = "__PAGEZERO",
       .vmaddr       = 0,
-      .vmsize       = UINT32_MAX,
+      .vmsize       = BASE_ADDR,
       // .flags        = 0, // access = segfault
     };
-    try(file_stream_write(str, &cmd, sizeof(cmd), 1));
+    try(file_write(file, &cmd, sizeof(cmd), 1));
   }
 
   {
-    const Uint            BASE_ADDR = (U64)UINT32_MAX + 1;
-    static constexpr auto MACH_RX   = MP_READ | MP_EXEC;
+    static constexpr auto MACH_RX = MP_READ | MP_EXEC;
 
     const auto cmd = (Mach_load_cmd_seg){
       .head.cmd     = MLC_SEGMENT_64,
@@ -125,7 +125,7 @@ static Err compile_mach_executable(Interp *interp) {
       .initprot = MACH_RX,
       .nsects   = 1,
     };
-    try(file_stream_write(str, &cmd, sizeof(cmd), 1));
+    try(file_write(file, &cmd, sizeof(cmd), 1));
   }
 
   {
@@ -140,7 +140,7 @@ static Err compile_mach_executable(Interp *interp) {
       // .nreloc   = {0},
       .flags = MST_REGULAR | MSA_SOME_INSTRUCTIONS,
     };
-    try(file_stream_write(str, &sect, sizeof(sect), 1));
+    try(file_write(file, &sect, sizeof(sect), 1));
   }
 
   {
@@ -153,7 +153,7 @@ static Err compile_mach_executable(Interp *interp) {
       .head.cmdsize = sizeof(Mach_load_cmd_main),
       .entryoff     = (U64)off,
     };
-    try(file_stream_write(str, &cmd, sizeof(cmd), 1));
+    try(file_write(file, &cmd, sizeof(cmd), 1));
   }
 
   {
@@ -166,8 +166,8 @@ static Err compile_mach_executable(Interp *interp) {
       .name_offset  = size,
     };
 
-    try(file_stream_write(str, &cmd, sizeof(cmd), 1));
-    try(file_stream_write(str, name, sizeof(name), 1));
+    try(file_write(file, &cmd, sizeof(cmd), 1));
+    try(file_write(file, name, sizeof(name), 1));
   }
 
   {
@@ -182,8 +182,8 @@ static Err compile_mach_executable(Interp *interp) {
       .compat_ver   = mach_ver(1, 0, 0),
     };
 
-    try(file_stream_write(str, &cmd, sizeof(cmd), 1));
-    try(file_stream_write(str, name, sizeof(name), 1));
+    try(file_write(file, &cmd, sizeof(cmd), 1));
+    try(file_write(file, name, sizeof(name), 1));
   }
 
   /*
@@ -191,7 +191,7 @@ static Err compile_mach_executable(Interp *interp) {
   Removing it would require us to relocate all PC-relative offsets in compiled
   code. Easy enough but requires additional book-keeping. Stay simple for now.
   */
-  try(file_stream_write(str, exec->dat, list_val_size(exec), exec->len));
+  try(file_write(file, exec->dat, list_val_size(exec), exec->len));
 
   /*
   Now missing:
@@ -209,11 +209,11 @@ static Err compile_mach_executable(Interp *interp) {
   for (set_range(auto, dep, &main->deps)) {
     if (set_has(&visited, dep)) continue;
     set_add(&visited, dep);
-    try(compile_exec_sym(str, *dep));
+    try(compile_exec_sym(file, *dep));
   }
   */
 
-  try_errno(fclose(str));
+  try_errno(fclose(file));
   return nullptr;
 }
 

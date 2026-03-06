@@ -26,17 +26,14 @@ catch handlers. But the complexity is not worth it.
 #include "./lib/cli.c"
 #include "./lib/fmt.c"
 #include "./lib/mach_exc.c"
+#include "./lib/mach_misc.h"
 #include "./lib/misc.h"
-#include "./mach_misc.h"
 #include <mach/mach.h>
 #include <stdio.h>
 
 #ifdef CALL_CONV_STACK
 #include "./mach_unwind.c"
 #endif
-
-extern const Instr asm_call_forth_epilogue __asm__("asm_call_forth_epilogue");
-extern const Instr asm_call_forth_trace __asm__("asm_call_forth_trace");
 
 #define SYS_REC_FMT "[system] [recovery] "
 
@@ -111,7 +108,7 @@ TODO: if we ever bother to support the x64 architecture, we should specify
 When initing the exception port, it should be safe to specify unsupported
 exception types; we simply print thread state and don't handle the exception.
 */
-kern_return_t catch_mach_exception_raise_state(
+static kern_return_t catch_mach_exception_raise_state(
   mach_port_t                 exception_port,
   exception_type_t            exception,
   const mach_exception_data_t code,

@@ -9,6 +9,7 @@
 * [Sublime Text](#sublime-text)
 * [Library](#library)
 * [Tricks and optimizations](#tricks-and-optimizations)
+* [Performance](#performance)
 * [Limitations](#limitations)
 * [Non-standard](#non-standard)
 * [Lessons](#lessons)
@@ -250,6 +251,10 @@ In reg-CC:
 - Associate locals with param regs, reuse when possible.
 - Keep track of clobbers, preserve caller-saved registers when possible.
 - ...Other small tricks. Some are word-specific.
+
+## Performance
+
+See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth vaguely approximates C with Clang, while leaving Gforth in the dust. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
 
 ## Limitations
 

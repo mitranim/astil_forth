@@ -30,7 +30,7 @@ Stack is surrounded by inaccessible guards.
 Underflow or overflow triggers a segfault.
 
   🚫🚫🚫🚫🔹🔹🔹🔹🔹🔹🔹🔹🚫🚫🚫🚫
-    guard       stack        guard
+  guard    stack            guard
 */
 static Err stack_init_impl(void *out, Stack_opt *opt, Uint val_size) {
   const auto len = opt ? opt->len : 0;
