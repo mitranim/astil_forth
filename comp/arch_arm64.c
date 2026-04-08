@@ -856,8 +856,8 @@ static void asm_reserve_sym_prologue(Comp *comp) {
 #ifndef CALL_CONV_STACK
 
   // Reserve space for `stp` of callee-saved registers.
-  auto len = __builtin_align_up(ASM_STABLE_REG_LEN, 2);
-  while ((len -= 2)) {
+  auto len = __builtin_align_up((S8)ASM_STABLE_REG_LEN, 2);
+  while ((len -= 2) >= 0) {
     asm_append_breakpoint(comp, ASM_CODE_PROLOGUE);
   }
 
@@ -879,14 +879,18 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   const bool frame  = !is_sym_leaf(sym) || sp_off || sym->norm.has_alloca;
   auto       floor  = inner;
 
+#ifdef CALL_CONV_STACK
+  static constexpr U8 len = 3;
+#else
+  static constexpr U8 len = 3 + __builtin_align_up(ASM_STABLE_REG_LEN, 2) / 2;
+#endif
+
   IF_DEBUG({
     const auto brk = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
     const auto pro = &instrs->dat[spans->prologue];
 
-    aver((inner - pro) == 3);
-    aver(pro[0] == brk);
-    aver(pro[1] == brk);
-    aver(pro[2] == brk);
+    aver((inner - pro) == len);
+    for (U8 ind = 0; ind < len; ind++) aver(pro[ind] == brk);
   });
 
   /*
