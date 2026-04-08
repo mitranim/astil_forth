@@ -68,7 +68,8 @@ static char *path_join(const char *base, const char *suf, bool is_dir) {
   rem -= len;
 
   len = strlcpy(ptr, suf, rem);
-  ptr += len;
+  // ptr += len;
+
   aver(rem >= len);
   rem -= len;
 

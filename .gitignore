@@ -24,5 +24,4 @@
 !*ignore
 !*rc
 !*config
-!.clang-format
-!.clangd
+!.clang*

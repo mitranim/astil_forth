@@ -1,4 +1,5 @@
 #pragma once
+#include "./misc.h"
 #include <errno.h>
 #include <execinfo.h>
 #include <stdio.h>

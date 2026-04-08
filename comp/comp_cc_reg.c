@@ -172,12 +172,11 @@ static bool comp_local_has_reg(Comp *comp, Local *loc, U8 reg) {
 }
 
 static S8 comp_local_reg_any(Comp *comp, Local *loc) {
-  const auto ctx = &comp->ctx;
   /*
   Could be "optimized" by creating two-way associations with extra
   book-keeping. There's no point and it would make things fragile.
   */
-  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+  for (U8 reg = 0; reg < arr_cap(comp->ctx.reg_vals); reg++) {
     if (comp_local_get_for_reg(comp, reg) == loc) return (S8)reg;
   }
   return -1;
@@ -207,10 +206,9 @@ static void comp_local_regs_clear(Comp *comp, Local *loc) {
 
 // For debug logging.
 static Bits comp_local_reg_bits(Comp *comp, const Local *loc) {
-  const auto ctx = &comp->ctx;
-  Bits       out = 0;
+  Bits out = 0;
 
-  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+  for (U8 reg = 0; reg < arr_cap(comp->ctx.reg_vals); reg++) {
     if (comp_local_get_for_reg(comp, reg) != loc) continue;
     bits_add_to(&out, reg);
   }

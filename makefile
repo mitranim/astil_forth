@@ -1,4 +1,5 @@
 MAKEFLAGS := --silent
+MAKE_CONC := $(MAKE) -j 128 CONC=true clear=$(or $(clear),false)
 CLEAR ?= $(if $(filter false,$(clear)),, )
 CC ?= clang
 PROD ?=
@@ -44,12 +45,27 @@ ARTIF ?= $(MAIN_S) $(MAIN) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 # Automatically affects `run_c`.
 .INTERMEDIATE: $(FILE_EXE)
 
+.PHONY: all
+all: vet build
+
+.PHONY: all_w
+all_w:
+	$(WATCH_COMP) -- $(MAKE) all
+
 .PHONY: build
 build: $(MAIN_S) $(MAIN)
 
 .PHONY: build_w
 build_w:
 	$(WATCH_COMP) -- $(MAKE) clean build
+
+.PHONY: vet
+vet:
+	clang-tidy --header-filter='.*' $(MAIN_SRC)
+
+.PHONY: vet_w
+vet_w:
+	$(WATCH_COMP) -- $(MAKE) vet
 
 # We use sandboxing to prevent buggy JIT-ted code from accidentally
 # deleting the entire filesystem, launching nuclear missiles, etc..
