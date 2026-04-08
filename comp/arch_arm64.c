@@ -1084,7 +1084,7 @@ entry; when finalizing a procedure, we inline the immediate after the body,
 and rewrite the instruction into `ldr <off>`. There are better approaches.
 Constants should normally be placed in a dedicated section and folded, which
 should play better with the CPU cache. Some immediates can be split into
-`mov & add`. Maybe later.
+`mov & add`. Some can be encoded with multiple `movk`. Maybe later.
 
 SYNC[asm_imm_to_reg].
 */
@@ -1190,15 +1190,14 @@ static void asm_append_page_load(Comp *comp, U8 reg, Uint adr) {
   asm_append_load_scaled_offset(comp, reg, reg, pageoff);
 }
 
-static void asm_append_dysym_load(Comp *comp, const char *name, U8 reg) {
-  const auto code = &comp->code;
-  const auto inds = &code->gots.inds;
-  aver(dict_has(inds, name));
+static void asm_append_dysym_load(
+  Comp *comp, const char *name, U8 reg, Comp_syms *syms
+) {
+  const auto inds    = &syms->inds;
+  const auto got_ind = dict_get_or(inds, name, INVALID_IND);
+  aver(got_ind != INVALID_IND);
 
-  const auto got_ind = dict_get(&code->gots.inds, name);
-  aver(ind_valid(got_ind));
-
-  const auto got_addr = comp->code.heap->got + got_ind;
+  const auto got_addr = syms->addrs.dat + got_ind;
   asm_append_page_load(comp, reg, (Uint)got_addr);
 }
 

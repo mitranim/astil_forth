@@ -24,13 +24,19 @@ Astil Forth is a native-code Forth system designed for self-bootstrapping and se
 Goals:
 - [x] Simple JIT compilation to native code.
 - [x] Easy _self-assembly_ in user/lib code.
+- [x] Explore viability of single-pass assembly.
 - [x] Language features can be implemented in user/lib code.
 - [x] Enough language features (in user/lib code) to be usable for scripting.
-- [x] Support native register-based ABI.
+- [x] Support native register-based call ABI.
 - [x] Avoid a VM or complex IR.
 - [x] Keep the code clear and educational for other compiler amateurs.
 - [ ] Rewrite in Forth to self-host.
 - [ ] AOT compilation.
+
+Non-goals:
+- Produce the best compiler.
+- Have the best architecture.
+- Portability to multiple ISAs.
 
 Everything was written by me. This is _not_ bot-generated.
 
@@ -45,13 +51,13 @@ On top of that, most languages isolate you from the CPU, or even from the OS, fr
 
 This system explores the opposite direction. The interpreter/compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
 
-This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth provides much nicer conditionals, also implemented in Forth, but at the cost of more code.)
+This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth also implements conditionals without compiler support, in Forth, and makes them much nicer to use, but at the cost of more code.)
 
 Unlike Frugal and mature systems such as Gforth, Astil Forth goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that, despite the non-portability.
 
 The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately, from differently selected C files. The stack-CC version is legacy and has fewer features.
 
-The outer interpreter / compiler, which is written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
+The outer interpreter / compiler, written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
 - Register-CC: boots via [`./forth/lang.f`](./forth/lang.f).
 - Stack-CC: boots via [`forth/lang_s.f`](./forth/lang_s.f).
 
@@ -141,8 +147,6 @@ Under the hood, an exception is a Go-style error value, implicitly appended to t
 The resulting system is an exact inverse of Go (and Rust). By default, errors are exceptions and don't clutter the code. When you want explicit errors, it's _for real_, without hidden panics. There is no separate panic mechanism, no stack unwinder. At the ABI level, caller code always has local control.
 
 The best part is cross-language ABI compatibility. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to `libc` and guarantee no surprises, such as a panic handler unwinding the C stack.
-
-This is easy to implement. Not aware of any other language taking this approach, which is strange. I think it's the only reasonable way of doing exceptions and errors in general.
 
 ## Usage
 

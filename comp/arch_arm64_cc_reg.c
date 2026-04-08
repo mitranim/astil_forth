@@ -370,10 +370,10 @@ static Err asm_append_call_intrin(
   }
 
   // Free to use because intrin calls clobber everything anyway.
-  constexpr auto fun = ASM_SCRATCH_REG_8;
+  constexpr auto reg = ASM_SCRATCH_REG_8;
 
-  asm_append_dysym_load(comp, callee->name.buf, fun);
-  asm_append_branch_link_to_reg(comp, fun);
+  asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.intrins);
+  asm_append_branch_link_to_reg(comp, reg);
   if (sp_off) asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);
   try(asm_append_try_catch(comp, caller, callee, catch));
 
@@ -398,7 +398,7 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
   // Free to use because extern calls clobber everything anyway.
   constexpr auto reg = ASM_SCRATCH_REG_8;
 
-  asm_append_dysym_load(comp, callee->name.buf, reg);
+  asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.externs);
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
 }

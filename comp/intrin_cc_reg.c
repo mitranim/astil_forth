@@ -281,18 +281,24 @@ static Err intrin_import(Sint buf, Sint len, Interp *interp) {
   try(interp_import(interp, path)) return nullptr;
 }
 
-// See comment on `interp_extern_got` for explanation.
-static Err intrin_extern_got(
-  Sint name, Sint len, Interp *interp, const U64 **got_addr
-) {
-  try(interp_validate_data_ptr(name));
+static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
+  try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
-  try(interp_extern_got(interp, (const char *)name, (Ind)len, got_addr));
+  try(interp_extern_adr(interp, (const char *)buf, (Ind)len));
+
+  const auto comp = &interp->comp;
+  U8         reg;
+  try(comp_next_arg_reg(comp, &reg));
+  asm_append_dysym_load(comp, (const char *)buf, reg, &comp->code.externs);
   return nullptr;
 }
 
-static Err intrin_extern_proc(Sint inp_len, Sint out_len, Interp *interp) {
-  try(interp_extern_proc(interp, inp_len, out_len));
+static Err intrin_extern_proc(
+  Sint buf, Sint len, Sint inp_len, Sint out_len, Interp *interp
+) {
+  try(interp_validate_data_ptr(buf));
+  try(interp_validate_data_len(len));
+  try(interp_extern_proc(interp, (const char *)buf, (Ind)len, inp_len, out_len));
   return nullptr;
 }
 

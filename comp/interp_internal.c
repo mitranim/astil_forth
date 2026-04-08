@@ -534,41 +534,27 @@ static Err find_extern(const char *name, void **out) {
   return nullptr;
 }
 
-/*
-Used for accessing external variables such as `stdout`. The resulting address
-points to an entry in the GOT (global offset table), and must be used with
-intrinsics `intrin_comp_page_addr` or `intrin_comp_page_load` which compile
-instructions for accessing that entry.
-*/
-static Err interp_extern_got(
-  Interp *interp, const char *name, Ind len, const U64 **out_addr
+static Err interp_extern_adr(Interp *interp, const char *name, Ind len) {
+  IF_DEBUG(aver((Sint)strlen(name) == len));
+
+  const auto comp    = &interp->comp;
+  const auto syms    = &comp->code.externs;
+  auto       ext_adr = comp_find_extern(comp, name);
+
+  if (!ext_adr) {
+    try(find_extern(name, &ext_adr));
+    comp_register_dysym(syms, name, (U64)ext_adr);
+  }
+  return nullptr;
+}
+
+static Err interp_extern_proc(
+  Interp *interp, const char *name, Ind len, Sint inp_len, Sint out_len
 ) {
   IF_DEBUG(aver((Sint)strlen(name) == len));
 
-  const auto comp     = &interp->comp;
-  auto       got_addr = comp_find_dysym(comp, name);
-
-  if (!got_addr) {
-    void *ext_addr;
-    try(find_extern(name, &ext_addr));
-    got_addr = comp_register_dysym(comp, name, (U64)ext_addr);
-    IF_DEBUG(aver(*got_addr == (Uint)ext_addr));
-  }
-
-  if (out_addr) *out_addr = got_addr;
-  return nullptr;
-}
-
-static Err interp_read_extern(Interp *interp, void **out) {
-  try(interp_read_word(interp));
-  const auto name = interp->reader->word.buf;
-  try(find_extern(name, out));
-  return nullptr;
-}
-
-static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
-  void *addr;
-  try(interp_read_extern(interp, &addr));
+  void *ext_adr;
+  try(find_extern(name, &ext_adr));
 
   if (inp_len < 0) {
     return err_str("negative input parameter count");
@@ -589,7 +575,7 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
       .type     = SYM_EXTERN,
       .name     = interp->reader->word,
       .wordlist = WORDLIST_EXEC,
-      .exter    = addr,
+      .exter    = ext_adr,
       .inp_len  = (U8)inp_len,
       .out_len  = (U8)out_len,
       .clobber  = ASM_REGS_VOLATILE, // Only used in reg-based call-conv.
@@ -597,7 +583,10 @@ static Err interp_extern_proc(Interp *interp, Sint inp_len, Sint out_len) {
   );
 
   dict_set(&interp->dict_exec, sym->name.buf, sym);
-  comp_register_dysym(&interp->comp, sym->name.buf, (U64)addr);
+
+  const auto comp = &interp->comp;
+  const auto syms = &comp->code.externs;
+  comp_register_dysym(syms, sym->name.buf, (U64)ext_adr);
   return nullptr;
 }
 

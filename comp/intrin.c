@@ -283,10 +283,10 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
       fprintf(
         stderr,
         "[debug] word:\n"
+        "[debug]   type:            normal\n"
         "[debug]   addr:            %p\n"
         "[debug]   name:            %s\n"
         "[debug]   wordlist:        %d (%s)\n"
-        "[debug]   type:            normal\n"
 #ifndef CALL_CONV_STACK
         "[debug]   inp_len:         %d\n"
         "[debug]   out_len:         %d\n"
@@ -337,10 +337,10 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
     case SYM_INTRIN: {
       eprintf(
         "[debug] word:\n"
+        "[debug]   type:               compiler intrinsic\n"
         "[debug]   addr:               %p\n"
         "[debug]   name:               %s\n"
         "[debug]   wordlist:           %d (%s)\n"
-        "[debug]   type:               intrinsic\n"
         "[debug]   inp_len:            %d\n"
         "[debug]   out_len:            %d\n"
         "[debug]   throws:             %s\n"
@@ -362,11 +362,11 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
     case SYM_EXTERN: {
       eprintf(
         "[debug] word:\n"
-        "[debug]   addr:           %p\n"
-        "[debug]   name:           %s\n"
-        "[debug]   wordlist:       %d (%s)\n"
-        "[debug]   type:           extern\n"
-        "[debug]   extern address: %p\n",
+        "[debug]   type:               external procedure\n"
+        "[debug]   addr:               %p\n"
+        "[debug]   name:               %s\n"
+        "[debug]   wordlist:           %d (%s)\n"
+        "[debug]   executable address: %p\n",
         sym,
         sym->name.buf,
         sym->wordlist,
@@ -721,20 +721,19 @@ static constexpr auto INTRIN_IMPORT_TICK = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_EXTERN_GOT = (Sym){
-  .name.buf = "extern_got",
+static constexpr auto INTRIN_EXTERN_ADR = (Sym){
+  .name.buf = "comp_extern_adr",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_extern_got,
+  .intrin   = (void *)intrin_comp_extern_adr,
   .inp_len  = 2,
-  .out_len  = 1,
   .throws   = true,
 };
 
 static constexpr auto INTRIN_EXTERN_PROC = (Sym){
-  .name.buf = "extern:",
+  .name.buf = "extern_proc",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_extern_proc,
-  .inp_len  = 2,
+  .inp_len  = 4,
   .throws   = true,
 };
 

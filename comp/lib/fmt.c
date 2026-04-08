@@ -82,7 +82,7 @@ static char *fmt_bytes_into(char *buf, Uint buf_len, const U8 *src, Uint src_len
 
   buf[buf_ind++] = '{';
 
-#define fmt_bytes_into_push(val)   \
+#define push(val)                  \
   {                                \
     buf[buf_ind++] = val;          \
     if (buf_ind >= buf_lim) break; \
@@ -90,18 +90,19 @@ static char *fmt_bytes_into(char *buf, Uint buf_len, const U8 *src, Uint src_len
 
   for (; src_ind < src_len; src_ind++) {
     if (buf_ind > 1) {
-      fmt_bytes_into_push(',');
-      fmt_bytes_into_push(' ');
+      push(',');
+      push(' ');
     }
 
     static constexpr char digits[] = "0123456789abcdef";
     const auto            byte     = src[src_ind];
 
-    fmt_bytes_into_push('0');
-    fmt_bytes_into_push('x');
-    fmt_bytes_into_push(digits[(byte >> 4) & 0b1111]);
-    fmt_bytes_into_push(digits[byte & 0b1111]);
+    push('0');
+    push('x');
+    push(digits[(byte >> 4) & 0b1111]);
+    push(digits[byte & 0b1111]);
   }
+#undef push
 
   // Ran out of buffer.
   if (src_ind < src_len) {

@@ -161,7 +161,7 @@ static Err asm_append_call_intrin(
 
   asm_append_call_intrin_before(comp);
   asm_append_mov_reg(comp, ASM_PARAM_REG_0, ASM_REG_INTERP);
-  asm_append_dysym_load(comp, callee->name.buf, reg);
+  asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.intrins);
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
   asm_append_call_intrin_after(comp);
@@ -190,7 +190,7 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
 
   constexpr auto reg = ASM_SCRATCH_REG_8;
 
-  asm_append_dysym_load(comp, callee->name.buf, reg);
+  asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.externs);
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
   if (out_len) asm_append_stack_push_from(comp, ASM_REG_ERR);

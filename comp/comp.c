@@ -3,6 +3,7 @@
 #include "./comp.h"
 #include "./lib/dict.c"
 #include "./lib/list.c"
+#include "./lib/num.h"
 #include "./lib/stack.c"
 #include "./lib/str.c"
 #include "./sym.c"
@@ -92,7 +93,8 @@ static bool comp_heap_valid(const Comp_heap *val) {
     is_aligned(val) &&
     is_aligned(&val->exec) &&
     instr_heap_valid(&val->exec) &&
-    is_aligned(&val->got)
+    is_aligned(&val->intrins) &&
+    is_aligned(&val->externs)
   );
 }
 
@@ -106,19 +108,14 @@ static bool comp_code_valid(const Comp_code *code) {
     is_aligned(&code->code_write) &&
     is_aligned(&code->code_exec) &&
     is_aligned(&code->data) &&
-    is_aligned(&code->got) &&
-    is_aligned(&code->gots) &&
+    is_aligned(&code->intrins) &&
+    is_aligned(&code->externs) &&
     is_aligned(&code->valid_instr_len) &&
     instr_heap_valid(code->write) &&
     comp_heap_valid(code->heap) &&
     list_valid((const List *)&code->code_write) &&
     list_valid((const List *)&code->code_exec) &&
-    list_valid((const List *)&code->data) &&
-    list_valid((const List *)&code->got) &&
-    (
-      stack_valid((const Stack *)&code->gots.names) &&
-      dict_valid((const Dict *)&code->gots.inds)
-    )
+    list_valid((const List *)&code->data)
   );
 }
 
@@ -168,13 +165,18 @@ static Err comp_heap_init(Comp_heap **out) {
 
   try(mprotect_jit(heap->exec.instrs, sizeof(heap->exec.instrs)));
   try(mprotect_mutable(heap->data, sizeof(heap->data)));
-  try(mprotect_mutable(heap->got, sizeof(heap->got)));
+  try(mprotect_mutable(heap->intrins, sizeof(heap->intrins)));
+  try(mprotect_mutable(heap->externs, sizeof(heap->externs)));
   return nullptr;
 }
 
 static Err comp_code_deinit(Comp_code *code) {
-  dict_deinit(&code->gots.inds);
-  Err err = stack_deinit(&code->gots.names);
+  dict_deinit(&code->intrins.inds);
+  dict_deinit(&code->externs.inds);
+
+  Err err = nullptr;
+  err     = either(err, stack_deinit(&code->intrins.names));
+  err     = either(err, stack_deinit(&code->externs.names));
   err     = either(err, instr_heap_deinit(&code->write));
   err     = either(err, comp_heap_deinit(&code->heap));
   *code   = (Comp_code){};
@@ -182,29 +184,50 @@ static Err comp_code_deinit(Comp_code *code) {
 }
 
 static void comp_code_init_lists(Comp_code *code) {
-  code->code_write = (typeof(code->code_write)){
-    .dat = code->write->instrs,
-    .len = 0,
-    .cap = arr_cap(code->write->instrs),
-  };
+  ptr_set(
+    &code->code_write,
+    {
+      .dat = code->write->instrs,
+      .len = 0,
+      .cap = arr_cap(code->write->instrs),
+    }
+  );
 
-  code->code_exec = (typeof(code->code_exec)){
-    .dat = code->heap->exec.instrs,
-    .len = 0,
-    .cap = arr_cap(code->heap->exec.instrs),
-  };
+  ptr_set(
+    &code->code_exec,
+    {
+      .dat = code->heap->exec.instrs,
+      .len = 0,
+      .cap = arr_cap(code->heap->exec.instrs),
+    }
+  );
 
-  code->data = (typeof(code->data)){
-    .dat = code->heap->data,
-    .len = 0,
-    .cap = arr_cap(code->heap->data),
-  };
+  ptr_set(
+    &code->data,
+    {
+      .dat = code->heap->data,
+      .len = 0,
+      .cap = arr_cap(code->heap->data),
+    }
+  );
 
-  code->got = (typeof(code->got)){
-    .dat = code->heap->got,
-    .len = 0,
-    .cap = arr_cap(code->heap->got),
-  };
+  ptr_set(
+    &code->intrins.addrs,
+    {
+      .dat = code->heap->intrins,
+      .len = 0,
+      .cap = arr_cap(code->heap->intrins),
+    }
+  );
+
+  ptr_set(
+    &code->externs.addrs,
+    {
+      .dat = code->heap->externs,
+      .len = 0,
+      .cap = arr_cap(code->heap->externs),
+    }
+  );
 }
 
 static Err comp_code_init(Comp_code *code) {
@@ -214,8 +237,12 @@ static Err comp_code_init(Comp_code *code) {
   try(comp_heap_init(&code->heap));
   comp_code_init_lists(code);
 
-  Stack_opt opt = {.len = arr_cap(code->heap->got)};
-  try(stack_init(&code->gots.names, &opt));
+  auto opt = (Stack_opt){.len = arr_cap(code->heap->intrins)};
+  try(stack_init(&code->intrins.names, &opt));
+
+  opt = (Stack_opt){.len = arr_cap(code->heap->externs)};
+  try(stack_init(&code->externs.names, &opt));
+
   return nullptr;
 }
 
@@ -235,41 +262,34 @@ static void comp_rewind(Comp *tar, Comp *snap) {
   comp_ctx_rewind(&tar->ctx, &snap->ctx);
 }
 
-static const U64 *comp_find_dysym(Comp *comp, const char *name) {
-  const auto code = &comp->code;
-  const auto inds = &code->gots.inds;
-
-  if (!dict_has(inds, name)) return nullptr;
-
-  const auto ind = dict_get(inds, name);
-  return &code->got.dat[ind];
-}
-
 /*
-Used for registering dynamically-linked symbols.
-
+Used for registering dynamically-linked symbols, either intrinsic or external.
 The provided address should be used only in interpretation. When we implement
 AOT compilation, GOT addresses should be pre-zeroed and patched by the linker.
 */
-static const U64 *comp_register_dysym(Comp *comp, const char *name, U64 addr) {
-  const auto code  = &comp->code;
-  const auto got   = &code->got;
-  const auto names = &code->gots.names;
-  const auto inds  = &code->gots.inds;
+static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
+  const auto addrs = &syms->addrs;
+  const auto names = &syms->names;
+  const auto inds  = &syms->inds;
 
-  if (dict_has(inds, name)) {
-    const auto got_ind = dict_get(inds, name);
-    return &got->dat[got_ind];
-  }
+  auto got_ind = dict_get_or(inds, name, INVALID_IND);
+  if (got_ind != INVALID_IND) return;
 
-  const auto got_ind = got->len;
-  list_push(got, addr);
+  got_ind = addrs->len;
+  list_push(addrs, addr);
   aver(stack_len(names) == got_ind);
 
   const auto got_name = names->top++;
   averr(str_copy(got_name, name));
   dict_set(inds, got_name->buf, got_ind);
-  return &got->dat[got_ind];
+}
+
+static void *comp_find_extern(Comp *comp, const char *name) {
+  const auto syms = &comp->code.externs;
+  const auto inds = &syms->inds;
+  const auto ind  = dict_get_or(inds, name, INVALID_IND);
+  if (ind == INVALID_IND) return nullptr;
+  return list_elem_ptr(&syms->addrs, ind);
 }
 
 static Err comp_append_call_sym(Comp *comp, Sym *callee) {
@@ -426,12 +446,11 @@ static Err comp_append_recur(Comp *comp) {
 }
 
 /*
-Takes an address and compiles instructions for accessing it at a PC-relative
-offset. Intended for entries in the `data` and `got` regions of `Comp_heap`.
-Their addresses are far away from the instruction addresses, and the offsets
-can't be encoded inline into `ldr` instructions.
+Takes an address and compiles instructions for obtaining that address using a
+PC-relative offset. Intended for accessing non-code segments of `Comp_heap`,
+namely `data`, `intrins`, `externs`.
 
-On Arm64, this is the `adrp & add` idiom.
+TODO skip `adrp` when offset fits into `adr`.
 */
 static Err comp_append_page_addr(Comp *comp, Uint adr, U8 reg) {
   Sym *sym;
@@ -441,6 +460,7 @@ static Err comp_append_page_addr(Comp *comp, Uint adr, U8 reg) {
   return nullptr;
 }
 
+// Counterpart of `comp_append_page_addr` which always loads.
 static Err comp_append_page_load(Comp *comp, Uint adr, U8 reg) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));

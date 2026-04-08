@@ -35,7 +35,7 @@ end
 0 let: CLOCK_REALTIME
 6 let: CLOCK_MONOTONIC
 
-extern_val: getdate_err getdate_err
+: getdate_err { -- err } extern_adr' getdate_err @ ;
 
 0 1 extern: clock       (          -- clock )
 1 1 extern: time        ( time_adr -- time  )

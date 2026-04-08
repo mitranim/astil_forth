@@ -71,29 +71,36 @@ typedef struct {
   U8    guard_1[MEM_PAGE];      // PROT_NONE
 } Instr_heap;
 
-// Sections are accessed and modified via `Comp_code`.
+/*
+Sections are accessed and modified via `Comp_code`.
+
+Sections `.intrins` and `.externs` are used for dynamic linking,
+analogous to a GOT (global offset table) in executable formats.
+*/
 typedef struct {
-  Instr_heap exec;                        // 4 MiB; executable code.
-  U8         data[1 << 18];               // 256 KiB; mutable values.
-  U8         guard_0[MEM_PAGE];           // PROT_NONE
-  U64        got[MEM_PAGE / sizeof(U64)]; // Global offset table.
-  U8         guard_1[MEM_PAGE];           // PROT_NONE
+  Instr_heap exec;                            // 4 MiB; executable code.
+  U8         data[1 << 18];                   // 256 KiB; mutable values.
+  U8         guard_0[MEM_PAGE];               // PROT_NONE
+  U64        intrins[MEM_PAGE / sizeof(U64)]; // Addresses of intrinsic procs.
+  U8         guard_1[MEM_PAGE];               // PROT_NONE
+  U64        externs[MEM_PAGE / sizeof(U64)]; // Addresses of external symbols.
+  U8         guard_2[MEM_PAGE];               // PROT_NONE
 } Comp_heap;
 
-// "GOT" = global offset table.
 typedef struct {
-  stack_of(Word_str) names;
-  Ind_dict           inds;
-} Comp_got;
+  U64_list           addrs; // References `Comp_heap.intrins` or `.externs`.
+  stack_of(Word_str) names; // Backing storage for keys in `.inds`.
+  Ind_dict           inds;  // Indexes in `.vals`; keys come from `.names`.
+} Comp_syms;
 
 typedef struct {
   Instr_heap *write;           // Writable non-executable instructions.
   Comp_heap  *heap;            // Executable code and data.
   Instr_list  code_write;      // References `.code.instrs`.
   Instr_list  code_exec;       // References `.heap.code.instrs`.
-  U8_list     data;            // References `.heap.datas`.
-  U64_list    got;             // References `.heap.got`.
-  Comp_got    gots;            // Offsets of intrin/extern symbols in GOT.
+  U8_list     data;            // References `.heap.data`.
+  Comp_syms   intrins;         // Intrin symbols in `.heap.intrins`.
+  Comp_syms   externs;         // Extern symbols in `.heap.externs`.
   Ind         valid_instr_len; // Further instructions may be unpatched.
 } Comp_code;
 

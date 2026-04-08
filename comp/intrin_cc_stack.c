@@ -294,26 +294,32 @@ static Err intrin_import(Interp *interp) {
   return nullptr;
 }
 
-// See comment on `interp_extern_got` for explanation.
-static Err intrin_extern_got(Interp *interp) {
+static Err intrin_comp_extern_adr(Interp *interp) {
   const char *name;
   Ind         len;
   try(interp_pop_data_len(interp, &len));
   try(interp_pop_data_ptr(interp, (const U8 **)&name));
+  try(interp_extern_adr(interp, name, len));
 
-  const U64 *got_addr;
-  try(interp_extern_got(interp, name, len, &got_addr));
-  try(int_stack_push(&interp->ints, (Sint)got_addr));
+  const auto            comp = &interp->comp;
+  static constexpr auto reg  = ASM_SCRATCH_REG_8;
+  asm_append_dysym_load(comp, name, reg, &comp->code.externs);
+  asm_append_stack_push_from(comp, reg);
+
   return nullptr;
 }
 
 static Err intrin_extern_proc(Interp *interp) {
-  const auto ints = &interp->ints;
-  Sint       out_len;
-  Sint       inp_len;
+  const auto  ints = &interp->ints;
+  Sint        out_len;
+  Sint        inp_len;
+  const char *name;
+  Ind         len;
   try(int_stack_pop(ints, &out_len));
   try(int_stack_pop(ints, &inp_len));
-  try(interp_extern_proc(interp, inp_len, out_len));
+  try(interp_pop_data_len(interp, &len));
+  try(interp_pop_data_ptr(interp, (const U8 **)&name));
+  try(interp_extern_proc(interp, name, len, inp_len, out_len));
   return nullptr;
 }
 

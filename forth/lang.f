@@ -802,7 +802,7 @@
 \ ## Memory load / store
 
 \ We allow to load inside an argument list, replacing the latest argument,
-\ which is an address, with a value, without consuming all prior arguments.
+\ which is an address, with a value without consuming all prior arguments.
 \ This violates the idea that every verb should consume all arguments, but
 \ can be convenient at times. TODO reconsider.
 \
@@ -866,15 +866,19 @@
 \ Aliases for some C types, so the user
 \ doesn't have to remember their width.
 
+\ 32 bit
 0b10 0b10 load:  @cint
 0b10      store: !cint
 
+\ 32 bit
 0b10 0b01 load:  @cuint
 0b10      store: !cuint
 
+\ 64 bit (Apple ABI)
 0b11 0b10 load:  @clong
 0b11      store: !clong
 
+\ 64 bit (Apple ABI)
 0b11 0b01 load:  @culong
 0b11      store: !culong
 
@@ -1037,9 +1041,7 @@
 : parse_str { -- cstr len } char' " parse ;
 : parse_cstr { -- cstr } parse_str { cstr -- } cstr ;
 
-\ Compilation semantics of standard `s"`.
-: comp_str ( C: "str" -- ) ( E: -- cstr len )
-  parse_str          { buf len }
+: comp_str { buf len } ( E: -- cstr len )
   len inc            { cap } \ Reserve terminating null byte.
   buf cap alloc_data { adr }
   comp_next_arg_reg  { RS }
@@ -1048,13 +1050,17 @@
   len RL comp_load      \ ldr RL, <len>
 ;
 
-: comp_cstr ( C: "str" -- ) ( E: -- cstr )
-  parse_str          { buf len }
+\ Compilation semantics of standard `s"`.
+: parse_comp_str ( C: "str" -- ) ( E: -- cstr len ) parse_str comp_str ;
+
+: comp_cstr { buf len } ( E: -- cstr )
   len inc            { cap } \ Reserve terminating null byte.
   buf cap alloc_data { adr }
   comp_next_arg_reg  { reg }
   adr reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
 ;
+
+: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr ;
 
 \ Parses the input until the terminating quote, and returns the address and
 \ length of the resulting string. In interpretation mode, the string buffer
@@ -1063,12 +1069,29 @@
 \ is statically allocated and unique. The string is always null-terminated,
 \ and can be safely passed to many `libc` procedures by pointer alone.
 :  s" { -- cstr len } ( E: "str" -- cstr len ) parse_str ;
-:: s" ( C: "str" -- ) ( E: -- cstr len )       comp_str  ;
+:: s" ( C: "str" -- ) ( E: -- cstr len )       parse_comp_str  ;
 
 \ C-style string literal. Like `s"` but returns only the address
 \ without the length. The string is always null-terminated.
 :  " { -- cstr }     ( E: "str" -- cstr ) parse_cstr ;
-:: " ( C: "str" -- ) ( E: -- cstr )       comp_cstr  ;
+:: " ( C: "str" -- ) ( E: -- cstr )       parse_comp_cstr  ;
+
+\ ## External procedures and symbols
+
+\ Finds an extern symbol by name and declares it as a procedure.
+: extern: { inp_len out_len } ( C: "name" -- ) ( E: …inps -- …outs )
+  parse_word inp_len out_len extern_proc
+;
+
+\ Finds an extern symbol by name and returns its address.
+:: extern_adr' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_extern_adr
+;
+
+\ Indirect version of `extern_adr'`: compiles its usage into another word.
+:: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_str compile' comp_extern_adr
+;
 
 \ ## Memory
 \
@@ -1108,6 +1131,8 @@
 : str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 ;
 : str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
 
+\ ## Some compilation-related stuff
+
 \ Returns the address of a local (on the system stack).
 \ Often avoids the need for `alloca`.
 \
@@ -1122,8 +1147,6 @@
   comp_next_arg_reg { reg }
   reg ASM_REG_FP off asm_add_imm comp_instr \ add <reg>, FP, <off>
 ;
-
-\ ## Some compilation-related stuff
 
 : comp_clobber_params
   0 comp_clobber \ x0
@@ -1163,34 +1186,19 @@
 \
 \ Used for taking an address of a data entry
 \ in the code heap allocated via `alloc_data`.
-: comp_extern_addr { adr } ( E: -- adr )
+: comp_next_page_addr { adr } ( E: -- adr )
   comp_next_arg_reg { reg }
   adr reg comp_page_addr
-;
-
-\ Used for loading a value in a data entry
-\ or GOT entry in the code heap.
-: comp_extern_load { adr } ( E: -- val )
-  comp_next_arg_reg { reg }
-  adr reg comp_page_load \ adrp & ldr
-;
-
-\ Used for loading the value behind an address
-\ stored in a GOT entry in the code heap.
-: comp_extern_load_load { adr } ( E: -- val )
-  comp_next_arg_reg { reg }
-  adr reg                comp_page_load \ adrp & ldr
-  reg reg 0 asm_load_off comp_instr     \ ldr x0, [x0]
 ;
 
 : init_data_word { name name_len adr }
   name name_len colon
     0 1 comp_signature_set ( E: -- ptr )
-    adr comp_extern_addr
+    adr comp_next_page_addr
   semicolon
 
   name name_len colon_colon
-    adr comp_push compile' comp_extern_addr
+    adr comp_push compile' comp_next_page_addr
   semicolon
 ;
 
@@ -1243,54 +1251,6 @@
 \ Shortcut for the standard idiom `create <name> N cells allot`.
 : cells: { len } ( C: "name" -- ) ( E: -- adr ) len cells execute' mem: ;
 
-4096 buf: EXTERN_VAL_BUF
-
-\ Finds an extern symbol by name and creates a word which loads the address
-\ of that symbol. The extern symbol can be either a variable or a procedure.
-\
-\ TODO dedup with `extern_val:`. They share the logic except for one callback.
-\ The compiler doesn't support generic callbacks because parameters don't have
-\ types, so it can't track the arity of a passed callback.
-: extern_adr: ( C: "ours" "extern" -- ) ( E: -- val )
-  parse_word { str len }
-
-  \ Get a stable name location because we're about
-  \ to parse one more word, which overwrites `str`.
-  EXTERN_VAL_BUF { buf cap } buf str cap strlcpy
-
-  parse_word extern_got { adr }
-
-  buf len colon
-    0 1 comp_signature_set ( E: -- val )
-    adr comp_extern_load
-  semicolon
-
-  buf len colon_colon
-    adr comp_push compile' comp_extern_load
-  semicolon
-
-  [ false comp_only ]
-;
-
-\ Like `extern_adr:` but dereferences the external value.
-\ Used for external C variables such as stdio streams.
-: extern_val: ( C: "ours" "extern" -- ) ( E: -- val )
-  parse_word            { str len }
-  EXTERN_VAL_BUF        { buf cap } buf str cap strlcpy
-  parse_word extern_got { adr }
-
-  buf len colon
-    0 1 comp_signature_set ( E: -- val )
-    adr comp_extern_load_load
-  semicolon
-
-  buf len colon_colon
-    adr comp_push compile' comp_extern_load_load
-  semicolon
-
-  [ false comp_only ]
-;
-
 \ ## IO
 \
 \ Having access to `libc` spares us from having to implement
@@ -1309,9 +1269,14 @@
 CR CRLF     !8 \ \r
 LF CRLF inc !8 \ \n
 
-extern_val: stdin  __stdinp
-extern_val: stdout __stdoutp
-extern_val: stderr __stderrp
+:  stdin {    -- adr } extern_adr'      __stdinp @ ;
+:: stdin ( E: -- adr ) comp_extern_adr' __stdinp execute'' @ ;
+
+:  stdout {    -- adr } extern_adr'      __stdoutp @ ;
+:: stdout ( E: -- adr ) comp_extern_adr' __stdoutp execute'' @ ;
+
+:  stderr {    -- adr } extern_adr'      __stderrp @ ;
+:: stderr ( E: -- adr ) comp_extern_adr' __stderrp execute'' @ ;
 
 4 1 extern: fread            ( buf size len file -- len        )
 4 1 extern: fwrite           ( buf size len file -- len        )
@@ -1349,15 +1314,14 @@ extern_val: stderr __stderrp
 : espace                  32 eputchar             { -- } ;
 : fprint { str len file } str 1 len file fwrite   { -- } ;
 
-extern_adr: fprintf_adr fprintf
-
 \ Analogue of `printf` missing from libc. Writes to standard error.
 \
-\ Slightly tricky to define correctly. To accept and forward variadic arguments,
-\ this must not modify their storage. Under the ABI we currently support, this
-\ means not modifying the SP, not touching the stack, and not changing the LR.
-\ We hide the call so the compiler doesn't create a frame record. However, we
-\ still need to inform the compiler about scratch register clobbers.
+\ Slightly tricky to define correctly. We need to forward variadic arguments to
+\ the `fprintf` call without accidentally modifying their storage. Under the
+\ ABI we currently support, this means not modifying the SP, not touching the
+\ stack, and not changing the LR. We hide the call so the compiler doesn't
+\ create a frame record. However, we still need to inform the compiler about
+\ scratch register clobbers.
 \
 \ The hoops we jump through, just because libc doesn't provide `eprintf`.
 \ On the bright side, this does not have any meaningful runtime overhead.
@@ -1370,7 +1334,7 @@ extern_adr: fprintf_adr fprintf
 
   stderr              \ adrp x0, <off> ; ldr x0, [x0, <off>] ; ldr x0, [x0]
   [ 2 comp_args_set ] \ Reveal to the compiler that `x1` holds something.
-  fprintf_adr         \ adrp x2, <off> ; ldr x2, [x2, <off>]
+  extern_adr' fprintf \ adrp x2, <off> ; ldr x2, [x2, <off>]
 
   [
                         comp_clobber_volatile

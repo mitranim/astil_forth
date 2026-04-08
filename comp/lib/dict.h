@@ -64,17 +64,22 @@ static constexpr auto  EMPTY = (Empty){};
 // Returns -1 when key is not present.
 #define dict_ind(dict, key) dict_ind_impl((const Dict *)(dict), key)
 
-#define dict_has(dict, key) (dict_ind(dict, key) < (Ind) - 1)
+#define dict_has(dict, key) (dict_ind(dict, key) != INVALID_IND)
 
-#define dict_get(dict, key)                                           \
+#define dict_get_or(dict, key, val)                                   \
   ({                                                                  \
     const auto tmp_dict = dict;                                       \
     const auto tmp_ind  = dict_ind_impl((const Dict *)tmp_dict, key); \
-    const auto tmp_got  = tmp_ind < (Ind) - 1;                        \
-    tmp_got ? tmp_dict->vals[tmp_ind] : (dict_val_type(tmp_dict)){0}; \
+    (tmp_ind == INVALID_IND) ? val : tmp_dict->vals[tmp_ind];         \
   })
 
-// Returned pointer is only valid until next dict resize.
+#define dict_get(dict, key) dict_get_or(dict, key, (dict_val_type(dict)){0})
+
+/*
+Returned pointer is only valid until next dict resize.
+Doesn't copy the key; the caller is responsible for its lifetime.
+Dicts which own their keys must be freed with `dict_deinit_with_keys`.
+*/
 #define dict_set(dict, key, ...)                             \
   ({                                                         \
     const dict_val_type(dict) tmp_val = __VA_ARGS__;         \

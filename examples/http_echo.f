@@ -2,10 +2,9 @@ import' std:lang.f
 import' std:internals.f
 import' ./http_util.f
 
-\ Simple example of an "HTTP" server which echoes requests
-\ back to clients. HTTP in quotes because it only responds
-\ with HTTP without parsing the request; the client can be
-\ sending anything it wants.
+\ Simple example of a single-threaded "HTTP" server which echoes requests
+\ back to clients. HTTP in quotes because it responds with HTTP without
+\ parsing the request; the client can be sending anything it wants.
 
 128  let: MAX_CONN
 4096 buf: READ_BUF

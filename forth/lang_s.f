@@ -922,20 +922,24 @@
 \ The parser ensures null-termination.
 : parse_str ( E: "str" -- cstr len ) char' " parse ;
 
-\ Compilation semantics of standard `s"`.
-: comp_str ( C: "str" -- ) ( E: -- cstr len )
-  parse_str tuck                ( len str len )
-  inc                           \ Reserve 1 more for null byte.
+: comp_str ( C: buf len -- ) ( E: -- cstr len )
+  tuck                          ( len buf len )
+  inc                           \ Reserve terminating null byte.
   alloc_data 1   comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   2              comp_load      \ ldr x2, <len>
   asm_push_x1_x2 comp_instr     \ stp x1, x2, [x27], 16
 ;
 
-: comp_cstr ( C: "str" -- ) ( E: -- cstr )
-  parse_str inc               \ Reserve 1 more for null byte.
+\ Compilation semantics of standard `s"`.
+: parse_comp_str ( C: "str" -- ) ( E: -- cstr len ) parse_str comp_str ;
+
+: comp_cstr ( C: buf len -- ) ( E: -- cstr )
+  inc                         \ Reserve terminating null byte.
   alloc_data 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
   asm_push_x1  comp_instr     \ str x1, [x27], 8
 ;
+
+: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr ;
 
 \ Parses the input until the terminating quote, and returns the address and
 \ length of the resulting string. In interpretation mode, the string buffer
@@ -944,12 +948,12 @@
 \ is statically allocated and unique. The string is always null-terminated,
 \ and can be safely passed to many `libc` procedures by pointer alone.
 :  s" ( E: "str" -- cstr len )           parse_str ;
-:: s" ( C: "str" -- ) ( E: -- cstr len ) comp_str ;
+:: s" ( C: "str" -- ) ( E: -- cstr len ) parse_comp_str ;
 
 \ C-style string literal. Like `s"` but returns only the address
 \ without the length. The string is always null-terminated.
 :  " ( E: "str" -- cstr )           parse_str drop ;
-:: " ( C: "str" -- ) ( E: -- cstr ) comp_cstr ;
+:: " ( C: "str" -- ) ( E: -- cstr ) parse_comp_cstr ;
 
 \ ## Variables
 \
@@ -1041,6 +1045,23 @@
   parse_word comp_named_local
   1 swap ASM_REG_FP swap asm_add_imm comp_instr \ add x1, FP, <loc>
   1                      asm_push1   comp_instr \ str x1, [x27], 8
+;
+
+\ ## External procedures and symbols
+
+\ Finds an extern symbol by name and declares it as a procedure.
+: extern: ( C: inp_len out_len "name" -- ) ( E: …inps -- …outs )
+  parse_word swap2 extern_proc
+;
+
+\ Finds an extern symbol by name and returns its address.
+:: extern_adr' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_extern_adr
+;
+
+\ Indirect version of `extern_adr'`: compiles its usage into another word.
+:: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_str compile' comp_extern_adr
 ;
 
 \ ## Memory
@@ -1442,34 +1463,10 @@
 : cstr<  ( cstr0 cstr1 -- bool ) ccompare <0 ;
 : cstr<> ( cstr0 cstr1 -- bool ) ccompare <>0 ;
 
-\ ## Extern variables
-
-\ Finds an extern symbol by name and creates a word which loads the address
-\ of that symbol. The extern symbol can be either a variable or a procedure.
-: extern_adr: ( C: "ours" "extern" -- ) ( E: -- ptr )
-  #word_beg
-  parse_word extern_got to: adr \ Addr of GOT entry holding extern addr.
-  adr 1       comp_page_load    \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
-  asm_push_x1 comp_instr        \ str x1, [x27], 8
-  #word_end
-;
-
-\ Like `extern_adr:` but dereferences the external value.
-\ Used for external C variables such as stdio streams.
-: extern_val: ( C: "ours" "extern" -- ) ( E: -- val )
-  #word_beg
-  parse_word extern_got to: adr     \ Addr of GOT entry holding extern addr.
-  adr 1              comp_page_load \ `adrp x1, <page>` & `ldr x1, x1, <pageoff>`
-  1 1 0 asm_load_off comp_instr     \ ldur x1, [x1]
-        asm_push_x1  comp_instr     \ str x1, [x27], 8
-  #word_end
-;
-
 \ ## IO
 \
-\ Having access to `libc` spares us from having
-\ to implement these procedures or provide them
-\ as intrinsics.
+\ Having access to `libc` spares us from having to implement
+\ these procedures or provide them as intrinsics.
 
 0 let: STDIN
 1 let: STDOUT
@@ -1478,9 +1475,9 @@
 10 let: LF
 13 let: CR
 
-extern_val: stdin  __stdinp
-extern_val: stdout __stdoutp
-extern_val: stderr __stderrp
+: stdin  ( -- adr ) extern_adr' __stdinp  @ ;
+: stdout ( -- adr ) extern_adr' __stdoutp @ ;
+: stderr ( -- adr ) extern_adr' __stderrp @ ;
 
 \ These definitions ignore errors and sizes returned by `libc`.
 \ This is inconsistent with reg-CC where we define the outputs

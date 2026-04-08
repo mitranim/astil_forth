@@ -17,7 +17,8 @@ import' std:lang.f
 ] ;
 
 flush
-STDOUT s" hello world! (using syscall)" sys_write lf
+STDOUT s" hello world! (using syscall)" sys_write
+STDOUT CRLF 2 sys_write
 
 : bool_str { val -- str }
   val

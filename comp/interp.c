@@ -62,16 +62,21 @@ static Err interp_init_syms(Interp *interp) {
     sym_init_intrin(sym);
     IF_DEBUG(aver(!dict_has(dict, sym->name.buf)));
     dict_set(dict, sym->name.buf, sym);
-    comp_register_dysym(comp, sym->name.buf, (U64)sym->intrin);
+
+    const auto syms = &comp->code.intrins;
+    comp_register_dysym(syms, sym->name.buf, (U64)sym->intrin);
   }
 
   IF_DEBUG({
     aver(dict_has(&interp->dict_exec, ":"));
     aver(dict_has(&interp->dict_comp, ";"));
 
-    const auto gots = &comp->code.gots;
-    aver(gots->inds.len == arr_cap(INTRIN));
-    aver(stack_len(&gots->names) == arr_cap(INTRIN));
+    const auto            syms = &comp->code.intrins;
+    static constexpr auto len  = arr_cap(INTRIN);
+
+    aver(syms->addrs.len == len);
+    aver(stack_len(&syms->names) == len);
+    aver(syms->inds.len == len);
   });
   return nullptr;
 }

@@ -17,6 +17,7 @@ typedef enum : U8 {
 
 /*
 Metadata for a word in a Forth dictionary / wordset.
+
 - "Norm" words are defined in Forth code.
 - "Intrin" words are provided by the interpreter / compiler.
 - "Extern" words are dynamically located in linked libraries.
@@ -45,7 +46,7 @@ typedef struct Sym {
     } norm;
 
     void *intrin; // Interpreter intrinsic; implies `interp_only`.
-    void *exter;  // Pointer to extern procedure; obtained from `dlsym`.
+    void *exter;  // External address; obtained from `dlsym`.
   };
 
   Sym_set callees;     // Dependencies in compiled code.
