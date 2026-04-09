@@ -23,7 +23,7 @@ static void print_help(void) {
     "  astil <file0> -\n"
     "  astil <file0> <file1> -\n"
     "\n"
-    "Hint: a program must first import \"std:lang.f\" to bootstrap the language.\n"
+    "Hint: a program must first import \"std:lang.af\" to bootstrap the language.\n"
     "\n"
     "An \"std:\" import searches the following locations:\n"
     "- Directory \"./forth\" relative to the executable.\n"
@@ -31,7 +31,7 @@ static void print_help(void) {
     "\n"
     "Hint: for a better REPL experience, install and use `rlwrap`:\n"
     "\n"
-    "  rlwrap astil std:lang.f -\n"
+    "  rlwrap astil std:lang.af -\n"
   );
 }
 

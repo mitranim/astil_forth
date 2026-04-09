@@ -35,11 +35,11 @@ See `./2_reg_alloc.md` which explains our simple algorithm.
 
 See `./3_exceptions.md` which showcases the value of doing exceptions the "right" way: ABI interop, simplicity, consistent performance.
 
-See `/examples/threads_*.f` which show seamless interop between `libc` and our system, which uses "exceptions".
+See `/examples/threads_*.af` which show seamless interop between `libc` and our system, which uses "exceptions".
 
 ## Structs
 
-`./4_structs.f`: quick mention of struct support; ABI interop again.
+`./4_structs.af`: quick mention of struct support; ABI interop again.
 
 ## System stack allocation
 

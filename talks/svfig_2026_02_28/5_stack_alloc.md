@@ -120,4 +120,4 @@ example
 \ real nanos:   322626000
 ```
 
-Also see `forth/time.f`, `forth/io.f`, and `examples`.
+Also see `forth/time.af`, `forth/io.af`, and `examples`.

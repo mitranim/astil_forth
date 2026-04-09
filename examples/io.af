@@ -1,0 +1,70 @@
+import' std:lang.af
+import' std:io.af
+
+\ The paths assume the script is being run from repo root:
+\
+\   ./astil.exe examples/io.af
+
+\ ## Stat
+
+: example_file_stat
+  " examples/io.af" { path }
+  Fstat alloca      { stat }
+
+  path stat path_stat
+
+  stat Fstat_size @    { size }
+  stat Fstat_mtimespec { mtime }
+  mtime Timespec_sec @ { secs }
+
+  " [example0] path:        %s"  path logf lf
+  " [example0] file size:   %zd" size logf lf
+  " [example0] last change: %zd" secs logf lf
+;
+example_file_stat
+
+\ [example0] path:        examples/io.af
+\ [example0] file size:   1348
+\ [example0] last change: 1772280472
+
+\ ## Seek
+
+128 mem: BUF
+
+: example_seek_and_thou_shall_find
+  " examples/io.af"   { path }
+  path " r" file_open { file }
+
+  \ Disable exceptions from here, so we can close the file reliably.
+  [ true catches ]
+
+  37 91 { off cap }
+
+  file off 0 fseek is_err if
+    file fclose { -- }
+
+    \ Explicit inline `throw` is perfectly fine. It's just like `ret`,
+    \ but doesn't zero-out the exception register.
+    " seek file" path io_err throw
+  end
+
+  BUF U8 cap file fread { len }
+  file ferror           { code }
+  file fclose           { -- }
+
+  len cap <> if
+    code " unable to read file" os_err throw
+  end
+
+  lf
+  " [example1] partial content of `%s`:" path logf lf lf
+
+  BUF log lf
+;
+example_seek_and_thou_shall_find
+
+\ [example1] partial content of `examples/io.af`:
+\
+\ \ The paths assume the script is being run from repo root:
+\ \
+\ \   ./astil.exe examples/io.af

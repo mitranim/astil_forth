@@ -58,8 +58,8 @@ Unlike Frugal and mature systems such as Gforth, Astil Forth goes straight for m
 The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately, from differently selected C files. The stack-CC version is legacy and has fewer features.
 
 The outer interpreter / compiler, written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
-- Register-CC: boots via [`./forth/lang.f`](./forth/lang.f).
-- Stack-CC: boots via [`forth/lang_s.f`](./forth/lang_s.f).
+- Register-CC: boots via [`./forth/lang.af`](./forth/lang.af).
+- Stack-CC: boots via [`forth/lang_s.af`](./forth/lang_s.af).
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
 
@@ -68,7 +68,7 @@ Unlike other compiler writers, I focused on keeping the system clear and educati
 IO and conditionals:
 
 ```forth
-import' std:lang.f
+import' std:lang.af
 
 : main
   " hello world!" log lf
@@ -114,7 +114,7 @@ Easy self-assembly (Arm64):
 
 ## Easy C interop
 
-It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang_s.f`](./forth/lang_s.f) and [`./forth/lang.f`](./forth/lang.f).
+It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang_s.af`](./forth/lang_s.af) and [`./forth/lang.af`](./forth/lang.af).
 
 The reg-CC version of this system, which is the default, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
 
@@ -156,22 +156,22 @@ With global installation:
 make install
 
 # Register-based calling convention.
-astil std:lang.f -  # REPL mode.
-astil some_file.f   # One-shot run.
-astil some_file.f - # Run file, then REPL.
+astil std:lang.af -  # REPL mode.
+astil some_file.af   # One-shot run.
+astil some_file.af - # Run file, then REPL.
 
 # Stack-based calling convention.
-astil_s std:lang_s.f - # REPL mode.
-astil_s some_file.f    # One-shot run.
-astil_s some_file.f -  # Run file, then REPL.
+astil_s std:lang_s.af - # REPL mode.
+astil_s some_file.af    # One-shot run.
+astil_s some_file.af -  # Run file, then REPL.
 ```
 
-Don't forget to `import' std:lang.f` (or `lang_s.f` for stack-CC) inside your program, or on the command line. Without it, the language does not exist.
+Don't forget to `import' std:lang.af` (or `lang_s.af` for stack-CC) inside your program, or on the command line. Without it, the language does not exist.
 
 The REPL is barebones. For a better experience, using `rlwrap` is recommended:
 
 ```sh
-rlwrap astil std:lang.f -
+rlwrap astil std:lang.af -
 
 # Or use this shortcut from repo root:
 make repl
@@ -183,14 +183,14 @@ Local-only usage inside this repo:
 make
 
 # Register-based calling convention.
-./astil.exe forth/lang.f - # REPL mode.
-./astil.exe some_file.f    # One-shot run.
-./astil.exe some_file.f -  # Run file, then REPL.
+./astil.exe forth/lang.af - # REPL mode.
+./astil.exe some_file.af    # One-shot run.
+./astil.exe some_file.af -  # Run file, then REPL.
 
 # Stack-based calling convention.
-./astil_s.exe forth/lang_s.f - # REPL mode.
-./astil_s.exe some_file.f      # One-shot run.
-./astil_s.exe some_file.f -    # Run file, then REPL.
+./astil_s.exe forth/lang_s.af - # REPL mode.
+./astil_s.exe some_file.af      # One-shot run.
+./astil_s.exe some_file.af -    # Run file, then REPL.
 ```
 
 Rebuild continuously while hacking:
@@ -210,8 +210,8 @@ make debug_run '<file>' RECOVERY=false # only for stack-CC
 ## Structure
 
 - [`./forth`](./forth):
-  - [`lang.f`](./forth/lang.f) — language core.
-  - [`testing.f`](./forth/testing.f) — simple testing utils.
+  - [`lang.af`](./forth/lang.af) — language core.
+  - [`testing.af`](./forth/testing.af) — simple testing utils.
   - Other files — optional small libraries; mostly interfaces to `libc` IO.
 - [`./examples`](./examples) — how to use `libc` for IO, networking, threading.
 - [`./comp`](./comp) — outer interpreter / compiler in C. Mostly library-style code with a small "main" entry point.

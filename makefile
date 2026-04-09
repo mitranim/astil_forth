@@ -97,7 +97,7 @@ run_s:
 
 # Usage example:
 #
-#   make run_w args='forth/test.f -'
+#   make run_w args='forth/test.af -'
 .PHONY: run_w
 run_w:
 	$(WATCH_IMM) -- $(MAKE) run
@@ -125,11 +125,11 @@ run_c_w:
 
 .PHONY: repl
 repl:
-	$(MAKE) run args='std:lang.f -'
+	$(MAKE) run args='std:lang.af -'
 
 .PHONY: repl_s
 repl_s:
-	$(MAKE) run_s args='std:lang_s.f -'
+	$(MAKE) run_s args='std:lang_s.af -'
 
 # For executables from arbitrary C files. This is possible because our C files
 # specify all their dependencies with `#include`, without needing the build

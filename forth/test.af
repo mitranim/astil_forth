@@ -1,0 +1,1483 @@
+import' ./lang.af
+import' ./testing.af
+
+\ This test suite for reg-CC is written differently from the test suite for
+\ stack-CC, because of the various checks and restrictions in the compiler.
+\ Control flow structures are not allowed to "return" or "push" any values.
+\ The amount of arguments before and after `<T>` is checked at compile time
+\ which means we can't write tests which repeatedly "push" values in a loop
+\ then check the resulting list of values. We just check the final results.
+
+T{       <T>       }T
+T{ 10    <T> 10    }T
+T{ 10 20 <T> 10 20 }T
+
+: test_test
+  T{       <T>       }T
+  T{ 10    <T> 10    }T
+  T{ 10 20 <T> 10 20 }T
+;
+test_test
+
+: test_conditionals
+  \ false if 10      end \ Must fail to compile.
+  \ false if else 10 end \ Must fail to compile.
+
+  T{ -1 { val } false if 10 { val } end val <T> -1 }T
+  T{ -1 { val } true  if 10 { val } end val <T> 10 }T
+
+  T{ false if 10 { val } else 20 { val } end val <T> 20 }T
+  T{ true  if 10 { val } else 20 { val } end val <T> 10 }T
+
+  T{ -1 { val } false ifn 10 { val } end val <T> 10 }T
+  T{ -1 { val } true  ifn 10 { val } end val <T> -1 }T
+
+  T{ false ifn 10 { val } else 20 { val } end val <T> 10 }T
+  T{ true  ifn 10 { val } else 20 { val } end val <T> 20 }T
+
+  T{
+    -1 { val } false if 10 { val } else false elif 20 { val } end val
+  <T>
+    -1
+  }T
+
+  T{
+    -1 { val }
+    false if 10 { val } else false elif 20 { val } else 30 { val } end
+    val
+  <T>
+    30
+  }T
+
+  T{
+    -1 { val } false if 10 { val } else true elif 20 { val } end val
+  <T>
+    20
+  }T
+
+  T{
+    -1 { val }
+    false if 10 { val } else true elif 20 { val } else 30 { val } end
+    val
+  <T>
+    20
+  }T
+
+  T{
+    -1 { val } true if 10 { val } else false elif 20 { val } end val
+  <T>
+    10
+  }T
+
+  T{
+    -1 { val }
+    true if 10 { val } else false elif 20 { val } else 30 { val } end
+    val
+  <T>
+    10
+  }T
+
+  T{
+    -1 { val } false if 10 { val } else false elifn 20 { val } end val
+  <T>
+    20
+  }T
+
+  T{
+    -1 { val }
+    false if 10 { val } else false elifn 20 { val } else 30 { val } end
+    val
+  <T>
+    20
+  }T
+
+  T{
+    -1 { val } false if 10 { val } else true elifn 20 { val } end val
+  <T>
+    -1
+  }T
+
+  T{
+    -1 { val }
+    false if 10 { val } else true elifn 20 { val } else 30 { val } end
+    val
+  <T>
+    30
+  }T
+
+  T{
+    -1 { val } true if 10 { val } else false elifn 20 { val } end val
+  <T>
+    10
+  }T
+
+  T{
+    -1 { val }
+    true if 10 { val } else false elifn 20 { val } else 30 { val } end
+    val
+  <T>
+    10
+  }T
+;
+test_conditionals
+
+: test_recursion { val -- val }
+  val 13 <= if val ret end
+  val dec recur
+;
+T{ 123 test_recursion <T> 13 }T
+
+1 0 extern: sleep
+
+: test_sleep_loop loop " sleeping" log lf 1 sleep end ;
+\ test_sleep_loop
+
+: test_loop_leave
+  T{ -1 { val } loop            leave abort             end val <T> -1 }T
+  T{ -1 { val } loop 10 { val } leave abort             end val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave abort leave abort end val <T> 10 }T
+;
+test_loop_leave
+
+: test_loop_nested
+  T{
+    -1 { one }
+    -2 { two }
+    -3 { three }
+    loop
+      10 { one }
+      loop
+        20 { two }
+        leave
+      end
+      30 { three }
+      leave
+    end
+    one two three
+  <T>
+    10 20 30
+  }T
+;
+test_loop_nested
+
+: test_loop_while
+  T{
+    -1 { val }
+    loop false while 10 { val } end
+    val
+  <T>
+    -1
+  }T
+
+  T{
+    -1 { val }
+    loop 10 { val } false while 20 { val } end
+    val
+  <T>
+    10
+  }T
+
+  T{
+    -1 { val }
+    loop 10 { val } false while 20 { val } true while end
+    val
+  <T>
+    10
+  }T
+
+  T{
+    -1 { val }
+    loop 10 { val } true while 20 { val } false while end
+    val
+  <T>
+    20
+  }T
+
+  T{
+    12 { val }
+    loop
+      val 5 > while
+      val dec { val }
+    end
+    val
+  <T>
+    5
+  }T
+
+  T{
+    12 { val }
+    loop
+      val 5 > while
+      val 7 > while
+      val dec { val }
+    end
+    val
+  <T>
+    7
+  }T
+
+  T{
+    12 { val }
+    loop
+      val dec { val }
+      val while
+      val while
+      val while
+    end
+    val
+  <T>
+    0
+  }T
+;
+test_loop_while
+
+: test_loop_while_leave
+  T{ -1 { val } loop            false while 10 { val } leave end val <T> -1 }T
+  T{ -1 { val } loop            true  while 10 { val } leave end val <T> 10 }T
+  T{ -1 { val } loop 10 { val } false while 20 { val } leave end val <T> 10 }T
+  T{ -1 { val } loop 10 { val } true  while 20 { val } leave end val <T> 20 }T
+  T{ -1 { val } loop 10 { val } true  while leave 20 { val } end val <T> 10 }T
+  T{ -1 { val } loop leave 10 { val } true  while 20 { val } end val <T> -1 }T
+;
+test_loop_while_leave
+
+: test_loop_until
+  T{ -1 { val } loop                              false until val <T> -1 }T
+  T{ -1 { val } loop 10 { val }                   false until val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave             true  until val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave leave       true  until val <T> 10 }T
+  T{ -1 { val } loop 10 { val } leave leave leave true  until val <T> 10 }T
+
+  T{ 12 { val } loop val dec { val } val     until val <T> 0 }T
+  T{ 12 { val } loop val dec { val } val 6 > until val <T> 6 }T
+
+  T{
+    12 { val }
+    loop val dec { val } val 8 > while val 6 > until
+    val
+  <T>
+    8
+  }T
+;
+test_loop_until
+
+: test_loop_for
+  T{ -12 for end <T> }T
+  T{ -1  for end <T> }T
+  T{ 0   for end <T> }T
+
+  T{ 0 { val } 12 for val inc { val }       end val <T> 12 }T
+  T{ 0 { val } 12 for val inc { val } leave end val <T> 1  }T
+  T{ 0 { val } 12 for leave val inc { val } end val <T> 0  }T
+
+  T{
+    0 { val }
+    12 for
+      val 5 > if leave end
+      val inc { val }
+    end
+    val
+  <T>
+    6
+  }T
+
+  T{
+    0 { val }
+    12 for
+      val 6 < while
+      val inc { val }
+    end
+    val
+  <T>
+    6
+  }T
+
+  T{
+    0 { val }
+    12 for
+      val 5 < while
+      val 8 < while
+      val inc { val }
+    end
+    val
+  <T>
+    5
+  }T
+
+  T{
+    0 { val }
+    12 for
+      val 8 < while
+      val 5 < while
+      val inc { val }
+    end
+    val
+  <T>
+    5
+  }T
+;
+test_loop_for
+
+: test_loop_for_countdown
+  T{ -12 -for: ind end <T> }T
+  T{ -1  -for: ind end <T> }T
+  T{ 0   -for: ind end <T> }T
+
+  T{ -1 { ind } 12 -for: ind                       end ind <T> 0  }T
+  T{ -1 { ind } 12 -for: ind            leave      end ind <T> 11 }T
+  T{ -1 { ind } 12 -for: ind ind 5 <= if leave end end ind <T> 5  }T
+  T{ -1 { ind } 12 -for: ind ind 5 >    while      end ind <T> 5  }T
+
+  T{
+    -1 { ind }
+    12 -for: ind
+      ind 7 > while
+      ind 5 > while
+    end
+    ind
+  <T>
+    7
+  }T
+
+  T{
+    -1 { ind }
+    12 -for: ind
+      ind 5 > while
+      ind 7 > while
+    end
+    ind
+  <T>
+    7
+  }T
+;
+test_loop_for_countdown
+
+: test_loop_for_countup
+  T{ -1 -1 +for: ind end ind <T> -1 }T
+  T{ -1 -2 +for: ind end ind <T> -1 }T
+  T{  0 -2 +for: ind end ind <T>  0 }T
+  T{  0  0 +for: ind end ind <T>  0 }T
+  T{  1  0 +for: ind end ind <T>  1 }T
+  T{  2  0 +for: ind end ind <T>  2 }T
+  T{ 12  0 +for: ind end ind <T> 12 }T
+
+  T{ -1 -2 +for: ind       leave end ind <T> -2 }T
+  T{ -1 -1 +for: ind       leave end ind <T> -1 }T
+  T{  0  0 +for: ind       leave end ind <T>  0 }T
+  T{  1  0 +for: ind       leave end ind <T>  0 }T
+  T{  1  1 +for: ind       leave end ind <T>  1 }T
+  T{  2  1 +for: ind       leave end ind <T>  1 }T
+  T{  2  1 +for: ind false while end ind <T>  1 }T
+  T{  2  1 +for: ind true  while end ind <T>  2 }T
+
+  T{
+    -123 { ind }
+    12 0 +for: ind
+      ind 5 > if leave end
+    end
+    ind
+  <T>
+    6
+  }T
+
+  T{
+    -123 { ind }
+    12 0 +for: ind
+      ind 6 < while
+    end
+    ind
+  <T>
+    6
+  }T
+
+  T{
+    -123 { ind }
+    12 0 +for: ind
+      ind 8 < while
+      ind 6 < while
+    end
+    ind
+  <T>
+    6
+  }T
+
+  T{
+    -123 { ind }
+    12 0 +for: ind
+      ind 6 < while
+      ind 8 < while
+    end
+    ind
+  <T>
+    6
+  }T
+;
+test_loop_for_countup
+
+\ When the loop terminates, the "ind" local should hold an out-of-range value.
+\ If the value is out of range at the start, it should remain unchanged.
+: test_loop_countup
+  0 { len }
+
+  T{
+    8 0 1
+    +loop: ind
+      ++: len
+    end
+    len ind
+  <T>
+    8 8
+  }T
+
+  0 { len }
+  T{ 8 0 2 +loop: ind ++: len end len ind <T> 4 8 }T
+
+  0 { len }
+  T{ 8 0 3 +loop: ind ++: len end len ind <T> 3 9 }T
+
+  0 { len }
+  T{ 8 0 4 +loop: ind ++: len end len ind <T> 2 8 }T
+
+  0 { len }
+  T{ 8 0 5 +loop: ind ++: len end len ind <T> 2 10 }T
+
+  0 { len }
+  T{ 8 0 6 +loop: ind ++: len end len ind <T> 2 12 }T
+
+  0 { len }
+  T{ 8 0 7 +loop: ind ++: len end len ind <T> 2 14 }T
+
+  0 { len }
+  T{ 8 0 8 +loop: ind ++: len end len ind <T> 1 8 }T
+
+  0 { len }
+  T{ 8 0 9 +loop: ind ++: len end len ind <T> 1 9 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 8 1 +loop: ind ++: len end len ind <T> 0 8 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 9 1 +loop: ind ++: len end len ind <T> 0 9 }T
+;
+test_loop_countup
+
+: test_loop_countup_nested
+  T{
+    4 0 1 +loop: one
+      7 one 1 +loop: two end
+    end
+    one two
+  <T>
+    4 7
+  }T
+;
+test_loop_countup_nested
+
+\ Unlike `+loop:`, this decrements the index at the start of each iteration
+\ rather than at the end. Also, it commits the index update only when still
+\ in range. TODO figure out if we can consolidate the behavior with `+loop:`
+\ without wasting cycles in the common cases.
+: test_loop_countdown
+  0 { len }
+
+  T{
+    8 0 1
+    -loop: ind
+      ++: len
+    end
+    len ind
+  <T>
+    8 0
+  }T
+
+  0 { len }
+  T{ 8 0 2 -loop: ind ++: len end len ind <T> 4 0 }T
+
+  0 { len }
+  T{ 8 0 3 -loop: ind ++: len end len ind <T> 2 2 }T
+
+  0 { len }
+  T{ 8 0 4 -loop: ind ++: len end len ind <T> 2 0 }T
+
+  0 { len }
+  T{ 8 0 5 -loop: ind ++: len end len ind <T> 1 3 }T
+
+  0 { len }
+  T{ 8 0 6 -loop: ind ++: len end len ind <T> 1 2 }T
+
+  0 { len }
+  T{ 8 0 7 -loop: ind ++: len end len ind <T> 1 1 }T
+
+  0 { len }
+  T{ 8 0 8 -loop: ind ++: len end len ind <T> 1 0 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 9 -loop: ind ++: len end len ind <T> 0 8 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 10 -loop: ind ++: len end len ind <T> 0 8 }T
+;
+test_loop_countdown
+
+: test_cont_loop
+  -1 { ind }
+  loop
+    ind inc { ind }
+    ind 7 < if cont end
+    leave
+  end
+  T{ ind <T> 7 }T
+;
+test_cont_loop
+
+: test_cont_for
+  0 { ind }
+  7 for
+    ind inc { ind }
+    cont
+    leave
+  end
+  T{ ind <T> 7 }T
+;
+test_cont_for
+
+\ Used internally by testing utils. The test is kinda cyclic.
+123 var: VAR
+T{ VAR @     <T> 123 }T
+T{ 234 VAR ! <T>     }T
+T{ VAR @     <T> 234 }T
+T{ 345 VAR ! <T>     }T
+T{ VAR @     <T> 345 }T
+
+T{ 0    negate <T> 0    }T
+T{ 123  negate <T> -123 }T
+T{ -123 negate <T> 123  }T
+
+\ `=` is used by the testing tools, so this test is almost meaningless.
+T{  0    0   = <T> 1 }T
+T{  0    123 = <T> 0 }T
+T{  123  0   = <T> 0 }T
+T{ -123  0   = <T> 0 }T
+T{ -123  123 = <T> 0 }T
+T{  123 -123 = <T> 0 }T
+T{ -123 -123 = <T> 1 }T
+T{  123  123 = <T> 1 }T
+
+T{  0    0   <> <T> 0 }T
+T{  0    123 <> <T> 1 }T
+T{  123  0   <> <T> 1 }T
+T{ -123  0   <> <T> 1 }T
+T{ -123  123 <> <T> 1 }T
+T{  123 -123 <> <T> 1 }T
+T{ -123 -123 <> <T> 0 }T
+T{  123  123 <> <T> 0 }T
+
+T{  0    0   > <T> 0 }T
+T{  0    123 > <T> 0 }T
+T{  123  0   > <T> 1 }T
+T{ -123  0   > <T> 0 }T
+T{ -123  123 > <T> 0 }T
+T{  123 -123 > <T> 1 }T
+T{ -123 -123 > <T> 0 }T
+T{  123  123 > <T> 0 }T
+
+T{  0    0   < <T> 0 }T
+T{  0    123 < <T> 1 }T
+T{  123  0   < <T> 0 }T
+T{ -123  0   < <T> 1 }T
+T{ -123  123 < <T> 1 }T
+T{  123 -123 < <T> 0 }T
+T{ -123 -123 < <T> 0 }T
+T{  123  123 < <T> 0 }T
+
+T{  0    0    <= <T> 1 }T
+T{  0    123  <= <T> 1 }T
+T{  123  0    <= <T> 0 }T
+T{ -123  0    <= <T> 1 }T
+T{ -123  123  <= <T> 1 }T
+T{  123 -123  <= <T> 0 }T
+T{ -123 -123  <= <T> 1 }T
+T{  123  123  <= <T> 1 }T
+
+T{  0    0    >= <T> 1 }T
+T{  0    123  >= <T> 0 }T
+T{  123  0    >= <T> 1 }T
+T{ -123  0    >= <T> 0 }T
+T{ -123  123  >= <T> 0 }T
+T{  123 -123  >= <T> 1 }T
+T{ -123 -123  >= <T> 1 }T
+T{  123  123  >= <T> 1 }T
+
+T{ 234 123 - <T> 111   }T
+T{ 234 123 + <T> 357   }T
+T{ 234 123 * <T> 28782 }T
+T{ 234 123 / <T> 1     }T
+
+T{ 12 1 mod <T> 0 }T
+T{ 12 2 mod <T> 0 }T
+T{ 12 3 mod <T> 0 }T
+T{ 12 4 mod <T> 0 }T
+T{ 12 5 mod <T> 2 }T
+T{ 12 6 mod <T> 0 }T
+T{ 12 7 mod <T> 5 }T
+T{ 12 8 mod <T> 4 }T
+T{ 12 9 mod <T> 3 }T
+
+T{ 12 1 /mod <T> 0 12 }T
+T{ 12 2 /mod <T> 0 6  }T
+T{ 12 3 /mod <T> 0 4  }T
+T{ 12 4 /mod <T> 0 3  }T
+T{ 12 5 /mod <T> 2 2  }T
+T{ 12 6 /mod <T> 0 2  }T
+T{ 12 7 /mod <T> 5 1  }T
+T{ 12 8 /mod <T> 4 1  }T
+T{ 12 9 /mod <T> 3 1  }T
+
+T{    0 abs <T>   0 }T
+T{ -123 abs <T> 123 }T
+T{  123 abs <T> 123 }T
+
+T{  123  234 min <T>  123 }T
+T{  234  123 min <T>  123 }T
+T{  0    123 min <T>  0   }T
+T{  123  0   min <T>  0   }T
+T{  0   -123 min <T> -123 }T
+T{ -123  0   min <T> -123 }T
+T{ -123  234 min <T> -123 }T
+T{  234 -123 min <T> -123 }T
+
+T{  123  234 max <T>  234 }T
+T{  234  123 max <T>  234 }T
+T{  0    123 max <T>  123 }T
+T{  123  0   max <T>  123 }T
+T{  0   -123 max <T>  0   }T
+T{ -123  0   max <T>  0   }T
+T{ -123  234 max <T>  234 }T
+T{  234 -123 max <T>  234 }T
+
+T{ nil           nil    cstr= <T> true  }T
+T{ nil           " one" cstr= <T> false }T
+T{ " one"        nil    cstr= <T> false }T
+T{ " one" strdup " two" cstr= <T> false }T
+T{ " two" strdup " one" cstr= <T> false }T
+T{ " one" strdup " one" cstr= <T> true  }T
+
+T{ nil           nil    cstr< <T> false }T
+T{ nil           " one" cstr< <T> true  }T
+T{ " one"        nil    cstr< <T> false }T
+T{ " one" strdup " two" cstr< <T> true  }T
+T{ " two" strdup " one" cstr< <T> false }T
+T{ " one" strdup " one" cstr< <T> false }T
+
+: int32_negative { -- val } [
+  0b0_00_100101_00_0000000000000000_00000 comp_instr \ mov w0, -1
+  1 comp_args_set
+] ;
+
+T{ int32_negative             <T> 0xffff_ffff           }T
+T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
+T{ int32_negative int_to_cell <T> -1                    }T
+
+: test_vargs_printf
+  10 20 30 va{ " numbers (should be 10 20 30): %zd %zd %zd" printf }va
+  { printed }
+  lf
+
+  s" numbers (should be 10 20 30): 10 20 30" { __ len }
+  T{ printed <T> len }T
+;
+\ test_vargs_printf
+
+: test_logf
+  " numbers (should be 40 50 60): %zd %zd %zd" 40 50 60 logf lf
+;
+\ test_logf
+
+: test_elogf
+  " numbers (should be 70 80 90): %zd %zd %zd" 70 80 90 elogf elf
+;
+\ test_elogf
+
+4096 buf: STR_BUF
+
+: test_strf
+  STR_BUF " numbers: %zd %zd %zd" 10 20 30 strf
+  STR_BUF { str -- }
+  T{ str " numbers: 10 20 30" cstr= <T> true }T
+;
+
+: test_errf
+  T{ ERR_BUF_0 " " cstr= <T> true }T
+
+  T{
+    " codes: %zd %zd %zd" 10 20 30 errf
+    " codes: 10 20 30"
+    cstr=
+  <T>
+    true
+  }T
+
+  T{ ERR_BUF_0 " codes: 10 20 30" cstr= <T> true }T
+;
+test_errf
+
+: test_errf_throw
+  " codes: %zd %zd %zd" 10 20 30 errf throw
+;
+\ test_errf_throw
+
+: test_wrapf
+  " one" nil      wrapf { err0 }
+  " two: %s" err0 wrapf { err1 }
+
+  \ err0 logf lf
+  \ err1 logf lf
+
+  T{ err0 " one"      cstr= <T> true }T
+  T{ err1 " two: one" cstr= <T> true }T
+
+  " three: %s" err1 wrapf { err2 }
+
+  \ `wrapf` rotates two string buffers.
+  T{ err0 err2 = <T> true  }T
+  T{ err0 err1 = <T> false }T
+
+  T{ err2 " three: two: one" cstr= <T> true }T
+
+  " four: %zd: %s" 123 err2 wrapf { err3 }
+
+  T{ err3 err0 = <T> false }T
+  T{ err3 err1 = <T> true  }T
+  T{ err3 err2 = <T> false }T
+  T{ err3 " four: 123: three: two: one" cstr= <T> true }T
+;
+test_wrapf
+
+: test_locals
+  T{          { }                                     <T>          }T
+  T{          { -- }                                  <T>          }T
+  T{ 10       { }                                     <T> 10       }T
+  T{ 10 20    { }                                     <T> 10 20    }T
+  T{ 10       { }                  20                 <T> 10 20    }T
+  T{          { }                  10 20              <T> 10 20    }T
+  T{ 10       { -- }                                  <T>          }T
+  T{ 10 20    { -- }                                  <T>          }T
+  T{ 10       { one }                                 <T>          }T
+  T{ 20       { one }              one                <T> 20       }T
+  T{ 30       { one }              one one            <T> 30 30    }T
+  T{ 40       { one -- }           one one            <T> 40 40    }T
+  T{ 10       { -- one }                              <T>          }T
+  T{ 10 20    { one two }          one two            <T> 10 20    }T
+  T{ 10 20    { one two }                             <T>          }T
+  T{ 10 20    { one two -- }                          <T>          }T
+  T{ 30 40    { one two }          one                <T> 30       }T
+  T{ 50 60    { one two -- }       one                <T> 50       }T
+  T{ 10 20    { one two }          two                <T> 20       }T
+  T{ 30 40    { one two }          one two            <T> 30 40    }T
+  T{ 50 60    { one two }          two one            <T> 60 50    }T
+  T{ 10 20    { one two }          two one one        <T> 20 10 10 }T
+  T{ 30 40    { one two }          two one two        <T> 40 30 40 }T
+  T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
+  T{ 30 40    { one two }          one one two        <T> 30 30 40 }T
+  T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
+  T{ 30 40    { one --     }       one one            <T> 30 30    }T
+  T{ 30 40    { one -- two }       one one            <T> 30 30    }T
+  T{ 10 20    { one --     }       one one            <T> 10 10    }T
+  T{ 10 20    { one -- two }       one one            <T> 10 10    }T
+  T{ 10 20    { -- one two }                          <T>          }T
+  T{ 30 40    { one two -- three } one one two        <T> 30 30 40 }T
+  T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
+  T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
+  T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
+  T{ 10 20 30 { -- one two three }                    <T>          }T
+  T{ 40 50 60 { -- one two three }                    <T>          }T
+  T{ 10 20 30 { -- }                                  <T>          }T
+  T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
+  T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
+  T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
+;
+test_locals
+
+: test_local_ref
+  ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
+  sysstack_frame_ptr { FP }
+
+  T{ FP   <T> sysstack_frame_ptr }T
+  T{ adr0 <T> FP 16 +            }T
+  T{ adr1 <T> FP 24 +            }T
+  T{ adr2 <T> FP 32 +            }T
+
+  12 23 34 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> 12 23 34 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
+
+  -34 -23 -12 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> -34 -23 -12 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
+
+  21 adr0 ! 32 adr1 ! 43 adr2 !
+  T{ val0   val1   val2   <T> 21 32 43 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
+;
+test_local_ref
+
+: test_local_ref_volatile_immediate_read
+  123                 \ mov x0, 123
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
+  ref' val { adr }    \ add x0, x29, 16
+  T{ adr @ <T> 123 }T \ no junk data
+;
+test_local_ref_volatile_immediate_read
+
+: test_local_ref_volatile_delayed_read
+  123                 \ mov x0, 123
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
+  234                 \ Clobber x0; compiler emits a fixup.
+  { -- }
+  ref' val { adr }    \ add x0, x29, 16
+  T{ adr @ <T> 123 }T \ no junk data
+;
+test_local_ref_volatile_delayed_read
+
+: bang_with_more_inputs { val adr x2 x3 x4 } val adr ! ;
+
+\ Taking a local's address makes it volatile. Temporary register associations
+\ may be silently invalidated by `!`, with the compiler none the wiser.
+: test_local_ref_volatile_with_inputs
+  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
+  ref' val { adr } \ add x0, x29, 16
+
+  T{ adr @ <T> 123 }T
+
+  \ mov  x5, x0        -- relocate `adr`
+  \ mov  x0, 234
+  \ mov  x1, x5
+  \ ldr  x2, [x29, 16]
+  \ mov  x3, x2        -- temp register assoc for `val`
+  \ mov  x4, x2        -- temp register assoc for `val`
+  \ stur x0, [x1]
+  234 adr val val val bang_with_more_inputs
+
+  \ Invalid: `mov x0, x4`.
+  \ Valid:   `ldr x0, [x29, 16]`.
+  T{ val   <T> 234 }T
+  T{ adr @ <T> 234 }T
+;
+test_local_ref_volatile_with_inputs
+
+: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next ;
+
+: test_local_ref_volatile_with_outputs
+  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
+  ref' val { adr } \ add x0, x29, 16
+
+  T{ adr @ <T> 123 }T
+
+  \ mov  x5, x0 -- relocate `adr`
+  \ mov  x0, 234
+  \ mov  x1, x5
+  \ stur x0, [x1]
+  \ mov  x0, 12
+  \ mov  x1, 23
+  \ mov  x2, 34
+  234 adr 345 bang_with_outputs
+
+  \ Without `ref'`, `val` would be temp-associated with `x0 x1 x2`
+  \ without immediately storing to memory. With `ref'`, this should
+  \ repeatedly store to memory.
+  { val val val }
+
+  T{ adr @ <T> 345 }T
+
+  456 adr 567 bang_with_outputs { val val val }
+
+  \ Invalid: `mov x0, x2`.
+  \ Valid:   `ldr x0, [x29, 16]`.
+  T{ val <T> 567 }T
+;
+test_local_ref_volatile_with_outputs
+
+: test_stack_primitives
+  T{ stack_len <T> 0 }T
+
+  10 >stack
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 10 }T
+  T{ stack_len <T> 0  }T
+
+  20 >stack
+  30 >stack
+  T{ stack_len <T> 2  }T
+  T{ stack>    <T> 30 }T
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 20 }T
+  T{ stack_len <T> 0  }T
+;
+test_stack_primitives
+
+\ Since `>stack` and `stack>` are intended for moving values
+\ between registers and the Forth data stack, using them in
+\ interpreted code is meaningless, doesn't change anything.
+T{ 10 >stack <T> 10 }T
+T{ 20 stack> <T> 20 }T
+
+: test_to_stack_variadic
+  T{ stack_len <T> 0 }T
+  >>stack
+  T{ stack_len <T> 0 }T
+
+  10 >>stack
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 10 }T
+  T{ stack_len <T> 0  }T
+
+  20 30 >>stack
+  T{ stack_len <T> 2  }T
+  T{ stack>    <T> 30 }T
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 20 }T
+  T{ stack_len <T> 0  }T
+
+  40 50 60 >>stack
+  T{ stack_len <T> 3  }T
+  T{ stack>    <T> 60 }T
+  T{ stack_len <T> 2  }T
+  T{ stack>    <T> 50 }T
+  T{ stack_len <T> 1  }T
+  T{ stack>    <T> 40 }T
+  T{ stack_len <T> 0  }T
+;
+test_to_stack_variadic
+
+: test_stack_braces
+  T{ stack_len <T> 0 }T
+  stack{ }
+  T{ stack_len <T> 0 }T
+
+  10 >>stack
+  T{ stack_len <T> 1 }T
+  stack{ one }
+  T{ stack_len one <T> 0 10 }T
+
+  10 20 >>stack
+  T{ stack_len <T> 2 }T
+  stack{ one two }
+  T{ stack_len one two <T> 0 10 20 }T
+
+  10 20 30 >>stack
+  T{ stack_len <T> 3 }T
+  stack{ one two three }
+  T{ stack_len one two three <T> 0 10 20 30 }T
+;
+test_stack_braces
+
+: test_alloca_cell
+  Cell alloca { ptr }
+
+  T{ ptr @ <T> ptr @ }T \ Should not segfault. The value is undefined.
+
+  123 ptr !
+  T{ ptr @ <T> 123 }T
+
+  234 ptr !
+  T{ ptr @ <T> 234 }T
+;
+test_alloca_cell
+
+: test_alloca_align
+  systack_ptr { SP }
+  1  alloca   { adr0 }
+  2  alloca   { adr1 }
+  4  alloca   { adr2 }
+  8  alloca   { adr3 }
+  16 alloca   { adr4 }
+  32 alloca   { adr5 }
+
+  \ Compiler ensures natural alignment up to 16.
+  T{ adr0 1  mod <T> 0 }T
+  T{ adr1 2  mod <T> 0 }T
+  T{ adr2 4  mod <T> 0 }T
+  T{ adr3 8  mod <T> 0 }T
+  T{ adr4 16 mod <T> 0 }T
+  T{ adr5 16 mod <T> 0 }T
+
+  T{ adr0 <T> SP 16 - }T
+  T{ adr1 <T> SP 32 - }T
+  T{ adr2 <T> SP 48 - }T
+  T{ adr3 <T> SP 64 - }T
+  T{ adr4 <T> SP 80 - }T
+  T{ adr5 <T> SP 112 - }T
+;
+test_alloca_align
+
+65536 let: SIZE_BIG
+
+: test_alloca_big
+  SIZE_BIG alloca { adr0 }
+  SIZE_BIG alloca { adr1 }
+  SIZE_BIG alloca { adr2 }
+
+  T{ adr0 16 mod <T> 0 }T
+  T{ adr1 16 mod <T> 0 }T
+  T{ adr2 16 mod <T> 0 }T
+
+  T{ adr0 adr1 - <T> SIZE_BIG }T
+  T{ adr1 adr2 - <T> SIZE_BIG }T
+;
+test_alloca_big
+
+: test_alloca_dynamic { size0 size1 }
+  systack_ptr  { SP   }
+  size0 alloca { adr0 }
+  size1 alloca { adr1 }
+
+  T{ SP   adr0 - <T> size0 }T
+  T{ adr0 adr1 - <T> size1 }T
+
+  adr0 @ { -- } \ Should not segfault.
+  adr1 @ { -- } \ Should not segfault.
+;
+32 64 test_alloca_dynamic
+
+1 1 arr: Arr0
+2 1 arr: Arr1
+3 1 arr: Arr2
+1 2 arr: Arr3
+1 3 arr: Arr4
+2 3 arr: Arr5
+3 3 arr: Arr6
+
+T{ Arr0 <T> 1 }T
+T{ Arr1 <T> 2 }T
+T{ Arr2 <T> 3 }T
+T{ Arr3 <T> 2 }T
+T{ Arr4 <T> 3 }T
+T{ Arr5 <T> 6 }T
+T{ Arr6 <T> 9 }T
+
+struct: Typ
+  8 1 field: Typ_field0
+  4 1 field: Typ_field1
+end
+
+\ Field alignment and padding needs to match C.
+\ We test alignment for a lot more cases below.
+T{        Typ        <T>    16  }T
+T{    0   Typ_field0 <T>    0   }T
+T{    0   Typ_field1 <T>    8   }T
+T{    123 Typ_field0 <T>    123 }T
+T{    234 Typ_field0 <T>    234 }T
+T{    123 Typ_field1 <T>    131 }T
+T{    234 Typ_field1 <T>    242 }T
+
+Typ mem: ptr
+
+T{ ptr Typ_field0 <T> ptr     }T
+T{ ptr Typ_field1 <T> ptr 8 + }T
+
+T{    ptr Typ_field0 @ <T> 0  }T
+T{ 10 ptr Typ_field0 ! <T>    }T
+T{    ptr Typ_field0 @ <T> 10 }T
+
+T{    ptr Typ_field1 @ <T> 0  }T
+T{ 20 ptr Typ_field1 ! <T>    }T
+T{    ptr Typ_field1 @ <T> 20 }T
+
+T{    ptr Typ_field0 @ <T> 10 }T
+T{ 30 ptr Typ_field0 ! <T>    }T
+T{    ptr Typ_field0 @ <T> 30 }T
+
+T{    ptr Typ_field1 @ <T> 20 }T
+T{ 40 ptr Typ_field1 ! <T>    }T
+T{    ptr Typ_field1 @ <T> 40 }T
+
+struct: Typ0 end
+T{ Typ0           <T> 0   }T
+
+struct: Typ1
+  U8 1 field: Typ1_field
+end
+
+T{ Typ1           <T> 1   }T
+T{ 123 Typ1_field <T> 123 }T
+
+struct: Typ2
+  U8  1 field: Typ2_field0
+  U32 1 field: Typ2_field1
+end
+
+T{ Typ2            <T> 8   }T
+T{ 123 Typ2_field0 <T> 123 }T
+T{ 123 Typ2_field1 <T> 127 }T
+
+struct: Typ3
+  U32 1 field: Typ3_field0
+  U8  1 field: Typ3_field1
+end
+
+T{ Typ3            <T> 8   }T
+T{ 123 Typ3_field0 <T> 123 }T
+T{ 123 Typ3_field1 <T> 127 }T
+
+struct: Typ4
+  U8  1 field: Typ4_field0
+  U32 1 field: Typ4_field1
+  U64 1 field: Typ4_field2
+end
+
+T{ Typ4            <T> 16  }T
+T{ 123 Typ4_field0 <T> 123 }T
+T{ 123 Typ4_field1 <T> 127 }T
+T{ 123 Typ4_field2 <T> 131 }T
+
+struct: Typ5
+  U32 1 field: Typ5_field0
+  U8  1 field: Typ5_field1
+  U64 1 field: Typ5_field2
+end
+
+T{ Typ5            <T> 16  }T
+T{ 123 Typ5_field0 <T> 123 }T
+T{ 123 Typ5_field1 <T> 127 }T
+T{ 123 Typ5_field2 <T> 131 }T
+
+struct: Typ6
+  U32 1 field: Typ6_field0
+  U64 1 field: Typ6_field1
+  U8  1 field: Typ6_field2
+end
+
+T{ Typ6            <T> 24  }T
+T{ 123 Typ6_field0 <T> 123 }T
+T{ 123 Typ6_field1 <T> 131 }T
+T{ 123 Typ6_field2 <T> 139 }T
+
+struct: Typ7
+  U64 1 field: Typ7_field0
+  U32 1 field: Typ7_field1
+  U32 1 field: Typ7_field2
+  U8  1 field: Typ7_field3
+end
+
+T{ Typ7            <T> 24  }T
+T{ 123 Typ7_field0 <T> 123 }T
+T{ 123 Typ7_field1 <T> 131 }T
+T{ 123 Typ7_field2 <T> 135 }T
+T{ 123 Typ7_field3 <T> 139 }T
+
+struct: Typ8
+  U8  1 field: Typ8_field0
+  U8  1 field: Typ8_field1
+  U8  1 field: Typ8_field2
+  U32 1 field: Typ8_field3
+end
+
+T{ Typ8            <T> 8   }T
+T{ 123 Typ8_field0 <T> 123 }T
+T{ 123 Typ8_field1 <T> 124 }T
+T{ 123 Typ8_field2 <T> 125 }T
+T{ 123 Typ8_field3 <T> 127 }T
+
+struct: Typ9
+  U8 1   field: Typ9_field0
+  U8 128 field: Typ9_field1
+end
+
+T{ Typ9            <T> 129 }T
+T{ 123 Typ9_field0 <T> 123 }T
+T{ 123 Typ9_field1 <T> 124 }T
+
+struct: Typ10
+  U8  1   field: Typ10_field0
+  U8  2   field: Typ10_field1
+  U32 3   field: Typ10_field2
+  U8  128 field: Typ10_field3
+end
+
+T{ Typ10            <T> 144 }T
+T{ 123 Typ10_field0 <T> 123 }T
+T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
+T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
+T{ 123 Typ10_field3 <T> 139 }T
+
+struct: Typ11
+  5   3 field: Typ11_field0
+  U64 1 field: Typ11_field1
+end
+
+T{ Typ11            <T> 24  }T
+T{ 123 Typ11_field0 <T> 123 }T
+T{ 123 Typ11_field1 <T> 139 }T
+
+: test_catch_invalid
+  \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
+  \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
+;
+
+: test_throw " test_err" throw ;
+
+: test_catch_0_val { -- val }
+  false if test_throw end
+  123
+;
+
+: test_catch_0
+  T{ test_catch_0_val          <T> 123     }T
+  T{ catch' test_catch_0_val   <T> 123 nil }T
+  T{ catch' test_throw { err } <T>         }T
+  T{ " test_err" err cstr=    <T> true    }T
+;
+test_catch_0
+
+: test_catch_1_cond { one -- two }
+  one if one 2 * ret end
+  test_throw
+  unreachable
+  nil
+;
+
+: test_catch_1
+  T{ 123 test_catch_1_cond                    <T> 246     }T
+  T{ 123 catch' test_catch_1_cond             <T> 246 nil }T
+  T{ 0   catch' test_catch_1_cond { val err } <T>         }T
+  T{ " test_err" err cstr=                    <T> true    }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ val <T> err }T
+;
+
+: test_catch_2_cond { one two -- three four }
+  one <>0 { ok0 }
+  two <>0 { ok1 }
+
+  ok0 ok1 and if
+    one two + { three }
+    two one - { four  }
+    three four ret
+  end
+
+  test_throw
+  unreachable
+  nil nil
+;
+
+: test_catch_2
+  T{ 13 25 test_catch_2_cond        <T> 38 12     }T
+  T{ 13 25 catch' test_catch_2_cond <T> 38 12 nil }T
+
+  T{ 0  13 catch' test_catch_2_cond { one two err } <T>      }T
+  T{ " test_err" err cstr=                          <T> true }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ one two <T> err true }T
+
+  T{ 12 0  catch' test_catch_2_cond { one two err } <T>      }T
+  T{ " test_err" err cstr=                          <T> true }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ one two <T> err 0 }T
+;
+test_catch_2
+
+\ Procedures with `catches` never throw IMPLICITLY, but we allow to throw
+\ EXPLICITLY. The compiler marks the procedure as "throwing", in addition
+\ to "catching". Callers handle its exception as usual.
+: test_catches_and_throws_fun [ true catches ]
+  test_throw { err_ignore }
+  " different_test_err" throw
+;
+
+\ Note: when testing `catches`, we have to replace `}T` with `}T`
+\ because `}T` throws on test failures, and `catches` reveals those
+\ exceptions as values. The code wouldn't compile without `try` due
+\ to arity mismatch.
+: test_catches_and_throws [ true catches ]
+  test_catches_and_throws_fun { err }
+  T{ " different_test_err" err cstr= <T> true }T
+;
+test_catches_and_throws
+
+: test_catches_0
+  [ true catches ]
+
+  test_throw   { err0 }
+  " test_err" { err1 }
+
+  T{ err0 err1 =     <T> false }T
+  T{ err0 err1 cstr= <T> true  }T
+;
+test_catches_0
+
+: test_catches_1_fun { one -- two }
+  one ifn test_throw end
+  one 2 *
+;
+
+\ Compare with `test_catches_1` which is the actual test.
+: test_catches_1_fun_throwing
+  \ 0 test_catches_1_fun { -- } \ Must throw.
+
+  T{ 123 test_catches_1_fun { val } <T>     }T
+  T{ val                            <T> 246 }T
+  T{ 123 test_catches_1_fun         <T> 246 }T
+;
+test_catches_1_fun_throwing
+
+: test_catches_1
+  [ true catches ]
+
+  T{ 0 test_catches_1_fun { val err } <T>      }T
+  T{ " test_err" err cstr=            <T> true }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ val <T> err }T
+
+  T{ 123 test_catches_1_fun { val err } <T>         }T
+  T{ val err                            <T> 246 nil }T
+  T{ 123 test_catches_1_fun             <T> 246 nil }T
+;
+test_catches_1
+
+: test_catches_2_fun { one two -- three }
+  one ifn test_throw end
+  one two +
+;
+
+\ Compare with `test_catches_2` which is the actual test.
+: test_catches_2_fun_throwing
+  \ 0 123 test_catches_2_fun { -- } \ Must throw.
+
+  T{ 11 22 test_catches_2_fun { val } <T>    }T
+  T{ val                              <T> 33 }T
+  T{ 11 22 test_catches_2_fun         <T> 33 }T
+
+  T{ 11 0 test_catches_2_fun { val } <T>    }T
+  T{ val                             <T> 11 }T
+  T{ 11 0 test_catches_2_fun         <T> 11 }T
+;
+test_catches_2_fun_throwing
+
+: test_catches_2
+  [ true catches ]
+
+  T{ 0 11 test_catches_2_fun { val err } <T>      }T
+  T{ " test_err" err cstr=               <T> true }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ val <T> err }T
+
+  T{ 11 22 test_catches_2_fun { val err } <T>        }T
+  T{ val err                              <T> 33 nil }T
+  T{ 11 22 test_catches_2_fun             <T> 33 nil }T
+
+  T{ 11 0 test_catches_2_fun { val err } <T>        }T
+  T{ val err                             <T> 11 nil }T
+  T{ 11 0 test_catches_2_fun             <T> 11 nil }T
+;
+test_catches_2
+
+: test_catches_3_fun { one -- two three }
+  one ifn test_throw end
+  one 2 *    { two }
+  one negate { three }
+  two three
+;
+
+\ Compare with `test_catches_3` which is the actual test.
+: test_catches_3_fun_throwing
+  \ 0 test_catches_3_fun { -- } \ Must throw.
+
+  T{ 123 negate <T> -123 }T
+
+  T{ 123 test_catches_3_fun { one two } <T>          }T
+  T{ one two                            <T> 246 -123 }T
+  T{ 123 test_catches_3_fun             <T> 246 -123 }T
+;
+test_catches_3_fun_throwing
+
+: test_catches_3
+  [ true catches ]
+
+  T{ 0 test_catches_3_fun { one two err } <T>      }T
+  T{ " test_err" err cstr=                <T> true }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ one <T> err }T
+  T{ two <T> 0   }T
+
+  T{ 123 test_catches_3_fun { one two err } <T>              }T
+  T{ one two err                            <T> 246 -123 nil }T
+  T{ 123 test_catches_3_fun                 <T> 246 -123 nil }T
+;
+test_catches_3
+
+: test_catches_4_fun { one two -- three four }
+  one ifn test_throw end
+  one two + { three }
+  two one - { four }
+  three four
+;
+
+\ Compare with `test_catches_4` which is the actual test.
+: test_catches_4_fun_throwing
+  \ 0 123 test_catches_4_fun { -- } \ Must throw.
+
+  T{ 13 25 test_catches_4_fun { one two } <T>       }T
+  T{ one two                              <T> 38 12 }T
+  T{ 13 25 test_catches_4_fun             <T> 38 12 }T
+
+  T{ 13 0 test_catches_4_fun { one two } <T>        }T
+  T{ one two                             <T> 13 -13 }T
+  T{ 13 0 test_catches_4_fun             <T> 13 -13 }T
+;
+test_catches_4_fun_throwing
+
+: test_catches_4
+  [ true catches ]
+
+  T{ 0 13 test_catches_4_fun { one two err } <T>      }T
+  T{ " test_err" err cstr=                   <T> true }T
+
+  \ Accident of register allocation. We're not attached to this behavior.
+  T{ one <T> err }T
+  T{ two <T> 13  }T
+
+  T{ 13 25 test_catches_4_fun { one two err } <T>           }T
+  T{ one two err                              <T> 38 12 nil }T
+  T{ 13 25 test_catches_4_fun                 <T> 38 12 nil }T
+
+  T{ 13 0 test_catches_4_fun { one two err } <T>            }T
+  T{ one two err                             <T> 13 -13 nil }T
+  T{ 13 0 test_catches_4_fun                 <T> 13 -13 nil }T
+;
+test_catches_4
+
+\ Must compile.
+: test_max_input_regs { A B C D E F G H -- } ;
+
+\ Must fail to compile.
+\ : test_too_many_input_regs { A B C D E F G H I -- } ;
+
+\ Must compile.
+: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 ;
+
+\ Must fail to compile.
+\ : test_too_many_output_regs { -- A B C D E F G H I } ;
+
+\ Must compile.
+: test_max_output_regs_throw { -- A B C D E F G }
+  false if test_throw end
+  0 1 2 3 4 5 6
+;
+
+\ Must fail to compile: error takes up 1 more reg.
+\ : test_too_many_output_regs_throw { -- A B C D E F G H }
+\   false if test_throw end
+\   0 1 2 3 4 5 6 7
+\ ;
+
+" [test] ok" log lf

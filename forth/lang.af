@@ -1,0 +1,2373 @@
+:: \ 10 parse { -- } ;
+:: ( 41 parse { -- } ;
+
+\ Can use comments now!
+\
+\ This file boostraps the Forth language. The outer interpreter / compiler
+\ provides only the most fundamental intrinsics; enough for self-assembly.
+\ We define basic words in terms of machine instructions, building up from
+\ there. Currently only the Arm64 CPU architecture is supported.
+\
+\ The compiler and language come in two variants: stack-CC and register-CC.
+\ This file uses the native register-based calling convention. See adjacent
+\ file `./lang_s.af` for the stack-based calling convention.
+
+\ brk 666
+: abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] ;
+: unreachable abort ;
+: nop ;
+
+\ ## Compilation-related words
+\
+\ These words are used for metaprogramming and mostly rely on
+\ compiler intrinsics. We define them first to be able to use
+\ constants via `let:`.
+\
+\ Unlike in standard Forth, we use separate wordlists for
+\ regular and compile-time / immediate words. As a result,
+\ we have to define parsing words like "compile" in pairs:
+\ one tick seeks in the regular wordlist, and double tick
+\ seeks in the compile-time wordlist.
+
+\ Non-immediate replacement for standard `literal`.
+: comp_push { val } ( E: -- val ) comp_next_arg_reg { reg } val reg comp_load ;
+
+: next_word { wlist -- XT } ( "word" -- XT ) parse_word wlist find_word ;
+
+: tick_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push ;
+:  '  {    -- XT } (    "word" -- ) 1 next_word ; \ WORDLIST_EXEC
+:  '' {    -- XT } (    "word" -- ) 2 next_word ; \ WORDLIST_COMP
+:: '  ( E: -- XT ) ( C: "word" -- ) 1 tick_next ; \ WORDLIST_EXEC
+:: '' ( E: -- XT ) ( C: "word" -- ) 2 tick_next ; \ WORDLIST_COMP
+
+: inline_next { wlist } ( "word" -- ) ( E: <word> )
+  wlist next_word inline_word
+;
+:: inline'  1 inline_next ;
+:: inline'' 2 inline_next ;
+
+\ "execute" is renamed from standard "postpone".
+\ Also see `execute_raw` for raw instruction addresses.
+: execute_next { wlist } ( "word" -- ) ( E: <word> )
+  wlist next_word comp_call
+;
+:: execute'  1 execute_next ;
+:: execute'' 2 execute_next ;
+
+: compile_next { wlist } ( "word" -- )
+  wlist next_word comp_push ' comp_call comp_call
+;
+:: compile'  1 compile_next ;
+:: compile'' 2 compile_next ;
+
+: semicolon execute'' ; ;
+
+: let_init { str len val } ( C: "name" -- ) ( E: -- val )
+  \ Execution-time semantics.
+  str len colon
+    0 1 comp_signature_set ( E: -- val )
+    val comp_push
+  semicolon
+
+  \ Compile-time semantics.
+  str len colon_colon
+    val comp_push compile' comp_push
+  semicolon
+;
+
+\ Similar to standard `constant`.
+: let: { val } ( C: "name" -- ) ( E: -- val )
+  parse_word val let_init
+  [ 0 comp_only ]
+;
+
+0 let: nil
+0 let: false
+1 let: true
+
+1 let: WORDLIST_EXEC
+2 let: WORDLIST_COMP
+
+\ ## Assembler and bitwise ops
+\
+\ We interleave definitions of assembler words with definitions
+\ of various arithmetic words used by the assembler.
+
+4      let: ASM_INSTR_SIZE
+8      let: ASM_REG_SCRATCH
+28     let: ASM_REG_INTERP \ SYNC[asm_reg_interp].
+29     let: ASM_REG_FP
+30     let: ASM_REG_LR
+31     let: ASM_REG_SP
+0b0000 let: ASM_EQ
+0b0001 let: ASM_NE
+0b0010 let: ASM_CS
+0b0011 let: ASM_CC
+0b0100 let: ASM_MI
+0b0101 let: ASM_PL
+0b0110 let: ASM_VS
+0b0111 let: ASM_VC
+0b1000 let: ASM_HI
+0b1001 let: ASM_LS
+0b1010 let: ASM_GE
+0b1011 let: ASM_LT
+0b1100 let: ASM_GT
+0b1101 let: ASM_LE
+0b1110 let: ASM_AL
+0b1111 let: ASM_NV
+666    let: ASM_PLACEHOLDER
+
+\ Bitwise arithmetic needed for the early stages of the self-assembler.
+
+: or { i0 i1 -- i2 } [
+  0 comp_clobber
+  0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
+  1 comp_args_set
+] ;
+
+: and { i0 i1 -- i2 } [
+  0 comp_clobber
+  0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
+  1 comp_args_set
+] ;
+
+: xor { i0 i1 -- i2 } [
+  0 comp_clobber
+  0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
+  1 comp_args_set
+] ;
+
+: lsl { i0 bits -- i1 } [
+  0 comp_clobber
+  0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
+  1 comp_args_set
+] ;
+
+: lsr { i0 bits -- i1 } [
+  0 comp_clobber
+  0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
+  1 comp_args_set
+] ;
+
+: invert { i0 -- i1 } [
+  0 comp_clobber
+  0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
+  1 comp_args_set
+] ;
+
+\ Our parsing rules prevent `1+` or `+1` from being a word name.
+: inc { i0 -- i1 } [
+  0 comp_clobber
+  0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
+  1 comp_args_set
+] ;
+
+\ Our parsing rules prevent `1-` or `-1` from being a word name.
+: dec { i0 -- i1 } [
+  0 comp_clobber
+  0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
+  1 comp_args_set
+] ;
+
+: low_bits { len -- bits } 1 len lsl dec ;
+: bit_trunc { imm len -- imm } len low_bits imm and ;
+
+\ cmp Xn, <imm>
+: asm_cmp_imm { Xn imm -- instr }
+  imm  10 lsl { imm }
+  Xn   5  lsl
+  imm or
+  0b1_1_1_100010_0_000000000000_00000_11111 or
+;
+
+\ cmp Xn, 0
+: asm_cmp_zero { Xn -- instr } Xn 0 asm_cmp_imm ;
+
+\ cset Xd, <cond>
+: asm_cset { Xd cond -- instr }
+  cond 1 xor 12 lsl { cond }
+  Xd cond or
+  0b1_0_0_11010100_11111_0000_0_1_11111_00000 or
+;
+
+: <>0 { int -- bool } [
+  0                     comp_clobber
+  0        asm_cmp_zero comp_instr \ cmp x0, 0
+  0 ASM_NE asm_cset     comp_instr \ cset x0, ne
+  1                     comp_args_set
+] ;
+
+: =0 { int -- bool } [
+  0                     comp_clobber
+  0        asm_cmp_zero comp_instr \ cmp x0, 0
+  0 ASM_EQ asm_cset     comp_instr \ cset x0, eq
+  1                     comp_args_set
+] ;
+
+\ Shared by a lot of load and store instructions. 64-bit only.
+: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
+  Xt2                    10 lsl { Xt2 }
+  Xn                      5 lsl { Xn }
+  imm7 3 lsr 7 bit_trunc 15 lsl
+  Xt1  or
+  Xt2  or
+  Xn   or
+;
+
+\ ldp Xt1, Xt2, [Xn, <imm>]!
+: asm_load_pair_pre { Xt1 Xt2 Xn imm7 -- instr }
+  Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
+  0b10_101_0_011_1_0000000_00000_00000_00000 or
+;
+
+\ ldp Xt1, Xt2, [Xn], <imm>
+: asm_load_pair_post { Xt1 Xt2 Xn imm7 -- instr }
+  Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
+  0b10_101_0_001_1_0000000_00000_00000_00000 or
+;
+
+\ ldp Xt1, Xt2, [Xn, <imm>]
+: asm_load_pair_off { Xt1 Xt2 Xn imm7 -- instr }
+  Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
+  0b10_101_0_010_1_0000000_00000_00000_00000 or
+;
+
+\ stp Xt1, Xt2, [Xn, <imm>]!
+: asm_store_pair_pre { Xt1 Xt2 Xn imm7 -- instr }
+  Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
+  0b10_101_0_011_0_0000000_00000_00000_00000 or
+;
+
+\ stp Xt1, Xt2, [Xn], <imm>
+: asm_store_pair_post { Xt1 Xt2 Xn imm7 -- instr }
+  Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
+  0b10_101_0_001_0_0000000_00000_00000_00000 or
+;
+
+\ stp Xt1, Xt2, [Xn, <imm>]
+: asm_store_pair_off { Xt1 Xt2 Xn imm7 -- instr }
+  Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
+  0b10_101_0_010_0_0000000_00000_00000_00000 or
+;
+
+\ Shared by a lot of load and store instructions.
+\ Patches these bits:
+\   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
+: asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
+  Xn                5 lsl { Xn }
+  imm9 9 bit_trunc 12 lsl
+  Xt or Xn or
+;
+
+\ ldr Xt, [Xn, <imm>]!
+: asm_load_pre { Xt Xn imm9 -- instr }
+  Xt Xn imm9 asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_11_00000_00000 or
+;
+
+\ ldr Xt, [Xn], <imm>
+: asm_load_post { Xt Xn imm9 -- instr }
+  Xt Xn imm9 asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_01_00000_00000 or
+;
+
+\ str Xt, [Xn, <imm>]!
+: asm_store_pre { Xt Xn imm9 -- instr }
+  Xt Xn imm9 asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_11_00000_00000 or
+;
+
+\ str Xt, [Xn], <imm>
+: asm_store_post { Xt Xn imm9 -- instr }
+  Xt Xn imm9 asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_01_00000_00000 or
+;
+
+\ ldur Xt, [Xn, <imm>]
+: asm_load_unscaled_off { Xt Xn imm9 -- instr }
+  Xt Xn imm9 asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_00_00000_00000 or
+;
+
+\ stur Xt, [Xn, <imm>]
+: asm_store_unscaled_off { Xt Xn imm9 -- instr }
+  Xt Xn imm9 asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_00_00000_00000 or
+;
+
+\ Shared by register-offset load and store instructions.
+\ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
+: asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
+  Xn        5  lsl { Xn }
+  Xm        16 lsl { Xm }
+  scale <>0 12 lsl \ lsl 3
+  Xt or Xn or Xm or
+;
+
+\ ldr Xt, [Xn, Xm, lsl <scale>]
+: asm_load_with_register_off { Xt Xn Xm scale -- instr }
+  Xt Xn Xm scale asm_pattern_load_store_with_register_off
+  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 or
+;
+
+\ str Xt, [Xn, Xm, lsl <scale>]
+: asm_store_with_register_off { Xt Xn Xm scale -- instr }
+  Xt Xn Xm scale asm_pattern_load_store_with_register_off
+  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 or
+;
+
+\ Shared by some integer arithmetic instructions.
+: asm_pattern_arith_reg { Xd Xn Xm -- instr_mask }
+  Xn 5  lsl { Xn }
+  Xm 16 lsl
+  Xd or Xn or
+;
+
+\ Shared by some integer arithmetic and load/store instructions.
+: asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
+  Xn                  5 lsl { Xn }
+  imm12 12 bit_trunc 10 lsl
+  Xd or Xn or
+;
+
+\ size:
+\
+\   0b00 -- 8  bit
+\   0b01 -- 16 bit
+\   0b10 -- 32 bit
+\   0b11 -- 64 bit
+\
+\ opc examples for size = 0b00:
+\
+\   0b01 -- ldrb  Wt
+\   0b11 -- ldrsb Wt
+\   0b10 -- ldrsb Xt
+\   0b00 -- strb  Wt
+\
+\ Base instruction variant: "immediate, unsigned offset". Offset is 0.
+: asm_load_store_imm { Rt Xn imm12 size opc -- instr }
+  size 30 lsl         { size }
+  opc  22 lsl size or { mask }
+  Rt Xn imm12 asm_pattern_arith_imm
+  mask or
+  0b00_111_0_01_00_000000000000_00000_00000 or
+;
+
+\ Unsigned 8-bit.
+\
+\ ldrb Wt, [Xn, imm12]
+: asm_load_off_u8 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b00 0b01 asm_load_store_imm
+;
+
+\ Signed 8-bit.
+\
+\ ldrsb Xt, [Xn, imm12]
+: asm_load_off_s8 { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b00 0b10 asm_load_store_imm
+;
+
+\ Either unsigned or signed 8-bit.
+\
+\ strb Wt, [Xn, imm12]
+: asm_store_off_u8 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b00 0b00 asm_load_store_imm
+;
+
+\ ldrh Wt, [Xn, imm12]
+: asm_load_off_u16 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b01 0b01 asm_load_store_imm
+;
+
+\ ldrsh Xt, [Xn, imm12]
+: asm_load_off_s16 { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b01 0b10 asm_load_store_imm
+;
+
+\ strh Wt, [Xn, imm12]
+: asm_store_off_u16 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b01 0b00 asm_load_store_imm
+;
+
+\ ldr Wt, [Xn, imm12]
+: asm_load_off_u32 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b10 0b01 asm_load_store_imm
+;
+
+\ ldrsw Xt, [Xn, imm12]
+: asm_load_off_s32 { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b10 0b10 asm_load_store_imm
+;
+
+\ str Wt, [Xn, imm12]
+: asm_store_off_u32 { Wt Xn imm12 -- instr }
+  Wt Xn imm12 0b10 0b00 asm_load_store_imm
+;
+
+\ ldr Xt, [Xn, imm12]
+: asm_load_off { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b11 0b01 asm_load_store_imm
+;
+
+\ str Xt, [Xn, imm12]
+: asm_store_off { Xt Xn imm12 -- instr }
+  Xt Xn imm12 0b11 0b00 asm_load_store_imm
+;
+
+\ neg Xd, Xd
+: asm_neg { Xd -- instr }
+  Xd 16 lsl \ Xt
+  Xd or
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 or
+;
+
+\ add Xd, Xn, <imm12>
+: asm_add_imm { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_0_0_100010_0_000000000000_00000_00000 or
+;
+
+\ add Xd, Xn, Xm
+: asm_add_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ sub Xd, Xn, <imm12>
+: asm_sub_imm { Xd Xn imm12 -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  0b1_1_0_100010_0_000000000000_00000_00000 or
+;
+
+\ sub Xd, Xn, Xm
+: asm_sub_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_1_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ sub Xd, Xn, Xm, lsl 3
+: asm_sub_reg_words { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_sub_reg
+  0b0_0_0_00000_00_0_00000_000011_00000_00000 or
+;
+
+\ mul Xd, Xn, Xm
+: asm_mul { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_00_11011_000_00000_0_11111_00000_00000 or
+;
+
+\ sdiv Xd, Xn, Xm
+: asm_sdiv { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_00001_1_00000_00000 or
+;
+
+\ msub Xd, Xn, Xm, Xa
+: asm_msub { Xd Xn Xm Xa -- instr }
+  Xn  5 lsl { Xn }
+  Xm 16 lsl { Xm }
+  Xa 10 lsl
+  Xd or Xn or Xm or
+  0b1_00_11011_000_00000_1_00000_00000_00000 or
+;
+
+: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
+  cond 12 lsl { cond }
+  Xd Xm Xn asm_pattern_arith_reg
+  cond or
+;
+
+\ csel Xd, Xn, Xm, <cond>
+: asm_csel { Xd Xn Xm cond -- instr }
+  Xd Xm Xn cond asm_pattern_arith_csel
+  0b1_0_0_11010100_00000_0000_0_0_00000_00000 or
+;
+
+\ csneg Xd, Xn, Xm, <cond>
+: asm_csneg { Xd Xn Xm cond -- instr }
+  Xd Xm Xn cond asm_pattern_arith_csel
+  0b1_1_0_11010100_00000_0000_0_1_00000_00000 or
+;
+
+\ asr Xd, Xn, imm6
+: asm_asr_imm { Xd Xn imm6 -- instr }
+  Xd Xn imm6 asm_pattern_arith_reg
+  0b1_00_100110_1_000000_111111_00000_00000 or
+;
+
+\ asr Xd, Xn, Xm
+: asm_asr_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_0010_10_00000_00000 or
+;
+
+\ Arithmetic (sign-preserving) right shift.
+: asr { i0 bits -- i1 } [
+  0                 comp_clobber
+  0 0 1 asm_asr_reg comp_instr \ asr x0, x0, x1
+  1                 comp_args_set
+] ;
+
+\ eor Xd, Xn, Xm
+: asm_eor_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_10_01010_00_0_00000_000000_00000_00000 or
+;
+
+\ cmp Xn, Xm
+: asm_cmp_reg { Xn Xm -- instr }
+  Xn  5 lsl { Xn }
+  Xm 16 lsl
+  Xn or
+  0b1_1_1_01011_00_0_00000_000_000_00000_11111 or
+;
+
+\ b <off>
+: asm_branch { off26 -- instr }
+  off26
+  2  lsr       \ Offset is implicitly times 4.
+  26 bit_trunc \ Offset may be negative.
+  0b0_00_101_00000000000000000000000000 or
+;
+
+\ b.<cond> <off>
+: asm_branch_cond { off19 cond -- instr }
+  off19 2 asr 19 bit_trunc 5 lsl \ Implicitly times 4.
+  cond or
+  0b010_101_00_0000000000000000000_0_0000 or
+;
+
+\ `off19` offset is implicitly times 4 and can be negative.
+: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
+  off19 2 lsr 19 bit_trunc 5 lsl
+  Xt or
+;
+
+\ cbz x1, <off>
+: asm_cmp_branch_zero { Xt off19 -- instr }
+  Xt off19 asm_pattern_cmp_branch
+  0b1_011010_0_0000000000000000000_00000 or
+;
+
+\ cbnz x1, <off>
+: asm_cmp_branch_not_zero { Xt off19 -- instr }
+  Xt off19 asm_pattern_cmp_branch
+  0b1_011010_1_0000000000000000000_00000 or
+;
+
+\ `off9` offset is implicitly times 4 and can be negative.
+: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
+  off9 2 lsr 9 bit_trunc 5  lsl { off9 }
+  cond                   21 lsl
+  Xt or off9 or
+;
+
+\ Not supported on M3 Pro.
+\ cb.<cond> Xt, <imm>, <off>
+: asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
+  Xt off9 cond asm_pattern_cmp_branch_cond { mask }
+  imm6 15 lsl
+  mask or
+  0b1_1110101_000_000000_0_000000000_00000 or
+;
+
+\ Not supported on M3 Pro.
+\ cb.<cond> Xt, Xm, <off>
+: asm_cmp_reg_branch { Xt Xm off9 cond -- instr }
+  Xt off9 cond asm_pattern_cmp_branch_cond { mask }
+  Xm 16 lsl
+  mask or
+  0b1_1110100_000_00000_00_000000000_00000 or
+;
+
+\ eor Xd, Xd, Xd
+: asm_zero_reg { Xd -- instr } Xd Xd Xd asm_eor_reg ;
+
+: asm_mov_reg { Xd Xm -- instr }
+  Xm 16 lsl
+  Xd or
+  0b1_01_01010_00_0_00000_000000_11111_00000 or
+;
+
+\ Immediate must be unsigned and within range.
+: asm_mov_imm { Xd imm -- instr }
+  imm 5 lsl
+  Xd or
+  0b1_10_100101_00_0000000000000000_00000 or
+;
+
+\ mvn Xd, Xm
+: asm_mvn { Xd Xm -- instr }
+  Xm 16 lsl
+  Xd or
+  0b1_01_01010_00_1_00000_000000_11111_00000 or
+;
+
+\ `ret x30`; requires caution with SP / FP.
+0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 let: asm_ret
+
+0b110_101_01000000110010_0000_000_11111 let: asm_nop
+
+\ svc 666
+0b110_101_00_000_0000001010011010_000_01 let: asm_svc
+
+\ ## Arithmetic
+
+: negate { i0 -- i1 } [
+  0         comp_clobber
+  0 asm_neg comp_instr \ neg x0, x0
+  1         comp_args_set
+] ;
+
+: + { i0 i1 -- i2 } [
+  0                 comp_clobber
+  0 0 1 asm_add_reg comp_instr \ add x0, x0, x1
+  1                 comp_args_set
+] ;
+
+: - { i0 i1 -- i2 } [
+  0                 comp_clobber
+  0 0 1 asm_sub_reg comp_instr \ sub x0, x0, x1
+  1                 comp_args_set
+] ;
+
+: * { i0 i1 -- i2 } [
+  0             comp_clobber
+  0 0 1 asm_mul comp_instr \ mul x0, x0, x1
+  1             comp_args_set
+] ;
+
+: / { i0 i1 -- i2 } [
+  0              comp_clobber
+  0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
+  1              comp_args_set
+] ;
+
+: mod { i0 i1 -- i2 } [
+  0                comp_clobber
+  2                comp_clobber
+  2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
+  0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
+  1                comp_args_set
+] ;
+
+: /mod { dividend divisor -- rem quo } [
+  0                   comp_clobber
+  1                   comp_clobber
+  2                   comp_clobber
+  2 1     asm_mov_reg comp_instr \ mov x2, x1
+  1 0 2   asm_sdiv    comp_instr \ sdiv x1, x0, x2
+  0 1 2 0 asm_msub    comp_instr \ msub x0, x1, x2, x0
+  2                   comp_args_set
+] ;
+
+: abs { int -- +int } [
+  0                         comp_clobber
+  0            asm_cmp_zero comp_instr \ cmp x0, 0
+  0 0 0 ASM_PL asm_csneg    comp_instr \ cneg x0, x0, pl
+  1                         comp_args_set
+] ;
+
+: min { i0 i1 -- i0|i1 } [
+  0                        comp_clobber
+  0 1          asm_cmp_reg comp_instr \ cmp x0, x1
+  0 0 1 ASM_LT asm_csel    comp_instr \ csel x0, x0, x1, lt
+  1                        comp_args_set
+] ;
+
+: max { i0 i1 -- i0|i1 } [
+  0                        comp_clobber
+  0 1          asm_cmp_reg comp_instr \ cmp x0, x1
+  0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
+  1                        comp_args_set
+] ;
+
+: align_down { len wid -- len } wid negate len and ;
+: align_up   { len wid -- len } wid dec len + wid align_down ;
+
+\ Named in title case for consistency with pretend "types" we define later,
+\ such as `U8`, `S64`, `Cint`, and so on.
+8 let: Cell
+: cells  { len  -- size } len 3 lsl ;
+: /cells { size -- len  } size 3 asr ;
+: +cell  { adr  -- adr  } adr Cell + ;
+: -cell  { adr  -- adr  } adr Cell - ;
+
+\ ## Assembler continued
+
+\ lsl Xd, Xn, <imm>
+: asm_lsl_imm { Xd Xn imm6 -- instr }
+  imm6 negate 64 mod 6 bit_trunc 16 lsl { immr }
+  63 imm6 -          6 bit_trunc 10 lsl { imms }
+  Xn 5 lsl
+  Xd or imms or immr or
+  0b1_10_100110_1_000000_000000_00000_00000 or
+;
+
+\ tbz Xt, <bit>, <imm>
+: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
+  imm14 2 lsr 14 bit_trunc 5 lsl { imm14 } \ Implicitly times 4.
+  bit   5 lsr             31 lsl { b5 }
+  bit         5 bit_trunc 19 lsl \ b40
+  Xt or imm14 or b5 or
+  0b0_01_101_1_0_00000_00000000000000_00000 or
+;
+
+\ br Xn
+: asm_branch_to_reg { Xn -- instr }
+  Xn 5 lsl
+  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 or
+;
+
+\ blr Xn
+: asm_branch_link_reg { Xn -- instr }
+  Xn 5 lsl
+  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or
+;
+
+\ orr Xd, Xn, #(1 << bit)
+\
+\ TODO add general-purpose `orr`.
+: asm_orr_bit { Xd Xn bit -- instr }
+  64 bit - 16 lsl { immr }
+  Xn        5 lsl
+  Xd or immr or
+  0b1_01_100100_1_000000_000000_00000_00000 or
+;
+
+: asm_comp_cset_reg { cond } ( E: i0 i1 -- bool )
+  0                  comp_clobber
+  0 1    asm_cmp_reg comp_instr \ cmp x0, x1
+  0 cond asm_cset    comp_instr \ cset x0, <cond>
+  1                  comp_args_set
+;
+
+: asm_comp_cset_zero { cond } ( E: num -- bool )
+  0                   comp_clobber
+  0      asm_cmp_zero comp_instr \ cmp x0, 0
+  0 cond asm_cset     comp_instr \ cset x0, <cond>
+  1                   comp_args_set
+;
+
+\ sbfm Xd, Xn, immr, imms
+: asm_bitfield_move { Xd Xn immr imms -- instr }
+  imms 10 lsl { imms }
+  immr 16 lsl { immr }
+  Xn   5  lsl { Xn }
+
+  0b1_00_100110_1_000000_000000_00000_00000
+  Xd   or
+  Xn   or
+  immr or
+  imms or
+;
+
+\ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
+: asm_sign_extend_32 { Xd Xn -- instr } Xd Xn 0 31 asm_bitfield_move ;
+
+\ Since we don't have a real type system, the compiler
+\ doesn't support automatically sign-extending integers
+\ when converting between types. Sometimes it has to be
+\ done manually, particularly when dealing with C words
+\ which return `(int)-1` which ends up being 0xffffffff.
+: int_to_cell { int32 -- cell } [
+  0                      comp_clobber
+  0 0 asm_sign_extend_32 comp_instr \ sxtw x0, x0
+  1                      comp_args_set
+] ;
+
+\ ## Numeric comparison
+
+\ https://gforth.org/manual/Numeric-comparison.html
+: =   { i0 i1 -- bool } [ ASM_EQ asm_comp_cset_reg  ] ;
+: <>  { i0 i1 -- bool } [ ASM_NE asm_comp_cset_reg  ] ;
+: >   { i0 i1 -- bool } [ ASM_GT asm_comp_cset_reg  ] ;
+: <   { i0 i1 -- bool } [ ASM_LT asm_comp_cset_reg  ] ;
+: <=  { i0 i1 -- bool } [ ASM_LE asm_comp_cset_reg  ] ;
+: >=  { i0 i1 -- bool } [ ASM_GE asm_comp_cset_reg  ] ;
+: <0  { num   -- bool } [ ASM_LT asm_comp_cset_zero ] ; \ Or `MI`.
+: >0  { num   -- bool } [ ASM_GT asm_comp_cset_zero ] ;
+: <=0 { num   -- bool } [ ASM_LE asm_comp_cset_zero ] ;
+: >=0 { num   -- bool } [ ASM_GE asm_comp_cset_zero ] ; \ Or `PL`.
+
+: within { num one two -- bool }
+  one num > { one }
+  num two >
+  one or =0
+;
+
+: odd { i0 -- bool } i0 1 and ;
+
+\ ## Memory load / store
+
+\ We allow to load inside an argument list, replacing the latest argument,
+\ which is an address, with a value without consuming all prior arguments.
+\ This violates the idea that every verb should consume all arguments, but
+\ can be convenient at times. TODO reconsider.
+\
+\ TODO validate there's an input.
+: comp_mem_load { size opc }
+  comp_args_get dec { reg }
+  reg comp_clobber
+  \ ldr<size> <reg>, [<reg>]
+  reg reg 0 size opc asm_load_store_imm comp_instr
+;
+
+\ Generically defines a load word for the given size / type.
+: load: { size opc } ( C: "name" -- )  ( E: adr -- val )
+  parse_word { str len }
+
+  \ Execution-time semantics.
+  str len colon
+    1 1 comp_signature_set ( E: adr -- val )
+    0 comp_clobber
+    0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
+    1 comp_args_set
+  semicolon
+
+  \ Compile-time semantics.
+  str len colon_colon
+    size     comp_push
+    opc      comp_push
+    compile' comp_mem_load
+  semicolon
+
+  [ false comp_only ]
+;
+
+\ Generically defines a store word for the given size / type.
+\ Execution-time semantics only. The compiler always inlines.
+: store: { size } ( C: "name" -- ) ( E: val adr -- )
+  parse_word colon
+    2 0 comp_signature_set
+    \ str<size> r0, [x1]
+    0 1 0 size 0b00 asm_load_store_imm comp_instr
+  semicolon
+
+  [ false comp_only ]
+;
+
+0b00 0b01 load:  @u8 \ Renamed from standard `c@`.
+0b00 0b10 load:  @s8
+0b00      store: !8  \ Renamed from standard `c!`.
+
+0b01 0b01 load:  @u16
+0b01 0b10 load:  @s16
+0b01      store: !16
+
+0b10 0b01 load:  @u32
+0b10 0b10 load:  @s32
+0b10      store: !32
+
+0b11 0b01 load:  @
+0b11      store: !
+
+\ Aliases for some C types, so the user
+\ doesn't have to remember their width.
+
+\ 32 bit
+0b10 0b10 load:  @cint
+0b10      store: !cint
+
+\ 32 bit
+0b10 0b01 load:  @cuint
+0b10      store: !cuint
+
+\ 64 bit (Apple ABI)
+0b11 0b10 load:  @clong
+0b11      store: !clong
+
+\ 64 bit (Apple ABI)
+0b11 0b01 load:  @culong
+0b11      store: !culong
+
+: @2 { adr -- val0 val1 } [
+  0                         comp_clobber
+  0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
+  2                         comp_args_set
+] ;
+
+: !2 { val0 val1 adr -- } [
+  0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
+] ;
+
+: off! { adr } false adr ! ;
+: on!  { adr } true  adr ! ;
+
+\ ## Stack introspection and manipulation
+\
+\ Under the register calling convention, the Forth data stack
+\ is used only in top-level interpretation. Because of this,
+\ we don't reserve any registers for the stack floor / top.
+\
+\ Instead, the stack is accessed directly on the interpreter
+\ object, which IS unavoidably stored in a special register.
+\ Compared to the stack CC, the reg-based CC gets away with
+\ fewer special registers.
+\
+\ Note: our stack is empty-ascending.
+\
+\ SYNC[interp_stack_offset].
+\ SYNC[stack_field_offsets].
+
+16 let: INTERP_INTS_FLOOR
+24 let: INTERP_INTS_TOP
+
+\ add <reg>, x28, INTERP_INTS_TOP
+:: stack_top_ptr ( E: -- adr )
+  comp_next_arg_reg
+  ASM_REG_INTERP INTERP_INTS_TOP asm_add_imm comp_instr
+;
+
+: stack_top_ptr { -- adr } stack_top_ptr ;
+
+\ ldur <reg>, [x28, INTERP_INTS_FLOOR]
+:: stack_floor ( E: -- adr )
+  comp_next_arg_reg
+  ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_unscaled_off comp_instr
+;
+
+: stack_floor { -- adr } stack_floor ;
+
+\ ldur <reg>, [x28, INTERP_INTS_TOP]
+:: stack_top ( E: -- adr )
+  comp_next_arg_reg
+  ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
+;
+
+: stack_top { -- adr } stack_top ;
+
+: stack@ { -- val } stack_top @ ;
+
+\ Updates the stack top address in the interpreter.
+: stack! { adr } [
+  \ stur x0, [x28, INTERP_INTS_TOP]
+  0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off comp_instr
+] ;
+
+: stack_at      { ind  -- adr } ind cells stack_floor + ;
+: stack_at@     { ind  -- val } ind stack_at @ ;
+: stack_len     {      -- len } stack_top stack_floor - /cells ;
+: stack_clear   {      --     } stack_floor stack! ;
+: stack_set_len { len  --     } len stack_at stack! ;
+: stack+        { diff --     } diff dec cells          stack_top      + stack! ;
+: stack-        { diff --     } diff dec cells { diff } stack_top diff - stack! ;
+
+\ Used by control structures such as conditionals.
+\
+\ Under the reg-based CC, compiled code does NOT use the Forth data stack.
+\ However, conditionals and loops need to use it for control information
+\ during compilation.
+\
+\ Each control structure pushes one or several "frames". Each frame consists
+\ of several inputs followed by a procedure which takes those inputs. Frame
+\ size is unknown to outside code; the knowledge of how many inputs to "pop"
+\ is hidden inside each frame's procedure. In other words, arities vary.
+\
+\ We can't really communicate any of this to the compiler,
+\ so we have to fall back on regular old push and pop here.
+
+\ ldur <top>, [x28, INTERP_INTS_TOP]
+: asm_stack_load { adr -- instr }
+  adr ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off
+;
+
+\ stur <top>, [x28, INTERP_INTS_TOP]
+: asm_stack_store { adr -- instr }
+  adr ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off
+;
+
+\ Usage:
+\
+\   stack>        unary
+\   stack> stack> binary
+\
+\ Mind the backwards order:
+\
+\   10 20 30 >>stack
+\   stack> stack> stack> { thirty twenty ten }
+\
+\ Also see `stack{` which is more convenient and less error-prone.
+:: stack> ( E: -- val )
+  comp_next_arg_reg { arg }
+  ASM_REG_SCRATCH   { top }
+
+  top                        comp_clobber
+  top        asm_stack_load  comp_instr
+  arg top -8 asm_load_pre    comp_instr \ ldr <arg>, [<top>, -8]!
+  top        asm_stack_store comp_instr
+;
+
+: stack> { -- val } stack> ;
+
+\ Also see `:: >>stack`, which is defined _way_ later in the file,
+\ when we have access to loops. Unlike this version it's variadic.
+: >stack { val } [
+  1                     comp_clobber
+  1     asm_stack_load  comp_instr \ ldur x1, [x28, INTERP_INTS_TOP]
+  0 1 8 asm_store_post  comp_instr \ str x0, [x1], 8
+  1     asm_stack_store comp_instr \ stur x1, [x28, INTERP_INTS_TOP]
+] ;
+
+\ For debugging.
+: systack_ptr { -- sp } [
+  0 comp_clobber
+  0 ASM_REG_SP 0 asm_add_imm comp_instr \ add x0, sp, 0 | mov x0, sp
+  1 comp_args_set
+] ;
+
+\ For debugging.
+: sysstack_frame_ptr { -- fp } [
+  0 comp_clobber
+  0 ASM_REG_FP asm_mov_reg comp_instr \ mov x0, x29
+  1 comp_args_set
+] ;
+
+\ ## Characters and strings
+
+: parse_char { -- char } parse_word { buf -- } buf @u8 ;
+
+: char' { -- char } ( E: "str" -- char ) parse_char ;
+
+:: char' ( C: "str" -- ) ( E: -- char )
+  parse_char        { char }
+  comp_next_arg_reg { reg }
+  char reg comp_load
+;
+
+\ Interpretation semantics of standard `s"`.
+\ The parser ensures null-termination.
+: parse_str { -- cstr len } char' " parse ;
+: parse_cstr { -- cstr } parse_str { cstr -- } cstr ;
+
+: comp_str { buf len } ( E: -- cstr len )
+  len inc            { cap } \ Reserve terminating null byte.
+  buf cap alloc_data { adr }
+  comp_next_arg_reg  { RS }
+  comp_next_arg_reg  { RL }
+  adr RS comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
+  len RL comp_load      \ ldr RL, <len>
+;
+
+\ Compilation semantics of standard `s"`.
+: parse_comp_str ( C: "str" -- ) ( E: -- cstr len ) parse_str comp_str ;
+
+: comp_cstr { buf len } ( E: -- cstr )
+  len inc            { cap } \ Reserve terminating null byte.
+  buf cap alloc_data { adr }
+  comp_next_arg_reg  { reg }
+  adr reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
+;
+
+: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr ;
+
+\ Parses the input until the terminating quote, and returns the address and
+\ length of the resulting string. In interpretation mode, the string buffer
+\ is reused for each call to `parse`, so the resulting string is only valid
+\ until the next `parse` invocation. In compilation mode, the string buffer
+\ is statically allocated and unique. The string is always null-terminated,
+\ and can be safely passed to many `libc` procedures by pointer alone.
+:  s" { -- cstr len } ( E: "str" -- cstr len ) parse_str ;
+:: s" ( C: "str" -- ) ( E: -- cstr len )       parse_comp_str  ;
+
+\ C-style string literal. Like `s"` but returns only the address
+\ without the length. The string is always null-terminated.
+:  " { -- cstr }     ( E: "str" -- cstr ) parse_cstr ;
+:: " ( C: "str" -- ) ( E: -- cstr )       parse_comp_cstr  ;
+
+\ ## External procedures and symbols
+
+\ Finds an extern symbol by name and declares it as a procedure.
+: extern: { inp_len out_len } ( C: "name" -- ) ( E: …inps -- …outs )
+  parse_word inp_len out_len extern_proc
+;
+
+\ Finds an extern symbol by name and returns its address.
+:: extern_adr' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_extern_adr
+;
+
+\ Indirect version of `extern_adr'`: compiles its usage into another word.
+:: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_str compile' comp_extern_adr
+;
+
+\ ## Memory
+\
+\ The program is implicitly linked with `libc`,
+\ so we get to use C stdlib procedures.
+\
+\ Compiler also provides `alloca` intrinsically.
+
+2 1 extern: calloc  ( len size -- addr )
+1 1 extern: malloc  ( size -- addr )
+1 0 extern: free    ( addr -- )
+3 0 extern: memset  ( buf char len -- )
+3 0 extern: memcpy  ( dst src len -- )
+3 0 extern: memmove ( dst src len -- )
+
+1 1 extern: strdup  ( cstr -- cstr )
+1 1 extern: strlen  ( cstr -- len )
+2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
+3 1 extern: strncmp ( str0 str1 len -- cmp )
+3 0 extern: strncpy ( dst src str_len -- )
+3 0 extern: strlcpy ( dst src buf_len -- )
+
+: move    { src dst len  } dst src len strncpy ;
+: fill    { buf len char } buf char len memset ;
+: blank   { buf len      } buf len 32 fill ;
+: erase   { buf len      } buf len 0 fill ;
+: memzero { len buf      } buf 0 len memset ;
+
+\ See `ccompare` below for null-terminated strings.
+: compare { str0 len0 str1 len1 -- direction }
+  len0 len1 min { len }
+  str0 str1 len strncmp
+;
+
+\ See `cstr=` and more below for null-terminated strings.
+: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0 ;
+: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 ;
+: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
+
+\ ## Some compilation-related stuff
+
+\ Returns the address of a local (on the system stack).
+\ Often avoids the need for `alloca`.
+\
+\ By accident, this also implicitly declares the local, but if it wasn't
+\ previously assigned, the compiler knows that it hasn't been initialized,
+\ and forbids any attempt to use it by name until the first assignment.
+\ So in practice, it doesn't really declare.
+\
+\ SYNC[asm_local_addressing].
+:: ref' ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_named_local comp_local_off { off }
+  comp_next_arg_reg { reg }
+  reg ASM_REG_FP off asm_add_imm comp_instr \ add <reg>, FP, <off>
+;
+
+: comp_clobber_params
+  0 comp_clobber \ x0
+  1 comp_clobber \ x1
+  2 comp_clobber \ x2
+  3 comp_clobber \ x3
+  4 comp_clobber \ x4
+  5 comp_clobber \ x5
+  6 comp_clobber \ x6
+  7 comp_clobber \ x7
+;
+
+: comp_clobber_scratch
+  8  comp_clobber \ x8
+  9  comp_clobber \ x9
+  10 comp_clobber \ x10
+  11 comp_clobber \ x11
+  12 comp_clobber \ x12
+  13 comp_clobber \ x13
+  14 comp_clobber \ x14
+  15 comp_clobber \ x15
+;
+
+\ External calls are assumed to clobber all caller-saved GPRs.
+\ This is used when compiling words which call external procs.
+: comp_clobber_volatile
+  comp_clobber_params
+  comp_clobber_scratch
+;
+
+\ ## Variables, buffers, extern vars
+
+\ Asks for a register and compiles this idiom:
+\
+\   adrp <reg>, <page>
+\   add <reg>, <reg>, <pageoff>
+\
+\ Used for taking an address of a data entry
+\ in the code heap allocated via `alloc_data`.
+: comp_next_page_addr { adr } ( E: -- adr )
+  comp_next_arg_reg { reg }
+  adr reg comp_page_addr
+;
+
+: init_data_word { name name_len adr }
+  name name_len colon
+    0 1 comp_signature_set ( E: -- ptr )
+    adr comp_next_page_addr
+  semicolon
+
+  name name_len colon_colon
+    adr comp_push compile' comp_next_page_addr
+  semicolon
+;
+
+\ Similar to standard `variable`, but takes an initial value like `let:`.
+: var: { val } ( C: "name" -- ) ( E: -- ptr )
+  parse_word { str len }
+  nil Cell alloc_data { adr }
+  val adr !
+  str len adr init_data_word
+  [ false comp_only ]
+;
+
+: comp_buf { adr cap } ( E: -- adr cap )
+  comp_next_arg_reg { RA }
+  comp_next_arg_reg { RL }
+  adr RA comp_page_addr
+  cap RL comp_load
+;
+
+\ Similar to the standard idiom `create <name> N allot`.
+\ Creates a global variable which refers to a buffer of
+\ at least the given size in bytes, initialized to zero.
+\
+\ TODO dedup code with `init_data_word`.
+: buf: { cap } ( C: "name" -- ) ( E: -- adr cap )
+  parse_word { str len }
+  nil cap alloc_data { adr }
+
+  str len colon
+    0 2 comp_signature_set ( E: -- ptr cap )
+    adr cap comp_buf
+  semicolon
+
+  str len colon_colon
+    adr comp_push cap comp_push compile' comp_buf
+  semicolon
+
+  [ false comp_only ]
+;
+
+\ Shortcut for the standard idiom `create <name> N allot`.
+\ Unlike the standard idiom, this also zeroes the memory.
+\ Like `buf:` but doesn't return capacity.
+: mem: { cap } ( C: "name" -- ) ( E: -- adr )
+  nil cap alloc_data { adr }
+  parse_word adr init_data_word
+  [ false comp_only ]
+;
+
+\ Shortcut for the standard idiom `create <name> N cells allot`.
+: cells: { len } ( C: "name" -- ) ( E: -- adr ) len cells execute' mem: ;
+
+\ ## IO
+\
+\ Having access to `libc` spares us from having to implement
+\ these procedures or provide them as intrinsics.
+\
+\ This is a partial interface. More is defined in `./io.af`.
+
+0 let: STDIN
+1 let: STDOUT
+2 let: STDERR
+
+10 let: LF
+13 let: CR
+
+3 mem: CRLF    \ \r\n\0
+CR CRLF     !8 \ \r
+LF CRLF inc !8 \ \n
+
+:  stdin {    -- adr } extern_adr'      __stdinp @ ;
+:: stdin ( E: -- adr ) comp_extern_adr' __stdinp execute'' @ ;
+
+:  stdout {    -- adr } extern_adr'      __stdoutp @ ;
+:: stdout ( E: -- adr ) comp_extern_adr' __stdoutp execute'' @ ;
+
+:  stderr {    -- adr } extern_adr'      __stderrp @ ;
+:: stderr ( E: -- adr ) comp_extern_adr' __stderrp execute'' @ ;
+
+4 1 extern: fread            ( buf size len file -- len        )
+4 1 extern: fwrite           ( buf size len file -- len        )
+2 1 extern: fputs            ( buf file          -- junk|eof32 )
+2 1 extern: fputc            ( char file         -- char|eof32 )
+2 1 extern: putc             ( char file         -- char|eof32 )
+2 1 extern: putc_unlocked    ( char file         -- char|eof32 )
+1 1 extern: putchar          ( char              -- char|eof32 )
+1 1 extern: putchar_unlocked ( char              -- char|eof32 )
+2 1 extern: putw             ( char file         -- zero|eof32 )
+1 1 extern: fflush           ( file              -- err        )
+1 1 extern: fpurge           ( file              -- err        )
+
+\ Variadic formatting words; see vararg support below.
+\ Also see `eprintf` which is defined there as well.
+1 1 extern: printf   ( … fmt         -- len|err )
+2 1 extern: fprintf  ( … file fmt    -- len|err )
+2 1 extern: sprintf  ( … buf fmt     -- len|err )
+3 1 extern: snprintf ( … buf cap fmt -- len|err )
+2 1 extern: asprintf ( … buf_adr fmt -- len|err )
+2 1 extern: dprintf  ( … fd fmt      -- len|err )
+
+: eputchar { char -- -1 } char stderr fputc              ; \ Symmetry with `putchar`.
+: logc     { char }       char putchar            { -- } ; \ Renamed from `emit`.
+: elogc    { char }       char stderr fputc       { -- } ;
+: log      { cstr }       cstr stdout fputs       { -- } ;
+: elog     { cstr }       cstr stderr fputs       { -- } ;
+: logs     { str len }    str 1 len stdout fwrite { -- } ; \ Renamed from `type`.
+: elogs    { str len }    str 1 len stderr fwrite { -- } ;
+: flush                   stdout fflush           { -- } ;
+: eflush                  stderr fflush           { -- } ;
+: lf                      LF putchar              { -- } ; \ Renamed from `cr`.
+: elf                     LF eputchar             { -- } ;
+: space                   32 putchar              { -- } ;
+: espace                  32 eputchar             { -- } ;
+: fprint { str len file } str 1 len file fwrite   { -- } ;
+
+\ Analogue of `printf` missing from libc. Writes to standard error.
+\
+\ Slightly tricky to define correctly. We need to forward variadic arguments to
+\ the `fprintf` call without accidentally modifying their storage. Under the
+\ ABI we currently support, this means not modifying the SP, not touching the
+\ stack, and not changing the LR. We hide the call so the compiler doesn't
+\ create a frame record. However, we still need to inform the compiler about
+\ scratch register clobbers.
+\
+\ The hoops we jump through, just because libc doesn't provide `eprintf`.
+\ On the bright side, this does not have any meaningful runtime overhead.
+: eprintf { fmt } ( E: fmt …vargs… -- )
+  \ Relocate `fmt` before we clobber `x0` with `stderr`.
+  [
+    1 0 asm_mov_reg comp_instr    \ mov x1, x0 -- `fmt`
+    0               comp_args_set \ Allow `stderr` to go in `x0`, below.
+  ]
+
+  stderr              \ adrp x0, <off> ; ldr x0, [x0, <off>] ; ldr x0, [x0]
+  [ 2 comp_args_set ] \ Reveal to the compiler that `x1` holds something.
+  extern_adr' fprintf \ adrp x2, <off> ; ldr x2, [x2, <off>]
+
+  [
+                        comp_clobber_volatile
+    2 asm_branch_to_reg comp_instr \ br <fprintf>
+    0                   comp_args_set
+  ]
+;
+
+\ ## Conditionals
+\
+\ General idea:
+\
+\   if        \ cbz <outside>
+\     if_true
+\   end
+\   outside
+\
+\   if        \ cbz <if_false>
+\     if_true
+\   else      \ b <outside>
+\     if_false
+\   end
+\   outside
+\
+\ Similarly to Gforth, our conditionals use the Forth data stack
+\ to store control information at compile time. When terminated,
+\ they use this information to "fixup" reserved instructions.
+\
+\ Unlike other Forth systems, we also support chains
+\ of "elif" terminated with a single "end".
+
+: pop_execute stack> execute ;
+: reserve_instr ASM_PLACEHOLDER comp_instr ;
+: reserve_here {     -- adr } here { out } ASM_PLACEHOLDER comp_instr out ;
+: off_to_pc    { adr -- off } here             adr - ; \ For forward jumps.
+: off_from_pc  { adr -- off } here { out } adr out - ; \ For backward jumps.
+: patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 ; \ b <off>
+: patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 ; \ b <off>
+
+0 var: COND_HAS
+
+\ cbz x0, <else|end>
+: if_patch ( C: adr -- )
+  stack>        { adr }
+  adr off_to_pc { off }
+  0 off asm_cmp_branch_zero adr !32
+;
+
+\ cbnz x0, <else|end>
+: ifn_patch ( C: adr -- )
+  stack>        { adr }
+  adr off_to_pc { off }
+  0 off asm_cmp_branch_not_zero adr !32
+;
+
+: if_done ( C: cond_prev        -- ) stack> COND_HAS ! ;
+: if_pop  ( C: prev_fun if_adr  -- ) if_patch  stack> execute ;
+: ifn_pop ( C: prev_fun ifn_adr -- ) ifn_patch stack> execute ;
+
+: elif_init ( C: -- exec_fun elif_adr ) ( E: pred -- )
+  comp_barrier \ Clobber / relocate locals.
+  reserve_here { adr }
+  ' pop_execute >stack
+  adr           >stack
+;
+
+:: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
+  " when calling `elif`" 1 comp_args_valid 0 comp_args_set
+  elif_init ' if_pop >stack
+;
+
+:: elifn ( C: -- exec_fun elifn_adr elifn_fun ) ( E: pred -- )
+  " when calling `elifn`" 1 comp_args_valid 0 comp_args_set
+  elif_init ' ifn_pop >stack
+;
+
+: if_init ( C: -- cond fun )
+  COND_HAS @ { cond } COND_HAS on!
+  cond      >stack
+  ' if_done >stack
+;
+
+\ With this strange setup, `end` pops the top control frame,
+\ which pops the next control frame, and so on. This allows us
+\ to pop any amount of control constructs with a single `end`.
+\ Prepending `if_done` terminates this chain.
+\
+\ TODO: define more variants like `=if` with fewer instructions.
+:: if ( C: -- cond done_fun exec_fun if_adr if_fun ) ( E: pred -- )
+  " when calling `if`" 1 comp_args_valid 0 comp_args_set
+  if_init elif_init ' if_pop >stack
+;
+
+:: ifn ( C: -- cond done_fun exec_fun ifn_adr ifn_fun ) ( E: pred -- )
+  " when calling `ifn`" 1 comp_args_valid 0 comp_args_set
+  if_init elif_init ' ifn_pop >stack
+;
+
+: else_pop ( C: prev_fun else_adr -- )
+  stack> patch_branch_forward stack> execute
+;
+
+:: else ( C: exec_fun if_adr if_fun -- else_adr else_fun )
+  stack> stack> stack> { if_fun if_adr exec_fun }
+
+  " when calling `else`" 0 comp_args_valid
+  comp_barrier \ Clobber / relocate locals.
+  reserve_here { else_adr }
+
+  ' nop      >stack \ Replace `exec_fun` to prevent further chaining.
+  if_adr     >stack
+  if_fun     execute
+  else_adr   >stack
+  ' else_pop >stack
+;
+
+\ TODO: use raw instruction addresses and `blr`
+\ instead of execution tokens and `execute`.
+:  end { fun }       fun          execute ;
+:: end ( C: fun -- ) comp_barrier pop_execute ;
+
+\ ## Loops
+\
+\ Unlike other Forth systems, we implement termination of arbitrary
+\ control structures with a generic `end`. This works for all loops
+\ and eliminates the need to remember many different terminators.
+\
+\ Our solution isn't complicated, either. We simply push procedures
+\ with their arguments to the control stack, and pop the latest one
+\ with `end`. Each procedure pops its arguments and does something,
+\ then pops the next procedure in the chain. The cascade terminates
+\ when encountering a procedure which doesn't pop a preceding one.
+
+\ Stack position of a special location in the top loop frame
+\ on the control stack. This is where auxiliary structures
+\ such as `leave` place their own control frames.
+0 var: LOOP_FRAME
+
+: loop_frame! ( C: frame_ind -- ) stack> LOOP_FRAME ! ;
+
+: loop_frame_init ( C: -- frame_ind frame_fun )
+  LOOP_FRAME @  >stack
+  ' loop_frame! >stack
+  stack_len LOOP_FRAME !
+;
+
+\ Used by auxiliary loop constructs such as "leave" and "while"
+\ to insert their control frame before a loop control frame.
+\ This allows to pop the control frames in the right order
+\ with a single "end" word.
+: loop_aux ( C: … <loop> … <aux> stack_len -- … <aux> <loop> … )
+  stack>    { stack_len_0 }
+  stack_len { stack_len_1 }
+
+  LOOP_FRAME @
+  ifn
+    " auxiliary loop constructs require an ancestor loop frame" throw
+  end
+
+  stack_len_1  stack_len_0 - { frame_len }
+  frame_len    cells         { frame_size }
+  stack_len_0  stack_at      { frame_sp_prev }
+  stack_len_1  stack_at      { frame_sp_temp }
+  LOOP_FRAME @ stack_at      { loop_sp_prev }
+  loop_sp_prev frame_size  + { loop_sp_next }
+
+  \ Need a backup copy of the frame we're moving,
+  \ because we're about to overwrite that data.
+  frame_len stack+
+  frame_sp_temp frame_sp_prev frame_size memmove
+
+  \ Move everything starting with the loop frame,
+  \ making space for the aux frame we're inserting.
+  frame_sp_temp loop_sp_next - { rest_size }
+  loop_sp_next loop_sp_prev rest_size memmove
+
+  \ The aux frame is now behind the moved loop frame.
+  loop_sp_prev frame_sp_temp frame_size memmove
+  frame_len stack-
+
+  \ Subsequent aux constructs will be inserted after the new frame.
+  LOOP_FRAME @ frame_len + LOOP_FRAME !
+;
+
+: loop_end ( C: adr -- )
+  comp_barrier                             \ Clobber / relocate locals.
+  stack> off_from_pc asm_branch comp_instr \ b <beg>
+;
+
+: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end pop_execute ;
+
+\ Implementation note. Each loop frame is "split" in two sub-frames:
+\ the "prev frame" and the "current frame". Auxiliary loop constructs
+\ such as "leave" and "while" insert their own frames in-between these
+\ subframes. See `loop_aux`.
+:: loop ( C: -- frame_ind frame_fun loop_adr loop_fun )
+  comp_barrier \ Clobber / relocate locals.
+  here { adr }
+  loop_frame_init adr >stack
+  ' loop_pop          >stack
+;
+
+\ Breaks out of any loop.
+:: leave ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
+  comp_barrier \ Clobber / relocate locals.
+  stack_len    { len }
+  reserve_here >stack
+  ' else_pop   >stack
+  len          >stack
+  loop_aux
+;
+
+\ Breaks out of any loop.
+:: while ( C: prev… <loop> …rest -- prev… while_adr while_fun <loop> …rest )
+  " when calling `while`" 1 comp_args_valid 0 comp_args_set
+  comp_barrier \ Clobber / relocate locals.
+  stack_len    { len }
+  reserve_here >stack
+  ' if_pop     >stack
+  len          >stack
+  loop_aux
+;
+
+\ Goes back to loop start. Requires EVERY loop frame to begin with `loop_adr`:
+\ the address of the first instruction inside the loop.
+:: cont
+  LOOP_FRAME @ { frame }
+  frame ifn " `cont` requires an ancestor loop frame" throw end
+  frame stack_at @ >stack loop_end \ b <beg>
+;
+
+\ Assumes that the top control frame is from `loop`.
+:: until ( C: fun -- )
+  " when calling `until`" 1 comp_args_valid 0 comp_args_set
+  comp_barrier \ Clobber / relocate locals.
+  0 8 asm_cmp_branch_zero comp_instr \ cbnz x0, 8
+  stack> execute
+;
+
+: count_loop_pop { cond } ( prev_fun …aux… loop_adr cond_adr -- )
+  stack> { adr }
+  loop_end \ b <beg>; clobber / relocate locals.
+  adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
+  pop_execute \ Pop auxiliaries; restore the previous loop frame.
+;
+
+: for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr cur_loc -- )
+  stack> { cur }
+  ASM_LE count_loop_pop  \ b <beg>; retropatch b.<cond> <end>
+  cur    comp_local_free \ Don't need a register for this local anymore.
+;
+
+: for_countdown_loop_init
+  { cur }
+  ( C: cur_loc -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
+  ( E: ceil -- )
+  loop_frame_init ( -- frame_ind frame_fun )
+
+  0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { loop_adr }                \ Skip above instr when repeating.
+  0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
+  0 asm_cmp_zero    comp_instr     \ cmp x0, 0
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
+  0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
+  0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+
+  loop_adr                 >stack
+  cond_adr                 >stack
+  cur                      >stack
+  ' for_countdown_loop_pop >stack
+;
+
+\ A count-down-by-one loop. Analogue of the non-standard
+\ `for … next` loop. Usage; ceiling must be positive:
+\
+\   123
+\   for
+\     " looping" log lf
+\   end
+\
+\ Anton Ertl circa 1994:
+\
+\ > This is the preferred loop of native code compiler writers
+\   who are too lazy to optimize `?do` loops properly.
+:: for
+  ( C: -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
+  ( E: ceil -- )
+  " when calling `for`" 1 comp_args_valid 0 comp_args_set
+  comp_anon_local for_countdown_loop_init
+;
+
+\ Like `for` but requires a local name to make the index
+\ accessible. Usage; ceiling must be positive:
+\
+\   123
+\   -for: ind
+\     ind .
+\   end
+:: -for:
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
+  ( E: ceil -- )
+  " when calling `+for:`" 1 comp_args_valid 0 comp_args_set
+  parse_word comp_named_local for_countdown_loop_init
+;
+
+: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur -- )
+  stack> stack> { cur lim }
+
+  0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
+  1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
+  1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
+  ASM_LE count_loop_pop            \ b <beg>; retropatch b.<cond> <end>
+
+  lim comp_local_free \ Don't need a register for this local anymore.
+;
+
+:: +for:
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_lim loc_cur loop_fun )
+  ( E: ceil floor -- )
+  " when calling `+for:`" 2 comp_args_valid 0 comp_args_set
+
+  loop_frame_init             ( -- frame_ind frame_fun )
+  comp_anon_local             { lim } \ ceil  = limit
+  parse_word comp_named_local { cur } \ floor = cursor
+
+  0 lim             comp_local_set \ mov <lim>, x0 | str x0, [FP, <lim>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { loop_adr }                \ Skip above instr when repeating.
+  1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
+  comp_barrier                     \ Tell lazy-ass compiler to commit local set.
+  0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
+
+  loop_adr               >stack
+  cond_adr               >stack
+  lim                    >stack
+  cur                    >stack
+  ' for_countup_loop_pop >stack
+;
+
+: loop_countup_pop
+  ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur loc_step )
+  stack> stack> stack> { step cur lim }
+
+  0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
+  1 cur             comp_local_get \ mov x1, <cur>  | ldr x1, [FP, <cur>]
+  2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
+  1 1 2 asm_add_reg comp_instr     \ add x1, x1, x2
+  ASM_LE count_loop_pop            \ b <beg>; retropatch b.<cond> <end>
+
+  \ Don't need registers for these locals anymore.
+  lim  comp_local_free
+  step comp_local_free
+;
+
+\ Similar to the standard `?do ... +loop`, but terminated with an `end`
+\ like other loops. Takes a name to make the index accessible. Usage:
+\
+\   ceil floor step
+\   +loop: ind \ Declare the index.
+\     ind .    \ Print the index.
+\   end
+\
+\   123 23 3 +loop: ind ind . end
+\
+\ When the loop ends, the index local is still in scope,
+\ holding a value which is out of range. For example, if
+\ `ceil floor step` is `7 3 2`, the loop iterates twice,
+\ with indexes `3` and `5`, and the index outside is `8`.
+:: +loop:
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
+  ( E: ceil floor step -- )
+  " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
+  loop_frame_init
+
+  comp_anon_local             { lim } \ ceil  = limit
+  parse_word comp_named_local { cur } \ floor = cursor
+  comp_anon_local             { step }
+
+  0 lim             comp_local_set \ mov <lim>,  x0 | str x0, [FP, <lim>]
+  2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { loop_adr }                \ Skip above instrs when repeating.
+  1 cur             comp_local_set \ mov <cur>,  x1 | str x1, [FP, <cur>]
+  comp_barrier                     \ Tell lazy-ass compiler to commit local set.
+  0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
+
+  loop_adr           >stack
+  cond_adr           >stack
+  lim                >stack
+  cur                >stack
+  step               >stack
+  ' loop_countup_pop >stack
+;
+
+: loop_countdown_pop
+  ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur loc_step )
+  stack> stack> stack> { step cur lim }
+  ASM_LT count_loop_pop \ b <beg>; retropatch b.<cond> <end>
+
+  \ Don't need registers for these locals anymore.
+  lim  comp_local_free
+  step comp_local_free
+;
+
+\ Like in `+loop:`, the range is `[floor,ceil)`.
+\
+\ Unlike in `+loop:`, when this loop ends, the index local
+\ is NOT guaranteed to hold an out-of-range value.
+:: -loop:
+  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
+  ( E: ceil floor step -- )
+  " when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
+  loop_frame_init
+
+  parse_word comp_named_local { cur } \ ceil  = cursor
+  comp_anon_local             { lim } \ floor = limit
+  comp_anon_local             { step }
+
+  0 cur             comp_local_set \ mov <cur>,  x0 | str x0, [FP, <cur>]
+  1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
+  2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
+  comp_barrier                     \ Clobber / relocate locals.
+  here { loop_adr }                \ Skip above instrs when repeating.
+  0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
+  1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
+  2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
+  0 0 2 asm_sub_reg comp_instr     \ sub x0, x0, x2
+  0 1   asm_cmp_reg comp_instr     \ cmp x0, x1
+  here { cond_adr } reserve_instr  \ b.<cond> <end>
+  0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+
+  loop_adr             >stack
+  cond_adr             >stack
+  lim                  >stack
+  cur                  >stack
+  step                 >stack
+  ' loop_countdown_pop >stack
+;
+
+\ ## String comparison continued
+
+\ `strcmp` doesn't like null string pointers.
+: ccompare { cstr0 cstr1 -- cmp }
+  cstr0 cstr1 or ifn 0 ret end
+  cstr0 ifn -1 ret end
+  cstr1 ifn +1 ret end
+  cstr0 cstr1 strcmp
+;
+
+: cstr=  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare =0 ;
+: cstr<  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <0 ;
+: cstr<> { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <>0 ;
+
+\ ## Varargs and formatting
+
+\ Short for "compile variadic arguments begin". Assumes the Apple Arm64 ABI
+\ where varargs always use the systack. Modifies the SP which must be later
+\ restored with `comp_va_end`. Doesn't clobber any registers.
+\
+\ We always store pairs and modify the SP by 16, because Arm64 requires the SP
+\ to be aligned to 16 when accessing memory. When length is odd, we also store
+\ an unused junk value from an unused register, which is fine.
+\
+\ Floor = index of first varg, ceiling = index just after vargs.
+\ If floor >= ceiling, there are no variadic arguments.
+: comp_va_beg { ceil floor }
+  ceil floor - 2 align_up { diff }
+  diff floor +            { ceil }
+  ceil floor 2
+  -loop: ind
+    ind     { Xd }
+    ind inc { Xt }
+    Xd Xt ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp Xd, Xt, [sp, -16]!
+  end
+;
+
+\ Short for "compile variadic arguments end".
+: comp_va_end { len -- }
+  len >=0 if
+    len cells 16 align_up { off }
+    ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
+  end
+;
+
+\ Sets up variadic arguments following the C ABI. Usage example:
+\
+\   : some_word
+\     10 20 30 va{ " numbers: %zd %zd %zd" printf }va lf
+\   ;
+\
+\ Caution: varargs can only be used in direct calls to variadic procedures.
+\ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
+:: va{ ( C: -- len ) ( E: <systack_push> )
+  comp_args_get { len }
+  0             { off }
+  len off comp_va_beg
+  len >stack
+  off comp_args_set
+;
+
+\ Restores the SP after a variadic call. See `va{`.
+:: }va ( C: len -- ) ( E: <systack_pop> ) stack> comp_va_end ;
+
+\ The given offset is how many non-vargs precede the vargs.
+\ The given function must take exactly that many non-vargs,
+\ and exactly as many vargs as are available in param regs.
+: comp_varcall { fun off } ( E: …args… …vargs… -- )
+  comp_args_get { len }
+  len off   comp_va_beg
+  off       comp_args_set
+  fun       comp_call
+  0         comp_args_set
+  len off - comp_va_end
+;
+
+:: logf  ( E: fmt …vargs… -- ) ' printf  1 comp_varcall ;
+:: elogf ( E: fmt …vargs… -- ) ' eprintf 1 comp_varcall ;
+
+\ Formats into a given string buffer. Returns the same buffer address.
+\ String is null-terminated. Usage:
+\
+\   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] strf
+:: strf ( E: buf cap fmt …vargs… -- buf ) ' snprintf 3 comp_varcall ;
+
+\ ## Exceptions
+\
+\ The compiler provides the following exception intrinsics:
+\ - `try`
+\ - `throw`
+\ - `catch`
+\ - `catches`
+\
+\ At the ABI level, each exception is an additional return value.
+\ An exception is placed into the next output parameter register
+\ immediately following the last regular output value, similarly
+\ to how errors are returned in Go. Unlike Go, we implicitly use
+\ exception semantics for errors. By default, when a word throws,
+\ the returned error is implicitly re-thrown in the caller. This
+\ behavior can be suppressed with `catch'`, which simply reveals
+\ the error value, and avoids emitting the "try" instructions.
+\
+\ We also support blanket implicit catch via the `catches` annotation.
+\ It disables implicit rethrow and reveals exceptions as error values.
+\ This mode may look superficially like Go. It is actualy closer to C,
+\ because there is NO support for panics and no hidden stack unwinder.
+\ In such words, control flow is entirely local and obvious from code.
+\
+\ Examples:
+\
+\   : word { -- one two } " some_error" throw ;
+\
+\   : throwing
+\     word { one two }
+\     catch' word { one two err }
+\   ;
+\
+\   : non_throwing [ true catches ]
+\     word { one two err } \ Implicit catch.
+\   ;
+
+:: catch'  WORDLIST_EXEC catch ;
+:: catch'' WORDLIST_COMP catch ;
+
+4096    let: ERR_CAP
+ERR_CAP mem: ERR_BUF_0
+ERR_CAP mem: ERR_BUF_1
+
+\ Usage example:
+\
+\  " error codes: %zd %zd %zd" 10 20 30 errf throw
+:: errf ( E: fmt …vargs… -- err )
+  comp_args_get { len }
+  1             { off }
+
+  len off    comp_va_beg
+  2          comp_clobber
+  2 0        asm_mov_reg comp_instr \ mov x2, x0
+  0          comp_args_set          \ Assume `x0` is used up.
+  execute''  ERR_BUF_0              \ mov x0, <buf>
+  execute''  ERR_CAP                \ mov x1, <cap>
+  3          comp_args_set          \ Assume x2 is useful.
+  ' snprintf comp_call              \ blr <fun>
+  0          comp_args_set          \ Ignore output length.
+  len off -  comp_va_end            \ Restore SP.
+  execute''  ERR_BUF_0              \ mov x0, <buf>
+;
+
+: wrapf_args { fmt err -- buf cap fmt }
+  err ERR_BUF_0 = if ERR_BUF_1 ERR_CAP fmt ret end
+  ERR_BUF_0 ERR_CAP fmt
+;
+
+\ Wraps a prior error with an additional message. The last argument must
+\ always be the previous error, and the format string should include the
+\ `%s` for it, usually after the additional context. Usage example:
+\
+\   " unable to blah (error code: %zd): %s" code err wrapf throw
+\
+\ This allows to create an error with `errf"` and repeatedly wrap
+\ it with more context by implicitly rotating the string buffers.
+:: wrapf ( C: fmt …varargs… err -- str )
+  comp_args_get { len }
+
+  len 2 < if
+    " unable to `wrapf`: need at least 2 arguments: the format string (first) and the previous error (last); got %zd arguments instead"
+    len errf throw
+  end
+
+  comp_anon_local { buf_loc }
+  len dec         { err_reg }
+  1               { off     } \ Vargs begin after `fmt`.
+
+  len off comp_va_beg
+
+  err_reg 1 <> if
+    1 comp_clobber
+    1 err_reg asm_mov_reg comp_instr \ mov x1, <err>
+  end
+
+  2 comp_args_set
+
+  compile' wrapf_args
+
+  0 buf_loc  comp_local_set \ str x0, [x29, <buf>]
+  ' snprintf comp_call      \ blr <fun>
+  len off -  comp_va_end    \ Restore SP.
+  0 buf_loc  comp_local_get \ ldr x0, [x29, <buf>]
+;
+
+0 1 extern: __error
+1 1 extern: strerror
+
+\ We'd like to treat `errno` as a noun. It would have been convenient if
+\ `errno` was a regular global variable, like `__stdinp`. Unfortunately,
+\ on MacOS it's implemented as a macro which calls an external procedure
+\ which returns `x0` while clobbering `x8` and `x9` on the tested system
+\ at the time of writing; the ABI is subject to change. Because of this,
+\ we have to treat `errno` as a verb, which sometimes requires user code
+\ to save its output into a local before using the value as an argument.
+\ We could work around this by hardcoding the knowledge of the clobbers,
+\ but that would make this system even less portable than it already is.
+: errno { -- code } __error @s32 ;
+
+\ Some `libc` procedures return -1 as 32-bit `0xffff_ffff` while some others,
+\ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
+\ the kernel. Since there's no way to know this generically, we must always
+\ sign-extend `int` before testing for -1.
+\
+\ Should NOT be used for addresses returned by the `mmap` family.
+\ Their error sentinel is actual 64-bit -1. Addresses they return
+\ may accidentally have the `int32` sign bit set.
+: is_err { int -- bool } int int_to_cell -1 = ;
+
+\ `code` comes from from `errno`, `ferror`, Posix procedures, etc.
+: os_err { code ctx -- err }
+  code strerror { msg }
+  msg if
+    " %s; code: %zd; msg: %s" ctx code msg errf ret
+  end
+  " %s; code: %zd" ctx code errf
+;
+
+\ Shortcut for calling `libc` functions which return
+\ `-1` and set `errno` on failure. Usage:
+\
+\   0 1 extern: some_proc
+\   some_proc " unable to do X" os_try
+: os_try { int ctx }
+  int is_err ifn ret end
+  errno ctx os_err throw
+;
+
+\ Like `os_try`, but for Posix procedures which directly
+\ return an `errno` code on failure and zero on success.
+: posix_try { code ctx } code if code ctx os_err throw end ;
+
+\ ## Stack manipulation — continued
+
+\ Variadic alternative to `>stack`.
+:: >>stack ( E: …args… -- )
+  ASM_REG_SCRATCH { top }
+
+  top                comp_clobber
+  top asm_stack_load comp_instr
+
+  comp_args_get 0 +for: arg
+    arg top 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
+  end
+
+  top asm_stack_store comp_instr
+  0 comp_args_set
+;
+
+\ Variadic assignment of locals from the stack:
+\
+\   10 20 30 >>stack
+\   stack{ ten twenty thirty }
+:: stack{ ( E: …args… -- )
+  0 { locs }
+
+  loop
+    parse_word { str len }
+
+    s" }"  str len str= if leave end
+
+    s" --" str len str= if
+      " unsupported `--` in `stack{`" throw
+    end
+
+    str len comp_named_local >stack
+    locs inc { locs }
+  end
+
+  locs ifn ret end
+
+  0 { arg_reg } \ x0
+  1 { top_reg } \ x1
+
+  arg_reg comp_clobber
+  top_reg comp_clobber
+  top_reg asm_stack_load comp_instr
+
+  locs for
+    stack> { loc }
+    arg_reg top_reg -8 asm_load_pre comp_instr     \ ldr x0, [x1, -8]!
+    arg_reg loc                     comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
+    arg_reg comp_clobber
+  end
+
+  top_reg asm_stack_store comp_instr
+;
+
+\ ldur <stack>, [x28, INTERP_INTS_TOP]
+\ ...
+\ str  <arg>,   [<stack>], 8
+\ ...
+\ stur <stack>, [x28, INTERP_INTS_TOP]
+: comp_args_to_stack { len }
+  len ifn ret end
+  comp_scratch_reg { stack }
+
+  \ ldur <stack>
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
+
+  len 0 +for: arg
+    arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
+  end
+
+  \ stur <stack>
+  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off comp_instr
+;
+
+\ ## Stack printing
+
+: log_int  { num     -- } " %zd" num logf ;
+: log_cell { num ind -- } " %zd 0x%zx <%zd>" num num ind logf ;
+: .        { num     -- } stack_len { ind } num ind log_cell lf ;
+
+: .s
+  stack_len { len }
+
+  len ifn
+    " stack is empty" log lf
+    ret
+  end
+
+  len <0 if
+    " stack length is negative: %zd" len logf lf
+    ret
+  end
+
+  " stack <%zd>:" len logf lf
+
+  len 0 +for: ind
+    space space
+    ind stack_at @ ind log_cell lf
+  end
+;
+
+: .sc .s stack_clear ;
+
+\ ## More memory stuff
+
+6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
+3 1 extern: mprotect ( adr len pflag -- err )
+
+16384 let: PAGE_SIZE \ TODO: ask the OS.
+0     let: PROT_NONE
+1     let: PROT_READ
+2     let: PROT_WRITE
+2     let: MAP_PRIVATE
+4096  let: MAP_ANON
+
+: mem_map_err
+  errno        { err }
+  err strerror { str }
+  " unable to map memory; code: %zd; message: %s" err str errf throw
+;
+
+: mem_map { size pflag -- addr }
+  MAP_ANON MAP_PRIVATE or { mflag }
+  0 size pflag mflag -1 0 mmap { addr }
+  addr -1 = if mem_map_err end
+  addr
+;
+
+: mem_unprot_err
+  errno        { err }
+  err strerror { str }
+  " unable to unprotect memory; code: %zd; message: %s" err str errf throw
+;
+
+: mem_unprot { addr size }
+  PROT_READ PROT_WRITE or { pflag }
+  addr size pflag mprotect
+  -1 = if " unable to mprotect" throw end
+;
+
+\ Allocates a guarded buffer: `guard|data|guard`.
+\ Attempting to read or write inside the guards,
+\ aka underflow or overflow, triggers a segfault.
+\ The given size is rounded up to the page size.
+: mem_alloc { size1 -- addr size2 }
+  size1 PAGE_SIZE align_up { size2 }
+  PAGE_SIZE 1 lsl size2 +  { size }
+  size PROT_NONE mem_map   { addr }
+  addr PAGE_SIZE +         { addr }
+  addr size2 mem_unprot
+  addr size2
+;
+
+\ Allocates space for N cells with lower and upper guards. Underflowing and
+\ overflowing into the guards triggers a segfault. The size gets page-aligned,
+\ usually leaving additional unguarded readable and writable space between the
+\ requested region and the upper guard. The lower guard is immediately below
+\ the returned address and immediately prevents underflows.
+\
+\ TODO consider compiling with lazy-init; dig up the old code.
+: cells_guard: { len } ( C: "name" -- ) ( E: -- adr )
+  parse_word          { name name_len }
+  len cells mem_alloc { adr -- }
+  name name_len adr init_data_word
+  [ false comp_only ]
+;
+
+\ ## Pretend types
+\
+\ We don't have a real type system, but it can still be useful
+\ to use type names, which simply return sizes, similar to the
+\ existing practice of `cell`/`cells`. The pretend type `Cell`
+\ is defined earlier.
+
+\ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
+\
+\ "S" stands for "signed integer", "U" for "unsigned integer".
+\
+\ Note: when converting shorter negative numbers to our `Cell`,
+\ they must be sign-extended. See `int_to_cell` for `S32`.
+\
+\ When accessing memory, use the appropriately sized and typed memory operators.
+\ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
+\ Both are stored with `!32`. For `Cint` and so on, we define appropriate
+\ aliases. See memory ops above.
+1 let: U8
+1 let: S8
+2 let: U16
+2 let: S16
+4 let: U32
+4 let: S32
+8 let: U64
+8 let: S64
+8 let: Adr
+8 let: Cstr \ char*
+4 let: Cint
+4 let: Cuint
+8 let: Clong
+8 let: Culong
+
+\ Defines a pretend "array type" which is really just capacity. Usage:
+\
+\   U8 128    arr: Some_type
+\   Some_type mem: SOME_BUF
+\
+\ This should NOT be used for struct fields, because it loses alignment
+\ information. Misuse can violate the C struct ABI. Arrays only need to
+\ be aligned to element width. For example, an array of `U8` only needs
+\ to be aligned to 1 byte, meaning no padding after the previous field.
+: arr: { size len -- } ( C: "name" -- ) ( E: -- cap )
+  size len * execute' let:
+;
+
+\ ## Pretend struct types
+\
+\ Structs allow C interop. Fields are aligned and padded to match the C ABI.
+\
+\ The name of a struct "type" returns its size. The name of a "field"
+\ is a compile-time word which computes its offset from an address.
+\ To get an offset from zero, provide zero.
+\
+\ Basic usage:
+\
+\   struct: Type
+\     S32 1  field: Type_field0
+\     U8  32 field: Type_field1
+\   end
+\
+\   Type alloca { adr }
+\
+\       adr Type_field0 @
+\   123 adr Type_field0 !
+\
+\ Normally, a verb consumes all arguments; a field appears to have arity 1.
+\ But these fields are not exactly verbs; multiple fields can be accessed in
+\ one argument list. The load operator `@` behaves the same way, so they can
+\ be all used inside a longer argument list, exactly like verbs behave in
+\ stack-based programming:
+\
+\   adr Type_field0 @ \ arg0
+\   adr Type_field1 @ \ arg1
+\   some_verb
+\
+\ Note that load / store is typed. Fields which are't cell-sized
+\ must be loaded and stored using dedicated typed operators.
+
+\ Used internally.
+: struct_pop ( C: str len align off -- )
+  stack{ str len align off }
+  off align align_up { size }
+  str len size let_init
+  str free \ String was `strdup`'d.
+  [ false comp_only ]
+;
+
+\ Begins a definition; terminate with `end`.
+: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
+  parse_word   { str len }
+  str strdup   { str }
+  ' struct_pop { fun }
+  str len 0 0 fun
+;
+
+\ Compile field access: compute offset from address.
+: struct_field_comp { off }
+  comp_args_get { len }
+  len ifn " struct field must be preceded by struct pointer" throw end
+
+  \ Offset is computed into the same register that held the address.
+  len dec { reg }
+  reg                     comp_clobber \ Disassociate locals from this reg.
+  reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
+;
+
+\ Every field requires both type width and array length.
+\ Most fields have length 1, but any length can be used.
+\ This allows us to align fields to element size, rather
+\ than total size.
+\
+\ A field becomes a word `( struct_adr -- field_adr )` which computes
+\ a field address from a struct address. Cell-sized fields are loaded
+\ and stored with `@ !`. Smaller fields require operators specific to
+\ their size and type. For example, signed 32-bit integers `S32` must
+\ be stored with `!32` and loaded with `@s32`, which sign-extends the
+\ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
+: field: { align off fun size len -- align off_next fun }
+  ( C: "name" -- )
+  ( E: struct_adr -- field_adr )
+
+  \ Since structs are intended for C interop, alignment
+  \ must match the C struct ABI of the target platform.
+  \ The ABI compatibility seems to hold in many cases,
+  \ but has NOT been thoroughly tested.
+  off size align_up { field_off }
+  parse_word        { name_buf name_len }
+
+  \ Execution-time semantics.
+  name_buf name_len colon
+    1 1 comp_signature_set ( E: struct_adr -- field_adr )
+    1 comp_args_set
+    field_off comp_push
+    compile' +
+  semicolon
+
+  \ Compile-time semantics.
+  name_buf name_len colon_colon
+    field_off comp_push
+    compile' struct_field_comp
+  semicolon
+
+  size len * field_off + { next_off }
+  align size max         { align }
+  align next_off fun
+
+  [ false comp_only ]
+;
+
+\ ## Misc
+
+: execute_raw { fun } [
+  0 asm_branch_link_reg comp_instr \ blr x0
+] ;
+
+\ Takes any amount of args, where the last arg is assumed to be a raw
+\ instruction address (procedure pointer). Invokes that procedure with
+\ the preceding args. Does not support output parameters.
+:: execute_raw ( C: …args fun -- ) ( E: …args fun -- )
+  comp_args_get { len }
+
+  len ifn
+    " unable to compile `execute_raw`: at least 1 argument is required" throw
+  end
+
+  0 comp_args_set
+  len dec asm_branch_link_reg comp_instr \ blr <fun_reg>
+;
+
+\ For compiling words which modify a local by applying the given function.
+: comp_loc_mut { fun name } ( C: "name" -- ) ( E: -- )
+  parse_word comp_named_local { loc }
+
+  comp_args_get if
+  " arity mismatch in `%s`: expected no arguments" name errf throw
+  end
+
+  0 loc comp_local_get \ mov x0, <loc> | ldr x0, [FP, <loc>]
+  1     comp_args_set
+  fun   comp_call      \ blr <fun>
+  0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
+  0     comp_args_set
+;
+
+\ Usage: `++: some_val`.
+:: ++: ( C: "name" -- ) ( E: -- ) ' inc " ++" comp_loc_mut ;
+:: --: ( C: "name" -- ) ( E: -- ) ' dec " --" comp_loc_mut ;

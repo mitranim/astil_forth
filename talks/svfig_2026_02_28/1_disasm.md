@@ -1,6 +1,6 @@
 The interpreter makes it easy to disassemble words; under the hood, it shells out to `llvm-mc`, which must be globally available.
 
-See `./1_disasm.f`.
+See `./1_disasm.af`.
 
 ```forth
 : example_arith

@@ -74,7 +74,7 @@ Booleans are `0 1` rather than `0 -1`.
 Special _semantic_ roles get special _syntactic_ roles.
 
 ```forth
-import'  ./some_file.f
+import'  ./some_file.af
 char'    A
 compile' some_word
 

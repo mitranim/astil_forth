@@ -1,0 +1,26 @@
+import' std:lang_s.af
+
+\ Interfacing with external libraries is a breeze.
+
+
+
+\ ## Easy IO
+
+3 0 extern: write   \ Note: uses unbuffered kernel IO.
+1 0 extern: putchar \ Note: uses buffered `libc` IO.
+
+: type { str len } STDOUT str len write ;
+: cr 10 putchar ;
+
+s" hello world! (using libc IO)" type cr
+
+
+
+\ ## Easy memory
+
+1 1            extern: calloc
+1 cells calloc let:    ptr
+
+ptr @ .   \ 0
+123 ptr !
+ptr @ .   \ 123
