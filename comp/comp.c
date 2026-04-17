@@ -93,8 +93,8 @@ static bool comp_heap_valid(const Comp_heap *val) {
     is_aligned(val) &&
     is_aligned(&val->exec) &&
     instr_heap_valid(&val->exec) &&
-    is_aligned(&val->intrins) &&
-    is_aligned(&val->externs)
+    is_aligned(&val->externs) &&
+    is_aligned(&val->intrins)
   );
 }
 
@@ -108,8 +108,8 @@ static bool comp_code_valid(const Comp_code *code) {
     is_aligned(&code->code_write) &&
     is_aligned(&code->code_exec) &&
     is_aligned(&code->data) &&
-    is_aligned(&code->intrins) &&
     is_aligned(&code->externs) &&
+    is_aligned(&code->intrins) &&
     is_aligned(&code->valid_instr_len) &&
     instr_heap_valid(code->write) &&
     comp_heap_valid(code->heap) &&
@@ -146,7 +146,7 @@ static Err instr_heap_init(Instr_heap **out) {
 
   const auto base = (Instr_heap *)ptr;
   *out            = base;
-  return mprotect_mutable(base->instrs, sizeof(base->instrs));
+  return mem_protect(base->instrs, sizeof(base->instrs), PROT_READ | PROT_WRITE);
 }
 
 static Err comp_heap_deinit(Comp_heap **out) {
@@ -164,19 +164,19 @@ static Err comp_heap_init(Comp_heap **out) {
   *out            = heap;
 
   try(mprotect_jit(heap->exec.instrs, sizeof(heap->exec.instrs)));
-  try(mprotect_mutable(heap->data, sizeof(heap->data)));
-  try(mprotect_mutable(heap->intrins, sizeof(heap->intrins)));
-  try(mprotect_mutable(heap->externs, sizeof(heap->externs)));
+  try(mem_protect(heap->data, sizeof(heap->data), PROT_READ | PROT_WRITE));
+  try(mem_protect(heap->externs, sizeof(heap->externs), PROT_READ | PROT_WRITE));
+  try(mem_protect(heap->intrins, sizeof(heap->intrins), PROT_READ | PROT_WRITE));
   return nullptr;
 }
 
 static Err comp_code_deinit(Comp_code *code) {
-  dict_deinit(&code->intrins.inds);
   dict_deinit(&code->externs.inds);
+  dict_deinit(&code->intrins.inds);
 
   Err err = nullptr;
-  err     = either(err, stack_deinit(&code->intrins.names));
   err     = either(err, stack_deinit(&code->externs.names));
+  err     = either(err, stack_deinit(&code->intrins.names));
   err     = either(err, instr_heap_deinit(&code->write));
   err     = either(err, comp_heap_deinit(&code->heap));
   *code   = (Comp_code){};
@@ -212,20 +212,20 @@ static void comp_code_init_lists(Comp_code *code) {
   );
 
   ptr_set(
-    &code->intrins.addrs,
-    {
-      .dat = code->heap->intrins,
-      .len = 0,
-      .cap = arr_cap(code->heap->intrins),
-    }
-  );
-
-  ptr_set(
     &code->externs.addrs,
     {
       .dat = code->heap->externs,
       .len = 0,
       .cap = arr_cap(code->heap->externs),
+    }
+  );
+
+  ptr_set(
+    &code->intrins.addrs,
+    {
+      .dat = code->heap->intrins,
+      .len = 0,
+      .cap = arr_cap(code->heap->intrins),
     }
   );
 }
@@ -237,11 +237,11 @@ static Err comp_code_init(Comp_code *code) {
   try(comp_heap_init(&code->heap));
   comp_code_init_lists(code);
 
-  auto opt = (Stack_opt){.len = arr_cap(code->heap->intrins)};
-  try(stack_init(&code->intrins.names, &opt));
-
-  opt = (Stack_opt){.len = arr_cap(code->heap->externs)};
+  auto opt = (Stack_opt){.len = arr_cap(code->heap->externs)};
   try(stack_init(&code->externs.names, &opt));
+
+  opt = (Stack_opt){.len = arr_cap(code->heap->intrins)};
+  try(stack_init(&code->intrins.names, &opt));
 
   return nullptr;
 }
@@ -264,8 +264,8 @@ static void comp_rewind(Comp *tar, Comp *snap) {
 
 /*
 Used for registering dynamically-linked symbols, either intrinsic or external.
-The provided address should be used only in interpretation. When we implement
-AOT compilation, GOT addresses should be pre-zeroed and patched by the linker.
+The provided address is used only in JIT-compiled code. In AOT-compiled code,
+intrinsics are not used, and external symbols are patched by the OS dylinker.
 */
 static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
   const auto addrs = &syms->addrs;
@@ -276,11 +276,14 @@ static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
   if (got_ind != INVALID_IND) return;
 
   got_ind = addrs->len;
-  list_push(addrs, addr);
   aver(stack_len(names) == got_ind);
+  aver(inds->len == got_ind);
 
-  const auto got_name = names->top++;
+  const auto got_name = names->top;
   averr(str_copy(got_name, name));
+
+  names->top++;
+  list_push(addrs, addr);
   dict_set(inds, got_name->buf, got_ind);
 }
 
@@ -448,7 +451,7 @@ static Err comp_append_recur(Comp *comp) {
 /*
 Takes an address and compiles instructions for obtaining that address using a
 PC-relative offset. Intended for accessing non-code segments of `Comp_heap`,
-namely `data`, `intrins`, `externs`.
+namely `data`, `externs`, `intrins`.
 
 TODO skip `adrp` when offset fits into `adr`.
 */
@@ -533,4 +536,39 @@ static const char *asm_fixup_fmt(Asm_fixup *fix) {
 
     default: unreachable();
   }
+}
+
+static Err comp_validate_main(const Sym *main) {
+  if (!main) {
+    return err_str("unable to build executable: missing entry point");
+  }
+
+  if (main->type != SYM_NORM) {
+    return errf(
+      "unable to build executable: entry word " FMT_QUOTED
+      " is not a regular Forth word",
+      main->name.buf
+    );
+  }
+
+  if (main->throws) {
+    return errf(
+      "unable to build executable: entry point " FMT_QUOTED
+      " throws;\n"
+      "hint 0: handle all exceptions, log the errors, return 0 on success and non-zero on error;\n"
+      "hint 1: use [ true catches ] at the beginning to auto-catch",
+      main->name.buf
+    );
+  }
+
+  if (main->out_len != 1) {
+    return errf(
+      "unable to build executable: entry point must return exactly one output (exit code); " FMT_QUOTED
+      " returns %d outputs",
+      main->name.buf,
+      main->out_len
+    );
+  }
+
+  return nullptr;
 }

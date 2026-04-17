@@ -1,5 +1,5 @@
 #pragma once
-#include "./hash.h"
+#include "./hash_fnv.h"
 #include "./num.h"
 #include <limits.h>
 
@@ -21,7 +21,7 @@ typedef struct {
   void *vals;
 } Hash_table;
 
-typedef Hash(Hash_fun)(const void *val, Uint len);
+typedef Fnv_hash(Hash_fun)(const void *val, Uint len);
 typedef bool(Eq_fun)(const void *one, const void *two, Uint len);
 
 /*

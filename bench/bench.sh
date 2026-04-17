@@ -1,5 +1,6 @@
 #! /usr/bin/env sh
 
+# Ensure we're in repo root.
 cd "$(realpath "$(dirname -- "$0")")/.." &&
 
 make PROD=true clean build bench/fib_rec.exe &&

@@ -5,57 +5,41 @@
 // #include "./intrin.c"
 // #endif
 
-static Err interp_validate_data_ptr(Sint ptr, const U8 **out) {
-  /*
-  Some systems deliberately ensure that virtual memory addresses
-  are just out of range of `int32`. Would be nice to check if the
-  pointer is somewhere in that range, but the assumption would be
-  really non-portable.
-
-  In a Forth implementation for OS-free microchips with a very small
-  amount of real memory, valid data pointers could begin close to 0,
-  depending on how data is organized. Since our implementation only
-  supports 64-bit machines and requires an OS, we can at least assume
-  addresses which are "decently large".
-  */
-  if (ptr > (1 << 14)) {
-    *out = (U8 *)ptr;
-    return nullptr;
-  }
-  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)ptr);
-}
-
-static Err interp_validate_data_len(Sint len, Ind *out) {
-  if (len > 0 && len < (Sint)IND_MAX) {
-    *out = (Ind)len;
-    return nullptr;
-  }
-  return errf("invalid data length: " FMT_SINT, len);
-}
-
 static Err interp_pop_data_ptr(Interp *interp, const U8 **out) {
   Sint buf;
   try(int_stack_pop(&interp->ints, &buf));
-  try(interp_validate_data_ptr(buf, out));
+  try(interp_validate_data_ptr(buf));
+  if (out) *out = (const U8 *)buf;
   return nullptr;
 }
 
 static Err interp_pop_data_ptr_opt(Interp *interp, const U8 **out) {
   Sint buf;
   try(int_stack_pop(&interp->ints, &buf));
-  if (buf) {
-    try(interp_validate_data_ptr(buf, out));
-  }
-  else if (out) {
-    *out = nullptr;
-  }
+  if (buf) try(interp_validate_data_ptr(buf));
+  if (out) *out = (const U8 *)buf;
   return nullptr;
 }
 
 static Err interp_pop_data_len(Interp *interp, Ind *out) {
   Sint len;
   try(int_stack_pop(&interp->ints, &len));
-  try(interp_validate_data_len(len, out));
+  try(interp_validate_data_len(len));
+  if (out) *out = (Ind)len;
+  return nullptr;
+}
+
+static Err interp_pop_str(Interp *interp, const char **out_buf, Ind *out_len) {
+  const auto ints = &interp->ints;
+
+  Sint len;
+  Sint buf;
+  try(int_stack_pop(ints, &len));
+  try(int_stack_pop(ints, &buf));
+  try(interp_validate_string(buf, len));
+
+  if (out_buf) *out_buf = (const char *)buf;
+  if (out_len) *out_len = (Ind)len;
   return nullptr;
 }
 
@@ -70,8 +54,7 @@ static Err interp_pop_reg(Interp *interp, U8 *out) {
 static Err interp_valid_name(Interp *interp, Word_str *out) {
   const char *buf;
   Ind         len;
-  try(interp_pop_data_len(interp, &len));
-  try(interp_pop_data_ptr(interp, (const U8 **)&buf));
+  try(interp_pop_str(interp, &buf, &len));
   try(valid_word(buf, len, out));
   return nullptr;
 }
@@ -156,6 +139,17 @@ static Err intrin_comp_only(Interp *interp) {
   try(int_stack_pop(&interp->ints, &val));
 
   sym->comp_only = !!val;
+  return nullptr;
+}
+
+static Err intrin_interp_only(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+
+  sym->interp_only = !!val;
   return nullptr;
 }
 
@@ -285,21 +279,16 @@ static Err intrin_parse_word(Interp *interp) {
 }
 
 static Err intrin_import(Interp *interp) {
-  const auto ints = &interp->ints;
-  Sint       path;
-
-  try(int_stack_pop(ints, nullptr)); // discard length
-  try(int_stack_pop(ints, &path));
-  try(interp_import(interp, (const char *)path));
+  const char *path;
+  try(interp_pop_str(interp, &path, nullptr));
+  try(interp_import(interp, path));
   return nullptr;
 }
 
 static Err intrin_comp_extern_adr(Interp *interp) {
   const char *name;
-  Ind         len;
-  try(interp_pop_data_len(interp, &len));
-  try(interp_pop_data_ptr(interp, (const U8 **)&name));
-  try(interp_extern_adr(interp, name, len));
+  try(interp_pop_str(interp, &name, nullptr));
+  try(interp_extern_adr(interp, name));
 
   const auto            comp = &interp->comp;
   static constexpr auto reg  = ASM_SCRATCH_REG_8;
@@ -310,29 +299,28 @@ static Err intrin_comp_extern_adr(Interp *interp) {
 }
 
 static Err intrin_extern_proc(Interp *interp) {
-  const auto  ints = &interp->ints;
-  Sint        out_len;
-  Sint        inp_len;
-  const char *name;
-  Ind         len;
+  const auto ints = &interp->ints;
+
+  Sint out_len;
+  Sint inp_len;
   try(int_stack_pop(ints, &out_len));
   try(int_stack_pop(ints, &inp_len));
-  try(interp_pop_data_len(interp, &len));
-  try(interp_pop_data_ptr(interp, (const U8 **)&name));
-  try(interp_extern_proc(interp, name, len, inp_len, out_len));
+
+  const char *name;
+  try(interp_pop_str(interp, &name, nullptr));
+  try(interp_extern_proc(interp, name, inp_len, out_len));
   return nullptr;
 }
 
 static Err intrin_find_word(Interp *interp) {
-  Sint      wordlist;
-  const U8 *buf;
-  Ind       len;
-  try(interp_pop_data_len(interp, &len));
-  try(interp_pop_data_ptr(interp, &buf));
+  const char *name;
+  try(interp_pop_str(interp, &name, nullptr));
+
+  Sint wordlist;
   try(int_stack_pop(&interp->ints, &wordlist));
 
   const Sym *sym;
-  try(interp_find_word(interp, (const char *)buf, len, (Wordlist)wordlist, &sym));
+  try(interp_find_word(interp, name, (Wordlist)wordlist, &sym));
   try(int_stack_push(&interp->ints, (Sint)sym));
   return nullptr;
 }
@@ -360,16 +348,15 @@ static Err intrin_execute(Interp *interp) {
 }
 
 static Err intrin_comp_named_local(Interp *interp) {
-  const auto comp = &interp->comp;
-  const U8  *buf;
-  Ind        len;
-  Local     *loc;
-  try(interp_pop_data_len(interp, &len));
-  try(interp_pop_data_ptr(interp, &buf));
-  try(interp_get_local(interp, (const char *)buf, len, &loc));
+  const char *name;
+  Ind         len;
+  try(interp_pop_str(interp, &name, &len));
+
+  Local *loc;
+  try(interp_get_local(interp, name, len, &loc));
 
   if (!loc->inited) {
-    comp_local_alloc_mem(comp, loc);
+    comp_local_alloc_mem(&interp->comp, loc);
     loc->inited = true;
   }
 

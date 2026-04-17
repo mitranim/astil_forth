@@ -2,7 +2,7 @@ import' std:lang.af
 
 " hello world! (using libc IO)" log lf
 
-\ Don't have to use libc for IO. Can just call into the kernel.
+\ Don't have to use libc for IO. Just call the kernel.
 \
 \ x8 = 64 -> Linux write syscall.
 \ x16 = 4 -> XNU write syscall.

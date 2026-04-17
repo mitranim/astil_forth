@@ -1,5 +1,6 @@
 #pragma once
 #include "./interp_internal.c"
+#include "./mach_o.c"
 
 // #ifdef CLANGD
 // #include "./intrin.c"
@@ -66,31 +67,8 @@ static Err intrin_brace(Interp *interp) {
   return nullptr;
 }
 
-static Err interp_validate_data_ptr(Sint val) {
-  /*
-  Some systems deliberately ensure that virtual memory addresses
-  are just out of range of `int32`. Would be nice to check if the
-  pointer is somewhere in that range, but the assumption would be
-  really non-portable.
-
-  In a Forth implementation for OS-free microchips with a very small
-  amount of real memory, valid data pointers could begin close to 0,
-  depending on how data is organized. Since our implementation only
-  supports 64-bit machines and requires an OS, we can at least assume
-  addresses which are "decently large".
-  */
-  if (val > (1 << 14)) return nullptr;
-  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
-}
-
-static Err interp_validate_data_len(Sint val) {
-  if (val > 0 && val < (Sint)IND_MAX) return nullptr;
-  return errf("invalid data length: " FMT_SINT, val);
-}
-
 static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
-  try(interp_validate_data_ptr(buf));
-  try(interp_validate_data_len(len));
+  try(interp_validate_string(buf, len));
   try(valid_word((const char *)buf, (Ind)len, out));
   return nullptr;
 }
@@ -180,6 +158,13 @@ static Err intrin_comp_only(bool val, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   sym->comp_only = val;
+  return nullptr;
+}
+
+static Err intrin_interp_only(bool val, Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->interp_only = val;
   return nullptr;
 }
 
@@ -273,18 +258,14 @@ static Err intrin_parse_word(Interp *interp, const char **buf, Sint *len) {
 }
 
 static Err intrin_import(Sint buf, Sint len, Interp *interp) {
-  try(interp_validate_data_ptr(buf));
-  try(interp_validate_data_len(len));
-
-  const auto path = (const char *)buf;
-  IF_DEBUG(aver((Sint)strlen(path) == len));
-  try(interp_import(interp, path)) return nullptr;
+  try(interp_validate_string(buf, len));
+  try(interp_import(interp, (const char *)buf));
+  return nullptr;
 }
 
 static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
-  try(interp_validate_data_ptr(buf));
-  try(interp_validate_data_len(len));
-  try(interp_extern_adr(interp, (const char *)buf, (Ind)len));
+  try(interp_validate_string(buf, len));
+  try(interp_extern_adr(interp, (const char *)buf));
 
   const auto comp = &interp->comp;
   U8         reg;
@@ -296,18 +277,16 @@ static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
 static Err intrin_extern_proc(
   Sint buf, Sint len, Sint inp_len, Sint out_len, Interp *interp
 ) {
-  try(interp_validate_data_ptr(buf));
-  try(interp_validate_data_len(len));
-  try(interp_extern_proc(interp, (const char *)buf, (Ind)len, inp_len, out_len));
+  try(interp_validate_string(buf, len));
+  try(interp_extern_proc(interp, (const char *)buf, inp_len, out_len));
   return nullptr;
 }
 
 static Err intrin_find_word(
   Sint buf, Sint len, Wordlist wordlist, Interp *interp, const Sym **sym
 ) {
-  try(interp_validate_data_ptr(buf));
-  try(interp_validate_data_len(len));
-  try(interp_find_word(interp, (const char *)buf, (Ind)len, wordlist, sym));
+  try(interp_validate_string(buf, len));
+  try(interp_find_word(interp, (const char *)buf, wordlist, sym));
   return nullptr;
 }
 
@@ -411,9 +390,8 @@ static Err intrin_comp_clobber(Sint reg, Interp *interp) {
 static Err intrin_comp_named_local(
   Sint buf, Sint len, Interp *interp, const Local **out
 ) {
+  try(interp_validate_string(buf, len));
   Local *loc;
-  try(interp_validate_data_ptr(buf));
-  try(interp_validate_data_len(len));
   try(interp_get_local(interp, (const char *)buf, (Ind)len, &loc));
   if (out) *out = local_token(loc);
   return nullptr;
@@ -471,6 +449,14 @@ static Err intrin_comp_local_off(Sint ptr, Interp *interp, Sint *out) {
 }
 
 static Err intrin_alloca(Interp *interp) { return comp_alloca(&interp->comp); }
+
+static Err intrin_compile_executable(Sint main, Sint path, Interp *interp) {
+  try(interp_validate_data_ptr(path));
+  Sym *sym;
+  try(interp_sym_by_ptr(interp, main, &sym));
+  try(compile_mach_executable_to(interp, (const char *)path, sym));
+  return nullptr;
+}
 
 static void intrin_debug_ctx(Interp *interp) {
   const auto ctx     = &interp->comp.ctx;
@@ -581,7 +567,7 @@ static void intrin_debug_ctx(Interp *interp) {
 
 static void intrin_debug_arg(Sint val, Interp *) {
   eprintf(
-    "[debug] arg: " FMT_SINT " " FMT_UINT_HEX " %s\n",
+    "[debug] arg: " FMT_SINT " " FMT_UINT_HEX " 0b%s\n",
     val,
     (Uint)val,
     uint64_to_bit_str((Uint)val)
@@ -726,6 +712,14 @@ static constexpr auto INTRIN_ALLOCA = (Sym){
   .intrin    = (void *)intrin_alloca,
   .throws    = true,
   .comp_only = true,
+};
+
+static constexpr auto INTRIN_COMPILE_EXECUTABLE = (Sym){
+  .name.buf = "compile_executable",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_compile_executable,
+  .inp_len  = 2,
+  .throws   = true,
 };
 
 static constexpr USED auto INTRIN_DEBUG_CTX = (Sym){

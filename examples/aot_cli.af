@@ -1,0 +1,43 @@
+import' std:lang.af
+
+\ ## AOT compilation
+\
+\ Specify `--build=<out_path>` AFTER the input paths:
+\
+\   astil examples/aot.af --build=out.exe
+\   ./out.exe
+\
+\ See `./aot.af` for compiling from INSIDE the program.
+
+: main { -- code }
+  has_interp if
+    " hello world (JIT mode)!" log lf
+  else
+    " hello world (AOT-compiled)!" log lf
+  end
+
+  \ OK exit code
+  0
+;
+
+\ Run immediately in JIT mode.
+main
+
+\ ## Bonus example
+\
+\ You can "automatically" make an executable from a REPL session.
+\ In your shell:
+\
+\   astil std:lang.af - --build=out.exe
+\
+\ In the Forth REPL:
+\
+\   : main { -- code } " hello world!" log lf 0 ;
+\   \ Then hit Ctrl+D (not Ctrl+C) to terminate stdin.
+\
+\ In your shell:
+\
+\   ./out.exe
+\   \ hello world!
+\
+\ Voila!

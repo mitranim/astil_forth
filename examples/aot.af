@@ -1,0 +1,71 @@
+import' std:lang.af
+
+\ ## AOT compilation
+\
+\ Usage:
+\
+\   astil examples/aot.af
+\   ./out.exe
+\
+\ See `./aot_cli.af` for compiling from outside the program.
+
+: main { -- code }
+  has_interp if
+    " hello world (JIT mode)!" log lf
+  else
+    " hello world (AOT-compiled)!" log lf
+  end
+
+  \ OK exit code
+  0
+;
+
+\ Run immediately in JIT mode.
+main
+
+' main " out.exe" compile_executable
+
+\ ## Bonus example
+\
+\ You can make an executable inside a REPL session.
+\ In your shell:
+\
+\   astil std:lang.af -
+\
+\ In the Forth REPL:
+\
+\   : main { -- code } " hello world!" log lf 0 ;
+\   ' main " out.exe" compile_executable
+\   \ Then hit Ctrl+D (not Ctrl+C) to exit.
+\
+\ In your shell:
+\
+\   ./out.exe
+\   \ hello world!
+\
+\ Voila!
+\
+\ ## Advanced example
+\
+\ Each build snapshots the current state of the program.
+\ You can repeatedly modify program state, redefine words,
+\ and build any amount of different executables on the fly.
+\
+\ Shell:
+\
+\   astil std:lang.af -
+\
+\ Forth:
+\
+\   : main { -- code } " hello world! (first)" log lf 0 ;
+\   ' main " out0.exe" compile_executable
+\   : main { -- code } " hello world! (second)" log lf 0 ;
+\   \ [system] redefined word `main` in wordlist 1
+\   ' main " out1.exe" compile_executable
+\   \ Hit Ctrl+D to exit.
+\
+\ Shell:
+\
+\   ./out0.exe && ./out1.exe
+\   \ hello world! (first)
+\   \ hello world! (second)

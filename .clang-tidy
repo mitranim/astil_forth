@@ -1,3 +1,5 @@
 Checks:
   - -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
-  - -clang-analyzer-optin.performance.Padding
+  - -clang-analyzer-optin.performance.Padding # Specific field order matters.
+  - -clang-analyzer-deadcode.DeadStores # False positives.
+  - -clang-diagnostic-deprecated-octal-literals # Clang doesn't like this yet.

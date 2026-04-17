@@ -1054,6 +1054,7 @@ static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
     ((Instr)src_reg << 16) | (Instr)tar_reg;
 }
 
+// mov Xd, Xt
 static void asm_append_mov_reg(Comp *comp, U8 tar_reg, U8 src_reg) {
   asm_append_instr(comp, asm_instr_mov_reg(tar_reg, src_reg));
 }
@@ -1079,12 +1080,13 @@ static Instr asm_maybe_mov_imm_to_reg(
 }
 
 /*
-When the immediate can't be encoded inline, we outline it and emit a fixup
-entry; when finalizing a procedure, we inline the immediate after the body,
-and rewrite the instruction into `ldr <off>`. There are better approaches.
-Constants should normally be placed in a dedicated section and folded, which
-should play better with the CPU cache. Some immediates can be split into
-`mov & add`. Some can be encoded with multiple `movk`. Maybe later.
+Many immediates can be encoded inline inside a `mov`, sometimes with a shift.
+For immediates which do not fit, we reserve space for an instruction and emit
+a fixup record; when finalizing a procedure, we place the immediate after the
+body and rewrite the instruction with `ldr <off>`. There are other approaches.
+Many compilers place constants into a dedicated section in the executable and
+fold / dedup them, which should be better for the CPU cache. Some immediates
+can be split into `mov & add`. Some can become multiple `movk`. Maybe later.
 
 SYNC[asm_imm_to_reg].
 */
@@ -1218,9 +1220,9 @@ static Err err_catch_no_throw(const char *callee) {
 static Err asm_append_call_norm(
   Comp *comp, Sym *caller, const Sym *callee, bool catch
 ) {
-  try(comp_code_ensure_sym_ready(&comp->code, callee));
+  const auto code = &comp->code;
+  try(comp_code_ensure_sym_ready(code, callee));
 
-  const auto code   = &comp->code;
   const auto fun    = comp_sym_exec_instr(comp, callee);
   const auto pc_off = fun - comp_code_next_prog_counter(code);
 

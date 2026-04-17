@@ -1,7 +1,7 @@
 #pragma once
 #include "./err.h"
 #include "./fmt.h"
-#include "./hash.c"
+#include "./hash_fnv.c"
 #include "./hash_table_common.h"
 #include "./mem.c"
 #include "./mem.h"
@@ -9,12 +9,14 @@
 #include <stdlib.h>
 
 // One bit per entry, with no tombstones: our hash tables are append-only.
-static constexpr Uint HASH_TABLE_BITS_SIZE = sizeof((Hash_table){}.bits);
-static constexpr Uint HASH_TABLE_BITS_CAP  = HASH_TABLE_BITS_SIZE * CHAR_BIT;
-static constexpr Uint HASH_TABLE_INIT_CAP  = 4;
+static constexpr U8 HASH_TABLE_BITS_SIZE = sizeof((Hash_table){}.bits);
+static constexpr U8 HASH_TABLE_BITS_CAP  = HASH_TABLE_BITS_SIZE * CHAR_BIT;
+static constexpr U8 HASH_TABLE_INIT_CAP  = 4;
 
 // Conforms to `Hash_fun`.
-static Hash mem_hash(const void *key, Uint len) { return hash_bytes(key, len); }
+static Fnv_hash mem_hash(const void *key, Uint len) {
+  return fnv_hash_bytes(key, len);
+}
 
 // Conforms to `Eq_fun`.
 static bool mem_eq(const void *one, const void *two, Uint len) {
@@ -32,10 +34,10 @@ static void hash_table_deinit(void *tab) {
 
 /*
 How many chunks of bits correspond to this capacity.
-Round-up divide; cap 0 = len 0, otherwise min 1.
+`cap` 0 = len 0, otherwise min 1.
 */
 static Ind hash_table_bits_arr_len(Ind cap) {
-  return (cap + HASH_TABLE_BITS_CAP - 1) / HASH_TABLE_BITS_CAP;
+  return divide_round_up(cap, HASH_TABLE_BITS_CAP);
 }
 
 static void hash_table_init(
@@ -128,7 +130,7 @@ static bool hash_table_loaded(const Hash_table *tab) {
 // Quadratic probing. Assumes `cap` is power of 2.
 static Ind hash_table_probe(Ind iter) { return (iter * iter + iter) / 2; }
 
-static Ind hash_table_probe_ind(const Hash_table *tab, Hash hash, Ind iter) {
+static Ind hash_table_probe_ind(const Hash_table *tab, Fnv_hash hash, Ind iter) {
   return (Ind)modulo2((hash + hash_table_probe(iter)), tab->cap);
 }
 

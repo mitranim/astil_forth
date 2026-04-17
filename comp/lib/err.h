@@ -42,8 +42,9 @@ typedef Err(Err_fun)(void);
 
 /*
 For procedures which return 0/-1 and set `errno`.
-Not suitable for procedures like `mmap` where the
-value may be either useful, or the -1 sentinel.
+
+Discards the value in case of non-error, which makes this unsuitable
+for `mmap`, whose result is either -1 or an address.
 */
 #define try_errno(expr) try(err_errno(expr))
 

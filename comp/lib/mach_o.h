@@ -1,15 +1,29 @@
 /*
 Links:
 
-- https://github.com/apple-oss-distributions/xnu/tree/main/EXTERNAL_HEADERS/mach-o/loader.h
+- https://github.com/apple-oss-distributions/xnu/blob/main/EXTERNAL_HEADERS/mach-o/loader.h
+- https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/mach_loader.c
 - https://github.com/apple-oss-distributions/cctools/blob/main/include/mach-o/loader.h
+- https://github.com/apple-oss-distributions/cctools/blob/main/otool/fixup-chains.h
 - https://github.com/apple-oss-distributions/cctools/blob/main/include/mach/machine-cctools.h
-- https://web.archive.org/web/20140911185310/https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/MachORuntime/Reference/reference.html
+- https://blog.xpnsec.com/building-a-mach-o-memory-loader-part-1/
+- https://www.emergetools.com/blog/posts/iOS15LaunchTime
 - https://en.wikipedia.org/wiki/Mach-O
+- (outdated) https://owenbrooks.org/blog/constructing-a-valid-macho/
+- (outdated) https://web.archive.org/web/20140911185310/https://developer.apple.com/library/mac/documentation/DeveloperTools/Conceptual/MachORuntime/Reference/reference.html
+- (outdated) https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
+
+Commands:
+
+  otool -hvl out.exe
+  otool -hvl -chained_fixups out.exe
+  pagestuff -a out.exe
+  codesign -dvvv out.exe
+  llvm-objdump --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms out.exe
 */
 
 #pragma once
-#include "./mach_misc.h"
+#include "./misc.h"
 #include "./num.h"
 
 // #include <nlist.h>
@@ -131,14 +145,14 @@ typedef enum : U32 {
   MLC_TARGET_TRIPLE            = 0x39,
 } Mach_load_cmd_type;
 
-// `mach_header_64` in Apple cctools.
+// `mach_header_64` in Apple `cctools`.
 typedef struct {
   U32            magic;
-  Mach_cpu_type  cpu_type;
-  U32            cpu_subtype;
-  Mach_file_type file_type;
-  U32            cmd_count;
-  U32            cmd_size;
+  Mach_cpu_type  cputype;
+  U32            cpusubtype;
+  Mach_file_type filetype;
+  U32            ncmds;
+  U32            sizeofcmds;
   U32            flags;
   U32            reserved;
 } Mach_head; // 64-bit
@@ -164,13 +178,32 @@ typedef enum : U32 {
   MSF_READ_ONLY           = 0x10,
 } Mach_load_cmd_seg_flag;
 
-// `segment_command_64` in Apple cctools.
+/*
+`segment_command_64` in Apple `cctools`.
+
+`fileoff` is the offset of this load command's body from the start of the Mach-O
+file, and `filesize` is the body's size within the file. For load commands with
+one or several sections, the `Mach_sect.offset` of the first section usually
+matches `Mach_load_cmd_seg.fileoff`.
+
+`vmaddr` is where the body starts in virtual memory, and `vmsize` is the size
+of the virtual memory segment, often larger than `filesize`. Virtual memory is
+chunked into "pages" of platform-dependent size (see `MEM_PAGE`). `vmaddr` has
+to be aligned to memory page size, and `vmsize` has to be padded up to it.
+
+The `__TEXT` command is special: it's obligated to reserve space for Mach-O
+headers before its `__text` section. Its `fileoff` is 0, meaning: it begins
+at the start of the Mach-O file. `filesize` includes `Mach_head.sizeofcmds`
+and the size of the `__text` section. The `__text` section's `offset` does
+not match `fileoff`; it's the offset of the executable instruction payload
+following after the headers. This rule doesn't apply to `MH_OBJECT` files.
+*/
 typedef struct {
   Mach_load_cmd_head     head;
   char                   segname[16];
   U64                    vmaddr;
   U64                    vmsize;
-  U64                    fileoff;
+  U64                    fileoff; // From start of entire Mach-O file.
   U64                    filesize;
   U32                    maxprot;
   U32                    initprot;
@@ -217,37 +250,37 @@ typedef enum : U32 {
   MSA_LOC_RELOC           = 0x00000100,
 } Mach_sect_flag;
 
-// `section_64` in Apple cctools.
+// `section_64` in Apple `cctools`.
 typedef struct {
-  char           sectname[16];
-  char           segname[16];
-  U64            addr;
-  U64            size;
-  U32            offset;
-  U32            align;
-  U32            reloff;
-  U32            nreloc;
-  Mach_sect_flag flags;
-  U32            reserved1;
-  U32            reserved2;
-  U32            reserved3;
+  char sectname[16];
+  char segname[16];
+  U64  addr;
+  U64  size;
+  U32  offset; // From start of entire Mach-O file.
+  U32  align;  // Expressed as power of 2; value of 2 = align to 4 bytes.
+  U32  reloff;
+  U32  nreloc;
+  U32  flags;
+  U32  reserved1;
+  U32  reserved2;
+  U32  reserved3;
 } Mach_sect;
 
 /*
-`linkedit_data_command` in Apple cctools.
+`linkedit_data_command` in Apple `cctools`.
 
-Command types:
-- LC_ATOM_INFO
-- LC_CODE_SIGNATURE
-- LC_DATA_IN_CODE
-- LC_DYLD_CHAINED_FIXUPS
-- LC_DYLD_EXPORTS_TRIE
-- LC_DYLIB_CODE_SIGN_DRS
-- LC_FUNCTION_STARTS
-- LC_FUNCTION_VARIANT_FIXUPS
-- LC_FUNCTION_VARIANTS
-- LC_LINKER_OPTIMIZATION_HINT
-- LC_SEGMENT_SPLIT_INFO
+Command types (see `Mach_load_cmd_type`):
+- MLC_ATOM_INFO
+- MLC_CODE_SIGNATURE
+- MLC_DATA_IN_CODE
+- MLC_DYLD_CHAINED_FIXUPS
+- MLC_DYLD_EXPORTS_TRIE
+- MLC_DYLIB_CODE_SIGN_DRS
+- MLC_FUNCTION_STARTS
+- MLC_FUNCTION_VARIANT_FIXUPS
+- MLC_FUNCTION_VARIANTS
+- MLC_LINKER_OPTIMIZATION_HINT
+- MLC_SEGMENT_SPLIT_INFO
 */
 typedef struct {
   Mach_load_cmd_head head;
@@ -255,7 +288,8 @@ typedef struct {
   U32                datasize;
 } Mach_load_cmd_linkedit;
 
-// `symtab_command` in Apple cctools. See `<nlist.h>` and `<stab.h>`.
+// `symtab_command` in Apple `cctools`.
+// See `<nlist.h>` and `<stab.h>`.
 typedef struct {
   Mach_load_cmd_head head;    // MLC_SYMTAB
   U32                symoff;  /* symbol table offset */
@@ -264,123 +298,31 @@ typedef struct {
   U32                strsize; /* string table size in bytes */
 } Mach_load_cmd_symtab;
 
-// `dysymtab_command` in Apple cctools.
+// `dysymtab_command` in Apple `cctools`.
 typedef struct {
-  Mach_load_cmd_head head; // MLC_DYSYMTAB
-
-  /*
-   * The symbols indicated by symoff and nsyms of the LC_SYMTAB load command
-   * are grouped into the following three groups:
-   *    local symbols (further grouped by the module they are from)
-   *    defined external symbols (further grouped by the module they are from)
-   *    undefined symbols
-   *
-   * The local symbols are used only for debugging.  The dynamic binding
-   * process may have to use them to indicate to the debugger the local
-   * symbols for a module that is being bound.
-   *
-   * The last two groups are used by the dynamic binding process to do the
-   * binding (indirectly through the module table and the reference symbol
-   * table when this is a dynamically linked shared library file).
-   */
-  U32 ilocalsym; /* index to local symbols */
-  U32 nlocalsym; /* number of local symbols */
-
-  U32 iextdefsym; /* index to externally defined symbols */
-  U32 nextdefsym; /* number of externally defined symbols */
-
-  U32 iundefsym; /* index to undefined symbols */
-  U32 nundefsym; /* number of undefined symbols */
-
-  /*
-   * For the for the dynamic binding process to find which module a symbol
-   * is defined in the table of contents is used (analogous to the ranlib
-   * structure in an archive) which maps defined external symbols to modules
-   * they are defined in.  This exists only in a dynamically linked shared
-   * library file.  For executable and object modules the defined external
-   * symbols are sorted by name and is use as the table of contents.
-   */
-  U32 tocoff; /* file offset to table of contents */
-  U32 ntoc;   /* number of entries in table of contents */
-
-  /*
-   * To support dynamic binding of "modules" (whole object files) the symbol
-   * table must reflect the modules that the file was created from.  This is
-   * done by having a module table that has indexes and counts into the merged
-   * tables for each module.  The module structure that these two entries
-   * refer to is described below.  This exists only in a dynamically linked
-   * shared library file.  For executable and object modules the file only
-   * contains one module so everything in the file belongs to the module.
-   */
-  U32 modtaboff; /* file offset to module table */
-  U32 nmodtab;   /* number of module table entries */
-
-  /*
-   * To support dynamic module binding the module structure for each module
-   * indicates the external references (defined and undefined) each module
-   * makes.  For each module there is an offset and a count into the
-   * reference symbol table for the symbols that the module references.
-   * This exists only in a dynamically linked shared library file.  For
-   * executable and object modules the defined external symbols and the
-   * undefined external symbols indicates the external references.
-   */
-  U32 extrefsymoff; /* offset to referenced symbol table */
-  U32 nextrefsyms;  /* number of referenced symbol table entries */
-
-  /*
-   * The sections that contain "symbol pointers" and "routine stubs" have
-   * indexes and (implied counts based on the size of the section and fixed
-   * size of the entry) into the "indirect symbol" table for each pointer
-   * and stub.  For every section of these two types the index into the
-   * indirect symbol table is stored in the section header in the field
-   * reserved1.  An indirect symbol table entry is simply a 32bit index into
-   * the symbol table to the symbol that the pointer or stub is referring to.
-   * The indirect symbol table is ordered to match the entries in the section.
-   */
-  U32 indirectsymoff; /* file offset to the indirect symbol table */
-  U32 nindirectsyms;  /* number of indirect symbol table entries */
-
-  /*
-   * To support relocating an individual module in a library file quickly the
-   * external relocation entries for each module in the library need to be
-   * accessed efficiently.  Since the relocation entries can't be accessed
-   * through the section headers for a library file they are separated into
-   * groups of local and external entries further grouped by module.  In this
-   * case the presents of this load command who's extreloff, nextrel,
-   * locreloff and nlocrel fields are non-zero indicates that the relocation
-   * entries of non-merged sections are not referenced through the section
-   * structures (and the reloff and nreloc fields in the section headers are
-   * set to zero).
-   *
-   * Since the relocation entries are not accessed through the section headers
-   * this requires the r_address field to be something other than a section
-   * offset to identify the item to be relocated.  In this case r_address is
-   * set to the offset from the vmaddr of the first LC_SEGMENT command.
-   * For MH_SPLIT_SEGS images r_address is set to the the offset from the
-   * vmaddr of the first read-write LC_SEGMENT command.
-   *
-   * The relocation entries are grouped by module and the module table
-   * entries have indexes and counts into them for the group of external
-   * relocation entries for that the module.
-   *
-   * For sections that are merged across modules there must not be any
-   * remaining external relocation entries for them (for merged sections
-   * remaining relocation entries must be local).
-   */
-  U32 extreloff; /* offset to external relocation entries */
-  U32 nextrel;   /* number of external relocation entries */
-
-  /*
-   * All the local relocation entries are grouped together (they are not
-   * grouped by their module since they are only used if the object is moved
-   * from it staticly link edited address).
-   */
-  U32 locreloff; /* offset to local relocation entries */
-  U32 nlocrel;   /* number of local relocation entries */
+  Mach_load_cmd_head head;         // MLC_DYSYMTAB
+  U32                ilocalsym;    // index to local symbols
+  U32                nlocalsym;    // number of local symbols
+  U32                iextdefsym;   // index to externally defined symbols
+  U32                nextdefsym;   // number of externally defined symbols
+  U32                iundefsym;    // index to undefined symbols
+  U32                nundefsym;    // number of undefined symbols
+  U32                tocoff;       // file offset to table of contents
+  U32                ntoc;         // number of entries in table of contents
+  U32                modtaboff;    // file offset to module table
+  U32                nmodtab;      // number of module table entries
+  U32                extrefsymoff; // offset to referenced symbol table
+  U32                nextrefsyms;  // number of referenced symbol table entries
+  U32                indirectsymoff; // file offset to the indirect symbol table
+  U32                nindirectsyms;  // number of indirect symbol table entries
+  U32                extreloff;      // offset to external relocation entries
+  U32                nextrel;        // number of external relocation entries
+  U32                locreloff;      // offset to local relocation entries
+  U32                nlocrel;        // number of local relocation entries
 } Mach_load_cmd_dysymtab;
 
 /*
-`dylinker_command` in Apple cctools.
+`dylinker_command` in Apple `cctools`.
 
 Command must be immediately followed by an inline string which is the dylinker
 path name. The string's size is included into `.head.cmdsize` and the whole
@@ -392,7 +334,17 @@ typedef struct {
   char               name[];      // Follows the command.
 } Mach_load_cmd_dyld;
 
-// `dylib_command` in Apple cctools. Must be followed by name string.
+// Fixed-size variant of `Mach_load_cmd_dyld`, easier to encode.
+typedef struct {
+  Mach_load_cmd_head head;
+  U32                name_offset;
+  char               name[sizeof("/usr/lib/dyld")];
+  char               pad[6];
+} Mach_load_cmd_dylinker;
+
+static_assert(divisible_by(sizeof(Mach_load_cmd_dylinker), 8));
+
+// `dylib_command` in Apple `cctools`. Must be followed by name string.
 typedef struct {
   Mach_load_cmd_head head;        // MLC_LOAD_DYLIB
   U32                name_offset; // sizeof(Mach_load_cmd_dylib)
@@ -402,71 +354,285 @@ typedef struct {
   char               name[]; // Follows the command.
 } Mach_load_cmd_dylib;
 
-// `uuid_command` in Apple cctools.
+// Fixed-size variant of `Mach_load_cmd_dylib`, easier to encode.
+typedef struct {
+  Mach_load_cmd_head head;
+  U32                name_offset;
+  U32                timestamp;
+  U32                cur_ver;
+  U32                compat_ver;
+  char               name[sizeof("/usr/lib/libSystem.B.dylib")];
+  char               pad[5];
+} Mach_cmd_dylib;
+
+static_assert(divisible_by(sizeof(Mach_cmd_dylib), 8));
+
+// `uuid_command` in Apple `cctools`.
 typedef struct {
   Mach_load_cmd_head head; // MLC_UUID
   U8                 uuid[16];
 } Mach_load_cmd_uuid;
 
+// Values for `Mach_load_cmd_bui_ver.platform`.
+typedef enum : U32 {
+  MBP_UNKNOWN              = 0,          // PLATFORM_UNKNOWN
+  MBP_MACOS                = 1,          // PLATFORM_MACOS
+  MBP_IOS                  = 2,          // PLATFORM_IOS
+  MBP_TVOS                 = 3,          // PLATFORM_TVOS
+  MBP_WATCHOS              = 4,          // PLATFORM_WATCHOS
+  MBP_BRIDGEOS             = 5,          // PLATFORM_BRIDGEOS
+  MBP_MACCATALYST          = 6,          // PLATFORM_MACCATALYST
+  MBP_IOS_SIM              = 7,          // PLATFORM_IOS_SIM
+  MBP_TVOS_SIM             = 8,          // PLATFORM_TVOS_SIM
+  MBP_WATCHOS_SIM          = 9,          // PLATFORM_WATCHOS_SIM
+  MBP_DRIVERKIT            = 10,         // PLATFORM_DRIVERKIT
+  MBP_VISIONOS             = 11,         // PLATFORM_VISIONOS
+  MBP_VISIONOS_SIM         = 12,         // PLATFORM_VISIONOS_SIM
+  MBP_FIRMWARE             = 13,         // PLATFORM_FIRMWARE
+  MBP_SEPOS                = 14,         // PLATFORM_SEPOS
+  MBP_MACOS_EXCLAVECORE    = 15,         // PLATFORM_MACOS_EXCLAVECORE
+  MBP_MACOS_EXCLAVEKIT     = 16,         // PLATFORM_MACOS_EXCLAVEKIT
+  MBP_IOS_EXCLAVECORE      = 17,         // PLATFORM_IOS_EXCLAVECORE
+  MBP_IOS_EXCLAVEKIT       = 18,         // PLATFORM_IOS_EXCLAVEKIT
+  MBP_TVOS_EXCLAVECORE     = 19,         // PLATFORM_TVOS_EXCLAVECORE
+  MBP_TVOS_EXCLAVEKIT      = 20,         // PLATFORM_TVOS_EXCLAVEKIT
+  MBP_WATCHOS_EXCLAVECORE  = 21,         // PLATFORM_WATCHOS_EXCLAVECORE
+  MBP_WATCHOS_EXCLAVEKIT   = 22,         // PLATFORM_WATCHOS_EXCLAVEKIT
+  MBP_VISIONOS_EXCLAVECORE = 23,         // PLATFORM_VISIONOS_EXCLAVECORE
+  MBP_VISIONOS_EXCLAVEKIT  = 24,         // PLATFORM_VISIONOS_EXCLAVEKIT
+  MBP_ANY                  = 0xFFFFFFFF, // PLATFORM_ANY
+} Mach_bui_plat;
+
 /*
-`build_version_command` in Apple cctools.
+`build_version_command` in Apple `cctools`.
 
 `.cmdsize` includes `ntools * sizeof(Mach_bui_ver)`.
 */
 typedef struct {
   Mach_load_cmd_head head; // MLC_BUILD_VERSION
-  U32                platform;
+  Mach_bui_plat      platform;
   U32                minos; // as `mach_ver`
   U32                sdk;   // as `mach_ver`
   U32                ntools;
 } Mach_load_cmd_bui_ver;
 
-// Known values.
+/*
+Values for `Mach_bui_ver.tool`. GPU tools are omitted.
+See `#define TOOL_*` in Apple's `loader.h`.
+*/
 typedef enum : U32 {
-  MBT_CLANG = 0x01,
-  MBT_SWIFT = 0x02,
-  MBT_LD    = 0x03,
-  MBT_LLD   = 0x04,
+  MBT_CLANG = 1,
+  MBT_SWIFT = 2,
+  MBT_LD    = 3,
+  MBT_LLD   = 4,
 } Mach_bui_tool;
 
-// `build_tool_version` in Apple cctools.
+// `build_tool_version` in Apple `cctools`.
 typedef struct {
   Mach_bui_tool tool;
   U32           version;
 } Mach_bui_ver;
 
-// `source_version_command` in Apple cctools.
+// `source_version_command` in Apple `cctools`.
 typedef struct {
   Mach_load_cmd_head head; // MLC_SOURCE_VERSION
   U64                version;
 } Mach_load_cmd_src_ver;
 
-// `entry_point_command` in Apple cctools.
+// `entry_point_command` in Apple `cctools`.
 typedef struct {
   Mach_load_cmd_head head;      // MLC_MAIN
   U64                entryoff;  // Offset in "text" section.
   U64                stacksize; // Optional.
 } Mach_load_cmd_main;
 
-// Must be immediately followed by at least one `Mach_unixthread_state`
-// whose size must be included into `.cmdsize`.
-typedef struct {
-  Mach_load_cmd_head head; // .cmd must be MLC_THREAD or MLC_UNIXTHREAD
-} Mach_load_cmd_unixthread;
-
-// Flavors for `Mach_unixthread_state`.
+// Values for `Mach_fixup_head.imports_format`.
 typedef enum : U32 {
-  MTF_ARM_THREAD_STATE      = 1, // ARM_THREAD_STATE
-  MTF_ARM_VFP_STATE         = 2, // ARM_VFP_STATE
-  MTF_ARM_EXCEPTION_STATE   = 3, // ARM_EXCEPTION_STATE
-  MTF_ARM_DEBUG_STATE       = 4, // ARM_DEBUG_STATE
-  MTF_THREAD_STATE_NONE     = 5, // THREAD_STATE_NONE
-  MTF_ARM_THREAD_STATE64    = 6, // ARM_THREAD_STATE64
-  MTF_ARM_EXCEPTION_STATE64 = 7, // ARM_EXCEPTION_STATE64
-} Mach_thread_flavor;
+  MFI_IMPORT          = 1, // DYLD_CHAINED_IMPORT
+  MFI_IMPORT_ADDEND   = 2, // DYLD_CHAINED_IMPORT_ADDEND
+  MFI_IMPORT_ADDEND64 = 3, // DYLD_CHAINED_IMPORT_ADDEND64
+} Mach_fixup_import_fmt;
 
+/*
+`dyld_chained_fixups_header` in Apple `cctools` `fixup-chains.h`.
+
+Describes the body of `LC_DYLD_CHAINED_FIXUPS`, loaded via the segment named
+`__LINKEDIT`; the body is also called "chain_data" in cctools; we may refer
+to this as "linkedit data". Each offset in `Mach_fixup_head` is from the start
+of linkedit data, which also begins with this struct.
+
+Structure of linkedit data in the general case;
+see comment on `Mach_fixup_img` for more notes:
+
+  [0]                  Mach_fixup_head     (28)
+  [28 = starts_offset] Mach_fixup_img      (4)     -- seg_count = A
+  [32]                 seg_info_offset[]   (4*A)   -- where each `Mach_fixup_seg[]`
+  [...]                Mach_fixup_seg[]    (24*B)  -- where actual fixups
+  [imports_offset]     Mach_fixup_import[] (4*C)   -- one fixup per symbol
+  [symbols_offset]     name[]              (...*C) -- one name per symbol
+
+The actual fixup locations, such as `__got` section, are filled up with
+address-sized `Mach_fixup_ptr_64_bind` structs, which point to their
+`Mach_fixup_import` entries in this data, and to each other in a chain;
+the dylinker rewrites them with addresses.
+
+The count of the following entries should generally match. It's possible
+to contrive an executable where the count doesn't match, for example by
+duplicating some of the entries, but there's no point:
+
+- `Mach_fixup_import[]`
+- `name[]`
+- `Mach_fixup_ptr_64_bind[]` in sections such as `__got`
+
+When compiling, we use a fixed amount of segments,
+and only the `__got` section needs fixups, so we can
+specialize the linkedit structure for convenience:
+
+  [0]                   Mach_fixup_head  (28)
+  [28 = starts_offset]  Mach_fixup_img_5 (24) -- where `Mach_fixup_seg` for `__got`
+  [52]                  Mach_fixup_seg   (24) -- where `__got`
+  [76 = imports_offset] Mach_fixup_import[]
+  [symbols_offset]      name[]
+*/
 typedef struct {
-  U32          flavor;
-  U32          count; // sizeof(Thread_state) / sizeof(U32)
-  Thread_state state;
-} Mach_unixthread_state;
+  U32                   fixups_version; // 0
+  U32                   starts_offset;  // sizeof(Mach_fixup_head)
+  U32                   imports_offset; // start of `Mach_fixup_import[]`
+  U32                   symbols_offset; // start of symbol strings
+  U32                   imports_count;  // number of imported symbol names
+  Mach_fixup_import_fmt imports_format; // DYLD_CHAINED_IMPORT*
+  U32                   symbols_format; // 0 = uncompressed, 1 = zlib
+} Mach_fixup_head;
+
+/*
+`dyld_chained_starts_in_image` in Apple `cctools` `fixup-chains.h`.
+Placed immediately after `Mach_fixup_head`.
+
+`.seg_count` must match the count of `MLC_SEGMENT_64` load commands in the
+executable file. `.seg_info_offset` after the struct must contain exactly
+that many entries, matching the order of the segment load commands.
+
+For segments which need fixups, the corresponding `.seg_info_offset[N]` holds
+the offset of a `Mach_fixup_seg` struct, which describes where to find its
+fixups; the offset is from the start of `Mach_fixup_img`. For those without
+fixups, the offset is 0, and no extra data is emitted.
+*/
+typedef struct {
+  U32 seg_count;
+  U32 seg_info_offset[]; // One per segment.
+} Mach_fixup_img;
+
+/*
+Fixed-size specialized variant of `Mach_fixup_img` for easier encoding.
+Used by `../comp/mach_o.c`; segment count must match how many segments
+are created by all our load commands.
+
+Segments:
+
+    __PAGEZERO   -- offset 0
+    __TEXT       -- offset 0
+    __DATA       -- offset 0
+    __DATA_CONST -- need fixup
+    __LINKEDIT   -- offset 0
+
+The `__DATA_CONST` offset is from the start of this struct.
+*/
+typedef struct {
+  U32 seg_count;          // 5
+  U32 seg_info_offset[5]; // `__got` gets fixups, other segments get offset 0.
+} Mach_fixup_img_5;
+
+/*
+Values for `Mach_fixup_seg.page_start`.
+
+- MFS_NONE  -- used in `Mach_fixup_seg.page_start[]` to denote a page with no fixups.
+- MFS_MULTI -- used in `Mach_fixup_seg.page_start[]` to denote a page which has multiple starts.
+- MFS_LAST  -- used in `Mach_fixup_seg.chain_starts[]` to denote last start in list for page.
+*/
+typedef enum : U16 {
+  MFS_NONE  = 0xFFFF, // DYLD_CHAINED_PTR_START_NONE
+  MFS_MULTI = 0x8000, // DYLD_CHAINED_PTR_START_MULTI
+  MFS_LAST  = 0x8000, // DYLD_CHAINED_PTR_START_LAST
+} Mach_fixup_start;
+
+// Values for `Mach_fixup_seg.pointer_format`.
+typedef enum : U16 {
+  MFP_ARM64E              = 1,  // DYLD_CHAINED_PTR_ARM64E
+  MFP_64                  = 2,  // DYLD_CHAINED_PTR_64
+  MFP_32                  = 3,  // DYLD_CHAINED_PTR_32
+  MFP_32_CACHE            = 4,  // DYLD_CHAINED_PTR_32_CACHE
+  MFP_32_FIRMWARE         = 5,  // DYLD_CHAINED_PTR_32_FIRMWARE
+  MFP_64_OFFSET           = 6,  // DYLD_CHAINED_PTR_64_OFFSET
+  MFP_ARM64E_OFFSET       = 7,  // DYLD_CHAINED_PTR_ARM64E_OFFSET
+  MFP_ARM64E_KERNEL       = 7,  // DYLD_CHAINED_PTR_ARM64E_KERNEL
+  MFP_64_KERNEL_CACHE     = 8,  // DYLD_CHAINED_PTR_64_KERNEL_CACHE
+  MFP_ARM64E_USERLAND     = 9,  // DYLD_CHAINED_PTR_ARM64E_USERLAND
+  MFP_ARM64E_FIRMWARE     = 10, // DYLD_CHAINED_PTR_ARM64E_FIRMWARE
+  MFP_X86_64_KERNEL_CACHE = 11, // DYLD_CHAINED_PTR_X86_64_KERNEL_CACHE
+  MFP_ARM64E_USERLAND24   = 12, // DYLD_CHAINED_PTR_ARM64E_USERLAND24
+} Mach_fixup_ptr;
+
+/*
+`dyld_chained_starts_in_segment` in Apple `cctools` `fixup-chains.h`.
+Per-segment chain-starts descriptor for a single page.
+*/
+typedef struct {
+  U32              size;              // sizeof(Mach_fixup_seg)
+  U16              page_size;         // 0x1000 or 0x4000 (`MEM_PAGE`)
+  Mach_fixup_ptr   pointer_format;    // DYLD_CHAINED_PTR_*
+  U64              segment_offset;    // from `vmaddr` of `__TEXT`
+  U32              max_valid_pointer; // 0 for 64-bit
+  U16              page_count;        // 1
+  Mach_fixup_start page_start[1]; // Offset of first fixup at `segment_offset`.
+
+  // U16 chain_starts[1]; // Unused: only for 32-bit formats.
+} Mach_fixup_seg;
+
+/*
+`dyld_chained_import` in Apple `cctools`.
+Entry for `DYLD_CHAINED_IMPORT` / `MFI_IMPORT`.
+One per extern symbol referenced from GOT.
+
+`.lib_ordinal` is a 1-based index of the `MLC_LOAD_DYLIB` load command
+which loads the symbol's dynamic library; in our case it's usually 1,
+meaning the first and only dylib (libSystem).
+
+`.name_offset` is a byte index of the start of the symbol's name
+in linkedit data pointed to by `Mach_fixup_head.symbols_offset`.
+*/
+typedef struct {
+  U32 lib_ordinal : 8;
+  U32 weak_import : 1; // 0
+  U32 name_offset : 23;
+} Mach_fixup_import;
+
+static_assert(sizeof(Mach_fixup_import) == 4);
+
+/*
+`dyld_chained_ptr_64_bind` in Apple `cctools`.
+
+Bind fixup for `DYLD_CHAINED_PTR_64` / `MFP_64`.
+Used for linking a single external symbol.
+
+These pointer-sized structs fill up the `__got` section. Each structs takes
+the eventual place of an external address. The dylinker interprets the data
+and replaces it with actual extern addresses.
+
+`.ordinal` is the index / offset of this symbol in `Mach_fixup_import[]` in
+linkedit data. We also keep the order of entries consistent between linkedit
+data and `__got`.
+
+See `Mach_fixup_head` for the description of the linkedit data.
+The start of the `Mach_fixup_import[]` list is indicated with
+`Mach_fixup_head.imports_offset`.
+*/
+typedef struct {
+  U64 ordinal  : 24; // Index into imports table.
+  U64 addend   : 8;  // 0
+  U64 reserved : 19; // 0
+  U64 next     : 12; // 4-byte distance to next fixup; 0 = end of chain.
+  U64 bind     : 1;  // 0 = rebase, 1 = bind.
+} Mach_fixup_ptr_64_bind;
+
+static_assert(sizeof(Mach_fixup_ptr_64_bind) == 8);
+static_assert(sizeof(Mach_fixup_ptr_64_bind) == sizeof(U64));

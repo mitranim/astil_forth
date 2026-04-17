@@ -95,7 +95,6 @@
 
 4      let: ASM_INSTR_SIZE
 8      let: ASM_REG_SCRATCH
-28     let: ASM_REG_INTERP \ SYNC[asm_reg_interp].
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP
@@ -116,6 +115,10 @@
 0b1110 let: ASM_AL
 0b1111 let: ASM_NV
 666    let: ASM_PLACEHOLDER
+
+\ SYNC[asm_reg_interp].
+:  ASM_REG_INTERP { -- reg } 28 ;
+:: ASM_REG_INTERP true interp_only ASM_REG_INTERP comp_push ;
 
 \ Bitwise arithmetic needed for the early stages of the self-assembler.
 
@@ -202,6 +205,20 @@
   0        asm_cmp_zero comp_instr \ cmp x0, 0
   0 ASM_EQ asm_cset     comp_instr \ cset x0, eq
   1                     comp_args_set
+] ;
+
+\ True if running in JIT mode (interpreter available).
+\ False if running in AOT-compiled mode.
+\
+\ In JIT mode, the outer interpreter (in C) always sets this register when
+\ calling into Forth. in AOT mode, the reg starts as zero when the OS runs
+\ the process, none of our compiled code modifies it, and locals are never
+\ assigned to this register.
+: has_interp { -- bool } [
+  0                           comp_clobber
+  ASM_REG_INTERP asm_cmp_zero comp_instr \ cmp x28, 0
+  0 ASM_NE       asm_cset     comp_instr \ cset x0, ne
+  1                           comp_args_set
 ] ;
 
 \ Shared by a lot of load and store instructions. 64-bit only.
@@ -721,6 +738,8 @@
 ;
 
 \ blr Xn
+\
+\ Requires caution to avoid messing up the link register.
 : asm_branch_link_reg { Xn -- instr }
   Xn 5 lsl
   0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or
@@ -906,11 +925,16 @@
 \ Compared to the stack CC, the reg-based CC gets away with
 \ fewer special registers.
 \
-\ Note: our stack is empty-ascending.
+\ The stack operations are valid ONLY in interpreted and JIT-compiled code.
+\ AOT-compiled executables do not have the Forth interpreter or data stack.
+\ Attempting to use any of this in AOT-compiled code will kill the program.
+\ By extension, control structures such as `if`, which use the Forth stack
+\ for control information, can only run during the initial interpretation.
 \
+\ Note: our stack is empty-ascending.
+
 \ SYNC[interp_stack_offset].
 \ SYNC[stack_field_offsets].
-
 16 let: INTERP_INTS_FLOOR
 24 let: INTERP_INTS_TOP
 
@@ -918,6 +942,7 @@
 :: stack_top_ptr ( E: -- adr )
   comp_next_arg_reg
   ASM_REG_INTERP INTERP_INTS_TOP asm_add_imm comp_instr
+  true interp_only
 ;
 
 : stack_top_ptr { -- adr } stack_top_ptr ;
@@ -926,6 +951,7 @@
 :: stack_floor ( E: -- adr )
   comp_next_arg_reg
   ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_unscaled_off comp_instr
+  true interp_only
 ;
 
 : stack_floor { -- adr } stack_floor ;
@@ -934,6 +960,7 @@
 :: stack_top ( E: -- adr )
   comp_next_arg_reg
   ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
+  true interp_only
 ;
 
 : stack_top { -- adr } stack_top ;
@@ -1292,12 +1319,12 @@ LF CRLF inc !8 \ \n
 
 \ Variadic formatting words; see vararg support below.
 \ Also see `eprintf` which is defined there as well.
-1 1 extern: printf   ( … fmt         -- len|err )
-2 1 extern: fprintf  ( … file fmt    -- len|err )
-2 1 extern: sprintf  ( … buf fmt     -- len|err )
-3 1 extern: snprintf ( … buf cap fmt -- len|err )
-2 1 extern: asprintf ( … buf_adr fmt -- len|err )
-2 1 extern: dprintf  ( … fd fmt      -- len|err )
+1 1 extern: printf   (         fmt … -- len|err )
+2 1 extern: fprintf  ( file    fmt … -- len|err )
+2 1 extern: sprintf  ( buf     fmt … -- len|err )
+3 1 extern: snprintf ( buf cap fmt … -- len|err )
+2 1 extern: asprintf ( buf_adr fmt … -- len|err )
+2 1 extern: dprintf  ( fd      fmt … -- len|err )
 
 : eputchar { char -- -1 } char stderr fputc              ; \ Symmetry with `putchar`.
 : logc     { char }       char putchar            { -- } ; \ Renamed from `emit`.
@@ -1341,6 +1368,8 @@ LF CRLF inc !8 \ \n
     2 asm_branch_to_reg comp_instr \ br <fprintf>
     0                   comp_args_set
   ]
+
+  unreachable \ brk 666
 ;
 
 \ ## Conditionals
@@ -2092,9 +2121,9 @@ ERR_CAP mem: ERR_BUF_1
 
 \ ## Stack printing
 
-: log_int  { num     -- } " %zd" num logf ;
-: log_cell { num ind -- } " %zd 0x%zx <%zd>" num num ind logf ;
-: .        { num     -- } stack_len { ind } num ind log_cell lf ;
+: log_int      { num } " %zd" num logf ;
+: log_cell     { num } " %zd 0x%zx" num num logf ;
+: .            { num } num log_cell lf ;
 
 : .s
   stack_len { len }
@@ -2113,7 +2142,9 @@ ERR_CAP mem: ERR_BUF_1
 
   len 0 +for: ind
     space space
-    ind stack_at @ ind log_cell lf
+    ind stack_at @ log_cell
+    " <%zd>" ind logf
+    lf
   end
 ;
 
@@ -2342,6 +2373,13 @@ ERR_CAP mem: ERR_BUF_1
 \ Takes any amount of args, where the last arg is assumed to be a raw
 \ instruction address (procedure pointer). Invokes that procedure with
 \ the preceding args. Does not support output parameters.
+\
+\ TODO: tell the compiler about the call. Without that, caller-callee relation
+\ is hidden; exceptions and outputs are ignored; the caller is not guaranteed
+\ to have a prologue and epilogue; if the caller is a leaf, this clobbers the
+\ link register of the caller's caller.
+\
+\ TODO: verify that clobbering works properly.
 :: execute_raw ( C: …args fun -- ) ( E: …args fun -- )
   comp_args_get { len }
 
@@ -2350,6 +2388,7 @@ ERR_CAP mem: ERR_BUF_1
   end
 
   0 comp_args_set
+  comp_clobber_volatile
   len dec asm_branch_link_reg comp_instr \ blr <fun_reg>
 ;
 
@@ -2368,6 +2407,6 @@ ERR_CAP mem: ERR_BUF_1
   0     comp_args_set
 ;
 
-\ Usage: `++: some_val`.
+\ Increment or decrement a local. Usage: `++: some_val`.
 :: ++: ( C: "name" -- ) ( E: -- ) ' inc " ++" comp_loc_mut ;
 :: --: ( C: "name" -- ) ( E: -- ) ' dec " --" comp_loc_mut ;

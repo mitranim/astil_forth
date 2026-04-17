@@ -21,6 +21,7 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_COMP_LOCAL_FREE,    // comp_local_free
   INTRIN_COMP_LOCAL_OFF,     // comp_local_off
   INTRIN_ALLOCA,             // alloca
+  INTRIN_COMPILE_EXECUTABLE, // compile_executable
   INTRIN_DEBUG_CTX,          // debug_ctx
   INTRIN_DEBUG_CTX_IMM,      // #debug_ctx
   INTRIN_DEBUG_ARG,          // debug_arg
@@ -41,6 +42,7 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_CATCHES,           // catches
   INTRIN_GET_CATCHES,       // get_catches
   INTRIN_COMP_ONLY,         // comp_only
+  INTRIN_INTERP_ONLY,       // interp_only
   INTRIN_INLINE,            // inline
   INTRIN_REDEFINE,          // redefine
   INTRIN_HERE,              // here

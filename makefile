@@ -19,7 +19,7 @@ ASM_GEN_SRC ?= $(SRC)/asm_gen.c
 ASM_GEN_OUT ?= $(SRC)/asm_generated.s
 MACH_GEN_SRC ?= mach/mach_exc.defs
 MACH_GEN_OUT ?= $(GEN)/mach_exc.c
-ALL_SRC ?= $(wildcard *.s *.c *.h **/*.c **/*.h) $(ASM_GEN_SRC)
+ALL_SRC ?= $(wildcard $(SRC)/*.c $(SRC)/*.h $(SRC)/**/*.c $(SRC)/**/*.h $(SRC)/arch_arm64_cc_stack.s) $(ASM_GEN_SRC)
 MAIN_SRC ?= $(SRC)/main.c
 MAIN_S ?= astil_s.exe
 MAIN ?= astil.exe
@@ -29,12 +29,16 @@ WATCH_IGNORE ?= -i=$(GEN) -i=$(ASM_GEN_OUT)
 WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 # WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q --no-vcs-ignore
 WATCH_COMP ?= $(WATCH) -e=c,h,s
-WATCH_PROG ?= $(WATCH) -e=f
-WATCH_ALL ?= $(WATCH) -e=c,h,s,f
-WATCH_IMM ?= $(WATCH) -e=f,exe --no-vcs-ignore
+WATCH_PROG ?= $(WATCH) -e=af
+WATCH_ALL ?= $(WATCH) -e=c,h,s,af
+WATCH_IMM ?= $(WATCH) -e=af,exe --no-vcs-ignore
 
 ARTIF ?= $(MAIN_S) $(MAIN) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg
+
+ifeq ($(verb),true)
+	OK = echo [$@] ok
+endif
 
 # Disables some dangerous behaviors. Without this, `$@` sometimes changes from
 # the intended target name to something surprising, like `makefile`, resulting
@@ -47,6 +51,7 @@ ARTIF ?= $(MAIN_S) $(MAIN) *.o *.exe *.dSYM *.plist *.elf *.dbg \
 
 .PHONY: all
 all: vet build
+	$(OK)
 
 .PHONY: all_w
 all_w:
@@ -54,14 +59,16 @@ all_w:
 
 .PHONY: build
 build: $(MAIN_S) $(MAIN)
+	$(OK)
 
 .PHONY: build_w
 build_w:
-	$(WATCH_COMP) -- $(MAKE) clean build
+	$(WATCH_COMP) -- $(MAKE) build
 
 .PHONY: vet
 vet:
-	clang-tidy --header-filter='.*' $(MAIN_SRC)
+	clang-tidy --header-filter='.*' --quiet $(MAIN_SRC)
+	$(OK)
 
 .PHONY: vet_w
 vet_w:
@@ -106,7 +113,7 @@ run_w:
 run_s_w:
 	$(WATCH_IMM) -- $(MAKE) run_s
 
-$(MAIN): $(ALL_SRC) $(ASM_GEN_OUT)
+$(MAIN): $(ALL_SRC)
 	$(CC) $(CFLAGS) $(MAIN_SRC) -o $@
 
 $(MAIN_S): $(ALL_SRC) $(ASM_GEN_OUT)

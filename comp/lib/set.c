@@ -24,8 +24,7 @@ static void set_init_impl(Set *set, Ind cap, Uint size) {
   // Power of 2, or 0. Assumed by `set_loaded` and `set_probe_ind`.
   IF_DEBUG(aver(!(cap & (cap - 1))));
 
-  // Round-up divide; also min 1 unless cap is 0.
-  auto bits_len = (cap + HASH_TABLE_BITS_CAP - 1) / HASH_TABLE_BITS_CAP;
+  const auto bits_len = hash_table_bits_arr_len(cap);
 
   *set = (Set){
     .bits = calloc(bits_len, sizeof(set->bits[0])),

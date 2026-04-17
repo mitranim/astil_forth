@@ -586,6 +586,15 @@ static constexpr auto INTRIN_COMP_ONLY = (Sym){
   .comp_only = true,
 };
 
+static constexpr auto INTRIN_INTERP_ONLY = (Sym){
+  .name.buf  = "interp_only",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_interp_only,
+  .inp_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
 static constexpr auto INTRIN_INLINE = (Sym){
   .name.buf  = "inline",
   .wordlist  = WORDLIST_EXEC,

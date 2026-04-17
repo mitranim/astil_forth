@@ -37,8 +37,8 @@ catch handlers. But the complexity is not worth it.
 
 #define SYS_REC_FMT "[system] [recovery] "
 
-static void Thread_state_repr(const Thread_state *val) {
-  eprint_struct_beg(val, const Thread_state);
+static void Mach_thread_state_repr(const Mach_thread_state *val) {
+  eprint_struct_beg(val, const Mach_thread_state);
 
 #ifdef CALL_CONV_STACK
   eprint_struct_field_hint(val, x[0], " // error register");
@@ -122,19 +122,19 @@ static kern_return_t catch_mach_exception_raise_state(
   (void)exception_port;
 
   constexpr auto state_chunk_size = sizeof(*(thread_state_t) nullptr);
-  constexpr auto state_len        = sizeof(Thread_state) / state_chunk_size;
-  static_assert(!(sizeof(Thread_state) % state_chunk_size));
+  constexpr auto state_len = sizeof(Mach_thread_state) / state_chunk_size;
+  static_assert(!(sizeof(Mach_thread_state) % state_chunk_size));
 
   if (code_len != 2) return MIG_BAD_ARGUMENTS;
   if (*flavor != ARM_THREAD_STATE64) return KERN_FAILURE;
   if (state_prev_len != state_len) return MIG_BAD_ARGUMENTS;
 
-  const auto state  = (Thread_state *)state_prev_ptr;
+  const auto state  = (Mach_thread_state *)state_prev_ptr;
   const auto interp = (Interp *)state->x[ASM_REG_INTERP];
 
   IF_DEBUG({
     eprintf(SYS_REC_FMT "bad thread state: ");
-    Thread_state_repr(state);
+    Mach_thread_state_repr(state);
     eprintf(SYS_REC_FMT "code[0]: %p\n", (void *)code[0]);
     eprintf(SYS_REC_FMT "code[1]: %p (bad address)\n", (void *)code[1]);
     eprintf(SYS_REC_FMT "interpreter address: %p\n", interp);
@@ -207,7 +207,7 @@ static kern_return_t catch_mach_exception_raise_state(
 
   // IF_DEBUG({
   //   eprintf(SYS_REC_FMT "updated thread state: ");
-  //   Thread_state_repr((const Thread_state *)state_next_ptr);
+  //   Mach_thread_state_repr((const Mach_thread_state *)state_next_ptr);
   //   fflush(stderr);
   // });
 

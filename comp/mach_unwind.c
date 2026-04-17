@@ -108,7 +108,7 @@ Assumptions:
 - If the faulty PC is in Forth, the call chain contains `asm_call_forth`.
 */
 static Err mach_unwind_thread(
-  const Interp *interp, const char *msg, Thread_state *state
+  const Interp *interp, const char *msg, Mach_thread_state *state
 ) {
   const auto code   = &interp->comp.code;
   auto       frame  = (Frame_record *)state->fp;

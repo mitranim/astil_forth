@@ -12,10 +12,10 @@ typedef struct {
   U64 pc;
   U32 cpsr;
   U32 pad;
-} Thread_state;
+} Mach_thread_state;
 
 /*
-Internal sanity check. Our `Thread_state` redefines `arm_thread_state64_t`
+Internal sanity check. Our `Mach_thread_state` redefines `arm_thread_state64_t`
 using same-sized but differently-typed integers for better repr printing.
 */
-static_assert(sizeof(Thread_state) == sizeof(arm_thread_state64_t));
+static_assert(sizeof(Mach_thread_state) == sizeof(arm_thread_state64_t));

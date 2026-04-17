@@ -26,10 +26,11 @@ struct: Sym
   \ ... Other fields are omitted until we need them.
 end
 
+\ For internal use below.
 : comp_word_instr { wordlist } ( C: "name" -- ) ( E: -- instr )
   wordlist next_word comp_push
-  compile' Sym_instr
-  compile' @
+  execute'' Sym_instr
+  execute'' @
 ;
 
 \ Similar to the ticks `'` and `''`, but instead of returning an execution

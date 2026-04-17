@@ -20,6 +20,7 @@ static constexpr USED Sym INTRIN[] = {
   INTRIN_CATCHES,           // catches
   INTRIN_GET_CATCHES,       // get_catches
   INTRIN_COMP_ONLY,         // comp_only
+  INTRIN_INTERP_ONLY,       // interp_only
   INTRIN_INLINE,            // inline
   INTRIN_REDEFINE,          // redefine
   INTRIN_HERE,              // here

@@ -49,7 +49,7 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Uint val_size) {
   if (cellar == MAP_FAILED) return err_mmap();
 
   const auto floor = (U8 *)cellar + guard_size;
-  try(mprotect_mutable(floor, data_size));
+  try(mem_protect(floor, data_size, PROT_READ | PROT_WRITE));
 
   *(Stack *)out = (Stack){
     .bytelen = total_size,

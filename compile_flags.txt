@@ -1,8 +1,10 @@
 -std=c2y
 -funsigned-char
+-fvisibility=hidden
 -Weverything
 -Wunused-parameter
 -Wunused-variable
+-Wunreachable-code-aggressive
 -Werror=return-type
 -Werror=format-insufficient-args
 -Wno-format-non-iso
@@ -22,7 +24,6 @@
 -Wno-unsafe-buffer-usage
 -Wno-pre-c11-compat
 -Wno-shadow
--Wno-unreachable-code-return
 -Wno-gnu-label-as-value
 -Wno-empty-translation-unit
 -Wno-c++-compat

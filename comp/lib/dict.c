@@ -1,6 +1,6 @@
 #pragma once
 #include "./dict.h" // IWYU pragma: export
-#include "./hash.c"
+#include "./hash_fnv.c"
 #include "./hash_table_common.c"
 #include "./num.h"
 #include <string.h>
@@ -31,9 +31,9 @@ static void dict_trunc_with_keys(Dict *dict) {
 }
 
 // Conforms to `Hash_fun`.
-static Hash dict_key_hash(const void *key, Uint len) {
+static Fnv_hash dict_key_hash(const void *key, Uint len) {
   (void)len;
-  return hash_str(*(const char *const *)key);
+  return fnv_hash_str(*(const char *const *)key);
 }
 
 // Conforms to `Eq_fun`.

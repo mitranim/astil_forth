@@ -534,9 +534,7 @@ static Err find_extern(const char *name, void **out) {
   return nullptr;
 }
 
-static Err interp_extern_adr(Interp *interp, const char *name, Ind len) {
-  IF_DEBUG(aver((Sint)strlen(name) == len));
-
+static Err interp_extern_adr(Interp *interp, const char *name) {
   const auto comp    = &interp->comp;
   const auto syms    = &comp->code.externs;
   auto       ext_adr = comp_find_extern(comp, name);
@@ -549,10 +547,8 @@ static Err interp_extern_adr(Interp *interp, const char *name, Ind len) {
 }
 
 static Err interp_extern_proc(
-  Interp *interp, const char *name, Ind len, Sint inp_len, Sint out_len
+  Interp *interp, const char *name, Sint inp_len, Sint out_len
 ) {
-  IF_DEBUG(aver((Sint)strlen(name) == len));
-
   void *ext_adr;
   try(find_extern(name, &ext_adr));
 
@@ -591,10 +587,8 @@ static Err interp_extern_proc(
 }
 
 static Err interp_find_word(
-  Interp *interp, const char *name, Ind len, Wordlist wordlist, const Sym **out
+  Interp *interp, const char *name, Wordlist wordlist, const Sym **out
 ) {
-  IF_DEBUG(aver((Sint)strlen(name) == len));
-
   Sym_dict *dict;
   try(interp_wordlist(interp, wordlist, &dict));
 
@@ -633,4 +627,34 @@ static void debug_mem_at(const Uint *adr) {
       "[debug]   %p -- " FMT_UINT_HEX " (" FMT_SINT ")\n", ptr, *ptr, (Sint)*ptr
     );
   }
+}
+
+static Err interp_validate_data_ptr(Sint val) {
+  /*
+  Some systems deliberately ensure that virtual memory addresses
+  are just out of range of `int32`. Would be nice to check if the
+  pointer is somewhere in that range, but the assumption would be
+  really non-portable.
+
+  In a Forth implementation for OS-free microchips with a very small
+  amount of real memory, valid data pointers could begin close to 0,
+  depending on how data is organized. Since our implementation only
+  supports 64-bit machines and runs inside an OS, 0-adjacent data
+  addresses aren't going to happen; we can assume addresses which
+  are "decently large".
+  */
+  if (val > (1 << 14)) return nullptr;
+  return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
+}
+
+static Err interp_validate_data_len(Sint val) {
+  if (val > 0 && val < (Sint)IND_MAX) return nullptr;
+  return errf("invalid data length: " FMT_SINT, val);
+}
+
+static Err interp_validate_string(Sint buf, Sint len) {
+  try(interp_validate_data_ptr(buf));
+  try(interp_validate_data_len(len));
+  aver((Ind)len == strlen((const char *)buf));
+  return nullptr;
 }

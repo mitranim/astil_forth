@@ -4,7 +4,7 @@
 * [Show me the code!](#show-me-the-code)
 * [Easy C interop](#easy-c-interop)
 * [Exceptions done right](#exceptions-done-right-abi-compatibility)
-* [Usage](#usage)
+* [CLI](#cli)
 * [Structure](#structure)
 * [Sublime Text](#sublime-text)
 * [Library](#library)
@@ -22,7 +22,8 @@
 Astil Forth is a native-code Forth system designed for self-bootstrapping and self-assembling. Uses a custom assembler in both C and Forth code. Currently supports only Arm64.
 
 Goals:
-- [x] Simple JIT compilation to native code.
+- [x] Easy JIT compilation.
+- [x] Easy AOT compilation.
 - [x] Easy _self-assembly_ in user/lib code.
 - [x] Explore viability of single-pass assembly.
 - [x] Language features can be implemented in user/lib code.
@@ -31,14 +32,13 @@ Goals:
 - [x] Avoid a VM or complex IR.
 - [x] Keep the code clear and educational for other compiler amateurs.
 - [ ] Rewrite in Forth to self-host.
-- [ ] AOT compilation.
 
 Non-goals:
 - Produce the best compiler.
 - Have the best architecture.
 - Portability to multiple ISAs.
 
-Everything was written by me. This is _not_ bot-generated.
+Everything was written by me. This is _not_ slopbot-generated.
 
 I gave talks about this system in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
 - 2026-Jan: intro to the system, self-assembly showcase, demos — https://www.youtube.com/watch?v=_4U1BR1U_oM
@@ -112,6 +112,21 @@ Easy self-assembly (Arm64):
 ] ;
 ```
 
+Easy AOT compilation; can be done either from inside a program, or from outside via CLI flags:
+
+```forth
+: main { -- code }
+  " hello world!" log lf
+  0
+;
+
+' main
+" out.exe"
+compile_executable
+
+\ Run `./out.exe` in your shell to print the message.
+```
+
 ## Easy C interop
 
 It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang_s.af`](./forth/lang_s.af) and [`./forth/lang.af`](./forth/lang.af).
@@ -148,7 +163,7 @@ The resulting system is an exact inverse of Go (and Rust). By default, errors ar
 
 The best part is cross-language ABI compatibility. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to `libc` and guarantee no surprises, such as a panic handler unwinding the C stack.
 
-## Usage
+## CLI
 
 With global installation:
 
@@ -175,6 +190,13 @@ rlwrap astil std:lang.af -
 
 # Or use this shortcut from repo root:
 make repl
+```
+
+Compile executables via `--build`:
+
+```forth
+astil my_program.af --build=out.exe
+./out.exe
 ```
 
 Local-only usage inside this repo:
@@ -221,7 +243,7 @@ make debug_run '<file>' RECOVERY=false # only for stack-CC
 
 ## Sublime Text
 
-Due to divergence from the standard, this dialect wants its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
+Due to divergence from the standard, this dialect prefers its own syntactic support. This repository includes a syntax implementation for Sublime Text. To enable, symlink the directory `./sublime` into ST's `Packages`. Example for MacOS:
 
 ```sh
 ln -sfn "$(pwd)/sublime" "$HOME/Library/Application Support/Sublime Text/Packages/astil_forth"
@@ -266,15 +288,15 @@ See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC versi
 
 A core premise of this system is forward-only single-pass compilation. This keeps it simple, while still allowing a degree of low-hanging optimizations, such as basic register allocation and inlining. Some instructions are reserved in the first pass, and patched in a fixup post-pass.
 
-This approach is at odds with most advanced compiler optimizations, which rely on building and analyzing intermediary representations before assembling. Complex compilers end up with multiple IR levels, and multiple passes. This interferes with self-assembly in library code; simply vomiting instructions into the procedure body no longer suffices; the code must now emit the first-pass IR instead of regular instructions.
+This approach is at odds with most advanced compiler optimizations, which rely on building and analyzing intermediary representations before assembling. Complex compilers end up with multiple IR levels, and multiple passes. Complexity interferes with self-assembly; simply vomiting instructions into the procedure body no longer suffices; the code must now emit the first-pass IR instead of regular instructions.
 
 I had a go, and bounced off the complexity. How to keep an optimizing compiler simple?
 
 ### Other limitations
 
-- Currently only Arm64 and MacOS.
-- Vocabulary is still a work in progress.
-- Exceptions print only C traces, not Forth traces. (Opt-in via env `TRACE=true`.)
+- Currently only Apple Silicon (MacOS + Arm64).
+- Vocabulary / stdlib is somewhat limited.
+- Exceptions print only C traces, not Forth traces. (Opt-in via `--trace`.)
 
 ## Non-standard
 
@@ -289,14 +311,14 @@ Non-decimal numeric literals are denoted with `0b 0o 0x`. Radix prefixes are cas
 Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
+- All conditionals and loops are terminated with `end`. No need to remember other terminators. (`until` is also available.)
 - `elif` is supported.
-- Any amount of `else elif` is popped with a single `end`.
-- Most loops are terminated with `end`. No need to remember other terminators.
-- Loop controls like `leave` and `while` are terminated by the same `end` as the loop, and can be used many times in one loop.
+- Any amount of `else elif` is terminated with a single `end`.
+- Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
 Because the system uses native procedure calls, there is no return stack; see below.
 
-There is no `state` or `does>`, or any form of state-smartness. Instead, the system uses two wordlists:
+There is no `state` or `does>`. Instead, the system uses two wordlists:
 - "exec" — execution-time words; not immediate.
 - "comp" — compile-time words; immediate.
 
@@ -309,16 +331,16 @@ Booleans are `0 1` rather than `0 -1`.
 Modifier words like `catches` and `comp_only` can only be used inside colon definitions.
 
 Special _semantic_ roles get special _syntactic_ roles:
-- Word-parsing words which declare must end with `:`.
-- Word-parsing words which don't declare must end with `'`.
-- Custom and unusual control-related words begin with `#`.
+- Word-parsing words which declare end with `:`.
+- Word-parsing words which don't declare end with `'`.
+- Unusual control-related words begin with `#` or use the `T{ }T` naming style.
 
 Examples:
 - Words which declare: `: :: let: var: to:` and more.
   - Syntax highlighters are encouraged to scope the next word like a declaration.
 - Parsing words: `' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
-- Custom or unusual control words: `#word_beg #word_end`.
+- Unusual control words: `va{ }va`.
 - Well-known control words don't use special characters: `if else end ret` and several more. Syntax highlighters should hardcode them.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names. These are commonly used as delimiters, like `T{ }T`.
@@ -350,7 +372,7 @@ When the system is simple, single-pass compilation (with fixups) seems to be a s
 
 ## What is JIT
 
-"JIT" is only here as a buzzword. It may even be a white lie. This doesn't assemble "just" in time; it assembles immediately. Saying "JIT" is just the most compact way to indicate on-the-fly assembly, rather than interpretation. In the Forth world this is common, usually without buzzwords.
+The term "JIT" is used here only for convenience. This doesn't assemble "just" in time; it assembles immediately. Saying "JIT" is just the most compact way to indicate on-the-fly assembly as opposed to interpretation. In the Forth world this is common, usually without buzzwords.
 
 ## What is compilation
 

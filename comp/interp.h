@@ -14,7 +14,7 @@ typedef struct {
 /*
 Every compiler is an interpreter.
 Every Forth interpreter is a compiler.
-Would be nice to have a name reflecting both.
+Would be nice to have a name describing both.
 
 The Forth code which uses the register-based calling convention
 accesses the data stack via the interpreter object, rather than
