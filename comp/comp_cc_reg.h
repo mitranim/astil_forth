@@ -1,9 +1,9 @@
 #pragma once
+#include "../clib/bits.h"
+#include "../clib/dict.h"
+#include "../clib/num.h"
+#include "../clib/str.h"
 #include "./arch.h"
-#include "./lib/bits.h"
-#include "./lib/dict.h"
-#include "./lib/num.h"
-#include "./lib/str.h"
 #include "./sym.h"
 
 // #ifdef CLANGD

@@ -1,3 +1,4 @@
+// Simple hash-based sets. Append-only, no deletion. No string support.
 #pragma once
 #include "./err.h"
 #include "./fmt.h"

@@ -1,7 +1,7 @@
 #pragma once
+#include "../clib/dict.h"
+#include "../clib/stack.h"
 #include "./comp.h"
-#include "./lib/dict.h"
-#include "./lib/stack.h"
 #include "./read.h"
 #include "./sym.h"
 

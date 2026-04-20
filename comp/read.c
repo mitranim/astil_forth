@@ -1,7 +1,7 @@
 #pragma once
-#include "./lib/err.c" // IWYU pragma: export
-#include "./lib/fmt.h"
-#include "./lib/mem.h"
+#include "../clib/err.c" // IWYU pragma: export
+#include "../clib/fmt.h"
+#include "../clib/mem.h"
 #include "./read.h"
 #include "./read_char_to_digit.h"
 #include "./read_head_char_kind.h"

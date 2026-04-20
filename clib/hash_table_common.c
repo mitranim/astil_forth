@@ -1,3 +1,8 @@
+/*
+Common code for dicts, maps, and sometimes sets. In this codebase:
+- "dict" = "hash table with string keys"
+- "map" = "hash table with opaque keys"
+*/
 #pragma once
 #include "./err.h"
 #include "./fmt.h"

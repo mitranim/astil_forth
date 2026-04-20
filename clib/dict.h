@@ -1,12 +1,3 @@
-/*
-In this codebase:
-
-- "dict" = "hash table with string keys"
-- "map" = "hash table with opaque keys"
-
-See `./map.h`, `./map.c`.
-*/
-
 #pragma once
 #include "./hash_table_common.h"
 #include "./num.h"

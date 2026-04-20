@@ -1,3 +1,7 @@
+/*
+Replica of Go slices. See example below (`main`).
+Resizing relocates memory; pointers are transient.
+*/
 #pragma once
 #include "./err.c"
 #include "./list.h" // IWYU pragma: export

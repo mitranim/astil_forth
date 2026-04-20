@@ -10,13 +10,13 @@ bounds in software. Additionally, regular "exceptions" in Forth code use
 local "gotos" and don't involve this at all.
 */
 #pragma once
+#include "../clib/fmt.c"
+#include "../clib/mach_exc.c"
+#include "../clib/mach_misc.h"
+#include "../clib/misc.h"
 #include "./arch.h"
 #include "./arch_arm64.c"
 #include "./interp.h"
-#include "./lib/fmt.c"
-#include "./lib/mach_exc.c"
-#include "./lib/mach_misc.h"
-#include "./lib/misc.h"
 #include <mach/mach.h>
 #include <stdio.h>
 

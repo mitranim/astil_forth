@@ -212,7 +212,7 @@ disasm:
 clean:
 	rm -rf $(GEN) $(wildcard $(ARTIF))
 
-# MIG is even worse than this.
+# The MIG's output is much worse than this.
 $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 	mkdir -p $(GEN)
 	xcrun mig -server $(GEN)/tmp.c -user /dev/null -header /dev/null $(MACH_GEN_SRC) \

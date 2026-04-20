@@ -1,10 +1,10 @@
 /*
 This horror is created by the Mach Interface Generator.
 
-See also:
+See the de-obfuscated code at:
 
-  make mach_gen
-  lib/mach_exc.c
+  clib/mach_exc.c
+  clib/mach_exc_msg.c
 */
 
 #pragma once

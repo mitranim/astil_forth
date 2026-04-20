@@ -3,10 +3,10 @@
 #include <string.h>
 
 /*
-`getpagesize()` and `sysconf(_SC_PAGESIZE)` exist,
-but we define some page-aligned arrays where size
-has to be hardcoded. This size should be fine for
-maybe about a decade.
+Memory page size used by some platforms; common on Arm64.
+
+`getpagesize()` and `sysconf(_SC_PAGESIZE)` also exist,
+but a hardcoded page size can be used for array sizes.
 */
 static constexpr Ind MEM_PAGE = 1 << 14; // 16 KiB
 

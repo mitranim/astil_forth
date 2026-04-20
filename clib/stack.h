@@ -5,11 +5,13 @@
 #include <assert.h>
 #include <string.h>
 
-// Stack with guards. Macros below assume the "empty ascending" style.
-//
-// Field ordering matters; some code hardcodes the offsets.
-//
-// SYNC[stack_field_offsets].
+/*
+Stack with guards. Macros below assume the "empty ascending" style.
+
+Field ordering matters; some code hardcodes the offsets.
+
+SYNC[stack_field_offsets].
+*/
 typedef struct {
   Uint  bytelen; // Size of full region in bytes.
   void *cellar;  // Starting address of full region: `guard|stack|guard`.

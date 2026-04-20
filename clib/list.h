@@ -1,9 +1,3 @@
-/*
-Replica of Go slices. See example in `./list.c`.
-Resizing relocates memory; pointers are transient.
-TODO: minimize chances of variable name collision.
-*/
-
 #pragma once
 #include "./err.h"
 #include "./num.h"

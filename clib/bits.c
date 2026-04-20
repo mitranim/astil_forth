@@ -1,3 +1,4 @@
+// Fixed-size bitsets and other bit-fiddling.
 #pragma once
 #include "./bits.h"
 #include "./err.c"

@@ -1,9 +1,9 @@
 #pragma once
+#include "../clib/dict.h"
+#include "../clib/mem.h"
+#include "../clib/num.h"
+#include "../clib/str.h"
 #include "./arch.h"
-#include "./lib/dict.h"
-#include "./lib/mem.h"
-#include "./lib/num.h"
-#include "./lib/str.h"
 
 /*
 Book-keeping for instructions which we can't properly encode

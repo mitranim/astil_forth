@@ -8,7 +8,7 @@ We translate its memory layout into virtual memory segments described in the
 executable, which allows offsets hardcoded inside instructions to work as-is.
 External addresses are located in a GOT section, patched by the OS dylinker.
 
-See `./lib/mach_o.h` for many useful links.
+See `../clib/mach_o.h` for many useful links.
 
 This is supported only for the register-based calling convention,
 where interpreter state and Forth stack are not (supposed to be)
@@ -17,17 +17,17 @@ need to setup the stack, which is easily doable via a dedicated
 Mach-O section; maybe later.
 */
 #pragma once
+#include "../clib/err.h"
+#include "../clib/io.c"
+#include "../clib/mach_codesign.c"
+#include "../clib/mach_misc.c"
+#include "../clib/mach_o.h"
+#include "../clib/mem.c"
+#include "../clib/mem.h"
+#include "../clib/set.c"
 #include "./arch.c"
 #include "./comp.c"
 #include "./interp.h"
-#include "./lib/err.h"
-#include "./lib/io.c"
-#include "./lib/mach_codesign.c"
-#include "./lib/mach_misc.c"
-#include "./lib/mach_o.h"
-#include "./lib/mem.c"
-#include "./lib/mem.h"
-#include "./lib/set.c"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

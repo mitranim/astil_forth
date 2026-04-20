@@ -1,10 +1,10 @@
 #pragma once
+#include "../clib/bits.h"
+#include "../clib/dict.h"
+#include "../clib/set.h"
+#include "../clib/stack.h"
+#include "../clib/str.h"
 #include "./arch.h"
-#include "./lib/bits.h"
-#include "./lib/dict.h"
-#include "./lib/set.h"
-#include "./lib/stack.h"
-#include "./lib/str.h"
 
 typedef struct Sym           Sym;
 typedef set_of(struct Sym *) Sym_set;

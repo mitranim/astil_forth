@@ -1,6 +1,6 @@
 #pragma once
-#include "./lib/num.h"
-#include "./lib/str.h"
+#include "../clib/num.h"
+#include "../clib/str.h"
 #include <stdio.h>
 
 typedef str_buf(4096) Read_buf;

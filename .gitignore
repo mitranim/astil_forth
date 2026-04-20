@@ -8,6 +8,7 @@
 !/*.txt
 !/makefile
 !/unlicense
+!/clib
 !/comp
 !/mach
 !/forth

@@ -36,17 +36,17 @@ assembly, which is only possible in a language like Forth. However,
 we still had to resort to an IR of sorts: the "fixups".
 */
 #pragma once
+#include "../clib/bits.c"
+#include "../clib/dict.c"
+#include "../clib/err.c"
+#include "../clib/num.h"
+#include "../clib/stack.c"
+#include "../clib/str.h"
 #include "./arch.c"
 #include "./arch_arm64.h"
 #include "./arch_arm64_cc_reg.c"
 #include "./comp.c"
 #include "./interp.h"
-#include "./lib/bits.c"
-#include "./lib/dict.c"
-#include "./lib/err.c"
-#include "./lib/num.h"
-#include "./lib/stack.c"
-#include "./lib/str.h"
 #include "./read.c"
 #include "./sym.h"
 

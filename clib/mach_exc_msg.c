@@ -1,8 +1,8 @@
 /*
 Cleaned-up, stripped-down, de-obfuscated, less-horrible version of the
 exception-handling "server" code created via Mach Interface Generator.
+See `../mig` and the related recipe in the makefile.
 */
-
 #pragma once
 #include <Availability.h>
 #include <mach/boolean.h>
@@ -103,7 +103,7 @@ with the `EXCEPTION_STATE` flag.
 */
 static constexpr auto MACH_MSG_EXCEPTION_STATE = 2406;
 
-// Adapted from `mach_exc_server` and `_Xmach_exception_raise_state`.
+// Adapted from MIG's `mach_exc_server` and `_Xmach_exception_raise_state`.
 boolean_t mach_on_exception(mach_msg_header_t *inp, mach_msg_header_t *out) {
   const auto out_msg = (Mach_exc_out *)out;
   const auto id      = inp->msgh_id;

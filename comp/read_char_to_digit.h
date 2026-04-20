@@ -1,5 +1,5 @@
 #pragma once
-#include "./lib/num.h"
+#include "../clib/num.h"
 
 static constexpr U8 DIGIT_INVALID = 255;
 static constexpr U8 DIGIT_BREAK   = 254;

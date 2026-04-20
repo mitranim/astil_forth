@@ -13,9 +13,9 @@ Special registers:
 The special registers are also hardcoded in `lang_s.af`.
 */
 #pragma once
+#include "../clib/err.h"
+#include "../clib/num.h"
 #include "./interp.h"
-#include "./lib/err.h"
-#include "./lib/num.h"
 #include "./sym.h"
 
 #ifdef CLANGD

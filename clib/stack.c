@@ -1,3 +1,9 @@
+/*
+Alternative to `./list.c`. Stacks are created with fixed capacity,
+with no support for resizing, which allows stable element pointers.
+Each stack is surrounded with guards which trigger a segfault when
+touched. This allows relatively fearless `*ptr++`-style operations.
+*/
 #pragma once
 #include "./err.h"
 #include "./fmt.c"

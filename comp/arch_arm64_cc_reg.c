@@ -10,9 +10,9 @@ Special registers:
 The special registers must be kept in sync with `lang.af`.
 */
 #pragma once
+#include "../clib/bits.c"
 #include "./arch_arm64.h"
 #include "./interp.h"
-#include "./lib/bits.c"
 #include "./sym.h"
 
 #ifdef CLANGD

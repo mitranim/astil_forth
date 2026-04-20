@@ -1,11 +1,11 @@
 #pragma once
+#include "../clib/dict.c"
+#include "../clib/list.c"
+#include "../clib/num.h"
+#include "../clib/stack.c"
+#include "../clib/str.c"
 #include "./arch.c"
 #include "./comp.h"
-#include "./lib/dict.c"
-#include "./lib/list.c"
-#include "./lib/num.h"
-#include "./lib/stack.c"
-#include "./lib/str.c"
 #include "./sym.c"
 
 static Err err_current_sym_not_defining() {

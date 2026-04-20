@@ -1,4 +1,6 @@
 /*
+Ad-hoc signing of Mach-O executables.
+
 Links:
 
 - https://github.com/golang/go/blob/master/src/cmd/internal/codesign/codesign.go
@@ -7,9 +9,6 @@ Links:
 - https://oliviagallucci.com/the-anatomy-of-a-mach-o-structure-code-signing-and-pac/
 - https://owenbrooks.org/blog/constructing-a-valid-macho/
 - https://developer.apple.com/library/archive/technotes/tn2206/_index.html
-
-Structs adapted from LLVM, algorithm very loosely adapted from Go
-(which looks like it was adapted from LLVM).
 */
 #pragma once
 #include "./hash_sha.c"
@@ -127,7 +126,7 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
   buf_append_byte(buf, '\0');
 
   {
-    // An internal restriction for simplicity.
+    // An internal restriction for peace of mind.
     aver(divisible_by(cfg.src_len, MCS_PAGE_SIZE));
     static_assert(MCS_HASH_SIZE == SHA256_SIZE);
 

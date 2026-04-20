@@ -1,7 +1,7 @@
 #pragma once
-#include "./lib/dict.h"
-#include "./lib/stack.h"
-#include "./lib/str.h"
+#include "../clib/dict.h"
+#include "../clib/stack.h"
+#include "../clib/str.h"
 #include "./sym.h"
 
 // #ifdef CLANGD

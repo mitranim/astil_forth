@@ -1,5 +1,5 @@
 #pragma once
-#include "./lib/set.c"
+#include "../clib/set.c"
 #include "./sym.h"
 
 // clang-format off

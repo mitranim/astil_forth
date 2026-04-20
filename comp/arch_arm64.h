@@ -1,8 +1,8 @@
 #pragma once
-#include "./lib/bits.h"
-#include "./lib/list.h"
-#include "./lib/num.h"
-#include "./lib/stack.h"
+#include "../clib/bits.h"
+#include "../clib/list.h"
+#include "../clib/num.h"
+#include "../clib/stack.h"
 
 typedef U32 Instr;
 

@@ -1,4 +1,6 @@
 /*
+Some of the data structures used in the Mach-O executable format.
+
 Links:
 
 - https://github.com/apple-oss-distributions/xnu/blob/main/EXTERNAL_HEADERS/mach-o/loader.h

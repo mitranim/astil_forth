@@ -21,13 +21,13 @@ tables which associate instruction addresses with systack frames and
 catch handlers. But the complexity is not worth it.
 */
 #pragma once
+#include "../clib/cli.c"
+#include "../clib/fmt.c"
+#include "../clib/mach_exc.c"
+#include "../clib/mach_misc.h"
+#include "../clib/misc.h"
 #include "./arch.h"
 #include "./interp.c"
-#include "./lib/cli.c"
-#include "./lib/fmt.c"
-#include "./lib/mach_exc.c"
-#include "./lib/mach_misc.h"
-#include "./lib/misc.h"
 #include <mach/mach.h>
 #include <stdio.h>
 

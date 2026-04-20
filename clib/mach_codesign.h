@@ -1,6 +1,7 @@
 /*
 "MCS_*" constants are short for "Mach-O code signature".
-Definitions are yoinked from LLVM's; see here:
+See `./mach_codesign.c` for many informative links.
+Struct definitions were adapted from LLVM's:
 
   https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/BinaryFormat/MachO.h
 */

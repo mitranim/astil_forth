@@ -1,17 +1,19 @@
+/*
+Tools for dealing with Mach exceptions on Darwin.
+Used together with associated `./mach_exc_msg.c`.
+
+Some links:
+
+  - https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/KernelProgramming/Mach/Mach.html
+  - https://docs.darlinghq.org/internals/macos-specifics/mach-exceptions.html
+  - https://www.mikeash.com/pyblog/friday-qa-2013-01-11-mach-exception-handlers.html
+*/
 #pragma once
 #include "./err.c" // IWYU pragma: export
 #include "./mach_exc_msg.c"
 #include <mach/mach.h>
 #include <pthread.h>
 #include <stdlib.h>
-
-/*
-Some links:
-
-  https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/KernelProgramming/Mach/Mach.html
-  https://docs.darlinghq.org/internals/macos-specifics/mach-exceptions.html
-  https://www.mikeash.com/pyblog/friday-qa-2013-01-11-mach-exception-handlers.html
-*/
 
 static mach_port_t mach_exc_port;
 
@@ -103,8 +105,8 @@ static Err err_mach_port_send(kern_return_t code) {
 }
 
 /*
-Requires `catch_mach_exception_raise_state` to be defined in the current
-translation unit. See the signature in `./mach_exc_msg.c`.
+`mach_msg_server` is provided by Apple's libSystem.
+See `./mach_exc_msg.c` for the actual messaging.
 */
 static void *mach_on_exceptions(void *) {
   mach_msg_server(mach_on_exception, MACH_EXC_MSG_MAX_SIZE, mach_exc_port, 0);

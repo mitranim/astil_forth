@@ -1,12 +1,3 @@
-/*
-In this codebase:
-
-- "dict" = "hash table with string keys"
-- "map" = "hash table with opaque keys"
-
-See `./dict.h`, `./dict.c`.
-*/
-
 #pragma once
 #include "./hash_table_common.h"
 #include <assert.h>
@@ -39,6 +30,7 @@ typedef Hash_table Map;
 
 #define map_has(map, key) (map_ind(map, key) < (Ind) - 1)
 
+// TODO add `map_get_or` similar to `dict_get_or`.
 #define map_get(map, key)                                                      \
   ({                                                                           \
     const map_key_type(map) tmp_key = key;                                     \

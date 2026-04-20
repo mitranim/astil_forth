@@ -9,9 +9,9 @@ This file contains "generic" intrinsics which don't care about the calling
 convention. Intrinsics which do are located in dedicated files.
 */
 #pragma once
+#include "../clib/spawn.c"
 #include "./comp.c"
 #include "./interp_internal.c"
-#include "./lib/spawn.c"
 
 static Err err_nested_definition(const Interp *interp) {
   Sym *sym;

@@ -1,7 +1,7 @@
+#include "../clib/cli.c"
+#include "../clib/err.h"
+#include "../clib/time.c"
 #include "./interp.c"
-#include "./lib/cli.c"
-#include "./lib/err.h"
-#include "./lib/time.c"
 #include "./mach_exc.c"
 #include "./mach_o.c"
 #include <stdio.h>

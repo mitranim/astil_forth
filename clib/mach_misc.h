@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <mach/mach.h>
 
-// Darwin-specific. TODO better segregation of CPU stuff vs OS stuff.
+// Darwin-specific.
 typedef struct {
   U64 x[29];
   U64 fp;

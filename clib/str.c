@@ -1,3 +1,7 @@
+/*
+Some tools for dealing with C strings in general,
+and with our `str_buf` buffers in particular.
+*/
 #pragma once
 #include "./err.c" // IWYU pragma: export
 #include "./fmt.h"

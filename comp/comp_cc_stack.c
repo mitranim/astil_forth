@@ -3,10 +3,10 @@ This file contains some compilation logic for the stack-based callvention
 which is mutually exclusive with the register-based callvention.
 */
 #pragma once
+#include "../clib/dict.c"
 #include "./arch.c"
 #include "./arch_arm64.h"
 #include "./comp.c"
-#include "./lib/dict.c"
 
 // clang-format off
 

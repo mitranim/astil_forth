@@ -1,3 +1,13 @@
+/*
+Simple hash-based dictionaries. Append-only, no deletion.
+
+In this codebase:
+
+- "dict" = "hash table with string keys"
+- "map" = "hash table with opaque keys"
+
+See `./map.h`, `./map.c`.
+*/
 #pragma once
 #include "./dict.h" // IWYU pragma: export
 #include "./hash_fnv.c"

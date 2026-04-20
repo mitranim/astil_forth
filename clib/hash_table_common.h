@@ -4,12 +4,6 @@
 #include <limits.h>
 
 /*
-Common code for dicts, maps, and sometimes sets. In this codebase:
-- "dict" = "hash table with string keys"
-- "map" = "hash table with opaque keys"
-*/
-
-/*
 Opaque dict/map header. See `./dict.*` and `./map.*` files.
 Must be binary-compatible with `Dict` and `Map`.
 */

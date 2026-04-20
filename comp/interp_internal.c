@@ -1,9 +1,9 @@
 // Various internal functions used by interpreter intrinsics.
 #pragma once
+#include "../clib/cli.h"
+#include "../clib/io.c"
+#include "../clib/path.c"
 #include "./comp.c"
-#include "./lib/cli.h"
-#include "./lib/io.c"
-#include "./lib/path.c"
 #include "./read.c"
 #include <dlfcn.h>
 

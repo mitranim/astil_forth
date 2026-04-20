@@ -68,7 +68,7 @@ static char *path_join(const char *base, const char *suf, bool is_dir) {
   rem -= len;
 
   len = strlcpy(ptr, suf, rem);
-  // ptr += len;
+  // (void)(ptr += len);
 
   aver(rem >= len);
   rem -= len;
@@ -90,8 +90,10 @@ static bool is_path_stdin(const char *path) {
   return !strcmp(path, "-") || !strcmp(path, "/dev/stdin");
 }
 
-// Normalizes the path so the file can be opened,
-// and returns a statically allocated string.
+/*
+Normalizes the path so the file can be opened,
+and returns a statically allocated string.
+*/
 static const char *file_path_stdio(const char *path) {
   if (is_path_stdin(path)) {
     return "/dev/stdin";

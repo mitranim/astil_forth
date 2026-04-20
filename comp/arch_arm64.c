@@ -44,15 +44,15 @@ type for each instruction type. It works and makes the code much clearer, but
 bitfield layout is implementation-defined and non-portable.
 */
 #pragma once
+#include "../clib/bits.c"
+#include "../clib/dict.c"
+#include "../clib/fmt.h"
+#include "../clib/jit.c"
+#include "../clib/list.c"
+#include "../clib/misc.h"
+#include "../clib/stack.c"
 #include "./arch_arm64.h"
 #include "./comp.h"
-#include "./lib/bits.c"
-#include "./lib/dict.c"
-#include "./lib/fmt.h"
-#include "./lib/jit.c"
-#include "./lib/list.c"
-#include "./lib/misc.h"
-#include "./lib/stack.c"
 #include "./sym.c"
 
 static bool comp_code_is_instr_ours(const Comp_code *code, const Instr *addr) {
@@ -94,7 +94,7 @@ static Err comp_code_sync(Comp_code *code) {
   const auto end = beg + diff;
   const auto len = (U8 *)end - (U8 *)beg;
 
-  // This alignment is only needed when `./lib/jit.c` uses `mprotect`.
+  // This alignment is only needed when `../clib/jit.c` uses `mprotect`.
   const auto page_beg = __builtin_align_down(beg, MEM_PAGE);
   const auto page_end = __builtin_align_up(end, MEM_PAGE);
   const auto page_len = (U8 *)page_end - (U8 *)page_beg;

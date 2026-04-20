@@ -1,3 +1,9 @@
+/*
+Pretty-printing for some Mach-O data structures.
+
+Mach-O compilation is not here because it involves compiler-specific
+data structures, which are out of scope for this generic library.
+*/
 #pragma once
 #include "../lib/fmt.c"
 #include "../lib/mach_misc.c"

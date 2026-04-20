@@ -1,3 +1,13 @@
+/*
+Simple hash-based maps. Append-only, no deletion.
+
+In this codebase:
+
+- "dict" = "hash table with string keys"
+- "map" = "hash table with opaque keys"
+
+See `./dict.h`, `./dict.c`.
+*/
 #pragma once
 #include "./hash_table_common.c"
 #include "./map.h" // IWYU pragma: export
