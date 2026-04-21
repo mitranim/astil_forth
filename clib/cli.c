@@ -32,8 +32,8 @@ Parses a CLI arg, which may be any of:
 
 Space-separated key-val pairs like `--key val` are not supported
 due to the ambiguities they create, particularly for booleans.
-Combined `-abc` boolean flags are not supported either.
-An input like `one=two` is considered to be a value.
+Combined boolean flags like `-abc` are not supported either.
+An input like `one=two` is considered to be just a value.
 
 The returned key, if any, includes all the leading `-`.
 For `--key=val` inputs, the returned key is valid only

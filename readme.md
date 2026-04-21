@@ -2,6 +2,7 @@
 
 * [Overview](#overview)
 * [Show me the code!](#show-me-the-code)
+* [Why](#why)
 * [Easy C interop](#easy-c-interop)
 * [Exceptions done right](#exceptions-done-right-abi-compatibility)
 * [CLI](#cli)
@@ -22,7 +23,7 @@
 Astil Forth is a native-code Forth system designed for self-bootstrapping and self-assembling. Uses a custom assembler in both C and Forth code. Currently supports only Arm64.
 
 Goals:
-- [x] Combined JIT & AOT compilation.
+- [x] Explore combined JIT & AOT compilation.
 - [x] Easy _self-assembly_ in user/lib code.
 - [x] Explore viability of single-pass assembly.
 - [x] Implement most of the language in user/lib code outside the compiler.
@@ -44,23 +45,7 @@ I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest 
 - 2026-Feb: register allocation and proper ABI interop with C — https://www.youtube.com/watch?v=rCF7wAB2wFQ
 - [`./talks`](./talks) directory: presentation notes with more details.
 
-Most languages ship with a smart, powerful, all-knowing compiler with intrinsic knowledge of the entire language. I feel this approach is too inflexible. It makes the compiler a closed system. Modifying and improving the language requires changing the compiler's source code, which is usually over-complicated.
-
-On top of that, most languages isolate you from the CPU, or even from the OS, from the get-go. Instead of giving you access to the foundations, and providing a convenient pre-built ramp to the high clouds, _all you get_ is high clouds.
-
-This system explores the opposite direction. The interpreter / compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
-
-This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth also implements conditionals without compiler support, in Forth, and makes them much nicer to use, but at the cost of more code.)
-
-Unlike Frugal and mature systems such as Gforth, Astil Forth goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that, despite the non-portability.
-
-The system comes in two variants which use different call conventions: register-based and stack-based. For code maintenance reasons, they compile separately, from differently selected C files. The stack-CC version is legacy and has fewer features.
-
-The outer interpreter / compiler, written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements Forth, on the fly, bootstrapping via inline assembly.
-- Register-CC: boots via [`./forth/lang.af`](./forth/lang.af).
-- Stack-CC: boots via [`forth/lang_s.af`](./forth/lang_s.af).
-
-Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can be full of obvious stuff you'd expect, and can learn from.
+Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can consist of obvious stuff you'd expect, and can learn from.
 
 ## Show me the code!
 
@@ -111,7 +96,7 @@ Easy self-assembly (Arm64):
 ] ;
 ```
 
-Easy AOT compilation; can be done either from inside a program, or from outside via CLI flags:
+Easy AOT compilation; can be used from inside a program, or via CLI flags:
 
 ```forth
 : main { -- exit }
@@ -119,16 +104,52 @@ Easy AOT compilation; can be done either from inside a program, or from outside 
   0
 ;
 
-' main
-" out.exe"
+' main             \ Reference to the entry point.
+" out.exe"         \ Where to put the executable.
 compile_executable
 
 \ Run `./out.exe` in your shell to print the message.
 ```
 
+## Why
+
+### Always extensible
+
+Most languages ship with a smart, powerful, all-knowing compiler with intrinsic knowledge of the entire language. I feel this approach is too inflexible. It makes the compiler a closed system. Modifying and improving the language requires changing the compiler's source code, which is usually over-complicated.
+
+On top of that, most languages isolate you from the CPU, or even from the OS, from the get-go. Instead of giving you access to the foundations, and providing a convenient pre-built ramp to the high clouds, _all you get_ is high clouds.
+
+Astil Forth explores the opposite direction. The interpreter / compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
+
+This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth also implements conditionals without compiler support, and makes them much nicer to use, but uses more code.)
+
+Unlike Frugal and mature systems such as Gforth, Astil Forth goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that, despite the non-portability.
+
+The system comes in two variants which use different call conventions: register-based and stack-based. For code simplicity reasons, they compile separately, from differently selected C files. The stack-CC version is legacy and has fewer features.
+
+The outer interpreter / compiler, written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements the language, on the fly, bootstrapping via inline assembly.
+- Register-CC: boots via [`./forth/lang.af`](./forth/lang.af).
+- Stack-CC: boots via [`forth/lang_s.af`](./forth/lang_s.af).
+
+### Always fast
+
+Most languages lock into one execution model: either interpretation/JIT, or AOT compilation. This causes friction. Interpreted languages are nicer for scripting, prototyping, iterating. Compiled languages produce faster code and make deployment easier (just a binary), but compilation slows down development. How many projects were rewritten in C++ after starting in Python? And Java is the worst joke; wait for "compilation", only to find out you need an interpreter for the resulting image.
+
+Astil Forth _proves_ that combining interpretation/JIT and AOT compilation in one language is easy, practical, and useful. We could end the "language split".
+
+In development, Astil is a scripting language with instant startup and feedback. For "production", it builds a standalone executable, deployable as-is, and without any interpreter inside.
+
+Some other scripting languages offer "compilation", but it's almost never the real deal. Some examples:
+- Gforth builds a VM image file, which requires the interpreter.
+- Deno and Bun bundle an interpreter when building an executable.
+
+Some recent AOT languages offer comptime execution, which is a nice step towards bridging the gap. Examples include Nim and Zig. Unfortunately, to the best of my knowledge, they do this with interpretation, not compilation, limiting the usefulness. Bun's sources have comments like "this used to be calculated at comptime, but too slow, so we moved this to runtime". Astil Forth avoids this problem: "comptime" execution uses assembled code, not an interpreter.
+
+Fun note. AOT compilation in Astil Forth might be the "fastest" of any language, because it simply dumps the already JIT-compiled code of your program (plus data and dyld symbols) into an executable file. At the time of writing, it takes about a millisecond for simple programs.
+
 ## Easy C interop
 
-It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang_s.af`](./forth/lang_s.af) and [`./forth/lang.af`](./forth/lang.af).
+It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang.af`](./forth/lang.af) and [`./forth/lang_s.af`](./forth/lang_s.af).
 
 The reg-CC version of Astil Forth, the default one, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
 
@@ -146,7 +167,7 @@ main
 
 ## Exceptions done right: ABI compatibility
 
-When using the register-based calling convention, you can _opt out of exceptions_ for individual words. Then, every exception is caught, and error values are always explicit.
+When using the register-based calling convention, you can _opt out of exceptions_ inside any procedure. This reveals all error values, transforming them from exceptions. It's an implicit "catch" with procedure-level granularity.
 
 ```forth
 : word [ true catches ]
@@ -169,12 +190,15 @@ With global installation:
 ```sh
 make install
 
-# Register-based calling convention.
+# Get some instructions:
+astil --help
+
+# Register-based calling convention:
 astil std:lang.af -  # REPL mode.
 astil some_file.af   # One-shot run.
 astil some_file.af - # Run file, then REPL.
 
-# Stack-based calling convention.
+# Stack-based calling convention:
 astil_s std:lang_s.af - # REPL mode.
 astil_s some_file.af    # One-shot run.
 astil_s some_file.af -  # Run file, then REPL.
@@ -202,16 +226,8 @@ Local-only usage inside this repo:
 
 ```sh
 make
-
-# Register-based calling convention.
-./astil.exe forth/lang.af - # REPL mode.
-./astil.exe some_file.af    # One-shot run.
-./astil.exe some_file.af -  # Run file, then REPL.
-
-# Stack-based calling convention.
-./astil_s.exe forth/lang_s.af - # REPL mode.
-./astil_s.exe some_file.af      # One-shot run.
-./astil_s.exe some_file.af -    # Run file, then REPL.
+./astil.exe
+./astil_s.exe
 ```
 
 Rebuild continuously while hacking:
@@ -220,12 +236,13 @@ Rebuild continuously while hacking:
 make clean build_w
 ```
 
-When debugging weird crashes, the following commands are useful:
+When debugging weird crashes, the following can be useful:
 
 ```sh
 make debug_run '<file>'
 make debug_run '<file>' DEBUG=true
-make debug_run '<file>' RECOVERY=false # only for stack-CC
+make debug_run '<file>' TRACE=true
+make debug_run '<file>' RECOVERY=false
 ```
 
 ## Structure
@@ -256,7 +273,7 @@ Should be usable as a library in another C/C++ program. The "main" file is only 
 
 In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to simply clone the repo into a submodule and include `comp/interp.c` which provides the top-level API and includes all other files it needs.
 
-Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every symbol is declared as `static`.
+Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every procedure is declared as `static`.
 
 ## Tricks and optimizations
 
@@ -375,7 +392,7 @@ The term "JIT" is used here only for convenience. This doesn't assemble "just" i
 
 ## What is compilation
 
-"Compilation" and especially "JIT compilation" are muddy terms. Many interpreters convert text to bytecode, which qualifies as JIT compilation, even if the bytecode remains interpreted. In the Java world, generating bytecode files is considered "compilation".
+"Compilation" and especially "JIT compilation" are muddy terms. Many interpreters convert text to VM code, which may qualify as JIT compilation, even if the result remains interpreted. In the Java world, generating VM code files is considered "compilation".
 
 Especially murky in the Forth world. Docs will often mention compilation, and sometimes decompilation, usually without saying what it compiles _to_ and decompiles _from_: VM code or machine code. Some Forth systems use both; some stop at VM code; Astil Forth uses only native code. Yet all these systems qualify as "compilers".
 
@@ -385,7 +402,7 @@ Perhaps we should differentiate "JIT compilers" and "JIT assemblers". But at the
 
 ## Name
 
-The name Astil references a sentient magic grimoire from some anime I watched. A book of magic words. Fitting for a Forth, don't you think?
+The name Astil references a sentient magic grimoire from one anime I watched. A book of magic words. Fitting for a Forth, don't you think?
 
 ## License
 

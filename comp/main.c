@@ -93,7 +93,9 @@ static Err main_run(int argc, const char *argv[]) {
     if (!key) {
       Timing time = {.prefix = "[import] "};
       if (timing) timing_beg(&time);
+
       try(interp_import(&interp, val));
+
       if (timing) timing_end(&time);
       continue;
     }
@@ -120,7 +122,12 @@ static Err main_run(int argc, const char *argv[]) {
 
 #ifndef CALL_CONV_STACK
     if (!strcmp(key, "--build")) {
+      Timing time = {.prefix = "[build] "};
+      if (timing) timing_beg(&time);
+
       try(build(&interp, val));
+
+      if (timing) timing_end(&time);
       continue;
     }
 #endif // CALL_CONV_STACK
