@@ -514,8 +514,8 @@ Placed immediately after `Mach_fixup_head`.
 executable file. `.seg_info_offset` after the struct must contain exactly
 that many entries, matching the order of the segment load commands.
 
-For segments which need fixups, the corresponding `.seg_info_offset[N]` holds
-the offset of a `Mach_fixup_seg` struct, which describes where to find its
+For segments which need fixups, the corresponding `.seg_info_offset[N]` has
+the offset of the `Mach_fixup_seg` struct which describes where to find its
 fixups; the offset is from the start of `Mach_fixup_img`. For those without
 fixups, the offset is 0, and no extra data is emitted.
 */
@@ -544,19 +544,6 @@ typedef struct {
   U32 seg_info_offset[5]; // `__got` gets fixups, other segments get offset 0.
 } Mach_fixup_img_5;
 
-/*
-Values for `Mach_fixup_seg.page_start`.
-
-- MFS_NONE  -- used in `Mach_fixup_seg.page_start[]` to denote a page with no fixups.
-- MFS_MULTI -- used in `Mach_fixup_seg.page_start[]` to denote a page which has multiple starts.
-- MFS_LAST  -- used in `Mach_fixup_seg.chain_starts[]` to denote last start in list for page.
-*/
-typedef enum : U16 {
-  MFS_NONE  = 0xFFFF, // DYLD_CHAINED_PTR_START_NONE
-  MFS_MULTI = 0x8000, // DYLD_CHAINED_PTR_START_MULTI
-  MFS_LAST  = 0x8000, // DYLD_CHAINED_PTR_START_LAST
-} Mach_fixup_start;
-
 // Values for `Mach_fixup_seg.pointer_format`.
 typedef enum : U16 {
   MFP_ARM64E              = 1,  // DYLD_CHAINED_PTR_ARM64E
@@ -577,15 +564,17 @@ typedef enum : U16 {
 /*
 `dyld_chained_starts_in_segment` in Apple `cctools` `fixup-chains.h`.
 Per-segment chain-starts descriptor for a single page.
+
+`.page_start` can hold other special values which we don't use.
 */
 typedef struct {
-  U32              size;              // sizeof(Mach_fixup_seg)
-  U16              page_size;         // 0x1000 or 0x4000 (`MEM_PAGE`)
-  Mach_fixup_ptr   pointer_format;    // DYLD_CHAINED_PTR_*
-  U64              segment_offset;    // from `vmaddr` of `__TEXT`
-  U32              max_valid_pointer; // 0 for 64-bit
-  U16              page_count;        // 1
-  Mach_fixup_start page_start[1]; // Offset of first fixup at `segment_offset`.
+  U32            size;              // sizeof(Mach_fixup_seg)
+  U16            page_size;         // 0x1000 or 0x4000 (`MEM_PAGE`)
+  Mach_fixup_ptr pointer_format;    // DYLD_CHAINED_PTR_*
+  U64            segment_offset;    // from `vmaddr` of `__TEXT`
+  U32            max_valid_pointer; // 0 for 64-bit
+  U16            page_count;        // 1
+  U16            page_start[1]; // Offset of first fixup at `segment_offset`.
 
   // U16 chain_starts[1]; // Unused: only for 32-bit formats.
 } Mach_fixup_seg;

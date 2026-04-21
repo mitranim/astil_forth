@@ -125,6 +125,7 @@ static void encode_linkedit_section(
       .pointer_format = MFP_64_OFFSET,
       .segment_offset = got_vm_off - text_seg_vm_off, // from cctools and dyld
       .page_count     = 1,
+      .page_start[0]  = 0,
     }
   );
 

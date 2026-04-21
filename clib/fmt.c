@@ -24,7 +24,7 @@ static const char *uint64_to_bit_str(U64 num) {
 
 /*
 Integer bits low to high. Not the same as little endian.
-To represent the bits of a signed number, simply cast it.
+To represent the bits of a signed number, just cast it.
 The returned buffer is only valid until the next call.
 */
 static const char *uint64_to_bit_str_reverse(U64 num) {
