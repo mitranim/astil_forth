@@ -52,7 +52,7 @@ typedef stack_of(Asm_fixup) Asm_fixups;
 #include "./comp_cc_stack.h"
 #endif
 
-// 4 MiB
+// 0x100000 * sizeof(Instr) = 4 MiB
 static constexpr Uint INSTR_HEAP_LEN = (1 << 22) / sizeof(Instr);
 
 /*

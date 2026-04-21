@@ -7,9 +7,9 @@ import' std:lang.af
   prev +
 ;
 
-: main
+: main { -- exit }
   36 fib { val }
-
   \ " fib(36): " log val log_int lf
+  0
 ;
 main

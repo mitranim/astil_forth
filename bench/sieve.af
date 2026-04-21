@@ -2,23 +2,28 @@ import' std:lang.af
 
 \ Adapted from Gforth's `sieve.fs`.
 
-4096        let: RUNS
-8192        let: CAP
-CAP         mem: FLAGS
-FLAGS CAP + let: EFLAG
+4096 let: RUNS
+8192 let: CAP
+CAP  mem: FLAGS
+
+\ Must be calculated rather than stored in a static constant because it depends
+\ on `FLAGS`, which is allocated in the compiler-managed data section and whose
+\ absolute address is different when running in JIT mode versus when running an
+\ AOT-compiled executable.
+: flags_ceil { -- adr } FLAGS CAP + ;
 
 : reset FLAGS CAP 1 fill ;
 
 : find_prime { -- num }
   reset
 
-  0 3 { num step }
+  flags_ceil 0 3 { ceil num step }
 
-  EFLAG FLAGS +for: ptr0
+  ceil FLAGS +for: ptr0
     ptr0 @u8 if
       ptr0 step + { ptr1 }
 
-      EFLAG ptr0 step +loop: ptr1
+      ceil ptr0 step +loop: ptr1
         0 ptr1 !8
       end
 
@@ -31,11 +36,13 @@ FLAGS CAP + let: EFLAG
   num
 ;
 
-: main
+: main { -- exit }
   \ find_prime .
 
   RUNS for
     find_prime { -- }
   end
+
+  0
 ;
 main

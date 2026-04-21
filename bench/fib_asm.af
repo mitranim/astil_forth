@@ -32,8 +32,9 @@ import' std:lang.af
   ]
 ;
 
-: main
+: main { -- exit }
   1 16 lsl run
   \ " fib(91): " log 91 fib log_int lf
+  0
 ;
 main

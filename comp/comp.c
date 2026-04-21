@@ -300,10 +300,11 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   try(comp_require_current_sym(comp, &caller));
   sym_auto_comp_only(caller, callee);
   sym_auto_interp_only(caller, callee);
-  try(sym_auto_throws(caller, callee));
 
-  const auto ctx   = &comp->ctx;
-  const auto catch = ctx->catches && callee->throws;
+  const auto ctx = &comp->ctx;
+  if (callee->throws && !ctx->catches) caller->throws = true;
+
+  const auto catch = callee->throws && ctx->catches;
   bool inlined     = false;
 
   switch (callee->type) {

@@ -9,7 +9,6 @@ import' std:lang_s.af
 
 : main
   36 fib
-
   \ " fib(36): " log log_int lf
 ;
 main

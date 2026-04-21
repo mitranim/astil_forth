@@ -9,7 +9,7 @@ import' std:lang.af
 \
 \ See `./aot_cli.af` for compiling from outside the program.
 
-: main { -- code }
+: main { -- exit }
   has_interp if
     " hello world (JIT mode)!" log lf
   else
@@ -34,7 +34,7 @@ main
 \
 \ In the Forth REPL:
 \
-\   : main { -- code } " hello world!" log lf 0 ;
+\   : main { -- exit } " hello world!" log lf 0 ;
 \   ' main " out.exe" compile_executable
 \   \ Then hit Ctrl+D (not Ctrl+C) to exit.
 \
@@ -57,9 +57,9 @@ main
 \
 \ Forth:
 \
-\   : main { -- code } " hello world! (first)" log lf 0 ;
+\   : main { -- exit } " hello world! (first)" log lf 0 ;
 \   ' main " out0.exe" compile_executable
-\   : main { -- code } " hello world! (second)" log lf 0 ;
+\   : main { -- exit } " hello world! (second)" log lf 0 ;
 \   \ [system] redefined word `main` in wordlist 1
 \   ' main " out1.exe" compile_executable
 \   \ Hit Ctrl+D to exit.

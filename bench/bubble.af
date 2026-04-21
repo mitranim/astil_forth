@@ -2,10 +2,15 @@ import' std:lang.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-74755            var:   SEED
-8192             let:   LEN
-LEN              cells: LIST
-LEN cells LIST + let:   CEIL
+74755 var:   SEED
+8192  let:   LEN
+LEN   cells: LIST
+
+\ Must be calculated rather than stored in a static constant because it depends
+\ on `LIST`, which is allocated in the compiler-managed data section, and whose
+\ absolute address is different when running in JIT mode versus when running an
+\ AOT-compiled executable.
+: list_ceil { -- adr } LEN cells LIST + ;
 
 : pseudo_random { -- val }
   SEED @ 1309 * 13849 + 65535 and { val }
@@ -14,21 +19,21 @@ LEN cells LIST + let:   CEIL
 ;
 
 : list_init
-  CEIL LIST Cell
+  list_ceil LIST Cell
   +loop: ptr
     pseudo_random ptr !
   end
 ;
 
 : list_dump
-  CEIL LIST Cell
+  list_ceil LIST Cell
   +loop: ptr
     ptr @ .
   end
 ;
 
 : list_verify
-  CEIL -cell
+  list_ceil -cell
   LIST Cell
   +loop: ptr
     ptr @2 > if " [bubble] not sorted" throw end
@@ -36,7 +41,7 @@ LEN cells LIST + let:   CEIL
 ;
 
 : bubble
-  CEIL LIST Cell
+  list_ceil LIST Cell
   -loop: ceil_ptr
     ceil_ptr LIST Cell
     +loop: ptr
@@ -55,8 +60,10 @@ LEN cells LIST + let:   CEIL
   list_verify
 ;
 
-: main
-  bubble_sort
-  " [bubble] done" log lf
+: main { -- exit } [ true catches ]
+  bubble_sort { err }
+  err ifn 0 ret end
+  " error: %s" err elogf elf
+  1
 ;
 main

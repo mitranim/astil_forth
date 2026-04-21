@@ -9,7 +9,7 @@ import' std:lang.af
 \
 \ See `./aot.af` for compiling from INSIDE the program.
 
-: main { -- code }
+: main { -- exit }
   has_interp if
     " hello world (JIT mode)!" log lf
   else
@@ -32,7 +32,7 @@ main
 \
 \ In the Forth REPL:
 \
-\   : main { -- code } " hello world!" log lf 0 ;
+\   : main { -- exit } " hello world!" log lf 0 ;
 \   \ Then hit Ctrl+D (not Ctrl+C) to terminate stdin.
 \
 \ In your shell:

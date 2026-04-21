@@ -459,7 +459,7 @@ separately in the high bits of the instruction in the opcode region.
 */
 static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
   constexpr Uint bits      = 12;
-  constexpr Uint mask      = (1 << bits) - 1;
+  constexpr Uint mask      = (1 << bits) - 1; // 0b111111111111 = 4095
   const auto     prog      = (Uint)(comp_code_next_prog_counter(&comp->code));
   const auto     pc_page   = prog & ~mask;
   const auto     addr_page = addr & ~mask;

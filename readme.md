@@ -22,12 +22,11 @@
 Astil Forth is a native-code Forth system designed for self-bootstrapping and self-assembling. Uses a custom assembler in both C and Forth code. Currently supports only Arm64.
 
 Goals:
-- [x] Easy JIT compilation.
-- [x] Easy AOT compilation.
+- [x] Combined JIT & AOT compilation.
 - [x] Easy _self-assembly_ in user/lib code.
 - [x] Explore viability of single-pass assembly.
-- [x] Language features can be implemented in user/lib code.
-- [x] Enough language features (in user/lib code) to be usable for scripting.
+- [x] Implement most of the language in user/lib code outside the compiler.
+- [x] Be usable for scripting.
 - [x] Support native register-based call ABI.
 - [x] Avoid a VM or complex IR.
 - [x] Keep the code clear and educational for other compiler amateurs.
@@ -40,7 +39,7 @@ Non-goals:
 
 Everything was written by me. This is _not_ slopbot-generated.
 
-I gave talks about this system in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
+I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
 - 2026-Jan: intro to the system, self-assembly showcase, demos — https://www.youtube.com/watch?v=_4U1BR1U_oM
 - 2026-Feb: register allocation and proper ABI interop with C — https://www.youtube.com/watch?v=rCF7wAB2wFQ
 - [`./talks`](./talks) directory: presentation notes with more details.
@@ -49,7 +48,7 @@ Most languages ship with a smart, powerful, all-knowing compiler with intrinsic 
 
 On top of that, most languages isolate you from the CPU, or even from the OS, from the get-go. Instead of giving you access to the foundations, and providing a convenient pre-built ramp to the high clouds, _all you get_ is high clouds.
 
-This system explores the opposite direction. The interpreter/compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
+This system explores the opposite direction. The interpreter / compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
 
 This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth also implements conditionals without compiler support, in Forth, and makes them much nicer to use, but at the cost of more code.)
 
@@ -115,7 +114,7 @@ Easy self-assembly (Arm64):
 Easy AOT compilation; can be done either from inside a program, or from outside via CLI flags:
 
 ```forth
-: main { -- code }
+: main { -- exit }
   " hello world!" log lf
   0
 ;
@@ -131,7 +130,7 @@ compile_executable
 
 It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang_s.af`](./forth/lang_s.af) and [`./forth/lang.af`](./forth/lang.af).
 
-The reg-CC version of this system, which is the default, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
+The reg-CC version of Astil Forth, the default one, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
 
 ```forth
 \ The numbers describe input and output parameters.
@@ -237,7 +236,7 @@ make debug_run '<file>' RECOVERY=false # only for stack-CC
   - Other files — optional small libraries; mostly interfaces to `libc` IO.
 - [`./examples`](./examples) — how to use `libc` for IO, networking, threading.
 - [`./comp`](./comp) — outer interpreter / compiler in C. Mostly library-style code with a small "main" entry point.
-- [`./talks`](./talks) — presentation "slides" for the talks I gave in [SVFIG](https://www.meetup.com/sv-fig/) about this system.
+- [`./talks`](./talks) — presentation "slides" for the talks I gave in [SVFIG](https://www.meetup.com/sv-fig/) about Astil Forth.
   - For now, this is the substitute for documentation, especially the February talk.
 - [`./sublime`](./sublime) — editor support for Sublime Text.
 
@@ -300,7 +299,7 @@ I had a go, and bounced off the complexity. How to keep an optimizing compiler s
 
 ## Non-standard
 
-For the sake of my sanity and ergonomics, this system does _not_ follow the ANS Forth standard. It improves upon it.
+For the sake of my sanity and ergonomics, Astil Forth does _not_ follow the ANS Forth standard. It improves upon it.
 
 Words are case-sensitive.
 

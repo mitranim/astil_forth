@@ -11,7 +11,6 @@ import' std:lang_s.af
 : main
   1 16 lsl
   for 91 fib drop end
-
   \ " fib(91): " log 91 fib log_int lf
 ;
 main

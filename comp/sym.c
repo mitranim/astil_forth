@@ -63,11 +63,6 @@ static void sym_auto_interp_only(Sym *caller, const Sym *callee) {
   ));
 }
 
-static Err sym_auto_throws(Sym *caller, const Sym *callee) {
-  if (callee->throws) caller->throws = true;
-  return nullptr;
-}
-
 static Err err_inline_not_norm(const Sym *sym) {
   return errf(
     "unable to inline " FMT_QUOTED ": not a regular Forth word", sym->name.buf

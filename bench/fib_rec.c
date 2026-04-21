@@ -7,7 +7,14 @@ int64_t fib(int64_t src) {
   return fib(src - 1) + fib(src - 2);
 }
 
-int main(int argc, const char *argv[]) {
-  const auto num = strtol(argv[1], nullptr, 10);
-  printf("fib(%ld): %lld\n", num, fib(num));
+int64_t escape(int64_t val) {
+  register int64_t x0 __asm__("x0") = val;
+  __asm__("" : "+r"(x0));
+  return x0;
+}
+
+int main(void) {
+  const int64_t count = 36;
+  escape(fib(escape(count)));
+  // printf("fib(%lld): %lld\n", count, fib(count));
 }

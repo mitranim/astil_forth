@@ -919,9 +919,9 @@
 :: char' ( C: "str" -- ) ( E: -- char ) parse_char comp_push ;
 
 \ Interpretation semantics of standard `s"`.
-\ The parser ensures null-termination.
 : parse_str ( E: "str" -- cstr len ) char' " parse ;
 
+\ The parser ensures null-termination of the given string.
 : comp_str ( C: buf len -- ) ( E: -- cstr len )
   tuck                          ( len buf len )
   inc                           \ Reserve terminating null byte.

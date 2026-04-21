@@ -1249,6 +1249,7 @@ test_catch_0
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
 ;
+test_catch_1
 
 : test_catch_2_cond { one two -- three four }
   one <>0 { ok0 }

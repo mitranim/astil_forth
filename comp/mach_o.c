@@ -231,8 +231,16 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   has `fileoff = 0`: it begins at the headers. Like every segment, offsets
   and sizes of `__TEXT` must have page alignment.
 
-  Note that `__text` is just one section in this segment and does not require
-  page alignment. Code in `__text` can begin immediately after Mach-O headers.
+  Since `__text` is a section, not a segment, normally it doesn't need page
+  alignment and may begin immediately after headers. Some compilers reserve
+  a bit of extra space between headers and `__text` to make post-processing
+  of the executable easier; inserting a code signature is a notable example.
+  In our case, `__text` needs page alignment because of `Comp_heap` mapping:
+
+    Mach-O headers        -> __TEXT (0x320)
+    Comp_heap.exec.instrs -> __text (0x100000)
+    Comp_heap.data        -> __data (0x40000)
+    Comp_heap.externs     -> __got  (0x4000)
 
   Mach-O seems to require the body of each segment load command to be padded
   to memory page size in the file too, not just in virtual memory, likely for
@@ -241,11 +249,13 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   Judging by `clang` and `codesign`, either `__LINKEDIT` or the last segment
   may be exempt from this, but we align it anyway.
   */
-  const auto    instrs              = &code->code_exec;
-  constexpr U32 text_seg_file_off   = 0;
-  constexpr U64 text_seg_vm_off     = pagezero_vm_size;
-  constexpr U32 text_code_file_off  = sizeof(Mach_head) + cmd_size;
-  const U32     text_code_real_size = instrs->len * sizeof(Instr);
+  constexpr U32 text_seg_file_off = 0;
+  constexpr U64 text_seg_vm_off   = pagezero_vm_size;
+  constexpr U32 text_code_file_off = mem_align_page(sizeof(Mach_head) + cmd_size);
+  constexpr U64 text_code_vm_off = text_seg_vm_off + text_code_file_off;
+
+  const auto instrs              = &code->code_exec;
+  const U32  text_code_real_size = instrs->len * sizeof(Instr);
 
   const U32 text_seg_size = mem_align_page(
     text_code_file_off + text_code_real_size
@@ -276,7 +286,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     (Mach_sect){
       .sectname = "__text",
       .segname  = "__TEXT",
-      .addr     = text_seg_vm_off + text_code_file_off,
+      .addr     = text_code_vm_off,
       .size     = text_code_real_size,
       .offset   = text_code_file_off,
       .align    = 2, // 2^2
@@ -297,10 +307,10 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   used in AOT. Offsets are "hardcoded" in instructions such as `adrp & ldr`.
   The same approach is used for the GOT section below.
   */
-  constexpr auto data_vm_off = text_seg_vm_off + offsetof(Comp_heap, data) -
+  constexpr auto data_vm_off = text_code_vm_off + offsetof(Comp_heap, data) -
     offsetof(Comp_heap, exec.instrs);
 
-  aver(text_seg_vm_off + text_seg_size <= data_vm_off);
+  aver(text_code_vm_off + text_seg_size <= data_vm_off);
 
   aver(is_aligned_to(data_file_off, MEM_PAGE));
   aver(is_aligned_to(data_file_size, MEM_PAGE));
@@ -343,7 +353,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   const auto got_file_size = mem_align_page(got_real_size);
   const auto got_vm_size   = mem_align_page(got_file_size);
 
-  constexpr auto got_vm_off = text_seg_vm_off + offsetof(Comp_heap, externs) -
+  constexpr auto got_vm_off = text_code_vm_off + offsetof(Comp_heap, externs) -
     offsetof(Comp_heap, exec.instrs);
 
   aver(data_vm_off + data_vm_size <= got_vm_off);
@@ -484,9 +494,14 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     }
   );
 
-  // Done writing headers; write bodies of various segments.
+  // Done writing headers; pad up to `__text` and write various sections.
+
   aver(buf->len == sizeof(Mach_head) + cmd_size);
+  aver(sizeof(Mach_head) + cmd_size <= text_code_file_off);
+
+  buf_zeropad_to(buf, text_code_file_off);
   aver(buf->len == text_code_file_off);
+
   aver(text_code_real_size == instrs->len * sizeof(Instr));
   buf_append_bytes(buf, (const U8 *)instrs->dat, text_code_real_size);
   aver(buf->len == text_code_file_off + text_code_real_size);

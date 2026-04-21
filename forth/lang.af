@@ -1064,10 +1064,10 @@
 ;
 
 \ Interpretation semantics of standard `s"`.
-\ The parser ensures null-termination.
 : parse_str { -- cstr len } char' " parse ;
 : parse_cstr { -- cstr } parse_str { cstr -- } cstr ;
 
+\ The parser ensures null-termination of the given string.
 : comp_str { buf len } ( E: -- cstr len )
   len inc            { cap } \ Reserve terminating null byte.
   buf cap alloc_data { adr }
@@ -1096,12 +1096,12 @@
 \ is statically allocated and unique. The string is always null-terminated,
 \ and can be safely passed to many `libc` procedures by pointer alone.
 :  s" { -- cstr len } ( E: "str" -- cstr len ) parse_str ;
-:: s" ( C: "str" -- ) ( E: -- cstr len )       parse_comp_str  ;
+:: s" ( C: "str" -- ) ( E: -- cstr len )       parse_comp_str ;
 
 \ C-style string literal. Like `s"` but returns only the address
 \ without the length. The string is always null-terminated.
 :  " { -- cstr }     ( E: "str" -- cstr ) parse_cstr ;
-:: " ( C: "str" -- ) ( E: -- cstr )       parse_comp_cstr  ;
+:: " ( C: "str" -- ) ( E: -- cstr )       parse_comp_cstr ;
 
 \ ## External procedures and symbols
 
@@ -1250,6 +1250,16 @@
 \ at least the given size in bytes, initialized to zero.
 \
 \ TODO dedup code with `init_data_word`.
+\
+\ The buffer is allocated in the compiler-managed data region,
+\ which is preserved in AOT compilation. Changes to this data
+\ made during interpretation persist into the AOT executable.
+\
+\ The variable does NOT hold a fixed address. Instead, it compiles
+\ instructions to calculate the address using PC-relative offsets.
+\ The address CHANGES from JIT to AOT. This means: it must not be
+\ stored in another static variable, or used to derive an address
+\ which would be stored in another static variable.
 : buf: { cap } ( C: "name" -- ) ( E: -- adr cap )
   parse_word { str len }
   nil cap alloc_data { adr }
@@ -1269,6 +1279,7 @@
 \ Shortcut for the standard idiom `create <name> N allot`.
 \ Unlike the standard idiom, this also zeroes the memory.
 \ Like `buf:` but doesn't return capacity.
+\ Also see `buf:` for warnings about AOT.
 : mem: { cap } ( C: "name" -- ) ( E: -- adr )
   nil cap alloc_data { adr }
   parse_word adr init_data_word
