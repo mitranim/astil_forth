@@ -562,15 +562,13 @@ static Err compile_mach_executable_to(
   Interp *interp, const char *path, const Sym *main
 ) {
   defer(buf_deinit) Buf buf = {};
-
   try(compile_mach_executable(interp, &buf, main));
 
-  FILE *file;
+  defer(file_deinit) FILE *file = nullptr;
   try(file_open(path, "w", &file));
   try(file_write(file, buf.dat, 1, buf.len));
   try_errno(fflush(file));
   try_errno(fchmod(fileno(file), 0755));
   try_errno(fclose(file));
-
   return nullptr;
 }
