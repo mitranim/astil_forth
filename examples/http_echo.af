@@ -1,5 +1,4 @@
 import' std:lang.af
-import' std:internals.af
 import' ./http_util.af
 
 \ Simple example of a single-threaded "HTTP" server which echoes requests

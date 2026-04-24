@@ -353,9 +353,9 @@ Special _semantic_ roles get special _syntactic_ roles:
 Examples:
 - Words which declare: `: :: let: var: to:` and more.
   - Syntax highlighters are encouraged to scope the next word like a declaration.
-- Parsing words: `' postpone' compile'`.
+- Parsing words: `xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
-- Unusual control words: `va{ }va`.
+- Unusual control words: `vargs{ }vargs`.
 - Well-known control words don't use special characters: `if else end ret` and several more. Syntax highlighters should hardcode them.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names. These are commonly used as delimiters, like `T{ }T`.

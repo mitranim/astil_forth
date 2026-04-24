@@ -34,11 +34,14 @@
 
 : next_word { wlist -- XT } ( "word" -- XT ) parse_word wlist find_word ;
 
-: tick_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push ;
-:  '  {    -- XT } (    "word" -- ) 1 next_word ; \ WORDLIST_EXEC
-:  '' {    -- XT } (    "word" -- ) 2 next_word ; \ WORDLIST_COMP
-:: '  ( E: -- XT ) ( C: "word" -- ) 1 tick_next ; \ WORDLIST_EXEC
-:: '' ( E: -- XT ) ( C: "word" -- ) 2 tick_next ; \ WORDLIST_COMP
+\ "XT" is short for "execution token".
+\ `xt'` is renamed from standard `'`.
+\ Each execution token is a `Sym*`.
+: xt_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push ;
+:  xt'  {    -- XT } (    "word" -- ) 1 next_word ; \ WORDLIST_EXEC
+:  xt'' {    -- XT } (    "word" -- ) 2 next_word ; \ WORDLIST_COMP
+:: xt'  ( E: -- XT ) ( C: "word" -- ) 1 xt_next   ; \ WORDLIST_EXEC
+:: xt'' ( E: -- XT ) ( C: "word" -- ) 2 xt_next   ; \ WORDLIST_COMP
 
 : inline_next { wlist } ( "word" -- ) ( E: <word> )
   wlist next_word inline_word
@@ -55,7 +58,7 @@
 :: execute'' 2 execute_next ;
 
 : compile_next { wlist } ( "word" -- )
-  wlist next_word comp_push ' comp_call comp_call
+  wlist next_word comp_push xt' comp_call comp_call
 ;
 :: compile'  1 compile_next ;
 :: compile'' 2 compile_next ;
@@ -914,128 +917,138 @@
 : off! { adr } false adr ! ;
 : on!  { adr } true  adr ! ;
 
-\ ## Stack introspection and manipulation
+\ ## Stacks
 \
-\ Under the register calling convention, the Forth data stack
-\ is used only in top-level interpretation. Because of this,
-\ we don't reserve any registers for the stack floor / top.
+\ This section defines operations on integer / cell stacks like the one
+\ provided by the outer interpreter. We also allocate additional stacks
+\ for auxiliary control information, such as `LOOP_AUX`.
 \
-\ Instead, the stack is accessed directly on the interpreter
-\ object, which IS unavoidably stored in a special register.
-\ Compared to the stack CC, the reg-based CC gets away with
-\ fewer special registers.
+\ Each stack is represented with an address of the struct below.
+\ The definition matches `Stack` in our C code. The default data
+\ stack provided by the interpreter is one of these. We hardcode
+\ the offsets below, because `struct:` is not yet available.
 \
-\ The stack operations are valid ONLY in interpreted and JIT-compiled code.
+\   \ SYNC[stack_field_offsets].
+\   struct: Stack
+\     Cell 1 field: Stack_bytelen \ Total size with guards.
+\     Adr  1 field: Stack_cellar  \ Lower guard.
+\     Adr  1 field: Stack_floor   \ First data cell.
+\     Adr  1 field: Stack_top     \ Next data cell.
+\     Adr  1 field: Stack_ceil    \ After last data cell.
+\   end
+\
+\ See `stack_init` for guarded allocation via memory mapping.
+\ A stack can also be allocated without guards if so desired.
+\
+\ The stack operations below have somewhat suboptimal performance.
+\ They're meant primarily for control frames, used in compilation
+\ and testing.
+\
+\ Because the interpreter's stack is accessible on the interpreter object,
+\ we get away with not having to reserve any special registers for stacks.
+\
+\ The default stack is available ONLY in interpreted and JIT-compiled code.
 \ AOT-compiled executables do not have the Forth interpreter or data stack.
-\ Attempting to use any of this in AOT-compiled code will kill the program.
-\ By extension, control structures such as `if`, which use the Forth stack
-\ for control information, can only run during the initial interpretation.
 \
-\ Note: our stack is empty-ascending.
+\ All our stacks are empty-ascending.
 
-\ SYNC[interp_stack_offset].
 \ SYNC[stack_field_offsets].
-16 let: INTERP_INTS_FLOOR
-24 let: INTERP_INTS_TOP
+16 let: STACK_OFF_FLOOR
+24 let: STACK_OFF_TOP
 
-\ add <reg>, x28, INTERP_INTS_TOP
-:: stack_top_ptr ( E: -- adr )
-  comp_next_arg_reg
-  ASM_REG_INTERP INTERP_INTS_TOP asm_add_imm comp_instr
+\ Default Forth stack provided by the interpreter.
+\ Not available when running in AOT-compiled mode.
+\
+\ SYNC[interp_stack_offset].
+:: STACK ( E: -- adr )
+  \ mov <arg>, x28
+  comp_next_arg_reg ASM_REG_INTERP asm_mov_reg comp_instr
   true interp_only
 ;
 
-: stack_top_ptr { -- adr } stack_top_ptr ;
+: STACK { -- adr } STACK ;
 
-\ ldur <reg>, [x28, INTERP_INTS_FLOOR]
-:: stack_floor ( E: -- adr )
-  comp_next_arg_reg
-  ASM_REG_INTERP INTERP_INTS_FLOOR asm_load_unscaled_off comp_instr
-  true interp_only
+\ ldur <out>, [<stack>, STACK_OFF_TOP]
+: asm_stack_top_load { out stack -- instr }
+  out stack STACK_OFF_TOP asm_load_unscaled_off
 ;
 
-: stack_floor { -- adr } stack_floor ;
-
-\ ldur <reg>, [x28, INTERP_INTS_TOP]
-:: stack_top ( E: -- adr )
-  comp_next_arg_reg
-  ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
-  true interp_only
+\ stur <out>, [<stack>, STACK_OFF_TOP]
+: asm_stack_top_store { out stack -- instr }
+  out stack STACK_OFF_TOP asm_store_unscaled_off
 ;
 
-: stack_top { -- adr } stack_top ;
-
-: stack@ { -- val } stack_top @ ;
-
-\ Updates the stack top address in the interpreter.
-: stack! { adr } [
-  \ stur x0, [x28, INTERP_INTS_TOP]
-  0 ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off comp_instr
+: stack_top { stack -- top } [
+  0 comp_clobber
+  0 0 asm_stack_top_load comp_instr \ ldur x0, [x0, <off>]
+  1 comp_args_set
 ] ;
 
-: stack_at      { ind  -- adr } ind cells stack_floor + ;
-: stack_at@     { ind  -- val } ind stack_at @ ;
-: stack_len     {      -- len } stack_top stack_floor - /cells ;
-: stack_clear   {      --     } stack_floor stack! ;
-: stack_set_len { len  --     } len stack_at stack! ;
-: stack+        { diff --     } diff dec cells          stack_top      + stack! ;
-: stack-        { diff --     } diff dec cells { diff } stack_top diff - stack! ;
+: stack_floor { stack -- floor } [
+  0 comp_clobber
+  0 0 STACK_OFF_FLOOR asm_load_unscaled_off comp_instr \ ldur x0, [x0, <off>]
+  1 comp_args_set
+] ;
 
-\ Used by control structures such as conditionals.
-\
-\ Under the reg-based CC, compiled code does NOT use the Forth data stack.
-\ However, conditionals and loops need to use it for control information
-\ during compilation.
-\
-\ Each control structure pushes one or several "frames". Each frame consists
-\ of several inputs followed by a procedure which takes those inputs. Frame
-\ size is unknown to outside code; the knowledge of how many inputs to "pop"
-\ is hidden inside each frame's procedure. In other words, arities vary.
-\
-\ We can't really communicate any of this to the compiler,
-\ so we have to fall back on regular old push and pop here.
+: s@ { stack -- val } stack stack_top @ ;
 
-\ ldur <top>, [x28, INTERP_INTS_TOP]
-: asm_stack_load { adr -- instr }
-  adr ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off
+: stack_top! { top stack } [
+  \ stur x0, [x1, STACK_OFF_TOP]
+  0 1 STACK_OFF_TOP asm_store_unscaled_off comp_instr
+] ;
+
+: stack_at { ind stack  -- adr } ind cells { off } stack stack_floor off + ;
+
+: stack_len { stack -- len }
+  stack stack_floor { floor }
+  stack stack_top floor - /cells
 ;
 
-\ stur <top>, [x28, INTERP_INTS_TOP]
-: asm_stack_store { adr -- instr }
-  adr ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off
-;
+: stack_clear   { stack     } stack stack_floor stack stack_top! ;
+: stack_len_set { len stack } len stack stack_at stack stack_top! ;
 
-\ Usage:
+: stack_len+ { diff stack } stack stack_len diff + stack stack_len_set ;
+: stack_len- { diff stack } stack stack_len diff - stack stack_len_set ;
+: stack_drop { stack      } 1 stack stack_len- ;
+
+\ Pops from a stack. Usage:
 \
-\   stack>        unary
-\   stack> stack> binary
+\   stack s> { val }
 \
 \ Mind the backwards order:
 \
-\   10 20 30 >>stack
-\   stack> stack> stack> { thirty twenty ten }
+\   10 20 30 >>s
+\   stack s> . \ 30
+\   stack s> . \ 20
+\   stack s> . \ 10
 \
 \ Also see `stack{` which is more convenient and less error-prone.
-:: stack> ( E: -- val )
-  comp_next_arg_reg { arg }
-  ASM_REG_SCRATCH   { top }
-
-  top                        comp_clobber
-  top        asm_stack_load  comp_instr
-  arg top -8 asm_load_pre    comp_instr \ ldr <arg>, [<top>, -8]!
-  top        asm_stack_store comp_instr
-;
-
-: stack> { -- val } stack> ;
-
-\ Also see `:: >>stack`, which is defined _way_ later in the file,
-\ when we have access to loops. Unlike this version it's variadic.
-: >stack { val } [
-  1                     comp_clobber
-  1     asm_stack_load  comp_instr \ ldur x1, [x28, INTERP_INTS_TOP]
-  0 1 8 asm_store_post  comp_instr \ str x0, [x1], 8
-  1     asm_stack_store comp_instr \ stur x1, [x28, INTERP_INTS_TOP]
+: s> { stack -- val } [
+  2 comp_clobber
+  1 comp_clobber
+  0 comp_clobber
+  2 0    asm_mov_reg         comp_instr \ mov  x2, x0
+  1 2    asm_stack_top_load  comp_instr \ ldur x1, [x2, STACK_OFF_TOP]
+  0 1 -8 asm_load_pre        comp_instr \ ldr  x0, [x1, -8]!
+  1 2    asm_stack_top_store comp_instr \ stur x1, [x2, STACK_OFF_TOP]
+  1 comp_args_set
 ] ;
+
+\ Pushes to a stack.
+\
+\ Also see `:: >>s` defined later in this file.
+\ Unlike this version, it's variadic.
+: >s { val stack } [
+  2 comp_clobber
+  1 comp_clobber
+  0 comp_clobber
+  2 1   asm_mov_reg         comp_instr \ mov  x2, x1
+  1 2   asm_stack_top_load  comp_instr \ ldur x1, [x2, STACK_OFF_TOP]
+  0 1 8 asm_store_post      comp_instr \ str  x0, [x1], 8
+  1 2   asm_stack_top_store comp_instr \ stur x1, [x2, STACK_OFF_TOP]
+] ;
+
+\ ## System stack stuff
 
 \ For debugging.
 : systack_ptr { -- sp } [
@@ -1406,7 +1419,7 @@ LF CRLF inc !8 \ \n
 \ Unlike other Forth systems, we also support chains
 \ of "elif" terminated with a single "end".
 
-: pop_execute stack> execute ;
+: pop_execute STACK s> execute ;
 : reserve_instr ASM_PLACEHOLDER comp_instr ;
 : reserve_here {     -- adr } here { out } ASM_PLACEHOLDER comp_instr out ;
 : off_to_pc    { adr -- off } here             adr - ; \ For forward jumps.
@@ -1416,45 +1429,54 @@ LF CRLF inc !8 \ \n
 
 0 var: COND_HAS
 
-\ cbz x0, <else|end>
-: if_patch ( C: adr -- )
-  stack>        { adr }
+: if_done_from { stack } ( C: cond_prev        -- ) stack s> COND_HAS ! ;
+
+: if_pop_from   { stack } ( C: prev_fun if_adr  -- )
+  stack s>      { adr }
   adr off_to_pc { off }
-  0 off asm_cmp_branch_zero adr !32
+  0 off asm_cmp_branch_zero adr !32 \ cbz x0, <else|end>
+  stack s> execute
 ;
 
-\ cbnz x0, <else|end>
-: ifn_patch ( C: adr -- )
-  stack>        { adr }
+: ifn_pop_from  { stack } ( C: prev_fun ifn_adr -- )
+  stack s>      { adr }
   adr off_to_pc { off }
-  0 off asm_cmp_branch_not_zero adr !32
+  0 off asm_cmp_branch_not_zero adr !32 \ cbnz x0, <else|end>
+  stack s> execute
 ;
 
-: if_done ( C: cond_prev        -- ) stack> COND_HAS ! ;
-: if_pop  ( C: prev_fun if_adr  -- ) if_patch  stack> execute ;
-: ifn_pop ( C: prev_fun ifn_adr -- ) ifn_patch stack> execute ;
+: if_done STACK if_done_from ;
+: if_pop  STACK if_pop_from  ;
+: ifn_pop STACK ifn_pop_from ;
+
+: else_pop_from { stack } ( C: prev_fun else_adr -- )
+  stack s> patch_branch_forward
+  stack s> execute
+;
+
+: else_pop STACK else_pop_from ;
 
 : elif_init ( C: -- exec_fun elif_adr ) ( E: pred -- )
   comp_barrier \ Clobber / relocate locals.
   reserve_here { adr }
-  ' pop_execute >stack
-  adr           >stack
+  xt' pop_execute STACK >s
+  adr             STACK >s
 ;
 
 :: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
   " when calling `elif`" 1 comp_args_valid 0 comp_args_set
-  elif_init ' if_pop >stack
+  elif_init xt' if_pop STACK >s
 ;
 
 :: elifn ( C: -- exec_fun elifn_adr elifn_fun ) ( E: pred -- )
   " when calling `elifn`" 1 comp_args_valid 0 comp_args_set
-  elif_init ' ifn_pop >stack
+  elif_init xt' ifn_pop STACK >s
 ;
 
 : if_init ( C: -- cond fun )
   COND_HAS @ { cond } COND_HAS on!
-  cond      >stack
-  ' if_done >stack
+  cond        STACK >s
+  xt' if_done STACK >s
 ;
 
 \ With this strange setup, `end` pops the top control frame,
@@ -1465,36 +1487,292 @@ LF CRLF inc !8 \ \n
 \ TODO: define more variants like `=if` with fewer instructions.
 :: if ( C: -- cond done_fun exec_fun if_adr if_fun ) ( E: pred -- )
   " when calling `if`" 1 comp_args_valid 0 comp_args_set
-  if_init elif_init ' if_pop >stack
+  if_init elif_init xt' if_pop STACK >s
 ;
 
 :: ifn ( C: -- cond done_fun exec_fun ifn_adr ifn_fun ) ( E: pred -- )
   " when calling `ifn`" 1 comp_args_valid 0 comp_args_set
-  if_init elif_init ' ifn_pop >stack
-;
-
-: else_pop ( C: prev_fun else_adr -- )
-  stack> patch_branch_forward stack> execute
+  if_init elif_init xt' ifn_pop STACK >s
 ;
 
 :: else ( C: exec_fun if_adr if_fun -- else_adr else_fun )
-  stack> stack> stack> { if_fun if_adr exec_fun }
-
   " when calling `else`" 0 comp_args_valid
   comp_barrier \ Clobber / relocate locals.
   reserve_here { else_adr }
 
-  ' nop      >stack \ Replace `exec_fun` to prevent further chaining.
-  if_adr     >stack
-  if_fun     execute
-  else_adr   >stack
-  ' else_pop >stack
+  STACK s> { if_fun }
+  STACK s> { if_adr }
+  STACK stack_drop \ Drop `exec_fun`.
+
+  xt' nop      STACK >s \ Replace `exec_fun` to prevent further chaining.
+  if_adr       STACK >s
+  if_fun       execute
+  else_adr     STACK >s
+  xt' else_pop STACK >s
 ;
 
-\ TODO: use raw instruction addresses and `blr`
-\ instead of execution tokens and `execute`.
 :  end { fun }       fun          execute ;
 :: end ( C: fun -- ) comp_barrier pop_execute ;
+
+\ ## Pretend types
+\
+\ We don't have a real type system, but it can still be useful
+\ to use type names, which simply return sizes, similar to the
+\ existing practice of `cell`/`cells`. The pretend type `Cell`
+\ is defined earlier.
+
+\ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
+\
+\ "S" stands for "signed integer", "U" for "unsigned integer".
+\
+\ Note: when converting shorter negative numbers to our `Cell`,
+\ they must be sign-extended. See `int_to_cell` for `S32`.
+\
+\ When accessing memory, use the appropriately sized/typed memory operators.
+\ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
+\ Both are stored with `!32`. Aliases like `Cint` get their own "operators".
+\ See memory ops above.
+1 let: U8
+1 let: S8
+2 let: U16
+2 let: S16
+4 let: U32
+4 let: S32
+8 let: U64
+8 let: S64
+8 let: Adr
+8 let: Cstr \ char*
+4 let: Cint
+4 let: Cuint
+8 let: Clong
+8 let: Culong
+
+\ Defines a pretend "array type" which is just capacity. Usage:
+\
+\   U8 128    arr: Some_type
+\   Some_type mem: SOME_BUF
+\
+\ This should NOT be used for struct fields, because it loses alignment
+\ information. Misuse can violate the C struct ABI. Arrays only need to
+\ be aligned to element width. For example, an array of `U8` only needs
+\ to be aligned to 1 byte, meaning no padding after the previous field.
+: arr: { size len -- } ( C: "name" -- ) ( E: -- cap )
+  size len * execute' let:
+;
+
+\ ## Pretend struct types
+\
+\ Structs allow C interop. Fields are aligned and padded to match the C ABI.
+\
+\ The name of a struct "type" returns its size. The name of a "field"
+\ is a compile-time word which computes its offset from an address.
+\ To get an offset from zero, provide zero.
+\
+\ Basic usage:
+\
+\   struct: Type
+\     S32 1  field: Type_field0
+\     U8  32 field: Type_field1
+\   end
+\
+\   Type alloca { adr }
+\
+\       adr Type_field0 @
+\   123 adr Type_field0 !
+\
+\ Normally, a verb consumes all arguments; a field appears to have arity 1.
+\ But these fields are not exactly verbs; multiple fields can be accessed in
+\ one argument list. The load operator `@` behaves the same way, so they can
+\ be all used inside a longer argument list, exactly like verbs behave in
+\ stack-based programming:
+\
+\   adr Type_field0 @ \ arg0
+\   adr Type_field1 @ \ arg1
+\   some_verb
+\
+\ Note that load / store is type-specific. Fields which are't cell-sized
+\ must be loaded and stored using dedicated typed operators.
+
+\ Used internally.
+: struct_pop ( C: str len max_align off -- )
+  STACK s> { off }
+  STACK s> { max_align }
+  STACK s> { len }
+  STACK s> { str }
+
+  off max_align align_up { size }
+  str len size let_init
+  str free \ String was `strdup`'d.
+  [ false comp_only ]
+;
+
+\ Begins a definition; terminate with `end`.
+: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
+  parse_word   { str len }
+  str strdup   { str }
+  xt' struct_pop { fun }
+  str len 0 0 fun
+;
+
+\ Compile field access: compute offset from address.
+: struct_field_comp { off }
+  comp_args_get { len }
+  len ifn " struct field must be preceded by struct pointer" throw end
+
+  \ Offset is computed into the same register that held the address.
+  len dec { reg }
+  reg                     comp_clobber \ Disassociate locals from this reg.
+  reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
+;
+
+\ Every field takes two inputs: type size, like `U8`, and element count.
+\ This allows us to align fields to element size rather than total size.
+\
+\ A field becomes a word `( struct_adr -- field_adr )` which computes
+\ a field address from a struct address. Cell-sized fields are loaded
+\ and stored with `@ !`. Smaller fields require operators specific to
+\ their size and type. For example, signed 32-bit integers `S32` must
+\ be stored with `!32` and loaded with `@s32`, which sign-extends the
+\ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
+: field: { max_align off fun size len -- align off_next fun }
+  ( C: "name" -- )
+  ( E: struct_adr -- field_adr )
+
+  parse_word { name_buf name_len }
+
+  \ Since structs are intended for C interop, alignment
+  \ must match the C struct ABI of the target platform.
+  \ The ABI compatibility seems to hold in many cases,
+  \ but has NOT been thoroughly tested.
+  size Cell min            { field_align }
+  off field_align align_up { field_off }
+
+  \ Execution-time semantics.
+  name_buf name_len colon
+    1 1 comp_signature_set ( E: struct_adr -- field_adr )
+    1 comp_args_set
+    field_off comp_push
+    compile' +
+  semicolon
+
+  \ Compile-time semantics.
+  name_buf name_len colon_colon
+    field_off comp_push
+    compile' struct_field_comp
+  semicolon
+
+  size len * field_off + { next_off }
+  max_align size max     { max_align }
+  max_align next_off fun
+
+  [ false comp_only ]
+;
+
+\ ## More memory stuff
+
+\ Some `libc` procedures return -1 as 32-bit `0xffff_ffff` while some others,
+\ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
+\ the kernel. Since there's no way to know this generically, we must always
+\ sign-extend `int` before testing for -1.
+\
+\ Should NOT be used for addresses returned by the `mmap`.
+\ Its error sentinel is 64-bit -1. The returned address
+\ may accidentally have the `int32` sign bit set.
+: is_err { int -- bool } int int_to_cell -1 = ;
+
+6 1 extern: mmap     ( adr size pflag mflag fd off -- adr )
+2 1 extern: munmap   ( adr size )
+3 1 extern: mprotect ( adr size pflag -- err )
+
+16384 let: PAGE_SIZE \ TODO: ask the OS.
+0     let: PROT_NONE
+1     let: PROT_READ
+2     let: PROT_WRITE
+2     let: MAP_PRIVATE
+4096  let: MAP_ANON
+
+: mem_map { size pflag -- addr }
+  MAP_ANON MAP_PRIVATE or { mflag }
+  0 size pflag mflag -1 0 mmap { addr }
+  addr -1 = if " unable to mmap" throw end
+  addr
+;
+
+: mem_unmap { addr size }
+  addr size munmap
+  is_err if " unable to munmap" throw end
+;
+
+: mem_unprot { addr size }
+  PROT_READ PROT_WRITE or { pflag }
+  addr size pflag mprotect
+  is_err if " unable to mprotect" throw end
+;
+
+\ ## Stacks continued
+
+\ This definition is assumed by stack operations defined earlier.
+\ See the section `## Stacks` above.
+\
+\ SYNC[stack_field_offsets].
+struct: Stack
+  Cell 1 field: Stack_bytelen
+  Adr  1 field: Stack_cellar
+  Adr  1 field: Stack_floor
+  Adr  1 field: Stack_top
+  Adr  1 field: Stack_ceil
+end
+
+\ Initializes a stack with guards. Note: the memory is acquired from the OS
+\ and is NOT managed by the compiler. When used for global variables, their
+\ state is not preserved in AOT compilation.
+: stack_init { len stack }
+  len cells PAGE_SIZE align_up { size }
+  PAGE_SIZE 1 lsl size +       { bytelen } \ + space for 2 guards
+  bytelen PROT_NONE mem_map    { cellar }
+  cellar PAGE_SIZE +           { floor }
+  floor size +                 { ceil }
+  floor size mem_unprot
+
+  bytelen stack Stack_bytelen !
+  cellar  stack Stack_cellar  !
+  floor   stack Stack_floor   !
+  floor   stack Stack_top     !
+  ceil    stack Stack_ceil    !
+;
+
+: stack_deinit { stack }
+  stack ifn ret end
+
+  stack Stack_bytelen @ { bytelen }
+  stack Stack_cellar  @ { cellar }
+
+  cellar if cellar bytelen mem_unmap end
+
+  nil stack Stack_bytelen !
+  nil stack Stack_cellar  !
+  nil stack Stack_floor   !
+  nil stack Stack_top     !
+  nil stack Stack_ceil    !
+;
+
+: stack_repr { stack }
+  stack ifn " [debug] stack: nil" elog elf ret end
+
+  " [debug] stack           " elog stack                 debug_arg
+  " [debug] Stack_bytelen @ " elog stack Stack_bytelen @ debug_arg
+  " [debug] Stack_cellar  @ " elog stack Stack_cellar  @ debug_arg
+  " [debug] Stack_floor   @ " elog stack Stack_floor   @ debug_arg
+  " [debug] Stack_top     @ " elog stack Stack_top     @ debug_arg
+  " [debug] Stack_ceil    @ " elog stack Stack_ceil    @ debug_arg
+;
+
+\ For JIT use only. TODO: AOT compatibility.
+: stack: { len } ( C: "name" -- ) ( E: -- stack )
+  Stack malloc { adr }
+  len adr stack_init
+  adr execute' let:
+;
 
 \ ## Loops
 \
@@ -1507,149 +1785,162 @@ LF CRLF inc !8 \ \n
 \ with `end`. Each procedure pops its arguments and does something,
 \ then pops the next procedure in the chain. The cascade terminates
 \ when encountering a procedure which doesn't pop a preceding one.
+\
+\ In every counting loop with a named index, such as `+for: ind`,
+\ when the loop terminates normally, not with `leave` or `while`,
+\ the index local is still in scope, with an out-of-range value.
 
-\ Stack position of a special location in the top loop frame
-\ on the control stack. This is where auxiliary structures
-\ such as `leave` place their own control frames.
-0 var: LOOP_FRAME
+\ Control stack for auxiliary loop constructs like
+\ `leave` and `while` which push their frames here.
+1024 stack: LOOP_AUX
 
-: loop_frame! ( C: frame_ind -- ) stack> LOOP_FRAME ! ;
+\ Position of the topmost loop frame on the control stack.
+\ Each loop pushes at least the following frame:
+\
+\   prev_loop_ind loop_frame_pop loop_beg …extra… loop_pop
+\                                ^
+\                                LOOP_IND points here
+\
+\ `loop_beg` holds the instruction address of loop start.
+\ It's used to compile jump-to-start in `end` and `cont`.
+\ Many loops also push extra stuff before the "pop" word.
+\
+\ In stack signatures below, `prev_loop_ind loop_frame_pop`
+\ is often shortened to `<loop_prev>`.
+0 var: LOOP_IND
 
-: loop_frame_init ( C: -- frame_ind frame_fun )
-  LOOP_FRAME @  >stack
-  ' loop_frame! >stack
-  stack_len LOOP_FRAME !
+: loop_frame_adr { -- adr }
+  LOOP_IND @ { frame }
+  frame ifn " missing loop frame" throw end
+  frame STACK stack_at
 ;
 
-\ Used by auxiliary loop constructs such as "leave" and "while"
-\ to insert their control frame before a loop control frame.
-\ This allows to pop the control frames in the right order
-\ with a single "end" word.
-: loop_aux ( C: … <loop> … <aux> stack_len -- … <aux> <loop> … )
-  stack>    { stack_len_0 }
-  stack_len { stack_len_1 }
+: loop_frame_pop
+  ( LOOP_AUX: …aux…         -- )
+  ( C:        prev_loop_ind -- )
 
-  LOOP_FRAME @
-  ifn
-    " auxiliary loop constructs require an ancestor loop frame" throw
-  end
-
-  stack_len_1  stack_len_0 - { frame_len }
-  frame_len    cells         { frame_size }
-  stack_len_0  stack_at      { frame_sp_prev }
-  stack_len_1  stack_at      { frame_sp_temp }
-  LOOP_FRAME @ stack_at      { loop_sp_prev }
-  loop_sp_prev frame_size  + { loop_sp_next }
-
-  \ Need a backup copy of the frame we're moving,
-  \ because we're about to overwrite that data.
-  frame_len stack+
-  frame_sp_temp frame_sp_prev frame_size memmove
-
-  \ Move everything starting with the loop frame,
-  \ making space for the aux frame we're inserting.
-  frame_sp_temp loop_sp_next - { rest_size }
-  loop_sp_next loop_sp_prev rest_size memmove
-
-  \ The aux frame is now behind the moved loop frame.
-  loop_sp_prev frame_sp_temp frame_size memmove
-  frame_len stack-
-
-  \ Subsequent aux constructs will be inserted after the new frame.
-  LOOP_FRAME @ frame_len + LOOP_FRAME !
+  LOOP_AUX s> execute    \ Pop all auxiliaries until a terminating `nop`.
+  STACK    s> LOOP_IND !
 ;
 
-: loop_end ( C: adr -- )
-  comp_barrier                             \ Clobber / relocate locals.
-  stack> off_from_pc asm_branch comp_instr \ b <beg>
+: loop_frame_init
+  ( C:        -- <loop_prev> )
+  ( LOOP_AUX: -- nop )
+
+  \ Stash prev loop info; make this the topmost loop frame.
+  LOOP_IND @       STACK >s
+  xt' loop_frame_pop STACK >s
+  STACK stack_len LOOP_IND !
+
+  \ Terminator for `loop_frame_pop`.
+  xt' nop LOOP_AUX >s
 ;
 
-: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end pop_execute ;
+: loop_back { adr }
+  comp_barrier                          \ Clobber / relocate locals.
+  adr off_from_pc asm_branch comp_instr \ b <beg>
+;
 
-\ Implementation note. Each loop frame is "split" in two sub-frames:
-\ the "prev frame" and the "current frame". Auxiliary loop constructs
-\ such as "leave" and "while" insert their own frames in-between these
-\ subframes. See `loop_aux`.
-:: loop ( C: -- frame_ind frame_fun loop_adr loop_fun )
+\ Pops the "base" loop frame described in comment for `LOOP_IND`.
+\ Loops which push larger frames simply pop-off extra data first.
+: loop_base_pop
+  ( LOOP_AUX: …aux…                -- )
+  ( C:        <loop_prev> loop_beg -- )
+  STACK s> loop_back \ b <beg>
+  STACK s> execute   \ Run `loop_frame_pop`.
+;
+
+:: loop ( C: -- <loop_prev> loop_beg loop_pop )
   comp_barrier \ Clobber / relocate locals.
-  here { adr }
-  loop_frame_init adr >stack
-  ' loop_pop          >stack
+  loop_frame_init
+  here            STACK >s
+  xt' loop_base_pop STACK >s
 ;
+
+: leave_pop LOOP_AUX else_pop_from ;
 
 \ Breaks out of any loop.
-:: leave ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
+:: leave ( LOOP_AUX: -- leave_adr leave_pop )
   comp_barrier \ Clobber / relocate locals.
-  stack_len    { len }
-  reserve_here >stack
-  ' else_pop   >stack
-  len          >stack
-  loop_aux
+  reserve_here LOOP_AUX >s
+  xt' leave_pop  LOOP_AUX >s
 ;
 
+: while_pop LOOP_AUX if_pop_from ;
+
 \ Breaks out of any loop.
-:: while ( C: prev… <loop> …rest -- prev… while_adr while_fun <loop> …rest )
+:: while ( LOOP_AUX: -- while_adr while_pop )
   " when calling `while`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
-  stack_len    { len }
-  reserve_here >stack
-  ' if_pop     >stack
-  len          >stack
-  loop_aux
+  reserve_here LOOP_AUX >s
+  xt' while_pop  LOOP_AUX >s
 ;
 
-\ Goes back to loop start. Requires EVERY loop frame to begin with `loop_adr`:
-\ the address of the first instruction inside the loop.
-:: cont
-  LOOP_FRAME @ { frame }
-  frame ifn " `cont` requires an ancestor loop frame" throw end
-  frame stack_at @ >stack loop_end \ b <beg>
-;
+\ Goes back to loop start.
+:: cont loop_frame_adr @ loop_back ; \ b <beg>
 
-\ Assumes that the top control frame is from `loop`.
+\ Like regular Forth `until`, but usable with any loop.
+\ Alternative loop terminator; replaces `end`. Example:
+\
+\   loop false until
 :: until ( C: fun -- )
   " when calling `until`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   0 8 asm_cmp_branch_zero comp_instr \ cbnz x0, 8
-  stack> execute
+  pop_execute
 ;
 
-: count_loop_pop { cond } ( prev_fun …aux… loop_adr cond_adr -- )
-  stack> { adr }
-  loop_end \ b <beg>; clobber / relocate locals.
-  adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
-  pop_execute \ Pop auxiliaries; restore the previous loop frame.
+: loop_pop_with_cond
+  ( LOOP_AUX: …aux… -- )
+  ( C: <loop_prev> loop_beg cond_adr asm_cond -- )
+  STACK s> { asm_cond }
+  STACK s> { cond_adr }
+
+  \ `b <beg>` and other effects.
+  loop_base_pop
+
+  \ Retropatch `b.<cond> <end>`.
+  cond_adr off_to_pc asm_cond asm_branch_cond cond_adr !32
 ;
 
-: for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr cur_loc -- )
-  stack> { cur }
-  ASM_LE count_loop_pop  \ b <beg>; retropatch b.<cond> <end>
-  cur    comp_local_free \ Don't need a register for this local anymore.
+: loop_init_with_cond { loop_beg cond_adr asm_cond }
+  loop_beg             STACK >s
+  cond_adr             STACK >s
+  asm_cond             STACK >s
+  xt' loop_pop_with_cond STACK >s
 ;
 
-: for_countdown_loop_init
+: loop_init_countdown { loop_beg cond_adr }
+  loop_beg cond_adr ASM_LT loop_init_with_cond \ stop on <
+;
+
+: loop_init_countup { loop_beg cond_adr }
+  loop_beg cond_adr ASM_LE loop_init_with_cond \ stop on <=
+;
+
+: for_loop_countdown_init
   { cur }
-  ( C: cur_loc -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
+  ( C: -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil -- )
-  loop_frame_init ( -- frame_ind frame_fun )
+  ( LOOP_AUX: -- nop )
 
+  loop_frame_init
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { loop_adr }                \ Skip above instr when repeating.
+  here { loop_beg }                \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
-  0 asm_cmp_zero    comp_instr     \ cmp x0, 0
-  here { cond_adr } reserve_instr  \ b.<cond> <end>
   0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+  comp_barrier                     \ Tell compiler to commit "local set".
+  0 asm_cmp_zero    comp_instr     \ cmp x0, 0
+  here { cond_adr } reserve_instr  \ b.lt <end>
 
-  loop_adr                 >stack
-  cond_adr                 >stack
-  cur                      >stack
-  ' for_countdown_loop_pop >stack
+  loop_beg cond_adr loop_init_countdown
 ;
 
-\ A count-down-by-one loop. Analogue of the non-standard
-\ `for … next` loop. Usage; ceiling must be positive:
+\ A count-down-by-one loop with the range `[0,ceil)`.
+\ Analogue of the non-standard `for … next` loop.
+\ Usage; ceiling must be positive:
 \
 \   123
 \   for
@@ -1661,10 +1952,11 @@ LF CRLF inc !8 \ \n
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
 :: for
-  ( C: -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
+  ( C: -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil -- )
+  ( LOOP_AUX: -- nop )
   " when calling `for`" 1 comp_args_valid 0 comp_args_set
-  comp_anon_local for_countdown_loop_init
+  comp_anon_local for_loop_countdown_init
 ;
 
 \ Like `for` but requires a local name to make the index
@@ -1675,120 +1967,47 @@ LF CRLF inc !8 \ \n
 \     ind .
 \   end
 :: -for:
-  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr cur_loc loop_fun )
+  ( C: "name" -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil -- )
-  " when calling `+for:`" 1 comp_args_valid 0 comp_args_set
-  parse_word comp_named_local for_countdown_loop_init
+  ( LOOP_AUX: -- nop )
+  " when calling `-for:`" 1 comp_args_valid 0 comp_args_set
+  parse_word comp_named_local for_loop_countdown_init
 ;
 
-: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur -- )
-  stack> stack> { cur lim }
-
-  0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
-  1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
-  1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
-  ASM_LE count_loop_pop            \ b <beg>; retropatch b.<cond> <end>
-
-  lim comp_local_free \ Don't need a register for this local anymore.
-;
-
+\ Count-up loop with the range `[floor,ceil)`. Usage:
+\
+\   ceil floor +for: ind       end
+\   123  45    +for: ind ind . end
 :: +for:
-  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_lim loc_cur loop_fun )
+  ( C: "name" -- <loop_prev> loop_beg cond_adr asm_cond loc_cur loop_pop )
   ( E: ceil floor -- )
   " when calling `+for:`" 2 comp_args_valid 0 comp_args_set
 
-  loop_frame_init             ( -- frame_ind frame_fun )
-  comp_anon_local             { lim } \ ceil  = limit
-  parse_word comp_named_local { cur } \ floor = cursor
-
-  0 lim             comp_local_set \ mov <lim>, x0 | str x0, [FP, <lim>]
-  comp_barrier                     \ Clobber / relocate locals.
-  here { loop_adr }                \ Skip above instr when repeating.
-  1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
-  comp_barrier                     \ Tell lazy-ass compiler to commit local set.
-  0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
-  here { cond_adr } reserve_instr  \ b.<cond> <end>
-
-  loop_adr               >stack
-  cond_adr               >stack
-  lim                    >stack
-  cur                    >stack
-  ' for_countup_loop_pop >stack
-;
-
-: loop_countup_pop
-  ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur loc_step )
-  stack> stack> stack> { step cur lim }
-
-  0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
-  1 cur             comp_local_get \ mov x1, <cur>  | ldr x1, [FP, <cur>]
-  2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
-  1 1 2 asm_add_reg comp_instr     \ add x1, x1, x2
-  ASM_LE count_loop_pop            \ b <beg>; retropatch b.<cond> <end>
-
-  \ Don't need registers for these locals anymore.
-  lim  comp_local_free
-  step comp_local_free
-;
-
-\ Similar to the standard `?do ... +loop`, but terminated with an `end`
-\ like other loops. Takes a name to make the index accessible. Usage:
-\
-\   ceil floor step
-\   +loop: ind \ Declare the index.
-\     ind .    \ Print the index.
-\   end
-\
-\   123 23 3 +loop: ind ind . end
-\
-\ When the loop ends, the index local is still in scope,
-\ holding a value which is out of range. For example, if
-\ `ceil floor step` is `7 3 2`, the loop iterates twice,
-\ with indexes `3` and `5`, and the index outside is `8`.
-:: +loop:
-  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
-  ( E: ceil floor step -- )
-  " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
   loop_frame_init
-
   comp_anon_local             { lim } \ ceil  = limit
   parse_word comp_named_local { cur } \ floor = cursor
-  comp_anon_local             { step }
 
-  0 lim             comp_local_set \ mov <lim>,  x0 | str x0, [FP, <lim>]
-  2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
+  0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
+  1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { loop_adr }                \ Skip above instrs when repeating.
-  1 cur             comp_local_set \ mov <cur>,  x1 | str x1, [FP, <cur>]
-  comp_barrier                     \ Tell lazy-ass compiler to commit local set.
+  20 asm_branch     comp_instr     \ b <cmp>
+  here { loop_beg }                \ `end` jumps here.
+  0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
+  1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
+  1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
+  1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
+  comp_barrier                     \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
-  here { cond_adr } reserve_instr  \ b.<cond> <end>
+  here { cond_adr } reserve_instr  \ b.le <end>
 
-  loop_adr           >stack
-  cond_adr           >stack
-  lim                >stack
-  cur                >stack
-  step               >stack
-  ' loop_countup_pop >stack
+  loop_beg cond_adr loop_init_countup
 ;
 
-: loop_countdown_pop
-  ( prev_fun …aux… loop_adr cond_adr loc_lim loc_cur loc_step )
-  stack> stack> stack> { step cur lim }
-  ASM_LT count_loop_pop \ b <beg>; retropatch b.<cond> <end>
-
-  \ Don't need registers for these locals anymore.
-  lim  comp_local_free
-  step comp_local_free
-;
-
-\ Like in `+loop:`, the range is `[floor,ceil)`.
-\
-\ Unlike in `+loop:`, when this loop ends, the index local
-\ is NOT guaranteed to hold an out-of-range value.
+\ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
 :: -loop:
-  ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
+  ( C: "name" -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil floor step -- )
+  ( LOOP_AUX: -- nop )
   " when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
   loop_frame_init
 
@@ -1800,21 +2019,54 @@ LF CRLF inc !8 \ \n
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { loop_adr }                \ Skip above instrs when repeating.
+  here { loop_beg }                \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
   1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
   0 0 2 asm_sub_reg comp_instr     \ sub x0, x0, x2
-  0 1   asm_cmp_reg comp_instr     \ cmp x0, x1
-  here { cond_adr } reserve_instr  \ b.<cond> <end>
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
+  comp_barrier                     \ Tell compiler to commit "local set".
+  0 1   asm_cmp_reg comp_instr     \ cmp <cur>, <lim>
+  here { cond_adr } reserve_instr  \ b.lt <end>
 
-  loop_adr             >stack
-  cond_adr             >stack
-  lim                  >stack
-  cur                  >stack
-  step                 >stack
-  ' loop_countdown_pop >stack
+  loop_beg cond_adr loop_init_countdown
+;
+
+\ Similar to the standard `?do ... +loop`, but terminated with an `end`
+\ like all our loops. Takes a name to make the index accessible. Usage:
+\
+\   ceil floor step +loop: ind       end
+\   123  23    3    +loop: ind ind . end
+\
+\ When the loop ends, the index local is still in scope,
+\ holding a value which is out of range. For example, if
+\ `ceil floor step` is `7 3 2`, the loop iterates twice,
+\ with indexes `3` and `5`, and the index outside is `8`.
+:: +loop:
+  ( C: "name" -- <loop_prev> loop_beg cond_adr loc_cur loc_step loop_pop )
+  ( E: ceil floor step -- )
+  " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
+  loop_frame_init
+
+  comp_anon_local             { lim } \ ceil  = limit
+  parse_word comp_named_local { cur } \ floor = cursor
+  comp_anon_local             { step }
+
+  0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
+  1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
+  2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
+  comp_barrier                     \ Clobber / relocate locals.
+  24 asm_branch     comp_instr     \ b <cmp>
+  here { loop_beg }                \ `end` jumps here.
+  0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
+  1 cur             comp_local_get \ mov x1, <cur>  | ldr x1, [FP, <cur>]
+  2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
+  1 1 2 asm_add_reg comp_instr     \ add x1, x1, x2
+  1 cur             comp_local_set \ mov <cur>, x1  | str x1, [FP, <cur>]
+  comp_barrier                     \ Tell compiler to commit "local set".
+  0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
+  here { cond_adr } reserve_instr  \ b.le <end>
+  loop_beg cond_adr loop_init_countup
 ;
 
 \ ## String comparison continued
@@ -1865,21 +2117,21 @@ LF CRLF inc !8 \ \n
 \ Sets up variadic arguments following the C ABI. Usage example:
 \
 \   : some_word
-\     10 20 30 va{ " numbers: %zd %zd %zd" printf }va lf
+\     10 20 30 vargs{ " numbers: %zd %zd %zd" printf }vargs lf
 \   ;
 \
 \ Caution: varargs can only be used in direct calls to variadic procedures.
 \ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
-:: va{ ( C: -- len ) ( E: <systack_push> )
+:: vargs{ ( C: -- len ) ( E: <systack_push> )
   comp_args_get { len }
   0             { off }
   len off comp_va_beg
-  len >stack
+  len STACK >s
   off comp_args_set
 ;
 
-\ Restores the SP after a variadic call. See `va{`.
-:: }va ( C: len -- ) ( E: <systack_pop> ) stack> comp_va_end ;
+\ Restores the SP after a variadic call. See `vargs{`.
+:: }vargs ( C: len -- ) ( E: <systack_pop> ) STACK s> comp_va_end ;
 
 \ The given offset is how many non-vargs precede the vargs.
 \ The given function must take exactly that many non-vargs,
@@ -1893,14 +2145,15 @@ LF CRLF inc !8 \ \n
   len off - comp_va_end
 ;
 
-:: logf  ( E: fmt …vargs… -- ) ' printf  1 comp_varcall ;
-:: elogf ( E: fmt …vargs… -- ) ' eprintf 1 comp_varcall ;
+:: logf  ( E: fmt …vargs… -- ) xt' printf  1 comp_varcall ;
+
+:: elogf ( E: fmt …vargs… -- ) xt' eprintf 1 comp_varcall ;
 
 \ Formats into a given string buffer. Returns the same buffer address.
 \ String is null-terminated. Usage:
 \
 \   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] strf
-:: strf ( E: buf cap fmt …vargs… -- buf ) ' snprintf 3 comp_varcall ;
+:: strf ( E: buf cap fmt …vargs… -- buf ) xt' snprintf 3 comp_varcall ;
 
 \ ## Exceptions
 \
@@ -1959,7 +2212,7 @@ ERR_CAP mem: ERR_BUF_1
   execute''  ERR_BUF_0              \ mov x0, <buf>
   execute''  ERR_CAP                \ mov x1, <cap>
   3          comp_args_set          \ Assume x2 is useful.
-  ' snprintf comp_call              \ blr <fun>
+  xt' snprintf comp_call              \ blr <fun>
   0          comp_args_set          \ Ignore output length.
   len off -  comp_va_end            \ Restore SP.
   execute''  ERR_BUF_0              \ mov x0, <buf>
@@ -2002,10 +2255,14 @@ ERR_CAP mem: ERR_BUF_1
   compile' wrapf_args
 
   0 buf_loc  comp_local_set \ str x0, [x29, <buf>]
-  ' snprintf comp_call      \ blr <fun>
+  xt' snprintf comp_call      \ blr <fun>
   len off -  comp_va_end    \ Restore SP.
   0 buf_loc  comp_local_get \ ldr x0, [x29, <buf>]
 ;
+
+\ ## OS error stuff
+\
+\ Also see `./errno.af`.
 
 0 1 extern: __error
 1 1 extern: strerror
@@ -2021,17 +2278,8 @@ ERR_CAP mem: ERR_BUF_1
 \ but that would make this system even less portable than it already is.
 : errno { -- code } __error @s32 ;
 
-\ Some `libc` procedures return -1 as 32-bit `0xffff_ffff` while some others,
-\ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
-\ the kernel. Since there's no way to know this generically, we must always
-\ sign-extend `int` before testing for -1.
-\
-\ Should NOT be used for addresses returned by the `mmap` family.
-\ Their error sentinel is actual 64-bit -1. Addresses they return
-\ may accidentally have the `int32` sign bit set.
-: is_err { int -- bool } int int_to_cell -1 = ;
-
 \ `code` comes from from `errno`, `ferror`, Posix procedures, etc.
+\ See `is_err` earlier in this file, for detecting -1 error codes.
 : os_err { code ctx -- err }
   code strerror { msg }
   msg if
@@ -2054,28 +2302,64 @@ ERR_CAP mem: ERR_BUF_1
 \ return an `errno` code on failure and zero on success.
 : posix_try { code ctx } code if code ctx os_err throw end ;
 
-\ ## Stack manipulation — continued
+\ ## Stack manipulation continued
 
-\ Variadic alternative to `>stack`.
-:: >>stack ( E: …args… -- )
-  ASM_REG_SCRATCH { top }
+\ ldur <top>, [<stk>, STACK_OFF_TOP]
+\ ...
+\   str  <arg>, [<top>], 8
+\   str  <arg>, [<top>], 8
+\   str  <arg>, [<top>], 8
+\ ...
+\ stur <top>, [<stk>, STACK_OFF_TOP]
+\
+\ Should usually be followed with `0 comp_args_set`.
+: comp_args_to_stack { len stk_reg top_reg } ( E: …args… -- )
+  len ifn ret end
 
-  top                comp_clobber
-  top asm_stack_load comp_instr
+  top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
-  comp_args_get 0 +for: arg
-    arg top 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
+  comp_args_get 0 +for: arg_reg
+    arg_reg top_reg 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
   end
 
-  top asm_stack_store comp_instr
+  top_reg stk_reg asm_stack_top_store comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
+;
+
+\ Variadic alternative to `>s`:
+\
+\   10 20 30 some_stack >>s
+\
+\ TODO drop: too error-prone.
+:: >>s ( E: …args… stack -- )
+  comp_args_get { len }
+
+  len ifn
+    " unable to use `>>s`: at least 1 argument is required (stack address)"
+    throw
+  end
+
+  len dec { len }
+  len comp_args_set
+  len ifn ret end
+
+  len              { stk_reg }
+  ASM_REG_SCRATCH  { top_reg }
+  len stk_reg top_reg comp_args_to_stack
   0 comp_args_set
 ;
 
 \ Variadic assignment of locals from the stack:
 \
-\   10 20 30 >>stack
-\   stack{ ten twenty thirty }
-:: stack{ ( E: …args… -- )
+\   10 20 30 some_stack >>s
+\   some_stack stack{ ten twenty thirty }
+:: stack{ ( E: stack -- )
+  comp_args_get { len }
+
+  len 1 <> if
+    " unable to use `stack{`: exactly one argument is required (stack address)"
+    throw
+  end
+
   0 { locs }
 
   loop
@@ -2087,57 +2371,40 @@ ERR_CAP mem: ERR_BUF_1
       " unsupported `--` in `stack{`" throw
     end
 
-    str len comp_named_local >stack
+    str len comp_named_local STACK >s
     locs inc { locs }
   end
 
+  0 comp_args_set
   locs ifn ret end
 
-  0 { arg_reg } \ x0
-  1 { top_reg } \ x1
+  0 { stk_reg }
+  1 { top_reg }
+  2 { val_reg }
 
-  arg_reg comp_clobber
   top_reg comp_clobber
-  top_reg asm_stack_load comp_instr
+  val_reg comp_clobber
+
+  top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
   locs for
-    stack> { loc }
-    arg_reg top_reg -8 asm_load_pre comp_instr     \ ldr x0, [x1, -8]!
-    arg_reg loc                     comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
-    arg_reg comp_clobber
+    STACK s> { loc }
+    val_reg top_reg -8 asm_load_pre comp_instr     \ ldr <val>, [<top>, -8]!
+    val_reg loc                     comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
+    val_reg comp_clobber
   end
 
-  top_reg asm_stack_store comp_instr
-;
-
-\ ldur <stack>, [x28, INTERP_INTS_TOP]
-\ ...
-\ str  <arg>,   [<stack>], 8
-\ ...
-\ stur <stack>, [x28, INTERP_INTS_TOP]
-: comp_args_to_stack { len }
-  len ifn ret end
-  comp_scratch_reg { stack }
-
-  \ ldur <stack>
-  stack ASM_REG_INTERP INTERP_INTS_TOP asm_load_unscaled_off comp_instr
-
-  len 0 +for: arg
-    arg stack 8 asm_store_post comp_instr \ str <arg>, [<stack>], 8
-  end
-
-  \ stur <stack>
-  stack ASM_REG_INTERP INTERP_INTS_TOP asm_store_unscaled_off comp_instr
+  top_reg stk_reg asm_stack_top_store comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
 ;
 
 \ ## Stack printing
 
-: log_int      { num } " %zd" num logf ;
-: log_cell     { num } " %zd 0x%zx" num num logf ;
-: .            { num } num log_cell lf ;
+: log_int  { num } " %zd" num logf ;
+: log_cell { num } " %zd 0x%zx" num num logf ;
+: .        { num } num log_cell lf ;
 
-: .s
-  stack_len { len }
+: stack_log { stack }
+  stack stack_len { len }
 
   len ifn
     " stack is empty" log lf
@@ -2153,233 +2420,134 @@ ERR_CAP mem: ERR_BUF_1
 
   len 0 +for: ind
     space space
-    ind stack_at @ log_cell
+    ind stack stack_at @ log_cell
     " <%zd>" ind logf
     lf
   end
 ;
 
-: .sc .s stack_clear ;
+: .s STACK stack_log ;
+: .sc .s STACK stack_clear ;
 
-\ ## More memory stuff
+\ ## Interpreter internals
+\
+\ Internal stuff not exposed via intrinsics.
 
-6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
-3 1 extern: mprotect ( adr len pflag -- err )
+\ SYNC[word_str].
+struct: Sym_word
+  U32 1   field: Sym_word_len
+  U8  128 field: Sym_word_buf
+end
 
-16384 let: PAGE_SIZE \ TODO: ask the OS.
-0     let: PROT_NONE
-1     let: PROT_READ
-2     let: PROT_WRITE
-2     let: MAP_PRIVATE
-4096  let: MAP_ANON
+\ Word metadata defined internally by the interpreter.
+\ Also execution token returned by `xt'` and `xt''`.
+\ Caution: this struct definition is incomplete.
+\
+\ SYNC[sym_fields].
+struct: Sym
+  Cint     1 field: Sym_type
+  Sym_word 1 field: Sym_name
+  U8       1 field: Sym_wordlist
+  Adr      1 field: Sym_instr \ Executable address.
 
-: mem_map_err
-  errno        { err }
-  err strerror { str }
-  " unable to map memory; code: %zd; message: %s" err str errf throw
+  \ ... Other fields elided until we need them.
+end
+
+\ For internal use below.
+: comp_word_instr { wordlist } ( C: "name" -- ) ( E: -- instr )
+  wordlist next_word comp_push
+  execute'' Sym_instr
+  execute'' @
 ;
 
-: mem_map { size pflag -- addr }
-  MAP_ANON MAP_PRIVATE or { mflag }
-  0 size pflag mflag -1 0 mmap { addr }
-  addr -1 = if mem_map_err end
-  addr
+\ Similar to the ticks `'` and `''`, but instead of returning an execution
+\ token which is `Sym *`, this returns the address of the first executable
+\ instruction of the next word.
+\
+\ Intended for callbacks passed to foreign callers
+\ such as `pthread_create` or `qsort`.
+\
+\ Note: callbacks passed to foreign callers should use `[ true catches ]`
+\ to reveal all exceptions as error values (and handle them). Otherwise,
+\ if a callback prematurely terminates via exception, the error will be
+\ silently ignored by the foreign caller.
+:: instr'  ( C: "name" -- ) ( E: -- instr ) WORDLIST_EXEC comp_word_instr ;
+:: instr'' ( C: "name" -- ) ( E: -- instr ) WORDLIST_COMP comp_word_instr ;
+
+Cell let: Interp_bitset
+
+\ SYNC[hash_table_structure].
+struct: Interp_dict
+  U32 1 field: Interp_dict_len
+  U32 1 field: Interp_dict_cap
+  Adr 1 field: Interp_dict_bits \ Interp_bitset*
+  Adr 1 field: Interp_dict_keys \ char**
+  Adr 1 field: Interp_dict_vals \ Sym**
+end
+
+\ SYNC[interp_dict_offsets].
+\
+\ Caution: this struct definition is incomplete.
+struct: Interp
+  Stack       1 field: Interp_ints
+  Interp_dict 1 field: Interp_dict_exec
+  Interp_dict 1 field: Interp_dict_comp
+
+  \ ... Other fields elided until we need them.
+end
+
+: interp { -- adr } [
+  true interp_only
+  0 ASM_REG_INTERP asm_mov_reg comp_instr
+  0 comp_clobber
+  1 comp_args_set
+] ;
+
+: wordlist_log { dict list_num list_name }
+  dict Interp_dict_len @u32 { len }
+
+  len ifn
+    " %s: empty" list_name logf lf
+    ret
+  end
+
+  " %s (%zd):" list_name len logf
+
+  dict Interp_dict_cap  @u32 { cap }
+  dict Interp_dict_keys @    { keys }
+  dict Interp_dict_bits @    { bitsets }
+  Interp_bitset 8 *          { bitset_size }
+
+  \ See C `dict_has` (with some indirections):
+  \
+  \   bits[ind / HASH_TABLE_BITS_CAP] & ((Uint)1 << (ind % HASH_TABLE_BITS_CAP))
+  cap 0 +for: ind
+    ind bitset_size / cells { bitset_off }
+    bitsets bitset_off + @  { bitset }
+    ind bitset_size mod     { bit_ind }
+    1 bit_ind lsl           { bit_mask }
+    bitset bit_mask and     { live }
+
+    live ifn cont end
+
+    ind cells { off }
+    keys off + @ { key }
+    space key log
+  end
+
+  lf
 ;
 
-: mem_unprot_err
-  errno        { err }
-  err strerror { str }
-  " unable to unprotect memory; code: %zd; message: %s" err str errf throw
-;
-
-: mem_unprot { addr size }
-  PROT_READ PROT_WRITE or { pflag }
-  addr size pflag mprotect
-  -1 = if " unable to mprotect" throw end
-;
-
-\ Allocates a guarded buffer: `guard|data|guard`.
-\ Attempting to read or write inside the guards,
-\ aka underflow or overflow, triggers a segfault.
-\ The given size is rounded up to the page size.
-: mem_alloc { size1 -- addr size2 }
-  size1 PAGE_SIZE align_up { size2 }
-  PAGE_SIZE 1 lsl size2 +  { size }
-  size PROT_NONE mem_map   { addr }
-  addr PAGE_SIZE +         { addr }
-  addr size2 mem_unprot
-  addr size2
-;
-
-\ Allocates space for N cells with lower and upper guards. Underflowing and
-\ overflowing into the guards triggers a segfault. The size gets page-aligned,
-\ usually leaving additional unguarded readable and writable space between the
-\ requested region and the upper guard. The lower guard is immediately below
-\ the returned address and immediately prevents underflows.
-\
-\ TODO consider compiling with lazy-init; dig up the old code.
-: cells_guard: { len } ( C: "name" -- ) ( E: -- adr )
-  parse_word          { name name_len }
-  len cells mem_alloc { adr -- }
-  name name_len adr init_data_word
-  [ false comp_only ]
-;
-
-\ ## Pretend types
-\
-\ We don't have a real type system, but it can still be useful
-\ to use type names, which simply return sizes, similar to the
-\ existing practice of `cell`/`cells`. The pretend type `Cell`
-\ is defined earlier.
-
-\ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
-\
-\ "S" stands for "signed integer", "U" for "unsigned integer".
-\
-\ Note: when converting shorter negative numbers to our `Cell`,
-\ they must be sign-extended. See `int_to_cell` for `S32`.
-\
-\ When accessing memory, use the appropriately sized and typed memory operators.
-\ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
-\ Both are stored with `!32`. For `Cint` and so on, we define appropriate
-\ aliases. See memory ops above.
-1 let: U8
-1 let: S8
-2 let: U16
-2 let: S16
-4 let: U32
-4 let: S32
-8 let: U64
-8 let: S64
-8 let: Adr
-8 let: Cstr \ char*
-4 let: Cint
-4 let: Cuint
-8 let: Clong
-8 let: Culong
-
-\ Defines a pretend "array type" which is really just capacity. Usage:
-\
-\   U8 128    arr: Some_type
-\   Some_type mem: SOME_BUF
-\
-\ This should NOT be used for struct fields, because it loses alignment
-\ information. Misuse can violate the C struct ABI. Arrays only need to
-\ be aligned to element width. For example, an array of `U8` only needs
-\ to be aligned to 1 byte, meaning no padding after the previous field.
-: arr: { size len -- } ( C: "name" -- ) ( E: -- cap )
-  size len * execute' let:
-;
-
-\ ## Pretend struct types
-\
-\ Structs allow C interop. Fields are aligned and padded to match the C ABI.
-\
-\ The name of a struct "type" returns its size. The name of a "field"
-\ is a compile-time word which computes its offset from an address.
-\ To get an offset from zero, provide zero.
-\
-\ Basic usage:
-\
-\   struct: Type
-\     S32 1  field: Type_field0
-\     U8  32 field: Type_field1
-\   end
-\
-\   Type alloca { adr }
-\
-\       adr Type_field0 @
-\   123 adr Type_field0 !
-\
-\ Normally, a verb consumes all arguments; a field appears to have arity 1.
-\ But these fields are not exactly verbs; multiple fields can be accessed in
-\ one argument list. The load operator `@` behaves the same way, so they can
-\ be all used inside a longer argument list, exactly like verbs behave in
-\ stack-based programming:
-\
-\   adr Type_field0 @ \ arg0
-\   adr Type_field1 @ \ arg1
-\   some_verb
-\
-\ Note that load / store is typed. Fields which are't cell-sized
-\ must be loaded and stored using dedicated typed operators.
-
-\ Used internally.
-: struct_pop ( C: str len align off -- )
-  stack{ str len align off }
-  off align align_up { size }
-  str len size let_init
-  str free \ String was `strdup`'d.
-  [ false comp_only ]
-;
-
-\ Begins a definition; terminate with `end`.
-: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
-  parse_word   { str len }
-  str strdup   { str }
-  ' struct_pop { fun }
-  str len 0 0 fun
-;
-
-\ Compile field access: compute offset from address.
-: struct_field_comp { off }
-  comp_args_get { len }
-  len ifn " struct field must be preceded by struct pointer" throw end
-
-  \ Offset is computed into the same register that held the address.
-  len dec { reg }
-  reg                     comp_clobber \ Disassociate locals from this reg.
-  reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
-;
-
-\ Every field requires both type width and array length.
-\ Most fields have length 1, but any length can be used.
-\ This allows us to align fields to element size, rather
-\ than total size.
-\
-\ A field becomes a word `( struct_adr -- field_adr )` which computes
-\ a field address from a struct address. Cell-sized fields are loaded
-\ and stored with `@ !`. Smaller fields require operators specific to
-\ their size and type. For example, signed 32-bit integers `S32` must
-\ be stored with `!32` and loaded with `@s32`, which sign-extends the
-\ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
-: field: { align off fun size len -- align off_next fun }
-  ( C: "name" -- )
-  ( E: struct_adr -- field_adr )
-
-  \ Since structs are intended for C interop, alignment
-  \ must match the C struct ABI of the target platform.
-  \ The ABI compatibility seems to hold in many cases,
-  \ but has NOT been thoroughly tested.
-  off size align_up { field_off }
-  parse_word        { name_buf name_len }
-
-  \ Execution-time semantics.
-  name_buf name_len colon
-    1 1 comp_signature_set ( E: struct_adr -- field_adr )
-    1 comp_args_set
-    field_off comp_push
-    compile' +
-  semicolon
-
-  \ Compile-time semantics.
-  name_buf name_len colon_colon
-    field_off comp_push
-    compile' struct_field_comp
-  semicolon
-
-  size len * field_off + { next_off }
-  align size max         { align }
-  align next_off fun
-
-  [ false comp_only ]
+\ "words" is magically recommended by compiler in REPL.
+: words
+  interp Interp_dict_exec WORDLIST_EXEC " WORDLIST_EXEC" wordlist_log
+  interp Interp_dict_comp WORDLIST_COMP " WORDLIST_COMP" wordlist_log
 ;
 
 \ ## Misc
 
-: execute_raw { fun } [
-  0 asm_branch_link_reg comp_instr \ blr x0
-] ;
+\ blr x0
+: execute_raw { fun } [ 0 asm_branch_link_reg comp_instr ] ;
 
 \ Takes any amount of args, where the last arg is assumed to be a raw
 \ instruction address (procedure pointer). Invokes that procedure with
@@ -2391,7 +2559,7 @@ ERR_CAP mem: ERR_BUF_1
 \ link register of the caller's caller.
 \
 \ TODO: verify that clobbering works properly.
-:: execute_raw ( C: …args fun -- ) ( E: …args fun -- )
+:: execute_raw ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_args_get { len }
 
   len ifn
@@ -2419,5 +2587,5 @@ ERR_CAP mem: ERR_BUF_1
 ;
 
 \ Increment or decrement a local. Usage: `++: some_val`.
-:: ++: ( C: "name" -- ) ( E: -- ) ' inc " ++" comp_loc_mut ;
-:: --: ( C: "name" -- ) ( E: -- ) ' dec " --" comp_loc_mut ;
+:: ++: ( C: "name" -- ) ( E: -- ) xt' inc " ++" comp_loc_mut ;
+:: --: ( C: "name" -- ) ( E: -- ) xt' dec " --" comp_loc_mut ;

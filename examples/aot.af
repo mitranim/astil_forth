@@ -35,7 +35,7 @@ main
 \ In the Forth REPL:
 \
 \   : main { -- exit } " hello world!" log lf 0 ;
-\   ' main " out.exe" compile_executable
+\   xt' main " out.exe" compile_executable
 \   \ Then hit Ctrl+D (not Ctrl+C) to exit.
 \
 \ In your shell:
@@ -58,10 +58,10 @@ main
 \ Forth:
 \
 \   : main { -- exit } " hello world! (first)" log lf 0 ;
-\   ' main " out0.exe" compile_executable
+\   xt' main " out0.exe" compile_executable
 \   : main { -- exit } " hello world! (second)" log lf 0 ;
 \   \ [system] redefined word `main` in wordlist 1
-\   ' main " out1.exe" compile_executable
+\   xt' main " out1.exe" compile_executable
 \   \ Hit Ctrl+D to exit.
 \
 \ Shell:

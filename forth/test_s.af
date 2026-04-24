@@ -517,7 +517,7 @@ T{ " one" strdup " one" cstr< <T> false }T
 
 : test_vargs_printf
   " numbers (should be 10 20 30): %zd %zd %zd"
-  10 20 30 [ 3 ] va{ printf }va lf
+  10 20 30 [ 3 ] vargs{ printf }vargs lf
 ;
 \ test_vargs_printf
 

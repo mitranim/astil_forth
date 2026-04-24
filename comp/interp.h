@@ -22,14 +22,15 @@ via a dedicated register, and hardcodes the field offsets which
 must be kept in sync.
 
 SYNC[interp_stack_offset].
+SYNC[interp_dict_offsets].
 SYNC[stack_field_offsets].
 */
 typedef struct {
   Sint_stack  ints;      // Forth integer stack.
-  Reader     *reader;    // Each input file has its own parser state.
-  Sym_stack   syms;      // Defined symbols.
   Sym_dict    dict_exec; // Wordlist `WORDLIST_EXEC`.
   Sym_dict    dict_comp; // Wordlist `WORDLIST_COMP`.
+  Sym_stack   syms;      // Defined symbols.
+  Reader     *reader;    // Each input file has its own parser state.
   Str_set     imports;   // Realpaths of already-imported files.
   Comp        comp;      // Code and compilation context.
   Interp_snap snap;      // Stable snapshot for rewinding.

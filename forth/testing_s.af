@@ -73,6 +73,6 @@ import' ./lang_s.af
   ok if true catches end
 ;
 
-:: T{  ' T{  T_compile_without_catch ;
-:: <T> ' <T> T_compile_without_catch ;
-:: }T  ' }T  T_compile_without_catch ;
+:: T{  xt' T{  T_compile_without_catch ;
+:: <T> xt' <T> T_compile_without_catch ;
+:: }T  xt' }T  T_compile_without_catch ;

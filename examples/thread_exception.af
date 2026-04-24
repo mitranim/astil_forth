@@ -1,7 +1,6 @@
 import' std:lang.af
 import' std:io.af
 import' std:pthread.af
-import' std:internals.af
 
 \ Passed to `pthread_spawn` by raw instruction address.
 \ There are no hidden adapters between Forth and libc.

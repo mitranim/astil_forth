@@ -19,6 +19,150 @@ T{ 10 20 <T> 10 20 }T
 ;
 test_test
 
+: test_locals
+  T{          { }                                     <T>          }T
+  T{          { -- }                                  <T>          }T
+  T{ 10       { }                                     <T> 10       }T
+  T{ 10 20    { }                                     <T> 10 20    }T
+  T{ 10       { }                  20                 <T> 10 20    }T
+  T{          { }                  10 20              <T> 10 20    }T
+  T{ 10       { -- }                                  <T>          }T
+  T{ 10 20    { -- }                                  <T>          }T
+  T{ 10       { one }                                 <T>          }T
+  T{ 20       { one }              one                <T> 20       }T
+  T{ 30       { one }              one one            <T> 30 30    }T
+  T{ 40       { one -- }           one one            <T> 40 40    }T
+  T{ 10       { -- one }                              <T>          }T
+  T{ 10 20    { one two }          one two            <T> 10 20    }T
+  T{ 10 20    { one two }                             <T>          }T
+  T{ 10 20    { one two -- }                          <T>          }T
+  T{ 30 40    { one two }          one                <T> 30       }T
+  T{ 50 60    { one two -- }       one                <T> 50       }T
+  T{ 10 20    { one two }          two                <T> 20       }T
+  T{ 30 40    { one two }          one two            <T> 30 40    }T
+  T{ 50 60    { one two }          two one            <T> 60 50    }T
+  T{ 10 20    { one two }          two one one        <T> 20 10 10 }T
+  T{ 30 40    { one two }          two one two        <T> 40 30 40 }T
+  T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
+  T{ 30 40    { one two }          one one two        <T> 30 30 40 }T
+  T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
+  T{ 30 40    { one --     }       one one            <T> 30 30    }T
+  T{ 30 40    { one -- two }       one one            <T> 30 30    }T
+  T{ 10 20    { one --     }       one one            <T> 10 10    }T
+  T{ 10 20    { one -- two }       one one            <T> 10 10    }T
+  T{ 10 20    { -- one two }                          <T>          }T
+  T{ 30 40    { one two -- three } one one two        <T> 30 30 40 }T
+  T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
+  T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
+  T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
+  T{ 10 20 30 { -- one two three }                    <T>          }T
+  T{ 40 50 60 { -- one two three }                    <T>          }T
+  T{ 10 20 30 { -- }                                  <T>          }T
+  T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
+  T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
+  T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
+;
+test_locals
+
+: test_local_ref
+  ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
+  sysstack_frame_ptr { FP }
+
+  T{ FP   <T> sysstack_frame_ptr }T
+  T{ adr0 <T> FP 16 +            }T
+  T{ adr1 <T> FP 24 +            }T
+  T{ adr2 <T> FP 32 +            }T
+
+  12 23 34 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> 12 23 34 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
+
+  -34 -23 -12 { val0 val1 val2 }
+  T{ val0   val1   val2   <T> -34 -23 -12 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
+
+  21 adr0 ! 32 adr1 ! 43 adr2 !
+  T{ val0   val1   val2   <T> 21 32 43 }T
+  T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
+;
+test_local_ref
+
+: test_local_ref_volatile_immediate_read
+  123                 \ mov x0, 123
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
+  ref' val { adr }    \ add x0, x29, 16
+  T{ adr @ <T> 123 }T \ no junk data
+;
+test_local_ref_volatile_immediate_read
+
+: test_local_ref_volatile_delayed_read
+  123                 \ mov x0, 123
+  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
+  234                 \ Clobber x0; compiler emits a fixup.
+  { -- }
+  ref' val { adr }    \ add x0, x29, 16
+  T{ adr @ <T> 123 }T \ no junk data
+;
+test_local_ref_volatile_delayed_read
+
+: bang_with_more_inputs { val adr x2 x3 x4 } val adr ! ;
+
+\ Taking a local's address makes it volatile. Temporary register associations
+\ may be silently invalidated by `!`, with the compiler none the wiser.
+: test_local_ref_volatile_with_inputs
+  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
+  ref' val { adr } \ add x0, x29, 16
+
+  T{ adr @ <T> 123 }T
+
+  \ mov  x5, x0        -- relocate `adr`
+  \ mov  x0, 234
+  \ mov  x1, x5
+  \ ldr  x2, [x29, 16]
+  \ mov  x3, x2        -- temp register assoc for `val`
+  \ mov  x4, x2        -- temp register assoc for `val`
+  \ stur x0, [x1]
+  234 adr val val val bang_with_more_inputs
+
+  \ Invalid: `mov x0, x4`.
+  \ Valid:   `ldr x0, [x29, 16]`.
+  T{ val   <T> 234 }T
+  T{ adr @ <T> 234 }T
+;
+test_local_ref_volatile_with_inputs
+
+: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next ;
+
+: test_local_ref_volatile_with_outputs
+  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
+  ref' val { adr } \ add x0, x29, 16
+
+  T{ adr @ <T> 123 }T
+
+  \ mov  x5, x0 -- relocate `adr`
+  \ mov  x0, 234
+  \ mov  x1, x5
+  \ stur x0, [x1]
+  \ mov  x0, 12
+  \ mov  x1, 23
+  \ mov  x2, 34
+  234 adr 345 bang_with_outputs
+
+  \ Without `ref'`, `val` would be temp-associated with `x0 x1 x2`
+  \ without immediately storing to memory. With `ref'`, this should
+  \ repeatedly store to memory.
+  { val val val }
+
+  T{ adr @ <T> 345 }T
+
+  456 adr 567 bang_with_outputs { val val val }
+
+  \ Invalid: `mov x0, x2`.
+  \ Valid:   `ldr x0, [x29, 16]`.
+  T{ val <T> 567 }T
+;
+test_local_ref_volatile_with_outputs
+
 : test_conditionals
   \ false if 10      end \ Must fail to compile.
   \ false if else 10 end \ Must fail to compile.
@@ -262,13 +406,14 @@ test_loop_while_leave
 test_loop_until
 
 : test_loop_for
+  \ Should terminate right away.
   T{ -12 for end <T> }T
   T{ -1  for end <T> }T
   T{ 0   for end <T> }T
 
-  T{ 0 { val } 12 for val inc { val }       end val <T> 12 }T
-  T{ 0 { val } 12 for val inc { val } leave end val <T> 1  }T
-  T{ 0 { val } 12 for leave val inc { val } end val <T> 0  }T
+  T{ 0 { val } 12 for       val inc { val }       end val <T> 12 }T
+  T{ 0 { val } 12 for       val inc { val } leave end val <T> 1  }T
+  T{ 0 { val } 12 for leave val inc { val }       end val <T> 0  }T
 
   T{
     0 { val }
@@ -318,18 +463,21 @@ test_loop_until
 ;
 test_loop_for
 
+\ A countdown loop walks the range [floor,ceil), in the backwards direction.
+\ We retain the index local after the loop with an out-of-range value, which
+\ is always -1 in this case.
 : test_loop_for_countdown
   T{ -12 -for: ind end <T> }T
   T{ -1  -for: ind end <T> }T
   T{ 0   -for: ind end <T> }T
 
-  T{ -1 { ind } 12 -for: ind                       end ind <T> 0  }T
-  T{ -1 { ind } 12 -for: ind            leave      end ind <T> 11 }T
-  T{ -1 { ind } 12 -for: ind ind 5 <= if leave end end ind <T> 5  }T
-  T{ -1 { ind } 12 -for: ind ind 5 >    while      end ind <T> 5  }T
+  T{ 666 { ind } 12 -for: ind                       end ind <T> -1 }T
+  T{ 666 { ind } 12 -for: ind             leave     end ind <T> 11 }T
+  T{ 666 { ind } 12 -for: ind ind 5 <= if leave end end ind <T> 5  }T
+  T{ 666 { ind } 12 -for: ind ind 5 >     while     end ind <T> 5  }T
 
   T{
-    -1 { ind }
+    666 { ind }
     12 -for: ind
       ind 7 > while
       ind 5 > while
@@ -340,7 +488,7 @@ test_loop_for
   }T
 
   T{
-    -1 { ind }
+    666 { ind }
     12 -for: ind
       ind 5 > while
       ind 7 > while
@@ -414,7 +562,51 @@ test_loop_for_countdown
 ;
 test_loop_for_countup
 
-\ When the loop terminates, the "ind" local should hold an out-of-range value.
+: test_loop_countdown
+  0 { len }
+
+  T{
+    8 0 1
+    -loop: ind
+      ++: len
+    end
+    len ind
+  <T>
+    8 -1
+  }T
+
+  0 { len }
+  T{ 8 0 2 -loop: ind ++: len end len ind <T> 4 -2 }T
+
+  0 { len }
+  T{ 8 0 3 -loop: ind ++: len end len ind <T> 2 -1 }T
+
+  0 { len }
+  T{ 8 0 4 -loop: ind ++: len end len ind <T> 2 -4 }T
+
+  0 { len }
+  T{ 8 0 5 -loop: ind ++: len end len ind <T> 1 -2 }T
+
+  0 { len }
+  T{ 8 0 6 -loop: ind ++: len end len ind <T> 1 -4 }T
+
+  0 { len }
+  T{ 8 0 7 -loop: ind ++: len end len ind <T> 1 -6 }T
+
+  0 { len }
+  T{ 8 0 8 -loop: ind ++: len end len ind <T> 1 -8 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 9 -loop: ind ++: len end len ind <T> 0 -1 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 10 -loop: ind ++: len end len ind <T> 0 -2 }T
+;
+test_loop_countdown
+
+\ When the loop terminates, the "ind" local holds an out-of-range value.
 \ If the value is out of range at the start, it should remain unchanged.
 : test_loop_countup
   0 { len }
@@ -475,75 +667,78 @@ test_loop_countup
 ;
 test_loop_countup_nested
 
-\ Unlike `+loop:`, this decrements the index at the start of each iteration
-\ rather than at the end. Also, it commits the index update only when still
-\ in range. TODO figure out if we can consolidate the behavior with `+loop:`
-\ without wasting cycles in the common cases.
-: test_loop_countdown
-  0 { len }
-
-  T{
-    8 0 1
-    -loop: ind
-      ++: len
-    end
-    len ind
-  <T>
-    8 0
-  }T
-
-  0 { len }
-  T{ 8 0 2 -loop: ind ++: len end len ind <T> 4 0 }T
-
-  0 { len }
-  T{ 8 0 3 -loop: ind ++: len end len ind <T> 2 2 }T
-
-  0 { len }
-  T{ 8 0 4 -loop: ind ++: len end len ind <T> 2 0 }T
-
-  0 { len }
-  T{ 8 0 5 -loop: ind ++: len end len ind <T> 1 3 }T
-
-  0 { len }
-  T{ 8 0 6 -loop: ind ++: len end len ind <T> 1 2 }T
-
-  0 { len }
-  T{ 8 0 7 -loop: ind ++: len end len ind <T> 1 1 }T
-
-  0 { len }
-  T{ 8 0 8 -loop: ind ++: len end len ind <T> 1 0 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 0 9 -loop: ind ++: len end len ind <T> 0 8 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 0 10 -loop: ind ++: len end len ind <T> 0 8 }T
+: test_cont_loop_basic
+  loop
+    leave
+    cont
+  end
 ;
-test_loop_countdown
+test_cont_loop_basic
 
 : test_cont_loop
-  -1 { ind }
+  -1 { len }
   loop
-    ind inc { ind }
-    ind 7 < if cont end
+    len inc { len }
+    len 7 < if cont end
     leave
   end
-  T{ ind <T> 7 }T
+  T{ len <T> 7 }T
 ;
 test_cont_loop
 
 : test_cont_for
-  0 { ind }
+  7 for cont end \ Should terminate.
+
+  0 { len }
   7 for
-    ind inc { ind }
+    len inc { len }
     cont
     leave
   end
-  T{ ind <T> 7 }T
+  T{ len <T> 7 }T
 ;
 test_cont_for
+
+\ Should terminate.
+: test_cont_for_countup
+  12 0 +for: ind cont end
+  T{ ind <T> 12 }T
+;
+test_cont_for_countup
+
+: test_cont_loop_countdown
+  8 0 1 -loop: ind cont end \ Should terminate.
+  T{ ind <T> -1 }T
+
+  T{
+    8 0 1
+    -loop: ind
+      ind 3 > if cont end
+      leave
+    end
+    ind
+  <T>
+    3
+  }T
+;
+test_cont_loop_countdown
+
+: test_cont_loop_countup
+  8 0 1 +loop: ind cont end \ Should terminate.
+  T{ ind <T> 8 }T
+
+  T{
+    8 0 1
+    +loop: ind
+      ind 5 < if cont end
+      leave
+    end
+    ind
+  <T>
+    5
+  }T
+;
+test_cont_loop_countup
 
 \ Used internally by testing utils. The test is kinda cyclic.
 123 var: VAR
@@ -683,7 +878,7 @@ T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
 T{ int32_negative int_to_cell <T> -1                    }T
 
 : test_vargs_printf
-  10 20 30 va{ " numbers (should be 10 20 30): %zd %zd %zd" printf }va
+  10 20 30 vargs{ " numbers (should be 10 20 30): %zd %zd %zd" printf }vargs
   { printed }
   lf
 
@@ -757,221 +952,92 @@ test_errf
 ;
 test_wrapf
 
-: test_locals
-  T{          { }                                     <T>          }T
-  T{          { -- }                                  <T>          }T
-  T{ 10       { }                                     <T> 10       }T
-  T{ 10 20    { }                                     <T> 10 20    }T
-  T{ 10       { }                  20                 <T> 10 20    }T
-  T{          { }                  10 20              <T> 10 20    }T
-  T{ 10       { -- }                                  <T>          }T
-  T{ 10 20    { -- }                                  <T>          }T
-  T{ 10       { one }                                 <T>          }T
-  T{ 20       { one }              one                <T> 20       }T
-  T{ 30       { one }              one one            <T> 30 30    }T
-  T{ 40       { one -- }           one one            <T> 40 40    }T
-  T{ 10       { -- one }                              <T>          }T
-  T{ 10 20    { one two }          one two            <T> 10 20    }T
-  T{ 10 20    { one two }                             <T>          }T
-  T{ 10 20    { one two -- }                          <T>          }T
-  T{ 30 40    { one two }          one                <T> 30       }T
-  T{ 50 60    { one two -- }       one                <T> 50       }T
-  T{ 10 20    { one two }          two                <T> 20       }T
-  T{ 30 40    { one two }          one two            <T> 30 40    }T
-  T{ 50 60    { one two }          two one            <T> 60 50    }T
-  T{ 10 20    { one two }          two one one        <T> 20 10 10 }T
-  T{ 30 40    { one two }          two one two        <T> 40 30 40 }T
-  T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
-  T{ 30 40    { one two }          one one two        <T> 30 30 40 }T
-  T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
-  T{ 30 40    { one --     }       one one            <T> 30 30    }T
-  T{ 30 40    { one -- two }       one one            <T> 30 30    }T
-  T{ 10 20    { one --     }       one one            <T> 10 10    }T
-  T{ 10 20    { one -- two }       one one            <T> 10 10    }T
-  T{ 10 20    { -- one two }                          <T>          }T
-  T{ 30 40    { one two -- three } one one two        <T> 30 30 40 }T
-  T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
-  T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
-  T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
-  T{ 10 20 30 { -- one two three }                    <T>          }T
-  T{ 40 50 60 { -- one two three }                    <T>          }T
-  T{ 10 20 30 { -- }                                  <T>          }T
-  T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
-  T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
-  T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
-;
-test_locals
+\ In top-level interpretation, `./testing.af` inspects the default Forth stack
+\ to compare expected with provided values. All of below should be equivalent.
+T{ 10          <T> 10 }T
+T{ 10 STACK >s <T> 10 }T
+T{ 10 STACK s> <T> 10 }T
 
-: test_local_ref
-  ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
-  sysstack_frame_ptr { FP }
-
-  T{ FP   <T> sysstack_frame_ptr }T
-  T{ adr0 <T> FP 16 +            }T
-  T{ adr1 <T> FP 24 +            }T
-  T{ adr2 <T> FP 32 +            }T
-
-  12 23 34 { val0 val1 val2 }
-  T{ val0   val1   val2   <T> 12 23 34 }T
-  T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
-
-  -34 -23 -12 { val0 val1 val2 }
-  T{ val0   val1   val2   <T> -34 -23 -12 }T
-  T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
-
-  21 adr0 ! 32 adr1 ! 43 adr2 !
-  T{ val0   val1   val2   <T> 21 32 43 }T
-  T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
-;
-test_local_ref
-
-: test_local_ref_volatile_immediate_read
-  123                 \ mov x0, 123
-  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
-  ref' val { adr }    \ add x0, x29, 16
-  T{ adr @ <T> 123 }T \ no junk data
-;
-test_local_ref_volatile_immediate_read
-
-: test_local_ref_volatile_delayed_read
-  123                 \ mov x0, 123
-  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
-  234                 \ Clobber x0; compiler emits a fixup.
-  { -- }
-  ref' val { adr }    \ add x0, x29, 16
-  T{ adr @ <T> 123 }T \ no junk data
-;
-test_local_ref_volatile_delayed_read
-
-: bang_with_more_inputs { val adr x2 x3 x4 } val adr ! ;
-
-\ Taking a local's address makes it volatile. Temporary register associations
-\ may be silently invalidated by `!`, with the compiler none the wiser.
-: test_local_ref_volatile_with_inputs
-  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
-  ref' val { adr } \ add x0, x29, 16
-
-  T{ adr @ <T> 123 }T
-
-  \ mov  x5, x0        -- relocate `adr`
-  \ mov  x0, 234
-  \ mov  x1, x5
-  \ ldr  x2, [x29, 16]
-  \ mov  x3, x2        -- temp register assoc for `val`
-  \ mov  x4, x2        -- temp register assoc for `val`
-  \ stur x0, [x1]
-  234 adr val val val bang_with_more_inputs
-
-  \ Invalid: `mov x0, x4`.
-  \ Valid:   `ldr x0, [x29, 16]`.
-  T{ val   <T> 234 }T
-  T{ adr @ <T> 234 }T
-;
-test_local_ref_volatile_with_inputs
-
-: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next ;
-
-: test_local_ref_volatile_with_outputs
-  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
-  ref' val { adr } \ add x0, x29, 16
-
-  T{ adr @ <T> 123 }T
-
-  \ mov  x5, x0 -- relocate `adr`
-  \ mov  x0, 234
-  \ mov  x1, x5
-  \ stur x0, [x1]
-  \ mov  x0, 12
-  \ mov  x1, 23
-  \ mov  x2, 34
-  234 adr 345 bang_with_outputs
-
-  \ Without `ref'`, `val` would be temp-associated with `x0 x1 x2`
-  \ without immediately storing to memory. With `ref'`, this should
-  \ repeatedly store to memory.
-  { val val val }
-
-  T{ adr @ <T> 345 }T
-
-  456 adr 567 bang_with_outputs { val val val }
-
-  \ Invalid: `mov x0, x2`.
-  \ Valid:   `ldr x0, [x29, 16]`.
-  T{ val <T> 567 }T
-;
-test_local_ref_volatile_with_outputs
-
+\ TODO: use a one-off stack for every stack-related test.
+\ TODO: move this higher; used by conditionals and loops.
 : test_stack_primitives
-  T{ stack_len <T> 0 }T
+  STACK { stk }
 
-  10 >stack
-  T{ stack_len <T> 1  }T
-  T{ stack>    <T> 10 }T
-  T{ stack_len <T> 0  }T
+  T{ stk stack_len <T> 0 }T
 
-  20 >stack
-  30 >stack
-  T{ stack_len <T> 2  }T
-  T{ stack>    <T> 30 }T
-  T{ stack_len <T> 1  }T
-  T{ stack>    <T> 20 }T
-  T{ stack_len <T> 0  }T
+  10 stk >s
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 10 }T
+  T{ stk stack_len <T> 0  }T
+
+  20 stk >s
+  30 stk >s
+  T{ stk stack_len <T> 2  }T
+  T{ stk s>        <T> 30 }T
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 20 }T
+  T{ stk stack_len <T> 0  }T
 ;
 test_stack_primitives
 
-\ Since `>stack` and `stack>` are intended for moving values
-\ between registers and the Forth data stack, using them in
-\ interpreted code is meaningless, doesn't change anything.
-T{ 10 >stack <T> 10 }T
-T{ 20 stack> <T> 20 }T
-
 : test_to_stack_variadic
-  T{ stack_len <T> 0 }T
-  >>stack
-  T{ stack_len <T> 0 }T
+  STACK { stk }
 
-  10 >>stack
-  T{ stack_len <T> 1  }T
-  T{ stack>    <T> 10 }T
-  T{ stack_len <T> 0  }T
+  T{ stk stack_len <T> 0 }T
 
-  20 30 >>stack
-  T{ stack_len <T> 2  }T
-  T{ stack>    <T> 30 }T
-  T{ stack_len <T> 1  }T
-  T{ stack>    <T> 20 }T
-  T{ stack_len <T> 0  }T
+  10 stk >>s
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 10 }T
+  T{ stk stack_len <T> 0  }T
 
-  40 50 60 >>stack
-  T{ stack_len <T> 3  }T
-  T{ stack>    <T> 60 }T
-  T{ stack_len <T> 2  }T
-  T{ stack>    <T> 50 }T
-  T{ stack_len <T> 1  }T
-  T{ stack>    <T> 40 }T
-  T{ stack_len <T> 0  }T
+  666 stk >>s
+  T{ stk stack_len <T> 1   }T
+  T{ stk s>        <T> 666 }T
+  T{ stk stack_len <T> 0   }T
+
+  T{ stk stack_len <T> 0 }T
+  stk >>s
+  T{ stk stack_len <T> 0 }T
+
+  20 30 stk >>s
+  T{ stk stack_len <T> 2  }T
+  T{ stk s>        <T> 30 }T
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 20 }T
+  T{ stk stack_len <T> 0  }T
+
+  40 50 60 stk >>s
+  T{ stk stack_len <T> 3  }T
+  T{ stk s>        <T> 60 }T
+  T{ stk stack_len <T> 2  }T
+  T{ stk s>        <T> 50 }T
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 40 }T
+  T{ stk stack_len <T> 0  }T
 ;
 test_to_stack_variadic
 
 : test_stack_braces
-  T{ stack_len <T> 0 }T
-  stack{ }
-  T{ stack_len <T> 0 }T
+  STACK { stk }
 
-  10 >>stack
-  T{ stack_len <T> 1 }T
-  stack{ one }
-  T{ stack_len one <T> 0 10 }T
+  T{ stk stack_len <T> 0 }T
+  stk stack{ }
+  T{ stk stack_len <T> 0 }T
 
-  10 20 >>stack
-  T{ stack_len <T> 2 }T
-  stack{ one two }
-  T{ stack_len one two <T> 0 10 20 }T
+  10 stk >>s
+  T{ stk stack_len <T> 1 }T
+  stk stack{ one }
+  T{ stk stack_len one <T> 0 10 }T
 
-  10 20 30 >>stack
-  T{ stack_len <T> 3 }T
-  stack{ one two three }
-  T{ stack_len one two three <T> 0 10 20 30 }T
+  10 20 stk >>s
+  T{ stk stack_len <T> 2 }T
+  stk stack{ one two }
+  T{ stk stack_len one two <T> 0 10 20 }T
+
+  10 20 30 stk >>s
+  T{ stk stack_len <T> 3 }T
+  stk stack{ one two three }
+  T{ stk stack_len one two three <T> 0 10 20 30 }T
 ;
 test_stack_braces
 

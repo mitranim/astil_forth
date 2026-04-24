@@ -541,9 +541,9 @@
 
 : next_word ( wlist "word" -- exec_tok ) parse_word find_word ;
 
-:  tick_next ( C: wlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
-:: '  WORDLIST_EXEC tick_next ;
-:: '' WORDLIST_COMP tick_next ;
+:  xt_next ( C: wlist "word" -- ) ( E: -- exec_tok ) next_word comp_push ;
+:: xt'  WORDLIST_EXEC xt_next ;
+:: xt'' WORDLIST_COMP xt_next ;
 
 :  inline_next ( wlist "word" -- ) ( E: <word> ) next_word inline_word ;
 :: inline'  WORDLIST_EXEC inline_next ;
@@ -554,7 +554,7 @@
 :: execute'  WORDLIST_EXEC execute_next ;
 :: execute'' WORDLIST_COMP execute_next ;
 
-:  compile_next ( wlist "word" -- ) next_word comp_push ' comp_call comp_call ;
+:  compile_next ( wlist "word" -- ) next_word comp_push xt' comp_call comp_call ;
 :: compile'  WORDLIST_EXEC compile_next ;
 :: compile'' WORDLIST_COMP compile_next ;
 
@@ -1132,14 +1132,14 @@
 : if_done ( cond_prev -- ) COND_HAS ! ;
 : if_pop  ( prev_fun if_adr  -- ) if_patch execute ;
 : ifn_pop ( prev_fun ifn_adr  -- ) ifn_patch execute ;
-: if_init COND_HAS @ COND_HAS on! ' if_done ;
+: if_init COND_HAS @ COND_HAS on! xt' if_done ;
 
 :: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
-  ' execute reserve_cond ' if_pop
+  xt' execute reserve_cond xt' if_pop
 ;
 
 :: elifn ( C: -- exec_fun elifn_adr elifn_fun ) ( E: pred -- )
-  ' execute reserve_cond ' ifn_pop
+  xt' execute reserve_cond xt' ifn_pop
 ;
 
 \ With this strange setup, `end` pops the top control frame,
@@ -1159,9 +1159,9 @@
 :: else
   ( C: exec_fun if_adr if_fun -- else_adr else_fun )
   here to: adr reserve_instr
-  ' nop 2 bury \ Disable `exec_fun` to prevent "if" from chaining.
+  xt' nop 2 bury \ Disable `exec_fun` to prevent "if" from chaining.
   execute      \ Pop just the top frame.
-  adr ' else_pop
+  adr xt' else_pop
 ;
 
 \ TODO: use raw instruction addresses and `blr`
@@ -1188,7 +1188,7 @@
 : loop_frame! ( C: frame_ind -- ) LOOP_FRAME ! ;
 
 : loop_frame_init ( C: -- frame_ind fun )
-  LOOP_FRAME @ ' loop_frame! stack_len LOOP_FRAME !
+  LOOP_FRAME @ xt' loop_frame! stack_len LOOP_FRAME !
 ;
 
 \ Used by auxiliary loop constructs such as "leave" and "while"
@@ -1240,21 +1240,21 @@
 :: loop
   ( C: -- frame_ind frame_fun … loop_adr loop_fun )
   \ Control frame is split:   ↑ auxiliary constructs like "leave" go here.
-  loop_frame_init here ' loop_pop
+  loop_frame_init here xt' loop_pop
 ;
 
 \ Breaks out of any loop.
 :: leave
   ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
   stack_len to: len
-  here reserve_instr ' else_pop len loop_aux
+  here reserve_instr xt' else_pop len loop_aux
 ;
 
 \ Breaks out of any loop.
 :: while
   ( C: prev… <loop> …rest -- prev… while_adr while_fun <loop> …rest )
   stack_len to: len
-  reserve_cond ' if_pop len loop_aux
+  reserve_cond xt' if_pop len loop_aux
 ;
 
 \ Assumes that the top control frame is from `loop`.
@@ -1264,8 +1264,12 @@
   execute
 ;
 
-\ Goes back to loop start. Requires EVERY loop frame to begin with `loop_adr`:
+\ Goes back to loop start. Requires loop frames to begin with `loop_adr`:
 \ the address of the first instruction inside the loop.
+\
+\ Warning: the implementation of count-up loops in this file is not compatible
+\ with `cont` because they update counters and check bounds at the end, rather
+\ than at the start. The issue was fixed for reg-CC, but not for stack-CC.
 :: cont
   LOOP_FRAME @ dup
   ifn " `cont` requires an ancestor loop frame" throw end
@@ -1299,7 +1303,7 @@
   1 1 1 asm_sub_imm   comp_instr    \ sub x1, x1, 1
   1 cur asm_local_set comp_instr    \ str x1, [FP, <cur>]
 
-  loop_adr cond_adr ' for_countdown_loop_pop
+  loop_adr cond_adr xt' for_countdown_loop_pop
 ;
 
 \ A count-down-by-one loop. Analogue of the non-standard
@@ -1378,7 +1382,7 @@
   cur     comp_pop_local_set
   lim     comp_pop_local_set
   cur lim comp_count_loop_init
-  ' for_countup_loop_pop
+  xt' for_countup_loop_pop
 ;
 
 : loop_countup_pop ( prev_fun …aux… loop_adr cond_adr loc_cur loc_step )
@@ -1409,7 +1413,7 @@
   cur     comp_pop_local_set
   lim     comp_pop_local_set
   cur lim comp_count_loop_init
-  step ' loop_countup_pop
+  step xt' loop_countup_pop
 ;
 
 : loop_countdown_pop ASM_LT count_loop_pop ;
@@ -1441,7 +1445,7 @@
   here to: cond_adr    reserve_instr \ b.lt <end>
   1 cur  asm_local_set comp_instr    \ str x1, [FP, <ceil_off>]
 
-  loop_adr cond_adr ' loop_countdown_pop
+  loop_adr cond_adr xt' loop_countdown_pop
 ;
 
 : ?dup ( val bool -- val ?val ) if dup end ;
@@ -1548,8 +1552,8 @@ LF CRLF inc c! \ \n
 ;
 
 \ Usage: `++: some_val`.
-:: ++: ( C: "name" -- ) ( E: -- ) ' inc comp_loc_mut ;
-:: --: ( C: "name" -- ) ( E: -- ) ' dec comp_loc_mut ;
+:: ++: ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut ;
+:: --: ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut ;
 
 : within { num one two -- bool }
   one num >
@@ -1605,7 +1609,7 @@ LF CRLF inc c! \ \n
 \ the precise `len` amount of items from the Forth integer stack.
 : comp_va_beg ( C: len -- )
   dup odd if
-    ' dup>systack inline_word
+    xt' dup>systack inline_word
     dec
   end
 
@@ -1614,7 +1618,7 @@ LF CRLF inc c! \ \n
   \ Not odd = automatically aligned to 16.
   loop
     dup while
-    ' pair>systack inline_word
+    xt' pair>systack inline_word
     2 -
   end
   drop
@@ -1630,18 +1634,17 @@ LF CRLF inc c! \ \n
   end
 ;
 
-\ Short for "varargs". Sets up arguments for a variadic call.
-\ Assumes the Apple Arm64 ABI, where varargs use the systack.
-\ Usage example:
+\ Sets up arguments for a variadic call. Assumes the Apple Arm64 ABI,
+\ where vargs use the systack. Usage example:
 \
 \   : some_word
-\     10 20 30 [ 3 ] va{ " numbers: %zd %zd %zd" printf }va lf
+\     10 20 30 [ 3 ] vargs{ " numbers: %zd %zd %zd" printf }vargs lf
 \   ;
 \
 \ Caution: varargs can only be used in direct calls to variadic procedures.
 \ Indirect calls DO NOT WORK because the stack pointer is changed by calls.
-:: va{ ( C: len -- len ) ( E: <systack_push> ) dup comp_va_beg ;
-:: }va ( C: len --     ) ( E: <systack_pop   )     comp_va_end ;
+:: vargs{ ( C: len -- len ) ( E: <systack_push> ) dup comp_va_beg ;
+:: }vargs ( C: len --     ) ( E: <systack_pop   )     comp_va_end ;
 
 \ The given offset is how many non-vargs precede the vargs.
 \ The given function must have exactly that arity.
@@ -1656,7 +1659,7 @@ LF CRLF inc c! \ \n
 \ Usage example:
 \
 \   " numbers: %zd %zd %zd" 10 20 30 [ 3 ] logf lf
-:: logf  ( C: len -- )  ( E: fmt …vargs… -- ) ' printf comp_varcall ;
+:: logf  ( C: len -- )  ( E: fmt …vargs… -- ) xt' printf comp_varcall ;
 
 :: elogf ( C: len -- ) ( E: fmt …vargs… -- )
   dup comp_va_beg
@@ -1671,7 +1674,9 @@ LF CRLF inc c! \ \n
 \ String is null-terminated. Usage:
 \
 \   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] strf
-:: strf ( C: len -- ) ( E: buf cap fmt …vargs… -- buf ) ' snprintf comp_varcall ;
+:: strf ( C: len -- ) ( E: buf cap fmt …vargs… -- buf )
+  xt' snprintf comp_varcall
+;
 
 \ ## Exceptions
 \

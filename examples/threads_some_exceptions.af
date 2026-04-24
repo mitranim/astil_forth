@@ -1,7 +1,6 @@
 import' std:lang.af
 import' std:io.af
 import' std:pthread.af
-import' std:internals.af
 
 \ ## Posix thread usage
 \
