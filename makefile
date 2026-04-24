@@ -26,6 +26,7 @@ ALL_SRC ?= $(filter-out $(ASM_GEN_OUT),$(shell find $(SRC_DIR) -type f \( -name 
 MAIN_SRC ?= $(SRC_DIR)/main.c
 MAIN_S ?= astil_s.exe
 MAIN ?= astil.exe
+TEST_EXE ?= test.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
 WATCH_IGNORE ?= -i=$(GEN_DIR) -i=$(ASM_GEN_OUT)
@@ -34,7 +35,7 @@ WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=af
 WATCH_ALL ?= $(WATCH) -e=c,h,s,af
-WATCH_IMM ?= $(WATCH) -e=af,exe --no-vcs-ignore
+WATCH_IMM ?= $(WATCH) -w=forth -w=$(MAIN) -w=$(MAIN_S)
 ARTIF ?= $(shell find . \( -type d -name '*.dSYM' \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' \) \))
 
 ifeq ($(verb),true)
@@ -88,6 +89,7 @@ run_boxed:
 		sandbox-exec \
 		-f sandbox.sb \
 		-D MAIN="$(PWD)/$(file)" \
+		-D OUT="$(PWD)/$(TEST_EXE)" \
 		-D EXE0=$(EXE0) \
 		-D EXE1=$(EXE1) \
 		-D EXE2=$(EXE2) \
@@ -138,6 +140,23 @@ repl:
 .PHONY: repl_s
 repl_s:
 	$(MAKE) run_s args='std:lang_s.af -'
+
+.PHONY: test
+test:
+	make run args='forth/test.af --build=$(TEST_EXE)'
+	./$(TEST_EXE)
+
+.PHONY: test_w
+test_w:
+	$(WATCH_IMM) -- $(MAKE) test
+
+.PHONY: test_s
+test_s:
+	make run_s args=forth/test_s.af
+
+.PHONY: test_s_w
+test_s_w:
+	$(WATCH_IMM) -- $(MAKE) test_s
 
 # For executables from arbitrary C files. This is possible because our C files
 # specify all their dependencies with `#include`, without needing the build

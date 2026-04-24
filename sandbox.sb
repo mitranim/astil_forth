@@ -12,6 +12,11 @@
 (allow network* (remote ip "localhost:*"))
 (allow network* (local ip "localhost:*"))
 
+; Allow creation of one executable file. Used in testing.
+(allow file-write-create (literal (param "OUT")))
+(allow file-write-data (literal (param "OUT")))
+(allow file-write-mode (literal (param "OUT")))
+
 ; We whitelist a few executables for debugging: disassembler,
 ; symbolizer, etc. See the makefile for the listing.
 (allow process-fork)

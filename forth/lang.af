@@ -955,6 +955,7 @@
 \ SYNC[stack_field_offsets].
 16 let: STACK_OFF_FLOOR
 24 let: STACK_OFF_TOP
+32 let: STACK_OFF_CEIL
 
 \ Default Forth stack provided by the interpreter.
 \ Not available when running in AOT-compiled mode.
@@ -968,6 +969,16 @@
 
 : STACK { -- adr } STACK ;
 
+: comp_load_off { off } ( E: adr -- adr )
+  0 comp_clobber
+  0 0 off asm_load_unscaled_off comp_instr \ ldur x0, [x0, <off>]
+  1 comp_args_set
+;
+
+: stack_floor { stack -- floor } [ STACK_OFF_FLOOR comp_load_off ] ;
+: stack_top   { stack -- top   } [ STACK_OFF_TOP   comp_load_off ] ;
+: stack_ceil  { stack -- ceil  } [ STACK_OFF_CEIL  comp_load_off ] ;
+
 \ ldur <out>, [<stack>, STACK_OFF_TOP]
 : asm_stack_top_load { out stack -- instr }
   out stack STACK_OFF_TOP asm_load_unscaled_off
@@ -978,23 +989,11 @@
   out stack STACK_OFF_TOP asm_store_unscaled_off
 ;
 
-: stack_top { stack -- top } [
-  0 comp_clobber
-  0 0 asm_stack_top_load comp_instr \ ldur x0, [x0, <off>]
-  1 comp_args_set
-] ;
-
-: stack_floor { stack -- floor } [
-  0 comp_clobber
-  0 0 STACK_OFF_FLOOR asm_load_unscaled_off comp_instr \ ldur x0, [x0, <off>]
-  1 comp_args_set
-] ;
-
 : s@ { stack -- val } stack stack_top @ ;
 
 : stack_top! { top stack } [
-  \ stur x0, [x1, STACK_OFF_TOP]
-  0 1 STACK_OFF_TOP asm_store_unscaled_off comp_instr
+  \ stur <top>, [<stack>, STACK_OFF_TOP]
+  0 1 asm_stack_top_store comp_instr
 ] ;
 
 : stack_at { ind stack  -- adr } ind cells { off } stack stack_floor off + ;
@@ -1002,6 +1001,11 @@
 : stack_len { stack -- len }
   stack stack_floor { floor }
   stack stack_top floor - /cells
+;
+
+: stack_cap { stack -- len }
+  stack stack_floor { floor }
+  stack stack_ceil floor - /cells
 ;
 
 : stack_clear   { stack     } stack stack_floor stack stack_top! ;

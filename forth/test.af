@@ -64,6 +64,110 @@ test_test
 ;
 test_locals
 
+\ In top-level interpretation, `./testing.af` inspects the default Forth stack
+\ to compare expected with provided values. All of below should be equivalent.
+T{ 10          <T> 10 }T
+T{ 10 STACK >s <T> 10 }T
+T{ 10 STACK s> <T> 10 }T
+
+\ Stack operations are tested early because they're used by conditionals,
+\ loops, and testing utils themselves, which makes testing kinda cycling.
+: test_stack_primitives
+  Stack alloca { stk }
+  Stack stk memzero
+
+  T{ stk stack_len <T> 0 }T
+  T{ stk stack_cap <T> 0 }T
+
+  32 stk stack_init
+
+  T{ stk stack_len <T> 0    }T
+  T{ stk stack_cap <T> 2048 }T \ Adjusted to mem page size.
+
+  10 stk >s
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 10 }T
+  T{ stk stack_len <T> 0  }T
+
+  20 stk >s
+  30 stk >s
+  T{ stk stack_len <T> 2  }T
+  T{ stk s>        <T> 30 }T
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 20 }T
+  T{ stk stack_len <T> 0  }T
+
+  stk stack_deinit
+;
+test_stack_primitives
+
+: test_to_stack_variadic
+  Stack alloca { stk }
+  32 stk stack_init
+
+  T{ stk stack_len <T> 0 }T
+
+  10 stk >>s
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 10 }T
+  T{ stk stack_len <T> 0  }T
+
+  666 stk >>s
+  T{ stk stack_len <T> 1   }T
+  T{ stk s>        <T> 666 }T
+  T{ stk stack_len <T> 0   }T
+
+  T{ stk stack_len <T> 0 }T
+  stk >>s
+  T{ stk stack_len <T> 0 }T
+
+  20 30 stk >>s
+  T{ stk stack_len <T> 2  }T
+  T{ stk s>        <T> 30 }T
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 20 }T
+  T{ stk stack_len <T> 0  }T
+
+  40 50 60 stk >>s
+  T{ stk stack_len <T> 3  }T
+  T{ stk s>        <T> 60 }T
+  T{ stk stack_len <T> 2  }T
+  T{ stk s>        <T> 50 }T
+  T{ stk stack_len <T> 1  }T
+  T{ stk s>        <T> 40 }T
+  T{ stk stack_len <T> 0  }T
+
+  stk stack_deinit
+;
+test_to_stack_variadic
+
+: test_stack_braces
+  Stack alloca { stk }
+  32 stk stack_init
+
+  T{ stk stack_len <T> 0 }T
+  stk stack{ }
+  T{ stk stack_len <T> 0 }T
+
+  10 stk >>s
+  T{ stk stack_len <T> 1 }T
+  stk stack{ one }
+  T{ stk stack_len one <T> 0 10 }T
+
+  10 20 stk >>s
+  T{ stk stack_len <T> 2 }T
+  stk stack{ one two }
+  T{ stk stack_len one two <T> 0 10 20 }T
+
+  10 20 30 stk >>s
+  T{ stk stack_len <T> 3 }T
+  stk stack{ one two three }
+  T{ stk stack_len one two three <T> 0 10 20 30 }T
+
+  stk stack_deinit
+;
+test_stack_braces
+
 : test_local_ref
   ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
   sysstack_frame_ptr { FP }
@@ -265,11 +369,15 @@ test_local_ref_volatile_with_outputs
 ;
 test_conditionals
 
-: test_recursion { val -- val }
+: recursive_proc { val -- val }
   val 13 <= if val ret end
   val dec recur
 ;
-T{ 123 test_recursion <T> 13 }T
+
+: test_recursion
+  T{ 123 recursive_proc <T> 13 }T
+;
+test_recursion
 
 1 0 extern: sleep
 
@@ -740,142 +848,199 @@ test_cont_loop_countdown
 ;
 test_cont_loop_countup
 
-\ Used internally by testing utils. The test is kinda cyclic.
 123 var: VAR
-T{ VAR @     <T> 123 }T
-T{ 234 VAR ! <T>     }T
-T{ VAR @     <T> 234 }T
-T{ 345 VAR ! <T>     }T
-T{ VAR @     <T> 345 }T
 
-T{ 0    negate <T> 0    }T
-T{ 123  negate <T> -123 }T
-T{ -123 negate <T> 123  }T
+\ Load/store is used internally by testing utils. The test is kinda cyclic.
+: test_load_store
+  has_interp if
+    T{ VAR @ <T> 123 }T
+  else
+    T{ VAR @ <T> 345 }T \ Preserved in AOT from this test.
+  end
+
+  T{ 234 VAR ! <T>     }T
+  T{ VAR @     <T> 234 }T
+  T{ 345 VAR ! <T>     }T
+  T{ VAR @     <T> 345 }T
+;
+test_load_store
+
+: test_negate
+  T{ 0    negate <T> 0    }T
+  T{ 123  negate <T> -123 }T
+  T{ -123 negate <T> 123  }T
+;
+test_negate
 
 \ `=` is used by the testing tools, so this test is almost meaningless.
-T{  0    0   = <T> 1 }T
-T{  0    123 = <T> 0 }T
-T{  123  0   = <T> 0 }T
-T{ -123  0   = <T> 0 }T
-T{ -123  123 = <T> 0 }T
-T{  123 -123 = <T> 0 }T
-T{ -123 -123 = <T> 1 }T
-T{  123  123 = <T> 1 }T
+: test_equal
+  T{  0    0   = <T> 1 }T
+  T{  0    123 = <T> 0 }T
+  T{  123  0   = <T> 0 }T
+  T{ -123  0   = <T> 0 }T
+  T{ -123  123 = <T> 0 }T
+  T{  123 -123 = <T> 0 }T
+  T{ -123 -123 = <T> 1 }T
+  T{  123  123 = <T> 1 }T
+;
+test_equal
 
-T{  0    0   <> <T> 0 }T
-T{  0    123 <> <T> 1 }T
-T{  123  0   <> <T> 1 }T
-T{ -123  0   <> <T> 1 }T
-T{ -123  123 <> <T> 1 }T
-T{  123 -123 <> <T> 1 }T
-T{ -123 -123 <> <T> 0 }T
-T{  123  123 <> <T> 0 }T
+: test_not_equal
+  T{  0    0   <> <T> 0 }T
+  T{  0    123 <> <T> 1 }T
+  T{  123  0   <> <T> 1 }T
+  T{ -123  0   <> <T> 1 }T
+  T{ -123  123 <> <T> 1 }T
+  T{  123 -123 <> <T> 1 }T
+  T{ -123 -123 <> <T> 0 }T
+  T{  123  123 <> <T> 0 }T
+;
+test_not_equal
 
-T{  0    0   > <T> 0 }T
-T{  0    123 > <T> 0 }T
-T{  123  0   > <T> 1 }T
-T{ -123  0   > <T> 0 }T
-T{ -123  123 > <T> 0 }T
-T{  123 -123 > <T> 1 }T
-T{ -123 -123 > <T> 0 }T
-T{  123  123 > <T> 0 }T
+: test_greater
+  T{  0    0   > <T> 0 }T
+  T{  0    123 > <T> 0 }T
+  T{  123  0   > <T> 1 }T
+  T{ -123  0   > <T> 0 }T
+  T{ -123  123 > <T> 0 }T
+  T{  123 -123 > <T> 1 }T
+  T{ -123 -123 > <T> 0 }T
+  T{  123  123 > <T> 0 }T
+;
+test_greater
 
-T{  0    0   < <T> 0 }T
-T{  0    123 < <T> 1 }T
-T{  123  0   < <T> 0 }T
-T{ -123  0   < <T> 1 }T
-T{ -123  123 < <T> 1 }T
-T{  123 -123 < <T> 0 }T
-T{ -123 -123 < <T> 0 }T
-T{  123  123 < <T> 0 }T
+: test_lesser
+  T{  0    0   < <T> 0 }T
+  T{  0    123 < <T> 1 }T
+  T{  123  0   < <T> 0 }T
+  T{ -123  0   < <T> 1 }T
+  T{ -123  123 < <T> 1 }T
+  T{  123 -123 < <T> 0 }T
+  T{ -123 -123 < <T> 0 }T
+  T{  123  123 < <T> 0 }T
+;
+test_lesser
 
-T{  0    0    <= <T> 1 }T
-T{  0    123  <= <T> 1 }T
-T{  123  0    <= <T> 0 }T
-T{ -123  0    <= <T> 1 }T
-T{ -123  123  <= <T> 1 }T
-T{  123 -123  <= <T> 0 }T
-T{ -123 -123  <= <T> 1 }T
-T{  123  123  <= <T> 1 }T
+: test_lesser_equal
+  T{  0    0    <= <T> 1 }T
+  T{  0    123  <= <T> 1 }T
+  T{  123  0    <= <T> 0 }T
+  T{ -123  0    <= <T> 1 }T
+  T{ -123  123  <= <T> 1 }T
+  T{  123 -123  <= <T> 0 }T
+  T{ -123 -123  <= <T> 1 }T
+  T{  123  123  <= <T> 1 }T
+;
+test_lesser_equal
 
-T{  0    0    >= <T> 1 }T
-T{  0    123  >= <T> 0 }T
-T{  123  0    >= <T> 1 }T
-T{ -123  0    >= <T> 0 }T
-T{ -123  123  >= <T> 0 }T
-T{  123 -123  >= <T> 1 }T
-T{ -123 -123  >= <T> 1 }T
-T{  123  123  >= <T> 1 }T
+: test_greater_equal
+  T{  0    0    >= <T> 1 }T
+  T{  0    123  >= <T> 0 }T
+  T{  123  0    >= <T> 1 }T
+  T{ -123  0    >= <T> 0 }T
+  T{ -123  123  >= <T> 0 }T
+  T{  123 -123  >= <T> 1 }T
+  T{ -123 -123  >= <T> 1 }T
+  T{  123  123  >= <T> 1 }T
+;
+test_greater_equal
 
-T{ 234 123 - <T> 111   }T
-T{ 234 123 + <T> 357   }T
-T{ 234 123 * <T> 28782 }T
-T{ 234 123 / <T> 1     }T
+: test_arith
+  T{ 234 123 - <T> 111   }T
+  T{ 234 123 + <T> 357   }T
+  T{ 234 123 * <T> 28782 }T
+  T{ 234 123 / <T> 1     }T
+;
+test_arith
 
-T{ 12 1 mod <T> 0 }T
-T{ 12 2 mod <T> 0 }T
-T{ 12 3 mod <T> 0 }T
-T{ 12 4 mod <T> 0 }T
-T{ 12 5 mod <T> 2 }T
-T{ 12 6 mod <T> 0 }T
-T{ 12 7 mod <T> 5 }T
-T{ 12 8 mod <T> 4 }T
-T{ 12 9 mod <T> 3 }T
+: test_mod
+  T{ 12 1 mod <T> 0 }T
+  T{ 12 2 mod <T> 0 }T
+  T{ 12 3 mod <T> 0 }T
+  T{ 12 4 mod <T> 0 }T
+  T{ 12 5 mod <T> 2 }T
+  T{ 12 6 mod <T> 0 }T
+  T{ 12 7 mod <T> 5 }T
+  T{ 12 8 mod <T> 4 }T
+  T{ 12 9 mod <T> 3 }T
+;
+test_mod
 
-T{ 12 1 /mod <T> 0 12 }T
-T{ 12 2 /mod <T> 0 6  }T
-T{ 12 3 /mod <T> 0 4  }T
-T{ 12 4 /mod <T> 0 3  }T
-T{ 12 5 /mod <T> 2 2  }T
-T{ 12 6 /mod <T> 0 2  }T
-T{ 12 7 /mod <T> 5 1  }T
-T{ 12 8 /mod <T> 4 1  }T
-T{ 12 9 /mod <T> 3 1  }T
+: test_slash_mod
+  T{ 12 1 /mod <T> 0 12 }T
+  T{ 12 2 /mod <T> 0 6  }T
+  T{ 12 3 /mod <T> 0 4  }T
+  T{ 12 4 /mod <T> 0 3  }T
+  T{ 12 5 /mod <T> 2 2  }T
+  T{ 12 6 /mod <T> 0 2  }T
+  T{ 12 7 /mod <T> 5 1  }T
+  T{ 12 8 /mod <T> 4 1  }T
+  T{ 12 9 /mod <T> 3 1  }T
+;
+test_slash_mod
 
-T{    0 abs <T>   0 }T
-T{ -123 abs <T> 123 }T
-T{  123 abs <T> 123 }T
+: test_abs
+  T{    0 abs <T>   0 }T
+  T{ -123 abs <T> 123 }T
+  T{  123 abs <T> 123 }T
+;
+test_abs
 
-T{  123  234 min <T>  123 }T
-T{  234  123 min <T>  123 }T
-T{  0    123 min <T>  0   }T
-T{  123  0   min <T>  0   }T
-T{  0   -123 min <T> -123 }T
-T{ -123  0   min <T> -123 }T
-T{ -123  234 min <T> -123 }T
-T{  234 -123 min <T> -123 }T
+: test_min
+  T{  123  234 min <T>  123 }T
+  T{  234  123 min <T>  123 }T
+  T{  0    123 min <T>  0   }T
+  T{  123  0   min <T>  0   }T
+  T{  0   -123 min <T> -123 }T
+  T{ -123  0   min <T> -123 }T
+  T{ -123  234 min <T> -123 }T
+  T{  234 -123 min <T> -123 }T
+;
+test_min
 
-T{  123  234 max <T>  234 }T
-T{  234  123 max <T>  234 }T
-T{  0    123 max <T>  123 }T
-T{  123  0   max <T>  123 }T
-T{  0   -123 max <T>  0   }T
-T{ -123  0   max <T>  0   }T
-T{ -123  234 max <T>  234 }T
-T{  234 -123 max <T>  234 }T
+: test_max
+  T{  123  234 max <T>  234 }T
+  T{  234  123 max <T>  234 }T
+  T{  0    123 max <T>  123 }T
+  T{  123  0   max <T>  123 }T
+  T{  0   -123 max <T>  0   }T
+  T{ -123  0   max <T>  0   }T
+  T{ -123  234 max <T>  234 }T
+  T{  234 -123 max <T>  234 }T
+;
+test_max
 
-T{ nil           nil    cstr= <T> true  }T
-T{ nil           " one" cstr= <T> false }T
-T{ " one"        nil    cstr= <T> false }T
-T{ " one" strdup " two" cstr= <T> false }T
-T{ " two" strdup " one" cstr= <T> false }T
-T{ " one" strdup " one" cstr= <T> true  }T
+: test_cstr_eq
+  T{ nil           nil    cstr= <T> true  }T
+  T{ nil           " one" cstr= <T> false }T
+  T{ " one"        nil    cstr= <T> false }T
+  T{ " one" strdup " two" cstr= <T> false }T
+  T{ " two" strdup " one" cstr= <T> false }T
+  T{ " one" strdup " one" cstr= <T> true  }T
+;
+test_cstr_eq
 
-T{ nil           nil    cstr< <T> false }T
-T{ nil           " one" cstr< <T> true  }T
-T{ " one"        nil    cstr< <T> false }T
-T{ " one" strdup " two" cstr< <T> true  }T
-T{ " two" strdup " one" cstr< <T> false }T
-T{ " one" strdup " one" cstr< <T> false }T
+: test_cstr_less
+  T{ nil           nil    cstr< <T> false }T
+  T{ nil           " one" cstr< <T> true  }T
+  T{ " one"        nil    cstr< <T> false }T
+  T{ " one" strdup " two" cstr< <T> true  }T
+  T{ " two" strdup " one" cstr< <T> false }T
+  T{ " one" strdup " one" cstr< <T> false }T
+;
+test_cstr_less
 
 : int32_negative { -- val } [
   0b0_00_100101_00_0000000000000000_00000 comp_instr \ mov w0, -1
   1 comp_args_set
 ] ;
 
-T{ int32_negative             <T> 0xffff_ffff           }T
-T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
-T{ int32_negative int_to_cell <T> -1                    }T
+: test_int_to_cell
+  T{ int32_negative             <T> 0xffff_ffff           }T
+  T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
+  T{ int32_negative int_to_cell <T> -1                    }T
+;
+test_int_to_cell
 
 : test_vargs_printf
   10 20 30 vargs{ " numbers (should be 10 20 30): %zd %zd %zd" printf }vargs
@@ -906,17 +1071,12 @@ T{ int32_negative int_to_cell <T> -1                    }T
 ;
 
 : test_errf
-  T{ ERR_BUF_0 " " cstr= <T> true }T
+  ERR_BUF_0 { buf }
 
-  T{
-    " codes: %zd %zd %zd" 10 20 30 errf
-    " codes: 10 20 30"
-    cstr=
-  <T>
-    true
-  }T
-
-  T{ ERR_BUF_0 " codes: 10 20 30" cstr= <T> true }T
+  T{ " codes: %zd %zd %zd" 10 20 30 errf <T> buf  }T
+  T{ " codes: 10 20 30" buf cstr=        <T> true }T
+  T{ " codes: %zd %zd %zd" 40 50 60 errf <T> buf  }T
+  T{ " codes: 40 50 60" buf cstr=        <T> true }T
 ;
 test_errf
 
@@ -951,95 +1111,6 @@ test_errf
   T{ err3 " four: 123: three: two: one" cstr= <T> true }T
 ;
 test_wrapf
-
-\ In top-level interpretation, `./testing.af` inspects the default Forth stack
-\ to compare expected with provided values. All of below should be equivalent.
-T{ 10          <T> 10 }T
-T{ 10 STACK >s <T> 10 }T
-T{ 10 STACK s> <T> 10 }T
-
-\ TODO: use a one-off stack for every stack-related test.
-\ TODO: move this higher; used by conditionals and loops.
-: test_stack_primitives
-  STACK { stk }
-
-  T{ stk stack_len <T> 0 }T
-
-  10 stk >s
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 10 }T
-  T{ stk stack_len <T> 0  }T
-
-  20 stk >s
-  30 stk >s
-  T{ stk stack_len <T> 2  }T
-  T{ stk s>        <T> 30 }T
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 20 }T
-  T{ stk stack_len <T> 0  }T
-;
-test_stack_primitives
-
-: test_to_stack_variadic
-  STACK { stk }
-
-  T{ stk stack_len <T> 0 }T
-
-  10 stk >>s
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 10 }T
-  T{ stk stack_len <T> 0  }T
-
-  666 stk >>s
-  T{ stk stack_len <T> 1   }T
-  T{ stk s>        <T> 666 }T
-  T{ stk stack_len <T> 0   }T
-
-  T{ stk stack_len <T> 0 }T
-  stk >>s
-  T{ stk stack_len <T> 0 }T
-
-  20 30 stk >>s
-  T{ stk stack_len <T> 2  }T
-  T{ stk s>        <T> 30 }T
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 20 }T
-  T{ stk stack_len <T> 0  }T
-
-  40 50 60 stk >>s
-  T{ stk stack_len <T> 3  }T
-  T{ stk s>        <T> 60 }T
-  T{ stk stack_len <T> 2  }T
-  T{ stk s>        <T> 50 }T
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 40 }T
-  T{ stk stack_len <T> 0  }T
-;
-test_to_stack_variadic
-
-: test_stack_braces
-  STACK { stk }
-
-  T{ stk stack_len <T> 0 }T
-  stk stack{ }
-  T{ stk stack_len <T> 0 }T
-
-  10 stk >>s
-  T{ stk stack_len <T> 1 }T
-  stk stack{ one }
-  T{ stk stack_len one <T> 0 10 }T
-
-  10 20 stk >>s
-  T{ stk stack_len <T> 2 }T
-  stk stack{ one two }
-  T{ stk stack_len one two <T> 0 10 20 }T
-
-  10 20 30 stk >>s
-  T{ stk stack_len <T> 3 }T
-  stk stack{ one two three }
-  T{ stk stack_len one two three <T> 0 10 20 30 }T
-;
-test_stack_braces
 
 : test_alloca_cell
   Cell alloca { ptr }
@@ -1117,13 +1188,16 @@ test_alloca_big
 2 3 arr: Arr5
 3 3 arr: Arr6
 
-T{ Arr0 <T> 1 }T
-T{ Arr1 <T> 2 }T
-T{ Arr2 <T> 3 }T
-T{ Arr3 <T> 2 }T
-T{ Arr4 <T> 3 }T
-T{ Arr5 <T> 6 }T
-T{ Arr6 <T> 9 }T
+: test_array_sizes
+  T{ Arr0 <T> 1 }T
+  T{ Arr1 <T> 2 }T
+  T{ Arr2 <T> 3 }T
+  T{ Arr3 <T> 2 }T
+  T{ Arr4 <T> 3 }T
+  T{ Arr5 <T> 6 }T
+  T{ Arr6 <T> 9 }T
+;
+test_array_sizes
 
 struct: Typ
   8 1 field: Typ_field0
@@ -1132,62 +1206,82 @@ end
 
 \ Field alignment and padding needs to match C.
 \ We test alignment for a lot more cases below.
-T{        Typ        <T>    16  }T
-T{    0   Typ_field0 <T>    0   }T
-T{    0   Typ_field1 <T>    8   }T
-T{    123 Typ_field0 <T>    123 }T
-T{    234 Typ_field0 <T>    234 }T
-T{    123 Typ_field1 <T>    131 }T
-T{    234 Typ_field1 <T>    242 }T
+: test_struct_fields_basic
+  T{     Typ        <T> 16  }T
+  T{ 0   Typ_field0 <T> 0   }T
+  T{ 0   Typ_field1 <T> 8   }T
+  T{ 123 Typ_field0 <T> 123 }T
+  T{ 234 Typ_field0 <T> 234 }T
+  T{ 123 Typ_field1 <T> 131 }T
+  T{ 234 Typ_field1 <T> 242 }T
+;
+test_struct_fields_basic
 
-Typ mem: ptr
+: test_struct_fields_load_store
+  Typ alloca { ptr }
+  Typ ptr memzero
 
-T{ ptr Typ_field0 <T> ptr     }T
-T{ ptr Typ_field1 <T> ptr 8 + }T
+  T{ ptr Typ_field0 <T> ptr     }T
+  T{ ptr Typ_field1 <T> ptr 8 + }T
 
-T{    ptr Typ_field0 @ <T> 0  }T
-T{ 10 ptr Typ_field0 ! <T>    }T
-T{    ptr Typ_field0 @ <T> 10 }T
+  T{    ptr Typ_field0 @ <T> 0  }T
+  T{ 10 ptr Typ_field0 ! <T>    }T
+  T{    ptr Typ_field0 @ <T> 10 }T
 
-T{    ptr Typ_field1 @ <T> 0  }T
-T{ 20 ptr Typ_field1 ! <T>    }T
-T{    ptr Typ_field1 @ <T> 20 }T
+  T{    ptr Typ_field1 @ <T> 0  }T
+  T{ 20 ptr Typ_field1 ! <T>    }T
+  T{    ptr Typ_field1 @ <T> 20 }T
 
-T{    ptr Typ_field0 @ <T> 10 }T
-T{ 30 ptr Typ_field0 ! <T>    }T
-T{    ptr Typ_field0 @ <T> 30 }T
+  T{    ptr Typ_field0 @ <T> 10 }T
+  T{ 30 ptr Typ_field0 ! <T>    }T
+  T{    ptr Typ_field0 @ <T> 30 }T
 
-T{    ptr Typ_field1 @ <T> 20 }T
-T{ 40 ptr Typ_field1 ! <T>    }T
-T{    ptr Typ_field1 @ <T> 40 }T
+  T{    ptr Typ_field1 @ <T> 20 }T
+  T{ 40 ptr Typ_field1 ! <T>    }T
+  T{    ptr Typ_field1 @ <T> 40 }T
+;
+test_struct_fields_load_store
 
 struct: Typ0 end
-T{ Typ0           <T> 0   }T
+
+: test_struct_0
+  T{ Typ0 <T> 0 }T
+;
+test_struct_0
 
 struct: Typ1
   U8 1 field: Typ1_field
 end
 
-T{ Typ1           <T> 1   }T
-T{ 123 Typ1_field <T> 123 }T
+: test_struct_1
+  T{ Typ1           <T> 1   }T
+  T{ 123 Typ1_field <T> 123 }T
+;
+test_struct_1
 
 struct: Typ2
   U8  1 field: Typ2_field0
   U32 1 field: Typ2_field1
 end
 
-T{ Typ2            <T> 8   }T
-T{ 123 Typ2_field0 <T> 123 }T
-T{ 123 Typ2_field1 <T> 127 }T
+: test_struct_2
+  T{ Typ2            <T> 8   }T
+  T{ 123 Typ2_field0 <T> 123 }T
+  T{ 123 Typ2_field1 <T> 127 }T
+;
+test_struct_2
 
 struct: Typ3
   U32 1 field: Typ3_field0
   U8  1 field: Typ3_field1
 end
 
-T{ Typ3            <T> 8   }T
-T{ 123 Typ3_field0 <T> 123 }T
-T{ 123 Typ3_field1 <T> 127 }T
+: test_struct_3
+  T{ Typ3            <T> 8   }T
+  T{ 123 Typ3_field0 <T> 123 }T
+  T{ 123 Typ3_field1 <T> 127 }T
+;
+test_struct_3
 
 struct: Typ4
   U8  1 field: Typ4_field0
@@ -1195,10 +1289,13 @@ struct: Typ4
   U64 1 field: Typ4_field2
 end
 
-T{ Typ4            <T> 16  }T
-T{ 123 Typ4_field0 <T> 123 }T
-T{ 123 Typ4_field1 <T> 127 }T
-T{ 123 Typ4_field2 <T> 131 }T
+: test_struct_4
+  T{ Typ4            <T> 16  }T
+  T{ 123 Typ4_field0 <T> 123 }T
+  T{ 123 Typ4_field1 <T> 127 }T
+  T{ 123 Typ4_field2 <T> 131 }T
+;
+test_struct_4
 
 struct: Typ5
   U32 1 field: Typ5_field0
@@ -1206,10 +1303,13 @@ struct: Typ5
   U64 1 field: Typ5_field2
 end
 
-T{ Typ5            <T> 16  }T
-T{ 123 Typ5_field0 <T> 123 }T
-T{ 123 Typ5_field1 <T> 127 }T
-T{ 123 Typ5_field2 <T> 131 }T
+: test_struct_5
+  T{ Typ5            <T> 16  }T
+  T{ 123 Typ5_field0 <T> 123 }T
+  T{ 123 Typ5_field1 <T> 127 }T
+  T{ 123 Typ5_field2 <T> 131 }T
+;
+test_struct_5
 
 struct: Typ6
   U32 1 field: Typ6_field0
@@ -1217,10 +1317,13 @@ struct: Typ6
   U8  1 field: Typ6_field2
 end
 
-T{ Typ6            <T> 24  }T
-T{ 123 Typ6_field0 <T> 123 }T
-T{ 123 Typ6_field1 <T> 131 }T
-T{ 123 Typ6_field2 <T> 139 }T
+: test_struct_6
+  T{ Typ6            <T> 24  }T
+  T{ 123 Typ6_field0 <T> 123 }T
+  T{ 123 Typ6_field1 <T> 131 }T
+  T{ 123 Typ6_field2 <T> 139 }T
+;
+test_struct_6
 
 struct: Typ7
   U64 1 field: Typ7_field0
@@ -1229,11 +1332,14 @@ struct: Typ7
   U8  1 field: Typ7_field3
 end
 
-T{ Typ7            <T> 24  }T
-T{ 123 Typ7_field0 <T> 123 }T
-T{ 123 Typ7_field1 <T> 131 }T
-T{ 123 Typ7_field2 <T> 135 }T
-T{ 123 Typ7_field3 <T> 139 }T
+: test_struct_7
+  T{ Typ7            <T> 24  }T
+  T{ 123 Typ7_field0 <T> 123 }T
+  T{ 123 Typ7_field1 <T> 131 }T
+  T{ 123 Typ7_field2 <T> 135 }T
+  T{ 123 Typ7_field3 <T> 139 }T
+;
+test_struct_7
 
 struct: Typ8
   U8  1 field: Typ8_field0
@@ -1242,20 +1348,26 @@ struct: Typ8
   U32 1 field: Typ8_field3
 end
 
-T{ Typ8            <T> 8   }T
-T{ 123 Typ8_field0 <T> 123 }T
-T{ 123 Typ8_field1 <T> 124 }T
-T{ 123 Typ8_field2 <T> 125 }T
-T{ 123 Typ8_field3 <T> 127 }T
+: test_struct_8
+  T{ Typ8            <T> 8   }T
+  T{ 123 Typ8_field0 <T> 123 }T
+  T{ 123 Typ8_field1 <T> 124 }T
+  T{ 123 Typ8_field2 <T> 125 }T
+  T{ 123 Typ8_field3 <T> 127 }T
+;
+test_struct_8
 
 struct: Typ9
   U8 1   field: Typ9_field0
   U8 128 field: Typ9_field1
 end
 
-T{ Typ9            <T> 129 }T
-T{ 123 Typ9_field0 <T> 123 }T
-T{ 123 Typ9_field1 <T> 124 }T
+: test_struct_9
+  T{ Typ9            <T> 129 }T
+  T{ 123 Typ9_field0 <T> 123 }T
+  T{ 123 Typ9_field1 <T> 124 }T
+;
+test_struct_9
 
 struct: Typ10
   U8  1   field: Typ10_field0
@@ -1264,20 +1376,26 @@ struct: Typ10
   U8  128 field: Typ10_field3
 end
 
-T{ Typ10            <T> 144 }T
-T{ 123 Typ10_field0 <T> 123 }T
-T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
-T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
-T{ 123 Typ10_field3 <T> 139 }T
+: test_struct_10
+  T{ Typ10            <T> 144 }T
+  T{ 123 Typ10_field0 <T> 123 }T
+  T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
+  T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
+  T{ 123 Typ10_field3 <T> 139 }T
+;
+test_struct_10
 
 struct: Typ11
   5   3 field: Typ11_field0
   U64 1 field: Typ11_field1
 end
 
-T{ Typ11            <T> 24  }T
-T{ 123 Typ11_field0 <T> 123 }T
-T{ 123 Typ11_field1 <T> 139 }T
+: test_struct_11
+  T{ Typ11            <T> 24  }T
+  T{ 123 Typ11_field0 <T> 123 }T
+  T{ 123 Typ11_field1 <T> 139 }T
+;
+test_struct_11
 
 : test_catch_invalid
   \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
@@ -1469,12 +1587,17 @@ test_catches_3_fun_throwing
 : test_catches_3
   [ true catches ]
 
-  T{ 0 test_catches_3_fun { one two err } <T>      }T
+  T{
+    \ Predictable state of regs x0 x1 x2.
+    123 234 345 { -- }
+    0 test_catches_3_fun { one two err }
+    <T>
+  }T
   T{ " test_err" err cstr=                <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
-  T{ two <T> 0   }T
+  T{ two <T> 234 }T
 
   T{ 123 test_catches_3_fun { one two err } <T>              }T
   T{ one two err                            <T> 246 -123 nil }T
@@ -1531,6 +1654,7 @@ test_catches_4
 
 \ Must compile.
 : test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 ;
+T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
 
 \ Must fail to compile.
 \ : test_too_many_output_regs { -- A B C D E F G H I } ;
@@ -1540,6 +1664,7 @@ test_catches_4
   false if test_throw end
   0 1 2 3 4 5 6
 ;
+T{ test_max_output_regs_throw <T> 0 1 2 3 4 5 6 }T
 
 \ Must fail to compile: error takes up 1 more reg.
 \ : test_too_many_output_regs_throw { -- A B C D E F G H }
@@ -1547,4 +1672,109 @@ test_catches_4
 \   0 1 2 3 4 5 6 7
 \ ;
 
-" [test] ok" log lf
+\ For AOT-compiled testing. Must call every test which is also called above
+\ during the initial interpretation, with the exception of tests which depend
+\ on interpreter-only features.
+: main_run
+  test_test
+  test_locals
+  test_stack_primitives
+  test_to_stack_variadic
+  test_stack_braces
+  test_local_ref
+  test_local_ref_volatile_immediate_read
+  test_local_ref_volatile_delayed_read
+  test_local_ref_volatile_with_inputs
+  test_local_ref_volatile_with_outputs
+  test_conditionals
+  test_recursion
+  \ test_sleep_loop
+  test_loop_leave
+  test_loop_nested
+  test_loop_while
+  test_loop_while_leave
+  test_loop_until
+  test_loop_for
+  test_loop_for_countdown
+  test_loop_for_countup
+  test_loop_countdown
+  test_loop_countup
+  test_loop_countup_nested
+  test_cont_loop_basic
+  test_cont_loop
+  test_cont_for
+  test_cont_for_countup
+  test_cont_loop_countdown
+  test_cont_loop_countup
+  test_load_store
+  test_negate
+  test_equal
+  test_not_equal
+  test_greater
+  test_lesser
+  test_lesser_equal
+  test_greater_equal
+  test_arith
+  test_mod
+  test_slash_mod
+  test_abs
+  test_min
+  test_max
+  test_cstr_eq
+  test_cstr_less
+  test_int_to_cell
+  \ test_vargs_printf
+  \ test_logf
+  \ test_elogf
+  test_errf
+  \ test_errf_throw
+  test_wrapf
+  test_alloca_cell
+  test_alloca_align
+  test_alloca_big
+  32 64 test_alloca_dynamic
+  test_array_sizes
+  test_struct_fields_basic
+  test_struct_fields_load_store
+  test_struct_0
+  test_struct_1
+  test_struct_2
+  test_struct_3
+  test_struct_4
+  test_struct_5
+  test_struct_6
+  test_struct_7
+  test_struct_8
+  test_struct_9
+  test_struct_10
+  test_struct_11
+  test_catch_0
+  test_catch_1
+  test_catch_2
+  test_catches_and_throws
+  test_catches_0
+  test_catches_1_fun_throwing
+  test_catches_1
+  test_catches_2_fun_throwing
+  test_catches_2
+  test_catches_3_fun_throwing
+  test_catches_3
+  test_catches_4_fun_throwing
+  test_catches_4
+  T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
+  T{ test_max_output_regs_throw <T> 0 1 2 3 4 5 6 }T
+;
+
+: main { -- exit } [ true catches ]
+  main_run { err }
+
+  err ifn
+    " [test] [aot] ok" elog elf
+    0 ret
+  end
+
+  " [test] [aot] error: %s" err elogf elf
+  1
+;
+
+" [test] [jit] ok" log lf

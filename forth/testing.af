@@ -88,17 +88,29 @@ import' ./lang.af
 \ ## Compilation-mode test routines (inside words)
 
 Stack mem: TEST_STACK
-false var: TEST_STACK_INITED
+false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
+
+32 TEST_STACK stack_init
 
 \ Captured at `<T>`, used only in compilation. We could have used
 \ the regular control stack for this, but using a dedicated place
 \ is probably more reliable, since buggy code could clobber that.
 0 var: TEST_ARG_LEN
 
-: testing_stack_init
-  TEST_STACK_INITED @ if ret end
+\ Needed in AOT execution.
+\
+\ We initialize `TEST_STACK` in initial interpretation. AOT compilation
+\ preserves the state of the stack header, but the addresses it contains
+\ are no longer valid, since the memory was requested from the OS and is
+\ not managed by the compiler. This re-inits the stack in AOT, making it
+\ valid again.
+\
+\ TODO: general solution for similar cases.
+: testing_stack_init_aot
+  has_interp if ret end
+  TEST_STACK_INITED_AOT @ if ret end
   32 TEST_STACK stack_init
-  TEST_STACK_INITED on!
+  TEST_STACK_INITED_AOT on!
 ;
 
 : testing_compiled_reset
@@ -132,7 +144,7 @@ false var: TEST_STACK_INITED
   \ seamlessly in tests annotated with `[ true catches ]`.
   get_catches { ok }
   ok if false catches end
-  compile' testing_stack_init
+  compile' testing_stack_init_aot
   ok if true catches end
 ;
 
