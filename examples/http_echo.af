@@ -5,6 +5,11 @@ import' ./http_util.af
 \ Simple example of a single-threaded "HTTP" server which echoes requests
 \ back to clients. HTTP in quotes because it responds with HTTP without
 \ parsing the request; the client can be sending anything it wants.
+\
+\ Usage:
+\
+\   astil examples/http_echo.af
+\   curl http://localhost:2345
 
 128  let: MAX_CONN
 4096 buf: READ_BUF

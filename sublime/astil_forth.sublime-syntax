@@ -2,7 +2,7 @@
 ---
 version: 2
 scope: source.forth meta.astil.forth
-file_extensions: [f, af]
+file_extensions: [af, f]
 
 variables:
   eol: (?:\n|$)

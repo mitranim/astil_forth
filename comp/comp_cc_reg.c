@@ -573,7 +573,11 @@ static Err comp_next_arg_reg(Comp *comp, U8 *out) {
   return nullptr;
 }
 
-// TODO: support asking for multiple scratch regs (when we need that).
+/*
+Caution: only one scratch reg may be requested at a time.
+TODO: support asking for multiple scratch regs.
+Requires adding the ability to "free" them.
+*/
 static Err comp_scratch_reg(Comp *comp, U8 *out) {
   const auto reg = comp->ctx.arg_len;
   validate_volatile_reg(reg);

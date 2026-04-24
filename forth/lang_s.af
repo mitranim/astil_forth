@@ -1233,8 +1233,8 @@
 : loop_end ( C: loop_adr -- ) off_from_pc asm_branch comp_instr ; \ b <begin>
 : loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end execute'' end ;
 
-\ Implementation note. Each loop frame is "split" in two sub-frames:
-\ the "prev frame" and the "current frame". Auxiliary loop constructs
+\ Implementation note. Each loop frame is "split" into two sub-frames:
+\ the "prev frame", and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
 :: loop
@@ -1392,9 +1392,9 @@
 ;
 
 \ Similar to the standard `?do ... +loop`, but terminated with an `end`
-\ like other loops. Takes a name to make the index accessible. Usage:
+\ like all our loops. Takes a name to make the index accessible. Usage:
 \
-\   ceil floor step +loop: ind ind . end
+\   ceil floor step +loop: ind       end
 \   123  23    3    +loop: ind ind . end
 :: +loop:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )

@@ -2,8 +2,7 @@ import' ./lang.af
 
 \ ## Internal interpreter structures
 \
-\ Using structs, we can access interpreter-internal data
-\ which is not exposed via dedicated intrinsics.
+\ Stuff not exposed via intrinsics.
 
 \ SYNC[word_str].
 struct: Sym_word
@@ -11,10 +10,10 @@ struct: Sym_word
   U8  128 field: Sym_word_buf
 end
 
-\ Word definition. This is also the execution token
+\ Word definition. Also execution token
 \ returned by the ticks `'` and `''`.
 \
-\ Note: this struct definition is incomplete.
+\ Caution: this struct definition is incomplete.
 \
 \ SYNC[sym_fields].
 struct: Sym
@@ -23,7 +22,7 @@ struct: Sym
   U8       1 field: Sym_wordlist
   Adr      1 field: Sym_instr \ Executable address.
 
-  \ ... Other fields are omitted until we need them.
+  \ ... Other fields elided until we need them.
 end
 
 \ For internal use below.

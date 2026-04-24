@@ -94,7 +94,7 @@
 \ of various arithmetic words used by the assembler.
 
 4      let: ASM_INSTR_SIZE
-8      let: ASM_REG_SCRATCH
+8      let: ASM_REG_SCRATCH \ Dangerous; high chance of collision.
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP

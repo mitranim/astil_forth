@@ -363,6 +363,7 @@ static Err intrin_comp_next_arg_reg(Interp *interp, Sint *out) {
   return nullptr;
 }
 
+// Caution: only ONE scratch reg is available at a time.
 static Err intrin_comp_scratch_reg(Interp *interp, Sint *out) {
   U8 reg;
   try(comp_scratch_reg(&interp->comp, &reg));

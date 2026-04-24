@@ -24,8 +24,8 @@ Astil Forth is a native-code Forth system designed for self-bootstrapping and se
 
 Goals:
 - [x] Explore combined JIT & AOT compilation.
-- [x] Easy _self-assembly_ in user/lib code.
 - [x] Explore viability of single-pass assembly.
+- [x] Easy _self-assembly_ in user/lib code.
 - [x] Implement most of the language in user/lib code outside the compiler.
 - [x] Be usable for scripting.
 - [x] Support native register-based call ABI.
@@ -34,8 +34,7 @@ Goals:
 - [ ] Rewrite in Forth to self-host.
 
 Non-goals:
-- Produce the best compiler.
-- Have the best architecture.
+- Following other compiler designs.
 - Portability to multiple ISAs.
 
 Everything was written by me. This is _not_ slopbot-generated.
@@ -129,7 +128,7 @@ The system comes in two variants which use different call conventions: register-
 
 The outer interpreter / compiler, written in C, doesn't actually implement Forth. It provides just enough intrinsics for self-compilation. The _Forth_ code implements the language, on the fly, bootstrapping via inline assembly.
 - Register-CC: boots via [`./forth/lang.af`](./forth/lang.af).
-- Stack-CC: boots via [`forth/lang_s.af`](./forth/lang_s.af).
+- Stack-CC: boots via [`./forth/lang_s.af`](./forth/lang_s.af).
 
 ### Always fast
 
@@ -143,7 +142,7 @@ Some other scripting languages offer "compilation", but it's almost never the re
 - Gforth builds a VM image file, which requires the interpreter.
 - Deno and Bun bundle an interpreter when building an executable.
 
-Some recent AOT languages offer comptime execution, which is a nice step towards bridging the gap. Examples include Nim and Zig. Unfortunately, to the best of my knowledge, they do this with interpretation, not compilation, limiting the usefulness. Bun's sources have comments like "this used to be calculated at comptime, but too slow, so we moved this to runtime". Astil Forth avoids this problem: "comptime" execution uses assembled code, not an interpreter.
+Some recent AOT languages offer comptime execution, which is a nice step towards bridging the gap. Examples include Nim and Zig. Unfortunately, to the best of my knowledge, they do this with interpretation, not compilation, limiting the usefulness. Bun's sources (Zig) have comments like "this used to be calculated at comptime, but too slow, so we moved this to runtime". Astil Forth avoids this problem: "comptime" execution uses assembled code, not an interpreter.
 
 Fun note. AOT compilation in Astil Forth might be the "fastest" of any language, because it simply dumps the already JIT-compiled code of your program (plus data and dyld symbols) into an executable file. At the time of writing, it takes about a millisecond for simple programs.
 
@@ -296,7 +295,7 @@ In reg-CC:
 
 ## Performance
 
-See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth vaguely approximates C with Clang, while leaving Gforth in the dust. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
+See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth vaguely approximates C with Clang (`-O2`), while leaving Gforth in the dust. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
 
 ## Limitations
 
@@ -328,7 +327,7 @@ Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
 - All conditionals and loops are terminated with `end`. No need to remember other terminators. (`until` is also available.)
-- `elif` is supported.
+- `elif` / `elifn` is supported.
 - Any amount of `else elif` is terminated with a single `end`.
 - Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
@@ -363,7 +362,7 @@ Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word 
 
 ### No return stack
 
-Because Astil Forth uses native calls and doesn't target embedded systems, the role of the return stack is fulfilled by registers and the system stack.
+Because Astil Forth targets Arm64 and assumes an OS, the role of the return stack is fulfilled by registers and the system stack.
 
 Reg-CC emphasizes named local variables. Locals are kept in registers when possible, and spilled to the system stack otherwise. The compiler figures out the locations.
 
@@ -377,6 +376,7 @@ Because I was learning and experimenting. Some of the code is generalized librar
 
 ## Lessons
 
+- Partial self-bootstrap is possible.
 - Partial self-assembly is possible.
 - Single-pass assembly is possible (with fixups 😔).
 - Single-pass assembly is compatible with _basic_ optimizations,
@@ -394,7 +394,7 @@ The term "JIT" is used here only for convenience. This doesn't assemble "just" i
 
 "Compilation" and especially "JIT compilation" are muddy terms. Many interpreters convert text to VM code, which may qualify as JIT compilation, even if the result remains interpreted. In the Java world, generating VM code files is considered "compilation".
 
-Especially murky in the Forth world. Docs will often mention compilation, and sometimes decompilation, usually without saying what it compiles _to_ and decompiles _from_: VM code or machine code. Some Forth systems use both; some stop at VM code; Astil Forth uses only native code. Yet all these systems qualify as "compilers".
+Especially murky in the Forth world. Docs will often mention compilation, and sometimes decompilation, usually without saying what it compiles _to_ and decompiles _from_: VM code or machine code. Some Forth systems use both; some stop at VM code; Astil Forth uses only machine code. Yet all these systems qualify as "compilers".
 
 Sometimes it's useful to describe a non-assembler as a "JIT compiler". For example, one of my Go libraries implements JIT-construction of data structures which, when subsequently interpreted, allow efficient deep traversal of complex Go data structures; it delegates setup to "compilation time" and eliminates many costs at "runtime", although both steps occur when the program runs, and the result is interpreted.
 

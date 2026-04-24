@@ -1,6 +1,9 @@
+# Requires Make 4+ for `$(file < ...)`.
+
 MAKEFLAGS := --silent
 MAKE_CONC := $(MAKE) -j 128 CONC=true clear=$(or $(clear),false)
 CLEAR ?= $(if $(filter false,$(clear)),, )
+HERE ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CC ?= clang
 PROD ?=
 STRICT ?=
@@ -10,31 +13,29 @@ DEBUG_FLAGS_PROD ?= -g3 -O2 -Wno-unused-parameter -Wno-unused-variable
 DEBUG_FLAGS ?= $(if $(DEBUG),$(DEBUG_FLAGS_0),$(if $(PROD),$(DEBUG_FLAGS_PROD),$(DEBUG_FLAGS_1)))
 CRASH_FLAGS ?= $(and $(FAST_CRASH),-DFAST_CRASH)
 STRICT_FLAGS ?= $(and $(STRICT),-Werror)
-COMPILE_FLAGS ?= $(shell printf ' %s' $$(cat compile_flags.txt))
+COMPILE_FLAGS ?= $(strip $(file < $(HERE)/compile_flags.txt))
 CFLAGS ?= $(and $(PROD),-DPROD) $(COMPILE_FLAGS) $(STRICT_FLAGS) $(DEBUG_FLAGS) $(CRASH_FLAGS)
 LOCAL ?= local
-SRC ?= comp
-GEN ?= generated
-ASM_GEN_SRC ?= $(SRC)/asm_gen.c
-ASM_GEN_OUT ?= $(SRC)/asm_generated.s
+SRC_DIR ?= comp
+GEN_DIR ?= generated
+ASM_GEN_SRC ?= $(SRC_DIR)/asm_gen.c
+ASM_GEN_OUT ?= $(SRC_DIR)/asm_generated.s
 MACH_GEN_SRC ?= mach/mach_exc.defs
-MACH_GEN_OUT ?= $(GEN)/mach_exc.c
-ALL_SRC ?= $(wildcard $(SRC)/*.c $(SRC)/*.h $(SRC)/**/*.c $(SRC)/**/*.h $(SRC)/arch_arm64_cc_stack.s) $(ASM_GEN_SRC)
-MAIN_SRC ?= $(SRC)/main.c
+MACH_GEN_OUT ?= $(GEN_DIR)/mach_exc.c
+ALL_SRC ?= $(filter-out $(ASM_GEN_OUT),$(shell find $(SRC_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) ))
+MAIN_SRC ?= $(SRC_DIR)/main.c
 MAIN_S ?= astil_s.exe
 MAIN ?= astil.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
-WATCH_IGNORE ?= -i=$(GEN) -i=$(ASM_GEN_OUT)
+WATCH_IGNORE ?= -i=$(GEN_DIR) -i=$(ASM_GEN_OUT)
 WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 # WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q --no-vcs-ignore
 WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=af
 WATCH_ALL ?= $(WATCH) -e=c,h,s,af
 WATCH_IMM ?= $(WATCH) -e=af,exe --no-vcs-ignore
-
-ARTIF ?= $(MAIN_S) $(MAIN) *.o *.exe *.dSYM *.plist *.elf *.dbg \
-	**/*.o **/*.exe **/*.dSYM **/*.plist **/*.elf **/*.dbg
+ARTIF ?= $(shell find . \( -type d -name '*.dSYM' \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' \) \))
 
 ifeq ($(verb),true)
 	OK = echo [$@] ok
@@ -90,7 +91,7 @@ run_boxed:
 		-D EXE0=$(EXE0) \
 		-D EXE1=$(EXE1) \
 		-D EXE2=$(EXE2) \
-		./$(file) $(args)
+		$(abspath $(file)) $(args)
 
 # Register-CC version.
 .PHONY: run
@@ -124,7 +125,7 @@ $(MAIN_S): $(ALL_SRC) $(ASM_GEN_OUT)
 #   make run_c file=some_file.c
 .PHONY: run_c
 run_c: $(FILE_EXE) $(ALL_SRC)
-	./$(FILE_EXE)
+	$(abspath $(FILE_EXE)) $(args)
 
 .PHONY: run_c_w
 run_c_w:
@@ -210,17 +211,17 @@ disasm:
 
 .PHONY: clean
 clean:
-	rm -rf $(GEN) $(wildcard $(ARTIF))
+	rm -rf $(GEN_DIR) $(wildcard $(ARTIF))
 
 # The MIG's output is much worse than this.
 $(MACH_GEN_OUT): $(MACH_GEN_SRC)
-	mkdir -p $(GEN)
-	xcrun mig -server $(GEN)/tmp.c -user /dev/null -header /dev/null $(MACH_GEN_SRC) \
-		&& cat mach/mach_pre.txt $(GEN)/tmp.c mach/mach_suf.txt \
+	mkdir -p $(GEN_DIR)
+	xcrun mig -server $(GEN_DIR)/tmp.c -user /dev/null -header /dev/null $(MACH_GEN_SRC) \
+		&& cat mach/mach_pre.txt $(GEN_DIR)/tmp.c mach/mach_suf.txt \
 			| sed -e 's/__attribute__((unused))//g' -e 's/__attribute__((__unused__))//g' \
 			| clang-format \
 			> $(MACH_GEN_OUT) \
-		; rm -rf $(GEN)/tmp.c
+		; rm -rf $(GEN_DIR)/tmp.c
 
 # Non-configurable for now; usage of `~/.local`
 # is also hardcoded in the interpreter.

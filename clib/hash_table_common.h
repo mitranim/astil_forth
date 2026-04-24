@@ -6,6 +6,8 @@
 /*
 Opaque dict/map header. See `./dict.*` and `./map.*` files.
 Must be binary-compatible with `Dict` and `Map`.
+
+SYNC[hash_table_structure].
 */
 typedef struct {
   Ind   len;
