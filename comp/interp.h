@@ -33,6 +33,7 @@ typedef struct {
   Str_set     imports;   // Realpaths of already-imported files.
   Comp        comp;      // Code and compilation context.
   Interp_snap snap;      // Stable snapshot for rewinding.
+  bool        welcomed;  // Already printed REPL help.
 } Interp;
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);

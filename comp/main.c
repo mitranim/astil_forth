@@ -14,7 +14,7 @@ static void print_help(void) {
     "\n"
     "  astil <file0> <file1> ...\n"
     "\n"
-    "For an interactive REPL session, pass `/dev/stdin` or `-`\n"
+    "For an interactive REPL session, use `/dev/stdin` or `-`\n"
     "as a \"file name\", in any order. Note: you need to import\n"
     "`std:lang.af` first, in order to bootstrap the language.\n"
     "Hint: to exit the REPL, press Ctrl+D to terminate stdin.\n"
@@ -43,6 +43,9 @@ static void print_help(void) {
     "Every file is evaluated immediately.\n"
     "Flags take effect only when reached.)\n"
     "\n"
+    "Debug logging with `--debug` is not available\n"
+    "when Astil Forth is compiled with `PROD=true`.\n"
+    "\n"
 #ifndef CALL_CONV_STACK
     "Compiling to a native executable:\n"
     "\n"
@@ -50,9 +53,9 @@ static void print_help(void) {
     "  ./out.exe\n"
     "\n"
 #endif // CALL_CONV_STACK
-    "Hint: an `std:*` import searches the following locations:\n"
-    "- Directory `./forth` relative to the `astil` executable.\n"
-    "- Directory `$HOME/.local/share/astil` (`make install`).\n",
+    "Hint: each `std:*` import searches the following locations:\n"
+    "- Directory `forth` relative to the path of the executable.\n"
+    "- Directory `$HOME/.local/share/astil` with `make install`.\n",
     stderr
   );
 }

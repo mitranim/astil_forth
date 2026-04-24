@@ -338,6 +338,24 @@ static Err interp_loop(Interp *interp) {
   return nullptr;
 }
 
+static void interp_welcome(Interp *interp) {
+  if (interp->welcomed) return;
+
+  const auto name = "words";
+
+  if (dict_has(&interp->dict_exec, name) || dict_has(&interp->dict_comp, name)) {
+    printf(
+      "Running Astil Forth REPL. Type " FMT_QUOTED " to see available words.\n",
+      name
+    );
+  }
+  else {
+    puts("Running Astil Forth REPL.");
+  }
+
+  interp->welcomed = true;
+}
+
 #ifdef __APPLE__
 #include <limits.h>
 #include <mach-o/dyld.h>
@@ -361,11 +379,12 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
   read->file      = file;
   try(str_set(&read->file_path, path));
 
+  const auto tty = isatty(fileno(file));
+  if (tty) interp_welcome(interp);
+
   IF_DEBUG(eprintf("[system] reading code from stdio: " FMT_QUOTED "\n", path));
 
-  if (!isatty(fileno(file))) {
-    return interp_err(read, interp_loop(interp));
-  }
+  if (!tty) return interp_err(read, interp_loop(interp));
 
   for (;;) {
     const auto err = interp_err(read, interp_loop(interp));
