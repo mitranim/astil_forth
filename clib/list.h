@@ -60,11 +60,11 @@ If more space is needed, doubles the required capacity until done.
   list_reserve_spare_cap_impl((List *)(list), list_val_size(list), cap)
 
 // Appends the given value, allocating space as needed.
-#define list_append_impl(tmp, list, ...)                 \
-  ({                                                     \
-    const auto tmp = list;                               \
-    list_reserve_more((List *)tmp, list_val_size(list)); \
-    tmp->dat[tmp->len++] = __VA_ARGS__;                  \
+#define list_append_impl(tmp, list, ...)                \
+  ({                                                    \
+    const auto tmp = list;                              \
+    list_reserve_more((List *)tmp, list_val_size(tmp)); \
+    tmp->dat[tmp->len++] = __VA_ARGS__;                 \
   })
 
 #define list_append(...) list_append_impl(UNIQ_IDENT, __VA_ARGS__)
@@ -73,13 +73,13 @@ If more space is needed, doubles the required capacity until done.
 Appends the given value, allocating space as needed,
 and returns a pointer to the newly appended entry.
 */
-#define list_append_ptr_impl(tmp_list, tmp_ptr, list, ...)    \
-  ({                                                          \
-    const auto tmp_list = list;                               \
-    list_reserve_more((List *)tmp_list, list_val_size(list)); \
-    const auto tmp_ptr = &tmp_list->dat[tmp_list->len++];     \
-    *tmp_ptr           = __VA_ARGS__;                         \
-    tmp_ptr;                                                  \
+#define list_append_ptr_impl(tmp_list, tmp_ptr, list, ...)        \
+  ({                                                              \
+    const auto tmp_list = list;                                   \
+    list_reserve_more((List *)tmp_list, list_val_size(tmp_list)); \
+    const auto tmp_ptr = &tmp_list->dat[tmp_list->len++];         \
+    *tmp_ptr           = __VA_ARGS__;                             \
+    tmp_ptr;                                                      \
   })
 
 #define list_append_ptr(...) \
@@ -252,13 +252,15 @@ Does not initialize memory at location.
 
 #define list_trunc(list) ((list)->len = 0)
 
-#define list_rewind_impl(tmp_next, tmp_prev, next, prev)                        \
-  ({                                                                            \
-    const auto tmp_next = next;                                                 \
-    const auto tmp_prev = prev;                                                 \
-    aver(tmp_next->cap >= tmp_prev->cap);                                       \
-    memmove(tmp_next->dat, tmp_prev->dat, tmp_prev->len * list_val_size(prev)); \
-    tmp_next->len = tmp_prev->len;                                              \
+#define list_rewind_impl(tmp_next, tmp_prev, next, prev)                    \
+  ({                                                                        \
+    const auto tmp_next = next;                                             \
+    const auto tmp_prev = prev;                                             \
+    aver(tmp_next->cap >= tmp_prev->cap);                                   \
+    memmove(                                                                \
+      tmp_next->dat, tmp_prev->dat, tmp_prev->len * list_val_size(tmp_prev) \
+    );                                                                      \
+    tmp_next->len = tmp_prev->len;                                          \
   })
 
 #define list_rewind(...) list_rewind_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)

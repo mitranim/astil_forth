@@ -23,7 +23,7 @@ import' std:lang.af
 \ Run immediately in JIT mode.
 main
 
-' main " out.exe" compile_executable
+xt' main " out.exe" compile_executable
 
 \ ## Bonus example
 \

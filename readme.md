@@ -103,7 +103,7 @@ Easy AOT compilation; can be used from inside a program, or via CLI flags:
   0
 ;
 
-' main             \ Reference to the entry point.
+xt' main           \ Reference to the entry point.
 " out.exe"         \ Where to put the executable.
 compile_executable
 
