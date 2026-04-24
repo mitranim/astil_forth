@@ -280,7 +280,7 @@ static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
   aver(inds->len == got_ind);
 
   const auto got_name = names->top;
-  averr(str_copy(got_name, name));
+  averr(str_set(got_name, name));
 
   names->top++;
   list_push(addrs, addr);

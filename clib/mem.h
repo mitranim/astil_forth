@@ -31,6 +31,15 @@ typedef struct {
   Ind cap;
 } Buf;
 
+#define buf_append_impl(tmp_buf, tmp_val, buf, ...)      \
+  ({                                                     \
+    const auto tmp_buf = buf;                            \
+    const auto tmp_val = __VA_ARGS__;                    \
+    buf_reserve(tmp_buf, sizeof(tmp_val));               \
+    memcpy(buf_top(tmp_buf), &tmp_val, sizeof(tmp_val)); \
+    (void)(tmp_buf->len += sizeof(tmp_val));             \
+  })
+
 /*
 Appends an arbitrary value to a `Buf` as raw bytes, resizing as needed.
 If the buffer memory is later reinterpreted as values larger than `U8`,
@@ -38,13 +47,14 @@ the caller is responsible for address alignment.
 
 Uses `memcpy` rather than pointer assignment to avoid UB.
 */
-#define buf_append(buf, ...)                             \
-  ({                                                     \
-    const auto tmp_buf = buf;                            \
-    const auto tmp_val = __VA_ARGS__;                    \
-    buf_reserve(tmp_buf, sizeof(tmp_val));               \
-    memcpy(buf_top(tmp_buf), &tmp_val, sizeof(tmp_val)); \
-    (void)(tmp_buf->len += sizeof(tmp_val));             \
+#define buf_append(...) buf_append_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define buf_load_impl(tmp_buf, tmp_val, buf, off, type)    \
+  ({                                                       \
+    const auto tmp_buf = buf;                              \
+    type       tmp_val;                                    \
+    memcpy(&tmp_val, tmp_buf->dat + off, sizeof(tmp_val)); \
+    tmp_val;                                               \
   })
 
 /*
@@ -59,17 +69,13 @@ This is also why we load/store values instead of operating on addresses.
 
 UNTESTED.
 */
-#define buf_load(buf, off, type)                           \
-  ({                                                       \
-    const auto tmp_buf = buf;                              \
-    type       tmp_val;                                    \
-    memcpy(&tmp_val, tmp_buf->dat + off, sizeof(tmp_val)); \
-    tmp_val;                                               \
+#define buf_load(...) buf_load_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define buf_store_impl(tmp, buf, off, ...)     \
+  ({                                           \
+    const auto tmp = __VA_ARGS__;              \
+    memcpy(buf->dat + off, &tmp, sizeof(tmp)); \
   })
 
 // UNTESTED.
-#define buf_store(buf, off, ...)                       \
-  ({                                                   \
-    const auto tmp_val = __VA_ARGS__;                  \
-    memcpy(buf->dat + off, &tmp_val, sizeof(tmp_val)); \
-  })
+#define buf_store(...) buf_store_impl(UNIQ_IDENT, __VA_ARGS__)

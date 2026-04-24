@@ -13,6 +13,10 @@ static bool TRACE = false;
   if (DEBUG) code;
 #endif
 
+#define CAT_IDENT(A, B) A##B
+#define XCAT_IDENT(A, B) CAT_IDENT(A, B)
+#define UNIQ_IDENT XCAT_IDENT(__uniq_, __COUNTER__)
+
 typedef void(Void_fun)(void);
 
 #define USED __attribute((used))
@@ -32,16 +36,26 @@ which weren't actually allocated.
 */
 #define defer(fun) __attribute__((cleanup(fun)))
 
+/*
+Usage:
+
+  static void deinit_global_state(void*) {}
+  defer_void(deinit_global_state);
+*/
+#define defer_void(fun) defer(fun) void *UNIQ_IDENT
+
 // For use in `X_deinit` functions used with `defer`.
-#define var_deinit(name, fun)           \
-  {                                     \
-    const auto deinit_tmp_ptr = name;   \
-    if (!deinit_tmp_ptr) return;        \
-    void *deinit_tmp = *deinit_tmp_ptr; \
-    if (!deinit_tmp) return;            \
-    *deinit_tmp_ptr = nullptr;          \
-    fun(deinit_tmp);                    \
+#define var_deinit_impl(tmp_ptr, tmp_val, name, fun) \
+  {                                                  \
+    const auto tmp_ptr = name;                       \
+    if (!tmp_ptr) return;                            \
+    void *tmp_val = *tmp_ptr;                        \
+    if (!tmp_val) return;                            \
+    *tmp_ptr = nullptr;                              \
+    fun(tmp_val);                                    \
   }
+
+#define var_deinit(...) var_deinit_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 #ifndef unreachable
 #define unreachable __builtin_unreachable
@@ -57,13 +71,14 @@ which weren't actually allocated.
 
 #define span(max) range(auto, tmp_ind, max)
 
-// Non-lazy "or" which doesn't convert operands to 0 or 1.
-#define either(one, two)         \
-  ({                             \
-    const auto tmp_one = one;    \
-    const auto tmp_two = two;    \
-    tmp_one ? tmp_one : tmp_two; \
+#define either_impl(tmp, A, B) \
+  ({                           \
+    const auto tmp = A;        \
+    tmp ? tmp : B;             \
   })
+
+// Non-lazy "or" which doesn't convert operands to 0 or 1.
+#define either(...) either_impl(UNIQ_IDENT, __VA_ARGS__)
 
 #define assign_cast(tar, src) *(tar) = (typeof(*(tar)))(src)
 

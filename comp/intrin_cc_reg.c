@@ -515,7 +515,7 @@ static void intrin_debug_ctx(Interp *interp) {
       const auto last_val_ind = (U8)(last_val + 1);
       auto       val_cap      = cap;
       val_cap                 = min(val_cap, last_val_ind);
-      val_cap = max(val_cap, args); // Macro `min` is not nestable.
+      val_cap                 = max(val_cap, args);
 
       for (U8 ind = 0; ind < val_cap; ind++) {
         const auto val = arr[ind];

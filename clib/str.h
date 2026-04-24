@@ -15,17 +15,30 @@ typedef str_buf(256) Path_str;
 
 #define str_cap(str) ((Ind)(sizeof((str)->buf) / sizeof((str)->buf[0])))
 
-#define str_trunc(str)              \
-  ({                                \
-    const auto str_trunc_tmp = str; \
-    str_trunc_tmp->len       = 0;   \
-    str_terminate(str_trunc_tmp);   \
+#define str_trunc_impl(tmp, str) \
+  ({                             \
+    const auto tmp = str;        \
+    tmp->len       = 0;          \
+    str_terminate(tmp);          \
   })
 
-#define str_terminate(str)                       \
-  ({                                             \
-    const auto str_term_tmp              = str;  \
-    str_term_tmp->buf[str_term_tmp->len] = '\0'; \
+#define str_trunc(...) str_trunc_impl(UNIQ_IDENT, __VA_ARGS__)
+
+#define str_terminate_impl(tmp, str) \
+  ({                                 \
+    const auto tmp     = str;        \
+    tmp->buf[tmp->len] = '\0';       \
+  })
+
+#define str_terminate(...) str_terminate_impl(UNIQ_IDENT, __VA_ARGS__)
+
+#define str_set_inner(tmp_str, tmp_len, out, src)                              \
+  ({                                                                           \
+    const auto tmp_str = out;                                                  \
+    Ind        tmp_len;                                                        \
+    Err tmp_err = str_set_impl(tmp_str->buf, src, str_cap(tmp_str), &tmp_len); \
+    if (!tmp_err) tmp_str->len = tmp_len;                                      \
+    tmp_err;                                                                   \
   })
 
 /*
@@ -33,25 +46,19 @@ Uses `strlcpy`. The source string must be null-terminated.
 The capacity of the source buffer is allowed to be smaller
 or larger than of the destination buffer.
 */
-#define str_copy(out, src)                                                    \
-  ({                                                                          \
-    const auto tmp_str = out;                                                 \
-    const auto tmp_cap = str_cap(tmp_str);                                    \
-    Ind        tmp_len;                                                       \
-    Err        tmp_err = str_copy_impl(tmp_str->buf, src, tmp_cap, &tmp_len); \
-    if (!tmp_err) tmp_str->len = tmp_len;                                     \
-    tmp_err;                                                                  \
+#define str_set(...) str_set_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define str_push_impl(tmp_str, tmp_ceil, str, byte) \
+  ({                                                \
+    const auto     tmp_str  = str;                  \
+    constexpr auto tmp_ceil = str_cap(str) - 1;     \
+    aver(tmp_str->len < tmp_ceil);                  \
+    tmp_str->buf[tmp_str->len++] = byte;            \
+    tmp_str->len >= tmp_ceil;                       \
   })
 
 // Checks bounds, returns true if about to overflow, panics on overflow.
-#define str_push(str, byte)                     \
-  ({                                            \
-    const auto     tmp_str  = str;              \
-    constexpr auto tmp_ceil = str_cap(str) - 1; \
-    aver(tmp_str->len < tmp_ceil);              \
-    tmp_str->buf[tmp_str->len++] = byte;        \
-    tmp_str->len >= tmp_ceil;                   \
-  })
+#define str_push(...) str_push_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 // // Returns 0 when out of length.
 // #define str_pop(str)                                          \
@@ -60,14 +67,15 @@ or larger than of the destination buffer.
 //     tmp_str->len ? tmp_str->buf[tmp_str->len-- - (Ind)1] : 0; \
 //   })
 
-#define str_eq(str, tar)                             \
-  ({                                                 \
-    const auto str_eq_tmp = str;                     \
-    !strncmp(tar, str_eq_tmp->buf, str_eq_tmp->len); \
+#define str_eq_impl(tmp, str, tar)     \
+  ({                                   \
+    const auto tmp = str;              \
+    !strncmp(tar, tmp->buf, tmp->len); \
   })
 
-// TODO when running out of capacity, return error instead of crashing.
-#define str_fmt(str, fmt, ...)                                            \
+#define str_eq(...) str_eq_impl(UNIQ_IDENT, __VA_ARGS__)
+
+#define str_fmt_impl(tmp_str, tmp_len, str, fmt, ...)                     \
   ({                                                                      \
     const auto tmp_str = str;                                             \
     const auto tmp_len = snprintf(                                        \
@@ -76,6 +84,9 @@ or larger than of the destination buffer.
     aver((Uint)tmp_len < arr_cap(tmp_str->buf));                          \
     tmp_str->len = (Ind)tmp_len;                                          \
   })
+
+// TODO when running out of capacity, return error instead of crashing.
+#define str_fmt(...) str_fmt_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 // For literal string prefixes; skips `strlen`.
 #define str_has_prefix(str, pre) (!strncmp(str, pre, (arr_cap(pre) - 1)))

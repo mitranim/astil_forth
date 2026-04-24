@@ -75,21 +75,23 @@ static constexpr auto INVALID_IND = (Ind)-1;
     (val) != INVALID_IND;                                          \
   })
 
-// Caution: can't be nested with itself or `max`.
-#define min(one, two)                      \
-  ({                                       \
-    const auto tmp_one = one;              \
-    const auto tmp_two = two;              \
-    tmp_one < tmp_two ? tmp_one : tmp_two; \
+#define min_impl(tmp_A, tmp_B, A, B) \
+  ({                                 \
+    const auto tmp_A = A;            \
+    const auto tmp_B = B;            \
+    tmp_A < tmp_B ? tmp_A : tmp_B;   \
   })
 
-// Caution: can't be nested with itself or `min`.
-#define max(one, two)                      \
-  ({                                       \
-    const auto tmp_one = one;              \
-    const auto tmp_two = two;              \
-    tmp_one > tmp_two ? tmp_one : tmp_two; \
+#define min(...) min_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define max_impl(tmp_A, tmp_B, A, B) \
+  ({                                 \
+    const auto tmp_A = A;            \
+    const auto tmp_B = B;            \
+    tmp_A > tmp_B ? tmp_A : tmp_B;   \
   })
+
+#define max(...) max_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 /*
 For powers of 2 this is equivalent to `big % smol`
@@ -103,15 +105,20 @@ but avoids "div" instructions which may be slower.
 Clang doesn't seem to support `__builtin_stdc_bit_ceil` yet.
 If the input is 0, this is UB.
 */
-#define round_up_pow2(val)                                                  \
+#define round_up_pow2_impl(tmp_val, tmp_wid, val)                           \
   ({                                                                        \
     const auto   tmp_val = val;                                             \
     constexpr U8 tmp_wid = sizeof(tmp_val) * CHAR_BIT;                      \
     (typeof(tmp_val))1 << (tmp_wid - __builtin_clzg(tmp_val - 1, tmp_wid)); \
   })
 
-#define divide_round_up(src, div)  \
-  ({                               \
-    const auto tmp_div = div;      \
-    (src + tmp_div - 1) / tmp_div; \
+#define round_up_pow2(...) \
+  round_up_pow2_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define divide_round_up_impl(tmp, src, div) \
+  ({                                        \
+    const auto tmp = div;                   \
+    (src + tmp - 1) / tmp;                  \
   })
+
+#define divide_round_up(...) divide_round_up_impl(UNIQ_IDENT, __VA_ARGS__)

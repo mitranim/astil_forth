@@ -33,24 +33,23 @@ typedef set_of(F64)  F64_set;
 
 #define set_init(set, cap) set_init_impl((Set *)(set), cap, set_val_size(set));
 
-#define set_has(set, val)                                               \
+#define set_has_impl(tmp, set, val)                                 \
+  ({                                                                \
+    const set_val_type(set) tmp = val;                              \
+    set_matching_ind((const Set *)(set), &tmp, set_val_size(set)) < \
+      INVALID_IND;                                                  \
+  })
+
+#define set_has(...) set_has_impl(UNIQ_IDENT, __VA_ARGS__)
+
+#define set_add_inner(tmp, set, ...)                                    \
   ({                                                                    \
-    const set_val_type(set) tmp_val = val;                              \
-    const auto tmp_size             = set_val_size(set);                \
-    const auto tmp_set              = (const Set *)(set);               \
-    const auto tmp_ind = set_matching_ind(tmp_set, &tmp_val, tmp_size); \
-    tmp_ind < (Ind) - 1;                                                \
+    const set_val_type(set) tmp = __VA_ARGS__;                          \
+    (typeof(tmp) *)set_add_impl((Set *)(set), &tmp, set_val_size(set)); \
   })
 
 // Returned pointer is only valid until next set resize.
-#define set_add(set, ...)                                                      \
-  ({                                                                           \
-    const set_val_type(set) tmp_val = (__VA_ARGS__);                           \
-    const auto tmp_val_size         = set_val_size(set);                       \
-    const auto tmp_set              = (set);                                   \
-    const auto tmp_ptr = set_add_impl((Set *)tmp_set, &tmp_val, tmp_val_size); \
-    (typeof(tmp_val) *)tmp_ptr;                                                \
-  })
+#define set_add(...) set_add_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #define set_val_type(set) typeof((set)->vals[0])
 #define set_val_size(set) sizeof((set)->vals[0])

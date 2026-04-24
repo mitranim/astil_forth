@@ -87,14 +87,16 @@ typedef span_of(F64)  F64_span;
 #define stack_trunc(stack) ((stack)->top = (stack)->floor)
 #define stack_trunc_to(stack, len) ((stack)->top = (stack)->floor + len)
 
-#define stack_push(stack, ...)         \
-  ({                                   \
-    const auto tmp_ptr = (stack)->top; \
-    aver(tmp_ptr < (stack)->ceil);     \
-    *tmp_ptr     = __VA_ARGS__;        \
-    (stack)->top = tmp_ptr + 1;        \
-    tmp_ptr;                           \
+#define stack_push_impl(tmp, stack, ...) \
+  ({                                     \
+    const auto tmp = (stack)->top;       \
+    aver(tmp < (stack)->ceil);           \
+    *tmp         = __VA_ARGS__;          \
+    (stack)->top = tmp + 1;              \
+    tmp;                                 \
   })
+
+#define stack_push(...) stack_push_impl(UNIQ_IDENT, __VA_ARGS__)
 
 #define stack_pop(stack)                  \
   ({                                      \
@@ -102,44 +104,58 @@ typedef span_of(F64)  F64_span;
     *(--(stack)->top);                    \
   })
 
+#define stack_push_raw_impl(                                           \
+  tmp_stack, tmp_val, tmp_out, tmp_val_size, tmp_elem_size, stack, ... \
+)                                                                      \
+  ({                                                                   \
+    const auto     tmp_stack     = stack;                              \
+    const auto     tmp_val       = __VA_ARGS__;                        \
+    const auto     tmp_out       = tmp_stack->top;                     \
+    constexpr auto tmp_val_size  = (Uint)sizeof(tmp_val);              \
+    constexpr auto tmp_elem_size = (Uint)sizeof(*tmp_stack->top);      \
+    static_assert(                                                     \
+      tmp_val_size >= tmp_elem_size &&                                 \
+      divisible_by(tmp_val_size, tmp_elem_size)                        \
+    );                                                                 \
+    memcpy(tmp_out, &tmp_val, tmp_val_size);                           \
+    tmp_stack->top += tmp_val_size / tmp_elem_size;                    \
+    tmp_out;                                                           \
+  })
+
 // Pushes the raw memory representation of the given value.
-#define stack_push_raw(stack, ...)                                             \
-  ({                                                                           \
-    const auto     stack_ptr = stack;                                          \
-    const auto     src_val   = __VA_ARGS__;                                    \
-    const auto     out_ptr   = stack_ptr->top;                                 \
-    constexpr auto val_size  = (Uint)sizeof(src_val);                          \
-    constexpr auto elem_size = (Uint)sizeof(*stack_ptr->top);                  \
-    static_assert(val_size >= elem_size && divisible_by(val_size, elem_size)); \
-    memcpy(out_ptr, &src_val, val_size);                                       \
-    (stack)->top += val_size / elem_size;                                      \
-    out_ptr;                                                                   \
+#define stack_push_raw(...)                                                 \
+  stack_push_raw_impl(                                                      \
+    UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__ \
+  )
+
+#define stack_push_from_impl(tmp, out, src)                        \
+  ({                                                               \
+    static_assert(sizeof(*(out)->top) == sizeof(*(src)->top));     \
+    const auto tmp = stack_len(src);                               \
+    if (tmp > 0) {                                                 \
+      memcpy((out)->top, (src)->floor, tmp * sizeof(*(out)->top)); \
+      (out)->top += tmp;                                           \
+    }                                                              \
   })
 
 // Pushes to the output stack/span everything from the source stack/span.
-#define stack_push_from(out, src)                                  \
-  ({                                                               \
-    static_assert(sizeof(*(out)->top) == sizeof(*(src)->top));     \
-    const auto len = stack_len(src);                               \
-    if (len > 0) {                                                 \
-      memcpy((out)->top, (src)->floor, len * sizeof(*(out)->top)); \
-      (out)->top += len;                                           \
-    }                                                              \
-  })
+#define stack_push_from(...) stack_push_from_impl(UNIQ_IDENT, __VA_ARGS__)
 
 // Index of given stack element, by pointer.
 // Providing an invalid pointer is UB.
 #define stack_ind(stack, val) ((Ind)((val) - (stack)->floor))
 
-#define stack_rewind(next, prev)              \
-  ({                                          \
-    const auto tmp_next = next;               \
-    const auto tmp_prev = prev;               \
-    aver(tmp_next->floor == tmp_prev->floor); \
-    tmp_next->top = tmp_prev->top;            \
+#define stack_rewind_impl(tmp_next, tmp_prev, next, prev) \
+  ({                                                      \
+    const auto tmp_next = next;                           \
+    const auto tmp_prev = prev;                           \
+    aver(tmp_next->floor == tmp_prev->floor);             \
+    tmp_next->top = tmp_prev->top;                        \
   })
 
-#define is_stack_elem(stack, ptr)                             \
+#define stack_rewind(...) stack_rewind_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define is_stack_elem_impl(tmp_stack, tmp_ptr, stack, ptr)    \
   ({                                                          \
     static_assert(sizeof(*ptr) == stack_val_size(stack));     \
     const auto tmp_stack = stack;                             \
@@ -147,6 +163,9 @@ typedef span_of(F64)  F64_span;
     is_aligned(tmp_ptr) &&                                    \
       tmp_ptr >= tmp_stack->floor &&tmp_ptr < tmp_stack->top; \
   })
+
+#define is_stack_elem(...) \
+  is_stack_elem_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 #define stack_range(type, name, stack) \
   type name = (stack)->floor;          \

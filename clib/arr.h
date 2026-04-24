@@ -14,22 +14,26 @@
     memcpy(tar, src, arr_cap(src));              \
   })
 
-#define arr_ptr_at(arr, ind)      \
-  ({                              \
-    const Ind tmp_ind = ind;      \
-    aver(tmp_ind < arr_cap(arr)); \
-    &(arr)[tmp_ind];              \
+#define arr_ptr_at_impl(tmp, arr, ind) \
+  ({                                   \
+    const Ind tmp = ind;               \
+    aver(tmp < arr_cap(arr));          \
+    &(arr)[tmp];                       \
+  })
+
+#define arr_ptr_at(...) arr_ptr_at_impl(UNIQ_IDENT, __VA_ARGS__)
+
+#define arr_set_impl(tmp, arr, ind, src)                     \
+  ({                                                         \
+    const auto tmp = src;                                    \
+    arr_set_impl(arr, arr_cap(arr), ind, &tmp, sizeof(tmp)); \
   })
 
 /*
 Caution: `ind` is for array elements (non-byte `sizeof`),
 and `src` may be any value that fits within the capacity.
 */
-#define arr_set(arr, ind, src)                               \
-  ({                                                         \
-    const auto tmp = src;                                    \
-    arr_set_impl(arr, arr_cap(arr), ind, &tmp, sizeof(tmp)); \
-  })
+#define arr_set(...) arr_set_impl(UNIQ_IDENT, __VA_ARGS__)
 
 // Examples: https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2299.htm
 #define arr_clear(arr) memcpy(arr, (typeof(arr)){}, sizeof(arr));

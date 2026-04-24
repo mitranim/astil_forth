@@ -22,22 +22,25 @@ typedef Err(Err_fun)(void);
     if (!(expr)) aver_fatal(#expr, __FILE__, __LINE__);                      \
   })
 
-#define averr(expr)                                   \
-  {                                                   \
-    Err tmp_err = expr;                               \
-    if (tmp_err) {                                    \
-      fatal_expr(tmp_err, #expr, __FILE__, __LINE__); \
-    }                                                 \
+#define averr_impl(tmp, expr)                     \
+  {                                               \
+    Err tmp = expr;                               \
+    if (tmp) {                                    \
+      fatal_expr(tmp, #expr, __FILE__, __LINE__); \
+    }                                             \
   }
+
+#define averr(...) averr_impl(UNIQ_IDENT, __VA_ARGS__)
 
 #ifdef FAST_CRASH
 #define try averr
 #else
-#define try(expr)                \
-  {                              \
-    Err tmp_err = expr;          \
-    if (tmp_err) return tmp_err; \
+#define try_impl(tmp, expr) \
+  {                         \
+    Err tmp = expr;         \
+    if (tmp) return tmp;    \
   }
+#define try(...) try_impl(UNIQ_IDENT, __VA_ARGS__)
 #endif
 
 /*
@@ -55,25 +58,28 @@ for `mmap`, whose result is either -1 or an address.
 // For procedures which directly return errno or 0.
 #define try_errno_posix(expr) try(err_errno_posix(expr))
 
-#define err_errno_posix(expr)                                              \
-  ({                                                                       \
-    const auto tmp_err = expr;                                             \
-    tmp_err ? err_from_errno(tmp_err, #expr, __func__, __FILE__, __LINE__) \
-            : nullptr;                                                     \
+#define err_errno_posix_impl(tmp, expr)                                       \
+  ({                                                                          \
+    const auto tmp = expr;                                                    \
+    tmp ? err_from_errno(tmp, #expr, __func__, __FILE__, __LINE__) : nullptr; \
   })
+
+#define err_errno_posix(...) err_errno_posix_impl(UNIQ_IDENT, __VA_ARGS__)
 
 #define try_main_errno(expr) try_main(err_errno(expr))
 
-#define try_main(expr)                         \
-  {                                            \
-    Err tmp_err = (expr);                      \
-    if (tmp_err) {                             \
-      fprintf(stderr, "error: %s\n", tmp_err); \
-      if (TRACE) backtrace_print();            \
-      if (DEBUG) abort();                      \
-      return 1;                                \
-    }                                          \
+#define try_main_impl(tmp, expr)           \
+  {                                        \
+    Err tmp = (expr);                      \
+    if (tmp) {                             \
+      fprintf(stderr, "error: %s\n", tmp); \
+      if (TRACE) backtrace_print();        \
+      if (DEBUG) abort();                  \
+      return 1;                            \
+    }                                      \
   }
+
+#define try_main(...) try_main_impl(UNIQ_IDENT, __VA_ARGS__)
 
 #ifdef NO_TRACE
 #define err_str(val) val
@@ -104,29 +110,30 @@ for `mmap`, whose result is either -1 or an address.
 #endif
 
 // Blame `clang-format` for the horrible ternary fmting.
-#define err_wrapf(fmt, err, ...)                           \
-  ({                                                       \
-    const auto err_wrapf_err = err;                        \
-    const auto err_wrapf_buf = !err_wrapf_err ? nullptr    \
-      : err_wrapf_err == ERR_BUF_0            ? ERR_BUF_1  \
-                                              : ERR_BUF_0; \
-    !err_wrapf_err ? nullptr : ({                          \
-      snprintf(                                            \
-        err_wrapf_buf,                                     \
-        arr_cap(ERR_BUF_0),                                \
-        fmt,                                               \
-        err_wrapf_err __VA_OPT__(, ) __VA_ARGS__           \
-      );                                                   \
-      err_wrapf_buf;                                       \
-    });                                                    \
+#define err_wrapf_impl(tmp_err, tmp_buf, fmt, err, ...)                      \
+  ({                                                                         \
+    const auto tmp_err = err;                                                \
+    const auto tmp_buf = !tmp_err ? nullptr                                  \
+      : tmp_err == ERR_BUF_0      ? ERR_BUF_1                                \
+                                  : ERR_BUF_0;                               \
+    !tmp_err ? nullptr : ({                                                  \
+      snprintf(                                                              \
+        tmp_buf, arr_cap(ERR_BUF_0), fmt, tmp_err __VA_OPT__(, ) __VA_ARGS__ \
+      );                                                                     \
+      tmp_buf;                                                               \
+    });                                                                      \
   })
 
-#define buf_fmtf(buf, fmt, ...)                                      \
-  ({                                                                 \
-    auto tmp_buf = buf;                                              \
-    snprintf(tmp_buf, arr_cap(buf), fmt __VA_OPT__(, ) __VA_ARGS__); \
-    tmp_buf;                                                         \
+#define err_wrapf(...) err_wrapf_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define buf_fmtf_impl(tmp, buf, fmt, ...)                        \
+  ({                                                             \
+    auto tmp = buf;                                              \
+    snprintf(tmp, arr_cap(buf), fmt __VA_OPT__(, ) __VA_ARGS__); \
+    tmp;                                                         \
   })
+
+#define buf_fmtf(...) buf_fmtf_impl(UNIQ_IDENT, __VA_ARGS__)
 
 #define static_assert_type(val, typ)                                     \
   static_assert(                                                         \

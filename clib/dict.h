@@ -9,6 +9,8 @@ Opaque dict header. Must be binary-compatible with `Hash_table`.
 
 The implementation makes no assumption if the keys are owned or borrowed.
 Consumer code decides this. See `dict_deinit` vs `dict_deinit_with_keys`.
+
+SYNC[hash_table_structure].
 */
 typedef struct {
   Ind    len;
@@ -52,17 +54,19 @@ static constexpr auto  EMPTY = (Empty){};
 #define dict_init(dict, cap) \
   hash_table_init((Hash_table *)dict, cap, DICT_KEY_SIZE, dict_val_size(dict));
 
-// Returns -1 when key is not present.
+// Returns `INVALID_IND` when key is not present.
 #define dict_ind(dict, key) dict_ind_impl((const Dict *)(dict), key)
 
 #define dict_has(dict, key) (dict_ind(dict, key) != INVALID_IND)
 
-#define dict_get_or(dict, key, val)                                   \
+#define dict_get_or_impl(tmp_dict, tmp_ind, dict, key, val)           \
   ({                                                                  \
     const auto tmp_dict = dict;                                       \
     const auto tmp_ind  = dict_ind_impl((const Dict *)tmp_dict, key); \
     (tmp_ind == INVALID_IND) ? val : tmp_dict->vals[tmp_ind];         \
   })
+
+#define dict_get_or(...) dict_get_or_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 #define dict_get(dict, key) dict_get_or(dict, key, (dict_val_type(dict)){0})
 
@@ -71,16 +75,15 @@ Returned pointer is only valid until next dict resize.
 Doesn't copy the key; the caller is responsible for its lifetime.
 Dicts which own their keys must be freed with `dict_deinit_with_keys`.
 */
-#define dict_set(dict, key, ...)                             \
-  ({                                                         \
-    const dict_val_type(dict) tmp_val = __VA_ARGS__;         \
-    const auto tmp_dict               = dict;                \
-    const auto tmp_val_size           = dict_val_size(dict); \
-    const auto tmp_ptr                = dict_set_impl(       \
-      (Dict *)tmp_dict, key, &tmp_val, tmp_val_size          \
-    );                                                       \
-    (typeof(tmp_val) *)tmp_ptr;                              \
+#define dict_set_inner(tmp, dict, key, ...)          \
+  ({                                                 \
+    const dict_val_type(dict) tmp = __VA_ARGS__;     \
+    (typeof(tmp) *)dict_set_impl(                    \
+      (Dict *)(dict), key, &tmp, dict_val_size(dict) \
+    );                                               \
   })
+
+#define dict_set(...) dict_set_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #define dict_val_type(dict) typeof((dict)->vals[0])
 #define dict_val_size(dict) sizeof((dict)->vals[0])
@@ -95,7 +98,7 @@ Usage:
 */
 #define dict_range hash_table_range
 
-#define dict_rewind(next, prev)                                              \
+#define dict_rewind_impl(tmp_next, tmp_prev, next, prev)                     \
   ({                                                                         \
     const auto tmp_next = next;                                              \
     const auto tmp_prev = prev;                                              \
@@ -111,3 +114,5 @@ Usage:
     );                                                                       \
     tmp_next->len = tmp_prev->len;                                           \
   })
+
+#define dict_rewind(...) dict_rewind_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)

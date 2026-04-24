@@ -359,7 +359,7 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
 
   const auto read = interp->reader;
   read->file      = file;
-  try(str_copy(&read->file_path, path));
+  try(str_set(&read->file_path, path));
 
   IF_DEBUG(eprintf("[system] reading code from stdio: " FMT_QUOTED "\n", path));
 
@@ -444,7 +444,7 @@ static Err interp_import_inner(
 
   const auto read = interp->reader;
   read->file      = file;
-  try(str_copy(&read->file_path, path));
+  try(str_set(&read->file_path, path));
   dict_set(imports, path, EMPTY);
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));

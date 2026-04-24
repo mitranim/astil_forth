@@ -165,11 +165,13 @@ static void sha256(U8 *out, const U8 *src, Ind len) {
   sha256_final(&ctx, out);
 }
 
-#define sha256_any(src, out)                            \
-  ({                                                    \
-    const auto tmp_src = src;                           \
-    sha256(out, (const U8 *)&tmp_src, sizeof(tmp_src)); \
+#define sha256_any_impl(tmp, src, out)          \
+  ({                                            \
+    const auto tmp = src;                       \
+    sha256(out, (const U8 *)&tmp, sizeof(tmp)); \
   })
+
+#define sha256_any(...) sha256_any_impl(UNIQ_IDENT, __VA_ARGS__)
 
 /*
 #include "./fmt.c"

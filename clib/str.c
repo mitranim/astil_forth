@@ -19,7 +19,7 @@ static Err err_str_buf_over(const char *src, Uint len, Ind cap) {
   );
 }
 
-static Err str_copy_impl(char *out, const char *src, Ind cap, Ind *out_len) {
+static Err str_set_impl(char *out, const char *src, Ind cap, Ind *out_len) {
   const auto len = strlcpy(out, src, cap);
   if (len >= cap) return err_str_buf_over(src, len, cap);
   *out_len = (Ind)len;
@@ -45,7 +45,7 @@ static Err err_word_len_mismatch(Word_str *word, Ind len) {
 }
 
 static Err valid_word(const char *buf, Ind len, Word_str *word) {
-  try(str_copy(word, buf));
+  try(str_set(word, buf));
   if (word->len == len) return nullptr;
   return err_word_len_mismatch(word, len);
 }
