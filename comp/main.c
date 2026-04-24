@@ -103,6 +103,18 @@ static Err main_run(int argc, const char *argv[]) {
       continue;
     }
 
+    if (!strcmp(key, "--eval")) {
+      if (!val) continue;
+
+      Timing time = {.prefix = "[eval] "};
+      if (timing) timing_beg(&time);
+
+      try(interp_eval(&interp, val));
+
+      if (timing) timing_end(&time);
+      continue;
+    }
+
     bool ok;
 
     try(cli_bool_for("--debug", key, val, &DEBUG, &ok));

@@ -371,6 +371,27 @@ static const char *get_exec_path(void) {
 static const char *get_exec_path(void) { return nullptr; }
 #endif // __APPLE__
 
+static Err interp_eval(Interp *interp, const char *code) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-qual"
+  const auto buf = (void *)code;
+#pragma clang diagnostic pop
+
+  defer(file_deinit) FILE *file = fmemopen(buf, strlen(code), "r");
+
+  Reader next = {};
+  next.file   = file;
+  try(str_set(&next.file_path, "<eval>"));
+
+  Reader *prev   = interp->reader;
+  interp->reader = &next;
+
+  const auto err = interp_err(&next, interp_loop(interp));
+
+  interp->reader = prev;
+  return err;
+}
+
 static Err interp_import_stdio(Interp *interp, const char *path) {
   defer(file_deinit) FILE *file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
