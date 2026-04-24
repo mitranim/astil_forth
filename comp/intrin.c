@@ -283,7 +283,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
       fprintf(
         stderr,
         "[debug] word:\n"
-        "[debug]   type:            normal\n"
+        "[debug]   type:            regular\n"
         "[debug]   addr:            %p\n"
         "[debug]   name:            %s\n"
         "[debug]   wordlist:        %d (%s)\n"

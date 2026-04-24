@@ -343,15 +343,17 @@ static void interp_welcome(Interp *interp) {
 
   const auto name = "words";
 
+  puts("Running Astil Forth REPL.");
+
   if (dict_has(&interp->dict_exec, name) || dict_has(&interp->dict_comp, name)) {
-    printf(
-      "Running Astil Forth REPL. Type " FMT_QUOTED " to see available words.\n",
-      name
-    );
+    printf("Type " FMT_QUOTED " to list the available words.\n", name);
   }
-  else {
-    puts("Running Astil Forth REPL.");
-  }
+
+  puts(
+    "Type `debug' <word>` to view its details.\n"
+    "Type `dis' <word>` to print disassembly.\n"
+    "(Only regular words; requires `llvm-mc`.)\n"
+  );
 
   interp->welcomed = true;
 }
