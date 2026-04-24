@@ -422,23 +422,6 @@ static Err intrin_comp_local_set(Sint reg, Sint loc_ptr, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_local_free(Sint ptr, Interp *interp) {
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(comp_validate_local(comp, ptr, &loc));
-
-  IF_DEBUG(eprintf(
-    "[system] freeing local " FMT_QUOTED
-    "; prior temp registers: %s; value is stable: %d",
-    loc->name.buf,
-    comp_local_fmt_reg_bits(comp, loc),
-    loc->stable
-  ));
-
-  comp_local_regs_clear(comp, loc);
-  return nullptr;
-}
-
 static Err intrin_comp_local_off(Sint ptr, Interp *interp, Sint *out) {
   const auto comp = &interp->comp;
   Local     *loc;
@@ -683,15 +666,6 @@ static constexpr USED auto INTRIN_COMP_LOCAL_SET = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_local_set,
   .inp_len   = 2,
-  .throws    = true,
-  .comp_only = true,
-};
-
-static constexpr auto INTRIN_COMP_LOCAL_FREE = (Sym){
-  .name.buf  = "comp_local_free",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_local_free,
-  .inp_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
