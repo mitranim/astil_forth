@@ -1,0 +1,37 @@
+Traditional world
+────────────────────────────────────────────────────────
+
+  Python / JS / Ruby              C / Rust / Go
+  ─────────────────────           ───────────────────
+
+  source                          source
+    │                               │
+    ▼                               ▼
+  interpreter / VM                compiler
+    │                               │
+    ▼                               ▼
+  run now                         executable
+    │                               │
+    ▼                               ▼
+  needs runtime                   deploy directly
+
+  - good for development          - good for production
+
+
+Astil Forth
+────────────────────────────────────────────────────────
+
+  source
+    │
+    ▼
+  native code immediately
+    │
+    ├──────────────▶ run now
+    │
+    └──────────────▶ write executable
+                         │
+                         ▼
+                    deploy directly
+
+  - interactive in development
+  - compiled in production

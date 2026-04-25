@@ -1,0 +1,34 @@
+out.exe
+──────────────────────────────────────────────────────────────
+
+┌────────────────────────────────────────────────────────────┐
+│ Mach-O header                                              │
+│ - file type: executable                                    │
+│ - CPU: Arm64                                               │
+│ - flags                                                    │
+│ - number of load commands                                  │
+└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ Load commands                                              │
+│                                                            │
+│ LC_SEGMENT_64  __PAGEZERO                                  │
+│ LC_SEGMENT_64  __TEXT        → code                        │
+│ LC_SEGMENT_64  __DATA        → data                        │
+│ LC_SEGMENT_64  __DATA_CONST  → GOT                         │
+│ LC_SEGMENT_64  __LINKEDIT    → linker metadata             │
+│ LC_LOAD_DYLINKER             → /usr/lib/dyld               │
+│ LC_LOAD_DYLIB                → /usr/lib/libSystem.B.dylib  │
+│ LC_DYLD_CHAINED_FIXUPS       → dynamic symbol binding      │
+│ LC_MAIN                      → entry point                 │
+│ LC_BUILD_VERSION             → macOS version metadata      │
+│ LC_CODE_SIGNATURE            → ad-hoc signature            │
+└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ Section contents                                           │
+│                                                            │
+│ __TEXT,__text       native instructions                    │
+│ __DATA,__data       program data                           │
+│ __DATA_CONST,__got  external-symbol slots                  │
+│ __LINKEDIT          chained fixup data                     │
+│ code signature      page hashes                            │
+└────────────────────────────────────────────────────────────┘

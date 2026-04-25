@@ -1,0 +1,22 @@
+design tradeoff
+────────────────────────────────────────────────────────────
+
+  simplicity / transparency
+  ▲
+  │
+  │       Astil Forth
+  │       - native code directly
+  │       - single pass + fixups
+  │       - no VM / no IR
+  │       - easy to understand
+  │
+  │
+  │
+  │                                 Large optimizing compilers
+  │                                 - multiple IRs
+  │                                 - many passes
+  │                                 - more portable
+  │                                 - harder to understand
+  │
+  └────────────────────────────────────────────────────────▶
+                                      optimization / portability

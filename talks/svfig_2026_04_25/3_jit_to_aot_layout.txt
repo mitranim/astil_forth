@@ -1,0 +1,32 @@
+Runtime compiler memory                Mach-O executable
+───────────────────────                ─────────────────────────
+
+Comp_heap                              out.exe
+┌──────────────────────┐              ┌────────────────────────┐
+│ (guard)              │              │ Mach-O header          │
+├──────────────────────┤              ├────────────────────────┤
+│ exec.instrs          │ ──────────▶  │ __TEXT,__text          │
+│ native instructions  │              │ native instructions    │
+├──────────────────────┤              ├────────────────────────┤
+│ (guard)              │              │ padding / alignment    │
+├──────────────────────┤              ├────────────────────────┤
+│ data                 │ ──────────▶  │ __DATA,__data          │
+│ mutable/static data  │              │ data bytes             │
+├──────────────────────┤              ├────────────────────────┤
+│ (guard)              │              │ padding / alignment    │
+├──────────────────────┤              ├────────────────────────┤
+│ externs              │ ──────────▶  │ __DATA_CONST,__got     │
+│ external addresses   │              │ GOT fixup entries      │
+├──────────────────────┤              ├────────────────────────┤
+│ (guard)              │              │ __LINKEDIT             │
+├──────────────────────┤              │ chained fixup metadata │
+│ intrins              │              ├────────────────────────┤
+│ compiler intrinsics  │ ─▶ (omitted) │ code signature         │
+└──────────────────────┘              └────────────────────────┘
+
+
+
+Relevant stuff in compiler code:
+
+- comp/comp.h → Comp_heap -- code layout in JIT mode
+- comp/mach_o.c           -- translating heap to AOT

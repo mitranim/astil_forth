@@ -1,0 +1,31 @@
+JIT memory
+────────────────────────────────────────────
+
+  compiled instruction:
+
+    "load value at relative offset +N"
+
+      ┌────────────┐
+      │ code       │
+      │ adrp/ldr   │───── +N bytes ─────┐
+      └────────────┘                    │
+                                        ▼
+                                  ┌────────────┐
+                                  │ data       │
+                                  └────────────┘
+
+
+AOT executable virtual memory
+────────────────────────────────────────────
+
+      ┌────────────┐
+      │ __text     │
+      │ adrp/ldr   │───── +N same ───────┐
+      └────────────┘                     │
+                                         ▼
+                                  ┌────────────┐
+                                  │ __data     │
+                                  └────────────┘
+
+
+Code can be reused because relative distances still work.

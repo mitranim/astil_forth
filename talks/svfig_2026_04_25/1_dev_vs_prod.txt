@@ -1,0 +1,38 @@
+Development process
+────────────────────────────────────────────
+
+  Astil interpreter / compiler process
+  ┌──────────────────────────────────────┐
+  │                                      │
+  │  parser                              │
+  │    │                                 │
+  │    ▼                                 │
+  │  compiler state                      │
+  │    │                                 │
+  │    ▼                                 │
+  │  native code + data + symbols        │
+  │                                      │
+  └──────────────────────────────────────┘
+
+
+
+AOT output
+────────────────────────────────────────────
+
+  out.exe
+  ┌──────────────────────────────────────┐
+  │ Mach-O headers                       │
+  │ native instructions                  │
+  │ static data                          │
+  │ dynamic-linking metadata             │
+  │ code signature                       │
+  └──────────────────────────────────────┘
+
+  Not included:
+    ✗ Forth parser
+    ✗ Forth interpreter
+    ✗ compiler state
+    ✗ REPL
+
+
+The binary still uses dynamically-linked libc.

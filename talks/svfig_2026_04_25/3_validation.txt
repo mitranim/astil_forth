@@ -1,0 +1,18 @@
+AOT build
+────────────────────────────────────────────
+
+  entry point: main
+        │
+        ▼
+  walk callees
+        │
+        ▼
+  for every reachable symbol:
+        │
+        ├── interpreter-only? ──────▶ fail build
+        │
+        └── runtime-independent? ───────▶ OK
+
+
+The output executable cannot depend on
+compiler/interpreter-only words.

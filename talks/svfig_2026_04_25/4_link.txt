@@ -1,0 +1,10 @@
+compiled code
+    │
+    ▼
+GOT slots for extern addresses
+    │
+    ▼
+dyld chained fixup metadata
+    │
+    ▼
+dyld fills GOT with actual libc addresses
