@@ -1121,18 +1121,14 @@
 : patch_branch_forward ( adr -- ) dup off_to_pc asm_branch swap !32 ; \ b <off>
 : patch_branch_back    ( adr -- ) off_from_pc   asm_branch swap !32 ; \ b <off>
 
-0 var: COND_HAS
-
 \ cbz x1, <else|end>
 : if_patch ( if_adr -- ) dup off_to_pc 1 swap asm_cmp_branch_zero swap !32 ;
 
 \ cbnz x1, <else|end>
 : ifn_patch ( ifn_adr -- ) dup off_to_pc 1 swap asm_cmp_branch_not_zero swap !32 ;
 
-: if_done ( cond_prev -- ) COND_HAS ! ;
 : if_pop  ( prev_fun if_adr  -- ) if_patch execute ;
 : ifn_pop ( prev_fun ifn_adr  -- ) ifn_patch execute ;
-: if_init COND_HAS @ COND_HAS on! xt' if_done ;
 
 :: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
   xt' execute reserve_cond xt' if_pop
@@ -1145,13 +1141,13 @@
 \ With this strange setup, `end` pops the top control frame,
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `end`.
-\ Prepending `if_done` terminates this chain.
+\ Prepending `nop` terminates this chain.
 :: if ( C: -- prev done_fun exec_fun if_adr if_fun ) ( E: pred -- )
-  if_init execute'' elif
+  xt' nop execute'' elif
 ;
 
 :: ifn ( C: -- prev done_fun exec_fun ifn_adr ifn_fun ) ( E: pred -- )
-  if_init execute'' elifn
+  xt' nop execute'' elifn
 ;
 
 : else_pop ( prev_fun else_adr -- ) patch_branch_forward execute ;

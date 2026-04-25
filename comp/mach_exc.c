@@ -96,6 +96,15 @@ static void Mach_thread_state_repr(const Mach_thread_state *val) {
   eprint_struct_end();
 }
 
+static void recovery_log_ctx(const Interp *interp) {
+  if (!interp_valid(interp)) return;
+  const auto read = interp->reader;
+  if (!reader_valid(read)) return;
+  eprintf(SYS_REC_FMT "position: " READ_POS_FMT "\n", READ_POS_ARGS(read));
+
+  // backtrace_from_fp();
+}
+
 /*
 `EXC_MASK_BAD_ACCESS` is sometimes recoverable; when it's an overflow or
 underflow of the Forth integer stack, we can assume that the thread state
@@ -132,14 +141,29 @@ static kern_return_t catch_mach_exception_raise_state(
   const auto state  = (Mach_thread_state *)state_prev_ptr;
   const auto interp = (Interp *)state->x[ASM_REG_INTERP];
 
-  IF_DEBUG({
+  if (DEBUG) {
     eprintf(SYS_REC_FMT "bad thread state: ");
     Mach_thread_state_repr(state);
     eprintf(SYS_REC_FMT "code[0]: %p\n", (void *)code[0]);
     eprintf(SYS_REC_FMT "code[1]: %p (bad address)\n", (void *)code[1]);
     eprintf(SYS_REC_FMT "interpreter address: %p\n", interp);
+
+    /*
+    Would be nice if this worked, but sadly `backtrace_from_fp` seems to look
+    only for the current thread's frames.
+
+    TODO: backtrace on our own. See `./mach_unwind.c`.
+
+    void      *buf[256];
+    const auto len = backtrace_from_fp((void *)state->fp, buf, arr_cap(buf));
+    if (len) {
+      eprintf(SYS_REC_FMT "backtrace:\n");
+      backtrace_symbols_fd(buf, len, STDERR_FILENO);
+    }
+    */
+
     fflush(stderr);
-  });
+  }
 
   if (!interp_valid(interp)) {
     IF_DEBUG({
@@ -178,6 +202,7 @@ static kern_return_t catch_mach_exception_raise_state(
       comp->code.code_exec.dat,
       list_len_ceil(&comp->code.code_exec)
     );
+    recovery_log_ctx(interp);
     fflush(stderr);
     return KERN_FAILURE;
   }
@@ -189,12 +214,14 @@ static kern_return_t catch_mach_exception_raise_state(
 
   IF_DEBUG({
     eprintf(SYS_REC_FMT "detected %s\n", msg);
+    recovery_log_ctx(interp);
     fflush(stderr);
   });
 
   const auto err = mach_unwind_thread(interp, msg, state);
   if (err) {
     eprintf(SYS_REC_FMT "%s\n", err);
+    recovery_log_ctx(interp);
     fflush(stderr);
     return KERN_FAILURE;
   }
@@ -219,6 +246,7 @@ static kern_return_t catch_mach_exception_raise_state(
   (void)state_next_len;
 
   eprintf(SYS_REC_FMT "detected %s\n", msg);
+  recovery_log_ctx(interp);
   fflush(stderr);
 
 #endif // CALL_CONV_STACK

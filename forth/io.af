@@ -126,6 +126,8 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 1 1 extern: fileno            ( file -- code )
 1 1 extern: fileno_unlocked   ( file -- code )
 
+\ TODO: translate `<unistd.h>`.
+
 : io_err { action path -- str }
   errno { code }
   code strerror { msg }

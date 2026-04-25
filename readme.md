@@ -295,7 +295,7 @@ In reg-CC:
 
 ## Performance
 
-See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth vaguely approximates C with Clang (`-O2`), while leaving Gforth in the dust. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
+See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth vaguely approximates Clang C with `-O2`, while leaving Gforth in the dust. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
 
 ## Limitations
 

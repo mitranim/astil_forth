@@ -10,4 +10,4 @@ Run `./bench.sh`. Requires [`hyperfine`](https://github.com/sharkdp/hyperfine).
 
 Results: [`bench/result.txt`](./result.txt).
 
-Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces interpreters, and vaguely approaches C (Clang with `-O2`).
+Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces interpreters, and vaguely approaches Clang C with `-O2`.

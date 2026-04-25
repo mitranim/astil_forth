@@ -7,6 +7,9 @@ import' ./testing.af
 \ The amount of arguments before and after `<T>` is checked at compile time
 \ which means we can't write tests which repeatedly "push" values in a loop
 \ then check the resulting list of values. We just check the final results.
+\
+\ We test both JIT-compiled and AOT-compiled modes.
+\ For AOT, every test must be called in `main_run`.
 
 T{       <T>       }T
 T{ 10    <T> 10    }T
@@ -1673,8 +1676,8 @@ T{ test_max_output_regs_throw <T> 0 1 2 3 4 5 6 }T
 \ ;
 
 \ For AOT-compiled testing. Must call every test which is also called above
-\ during the initial interpretation, with the exception of tests which depend
-\ on interpreter-only features.
+\ during the initial interpretation, except for any tests which depend on
+\ interpreter-only features (currently none).
 : main_run
   test_test
   test_locals

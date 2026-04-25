@@ -52,7 +52,6 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
   const auto buf        = cfg.buf;
 
   {
-    // For magic constants, see LLVM's `MachO.h` linked above.
     const auto src = (Mach_codesign_head){
       .magic  = MCS_MAGIC_EMBEDDED_SIGNATURE,
       .length = total_size,
@@ -79,7 +78,6 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
   }
 
   {
-    // For magic constants, see LLVM's `MachO.h` linked above.
     const auto src = (Mach_codesign_dir){
       .magic          = MCS_MAGIC_CODE_DIRECTORY,
       .length         = dir_size,

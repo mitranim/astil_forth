@@ -706,10 +706,11 @@
 : align_down { len wid -- len } wid negate len and ;
 : align_up   { len wid -- len } wid dec len + wid align_down ;
 
-\ Named in title case for consistency with pretend "types" we define later,
-\ such as `U8`, `S64`, `Cint`, and so on.
+\ Named in Titlecase for consistency with pretend "types"
+\ defined later, such as `U8`, `S64`, `Cint`, and so on.
 8 let: Cell
-: cells  { len  -- size } len 3 lsl ;
+
+: cells  { len  -- size } len 3 lsl  ;
 : /cells { size -- len  } size 3 asr ;
 : +cell  { adr  -- adr  } adr Cell + ;
 : -cell  { adr  -- adr  } adr Cell - ;
@@ -873,6 +874,10 @@
 0b00 0b01 load:  @u8 \ Renamed from standard `c@`.
 0b00 0b10 load:  @s8
 0b00      store: !8  \ Renamed from standard `c!`.
+
+\ Byte load/store; aliases for `@u8` and `!8`.
+0b00 0b01 load:  @b \ Renamed from standard `c@`.
+0b00      store: !b \ Renamed from standard `c!`.
 
 0b01 0b01 load:  @u16
 0b01 0b10 load:  @s16
@@ -1402,7 +1407,9 @@ LF CRLF inc !8 \ \n
 
 \ ## Conditionals
 \
-\ General idea:
+\ The general idea is to reserve branching instructions,
+\ push addresses to the control stack, then patch-up the
+\ instructions in later words like `else` and `end`.
 \
 \   if        \ cbz <outside>
 \     if_true
@@ -1431,10 +1438,6 @@ LF CRLF inc !8 \ \n
 : patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 ; \ b <off>
 : patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 ; \ b <off>
 
-0 var: COND_HAS
-
-: if_done_from { stack } ( C: cond_prev        -- ) stack s> COND_HAS ! ;
-
 : if_pop_from   { stack } ( C: prev_fun if_adr  -- )
   stack s>      { adr }
   adr off_to_pc { off }
@@ -1449,7 +1452,6 @@ LF CRLF inc !8 \ \n
   stack s> execute
 ;
 
-: if_done STACK if_done_from ;
 : if_pop  STACK if_pop_from  ;
 : ifn_pop STACK ifn_pop_from ;
 
@@ -1477,16 +1479,12 @@ LF CRLF inc !8 \ \n
   elif_init xt' ifn_pop STACK >s
 ;
 
-: if_init ( C: -- cond fun )
-  COND_HAS @ { cond } COND_HAS on!
-  cond        STACK >s
-  xt' if_done STACK >s
-;
+: if_init ( C: -- nop ) xt' nop STACK >s ;
 
 \ With this strange setup, `end` pops the top control frame,
 \ which pops the next control frame, and so on. This allows us
 \ to pop any amount of control constructs with a single `end`.
-\ Prepending `if_done` terminates this chain.
+\ Prepending `nop` terminates this chain.
 \
 \ TODO: define more variants like `=if` with fewer instructions.
 :: if ( C: -- cond done_fun exec_fun if_adr if_fun ) ( E: pred -- )
@@ -1590,8 +1588,8 @@ LF CRLF inc !8 \ \n
 \ be all used inside a longer argument list, exactly like verbs behave in
 \ stack-based programming:
 \
-\   adr Type_field0 @ \ arg0
-\   adr Type_field1 @ \ arg1
+\   adr Type_field0 @ \ noun0
+\   adr Type_field1 @ \ noun1
 \   some_verb
 \
 \ Note that load / store is type-specific. Fields which are't cell-sized
@@ -1644,10 +1642,9 @@ LF CRLF inc !8 \ \n
 
   parse_word { name_buf name_len }
 
-  \ Since structs are intended for C interop, alignment
-  \ must match the C struct ABI of the target platform.
-  \ The ABI compatibility seems to hold in many cases,
-  \ but has NOT been thoroughly tested.
+  \ Since structs are intended for C interop, alignment of every field
+  \ must match the platform's C ABI. So far, ABI compat seems to hold,
+  \ but has NOT been tested thoroughly enough.
   size Cell min            { field_align }
   off field_align align_up { field_off }
 
