@@ -6,7 +6,8 @@ set -e
 # Ensure we're in repo root.
 cd "$(realpath "$(dirname -- "$0")")/.."
 
-make PROD=true clean build
+# requires Make 4+
+gmake PROD=true clean build
 
 # OPTS='--warmup=8 --shell=none --show-output'
 OPTS='--warmup=8 --shell=none'
