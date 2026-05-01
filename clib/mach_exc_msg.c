@@ -28,17 +28,21 @@ routine mach_exception_raise_state(
 );
 */
 
-static kern_return_t catch_mach_exception_raise_state(
-  mach_port_t                 exception_port,
-  exception_type_t            exception,
-  const mach_exception_data_t code,
-  mach_msg_type_number_t      code_len,
-  int                        *flavor,
-  const thread_state_t        state_prev,
-  mach_msg_type_number_t      state_prev_len,
-  thread_state_t              state_next,
-  mach_msg_type_number_t     *state_next_len
+// NOLINTBEGIN(misc-use-internal-linkage)
+
+kern_return_t catch_mach_exception_raise_state(
+  mach_port_t             exception_port,
+  exception_type_t        exception,
+  mach_exception_data_t   code,
+  mach_msg_type_number_t  code_len,
+  int                    *flavor,
+  thread_state_t          state_prev,
+  mach_msg_type_number_t  state_prev_len,
+  thread_state_t          state_next,
+  mach_msg_type_number_t *state_next_len
 );
+
+// NOLINTEND(misc-use-internal-linkage)
 
 #pragma pack(push, 4)
 
@@ -103,10 +107,16 @@ with the `EXCEPTION_STATE` flag.
 */
 static constexpr auto MACH_MSG_EXCEPTION_STATE = 2406;
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
 // Adapted from MIG's `mach_exc_server` and `_Xmach_exception_raise_state`.
-boolean_t mach_on_exception(mach_msg_header_t *inp, mach_msg_header_t *out) {
+static boolean_t mach_on_exception(
+  mach_msg_header_t *inp, mach_msg_header_t *out
+) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+
   const auto out_msg = (Mach_exc_out *)out;
-  const auto id      = inp->msgh_id;
+  const auto mid     = inp->msgh_id;
   const auto bits    = MACH_MSGH_BITS(MACH_MSGH_BITS_REMOTE(inp->msgh_bits), 0);
 
   out_msg->err = (mig_reply_error_t){
@@ -115,12 +125,12 @@ boolean_t mach_on_exception(mach_msg_header_t *inp, mach_msg_header_t *out) {
         .msgh_bits        = bits,
         .msgh_remote_port = inp->msgh_remote_port,
         .msgh_local_port  = MACH_PORT_NULL,
-        .msgh_id          = id + 100,
+        .msgh_id          = mid + 100,
       },
     .NDR = NDR_record,
   };
 
-  if (id != MACH_MSG_EXCEPTION_STATE) {
+  if (mid != MACH_MSG_EXCEPTION_STATE) {
     out_msg->err.RetCode        = MIG_BAD_ID;
     out_msg->err.Head.msgh_size = sizeof(mig_reply_error_t);
     return false;
@@ -135,7 +145,8 @@ boolean_t mach_on_exception(mach_msg_header_t *inp, mach_msg_header_t *out) {
   */
   const auto ptr0 = (Mach_exc_inp_head *)inp + 1;
   const auto seg0 = (Mach_exc_inp_seg_0 *)ptr0;
-  const auto ptr1 = (char *)(seg0 + 1) + seg0->code_len * sizeof(seg0->code[0]);
+  const auto ptr1 = (char *)(seg0 + 1) +
+    (seg0->code_len * sizeof(seg0->code[0]));
   const auto seg1 = (Mach_exc_inp_seg_1 *)ptr1;
 
   // TODO validate `bits`, `seg0->code_len`, total msg size.
@@ -159,7 +170,7 @@ boolean_t mach_on_exception(mach_msg_header_t *inp, mach_msg_header_t *out) {
   }
 
   const auto out_size = offsetof(Mach_exc_out, state_next) +
-    out_msg->state_next_len * sizeof(out_msg->state_next[0]);
+    (out_msg->state_next_len * sizeof(out_msg->state_next[0]));
 
   out_msg->err.Head.msgh_size = (mach_msg_size_t)out_size;
   out_msg->flavor             = seg1->flavor;

@@ -4,7 +4,7 @@
 #include "./intrin.c"
 #endif
 
-static constexpr USED Sym INTRIN[] = {
+static const USED Sym INTRIN[] = {
   INTRIN_COLON,             // :
   INTRIN_COLON_COLON,       // ::
   INTRIN_COLON_NAMED,       // colon_named

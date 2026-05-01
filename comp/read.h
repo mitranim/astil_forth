@@ -11,6 +11,8 @@ typedef struct {
   Ind col;
 } Read_pos;
 
+typedef str_buf(256) Path_str;
+
 typedef struct {
   FILE    *file;
   Path_str file_path;

@@ -1,8 +1,17 @@
+/*
+Memory-related stuff.
+
+We tend to express memory sizes with `Ind` which is `U32` on 64-bit systems.
+This limits allocation size to 4 GiB which currently seems to be sufficient.
+This is mainly because we express memory offsets with `Ind`; using the same
+type avoids widening conversions, simplifying arithmetic. See `Ind` for the
+explanation of using a shorter-than-pointer integer type for memory offsets.
+*/
 #pragma once
 #include "./err.c"
 #include "./mem.h" // IWYU pragma: export
 #include "./misc.h"
-#include "./num.h"
+#include "./num.c"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,64 +20,71 @@
 /*
 Usage example:
 
-  defer(mem_deinit) void * some_val = some_func();
+  deferred(mem_deinit) void * some_val = some_func();
 */
 static void mem_deinit(void **var) { var_deinit(var, free); }
 
 /*
 Usage example:
 
-  defer(str_deinit) char * some_val = some_func();
+  deferred(chars_deinit) char * some_val = some_func();
 */
-static void str_deinit(char **var) { mem_deinit((void **)var); }
+static void chars_deinit(char **var) { mem_deinit((void **)var); }
 
 /*
 Usage example:
 
-  defer(bytes_deinit) U8 * some_val = some_func();
+  deferred(bytes_deinit) U8 * some_val = some_func();
 */
 static void bytes_deinit(U8 **var) { mem_deinit((void **)var); }
 
 [[noreturn]]
-static void abort_mem_mul_over(Uint len, Uint size) {
+static void abort_mem_mul_over(Ind len, Ind size) {
   fprintf(
-    stderr, "requested memory size overflow: " FMT_UINT " * " FMT_UINT, len, size
+    stderr, "requested memory size overflow: " FMT_IND " * " FMT_IND, len, size
   );
   abort_traced();
 }
 
 // Overflow-safe counterpart of `len * size`.
-static Uint mem_size(Uint len, Uint size) {
-  Uint out;
+static Ind mem_size(Ind len, Ind size) {
+  Ind out;
   if (!__builtin_mul_overflow(len, size, &out)) return out;
   abort_mem_mul_over(len, size);
 }
 
 // Overflow-safe counterpart of `malloc(len * size)`.
-static void *memalloc(Uint len, Uint size) {
-  return malloc(mem_size(len, size));
-}
+static void *memalloc(Ind len, Ind size) { return malloc(mem_size(len, size)); }
 
-static void *ptr_at(void *src, Ind ind, Uint size) {
+static void *ptr_at(void *src, Ind ind, Ind size) {
   return (U8 *)src + mem_size(ind, size);
 }
 
-static Err err_mmap() {
+static Err err_mmap(void) {
   const auto code = errno;
   return errf(
     "unable to map memory; code: %d; message: %s", code, strerror(code)
   );
 }
 
-// Doesn't take pflags because we always use guards and `mprotect` inner parts.
-static void *mem_map(Uint len, int mflag) {
+/*
+Doesn't take pflags because we always use guards and `mprotect` inner parts.
+The caller needs to handle the failure case:
+
+  const auto ptr = mem_map(some_size, some_mflags);
+  if (ptr == MAP_FAILED) return err_mmap();
+*/
+static void *mem_map(Ind len, int mflag) {
+  // NOLINTBEGIN(hicpp-signed-bitwise)
   mflag |= MAP_ANON | MAP_PRIVATE;
-  const auto fd  = -1;
-  const auto off = 0;
-  return mmap(nullptr, len, PROT_NONE, mflag, fd, off);
+  // NOLINTEND(hicpp-signed-bitwise)
+
+  const auto fdes = -1;
+  const auto off  = 0;
+  return mmap(nullptr, len, PROT_NONE, mflag, fdes, off);
 }
 
-static Err mem_protect(void *addr, Uint len, int pflag) {
+static Err mem_protect(void *addr, Ind len, int pflag) {
   return err_errno(mprotect(addr, len, pflag));
 }
 
@@ -78,28 +94,28 @@ static void *ptr_align(void *val) {
 
 // Caller must reserve enough space. Assumes current system is little-endian.
 static void encode_bigend_U32(U8 *ptr, U32 src) {
-  ptr[0] = (U8)(src >> 24);
-  ptr[1] = (U8)(src >> 16);
-  ptr[2] = (U8)(src >> 8);
-  ptr[3] = (U8)(src);
+  ptr[0] = (U8)(src >> 24u);
+  ptr[1] = (U8)(src >> 16u);
+  ptr[2] = (U8)(src >> 8u);
+  ptr[3] = (U8)src;
 }
 
 // Caller must reserve enough space. Assumes current system is little-endian.
 static void encode_bigend_U64(U8 *ptr, U64 src) {
-  ptr[0] = (U8)(src >> 56);
-  ptr[1] = (U8)(src >> 48);
-  ptr[2] = (U8)(src >> 40);
-  ptr[3] = (U8)(src >> 32);
-  ptr[4] = (U8)(src >> 24);
-  ptr[5] = (U8)(src >> 16);
-  ptr[6] = (U8)(src >> 8);
-  ptr[7] = (U8)(src);
+  ptr[0] = (U8)(src >> 56u);
+  ptr[1] = (U8)(src >> 48u);
+  ptr[2] = (U8)(src >> 40u);
+  ptr[3] = (U8)(src >> 32u);
+  ptr[4] = (U8)(src >> 24u);
+  ptr[5] = (U8)(src >> 16u);
+  ptr[6] = (U8)(src >> 8u);
+  ptr[7] = (U8)src;
 }
 
 /*
 Usage:
 
-  defer(buf_deinit) Buf buf = {};
+  deferred(buf_deinit) Buf buf = {};
   // ...
 
 Value must be zero-initialized via `{}`.
@@ -109,7 +125,7 @@ before the deferred invocation, any amount of times.
 */
 static void buf_deinit(Buf *buf) {
   if (!buf) return;
-  if (buf->dat) free(buf->dat);
+  free(buf->dat);
   buf->dat = nullptr;
   buf->len = 0;
   buf->cap = 0;
@@ -122,14 +138,18 @@ Reserves at least this much extra capacity over the current capacity. Due to
 pow2 rounding, capacity may be increased by more than the requested amount.
 */
 static void buf_reserve(Buf *buf, Ind more) {
-  Ind goal;
-  aver(!__builtin_add_overflow(buf->len, more, &goal));
-
+  const auto goal = add(buf->len, more);
   if (buf->cap >= goal) return;
 
-  goal     = round_up_pow2(goal);
-  buf->dat = realloc(buf->dat, goal);
-  buf->cap = goal;
+  const Ind cap = round_up_pow2_Ind(goal);
+  aver(cap);
+  aver(cap >= goal);
+
+  const auto dat = realloc(buf->dat, cap);
+  aver(dat);
+
+  buf->dat = dat;
+  buf->cap = cap;
 }
 
 static void buf_append_byte(Buf *buf, U8 val) {
@@ -214,7 +234,7 @@ static constexpr U64 MPAGE_MAGIC[] = {
 /*
 Usage:
 
-  defer(mpage_deinit) void* page = nullptr;
+  deferred(mpage_deinit) void* page = nullptr;
   try(mpage_init(&page, size));
 
 Deinit is idempotent and may be invoked explicitly
@@ -281,15 +301,15 @@ static Err mpage_init(void **page, Ind cap) {
 #include "./misc.h"
 
 int main(int argc, const char *argv[]) {
-  defer(str_deinit) char *empty = nullptr;
-  defer(str_deinit) char *val   = strdup(argv[argc - 1]);
+  deferred(chars_deinit) char *empty = nullptr;
+  deferred(chars_deinit) char *val   = strdup(argv[argc - 1]);
   puts(val);
 }
 */
 
 /*
 int main(void) {
-  defer(buf_deinit) Buf buf = {};
+  deferred(buf_deinit) Buf buf = {};
 
   buf_append(&buf, 1234);
   printf("buf.len: " FMT_IND "\n", buf.len);
@@ -301,7 +321,7 @@ int main(void) {
 
 /*
 int main(void) {
-  defer(mpage_deinit) void *page;
+  deferred(mpage_deinit) void *page;
   try_main(mpage_init(&page, 0x10000));
 
   static constexpr char msg[] = "test";

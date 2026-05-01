@@ -16,7 +16,7 @@ See `./map.h`, `./map.c`.
 #include <string.h>
 
 // Used only for pointer arithmetic; ignored by hashing and equality.
-static constexpr Uint DICT_KEY_SIZE = sizeof(char *);
+static constexpr U8 DICT_KEY_SIZE = sizeof(char *);
 
 // For dicts where keys are borrowed.
 static void dict_deinit(void *dict) { hash_table_deinit(dict); }
@@ -41,28 +41,38 @@ static void dict_trunc_with_keys(Dict *dict) {
 }
 
 // Conforms to `Hash_fun`.
-static Fnv_hash dict_key_hash(const void *key, Uint len) {
+static Fnv_hash dict_key_hash(const void *key, Ind len) {
   (void)len;
   return fnv_hash_str(*(const char *const *)key);
 }
 
 // Conforms to `Eq_fun`.
-static bool dict_key_eq(const void *one, const void *two, Uint len) {
+static bool dict_key_eq(const void *one, const void *two, Ind len) {
   (void)len;
   return !strcmp(*(const char *const *)one, *(const char *const *)two);
 }
 
 static Ind dict_ind_impl(const Dict *dict, const char *key) {
   return hash_table_matching_ind(
-    (const Hash_table *)dict, &key, DICT_KEY_SIZE, dict_key_hash, dict_key_eq
+    (const Hash_table *)dict,
+    (const void *)&key,
+    DICT_KEY_SIZE,
+    dict_key_hash,
+    dict_key_eq
   );
 }
 
 static void *dict_set_impl(
-  Dict *dict, const char *key, const void *val, Uint val_size
+  Dict *dict, const char *key, const void *val, Ind val_size
 ) {
   return hash_table_set(
-    (Hash_table *)dict, &key, val, DICT_KEY_SIZE, val_size, dict_key_hash, dict_key_eq
+    (Hash_table *)dict,
+    (const void *)&key,
+    val,
+    DICT_KEY_SIZE,
+    val_size,
+    dict_key_hash,
+    dict_key_eq
   );
 }
 
@@ -76,7 +86,7 @@ static void dict_eprint_repr(const Dict *dict) {
 #include <stdio.h>
 
 int main(void) {
-  defer(dict_deinit) dict_of(Sint) dict = {};
+  deferred(dict_deinit) dict_of(Sint) dict = {};
   // dict_eprint_repr((Dict *)&dict);
 
   aver(dict.len == 0);

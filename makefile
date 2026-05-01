@@ -1,10 +1,8 @@
-# Requires Make 4+ for `$(file < ...)`.
-
 MAKEFLAGS := --silent
 MAKE_CONC := $(MAKE) -j 128 CONC=true clear=$(or $(clear),false)
 CLEAR ?= $(if $(filter false,$(clear)),, )
 HERE ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-CC ?= clang
+CC := clang
 PROD ?=
 STRICT ?=
 DEBUG_FLAGS_0 ?= -g3 -fsanitize=undefined,address,integer,nullability -fstack-protector
@@ -13,17 +11,20 @@ DEBUG_FLAGS_PROD ?= -g3 -O2 -Wno-unused-parameter -Wno-unused-variable
 DEBUG_FLAGS ?= $(if $(DEBUG),$(DEBUG_FLAGS_0),$(if $(PROD),$(DEBUG_FLAGS_PROD),$(DEBUG_FLAGS_1)))
 CRASH_FLAGS ?= $(and $(FAST_CRASH),-DFAST_CRASH)
 STRICT_FLAGS ?= $(and $(STRICT),-Werror)
-COMPILE_FLAGS ?= $(strip $(file < $(HERE)/compile_flags.txt))
+COMPILE_FLAGS ?= $(strip $(shell cat $(HERE)/compile_flags.txt))
 CFLAGS ?= $(and $(PROD),-DPROD) $(COMPILE_FLAGS) $(STRICT_FLAGS) $(DEBUG_FLAGS) $(CRASH_FLAGS)
 LOCAL ?= local
-SRC_DIR ?= comp
+CLIB_DIR ?= clib
+COMP_DIR ?= comp
 GEN_DIR ?= generated
-ASM_GEN_SRC ?= $(SRC_DIR)/asm_gen.c
-ASM_GEN_OUT ?= $(SRC_DIR)/asm_generated.s
+ASM_GEN_SRC ?= $(COMP_DIR)/asm_gen.c
+ASM_GEN_OUT ?= $(COMP_DIR)/asm_generated.s
 MACH_GEN_SRC ?= mach/mach_exc.defs
 MACH_GEN_OUT ?= $(GEN_DIR)/mach_exc.c
-ALL_SRC ?= $(filter-out $(ASM_GEN_OUT),$(shell find $(SRC_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) ))
-MAIN_SRC ?= $(SRC_DIR)/main.c
+CLIB_SRC ?= $(shell find $(CLIB_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) )
+COMP_SRC ?= $(filter-out $(ASM_GEN_OUT),$(shell find $(COMP_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) ))
+ALL_SRC ?= $(CLIB_SRC) $(COMP_SRC)
+MAIN_SRC ?= $(COMP_DIR)/main.c
 MAIN_S ?= astil_s.exe
 MAIN ?= astil.exe
 TEST_EXE ?= test.exe
@@ -35,7 +36,7 @@ WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=af
 WATCH_ALL ?= $(WATCH) -e=c,h,s,af
-WATCH_IMM ?= $(WATCH) -w=forth -w=$(MAIN) -w=$(MAIN_S)
+WATCH_IMM ?= $(WATCH) --no-vcs-ignore -w=forth -w=$(MAIN) -w=$(MAIN_S)
 ARTIF ?= $(shell find . \( -type d -name '*.dSYM' \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' \) \))
 
 ifeq ($(verb),true)
@@ -69,7 +70,7 @@ build_w:
 
 .PHONY: vet
 vet:
-	clang-tidy --header-filter='.*' --quiet $(MAIN_SRC)
+	clang-tidy --quiet $(MAIN_SRC) -- $(CFLAGS) -ferror-limit=1
 	$(OK)
 
 .PHONY: vet_w
@@ -171,8 +172,10 @@ test_s_w:
 **/%.exe: %.c $(ALL_SRC)
 	$(CC) $(CFLAGS) -x c $< -o $@
 
-$(ASM_GEN_OUT): $(ASM_GEN_SRC) $(ALL_SRC)
-	$(CC) $(CFLAGS) -S $< -o - | awk '/^[[:space:]]*\.set[[:space:]]+[A-Z_]+[[:space:]]*,[[:space:]]*[[:digit:]]/' > $(ASM_GEN_OUT)
+# This is easier to define with `make run_c`, but in that case,
+# removing `--silent` or adding any logging breaks the recipe.
+$(ASM_GEN_OUT): $(ASM_GEN_SRC) $(ALL_SRC) $(COMP_DIR)/asm_gen.exe
+	$(COMP_DIR)/asm_gen.exe > $(ASM_GEN_OUT)
 
 .PHONY: debug
 debug:

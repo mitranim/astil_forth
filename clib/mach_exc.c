@@ -158,5 +158,5 @@ static Err mach_exception_server_init(pthread_t *out) {
 }
 
 static Err mach_exception_server_deinit(pthread_t val) {
-  return err_errno_posix(pthread_kill(val, SIGTERM));
+  return err_errno_posix(pthread_kill(val, SIGINT));
 }

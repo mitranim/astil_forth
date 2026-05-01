@@ -351,7 +351,7 @@ static void interp_welcome(Interp *interp) {
 
   puts(
     "Type `debug' <word>` to view its details.\n"
-    "Type `dis' <word>` to print disassembly.\n"
+    "Type `dis' <word>` to disassemble a word.\n"
     "(Only regular words; requires `llvm-mc`.)\n"
   );
 
@@ -379,7 +379,8 @@ static Err interp_eval(Interp *interp, const char *code) {
   const auto buf = (void *)code;
 #pragma clang diagnostic pop
 
-  defer(file_deinit) FILE *file = fmemopen(buf, strlen(code), "r");
+  deferred(file_deinit) FILE *file = fmemopen(buf, strlen(code), "r");
+  if (!file) return err_str("unable to fmemopen");
 
   Reader next = {};
   next.file   = file;
@@ -395,7 +396,7 @@ static Err interp_eval(Interp *interp, const char *code) {
 }
 
 static Err interp_import_stdio(Interp *interp, const char *path) {
-  defer(file_deinit) FILE *file = fopen(path, "r");
+  deferred(file_deinit) FILE *file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
 
   const auto read = interp->reader;
@@ -419,8 +420,8 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
 
 static char *resolve_import_path(const char *prev, const char *next) {
   {
-    defer(str_deinit) char *path = path_join(prev, next, false);
-    const auto              out  = realpath(path, nullptr);
+    deferred(chars_deinit) char *path = path_join(prev, next, false);
+    const auto                   out  = realpath(path, nullptr);
     if (out) return out;
   }
 
@@ -431,9 +432,9 @@ static char *resolve_import_path(const char *prev, const char *next) {
   // Try relative to the interpreter executable.
   const auto exec = get_exec_path();
   if (exec && is_path_abs(exec)) {
-    defer(str_deinit) char *base = path_join(exec, "forth", false);
-    defer(str_deinit) char *full = path_join(base, next, true);
-    const auto              path = realpath(full, nullptr);
+    deferred(chars_deinit) char *base = path_join(exec, "forth", false);
+    deferred(chars_deinit) char *full = path_join(base, next, true);
+    const auto                   path = realpath(full, nullptr);
     if (path) return path;
   }
 
@@ -441,9 +442,11 @@ static char *resolve_import_path(const char *prev, const char *next) {
   // SYNC[install_path].
   const auto home = getenv("HOME");
   if (home) {
-    defer(str_deinit) char *base = path_join(home, ".local/share/astil", true);
-    defer(str_deinit) char *full = path_join(base, next, false);
-    const auto              path = realpath(full, nullptr);
+    deferred(chars_deinit) char *base = path_join(
+      home, ".local/share/astil", true
+    );
+    deferred(chars_deinit) char *full = path_join(base, next, false);
+    const auto                   path = realpath(full, nullptr);
     if (path) return path;
   }
 
@@ -481,7 +484,7 @@ static Err interp_import_inner(
     return nullptr;
   }
 
-  defer(file_deinit) FILE *file = fopen(path, "r");
+  deferred(file_deinit) FILE *file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
 
   const auto read = interp->reader;
@@ -685,7 +688,7 @@ static Err interp_validate_data_ptr(Sint val) {
   addresses aren't going to happen; we can assume addresses which
   are "decently large".
   */
-  if (val > (1 << 14)) return nullptr;
+  if (val > (1u << 14u)) return nullptr;
   return errf("suspiciously invalid-looking data pointer: %p", (U8 *)val);
 }
 

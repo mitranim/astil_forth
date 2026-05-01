@@ -93,11 +93,13 @@ static Err comp_code_sync(Comp_code *code) {
   const auto beg = &exec->dat[exec_len];
   const auto end = beg + diff;
   const auto len = (U8 *)end - (U8 *)beg;
+  aver(len > 0 && len < IND_MAX);
 
   // This alignment is only needed when `../clib/jit.c` uses `mprotect`.
   const auto page_beg = __builtin_align_down(beg, MEM_PAGE);
   const auto page_end = __builtin_align_up(end, MEM_PAGE);
   const auto page_len = (U8 *)page_end - (U8 *)page_beg;
+  aver(page_len > 0 && page_len < IND_MAX);
 
   IF_DEBUG({
     aver(page_beg >= exec->dat);
@@ -107,9 +109,9 @@ static Err comp_code_sync(Comp_code *code) {
     aver(end <= page_end);
   });
 
-  try(jit_before_write(page_beg, (Uint)page_len));
-  memcpy(beg, &write->dat[exec_len], (Uint)len);
-  try(jit_after_write(page_beg, (Uint)page_len));
+  try(jit_before_write(page_beg, (Ind)page_len));
+  memcpy(beg, &write->dat[exec_len], (Ind)len);
+  try(jit_after_write(page_beg, (Ind)page_len));
 
   exec->len = valid_len;
   return nullptr;
@@ -213,10 +215,13 @@ where a signed `imm6` is expected, the CPU will interpret it as -32:
 Assumptions: `width < 32`, `sizeof(Sint) >= 32/8`.
 */
 static Err imm_signed(Sint src, U8 wid, Instr *out) {
+  IF_DEBUG(aver(wid));
+
   // Comments show example bit patterns with `wid = 6` within `U8`.
-  const Sint sig = (Sint)1 << (wid - 1); // 00100000 = 32
-  const Sint max = sig - 1;              // 00011111 = 31
-  const Sint min = -max - 1;             // 11100000 = -32
+  // Some redundant casts were a concession to `clang-tidy` checks.
+  const auto sig = (Sint)((Uint)1 << (U8)(wid - (U8)1)); // 00100000 = 32
+  const Sint max = sig - 1;                              // 00011111 = 31
+  const Sint min = -max - 1;                             // 11100000 = -32
 
   if (src < min || src > max) {
     return err_imm_range_signed(src, wid, min, max);
@@ -306,8 +311,8 @@ static Instr asm_instr_load_store_pre_post(
   averr(asm_validate_reg(val_reg));
   averr(asm_validate_reg(addr_reg));
 
-  return (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) | (mod_val << 12) |
-    (order << 10) | ((Instr)addr_reg << 5) | val_reg;
+  return ASM_BASE_LOAD_STORE | ((Instr)is_load << 22u) | (mod_val << 12u) |
+    (order << 10u) | ((Instr)addr_reg << 5u) | val_reg;
 }
 
 /*
@@ -366,7 +371,7 @@ static Instr asm_instr_load_store_scaled_offset(
   averr(asm_validate_reg(addr_reg));
 
   return (Instr)0b11'111'0'01'00'000000000000'00000'00000 |
-    ((Instr)is_load << 22) | ((Instr)off << 10) | ((Instr)addr_reg << 5) |
+    ((Instr)is_load << 22u) | ((Instr)off << 10u) | ((Instr)addr_reg << 5u) |
     val_reg;
 }
 
@@ -407,8 +412,8 @@ static Instr asm_instr_load_store_unscaled_offset(
   averr(asm_validate_reg(val_reg));
   averr(asm_validate_reg(addr_reg));
 
-  return (Instr)ASM_BASE_LOAD_STORE | ((Instr)is_load << 22) |
-    ((Instr)imm << 12) | ((Instr)addr_reg << 5) | val_reg;
+  return ASM_BASE_LOAD_STORE | ((Instr)is_load << 22u) | (imm << 12u) |
+    ((Instr)addr_reg << 5u) | val_reg;
 }
 
 static Instr asm_instr_load_unscaled_offset(U8 src_reg, U8 addr_reg, Sint off) {
@@ -442,7 +447,7 @@ static void asm_append_load_literal_offset(Comp *comp, U8 reg, Sint off) {
   asm_append_instr(
     comp,
     // ldr <reg>, <off>
-    (Instr)0b01'011'0'00'0000000000000000000'00000 | (imm << 5) | reg
+    (Instr)0b01'011'0'00'0000000000000000000'00000 | (imm << 5u) | reg
   );
 }
 
@@ -459,7 +464,7 @@ separately in the high bits of the instruction in the opcode region.
 */
 static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
   constexpr Uint bits      = 12;
-  constexpr Uint mask      = (1 << bits) - 1; // 0b111111111111 = 4095
+  constexpr Uint mask      = (1u << bits) - 1u; // 0b111111111111 = 4095
   const auto     prog      = (Uint)(comp_code_next_prog_counter(&comp->code));
   const auto     pc_page   = prog & ~mask;
   const auto     addr_page = addr & ~mask;
@@ -470,19 +475,19 @@ static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
   aver(addr_page > pc_page);
   aver(page_diff > 0);
   aver(addr >= addr_page);
-  aver(pageoff < (1 << bits));
+  aver(pageoff < (1u << bits));
 
   // The immediate can be 21-bit signed, but ours is always positive.
   averr(imm_unsigned(page_diff, 20));
 
-  const Instr high = (Instr)page_diff >> 2;
-  const Instr low  = (Instr)page_diff & 0b11;
+  const Instr high = (Instr)page_diff >> 2u;
+  const Instr low  = (Instr)page_diff & 0b11u;
 
   asm_append_instr(
     comp,
     // adrp <reg>, <imm>
-    (Instr)0b1'00'100'00'0000000000000000000'00000 | (low << 29) | (high << 5) |
-      reg
+    (Instr)0b1'00'100'00'0000000000000000000'00000 | (low << 29u) |
+      (high << 5u) | reg
   );
   return (U16)pageoff;
 }
@@ -531,8 +536,8 @@ static Instr asm_instr_load_store_pair(
   averr(asm_validate_reg(reg1));
   averr(asm_validate_reg(addr_reg));
 
-  return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (opc << 22) |
-    (off_val << 15) | ((Instr)reg1 << 10) | ((Instr)addr_reg << 5) | reg0;
+  return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (opc << 22u) |
+    (off_val << 15u) | ((Instr)reg1 << 10u) | ((Instr)addr_reg << 5u) | reg0;
 }
 
 static void asm_append_load_store_pair(
@@ -579,7 +584,7 @@ static void asm_append_branch_link_to_offset(Comp *comp, Sint pc_off) {
 static void asm_append_branch_link_to_reg(Comp *comp, U8 reg) {
   averr(asm_validate_reg(reg));
   const auto base = (Instr)0b110'101'1'0'0'01'11111'0000'0'0'00000'00000;
-  asm_append_instr(comp, base | ((Instr)reg << 5));
+  asm_append_instr(comp, base | ((Instr)reg << 5u));
 }
 
 static Instr asm_instr_compare_branch(U8 reg, Sint off, bool non_zero) {
@@ -590,10 +595,10 @@ static Instr asm_instr_compare_branch(U8 reg, Sint off, bool non_zero) {
 
   // 0 = zero
   // 1 = zero not
-  const auto op = (Instr) !!non_zero << 24;
+  const auto op = (Instr) !!non_zero << 24u;
 
   // (cbz|cbnz) <reg>, <off*4>
-  return (Instr)0b1'011010'0'0000000000000000000'00000 | op | (imm << 5) | reg;
+  return (Instr)0b1'011010'0'0000000000000000000'00000 | op | (imm << 5u) | reg;
 }
 
 static Instr asm_instr_compare_branch_zero(U8 reg, Sint off) {
@@ -647,7 +652,7 @@ when reserving space for later fixups.
 static Instr asm_instr_breakpoint(Instr imm) {
   averr(imm_unsigned(imm, 16));
   // brk <imm>
-  return (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5);
+  return (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5u);
 }
 
 static Instr *asm_append_breakpoint(Comp *comp, Instr imm) {
@@ -679,8 +684,8 @@ static void asm_fixup_load(Comp *comp, const Asm_fixup *fix, Sym *sym) {
   Instr imm19;
   averr(imm_signed((top - pci), 19, &imm19));
 
-  *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30) |
-    (imm19 << 5) | imm->reg;
+  *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30u) |
+    (imm19 << 5u) | imm->reg;
   sym->norm.has_loads = true;
 }
 
@@ -724,7 +729,7 @@ static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
   averr(imm_unsigned(imm12, 12));
   averr(asm_validate_reg(src_reg));
   averr(asm_validate_reg(tar_reg));
-  return (Instr)tar_reg | ((Instr)src_reg << 5) | ((Instr)imm12 << 10);
+  return (Instr)tar_reg | ((Instr)src_reg << 5u) | ((Instr)imm12 << 10u);
 }
 
 static constexpr Uint ASM_ADD_SUB_SCALE = 12;
@@ -737,7 +742,7 @@ static Instr asm_instr_add_imm(U8 tar_reg, U8 src_reg, Uint imm) {
     imm >>= ASM_ADD_SUB_SCALE;
   }
 
-  return (Instr)0b1'0'0'100010'0'000000000000'00000'00000 | (shift << 22) |
+  return (Instr)0b1'0'0'100010'0'000000000000'00000'00000 | (shift << 22u) |
     asm_pattern_arith_imm(tar_reg, src_reg, imm);
 }
 
@@ -749,7 +754,7 @@ static Instr asm_instr_sub_imm(U8 tar_reg, U8 src_reg, Uint imm) {
     imm >>= ASM_ADD_SUB_SCALE;
   }
 
-  return (Instr)0b1'1'0'100010'0'000000000000'00000'00000 | (shift << 22) |
+  return (Instr)0b1'1'0'100010'0'000000000000'00000'00000 | (shift << 22u) |
     asm_pattern_arith_imm(tar_reg, src_reg, imm);
 }
 
@@ -767,7 +772,7 @@ static Instr asm_pattern_arith_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
   averr(asm_validate_reg(src_reg));
   averr(asm_validate_reg(tar_reg));
   averr(asm_validate_reg(mod_reg));
-  return (Instr)tar_reg | ((Instr)src_reg << 5) | ((Instr)mod_reg << 16);
+  return (Instr)tar_reg | ((Instr)src_reg << 5u) | ((Instr)mod_reg << 16u);
 }
 
 // add Xd, Xt|sp, Xm
@@ -823,7 +828,7 @@ SYNC[asm_sp_off].
 static Ind asm_sp_off(Ind off) {
   off = asm_align_sp_off(off);
   if (high_bits_zero(off, ASM_ADD_SUB_SCALE)) return off;
-  return __builtin_align_up(off, (1 << ASM_ADD_SUB_SCALE));
+  return __builtin_align_up(off, ((U8)1 << ASM_ADD_SUB_SCALE));
 }
 
 // SYNC[asm_sp_off].
@@ -882,7 +887,7 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
 #ifdef CALL_CONV_STACK
   static constexpr U8 len = 3;
 #else
-  static constexpr U8 len = 3 + __builtin_align_up(ASM_STABLE_REG_LEN, 2) / 2;
+  static constexpr U8 len = 3 + (__builtin_align_up(ASM_STABLE_REG_LEN, 2) / 2);
 #endif
 
   IF_DEBUG({
@@ -1051,7 +1056,7 @@ static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
   averr(asm_validate_reg(src_reg));
 
   return (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 |
-    ((Instr)src_reg << 16) | (Instr)tar_reg;
+    ((Instr)src_reg << 16u) | (Instr)tar_reg;
 }
 
 // mov Xd, Xt
@@ -1069,14 +1074,14 @@ static Instr asm_maybe_mov_imm_to_reg(
   aver(hw && hw <= 0b11);
   averr(imm_unsigned(reg, 5));
 
-  const auto shift = (Uint)hw << 4;
+  const auto shift = (Uint)hw << 4u;
   const auto low   = ((Uint)1 << shift) - 1;
   if (imm & low) return 0;
 
   const auto scaled = imm >> shift;
   if (scaled > imm_max) return 0;
 
-  return base | (hw << 21) | (Instr)(scaled << 5) | reg;
+  return base | (hw << 21u) | (Instr)(scaled << 5u) | reg;
 }
 
 /*
@@ -1101,29 +1106,29 @@ static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) 
   const auto opc = (Instr)(src < 0 ? 0b00 : 0b10);
 
   // imm16 unsigned
-  constexpr auto imm_max = ((Uint)1 << 16) - 1;
+  constexpr auto imm_max = ((Uint)1 << 16u) - 1u;
 
   const auto base = (Instr)0b1'00'100101'00'0000000000000000'00000 |
-    (opc << 29) | reg;
+    (opc << 29u) | reg;
 
   if (imm <= imm_max) {
-    asm_append_instr(comp, base | (Instr)((imm) << 5));
+    asm_append_instr(comp, base | (Instr)((imm) << 5u));
     if (has_load) *has_load = false;
     return;
   }
 
   Instr out = 0;
-  if ((out = asm_maybe_mov_imm_to_reg(base, 0b01, imm, imm_max, reg))) {
+  if ((out = asm_maybe_mov_imm_to_reg(base, 0b01u, imm, imm_max, reg))) {
     asm_append_instr(comp, out);
     if (has_load) *has_load = false;
     return;
   }
-  if ((out = asm_maybe_mov_imm_to_reg(base, 0b10, imm, imm_max, reg))) {
+  if ((out = asm_maybe_mov_imm_to_reg(base, 0b10u, imm, imm_max, reg))) {
     asm_append_instr(comp, out);
     if (has_load) *has_load = false;
     return;
   }
-  if ((out = asm_maybe_mov_imm_to_reg(base, 0b11, imm, imm_max, reg))) {
+  if ((out = asm_maybe_mov_imm_to_reg(base, 0b11u, imm, imm_max, reg))) {
     asm_append_instr(comp, out);
     if (has_load) *has_load = false;
     return;
@@ -1156,7 +1161,7 @@ static void asm_append_zero_reg(Comp *comp, U8 reg) {
   // eor <reg>, <reg>, <reg>
   const auto ireg  = (Instr)reg;
   const auto base  = (Instr)0b1'10'01010'00'0'00000'000000'00000'00000;
-  const auto instr = base | (ireg << 16) | (ireg << 5) | ireg;
+  const auto instr = base | (ireg << 16u) | (ireg << 5u) | ireg;
   asm_append_instr(comp, instr);
 }
 

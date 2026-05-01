@@ -199,7 +199,7 @@ static Err read_num_internal(
           if (__builtin_mul_overflow(num, radix, &next)) {
             return err_overflow(radix, "signed");
           }
-          num = next + (dig * sign);
+          num = next + (Sint)(dig * sign);
         }
         else {
           Uint prev = (Uint)num;

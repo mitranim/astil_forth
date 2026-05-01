@@ -4,7 +4,7 @@
 #include "./intrin.c"
 #endif
 
-static constexpr USED Sym INTRIN[] = {
+static const USED Sym INTRIN[] = {
   // Specific to this CC.
   INTRIN_BRACE,              // {
   INTRIN_COMP_SIGNATURE_GET, // comp_signature_get

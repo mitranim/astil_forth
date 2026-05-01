@@ -157,8 +157,8 @@ static Err comp_heap_deinit(Comp_heap **out) {
 }
 
 static Err comp_heap_init(Comp_heap **out) {
-  const auto ptr = mem_map(sizeof(Comp_heap), MAP_JIT);
-  if (ptr == MAP_FAILED) return err_mmap();
+  void *ptr;
+  try(mem_map_jit(sizeof(Comp_heap), &ptr));
 
   const auto heap = (Comp_heap *)ptr;
   *out            = heap;

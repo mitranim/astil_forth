@@ -11,9 +11,15 @@
 /*
 Usage:
 
-  defer(fd_deinit) int file = -1;
+  deferred(fd_deinit) int file = -1;
 
 The variable MUST be initialized to -1.
+
+Alternatively, use `defer`:
+
+  int file;
+  try(fd_open(path, mode, &file));
+  defer close(file);
 */
 static void fd_deinit(int *file) {
   if (!file) return;
@@ -70,9 +76,15 @@ static Err err_file_read_mismatch(const char *path, Uint file_len, Uint read_len
 /*
 Usage:
 
-  defer(file_deinit) FILE *file = nullptr;
+  deferred(file_deinit) FILE *file = nullptr;
 
 The variable MUST be zero-initialized.
+
+Alternatively, use `defer`:
+
+  FILE *file;
+  try(file_open(path, mode, &file));
+  defer fclose(file);
 */
 static void file_deinit(FILE **var) { var_deinit(var, fclose); }
 
@@ -84,7 +96,7 @@ static Err file_open(const char *path, const char *mode, FILE **out) {
 }
 
 static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
-  defer(fd_deinit) int file = -1;
+  deferred(fd_deinit) int file = -1;
   try(fd_open(path, O_RDONLY, &file));
 
   struct stat info;
@@ -160,12 +172,12 @@ static Err write_all(int file, const U8 *buf, Ind len, int *out_err) {
 
 int main(void) {
   {
-    defer(file_deinit) FILE *file = nullptr;
+    deferred(file_deinit) FILE *file = nullptr;
     file                          = stdin; // OK to "close"
   }
 
   {
-    defer(str_deinit) char *body = nullptr;
+    deferred(chars_deinit) char *body = nullptr;
     Uint                    len;
 
     try_main(file_read_text("./io.c", &body, &len));

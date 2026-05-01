@@ -42,6 +42,9 @@ static bool is_path_strict_rel(const char *path) {
 Lazy-ass code, doesn't try to "clean" the path by collapsing
 redundant segments. The output should be passed to `realpath`
 which canonicalizes the path for us, then freed.
+
+  char *path = path_join("one", "two", false);
+  defer free(path);
 */
 static char *path_join(const char *base, const char *suf, bool is_dir) {
   if (!suf) return base ? strdup(base) : nullptr;

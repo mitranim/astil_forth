@@ -19,21 +19,21 @@ static constexpr U8 HASH_TABLE_BITS_CAP  = HASH_TABLE_BITS_SIZE * CHAR_BIT;
 static constexpr U8 HASH_TABLE_INIT_CAP  = 4;
 
 // Conforms to `Hash_fun`.
-static Fnv_hash mem_hash(const void *key, Uint len) {
+static Fnv_hash mem_hash(const void *key, Ind len) {
   return fnv_hash_bytes(key, len);
 }
 
 // Conforms to `Eq_fun`.
-static bool mem_eq(const void *one, const void *two, Uint len) {
+static bool mem_eq(const void *one, const void *two, Ind len) {
   return !memcmp(one, two, len);
 }
 
 static void hash_table_deinit(void *tab) {
   const auto tar = (Hash_table *)tab;
   if (!tar) return;
-  if (tar->bits) free(tar->bits);
-  if (tar->keys) free(tar->keys);
-  if (tar->vals) free(tar->vals);
+  free(tar->bits);
+  free(tar->keys);
+  free(tar->vals);
   *tar = (Hash_table){};
 }
 
@@ -45,9 +45,7 @@ static Ind hash_table_bits_arr_len(Ind cap) {
   return divide_round_up(cap, HASH_TABLE_BITS_CAP);
 }
 
-static void hash_table_init(
-  Hash_table *out, Ind cap, Uint key_size, Uint val_size
-) {
+static void hash_table_init(Hash_table *out, Ind cap, Ind key_size, Ind val_size) {
   if (!cap) {
     *out = (Hash_table){};
     return;
@@ -129,11 +127,11 @@ static Ind hash_table_head(const Hash_table *tab) {
 
 // Load factor 50%. Assumes `cap` is power of 2.
 static bool hash_table_loaded(const Hash_table *tab) {
-  return (tab->len << 1) > tab->cap;
+  return (tab->len << 1u) > tab->cap;
 }
 
 // Quadratic probing. Assumes `cap` is power of 2.
-static Ind hash_table_probe(Ind iter) { return (iter * iter + iter) / 2; }
+static Ind hash_table_probe(Ind iter) { return ((iter * iter) + iter) / 2; }
 
 static Ind hash_table_probe_ind(const Hash_table *tab, Fnv_hash hash, Ind iter) {
   return (Ind)modulo2((hash + hash_table_probe(iter)), tab->cap);
@@ -142,7 +140,7 @@ static Ind hash_table_probe_ind(const Hash_table *tab, Fnv_hash hash, Ind iter) 
 static Ind hash_table_matching_ind(
   const Hash_table *tab,
   const void       *key,
-  Uint              key_size,
+  Ind               key_size,
   Hash_fun          hash_fun,
   Eq_fun            eq_fun
 ) {
@@ -168,7 +166,7 @@ and the length. The caller is responsible for updating the value.
 static Ind hash_table_available_ind(
   const Hash_table *tab,
   const void       *key,
-  Uint              key_size,
+  Ind               key_size,
   Hash_fun          hash_fun,
   Eq_fun            eq_fun,
   bool *new
@@ -200,7 +198,7 @@ static Ind hash_table_available_ind(
 static bool hash_table_has(
   const Hash_table *tab,
   const void       *key,
-  Uint              key_size,
+  Ind               key_size,
   Hash_fun          hash_fun,
   Eq_fun            eq_fun
 ) {
@@ -211,8 +209,8 @@ static bool hash_table_has(
 static void hash_table_rehash(
   Hash_table *prev,
   Ind         cap,
-  Uint        key_size,
-  Uint        val_size,
+  Ind         key_size,
+  Ind         val_size,
   Hash_fun    hash_fun,
   Eq_fun      eq_fun
 ) {
@@ -246,8 +244,8 @@ static void *hash_table_set(
   Hash_table *tab,
   const void *key,
   const void *val,
-  Uint        key_size,
-  Uint        val_size,
+  Ind         key_size,
+  Ind         val_size,
   Hash_fun    hash_fun,
   Eq_fun      eq_fun
 ) {

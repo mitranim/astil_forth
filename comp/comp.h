@@ -53,7 +53,7 @@ typedef stack_of(Asm_fixup) Asm_fixups;
 #endif
 
 // 0x100000 * sizeof(Instr) = 4 MiB
-static constexpr Uint INSTR_HEAP_LEN = (1 << 22) / sizeof(Instr);
+static constexpr Uint INSTR_HEAP_LEN = (1u << 22u) / sizeof(Instr);
 
 /*
 Fixed-size code heap. Stupid, simple solution.
@@ -80,7 +80,7 @@ analogous to a GOT (global offset table) in executable formats.
 typedef struct {
   Instr_heap exec;                            // 4 MiB; executable code.
   U8         guard_0[MEM_PAGE];               // PROT_NONE
-  U8         data[1 << 18];                   // 256 KiB; mutable values.
+  U8         data[1u << 18u];                 // 256 KiB; mutable values.
   U8         guard_1[MEM_PAGE];               // PROT_NONE
   U64        externs[MEM_PAGE / sizeof(U64)]; // Addresses of external symbols.
   U8         guard_2[MEM_PAGE];               // PROT_NONE

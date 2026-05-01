@@ -13,8 +13,9 @@ import' std:pthread.af
 \ - Unwinding the stack.
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
-: callback { ignored -- }
-  ( E: val -- err ) \ Real ABI signature.
+: callback
+  { ignored -- } \ Official signature.
+  ( val -- err ) \ Real ABI signature.
 
   " [child] running and throwing" log lf
 

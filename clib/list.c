@@ -11,21 +11,27 @@ Resizing relocates memory; pointers are transient.
 /*
 Frees the data and zeroes all fields. Usage:
 
-  defer(list_deinit) Sint_list some_list = {};
+  deferred(list_deinit) list_of(int) some_list = {};
 */
 static void list_deinit(void *src) {
   const auto tar = (List *)src;
+  if (!tar) return;
   free(tar->dat);
-  tar->dat = nullptr;
-  tar->len = 0;
-  tar->cap = 0;
+  *tar = (List){};
 }
 
 static void list_reserve_total_cap_impl(List *tar, Ind size, Ind cap) {
   if (cap <= tar->cap) return;
-  tar->dat = realloc(tar->dat, cap * size);
+
+  const auto next = mul(cap, size);
+  const auto dat  = realloc(tar->dat, next);
+  aver(dat);
+
+  tar->dat = dat;
   tar->cap = cap;
 }
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 
 static void list_reserve_spare_cap_impl(List *tar, Ind size, Ind more) {
   const auto goal = tar->len + more;
@@ -33,6 +39,8 @@ static void list_reserve_spare_cap_impl(List *tar, Ind size, Ind more) {
   while (next < goal) next *= 2;
   list_reserve_total_cap_impl(tar, size, next);
 }
+
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 static void list_reserve_more(List *tar, Ind size) {
   if (tar->len < tar->cap) return;
@@ -52,7 +60,8 @@ static void list_push_raw_impl(
     fatal("unable to push raw data: out of capacity", file, line);
   }
 
-  memcpy(((U8 *)tar->dat + (tar->len * size)), src, len);
+  const auto off = mul(tar->len, size);
+  memcpy(((U8 *)tar->dat + off), src, len);
   tar->len += len / size;
 }
 
@@ -73,7 +82,7 @@ static bool list_valid(const List *list) {
 // clang-format on
 
 static void *list_ceil_impl(const List *list, Ind size) {
-  return (U8 *)list->dat + (list->cap * size);
+  return (U8 *)list->dat + mul(list->cap, size);
 }
 
 static bool is_list_elem_impl(
@@ -96,7 +105,7 @@ static bool is_list_elem_impl(
 #include <stdio.h>
 
 int main(void) {
-  defer(list_deinit) list_of(Uint) list = {};
+  deferred(list_deinit) list_of(Uint) list = {};
 
   // list_head(&list); // crash
 

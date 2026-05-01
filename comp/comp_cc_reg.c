@@ -172,11 +172,13 @@ static bool comp_local_has_reg(Comp *comp, Local *loc, U8 reg) {
 }
 
 static S8 comp_local_reg_any(Comp *comp, Local *loc) {
+  constexpr U8 ceil = arr_cap(comp->ctx.reg_vals);
+
   /*
   Could be "optimized" by creating two-way associations with extra
   book-keeping. There's no point and it would make things fragile.
   */
-  for (U8 reg = 0; reg < arr_cap(comp->ctx.reg_vals); reg++) {
+  for (U8 reg = 0; reg < ceil; reg++) {
     if (comp_local_get_for_reg(comp, reg) == loc) return (S8)reg;
   }
   return -1;
@@ -196,9 +198,10 @@ static void comp_local_reg_add(Comp *comp, Local *loc, U8 reg) {
 }
 
 static void comp_local_regs_clear(Comp *comp, Local *loc) {
-  const auto ctx = &comp->ctx;
+  const auto   ctx  = &comp->ctx;
+  constexpr U8 ceil = arr_cap(comp->ctx.reg_vals);
 
-  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+  for (U8 reg = 0; reg < ceil; reg++) {
     if (comp_local_get_for_reg(comp, reg) != loc) continue;
     ptr_clear(&ctx->reg_vals[reg]);
   }
@@ -206,9 +209,10 @@ static void comp_local_regs_clear(Comp *comp, Local *loc) {
 
 // For debug logging.
 static Bits comp_local_reg_bits(Comp *comp, const Local *loc) {
-  Bits out = 0;
+  constexpr U8 ceil = arr_cap(comp->ctx.reg_vals);
+  Bits         out  = 0;
 
-  for (U8 reg = 0; reg < arr_cap(comp->ctx.reg_vals); reg++) {
+  for (U8 reg = 0; reg < ceil; reg++) {
     if (comp_local_get_for_reg(comp, reg) != loc) continue;
     bits_add_to(&out, reg);
   }
@@ -440,9 +444,10 @@ static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   So, we use a simple solution: every call evicts all volatile locals
   from parameter registers, forcing subsequent access to use memory.
   */
-  const auto ctx = &comp->ctx;
+  const auto   ctx  = &comp->ctx;
+  constexpr U8 ceil = arr_cap(ctx->reg_vals);
 
-  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+  for (U8 reg = 0; reg < ceil; reg++) {
     const auto loc = comp_local_get_for_reg(comp, reg);
 
     if (!loc) continue;
@@ -850,10 +855,11 @@ static Err comp_barrier(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
-  const auto ctx     = &comp->ctx;
-  const auto arg_low = ctx->arg_low;
-  const auto arg_len = ctx->arg_len;
-  const auto name    = sym->name.buf;
+  const auto   ctx     = &comp->ctx;
+  const auto   arg_low = ctx->arg_low;
+  const auto   arg_len = ctx->arg_len;
+  const auto   name    = sym->name.buf;
+  constexpr U8 ceil    = arr_cap(ctx->reg_vals);
 
   if (arg_low) {
     return err_args_partial(name, "in control flow", arg_low, arg_len);
@@ -861,7 +867,7 @@ static Err comp_barrier(Comp *comp) {
   if (arg_len) {
     return err_args_arity(name, "in control flow", 0, arg_len);
   }
-  for (U8 reg = 0; reg < arr_cap(ctx->reg_vals); reg++) {
+  for (U8 reg = 0; reg < ceil; reg++) {
     comp_clear_param_reg(comp, reg);
   }
   return nullptr;

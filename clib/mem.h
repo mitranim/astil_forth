@@ -8,7 +8,7 @@ Memory page size used by some platforms; common on Arm64.
 `getpagesize()` and `sysconf(_SC_PAGESIZE)` also exist,
 but a hardcoded page size can be used for array sizes.
 */
-static constexpr Ind MEM_PAGE = 1 << 14; // 16 KiB
+static constexpr Ind MEM_PAGE = 1u << 14u; // 16 KiB
 
 #define is_aligned_to(num, size) __builtin_is_aligned(num, size)
 
@@ -31,7 +31,7 @@ typedef struct {
   Ind cap;
 } Buf;
 
-#define buf_append_impl(tmp_buf, tmp_val, buf, ...)      \
+#define buf_append_inner(tmp_buf, tmp_val, buf, ...)     \
   ({                                                     \
     const auto tmp_buf = buf;                            \
     const auto tmp_val = __VA_ARGS__;                    \
@@ -47,9 +47,9 @@ the caller is responsible for address alignment.
 
 Uses `memcpy` rather than pointer assignment to avoid UB.
 */
-#define buf_append(...) buf_append_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define buf_append(...) buf_append_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
-#define buf_load_impl(tmp_buf, tmp_val, buf, off, type)    \
+#define buf_load_inner(tmp_buf, tmp_val, buf, off, type)   \
   ({                                                       \
     const auto tmp_buf = buf;                              \
     type       tmp_val;                                    \
@@ -69,13 +69,13 @@ This is also why we load/store values instead of operating on addresses.
 
 UNTESTED.
 */
-#define buf_load(...) buf_load_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define buf_load(...) buf_load_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
-#define buf_store_impl(tmp, buf, off, ...)     \
+#define buf_store_inner(tmp, buf, off, ...)    \
   ({                                           \
     const auto tmp = __VA_ARGS__;              \
     memcpy(buf->dat + off, &tmp, sizeof(tmp)); \
   })
 
 // UNTESTED.
-#define buf_store(...) buf_store_impl(UNIQ_IDENT, __VA_ARGS__)
+#define buf_store(...) buf_store_inner(UNIQ_IDENT, __VA_ARGS__)

@@ -1,4 +1,59 @@
+HeaderFilterRegex: '.*'
 Checks:
+  - '*'
+  - -altera-*  # Doesn't apply to our targets.
+  - -android-* # Doesn't apply to our targets.
+
+  # We prefer `#pragma once` as guards.
+  - -llvm-header-guard
+  - -portability-avoid-pragma-once
+
+  # Many of our macros accept unique names of temp variables as params.
+  # They can't be parenthesized.
+  - -bugprone-macro-parentheses
+
+  - -hicpp-no-assembler # No choice.
+  - -readability-identifier-length # `reg_x0` isn't an improvement over `x0`.
+
+  # Has many false positives but may catch bugs.
+  # Silenced on a case-by-case basis with casts.
+  # - -hicpp-signed-bitwise
+
+  # Has false positives which break code when complied with.
+  - -readability-redundant-parentheses
+
+  # We have some cyclic includes and that's okay.
+  - -misc-header-include-cycle
+
+  - -misc-no-recursion # WTF
+  - -bugprone-branch-clone
+  - -bugprone-invalid-enum-default-initialization
+
+  - -bugprone-assignment-in-if-condition
+  - -performance-no-int-to-ptr
+  - -bugprone-easily-swappable-parameters # So many unavoidables.
+  - -google-readability-braces-around-statements
+  - -llvmlibc-restrict-system-libc-headers
+  - -hicpp-braces-around-statements
+  - -readability-braces-around-statements
+  - -cppcoreguidelines-avoid-non-const-global-variables
+  - -misc-include-cleaner
+  - -cert-err33-c
+  - -readability-function-cognitive-complexity
+  - -bugprone-suspicious-include
+  - -cppcoreguidelines-init-variables
+  - -cppcoreguidelines-avoid-magic-numbers # Way too aggressive.
+  - -readability-magic-numbers # Way too aggressive.
+  - -concurrency-mt-unsafe # False positives.
+  - -readability-implicit-bool-conversion
+  - -google-readability-todo
+  - -bugprone-suspicious-string-compare
+  - -hicpp-uppercase-literal-suffix # Backwards logic.
+  - -readability-uppercase-literal-suffix # Backwards logic.
+  - -clang-analyzer-unix.Malloc # Doesn't understand `_Defer`.
+  - -hicpp-named-parameter
+  - -readability-named-parameter
+
   - -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
   - -clang-analyzer-optin.performance.Padding # Specific field order matters.
   - -clang-analyzer-deadcode.DeadStores # False positives.

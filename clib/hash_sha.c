@@ -9,28 +9,31 @@ Original files are in public domain.
 
 Changes:
 
-- Avoid signed left shifts (UB).
+- Only unsigned bitwise ops.
 - Sensible integer names.
 - Avoid scope pollution.
+- Drop unused macros.
 */
 #pragma once
 #include "./hash_sha.h"
+#include <string.h> // `memset`
+
+// NOLINTBEGIN(readability-identifier-length)
 
 ALLOW_OVERFLOW static void sha256_transform(Sha256_ctx *ctx, const U8 data[]) {
-#define ROTLEFT(a, b) (((a) << (b)) | ((a) >> (32 - (b))))
-#define ROTRIGHT(a, b) (((a) >> (b)) | ((a) << (32 - (b))))
+#define ROTRIGHT(a, b) (((a) >> (b)) | ((a) << (32u - (b))))
 #define CH(x, y, z) (((x) & (y)) ^ (~(x) & (z)))
 #define MAJ(x, y, z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
-#define EP0(x) (ROTRIGHT(x, 2) ^ ROTRIGHT(x, 13) ^ ROTRIGHT(x, 22))
-#define EP1(x) (ROTRIGHT(x, 6) ^ ROTRIGHT(x, 11) ^ ROTRIGHT(x, 25))
-#define SIG0(x) (ROTRIGHT(x, 7) ^ ROTRIGHT(x, 18) ^ ((x) >> 3))
-#define SIG1(x) (ROTRIGHT(x, 17) ^ ROTRIGHT(x, 19) ^ ((x) >> 10))
+#define EP0(x) (ROTRIGHT(x, 2u) ^ ROTRIGHT(x, 13u) ^ ROTRIGHT(x, 22u))
+#define EP1(x) (ROTRIGHT(x, 6u) ^ ROTRIGHT(x, 11u) ^ ROTRIGHT(x, 25u))
+#define SIG0(x) (ROTRIGHT(x, 7u) ^ ROTRIGHT(x, 18u) ^ ((x) >> 3u))
+#define SIG1(x) (ROTRIGHT(x, 17u) ^ ROTRIGHT(x, 19u) ^ ((x) >> 10u))
 
   U32 m[64];
 
   for (U32 i = 0, j = 0; i < 16; i += 1, j += 4) {
-    m[i] = ((U32)data[j] << 24) | ((U32)data[j + 1] << 16) |
-      ((U32)data[j + 2] << 8) | (data[j + 3]);
+    m[i] = ((U32)data[j] << 24u) | ((U32)data[j + 1] << 16u) |
+      ((U32)data[j + 2] << 8u) | (data[j + 3]);
   }
   for (U32 i = 16; i < 64; ++i) {
     m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
@@ -81,7 +84,6 @@ ALLOW_OVERFLOW static void sha256_transform(Sha256_ctx *ctx, const U8 data[]) {
   ctx->state[6] += g;
   ctx->state[7] += h;
 
-#undef ROTLEFT
 #undef ROTRIGHT
 #undef CH
 #undef MAJ
@@ -132,28 +134,29 @@ static void sha256_final(Sha256_ctx *ctx, U8 hash[]) {
   }
 
   // Append to the padding the total message's length in bits and transform.
-  ctx->bitlen += ctx->datalen * 8;
+  ctx->bitlen += (typeof(ctx->bitlen))ctx->datalen * 8;
   ctx->data[63] = (U8)(ctx->bitlen);
-  ctx->data[62] = (U8)(ctx->bitlen >> 8);
-  ctx->data[61] = (U8)(ctx->bitlen >> 16);
-  ctx->data[60] = (U8)(ctx->bitlen >> 24);
-  ctx->data[59] = (U8)(ctx->bitlen >> 32);
-  ctx->data[58] = (U8)(ctx->bitlen >> 40);
-  ctx->data[57] = (U8)(ctx->bitlen >> 48);
-  ctx->data[56] = (U8)(ctx->bitlen >> 56);
+  ctx->data[62] = (U8)(ctx->bitlen >> 8u);
+  ctx->data[61] = (U8)(ctx->bitlen >> 16u);
+  ctx->data[60] = (U8)(ctx->bitlen >> 24u);
+  ctx->data[59] = (U8)(ctx->bitlen >> 32u);
+  ctx->data[58] = (U8)(ctx->bitlen >> 40u);
+  ctx->data[57] = (U8)(ctx->bitlen >> 48u);
+  ctx->data[56] = (U8)(ctx->bitlen >> 56u);
   sha256_transform(ctx, ctx->data);
 
-  // Since this implementation uses little endian U8 ordering and SHA uses big endian,
-  // reverse all the bytes when copying the final state to the output hash.
+  // Since this implementation uses little endian `U8` ordering,
+  // and SHA uses big endian, reverse all the bytes when copying
+  // the final state to the output hash.
   for (U8 i = 0; i < 4; ++i) {
-    hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 4]  = (ctx->state[1] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 8]  = (ctx->state[2] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 20] = (ctx->state[5] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000FF;
-    hash[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000FF;
+    hash[i]      = (ctx->state[0] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 4]  = (ctx->state[1] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 8]  = (ctx->state[2] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 12] = (ctx->state[3] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 16] = (ctx->state[4] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 20] = (ctx->state[5] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 24] = (ctx->state[6] >> (24u - (i * 8))) & 0x000000FFu;
+    hash[i + 28] = (ctx->state[7] >> (24u - (i * 8))) & 0x000000FFu;
   }
 }
 
@@ -165,13 +168,15 @@ static void sha256(U8 *out, const U8 *src, Ind len) {
   sha256_final(&ctx, out);
 }
 
-#define sha256_any_impl(tmp, src, out)          \
+#define sha256_any_inner(tmp, src, out)         \
   ({                                            \
     const auto tmp = src;                       \
     sha256(out, (const U8 *)&tmp, sizeof(tmp)); \
   })
 
-#define sha256_any(...) sha256_any_impl(UNIQ_IDENT, __VA_ARGS__)
+#define sha256_any(...) sha256_any_inner(UNIQ_IDENT, __VA_ARGS__)
+
+// NOLINTEND(readability-identifier-length)
 
 /*
 #include "./fmt.c"

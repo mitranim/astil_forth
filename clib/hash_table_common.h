@@ -17,8 +17,8 @@ typedef struct {
   void *vals;
 } Hash_table;
 
-typedef Fnv_hash(Hash_fun)(const void *val, Uint len);
-typedef bool(Eq_fun)(const void *one, const void *two, Uint len);
+typedef Fnv_hash(Hash_fun)(const void *val, Ind len);
+typedef bool(Eq_fun)(const void *one, const void *two, Ind len);
 
 /*
 Usage:

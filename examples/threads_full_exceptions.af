@@ -22,8 +22,9 @@ import' std:pthread.af
 \ - Unwinding the stack.
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
-: callback { inout -- }
-  ( E: val -- err ) \ Real ABI signature.
+: callback
+  { inout -- }   \ Official signature.
+  ( val -- err ) \ Real ABI signature.
 
   inout @ { path }
   " [child] checking size of `%s`..." path logf lf

@@ -33,14 +33,16 @@ typedef set_of(F64)  F64_set;
 
 #define set_init(set, cap) set_init_impl((Set *)(set), cap, set_val_size(set));
 
-#define set_has_impl(tmp, set, val)                                 \
+#define set_has_inner(tmp, set, val)                                \
   ({                                                                \
     const set_val_type(set) tmp = val;                              \
     set_matching_ind((const Set *)(set), &tmp, set_val_size(set)) < \
       INVALID_IND;                                                  \
   })
 
-#define set_has(...) set_has_impl(UNIQ_IDENT, __VA_ARGS__)
+// NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
+#define set_has(...) set_has_inner(UNIQ_IDENT, __VA_ARGS__)
+// NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #define set_add_inner(tmp, set, ...)                                    \
   ({                                                                    \
@@ -48,8 +50,12 @@ typedef set_of(F64)  F64_set;
     (typeof(tmp) *)set_add_impl((Set *)(set), &tmp, set_val_size(set)); \
   })
 
+// NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
+
 // Returned pointer is only valid until next set resize.
 #define set_add(...) set_add_inner(UNIQ_IDENT, __VA_ARGS__)
+
+// NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #define set_val_type(set) typeof((set)->vals[0])
 #define set_val_size(set) sizeof((set)->vals[0])

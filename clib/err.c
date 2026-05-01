@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-static void backtrace_capture() {
+static void backtrace_capture(void) {
   BT_BUF_LEN = backtrace(BT_BUF, arr_cap(BT_BUF));
 }
 

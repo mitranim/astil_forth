@@ -8,8 +8,15 @@
 static Bits bits_span(U8 ceil) {
   aver(ceil <= BITS_CEIL);
 
+  /*
+  Why all the casts: apparently, C "promotes" operands of bitwise operations
+  from shorter types to SIGNED `int` THEN `clang-tidy` complains about using
+  signed `int` in bitwise operations. What insanity.
+  */
+  const U8 shift = ceil & (U8)(BITS_CEIL - 1);
+
   // OK for `0..63`, not OK (and not portable) for `64`.
-  const auto shifted = (Bits)1 << (ceil & (BITS_CEIL - 1));
+  const auto shifted = (Bits)1 << shift;
 
   // All-1 for `0..63`, all-0 for `64`.
   const auto mask = -(Bits)(ceil < BITS_CEIL);
@@ -97,7 +104,7 @@ ALLOW_OVERFLOW static U8 bits_push_low(Bits *tar) {
 }
 
 static bool low_bits_zero(Uint val, Uint scale) {
-  return !(val & ((1 << scale) - 1));
+  return !(val & ((1u << scale) - 1));
 }
 
 static bool high_bits_zero(Uint val, Uint scale) { return !(val >> scale); }

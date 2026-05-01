@@ -59,14 +59,14 @@ static constexpr auto  EMPTY = (Empty){};
 
 #define dict_has(dict, key) (dict_ind(dict, key) != INVALID_IND)
 
-#define dict_get_or_impl(tmp_dict, tmp_ind, dict, key, val)           \
+#define dict_get_or_inner(tmp_dict, tmp_ind, dict, key, val)          \
   ({                                                                  \
     const auto tmp_dict = dict;                                       \
     const auto tmp_ind  = dict_ind_impl((const Dict *)tmp_dict, key); \
     (tmp_ind == INVALID_IND) ? val : tmp_dict->vals[tmp_ind];         \
   })
 
-#define dict_get_or(...) dict_get_or_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define dict_get_or(...) dict_get_or_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 #define dict_get(dict, key) dict_get_or(dict, key, (dict_val_type(dict)){0})
 
@@ -83,7 +83,9 @@ Dicts which own their keys must be freed with `dict_deinit_with_keys`.
     );                                               \
   })
 
+// NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
 #define dict_set(...) dict_set_inner(UNIQ_IDENT, __VA_ARGS__)
+// NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #define dict_val_type(dict) typeof((dict)->vals[0])
 #define dict_val_size(dict) sizeof((dict)->vals[0])
@@ -98,7 +100,7 @@ Usage:
 */
 #define dict_range hash_table_range
 
-#define dict_rewind_impl(tmp_next, tmp_prev, next, prev)                     \
+#define dict_rewind_inner(tmp_next, tmp_prev, next, prev)                    \
   ({                                                                         \
     const auto tmp_next = next;                                              \
     const auto tmp_prev = prev;                                              \
@@ -115,4 +117,6 @@ Usage:
     tmp_next->len = tmp_prev->len;                                           \
   })
 
-#define dict_rewind(...) dict_rewind_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+// NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
+#define dict_rewind(...) dict_rewind_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+// NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)

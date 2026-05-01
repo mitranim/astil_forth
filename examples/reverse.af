@@ -1,0 +1,25 @@
+import' std:lang.af
+
+: reverse { str len }
+  str           { floor }
+  str len + dec { ceil }
+
+  loop
+    floor ceil < while
+    floor @b { low }
+    ceil  @b { high }
+    high  floor !b
+    low   ceil  !b
+    ++:   floor
+    --:   ceil
+  end
+;
+
+: main
+  s" 0123456789abcdef" { str len }
+  str len reverse
+  str log lf
+;
+
+main
+\ fedcba9876543210

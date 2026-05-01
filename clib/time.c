@@ -19,7 +19,7 @@ static void timing_end(Timing *time) {
 
   const auto secs  = (F64)(time->end.tv_sec - time->beg.tv_sec);
   const auto nanos = (F64)(time->end.tv_nsec - time->beg.tv_nsec);
-  time->diff       = secs + nanos / 1'000'000'000;
+  time->diff       = secs + (nanos / 1'000'000'000);
 
   auto file = time->file;
   if (!file) file = stderr;

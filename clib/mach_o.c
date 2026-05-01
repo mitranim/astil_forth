@@ -5,18 +5,18 @@ Mach-O compilation is not here because it involves compiler-specific
 data structures, which are out of scope for this generic library.
 */
 #pragma once
-#include "../lib/fmt.c"
-#include "../lib/mach_misc.c"
-#include "../lib/mach_o.h"
+#include "./fmt.c"
+#include "./mach_misc.c"
+#include "./mach_o.h"
 
 static void Mach_head_repr(Mach_head *val) {
   print_struct_beg(val, Mach_head);
   print_struct_field(val, magic);
-  print_struct_field(val, cpu_type);
-  print_struct_field(val, cpu_subtype);
-  print_struct_field(val, file_type);
-  print_struct_field(val, cmd_count);
-  print_struct_field(val, cmd_size);
+  print_struct_field(val, cputype);
+  print_struct_field(val, cpusubtype);
+  print_struct_field(val, filetype);
+  print_struct_field(val, ncmds);
+  print_struct_field(val, sizeofcmds);
   print_struct_field(val, flags);
   print_struct_field(val, reserved);
   print_struct_end();
@@ -125,11 +125,16 @@ static void Mach_load_cmd_bui_ver_repr(Mach_load_cmd_bui_ver *val) {
   print_struct_field(val, head.cmdsize);
   print_struct_field(val, platform);
   printf(
-    "  .minos = mach_ver_from_str(" FMT_QUOTED "),\n",
-    mach_ver_to_str(val->minos)
+    "  .minos = mach_ver(%d, %d, %d),\n",
+    mach_ver_major(val->minos),
+    mach_ver_minor(val->minos),
+    mach_ver_patch(val->minos)
   );
   printf(
-    "  .sdk = mach_ver_from_str(" FMT_QUOTED "),\n", mach_ver_to_str(val->sdk)
+    "  .sdk = mach_ver(%d, %d, %d),\n",
+    mach_ver_major(val->sdk),
+    mach_ver_minor(val->sdk),
+    mach_ver_patch(val->sdk)
   );
   print_struct_field(val, ntools);
   print_struct_end();
@@ -139,8 +144,10 @@ static void Mach_bui_ver_repr(Mach_bui_ver *val) {
   print_struct_beg(val, Mach_bui_ver);
   print_struct_field(val, tool);
   printf(
-    "  .version = mach_ver_from_str(" FMT_QUOTED "),\n",
-    mach_ver_to_str(val->version)
+    "  .version = mach_ver(%d, %d, %d),\n",
+    mach_ver_major(val->version),
+    mach_ver_minor(val->version),
+    mach_ver_patch(val->version)
   );
   print_struct_end();
 }
@@ -170,12 +177,16 @@ static void Mach_load_cmd_dylib_repr(Mach_load_cmd_dylib *val) {
   print_struct_field(val, name_offset);
   print_struct_field(val, timestamp);
   printf(
-    "  .cur_ver = mach_ver_from_str(" FMT_QUOTED "),\n",
-    mach_ver_to_str(val->cur_ver)
+    "  .cur_ver = mach_ver(%d, %d, %d),\n",
+    mach_ver_major(val->cur_ver),
+    mach_ver_minor(val->cur_ver),
+    mach_ver_patch(val->cur_ver)
   );
   printf(
-    "  .compat_ver = mach_ver_from_str(" FMT_QUOTED "),\n",
-    mach_ver_to_str(val->compat_ver)
+    "  .compat_ver = mach_ver(%d, %d, %d),\n",
+    mach_ver_major(val->compat_ver),
+    mach_ver_minor(val->compat_ver),
+    mach_ver_patch(val->compat_ver)
   );
   print_struct_end();
 

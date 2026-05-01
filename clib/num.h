@@ -1,4 +1,5 @@
 #pragma once
+#include "./err.h"
 #include <inttypes.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -34,19 +35,19 @@ Suggested by Eskil: https://www.youtube.com/watch?v=sfrnU3-EpPI&t=2517
 
 typedef uint32_t Ind;
 #define FMT_IND "%u"
-static constexpr Uint IND_MAX = UINT32_MAX;
+static constexpr Ind IND_MAX = UINT32_MAX;
 
 #elif SIZE_MAX == 0xFFFFFFFFull // sizeof(size_t) == 4
 
 typedef uint16_t Ind;
 #define FMT_IND "%u"
-static constexpr Uint IND_MAX = UINT16_MAX;
+static constexpr Ind IND_MAX = UINT16_MAX;
 
 #else // SIZE_MAX
 
 typedef Uint Ind;
 #define FMT_IND "%zu"
-static constexpr Uint IND_MAX = SIZE_MAX;
+static constexpr Ind IND_MAX = SIZE_MAX;
 
 #endif // SIZE_MAX
 // clang-format on
@@ -69,29 +70,56 @@ static constexpr Uint IND_MAX = SIZE_MAX;
 
 static constexpr auto INVALID_IND = (Ind)-1;
 
-#define ind_valid(val)                                             \
-  ({                                                               \
-    static_assert(__builtin_types_compatible_p(typeof(val), Ind)); \
-    (val) != INVALID_IND;                                          \
+#define ind_valid(val)                                                    \
+  ({                                                                      \
+    static_assert(__builtin_types_compatible_p(typeof_unqual(val), Ind)); \
+    val != INVALID_IND;                                                   \
   })
 
-#define min_impl(tmp_A, tmp_B, A, B) \
-  ({                                 \
-    const auto tmp_A = A;            \
-    const auto tmp_B = B;            \
-    tmp_A < tmp_B ? tmp_A : tmp_B;   \
+#define add_inner(tmp, one, two)                   \
+  ({                                               \
+    typeof_unqual(one) tmp;                        \
+    aver(!__builtin_add_overflow(one, two, &tmp)); \
+    tmp;                                           \
   })
 
-#define min(...) min_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define add(...) add_inner(UNIQ_IDENT, __VA_ARGS__)
 
-#define max_impl(tmp_A, tmp_B, A, B) \
-  ({                                 \
-    const auto tmp_A = A;            \
-    const auto tmp_B = B;            \
-    tmp_A > tmp_B ? tmp_A : tmp_B;   \
+#define sub_inner(tmp, one, two)                   \
+  ({                                               \
+    typeof_unqual(one) tmp;                        \
+    aver(!__builtin_sub_overflow(one, two, &tmp)); \
+    tmp;                                           \
   })
 
-#define max(...) max_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define sub(...) sub_inner(UNIQ_IDENT, __VA_ARGS__)
+
+#define mul_inner(tmp, one, two)                   \
+  ({                                               \
+    typeof_unqual(one) tmp;                        \
+    aver(!__builtin_mul_overflow(one, two, &tmp)); \
+    tmp;                                           \
+  })
+
+#define mul(...) mul_inner(UNIQ_IDENT, __VA_ARGS__)
+
+#define min_inner(tmp_A, tmp_B, A, B)               \
+  ({                                                \
+    const auto tmp_A = A;                           \
+    const auto tmp_B = B;                           \
+    (typeof(tmp_A))(tmp_A < tmp_B ? tmp_A : tmp_B); \
+  })
+
+#define min(...) min_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+
+#define max_inner(tmp_A, tmp_B, A, B)               \
+  ({                                                \
+    const auto tmp_A = A;                           \
+    const auto tmp_B = B;                           \
+    (typeof(tmp_A))(tmp_A > tmp_B ? tmp_A : tmp_B); \
+  })
+
+#define max(...) max_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 /*
 For powers of 2 this is equivalent to `big % smol`
@@ -101,24 +129,10 @@ but avoids "div" instructions which may be slower.
 
 #define ALLOW_OVERFLOW __attribute__((no_sanitize("integer")))
 
-/*
-Clang doesn't seem to support `__builtin_stdc_bit_ceil` yet.
-If the input is 0, this is UB.
-*/
-#define round_up_pow2_impl(tmp_val, tmp_wid, val)                           \
-  ({                                                                        \
-    const auto   tmp_val = val;                                             \
-    constexpr U8 tmp_wid = sizeof(tmp_val) * CHAR_BIT;                      \
-    (typeof(tmp_val))1 << (tmp_wid - __builtin_clzg(tmp_val - 1, tmp_wid)); \
+#define divide_round_up_inner(tmp, src, div) \
+  ({                                         \
+    const auto tmp = div;                    \
+    (src + tmp - 1) / tmp;                   \
   })
 
-#define round_up_pow2(...) \
-  round_up_pow2_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
-
-#define divide_round_up_impl(tmp, src, div) \
-  ({                                        \
-    const auto tmp = div;                   \
-    (src + tmp - 1) / tmp;                  \
-  })
-
-#define divide_round_up(...) divide_round_up_impl(UNIQ_IDENT, __VA_ARGS__)
+#define divide_round_up(...) divide_round_up_inner(UNIQ_IDENT, __VA_ARGS__)

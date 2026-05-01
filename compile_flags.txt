@@ -1,4 +1,5 @@
 -std=c2y
+-fdefer-ts
 -funsigned-char
 -fvisibility=hidden
 -Weverything
@@ -11,8 +12,8 @@
 -Wno-pre-c23-compat
 -Wno-pre-c2y-compat
 -Wno-c++98-compat
+-Wno-c++-compat
 -Wno-padded
--Wno-missing-prototypes
 -Wno-poison-system-directories
 -Wno-pragma-once-outside-header
 -Wno-declaration-after-statement
@@ -26,7 +27,6 @@
 -Wno-shadow
 -Wno-gnu-label-as-value
 -Wno-empty-translation-unit
--Wno-c++-compat
 -Wno-format-pedantic
 -Wno-documentation-html
 -Wno-gnu-empty-struct
@@ -35,3 +35,4 @@
 -Wno-reserved-macro-identifier
 -Wno-newline-eof
 -Wno-char-subscripts
+-Wno-deprecated-octal-literals

@@ -82,7 +82,7 @@ Our version also prints `char*` as string.
     fun(generic_val(typ, val), sizeof(val) /* NOLINT */) \
   )
 
-#define fmt_composite_impl(tmp, val)                                     \
+#define fmt_composite_inner(tmp, val)                                    \
   __builtin_choose_expr(                                                 \
     is_arr(val),                                                         \
     fmt_bytes((const U8 *)to_ptr_or_arr(val), sizeof(val) /* NOLINT */), \
@@ -93,7 +93,7 @@ Our version also prints `char*` as string.
   )
 
 // For internal usage in fmting.
-#define fmt_composite(...) fmt_composite_impl(UNIQ_IDENT, __VA_ARGS__)
+#define fmt_composite(...) fmt_composite_inner(UNIQ_IDENT, __VA_ARGS__)
 
 // For internal usage in fmting.
 #define fmt_ptr_or_composite(val)                                \
@@ -129,11 +129,11 @@ Our version also prints `char*` as string.
   )
 /* clang-format on */
 
-#define fmt_any_as_hex_bytes_impl(tmp, val)       \
+#define fmt_any_as_hex_bytes_inner(tmp, val)      \
   ({                                              \
     const auto tmp = val;                         \
     fmt_bytes_hex((const U8 *)&tmp, sizeof(tmp)); \
   })
 
 #define fmt_any_as_hex_bytes(...) \
-  fmt_any_as_hex_bytes_impl(UNIQ_IDENT, __VA_ARGS__)
+  fmt_any_as_hex_bytes_inner(UNIQ_IDENT, __VA_ARGS__)

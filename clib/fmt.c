@@ -15,9 +15,9 @@ Clang explodes this 4-liner into more than a kilobyte of Arm64
 vector instructions and lookup tables (combined) 🤯. Wild.
 */
 static const char *uint64_to_bit_str(U64 num) {
-  constexpr auto LEN = 64;
+  constexpr U8 LEN = 64;
   for (Ind ind = 0; ind < LEN; ind++) {
-    FMT_64_BUF[ind] = ((num >> (LEN - ind - 1)) & 1) ? '1' : '0';
+    FMT_64_BUF[ind] = ((num >> (LEN - ind - 1)) & 1u) ? '1' : '0';
   }
   return FMT_64_BUF;
 }
@@ -28,17 +28,17 @@ To represent the bits of a signed number, just cast it.
 The returned buffer is only valid until the next call.
 */
 static const char *uint64_to_bit_str_reverse(U64 num) {
-  constexpr auto LEN = 64;
+  constexpr U8 LEN = 64;
   for (Ind ind = 0; ind < LEN; ind++) {
-    FMT_64_BUF[ind] = ((num >> ind) & 1) ? '1' : '0';
+    FMT_64_BUF[ind] = ((num >> ind) & 1u) ? '1' : '0';
   }
   return FMT_64_BUF;
 }
 
 static const char *uint32_to_bit_str(U32 num) {
-  constexpr auto LEN = 32;
+  constexpr U8 LEN = 32;
   for (Ind ind = 0; ind < LEN; ind++) {
-    FMT_64_BUF[ind] = ((num >> (LEN - ind - 1)) & 1) ? '1' : '0';
+    FMT_64_BUF[ind] = ((num >> (LEN - ind - 1)) & 1u) ? '1' : '0';
   }
   FMT_64_BUF[LEN] = '\0';
   return FMT_64_BUF;
@@ -52,71 +52,135 @@ static void eprint_byte_range_hex(const U8 *beg, const U8 *end) {
   while (beg && beg < end) eprintf("%0.2x", *beg++);
 }
 
-static char *fmt_bytes_hex_into(char *buf, Uint buf_len, const U8 *src, Uint len) {
-  if (!buf_len) return nullptr;
+static char *fmt_bytes_hex_into(char *buf, Ind cap, const U8 *src, Ind len) {
+  if (!cap) return nullptr;
 
-  static constexpr char digits[] = "0123456789abcdef";
-  const auto            buf_cap  = (Ind)buf_len - 1;
-  Ind                   buf_ind  = 0;
-
-  for (Ind ind = 0; ind < len && buf_ind < buf_cap; ind++) {
-    const auto byte = src[ind];
-    buf[buf_ind++]  = digits[(byte >> 4) & 0b1111];
-    buf[buf_ind++]  = digits[byte & 0b1111];
+  // Want enough space for `...\0`.
+  if (cap < 4 || !len) {
+    buf[0] = '\0';
+    return buf;
   }
 
-  buf[buf_ind] = 0;
+  const auto buf_ceil = buf + cap;
+  const auto buf_end  = buf_ceil - 1; // Reserve `\0`.
+  const auto src_ceil = src + len;
+
+  auto buf_top = buf;
+  auto src_top = src;
+
+  while (src_top < src_ceil) {
+    const auto rem = buf_ceil - buf_top;
+    if (rem < 2) break;
+
+    static constexpr char digits[] = "0123456789abcdef";
+    const auto            byte     = *src_top++;
+
+    /*
+    Why all the casts: apparently, C "promotes" operands of bitwise operations
+    from shorter types to SIGNED `int` THEN `clang-tidy` complains about using
+    signed `int` in bitwise operations. What insanity.
+    */
+    const U8 high = (U8)(byte >> (U8)4) & (U8)0b1111;
+
+    *buf_top++ = digits[high];
+    *buf_top++ = digits[byte & (U8)0b1111];
+  }
+
+  // Ran out of buffer.
+  if (src_top < src_ceil) {
+    buf_end[-1] = '.';
+    buf_end[-2] = '.';
+    buf_end[-3] = '.';
+    buf_top     = buf_end;
+  }
+
+  *buf_top = '\0';
   return buf;
 }
 
-static char *fmt_bytes_hex(const U8 *src, Uint len) {
+static char *fmt_bytes_hex(const U8 *src, Ind len) {
   return fmt_bytes_hex_into(FMT_BUF, arr_cap(FMT_BUF), src, len);
 }
 
-static char *fmt_bytes_into(char *buf, Uint buf_len, const U8 *src, Uint src_len) {
-  aver(buf_len >= 6); // {...}\0
+static char *fmt_bytes_into(char *buf, Ind cap, const U8 *src, Ind src_len) {
+  // Want enough space for `{...}\0` and `{0xNN}\0`.
+  if (cap < 8) return nullptr;
 
-  const auto buf_lim = buf_len - 2; // }\0
-  Ind        buf_ind = 0;
-  Ind        src_ind = 0;
-
-  buf[buf_ind++] = '{';
-
-#define push(val)                  \
-  {                                \
-    buf[buf_ind++] = val;          \
-    if (buf_ind >= buf_lim) break; \
+  if (!src_len) {
+    // NOLINTBEGIN(clang-analyzer-security.insecureAPI.strcpy)
+    strcpy(buf, "{}");
+    // NOLINTEND(clang-analyzer-security.insecureAPI.strcpy)
+    return buf;
   }
 
-  for (; src_ind < src_len; src_ind++) {
-    if (buf_ind > 1) {
-      push(',');
-      push(' ');
+  const auto src_ceil   = src + src_len;
+  const auto buf_ceil   = buf + cap;
+  const auto buf_end    = buf_ceil - 1; // Reserve `\0`.
+  const auto inner_ceil = buf_ceil - 2; // Reserve `}\0`.
+
+  auto buf_top = buf;
+  auto src_top = src;
+
+  *buf_top++ = '{';
+
+  const auto inner_beg = buf_top;
+
+  while (src_top < src_ceil) {
+    const bool sep = buf_top > inner_beg;
+    const auto rem = inner_ceil - buf_top;
+    const auto req = sep ? 6 : 4; // `0xNN` and maybe `, `
+
+    if (rem < req) break;
+
+    if (sep) {
+      *buf_top++ = ',';
+      *buf_top++ = ' ';
     }
 
     static constexpr char digits[] = "0123456789abcdef";
-    const auto            byte     = src[src_ind];
 
-    push('0');
-    push('x');
-    push(digits[(byte >> 4) & 0b1111]);
-    push(digits[byte & 0b1111]);
+    // False positive.
+    //
+    // NOLINTBEGIN(clang-analyzer-core.uninitialized.Assign)
+
+    const auto byte = *src_top++;
+
+    // NOLINTEND(clang-analyzer-core.uninitialized.Assign)
+
+    /*
+    Why all the casts: apparently, C "promotes" operands of bitwise operations
+    from shorter types to SIGNED `int` THEN `clang-tidy` complains about using
+    signed `int` in bitwise operations. What insanity.
+    */
+    const U8 high = (U8)(byte >> (U8)4) & (U8)0b1111;
+
+    *buf_top++ = '0';
+    *buf_top++ = 'x';
+    *buf_top++ = digits[high];
+    *buf_top++ = digits[byte & (U8)0b1111];
   }
-#undef push
 
-  // Ran out of buffer.
-  if (src_ind < src_len) {
-    buf[buf_len - 5] = '.';
-    buf[buf_len - 4] = '.';
-    buf[buf_len - 3] = '.';
+  aver(buf_top <= inner_ceil);
+
+  // Ran out of buffer for inner content.
+  if (src_top < src_ceil) {
+    buf_top -= 4;
+    aver(buf_top >= inner_beg);
+    *buf_top++ = '.';
+    *buf_top++ = '.';
+    *buf_top++ = '.';
   }
 
-  buf[buf_ind++] = '}';
-  buf[buf_ind]   = '\0';
+  aver(buf_top < buf_end);
+  *buf_top++ = '}';
+
+  aver(buf_top <= buf_end);
+  *buf_top = '\0';
+
   return buf;
 }
 
-static char *fmt_bytes(const U8 *src, Uint len) {
+static char *fmt_bytes(const U8 *src, Ind len) {
   return fmt_bytes_into(FMT_BUF, arr_cap(FMT_BUF), src, len);
 }
 
@@ -141,12 +205,12 @@ static char *fmt_chars                  (char const *           val) {return spf
 
 /* clang-format on */
 
-static char *fmt_chars_unsigned(const char unsigned *src, Uint len) {
+static char *fmt_chars_unsigned(const char unsigned *src, Ind len) {
   return fmt_bytes(src, len);
 }
 
 // TODO use `%d` format.
-static char *fmt_chars_signed(const char signed *src, Uint len) {
+static char *fmt_chars_signed(const char signed *src, Ind len) {
   return fmt_bytes((const U8 *)src, len);
 }
 

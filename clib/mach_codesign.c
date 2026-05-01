@@ -17,6 +17,8 @@ Links:
 #include "./misc.h"
 #include "./num.h"
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
 /*
 The provided offset is where the code signature data begins in the Mach-O file.
 The signature will contain hashes of everything in the file before this offset.
@@ -24,17 +26,17 @@ The signature will contain hashes of everything in the file before this offset.
 SYNC[mach_codesign_total_size].
 */
 static U32 mach_codesign_total_size(U32 file_off, U8 id_len) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+
   aver(is_aligned_to(file_off, MCS_PAGE_SIZE));
 
-  // clang-format off
-  return (
-    sizeof(Mach_codesign_head) +
-    sizeof(Mach_codesign_index) +
-    sizeof(Mach_codesign_dir) +
-    id_len + 1 +
-    (file_off / MCS_PAGE_SIZE * MCS_HASH_SIZE)
-  );
-  // clang-format on
+  U32 out = sizeof(Mach_codesign_head) + sizeof(Mach_codesign_index) +
+    sizeof(Mach_codesign_dir);
+
+  out = add(out, id_len);
+  out = add(out, 1);
+  out = add(out, mul((file_off / MCS_PAGE_SIZE), MCS_HASH_SIZE));
+  return out;
 }
 
 // SYNC[mach_codesign_total_size].

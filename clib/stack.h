@@ -10,6 +10,11 @@ Stack with guards. Macros below assume the "empty ascending" style.
 
 Field ordering matters; some code hardcodes the offsets.
 
+`bytelen` is pointer-sized `Uint` for ABI reasons;
+this allows for easier interop with external code.
+However, we generally limit allocation size to the
+size representable with `Ind` (subject to change).
+
 SYNC[stack_field_offsets].
 */
 typedef struct {
@@ -31,7 +36,7 @@ typedef struct {
   }
 
 typedef struct {
-  Uint len;
+  Ind len;
 } Stack_opt;
 
 #define span_of(Elem) \
@@ -87,16 +92,16 @@ typedef span_of(F64)  F64_span;
 #define stack_trunc(stack) ((stack)->top = (stack)->floor)
 #define stack_trunc_to(stack, len) ((stack)->top = (stack)->floor + len)
 
-#define stack_push_impl(tmp, stack, ...) \
-  ({                                     \
-    const auto tmp = (stack)->top;       \
-    aver(tmp < (stack)->ceil);           \
-    *tmp         = __VA_ARGS__;          \
-    (stack)->top = tmp + 1;              \
-    tmp;                                 \
+#define stack_push_inner(tmp, stack, ...) \
+  ({                                      \
+    const auto tmp = (stack)->top;        \
+    aver(tmp < (stack)->ceil);            \
+    *tmp         = __VA_ARGS__;           \
+    (stack)->top = tmp + 1;               \
+    tmp;                                  \
   })
 
-#define stack_push(...) stack_push_impl(UNIQ_IDENT, __VA_ARGS__)
+#define stack_push(...) stack_push_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #define stack_pop(stack)                  \
   ({                                      \
@@ -104,7 +109,7 @@ typedef span_of(F64)  F64_span;
     *(--(stack)->top);                    \
   })
 
-#define stack_push_raw_impl(                                           \
+#define stack_push_raw_inner(                                          \
   tmp_stack, tmp_val, tmp_out, tmp_val_size, tmp_elem_size, stack, ... \
 )                                                                      \
   ({                                                                   \
@@ -128,7 +133,7 @@ typedef span_of(F64)  F64_span;
     UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__ \
   )
 
-#define stack_push_from_impl(tmp, out, src)                        \
+#define stack_push_from_inner(tmp, out, src)                       \
   ({                                                               \
     static_assert(sizeof(*(out)->top) == sizeof(*(src)->top));     \
     const auto tmp = stack_len(src);                               \
@@ -139,23 +144,24 @@ typedef span_of(F64)  F64_span;
   })
 
 // Pushes to the output stack/span everything from the source stack/span.
-#define stack_push_from(...) stack_push_from_impl(UNIQ_IDENT, __VA_ARGS__)
+#define stack_push_from(...) stack_push_from_inner(UNIQ_IDENT, __VA_ARGS__)
 
 // Index of given stack element, by pointer.
 // Providing an invalid pointer is UB.
 #define stack_ind(stack, val) ((Ind)((val) - (stack)->floor))
 
-#define stack_rewind_impl(tmp_next, tmp_prev, next, prev) \
-  ({                                                      \
-    const auto tmp_next = next;                           \
-    const auto tmp_prev = prev;                           \
-    aver(tmp_next->floor == tmp_prev->floor);             \
-    tmp_next->top = tmp_prev->top;                        \
+#define stack_rewind_inner(tmp_next, tmp_prev, next, prev) \
+  ({                                                       \
+    const auto tmp_next = next;                            \
+    const auto tmp_prev = prev;                            \
+    aver(tmp_next->floor == tmp_prev->floor);              \
+    tmp_next->top = tmp_prev->top;                         \
   })
 
-#define stack_rewind(...) stack_rewind_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define stack_rewind(...) \
+  stack_rewind_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
-#define is_stack_elem_impl(tmp_stack, tmp_ptr, stack, ptr)    \
+#define is_stack_elem_inner(tmp_stack, tmp_ptr, stack, ptr)   \
   ({                                                          \
     static_assert(sizeof(*ptr) == stack_val_size(stack));     \
     const auto tmp_stack = stack;                             \
@@ -165,7 +171,7 @@ typedef span_of(F64)  F64_span;
   })
 
 #define is_stack_elem(...) \
-  is_stack_elem_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+  is_stack_elem_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 #define stack_range(type, name, stack) \
   type name = (stack)->floor;          \

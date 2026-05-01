@@ -92,7 +92,7 @@ static void encode_linkedit_section(
   constexpr U32 img_off = sizeof(Mach_fixup_head);
   constexpr U32 seg_off = img_off + sizeof(Mach_fixup_img_5);
   constexpr U32 imp_off = seg_off + sizeof(Mach_fixup_seg);
-  const U32     sym_off = imp_off + sizeof(Mach_fixup_import) * imports_count;
+  const U32     sym_off = imp_off + (sizeof(Mach_fixup_import) * imports_count);
 
   buf_append(
     buf,
@@ -171,7 +171,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   try(comp_code_sync(code));
 
   {
-    defer(set_deinit) Sym_set visited = {};
+    deferred(set_deinit) Sym_set visited = {};
     try(validate_callees_can_compile(&visited, main));
   }
 
@@ -396,7 +396,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     }
   );
 
-  defer(buf_deinit) Buf linkedit = {};
+  deferred(buf_deinit) Buf linkedit = {};
   encode_linkedit_section(comp, text_seg_vm_off, got_vm_off, &linkedit);
 
   const auto linkedit_file_off  = file_off;
@@ -561,10 +561,10 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
 static Err compile_mach_executable_to(
   Interp *interp, const char *path, const Sym *main
 ) {
-  defer(buf_deinit) Buf buf = {};
+  deferred(buf_deinit) Buf buf = {};
   try(compile_mach_executable(interp, &buf, main));
 
-  defer(file_deinit) FILE *file = nullptr;
+  deferred(file_deinit) FILE *file = nullptr;
   try(file_open(path, "w", &file));
   try(file_write(file, buf.dat, 1, buf.len));
   try_errno(fflush(file));

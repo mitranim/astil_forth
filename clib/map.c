@@ -14,24 +14,24 @@ See `./dict.h`, `./dict.c`.
 
 static void map_deinit(void *map) { hash_table_deinit(map); }
 
-static bool map_valid(const Hash_table *map) {
+static bool map_valid(const Map *map) {
   return hash_table_valid((const Hash_table *)map);
 }
 
-static Ind map_ind_impl(const Map *map, const void *key, Uint key_size) {
+static Ind map_ind_impl(const Map *map, const void *key, Ind key_size) {
   return hash_table_matching_ind(
     (const Hash_table *)map, key, key_size, mem_hash, mem_eq
   );
 }
 
-static bool map_has_impl(Map *map, const void *key, Uint key_size) {
+static bool map_has_impl(Map *map, const void *key, Ind key_size) {
   return hash_table_matching_ind(
     (const Hash_table *)map, key, key_size, mem_hash, mem_eq
   );
 }
 
 static void *map_set_impl(
-  Map *map, const void *key, const void *val, Uint key_size, Uint val_size
+  Map *map, const void *key, const void *val, Ind key_size, Ind val_size
 ) {
   return hash_table_set(
     (Hash_table *)map, key, val, key_size, val_size, mem_hash, mem_eq
@@ -48,7 +48,7 @@ static void map_eprint_repr(const Map *map) {
 #include <stdio.h>
 
 int main(void) {
-  defer(map_deinit) map_of(Sint, Uint) map = {};
+  deferred(map_deinit) map_of(Sint, Uint) map = {};
   // map_eprint_repr((const Map *)&map);
 
   aver(map.len == 0);

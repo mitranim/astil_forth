@@ -105,6 +105,9 @@ static void recovery_log_ctx(const Interp *interp) {
   // backtrace_from_fp();
 }
 
+// NOLINTBEGIN(readability-non-const-parameter)
+// NOLINTBEGIN(misc-misplaced-const)
+
 /*
 `EXC_MASK_BAD_ACCESS` is sometimes recoverable; when it's an overflow or
 underflow of the Forth integer stack, we can assume that the thread state
@@ -115,9 +118,9 @@ TODO: if we ever bother to support the x64 architecture, we should specify
 `EXC_ARITHMETIC` for division by zero and convert it to a Forth exception.
 
 When initing the exception port, it should be safe to specify unsupported
-exception types; we simply print thread state and don't handle the exception.
+exception types; we simply print thread state and skip exception handling.
 */
-static kern_return_t catch_mach_exception_raise_state(
+kern_return_t catch_mach_exception_raise_state(
   mach_port_t                 exception_port,
   exception_type_t            exception,
   const mach_exception_data_t code,
@@ -128,6 +131,9 @@ static kern_return_t catch_mach_exception_raise_state(
   thread_state_t              state_next_ptr,
   mach_msg_type_number_t     *state_next_len
 ) {
+  // NOLINTEND(misc-misplaced-const)
+  // NOLINTEND(readability-non-const-parameter)
+
   (void)exception_port;
 
   constexpr auto state_chunk_size = sizeof(*(thread_state_t) nullptr);

@@ -22,6 +22,8 @@ static Err err_cli_key_over(const char *src, Ind len, Ind cap) {
   );
 }
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
 /*
 Parses a CLI arg, which may be any of:
 
@@ -40,6 +42,8 @@ For `--key=val` inputs, the returned key is valid only
 until the next call to `cli_key_val`.
 */
 static Err cli_key_val(const char *src, const char **key, const char **val) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+
   *key = nullptr;
   *val = nullptr;
 
@@ -58,16 +62,16 @@ static Err cli_key_val(const char *src, const char **key, const char **val) {
   }
 
   const auto key_len = sep - src;
-  aver(key_len > 0);
+  aver(key_len > 0 && key_len < IND_MAX);
 
   static char buf[256] = {};
   const auto  buf_cap  = arr_cap(buf);
 
-  if ((Uint)key_len >= buf_cap) {
+  if ((Ind)key_len >= buf_cap) {
     return err_cli_key_over(src, (Ind)key_len, buf_cap);
   }
 
-  const auto end = stpncpy(buf, src, key_len);
+  const auto end = stpncpy(buf, src, (Ind)key_len);
   aver(end > buf && end < (buf + buf_cap));
 
   *key = buf;
@@ -75,24 +79,28 @@ static Err cli_key_val(const char *src, const char **key, const char **val) {
   return nullptr;
 }
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
 /*
 Note that unlike `cli_key_val`, this modifies the output `out_val`
 only when a matching CLI flag is actually provided.
 */
 static Err cli_bool_for(
-  const char *name, const char *key, const char *val, bool *out_val, bool *ok
+  const char *name, const char *key, const char *val, bool *out_val, bool *found
 ) {
-  *ok = false;
+  *found = false;
 
   if (!key || strcmp(key, name)) return nullptr;
 
   if (!val || !val[0]) {
     *out_val = true;
-    *ok      = true;
+    *found   = true;
     return nullptr;
   }
 
   try(bool_decode(val, out_val));
-  *ok = true;
+  *found = true;
   return nullptr;
 }
+
+// NOLINTEND(bugprone-easily-swappable-parameters)

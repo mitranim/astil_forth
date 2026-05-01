@@ -22,7 +22,7 @@ typedef Err(Err_fun)(void);
     if (!(expr)) aver_fatal(#expr, __FILE__, __LINE__);                      \
   })
 
-#define averr_impl(tmp, expr)                     \
+#define averr_inner(tmp, expr)                    \
   {                                               \
     Err tmp = expr;                               \
     if (tmp) {                                    \
@@ -30,17 +30,17 @@ typedef Err(Err_fun)(void);
     }                                             \
   }
 
-#define averr(...) averr_impl(UNIQ_IDENT, __VA_ARGS__)
+#define averr(...) averr_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #ifdef FAST_CRASH
 #define try averr
 #else
-#define try_impl(tmp, expr) \
-  {                         \
-    Err tmp = expr;         \
-    if (tmp) return tmp;    \
+#define try_inner(tmp, expr) \
+  {                          \
+    Err tmp = expr;          \
+    if (tmp) return tmp;     \
   }
-#define try(...) try_impl(UNIQ_IDENT, __VA_ARGS__)
+#define try(...) try_inner(UNIQ_IDENT, __VA_ARGS__)
 #endif
 
 /*
@@ -58,17 +58,17 @@ for `mmap`, whose result is either -1 or an address.
 // For procedures which directly return errno or 0.
 #define try_errno_posix(expr) try(err_errno_posix(expr))
 
-#define err_errno_posix_impl(tmp, expr)                                       \
+#define err_errno_posix_inner(tmp, expr)                                      \
   ({                                                                          \
     const auto tmp = expr;                                                    \
     tmp ? err_from_errno(tmp, #expr, __func__, __FILE__, __LINE__) : nullptr; \
   })
 
-#define err_errno_posix(...) err_errno_posix_impl(UNIQ_IDENT, __VA_ARGS__)
+#define err_errno_posix(...) err_errno_posix_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #define try_main_errno(expr) try_main(err_errno(expr))
 
-#define try_main_impl(tmp, expr)           \
+#define try_main_inner(tmp, expr)          \
   {                                        \
     Err tmp = (expr);                      \
     if (tmp) {                             \
@@ -79,7 +79,7 @@ for `mmap`, whose result is either -1 or an address.
     }                                      \
   }
 
-#define try_main(...) try_main_impl(UNIQ_IDENT, __VA_ARGS__)
+#define try_main(...) try_main_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #ifdef NO_TRACE
 #define err_str(val) val
@@ -110,7 +110,7 @@ for `mmap`, whose result is either -1 or an address.
 #endif
 
 // Blame `clang-format` for the horrible ternary fmting.
-#define err_wrapf_impl(tmp_err, tmp_buf, fmt, err, ...)                      \
+#define err_wrapf_inner(tmp_err, tmp_buf, fmt, err, ...)                     \
   ({                                                                         \
     const auto tmp_err = err;                                                \
     const auto tmp_buf = !tmp_err ? nullptr                                  \
@@ -124,16 +124,16 @@ for `mmap`, whose result is either -1 or an address.
     });                                                                      \
   })
 
-#define err_wrapf(...) err_wrapf_impl(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define err_wrapf(...) err_wrapf_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
-#define buf_fmtf_impl(tmp, buf, fmt, ...)                        \
+#define buf_fmtf_inner(tmp, buf, fmt, ...)                       \
   ({                                                             \
     auto tmp = buf;                                              \
     snprintf(tmp, arr_cap(buf), fmt __VA_OPT__(, ) __VA_ARGS__); \
     tmp;                                                         \
   })
 
-#define buf_fmtf(...) buf_fmtf_impl(UNIQ_IDENT, __VA_ARGS__)
+#define buf_fmtf(...) buf_fmtf_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #define static_assert_type(val, typ)                                     \
   static_assert(                                                         \

@@ -472,21 +472,21 @@ Some fields are used only in the register-based callvention:
   clobber
 */
 
-static constexpr auto INTRIN_COLON = (Sym){
+static const USED auto INTRIN_COLON = (Sym){
   .name.buf = ":",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_COLON_COLON = (Sym){
+static const USED auto INTRIN_COLON_COLON = (Sym){
   .name.buf = "::",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon_colon,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_COLON_NAMED = (Sym){
+static const USED auto INTRIN_COLON_NAMED = (Sym){
   .name.buf = "colon",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon_named,
@@ -494,7 +494,7 @@ static constexpr auto INTRIN_COLON_NAMED = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_COLON_COLON_NAMED = (Sym){
+static const USED auto INTRIN_COLON_COLON_NAMED = (Sym){
   .name.buf = "colon_colon",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_colon_colon_named,
@@ -502,7 +502,7 @@ static constexpr auto INTRIN_COLON_COLON_NAMED = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_SEMICOLON = (Sym){
+static const USED auto INTRIN_SEMICOLON = (Sym){
   .name.buf  = ";",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_semicolon,
@@ -510,20 +510,20 @@ static constexpr auto INTRIN_SEMICOLON = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_BRACKET_BEG = (Sym){
+static const USED auto INTRIN_BRACKET_BEG = (Sym){
   .name.buf  = "[",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_bracket_beg,
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_BRACKET_END = (Sym){
+static const USED auto INTRIN_BRACKET_END = (Sym){
   .name.buf = "]",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_bracket_end,
 };
 
-static constexpr auto INTRIN_RET = (Sym){
+static const USED auto INTRIN_RET = (Sym){
   .name.buf  = "ret",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_ret,
@@ -531,7 +531,7 @@ static constexpr auto INTRIN_RET = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_RECUR = (Sym){
+static const USED auto INTRIN_RECUR = (Sym){
   .name.buf  = "recur",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_recur,
@@ -539,21 +539,21 @@ static constexpr auto INTRIN_RECUR = (Sym){
   .comp_only = true,
 };
 
-static constexpr USED auto INTRIN_TRY = (Sym){
+static const USED auto INTRIN_TRY = (Sym){
   .name.buf = "try",
   .wordlist = WORDLIST_COMP,
   .intrin   = (void *)intrin_try,
   .throws   = true,
 };
 
-static constexpr USED auto INTRIN_THROW = (Sym){
+static const USED auto INTRIN_THROW = (Sym){
   .name.buf = "throw",
   .wordlist = WORDLIST_COMP,
   .intrin   = (void *)intrin_throw,
   .throws   = true,
 };
 
-static constexpr USED auto INTRIN_CATCH = (Sym){
+static const USED auto INTRIN_CATCH = (Sym){
   .name.buf = "catch",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_catch,
@@ -561,7 +561,7 @@ static constexpr USED auto INTRIN_CATCH = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_CATCHES = (Sym){
+static const USED auto INTRIN_CATCHES = (Sym){
   .name.buf  = "catches",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_catches,
@@ -569,7 +569,7 @@ static constexpr auto INTRIN_CATCHES = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_GET_CATCHES = (Sym){
+static const USED auto INTRIN_GET_CATCHES = (Sym){
   .name.buf  = "get_catches",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_get_catches,
@@ -577,7 +577,7 @@ static constexpr auto INTRIN_GET_CATCHES = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_ONLY = (Sym){
+static const USED auto INTRIN_COMP_ONLY = (Sym){
   .name.buf  = "comp_only",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_only,
@@ -586,7 +586,7 @@ static constexpr auto INTRIN_COMP_ONLY = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_INTERP_ONLY = (Sym){
+static const USED auto INTRIN_INTERP_ONLY = (Sym){
   .name.buf  = "interp_only",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_interp_only,
@@ -595,7 +595,7 @@ static constexpr auto INTRIN_INTERP_ONLY = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_INLINE = (Sym){
+static const USED auto INTRIN_INLINE = (Sym){
   .name.buf  = "inline",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline,
@@ -603,7 +603,7 @@ static constexpr auto INTRIN_INLINE = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_REDEFINE = (Sym){
+static const USED auto INTRIN_REDEFINE = (Sym){
   .name.buf  = "redefine",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_redefine,
@@ -611,7 +611,7 @@ static constexpr auto INTRIN_REDEFINE = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_HERE = (Sym){
+static const USED auto INTRIN_HERE = (Sym){
   .name.buf  = "here",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_here,
@@ -620,7 +620,7 @@ static constexpr auto INTRIN_HERE = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_INSTR = (Sym){
+static const USED auto INTRIN_COMP_INSTR = (Sym){
   .name.buf    = "comp_instr",
   .wordlist    = WORDLIST_EXEC,
   .intrin      = (void *)intrin_comp_instr,
@@ -630,7 +630,7 @@ static constexpr auto INTRIN_COMP_INSTR = (Sym){
   .interp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_LOAD = (Sym){
+static const USED auto INTRIN_COMP_LOAD = (Sym){
   .name.buf  = "comp_load",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_load,
@@ -639,7 +639,7 @@ static constexpr auto INTRIN_COMP_LOAD = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_ALLOC_DATA = (Sym){
+static const USED auto INTRIN_ALLOC_DATA = (Sym){
   .name.buf = "alloc_data",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_alloc_data,
@@ -648,7 +648,7 @@ static constexpr auto INTRIN_ALLOC_DATA = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
+static const USED auto INTRIN_COMP_PAGE_ADDR = (Sym){
   .name.buf  = "comp_page_addr",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_page_addr,
@@ -658,7 +658,7 @@ static constexpr auto INTRIN_COMP_PAGE_ADDR = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_PAGE_LOAD = (Sym){
+static const USED auto INTRIN_COMP_PAGE_LOAD = (Sym){
   .name.buf  = "comp_page_load",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_page_load,
@@ -668,7 +668,7 @@ static constexpr auto INTRIN_COMP_PAGE_LOAD = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_CALL = (Sym){
+static const USED auto INTRIN_COMP_CALL = (Sym){
   .name.buf  = "comp_call",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_call,
@@ -677,21 +677,21 @@ static constexpr auto INTRIN_COMP_CALL = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_QUIT = (Sym){
+static const USED auto INTRIN_QUIT = (Sym){
   .name.buf = "quit",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_quit,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_CHAR = (Sym){
+static const USED auto INTRIN_CHAR = (Sym){
   .name.buf = "char",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_char,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_PARSE = (Sym){
+static const USED auto INTRIN_PARSE = (Sym){
   .name.buf = "parse",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_parse,
@@ -700,7 +700,7 @@ static constexpr auto INTRIN_PARSE = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_PARSE_WORD = (Sym){
+static const USED auto INTRIN_PARSE_WORD = (Sym){
   .name.buf = "parse_word",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_parse_word,
@@ -708,7 +708,7 @@ static constexpr auto INTRIN_PARSE_WORD = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_IMPORT = (Sym){
+static const USED auto INTRIN_IMPORT = (Sym){
   .name.buf = "import",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import,
@@ -716,21 +716,21 @@ static constexpr auto INTRIN_IMPORT = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_IMPORT_QUOTE = (Sym){
+static const USED auto INTRIN_IMPORT_QUOTE = (Sym){
   .name.buf = "import\"",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import_quote,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_IMPORT_TICK = (Sym){
+static const USED auto INTRIN_IMPORT_TICK = (Sym){
   .name.buf = "import'",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import_tick,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_EXTERN_ADR = (Sym){
+static const USED auto INTRIN_EXTERN_ADR = (Sym){
   .name.buf = "comp_extern_adr",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_comp_extern_adr,
@@ -738,7 +738,7 @@ static constexpr auto INTRIN_EXTERN_ADR = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_EXTERN_PROC = (Sym){
+static const USED auto INTRIN_EXTERN_PROC = (Sym){
   .name.buf = "extern_proc",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_extern_proc,
@@ -746,7 +746,7 @@ static constexpr auto INTRIN_EXTERN_PROC = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_FIND_WORD = (Sym){
+static const USED auto INTRIN_FIND_WORD = (Sym){
   .name.buf = "find_word",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_find_word,
@@ -755,7 +755,7 @@ static constexpr auto INTRIN_FIND_WORD = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_INLINE_WORD = (Sym){
+static const USED auto INTRIN_INLINE_WORD = (Sym){
   .name.buf  = "inline_word",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline_word,
@@ -764,7 +764,7 @@ static constexpr auto INTRIN_INLINE_WORD = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_EXECUTE = (Sym){
+static const USED auto INTRIN_EXECUTE = (Sym){
   .name.buf = "execute",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_execute,
@@ -772,7 +772,7 @@ static constexpr auto INTRIN_EXECUTE = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_COMP_NAMED_LOCAL = (Sym){
+static const USED auto INTRIN_COMP_NAMED_LOCAL = (Sym){
   .name.buf  = "comp_named_local",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_named_local,
@@ -782,7 +782,7 @@ static constexpr auto INTRIN_COMP_NAMED_LOCAL = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_COMP_ANON_LOCAL = (Sym){
+static const USED auto INTRIN_COMP_ANON_LOCAL = (Sym){
   .name.buf  = "comp_anon_local",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_anon_local,
@@ -791,68 +791,68 @@ static constexpr auto INTRIN_COMP_ANON_LOCAL = (Sym){
   .comp_only = true,
 };
 
-static constexpr auto INTRIN_DEBUG_ON = (Sym){
+static const USED auto INTRIN_DEBUG_ON = (Sym){
   .name.buf = "debug_on",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_debug_on,
 };
 
-static constexpr auto INTRIN_DEBUG_OFF = (Sym){
+static const USED auto INTRIN_DEBUG_OFF = (Sym){
   .name.buf = "debug_off",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_debug_off,
 };
 
-static constexpr auto INTRIN_DEBUG_FLUSH = (Sym){
+static const USED auto INTRIN_DEBUG_FLUSH = (Sym){
   .name.buf = "debug_flush",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_flush,
 };
 
-static constexpr auto INTRIN_DEBUG_THROW = (Sym){
+static const USED auto INTRIN_DEBUG_THROW = (Sym){
   .name.buf = "debug_throw",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_throw,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_DEBUG_STACK_LEN = (Sym){
+static const USED auto INTRIN_DEBUG_STACK_LEN = (Sym){
   .name.buf = "debug_stack_len",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_stack_len,
 };
 
-static constexpr auto INTRIN_DEBUG_STACK = (Sym){
+static const USED auto INTRIN_DEBUG_STACK = (Sym){
   .name.buf = "debug_stack",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_stack,
 };
 
-static constexpr auto INTRIN_DEBUG_DEPTH = (Sym){
+static const USED auto INTRIN_DEBUG_DEPTH = (Sym){
   .name.buf = "debug_depth",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_depth,
 };
 
-static constexpr auto INTRIN_DEBUG_TOP_INT = (Sym){
+static const USED auto INTRIN_DEBUG_TOP_INT = (Sym){
   .name.buf = "debug_top_int",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_top_int,
 };
 
-static constexpr auto INTRIN_DEBUG_TOP_PTR = (Sym){
+static const USED auto INTRIN_DEBUG_TOP_PTR = (Sym){
   .name.buf = "debug_top_ptr",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_top_ptr,
 };
 
-static constexpr auto INTRIN_DEBUG_TOP_STR = (Sym){
+static const USED auto INTRIN_DEBUG_TOP_STR = (Sym){
   .name.buf = "debug_top_str",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_top_str,
 };
 
-static constexpr auto INTRIN_DEBUG_MEM = (Sym){
+static const USED auto INTRIN_DEBUG_MEM = (Sym){
   .name.buf = "debug_mem",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_mem,
@@ -860,21 +860,21 @@ static constexpr auto INTRIN_DEBUG_MEM = (Sym){
   .throws   = true,
 };
 
-static constexpr auto INTRIN_DEBUG_WORD = (Sym){
+static const USED auto INTRIN_DEBUG_WORD = (Sym){
   .name.buf = "debug'",
   .wordlist = WORDLIST_COMP,
   .intrin   = (void *)debug_word,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_DEBUG_DIS = (Sym){
+static const USED auto INTRIN_DEBUG_DIS = (Sym){
   .name.buf = "dis'",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_dis,
   .throws   = true,
 };
 
-static constexpr auto INTRIN_DEBUG_SYNC_CODE = (Sym){
+static const USED auto INTRIN_DEBUG_SYNC_CODE = (Sym){
   .name.buf = "debug_sync_code",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_sync_code,
