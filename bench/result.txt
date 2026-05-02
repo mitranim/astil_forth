@@ -9,146 +9,173 @@ Each "_reg" and "_stack" benchmark includes the cost of bootstrapping
 the entire language, in addition to the actual program we're testing.
 Reg-CC takes longer to bootstrap because it has more lang features.
 
+TODO: find out why `gforth-fast` is slower here than regular `gforth`.
+
 ## NONE
 
 Benchmark 1: none_reg
-  Time (mean ± σ):     963.3 µs ± 138.7 µs    [User: 415.7 µs, System: 284.0 µs]
-  Range (min … max):   773.2 µs … 2504.8 µs    2820 runs
+  Time (mean ± σ):     971.1 µs ± 161.3 µs    [User: 419.8 µs, System: 288.4 µs]
+  Range (min … max):   777.6 µs … 2700.8 µs    3011 runs
 
 Benchmark 2: none_stack
-  Time (mean ± σ):     931.7 µs ±  46.4 µs    [User: 397.2 µs, System: 265.5 µs]
-  Range (min … max):   811.7 µs … 1304.6 µs    2955 runs
+  Time (mean ± σ):     922.0 µs ±  46.3 µs    [User: 393.0 µs, System: 264.4 µs]
+  Range (min … max):   818.6 µs … 1243.3 µs    2755 runs
 
 Summary
   none_stack ran
-    1.03 ± 0.16 times faster than none_reg
+    1.05 ± 0.18 times faster than none_reg
 
 ## BASELINE
 
 Benchmark 1: baseline_reg
   Time (mean ± σ):       5.8 ms ±   0.1 ms    [User: 5.0 ms, System: 0.4 ms]
-  Range (min … max):     5.6 ms …   6.1 ms    525 runs
+  Range (min … max):     5.6 ms …   6.2 ms    520 runs
 
 Benchmark 2: baseline_stack
-  Time (mean ± σ):       3.7 ms ±   0.0 ms    [User: 3.0 ms, System: 0.4 ms]
-  Range (min … max):     3.5 ms …   4.1 ms    811 runs
+  Time (mean ± σ):       3.7 ms ±   0.1 ms    [User: 3.0 ms, System: 0.4 ms]
+  Range (min … max):     3.6 ms …   4.2 ms    810 runs
 
 Benchmark 3: baseline_gforth
   Time (mean ± σ):       2.8 ms ±   0.3 ms    [User: 1.3 ms, System: 0.4 ms]
-  Range (min … max):     2.4 ms …   3.9 ms    1140 runs
+  Range (min … max):     2.4 ms …   4.0 ms    1160 runs
+
+Benchmark 4: baseline_gforth_fast
+  Time (mean ± σ):       4.0 ms ±   0.3 ms    [User: 2.4 ms, System: 0.4 ms]
+  Range (min … max):     3.5 ms …   5.2 ms    727 runs
 
 Summary
   baseline_gforth ran
-    1.32 ± 0.14 times faster than baseline_stack
-    2.05 ± 0.22 times faster than baseline_reg
+    1.31 ± 0.15 times faster than baseline_stack
+    1.42 ± 0.20 times faster than baseline_gforth_fast
+    2.04 ± 0.23 times faster than baseline_reg
 
 ## BUBBLE
 
 Benchmark 1: bubble_aot
-  Time (mean ± σ):      32.6 ms ±   1.8 ms    [User: 31.7 ms, System: 0.4 ms]
-  Range (min … max):    30.3 ms …  35.4 ms    98 runs
+  Time (mean ± σ):      32.9 ms ±   2.0 ms    [User: 32.0 ms, System: 0.4 ms]
+  Range (min … max):    30.3 ms …  38.8 ms    98 runs
 
 Benchmark 2: bubble_reg
-  Time (mean ± σ):      37.0 ms ±   1.3 ms    [User: 36.0 ms, System: 0.6 ms]
-  Range (min … max):    35.6 ms …  40.0 ms    76 runs
+  Time (mean ± σ):      37.0 ms ±   1.2 ms    [User: 35.9 ms, System: 0.6 ms]
+  Range (min … max):    35.6 ms …  39.6 ms    80 runs
 
 Benchmark 3: bubble_stack
-  Time (mean ± σ):      96.1 ms ±   2.1 ms    [User: 94.9 ms, System: 0.6 ms]
-  Range (min … max):    93.2 ms …  98.3 ms    30 runs
+  Time (mean ± σ):      95.0 ms ±   2.1 ms    [User: 93.7 ms, System: 0.7 ms]
+  Range (min … max):    93.2 ms …  98.7 ms    32 runs
 
 Benchmark 4: bubble_gforth
-  Time (mean ± σ):     208.0 ms ±   8.3 ms    [User: 204.9 ms, System: 1.1 ms]
-  Range (min … max):   198.1 ms … 228.1 ms    14 runs
+  Time (mean ± σ):     208.3 ms ±   6.3 ms    [User: 205.1 ms, System: 1.1 ms]
+  Range (min … max):   199.9 ms … 221.3 ms    14 runs
+
+Benchmark 5: bubble_gforth_fast
+  Time (mean ± σ):     346.4 ms ±  14.1 ms    [User: 342.8 ms, System: 1.3 ms]
+  Range (min … max):   324.8 ms … 363.0 ms    10 runs
 
 Summary
   bubble_aot ran
-    1.13 ± 0.07 times faster than bubble_reg
-    2.95 ± 0.17 times faster than bubble_stack
-    6.38 ± 0.43 times faster than bubble_gforth
+    1.12 ± 0.08 times faster than bubble_reg
+    2.89 ± 0.19 times faster than bubble_stack
+    6.34 ± 0.44 times faster than bubble_gforth
+   10.54 ± 0.78 times faster than bubble_gforth_fast
 
 ## PRIME SIEVE
 
 Benchmark 1: sieve_aot
-  Time (mean ± σ):      61.2 ms ±   3.6 ms    [User: 60.1 ms, System: 0.5 ms]
-  Range (min … max):    57.4 ms …  67.5 ms    52 runs
+  Time (mean ± σ):      62.6 ms ±   3.6 ms    [User: 61.6 ms, System: 0.5 ms]
+  Range (min … max):    57.6 ms …  71.2 ms    51 runs
 
 Benchmark 2: sieve_reg
-  Time (mean ± σ):      64.9 ms ±   1.8 ms    [User: 63.8 ms, System: 0.7 ms]
-  Range (min … max):    62.4 ms …  69.2 ms    45 runs
+  Time (mean ± σ):      64.4 ms ±   2.1 ms    [User: 63.3 ms, System: 0.6 ms]
+  Range (min … max):    62.3 ms …  68.5 ms    45 runs
 
 Benchmark 3: sieve_stack
-  Time (mean ± σ):     160.5 ms ±   1.1 ms    [User: 159.1 ms, System: 0.8 ms]
-  Range (min … max):   159.2 ms … 162.3 ms    18 runs
+  Time (mean ± σ):     166.1 ms ±   3.8 ms    [User: 164.4 ms, System: 1.1 ms]
+  Range (min … max):   160.0 ms … 172.6 ms    17 runs
 
 Benchmark 4: sieve_gforth
-  Time (mean ± σ):     428.2 ms ±   6.2 ms    [User: 425.0 ms, System: 1.5 ms]
-  Range (min … max):   418.0 ms … 437.0 ms    10 runs
+  Time (mean ± σ):     429.1 ms ±   5.7 ms    [User: 425.4 ms, System: 1.6 ms]
+  Range (min … max):   420.8 ms … 441.0 ms    10 runs
+
+Benchmark 5: sieve_gforth_fast
+  Time (mean ± σ):     821.2 ms ±  33.2 ms    [User: 816.6 ms, System: 2.3 ms]
+  Range (min … max):   782.2 ms … 886.5 ms    10 runs
 
 Summary
   sieve_aot ran
-    1.06 ± 0.07 times faster than sieve_reg
-    2.62 ± 0.16 times faster than sieve_stack
-    7.00 ± 0.43 times faster than sieve_gforth
+    1.03 ± 0.07 times faster than sieve_reg
+    2.65 ± 0.16 times faster than sieve_stack
+    6.85 ± 0.40 times faster than sieve_gforth
+   13.11 ± 0.92 times faster than sieve_gforth_fast
 
 ## FIB_LOOP
 
 Benchmark 1: fib_loop_aot
-  Time (mean ± σ):       3.9 ms ±   0.4 ms    [User: 3.3 ms, System: 0.3 ms]
-  Range (min … max):     3.5 ms …   5.6 ms    642 runs
+  Time (mean ± σ):       4.0 ms ±   0.4 ms    [User: 3.4 ms, System: 0.3 ms]
+  Range (min … max):     3.5 ms …   5.3 ms    612 runs
 
 Benchmark 2: fib_loop_asm
-  Time (mean ± σ):       8.1 ms ±   0.2 ms    [User: 7.3 ms, System: 0.5 ms]
-  Range (min … max):     7.8 ms …   8.9 ms    350 runs
+  Time (mean ± σ):       8.2 ms ±   0.2 ms    [User: 7.4 ms, System: 0.5 ms]
+  Range (min … max):     7.6 ms …   9.0 ms    366 runs
 
 Benchmark 3: fib_loop_reg
   Time (mean ± σ):       8.7 ms ±   0.2 ms    [User: 7.9 ms, System: 0.4 ms]
-  Range (min … max):     8.4 ms …   9.8 ms    346 runs
+  Range (min … max):     8.4 ms …   9.4 ms    353 runs
 
 Benchmark 4: fib_loop_stack
-  Time (mean ± σ):      21.3 ms ±   0.7 ms    [User: 20.5 ms, System: 0.4 ms]
-  Range (min … max):    20.5 ms …  23.4 ms    145 runs
+  Time (mean ± σ):      21.5 ms ±   0.9 ms    [User: 20.7 ms, System: 0.5 ms]
+  Range (min … max):    20.3 ms …  24.0 ms    129 runs
 
 Benchmark 5: fib_loop_gforth
-  Time (mean ± σ):      38.3 ms ±   1.2 ms    [User: 36.1 ms, System: 0.6 ms]
-  Range (min … max):    36.0 ms …  40.3 ms    75 runs
+  Time (mean ± σ):      38.3 ms ±   1.3 ms    [User: 36.1 ms, System: 0.6 ms]
+  Range (min … max):    36.0 ms …  40.9 ms    81 runs
+
+Benchmark 6: fib_loop_gforth_fast
+  Time (mean ± σ):      41.7 ms ±   1.1 ms    [User: 39.6 ms, System: 0.6 ms]
+  Range (min … max):    39.6 ms …  44.1 ms    69 runs
 
 Summary
   fib_loop_aot ran
-    2.09 ± 0.21 times faster than fib_loop_asm
-    2.23 ± 0.23 times faster than fib_loop_reg
-    5.48 ± 0.58 times faster than fib_loop_stack
-    9.85 ± 1.03 times faster than fib_loop_gforth
+    2.06 ± 0.21 times faster than fib_loop_asm
+    2.18 ± 0.22 times faster than fib_loop_reg
+    5.39 ± 0.57 times faster than fib_loop_stack
+    9.61 ± 1.00 times faster than fib_loop_gforth
+   10.45 ± 1.06 times faster than fib_loop_gforth_fast
 
 ## FIB_RECURSIVE: fib(36) single run
 
 Benchmark 1: fib_rec_clang
-  Time (mean ± σ):      39.4 ms ±   2.3 ms    [User: 38.4 ms, System: 0.5 ms]
-  Range (min … max):    35.4 ms …  42.3 ms    83 runs
+  Time (mean ± σ):      39.3 ms ±   2.4 ms    [User: 38.4 ms, System: 0.4 ms]
+  Range (min … max):    35.4 ms …  45.4 ms    84 runs
 
 Benchmark 2: fib_rec_aot
-  Time (mean ± σ):      55.2 ms ±   1.5 ms    [User: 54.2 ms, System: 0.4 ms]
-  Range (min … max):    52.3 ms …  57.4 ms    53 runs
+  Time (mean ± σ):      55.8 ms ±   2.6 ms    [User: 54.9 ms, System: 0.4 ms]
+  Range (min … max):    52.3 ms …  61.0 ms    52 runs
 
 Benchmark 3: fib_rec_reg
-  Time (mean ± σ):      60.5 ms ±   1.6 ms    [User: 59.3 ms, System: 0.6 ms]
-  Range (min … max):    57.3 ms …  62.8 ms    48 runs
+  Time (mean ± σ):      59.4 ms ±   1.8 ms    [User: 58.3 ms, System: 0.6 ms]
+  Range (min … max):    57.4 ms …  63.1 ms    51 runs
 
 Benchmark 4: fib_rec_stack
-  Time (mean ± σ):     240.3 ms ±   6.2 ms    [User: 238.6 ms, System: 1.0 ms]
-  Range (min … max):   234.2 ms … 255.6 ms    12 runs
+  Time (mean ± σ):     242.9 ms ±  13.1 ms    [User: 241.1 ms, System: 1.1 ms]
+  Range (min … max):   233.5 ms … 276.0 ms    12 runs
 
 Benchmark 5: fib_rec_gforth
-  Time (mean ± σ):     338.9 ms ±   3.4 ms    [User: 335.2 ms, System: 1.3 ms]
-  Range (min … max):   332.3 ms … 344.7 ms    10 runs
+  Time (mean ± σ):     338.0 ms ±   3.9 ms    [User: 334.5 ms, System: 1.3 ms]
+  Range (min … max):   332.2 ms … 344.9 ms    10 runs
 
-Benchmark 6: fib_rec_js_bun
-  Time (mean ± σ):      67.1 ms ±   1.1 ms    [User: 64.0 ms, System: 2.4 ms]
-  Range (min … max):    65.6 ms …  71.2 ms    45 runs
+Benchmark 6: fib_rec_gforth_fast
+  Time (mean ± σ):     777.9 ms ±  33.3 ms    [User: 773.4 ms, System: 2.2 ms]
+  Range (min … max):   740.8 ms … 819.0 ms    10 runs
+
+Benchmark 7: fib_rec_js_bun
+  Time (mean ± σ):      67.4 ms ±   1.5 ms    [User: 64.2 ms, System: 2.4 ms]
+  Range (min … max):    65.8 ms …  73.2 ms    43 runs
 
 Summary
   fib_rec_clang ran
-    1.40 ± 0.09 times faster than fib_rec_aot
-    1.53 ± 0.10 times faster than fib_rec_reg
-    1.70 ± 0.10 times faster than fib_rec_js_bun
-    6.10 ± 0.39 times faster than fib_rec_stack
-    8.60 ± 0.51 times faster than fib_rec_gforth
+    1.42 ± 0.11 times faster than fib_rec_aot
+    1.51 ± 0.10 times faster than fib_rec_reg
+    1.72 ± 0.11 times faster than fib_rec_js_bun
+    6.18 ± 0.50 times faster than fib_rec_stack
+    8.60 ± 0.52 times faster than fib_rec_gforth
+   19.79 ± 1.46 times faster than fib_rec_gforth_fast
