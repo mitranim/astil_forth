@@ -245,6 +245,10 @@ $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 			> $(MACH_GEN_OUT) \
 		; rm -rf $(GEN_DIR)/tmp.c
 
+.PHONY: bench
+bench:
+	bench/bench.sh
+
 # Non-configurable for now; usage of `~/.local`
 # is also hardcoded in the interpreter.
 # SYNC[install_path].

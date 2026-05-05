@@ -178,7 +178,7 @@ int main(void) {
 
   {
     deferred(chars_deinit) char *body = nullptr;
-    Uint                    len;
+    Uint                         len;
 
     try_main(file_read_text("./io.c", &body, &len));
 

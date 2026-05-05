@@ -477,6 +477,12 @@
   0b1_00_11011_000_00000_0_11111_00000_00000 or
 ;
 
+\ udiv Xd, Xn, Xm
+: asm_udiv { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_00001_0_00000_00000 or
+;
+
 \ sdiv Xd, Xn, Xm
 : asm_sdiv { Xd Xn Xm -- instr }
   Xd Xn Xm asm_pattern_arith_reg
@@ -661,6 +667,12 @@
 : / { i0 i1 -- i2 } [
   0              comp_clobber
   0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
+  1              comp_args_set
+] ;
+
+: u/ { i0 i1 -- i2 } [
+  0              comp_clobber
+  0 0 1 asm_udiv comp_instr \ udiv x0, x0, x1
   1              comp_args_set
 ] ;
 

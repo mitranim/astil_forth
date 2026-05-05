@@ -77,4 +77,5 @@ hyperfine $OPTS                                                              \
   --command-name fib_rec_stack       './astil_s.exe bench/fib_rec_s.af'      \
   --command-name fib_rec_gforth      'gforth bench/fib_rec_g.fs -e bye'      \
   --command-name fib_rec_gforth_fast 'gforth-fast bench/fib_rec_g.fs -e bye' \
+  --command-name fib_rec_luajit      'luajit bench/fib_rec.lua'              \
   --command-name fib_rec_js_bun      'bun bench/fib_rec.mjs'                 \
