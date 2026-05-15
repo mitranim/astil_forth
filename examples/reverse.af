@@ -17,6 +17,7 @@ import' std:lang.af
 
 : main
   s" 0123456789abcdef" { str len }
+  str log lf
   str len reverse
   str log lf
 ;

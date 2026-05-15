@@ -88,7 +88,7 @@ Dicts which own their keys must be freed with `dict_deinit_with_keys`.
 // NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #define dict_val_type(dict) typeof((dict)->vals[0])
-#define dict_val_size(dict) sizeof((dict)->vals[0])
+#define dict_val_size(dict) (Ind)sizeof((dict)->vals[0])
 
 /*
 Usage:
@@ -100,21 +100,27 @@ Usage:
 */
 #define dict_range hash_table_range
 
-#define dict_rewind_inner(tmp_next, tmp_prev, next, prev)                    \
-  ({                                                                         \
-    const auto tmp_next = next;                                              \
-    const auto tmp_prev = prev;                                              \
-    aver(tmp_next->cap >= tmp_prev->cap);                                    \
-    memcpy(                                                                  \
-      tmp_next->bits, tmp_prev->bits, tmp_prev->len * sizeof(tmp_prev->bits) \
-    );                                                                       \
-    memcpy(                                                                  \
-      tmp_next->keys, tmp_prev->keys, tmp_prev->len * sizeof(tmp_prev->keys) \
-    );                                                                       \
-    memcpy(                                                                  \
-      tmp_next->vals, tmp_prev->vals, tmp_prev->len * sizeof(tmp_prev->vals) \
-    );                                                                       \
-    tmp_next->len = tmp_prev->len;                                           \
+#define dict_rewind_inner(tmp_next, tmp_prev, next, prev) \
+  ({                                                      \
+    const auto tmp_next = next;                           \
+    const auto tmp_prev = prev;                           \
+    aver(tmp_next->cap >= tmp_prev->cap);                 \
+    memcpy(                                               \
+      tmp_next->bits,                                     \
+      tmp_prev->bits,                                     \
+      tmp_prev->len * (Ind)sizeof(tmp_prev->bits)         \
+    );                                                    \
+    memcpy(                                               \
+      tmp_next->keys,                                     \
+      tmp_prev->keys,                                     \
+      tmp_prev->len * (Ind)sizeof(tmp_prev->keys)         \
+    );                                                    \
+    memcpy(                                               \
+      tmp_next->vals,                                     \
+      tmp_prev->vals,                                     \
+      tmp_prev->len * (Ind)sizeof(tmp_prev->vals)         \
+    );                                                    \
+    tmp_next->len = tmp_prev->len;                        \
   })
 
 // NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)

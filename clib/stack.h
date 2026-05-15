@@ -80,7 +80,7 @@ typedef span_of(F64)  F64_span;
 #define stack_rem(stack) ((Sint)((stack)->ceil - (stack)->top))
 
 #define stack_val_type(stack) typeof((stack)->floor[0])
-#define stack_val_size(stack) sizeof((stack)->floor[0])
+#define stack_val_size(stack) (Ind)sizeof((stack)->floor[0])
 
 #define stack_cap_bytes(stack) \
   ((Uint)((U8 *)(stack)->ceil - (U8 *)(stack)->floor))
@@ -133,14 +133,14 @@ typedef span_of(F64)  F64_span;
     UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__ \
   )
 
-#define stack_push_from_inner(tmp, out, src)                       \
-  ({                                                               \
-    static_assert(sizeof(*(out)->top) == sizeof(*(src)->top));     \
-    const auto tmp = stack_len(src);                               \
-    if (tmp > 0) {                                                 \
-      memcpy((out)->top, (src)->floor, tmp * sizeof(*(out)->top)); \
-      (out)->top += tmp;                                           \
-    }                                                              \
+#define stack_push_from_inner(tmp, out, src)                            \
+  ({                                                                    \
+    static_assert(sizeof(*(out)->top) == sizeof(*(src)->top));          \
+    const auto tmp = stack_len(src);                                    \
+    if (tmp > 0) {                                                      \
+      memcpy((out)->top, (src)->floor, tmp * (Ind)sizeof(*(out)->top)); \
+      (out)->top += tmp;                                                \
+    }                                                                   \
   })
 
 // Pushes to the output stack/span everything from the source stack/span.

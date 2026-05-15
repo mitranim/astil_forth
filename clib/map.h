@@ -63,9 +63,9 @@ typedef Hash_table Map;
 // NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #define map_key_type(map) typeof((map)->keys[0])
-#define map_key_size(map) sizeof((map)->keys[0])
+#define map_key_size(map) (Ind)sizeof((map)->keys[0])
 #define map_val_type(map) typeof((map)->vals[0])
-#define map_val_size(map) sizeof((map)->vals[0])
+#define map_val_size(map) (Ind)sizeof((map)->vals[0])
 
 /*
 Usage:

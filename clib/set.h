@@ -58,5 +58,5 @@ typedef set_of(F64)  F64_set;
 // NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #define set_val_type(set) typeof((set)->vals[0])
-#define set_val_size(set) sizeof((set)->vals[0])
+#define set_val_size(set) (Ind)sizeof((set)->vals[0])
 #define set_range hash_table_range

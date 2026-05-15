@@ -11,7 +11,7 @@
 
 MUST_USE typedef const char *Err;
 
-typedef Err(Err_fun)(void);
+typedef Err Err_fun(void);
 
 // Assert with backtrace. Name yoinked from SBCL.
 #define aver(expr)                                                           \

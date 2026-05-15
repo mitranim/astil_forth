@@ -54,9 +54,15 @@ static Err spawn_with_stdin(
 
 static Err wait_pid(pid_t pid, int *status) {
   for (;;) {
-    int code = waitpid(pid, status, 0);
+    int code;
+    if (waitpid(pid, &code, 0) >= 0) {
+      if (WIFSIGNALED(code)) {
+        return errf("PID %d terminated with signal %d", pid, WTERMSIG(code));
+      }
 
-    if (!(code < 0)) break;
+      *status = WEXITSTATUS(code);
+      return nullptr;
+    }
 
     code = errno;
     if (code == EINTR) continue;
@@ -65,18 +71,18 @@ static Err wait_pid(pid_t pid, int *status) {
       "unable to wait on PID %d; code: %d; msg: %s", pid, code, strerror(code)
     );
   }
-  return nullptr;
 }
 
 static Err print_disasm(const void *src, Ind len) {
   const auto str_len = len * 2;
+  const auto buf_cap = str_len + 1;
 
   /*
   `llvm-mc` doesn't seem to support disassembling actual
   raw bytes, so we have to convert them to hex first.
   */
-  deferred(chars_deinit) char *buf = malloc(str_len + 1);
-  fmt_bytes_hex_into(buf, str_len, src, len);
+  deferred(chars_deinit) char *buf = malloc(buf_cap);
+  fmt_bytes_hex_into(buf, buf_cap, src, len);
 
   const auto  proc   = "llvm-mc";
   char *const argv[] = {proc, "--disassemble", "--hex", nullptr};

@@ -233,7 +233,7 @@ Does not initialize memory at location.
   ))
 
 #define list_val_type(list) typeof((list)->dat[0])
-#define list_val_size(list) sizeof((list)->dat[0])
+#define list_val_size(list) (Ind)sizeof((list)->dat[0])
 
 // Index of given list element, by pointer.
 // If the element isn't in the list, index is -1.

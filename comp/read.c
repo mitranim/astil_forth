@@ -116,7 +116,7 @@ static Err validate_char_ascii_printable(Sint code) {
 
 // Output is 0 on EOF.
 static Err read_ascii_printable(Reader *read, U8 *out) {
-  auto next = read_char(read);
+  const auto next = read_char(read);
   try(validate_char_ascii_printable(next));
   *out = next;
   return nullptr;

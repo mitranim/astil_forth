@@ -187,6 +187,8 @@ The best part is cross-language ABI compatibility. Having exceptions without a r
 With global installation:
 
 ```sh
+# (Choose between perf and debug.)
+make install PROD=true
 make install
 
 # Get some instructions:
