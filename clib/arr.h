@@ -8,10 +8,10 @@
 
 #define arr_ceil(arr) (&(arr)[arr_cap(arr)])
 
-#define arr_copy(tar, src)                       \
-  ({                                             \
-    static_assert(arr_cap(src) == arr_cap(tar)); \
-    memcpy(tar, src, arr_cap(src));              \
+#define arr_copy(tar, src)                      \
+  ({                                            \
+    static_assert(sizeof(tar) >= sizeof(src));  \
+    memcpy(tar, src, sizeof(src));              \
   })
 
 #define arr_ptr_at_inner(tmp, arr, ind) \
