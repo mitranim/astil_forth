@@ -962,7 +962,7 @@ Speculative unclobbering assignment of params or locals is one such case.
 
 SYNC[asm_prologue].
 */
-static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
+static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, const Instr *instr) {
   const auto spans = &sym->norm.spans;
   const auto write = &comp->code.code_write;
   if (&write->dat[spans->inner] != instr) return false;

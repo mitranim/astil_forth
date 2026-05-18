@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <termios.h>
 
 /*
 Usage:
@@ -165,6 +166,14 @@ static Err write_all(int file, const U8 *buf, Ind len, int *out_err) {
     );
   }
   return nullptr;
+}
+
+static void file_purge(FILE *file) {
+  if (!file) return;
+  fpurge(file);
+  int fdes = fileno(file);
+  if (isatty(fdes)) tcflush(fdes, TCIFLUSH);
+  clearerr(file);
 }
 
 /*

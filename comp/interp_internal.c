@@ -6,29 +6,36 @@
 #include "./comp.c"
 #include "./read.c"
 #include <dlfcn.h>
+#include <stdio.h>
+#include <termios.h>
 
-static void interp_snapshot(Interp *interp) {
-  interp->snap.comp     = interp->comp;
-  interp->snap.ints_len = (Ind)stack_len(&interp->ints);
-  interp->snap.syms_len = (Ind)stack_len(&interp->syms);
+static Err comp_snapshot(const Comp *prev, Comp *next) {
+  try(comp_ctx_snapshot(&prev->ctx, &next->ctx));
+  next->code = prev->code;
+  return nullptr;
+}
+
+static Err interp_snapshot(Interp *interp) {
+  try(comp_snapshot(&interp->comp, &interp->snap.comp));
+  interp->snap.ints = interp->ints;
+  interp->snap.syms = interp->syms;
+  return nullptr;
 }
 
 /*
 Restores the interpreter to a consistent state.
 Should be used when handling errors in REPL mode.
 
-TODO: drop currently being defined symbol from list and dict.
+TODO: drop currently defined symbol from list and dict.
 Our dicts don't support deletion at the moment.
 */
 static Err interp_rewind(Interp *interp) {
-  const auto snap = &interp->snap;
+  const auto prev = &interp->snap;
   const auto sym  = interp->comp.ctx.sym;
 
-  comp_rewind(&interp->comp, &snap->comp);
-  stack_trunc_to(&interp->ints, snap->ints_len);
-
-  const auto syms     = &interp->syms;
-  const auto len_prev = snap->syms_len;
+  comp_rewind(&prev->comp, &interp->comp);
+  stack_rewind(&prev->ints, &interp->ints);
+  stack_rewind(&prev->syms, &interp->syms);
 
   /*
   TODO: support deletion in dicts.
@@ -43,20 +50,17 @@ static Err interp_rewind(Interp *interp) {
     }
   */
 
-  stack_trunc_to(syms, len_prev);
+  /*
+  Purge the remaining buffered input. Without this, we'd continue interpreting
+  the remainder of a failed script, possibly inside a failed word definition,
+  which is a totally invalid state after rewinding.
+  */
+  if (interp->reader) file_purge(interp->reader->file);
 
   if (!sym) {
     IF_DEBUG(eprintf("[debug] rewound interpreter state\n"));
     return nullptr;
   }
-
-  /*
-  A hack which should be good enough. When compilation of a word fails,
-  parse until `;` to exit the definition. Without this, when we continue
-  interpretation, we would keep reading buffered text INSIDE that word,
-  but without its compilation context, which would be broken anyway.
-  */
-  try(read_until_word(interp->reader, ";"));
 
   IF_DEBUG(eprintf(
     "[debug] rewound interpreter state and exited the definition of " FMT_QUOTED
@@ -91,12 +95,24 @@ Chuck circa June 1970 (PPOL): "type the offending word"; "reset all stacks".
 > the stack: type the word and "STACK!". He tries to access a field
 > beyond the limit of his memory: type the word and "LIMIT!".
 
+---
+
 We can afford slightly more informative error messages.
+
+Truncating the integer stack is technically optional
+but it makes REPL behavior less weird. For example:
+
+  10 20 30 : word ; stack_clear .
+
+`;` snapshots `10 20 30`. Without the truncation, when `.` underflows,
+rewind resets the (empty) stack to `10 20 30` which feels kinda weird.
 */
 static Err interp_handle_err(Interp *interp, Err err) {
   eprintf(TTY_RED_BEG "error:" TTY_RED_END " %s\n", err);
   if (TRACE) backtrace_print();
-  return interp_rewind(interp);
+  try(interp_rewind(interp));
+  stack_trunc(&interp->ints);
+  return nullptr;
 }
 
 static Err err_unrecognized_wordlist(Wordlist val) {

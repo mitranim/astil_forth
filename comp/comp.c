@@ -258,8 +258,8 @@ static Err comp_deinit(Comp *comp) {
   return nullptr;
 }
 
-static void comp_rewind(Comp *tar, Comp *snap) {
-  comp_ctx_rewind(&tar->ctx, &snap->ctx);
+static void comp_rewind(const Comp *prev, Comp *next) {
+  comp_ctx_rewind(&prev->ctx, &next->ctx);
 }
 
 /*

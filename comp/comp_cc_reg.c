@@ -117,26 +117,42 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
 }
 
 // SYNC[comp_ctx_rewind].
-static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
-  tar->sym        = snap->sym;
-  tar->anon_locs  = snap->anon_locs;
-  tar->fp_off     = snap->fp_off;
-  tar->vol_regs   = snap->vol_regs;
-  tar->saved_reg  = snap->saved_reg;
-  tar->arg_low    = snap->arg_low;
-  tar->arg_len    = snap->arg_len;
-  tar->redefining = snap->redefining;
-  tar->compiling  = snap->compiling;
-  tar->has_alloca = snap->has_alloca;
-  tar->catches    = snap->catches;
+static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
+  // Can't rewind dictionary state.
+  const auto len = prev->local_dict.len;
+  if (len) {
+    return errf(
+      "unable to snapshot compilation context: non-empty local dict (" FMT_IND
+      ")",
+      len
+    );
+  }
 
-  stack_rewind(&snap->locals, &tar->locals);
-  dict_rewind(&snap->local_dict, &tar->local_dict);
-  stack_rewind(&snap->asm_fix, &tar->asm_fix);
-  stack_rewind(&snap->loc_fix, &tar->loc_fix);
+  *next = *prev;
+  return nullptr;
+}
 
-  for (Ind ind = 0; ind < arr_cap(tar->reg_vals); ind++) {
-    tar->reg_vals[ind] = snap->reg_vals[ind];
+// SYNC[comp_ctx_rewind].
+static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
+  next->sym        = prev->sym;
+  next->anon_locs  = prev->anon_locs;
+  next->fp_off     = prev->fp_off;
+  next->vol_regs   = prev->vol_regs;
+  next->saved_reg  = prev->saved_reg;
+  next->arg_low    = prev->arg_low;
+  next->arg_len    = prev->arg_len;
+  next->redefining = prev->redefining;
+  next->compiling  = prev->compiling;
+  next->has_alloca = prev->has_alloca;
+  next->catches    = prev->catches;
+
+  stack_rewind(&prev->locals, &next->locals);
+  dict_trunc((Dict *)&next->local_dict);
+  stack_rewind(&prev->asm_fix, &next->asm_fix);
+  stack_rewind(&prev->loc_fix, &next->loc_fix);
+
+  for (Ind ind = 0; ind < arr_cap(next->reg_vals); ind++) {
+    next->reg_vals[ind] = prev->reg_vals[ind];
   }
 }
 

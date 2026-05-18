@@ -89,7 +89,7 @@ static Err interp_init(Interp *interp) {
   try(stack_init(&interp->syms, &opt));
   try(comp_init(&interp->comp));
   try(interp_init_syms(interp)); // Requires `comp_init` first.
-  interp_snapshot(interp);
+  try(interp_snapshot(interp));
 
   IF_DEBUG({
     eprintf("[system] interpreter: %p\n", interp);

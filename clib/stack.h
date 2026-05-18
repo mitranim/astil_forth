@@ -150,16 +150,8 @@ typedef span_of(F64)  F64_span;
 // Providing an invalid pointer is UB.
 #define stack_ind(stack, val) ((Ind)((val) - (stack)->floor))
 
-#define stack_rewind_inner(tmp_next, tmp_prev, next, prev) \
-  ({                                                       \
-    const auto tmp_next = next;                            \
-    const auto tmp_prev = prev;                            \
-    aver(tmp_next->floor == tmp_prev->floor);              \
-    tmp_next->top = tmp_prev->top;                         \
-  })
-
-#define stack_rewind(...) \
-  stack_rewind_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
+#define stack_rewind(prev, next) \
+  stack_rewind_impl((const Stack *)prev, (Stack *)next)
 
 #define is_stack_elem_inner(tmp_stack, tmp_ptr, stack, ptr)   \
   ({                                                          \

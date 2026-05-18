@@ -6,9 +6,9 @@
 #include "./sym.h"
 
 typedef struct {
-  Ind  ints_len;
-  Ind  syms_len;
-  Comp comp;
+  Comp       comp;
+  Sint_stack ints;
+  Sym_stack  syms;
 } Interp_snap;
 
 /*

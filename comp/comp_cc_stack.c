@@ -60,18 +60,34 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
 }
 
 // SYNC[comp_ctx_rewind].
-static void comp_ctx_rewind(Comp_ctx *tar, Comp_ctx *snap) {
-  tar->sym        = snap->sym;
-  tar->anon_locs  = snap->anon_locs;
-  tar->fp_off     = snap->fp_off;
-  tar->redefining = snap->redefining;
-  tar->compiling  = snap->compiling;
-  tar->has_alloca = snap->has_alloca;
-  tar->catches    = snap->catches;
+static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
+  // Can't rewind dictionary state.
+  const auto len = prev->local_dict.len;
+  if (len) {
+    return errf(
+      "unable to snapshot compilation context: non-empty local dict (" FMT_IND
+      ")",
+      len
+    );
+  }
 
-  stack_rewind(&snap->locals, &tar->locals);
-  dict_rewind(&snap->local_dict, &tar->local_dict);
-  stack_rewind(&snap->asm_fix, &tar->asm_fix);
+  *next = *prev;
+  return nullptr;
+}
+
+// SYNC[comp_ctx_rewind].
+static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
+  next->sym        = prev->sym;
+  next->anon_locs  = prev->anon_locs;
+  next->fp_off     = prev->fp_off;
+  next->redefining = prev->redefining;
+  next->compiling  = prev->compiling;
+  next->has_alloca = prev->has_alloca;
+  next->catches    = prev->catches;
+
+  stack_rewind(&prev->locals, &next->locals);
+  dict_trunc((Dict *)&next->local_dict);
+  stack_rewind(&prev->asm_fix, &next->asm_fix);
 }
 
 // Returns a token representing a local which can be given to Forth code.

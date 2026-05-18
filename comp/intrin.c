@@ -80,7 +80,7 @@ static Err intrin_semicolon(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   comp_sym_end(comp, sym);
-  interp_snapshot(interp);
+  try(interp_snapshot(interp));
 
   const auto name     = sym->name.buf;
   const auto wordlist = sym->wordlist;

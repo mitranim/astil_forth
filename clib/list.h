@@ -252,17 +252,4 @@ Does not initialize memory at location.
 
 #define list_trunc(list) ((list)->len = 0)
 
-#define list_rewind_inner(tmp_next, tmp_prev, next, prev)                   \
-  ({                                                                        \
-    const auto tmp_next = next;                                             \
-    const auto tmp_prev = prev;                                             \
-    aver(tmp_next->cap >= tmp_prev->cap);                                   \
-    memmove(                                                                \
-      tmp_next->dat, tmp_prev->dat, tmp_prev->len * list_val_size(tmp_prev) \
-    );                                                                      \
-    tmp_next->len = tmp_prev->len;                                          \
-  })
-
-#define list_rewind(...) list_rewind_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
-
 static constexpr Uint LIST_INIT_CAP = 4;
