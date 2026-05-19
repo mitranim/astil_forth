@@ -470,8 +470,10 @@ static char *resolve_import_path(const char *prev, const char *next) {
 }
 
 static Err interp_import_inner(
-  Interp *interp, const char *prev, const char *next
+  Interp *interp, FILE *prev_file, const char *prev, const char *next
 ) {
+  if (prev_file && isatty(fileno(prev_file))) prev = nullptr;
+
   // Owned by `interp.imports`, freed in `interp_deinit`.
   const auto path = resolve_import_path(prev, next);
 
@@ -515,6 +517,7 @@ static Err interp_import_inner(
 // There better not be a `longjmp` over this.
 static Err interp_import(Interp *interp, const char *path) {
   const auto prev            = interp->reader;
+  const auto prev_file       = prev ? prev->file : nullptr;
   const auto prev_path       = prev ? prev->file_path.buf : nullptr;
   const auto stdio_file_path = file_path_stdio(path);
   Reader     next            = {};
@@ -522,7 +525,7 @@ static Err interp_import(Interp *interp, const char *path) {
 
   const auto err = stdio_file_path
     ? interp_import_stdio(interp, stdio_file_path)
-    : interp_import_inner(interp, prev_path, path);
+    : interp_import_inner(interp, prev_file, prev_path, path);
 
   interp->reader = prev;
   return err;
