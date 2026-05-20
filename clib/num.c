@@ -1,6 +1,6 @@
 #pragma once
-#include "./err.c"
 #include "./num.h"
+#include "./err.c"
 #include <limits.h>
 
 /*

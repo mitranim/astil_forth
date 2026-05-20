@@ -9,8 +9,8 @@ In this codebase:
 See `./dict.h`, `./dict.c`.
 */
 #pragma once
-#include "./hash_table_common.c"
 #include "./map.h" // IWYU pragma: export
+#include "./hash_table_common.c"
 
 static void map_deinit(void *map) { hash_table_deinit(map); }
 

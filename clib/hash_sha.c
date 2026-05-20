@@ -189,7 +189,7 @@ int main(int argc, const char **argv) {
     sha256_any(ind, buf);
     printf("ind:         " FMT_IND "\n", ind);
     printf("ind as hex:  %s\n", fmt_bytes_hex((const U8 *)&ind, sizeof(ind)));
-    printf("sha256(ind): %s\n", fmt_bytes_hex(buf, arr_cap(buf)));
+    printf("sha256(ind): %s\n", fmt_bytes_hex(buf, sizeof(buf)));
   }
 }
 */

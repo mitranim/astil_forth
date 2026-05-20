@@ -31,7 +31,7 @@ static thread_local char MACH_VER_BUF[32];
 static char *mach_ver_to_str(U32 src) {
   snprintf(
     MACH_VER_BUF,
-    arr_cap(MACH_VER_BUF),
+    sizeof(MACH_VER_BUF),
     "%u.%u.%u",
     mach_ver_major(src),
     mach_ver_minor(src),

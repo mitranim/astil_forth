@@ -16,7 +16,7 @@
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 
 #define sprintbuf(buf, fmt, ...) \
-  (snprintf((buf), arr_cap(buf), fmt __VA_OPT__(, ) __VA_ARGS__), (buf))
+  (snprintf((buf), sizeof(buf), fmt __VA_OPT__(, ) __VA_ARGS__), (buf))
 
 #define spf(...) sprintbuf(FMT_BUF, __VA_ARGS__)
 
@@ -82,6 +82,7 @@ Our version also prints `char*` as string.
     fun(generic_val(typ, val), sizeof(val) /* NOLINT */) \
   )
 
+// TODO see if we can detect structs and use `repr_struct`.
 #define fmt_composite_inner(tmp, val)                                    \
   __builtin_choose_expr(                                                 \
     is_arr(val),                                                         \
@@ -105,6 +106,7 @@ Our version also prints `char*` as string.
 #define fmt_any(val)                                                           \
   _Generic(                                                                    \
     val,                                                                       \
+    generic_call    (bool,                   fmt_int_signed,             val), \
     generic_call    (char,                   fmt_char,                   val), \
     generic_call    (char unsigned,          fmt_char_unsigned,          val), \
     generic_call    (char signed,            fmt_char_signed,            val), \
@@ -121,6 +123,8 @@ Our version also prints `char*` as string.
     generic_call    (double long,            fmt_double_long,            val), \
     generic_call    (char *,                 fmt_chars,                  val), \
     generic_call    (char const *,           fmt_chars,                  val), \
+    generic_call    (wchar_t *,              fmt_wchars,                 val), \
+    generic_call    (wchar_t const *,        fmt_wchars,                 val), \
     generic_fmt_arr (char unsigned *,        fmt_chars_unsigned,         val), \
     generic_fmt_arr (char unsigned const *,  fmt_chars_unsigned,         val), \
     generic_fmt_arr (char signed *,          fmt_chars_signed,           val), \
@@ -128,6 +132,9 @@ Our version also prints `char*` as string.
     default: fmt_ptr_or_composite(val)                                         \
   )
 /* clang-format on */
+
+#define prn(val) printf(#val ": %s\n", fmt_any(val))
+#define eprn(val) eprintf(#val ": %s\n", fmt_any(val))
 
 #define fmt_any_as_hex_bytes_inner(tmp, val)      \
   ({                                              \

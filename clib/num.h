@@ -1,8 +1,5 @@
 #pragma once
 #include "./err.h"
-#include <inttypes.h>
-#include <stdint.h>
-#include <unistd.h>
 
 typedef size_t  Uint;
 typedef ssize_t Sint;
@@ -21,6 +18,12 @@ typedef int64_t  S64;
 
 typedef float  F32;
 typedef double F64;
+
+static constexpr Uint UINT_MIN = 0;
+static constexpr Uint UINT_MAX = SIZE_MAX;
+
+static constexpr Sint SINT_MAX = (Sint)(((Uint)-1) >> (Uint)1);
+static constexpr Sint SINT_MIN = -SINT_MAX - (Sint)1;
 
 /*
 Unsigned index smaller than a pointer. Unlike a signed index or a pointer-sized

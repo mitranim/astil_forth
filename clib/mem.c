@@ -8,8 +8,8 @@ type avoids widening conversions, simplifying arithmetic. See `Ind` for the
 explanation of using a shorter-than-pointer integer type for memory offsets.
 */
 #pragma once
-#include "./err.c"
 #include "./mem.h" // IWYU pragma: export
+#include "./err.c"
 #include "./misc.h"
 #include "./num.c"
 #include <limits.h>

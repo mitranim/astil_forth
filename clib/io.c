@@ -74,6 +74,26 @@ static Err err_file_read_mismatch(const char *path, Uint file_len, Uint read_len
   );
 }
 
+static Err fd_read_all(const char *path, int file, U8 *buf, Uint len) {
+  Uint off = 0;
+
+  while (off < len) {
+    const auto read_len = read(file, buf + off, len - off);
+
+    if (read_len > 0) {
+      off += (Uint)read_len;
+      continue;
+    }
+
+    if (read_len == 0) return err_file_read_mismatch(path, len, off);
+
+    if (errno == EINTR) continue;
+    return err_file_unable_to_read_errno(path);
+  }
+
+  return nullptr;
+}
+
 /*
 Usage:
 
@@ -96,6 +116,10 @@ static Err file_open(const char *path, const char *mode, FILE **out) {
   return nullptr;
 }
 
+static Err err_file_not_regular(const char *path) {
+  return errf("unable to read %s: not a regular file", path);
+}
+
 static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
   deferred(fd_deinit) int file = -1;
   try(fd_open(path, O_RDONLY, &file));
@@ -103,20 +127,22 @@ static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
   struct stat info;
   try(fd_stat(path, file, &info));
 
+  if (!S_ISREG(info.st_mode)) return err_file_not_regular(path);
+  aver(info.st_size >= 0);
+
   const auto file_len = (Uint)info.st_size;
-  const auto buf_len  = file_len + 1;
+  const auto buf_len  = add(file_len, 1);
   U8        *buf      = malloc(buf_len);
-  const auto read_len = read(file, buf, file_len);
+  const auto err      = fd_read_all(path, file, buf, file_len);
 
-  if (read_len < 0) return err_file_unable_to_read_errno(path);
-
-  if ((Uint)read_len != file_len) {
-    return err_file_read_mismatch(path, file_len, (Uint)read_len);
+  if (err) {
+    free(buf);
+    return err;
   }
 
   buf[file_len] = '\0';
   *out_body     = buf;
-  *out_len      = buf_len;
+  *out_len      = file_len;
   return nullptr;
 }
 

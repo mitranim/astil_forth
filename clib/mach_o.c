@@ -5,9 +5,9 @@ Mach-O compilation is not here because it involves compiler-specific
 data structures, which are out of scope for this generic library.
 */
 #pragma once
+#include "./mach_o.h"
 #include "./fmt.c"
 #include "./mach_misc.c"
-#include "./mach_o.h"
 
 static void Mach_head_repr(Mach_head *val) {
   print_struct_beg(val, Mach_head);

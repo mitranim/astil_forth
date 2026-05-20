@@ -11,8 +11,8 @@ Links:
 - https://developer.apple.com/library/archive/technotes/tn2206/_index.html
 */
 #pragma once
-#include "./hash_sha.c"
 #include "./mach_codesign.h"
+#include "./hash_sha.c"
 #include "./mem.c"
 #include "./misc.h"
 #include "./num.h"

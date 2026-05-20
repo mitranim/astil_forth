@@ -5,7 +5,7 @@
 #include "./num.h"
 
 // Is there a simpler way?
-static Bits bits_span(U8 ceil) {
+ALLOW_OVERFLOW static Bits bits_span(U8 ceil) {
   aver(ceil <= BITS_CEIL);
 
   /*
@@ -29,7 +29,7 @@ static Bits bits_range(U8 floor, U8 ceil) {
   return bits_span(ceil) ^ bits_span(floor);
 }
 
-static bool bits_full(Bits set) { return !~set; }
+static bool bits_full(Bits set) { return set == BITS_ALL; }
 
 static U8 bits_len(Bits set) { return (U8)__builtin_popcountg(set); }
 
@@ -73,7 +73,9 @@ static void bits_add_span_to(Bits *set, U8 ceil) {
   *set = bits_add_span(*set, ceil);
 }
 
-static Bits bits_del_span(Bits set, U8 ceil) { return set ^ bits_span(ceil); }
+static Bits bits_del_span(Bits set, U8 ceil) {
+  return bits_del_all(set, bits_span(ceil));
+}
 
 static void bits_del_span_from(Bits *set, U8 ceil) {
   *set = bits_del_span(*set, ceil);
@@ -108,60 +110,3 @@ static bool low_bits_zero(Uint val, Uint scale) {
 }
 
 static bool high_bits_zero(Uint val, Uint scale) { return !(val >> scale); }
-
-/*
-#include <stdio.h>
-
-int main(void) {
-  Bits one   = 0b01010;
-  Bits two   = 0b10101;
-  Bits three = 0b00001;
-
-  printf("%d\n", bits_has_some(one, two));
-  printf("%d\n", bits_has_some(one, three));
-  printf("%d\n", bits_has_some(two, three));
-  printf("%llu\n", bits_del_all(three, one));
-  printf("%llu\n", bits_del_all(three, two));
-}
-*/
-
-/*
-#include <stdio.h>
-
-int main(void) {
-  Bits set = 0b0111000111000;
-  while (set) printf("pop: %d\n", bits_pop_low(&set));
-
-  set = 0b0111000111000;
-  while (!bits_full(set)) printf("push: %d\n", bits_push_low(&set));
-}
-*/
-
-/*
-#include "./fmt.c"
-#include <stdio.h>
-
-int main(void) {
-  printf("%s\n", uint64_to_bit_str(bits_span(0)));
-  printf("%s\n", uint64_to_bit_str(bits_span(5)));
-  printf("%s\n", uint64_to_bit_str(bits_span(63)));
-  printf("%s\n", uint64_to_bit_str(bits_span(64)));
-}
-*/
-
-/*
-#include "./fmt.c"
-#include <stdio.h>
-
-int main(void) {
-  printf("[5  9):  %s\n", uint64_to_bit_str(bits_range(5, 9)));
-  printf("[0  23): %s\n", uint64_to_bit_str(bits_range(0, 23)));
-  printf("[0  31): %s\n", uint64_to_bit_str(bits_range(0, 31)));
-  printf("[0  32): %s\n", uint64_to_bit_str(bits_range(0, 32)));
-  printf("[0  40): %s\n", uint64_to_bit_str(bits_range(0, 40)));
-  printf("[0  51): %s\n", uint64_to_bit_str(bits_range(0, 51)));
-  printf("[51 62): %s\n", uint64_to_bit_str(bits_range(51, 62)));
-  printf("[51 63): %s\n", uint64_to_bit_str(bits_range(51, 63)));
-  printf("[51 64): %s\n", uint64_to_bit_str(bits_range(51, 64)));
-}
-*/

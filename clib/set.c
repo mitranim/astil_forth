@@ -1,12 +1,12 @@
 // Simple hash-based sets. Append-only, no deletion. No string support.
 #pragma once
+#include "./set.h" // IWYU pragma: export
 #include "./err.h"
 #include "./fmt.h"
 #include "./hash_table_common.c"
 #include "./mem.h"
 #include "./misc.h"
 #include "./num.h"
-#include "./set.h" // IWYU pragma: export
 
 static void set_deinit(void *set) {
   const auto tar = (Set *)set;
@@ -86,7 +86,7 @@ static void set_rehash(Set *prev, Ind cap, Ind size) {
   for (Ind ind_prev = 0; ind_prev < prev->cap; ind_prev++) {
     if (!hash_table_bits_get_at(prev->bits, ind_prev)) continue;
 
-    bool new;
+    bool       new;
     const auto val_prev = ptr_at(prev->vals, ind_prev, size);
     const auto ind_next = set_available_ind(&next, val_prev, size, &new);
     const auto val_next = ptr_at(next.vals, ind_next, size);
@@ -108,7 +108,7 @@ static void *set_add_impl(Set *set, const void *val, Ind size) {
     set_rehash(set, set->cap * 2, size);
   }
 
-  bool new;
+  bool       new;
   const auto ind = set_available_ind(set, val, size, &new);
   const auto out = ptr_at(set->vals, ind, size);
 

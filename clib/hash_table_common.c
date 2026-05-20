@@ -4,10 +4,10 @@ Common code for dicts, maps, and sometimes sets. In this codebase:
 - "map" = "hash table with opaque keys"
 */
 #pragma once
+#include "./hash_table_common.h"
 #include "./err.h"
 #include "./fmt.h"
 #include "./hash_fnv.c"
-#include "./hash_table_common.h"
 #include "./mem.c"
 #include "./mem.h"
 #include "./misc.h"
@@ -169,7 +169,7 @@ static Ind hash_table_available_ind(
   Ind               key_size,
   Hash_fun          hash_fun,
   Eq_fun            eq_fun,
-  bool *new
+  bool             *new
 ) {
   aver(tab->cap > tab->len);
   const auto hash = hash_fun(key, key_size);
@@ -220,7 +220,7 @@ static void hash_table_rehash(
   for (Ind ind_prev = 0; ind_prev < prev->cap; ind_prev++) {
     if (!hash_table_bits_get_at(prev->bits, ind_prev)) continue;
 
-    bool new;
+    bool       new;
     const auto key_prev = ptr_at(prev->keys, ind_prev, key_size);
     const auto val_prev = ptr_at(prev->vals, ind_prev, val_size);
     const auto ind_next = hash_table_available_ind(
@@ -256,7 +256,7 @@ static void *hash_table_set(
     hash_table_rehash(tab, tab->cap * 2, key_size, val_size, hash_fun, eq_fun);
   }
 
-  bool new;
+  bool       new;
   const auto ind = hash_table_available_ind(
     tab, key, key_size, hash_fun, eq_fun, &new
   );

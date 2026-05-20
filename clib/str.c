@@ -3,10 +3,10 @@ Some tools for dealing with C strings in general,
 and with our `str_buf` buffers in particular.
 */
 #pragma once
+#include "./str.h" // IWYU pragma: export
 #include "./err.c" // IWYU pragma: export
 #include "./fmt.h"
 #include "./num.h"
-#include "./str.h" // IWYU pragma: export
 #include <string.h>
 
 static Err err_str_buf_over(const char *src, Uint len, Ind cap) {
@@ -19,11 +19,23 @@ static Err err_str_buf_over(const char *src, Uint len, Ind cap) {
   );
 }
 
-static Err str_set_impl(char *out, const char *src, Ind cap, Ind *out_len) {
-  const auto len = strlcpy(out, src, cap);
-  if (len >= cap) return err_str_buf_over(src, len, cap);
-  *out_len = (Ind)len;
-  return nullptr;
+static Err str_set_impl(char *out_buf, Ind *out_len, const char *src, Ind cap) {
+  aver(cap);
+  const auto len = strlcpy(out_buf, src, cap);
+
+  if (len < cap) {
+    *out_len = (Ind)len;
+    return nullptr;
+  }
+
+  *out_len = cap - 1;
+  return err_str_buf_over(src, len, cap);
+}
+
+static bool str_eq_impl(const char *buf, Ind len, const char *tar) {
+  Ind ind = 0;
+  while (ind < len && tar[ind] == buf[ind]) ind++;
+  return ind == len && tar[ind] == '\0';
 }
 
 static char *str_alloc_copy(const char *src, Ind src_len) {

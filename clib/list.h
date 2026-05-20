@@ -93,7 +93,7 @@ Crashes the program if length is <= 0.
   ({                              \
     const auto tmp = list;        \
     aver(tmp->len > 0);           \
-    tmp->dat[tmp->len--];         \
+    tmp->dat[--tmp->len];         \
   })
 
 #define list_pop(...) list_pop_inner(UNIQ_IDENT, __VA_ARGS__)

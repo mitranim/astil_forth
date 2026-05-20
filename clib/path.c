@@ -52,7 +52,7 @@ static char *path_join(const char *base, const char *suf, bool is_dir) {
   if (is_path_abs(suf)) return strdup(suf);
 
   const auto inf     = is_dir ? "/" : "/../";
-  const auto inf_len = is_dir ? arr_cap("/") : arr_cap("/../");
+  const auto inf_len = is_dir ? sizeof("/") : sizeof("/../");
   const auto buf_len = (Ind)(strlen(base) + inf_len + strlen(suf));
   const auto buf_cap = buf_len + 1;
   const auto buf     = (char *)calloc(buf_cap, sizeof(char));

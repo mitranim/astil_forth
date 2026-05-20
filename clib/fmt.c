@@ -1,6 +1,6 @@
 #pragma once
-#include "./err.c" // IWYU pragma: export
 #include "./fmt.h" // IWYU pragma: export
+#include "./err.c" // IWYU pragma: export
 #include "./num.h"
 #include <stdio.h>
 
@@ -99,7 +99,7 @@ static char *fmt_bytes_hex_into(char *buf, Ind cap, const U8 *src, Ind len) {
 }
 
 static char *fmt_bytes_hex(const U8 *src, Ind len) {
-  return fmt_bytes_hex_into(FMT_BUF, arr_cap(FMT_BUF), src, len);
+  return fmt_bytes_hex_into(FMT_BUF, sizeof(FMT_BUF), src, len);
 }
 
 static char *fmt_bytes_into(char *buf, Ind cap, const U8 *src, Ind src_len) {
@@ -181,14 +181,14 @@ static char *fmt_bytes_into(char *buf, Ind cap, const U8 *src, Ind src_len) {
 }
 
 static char *fmt_bytes(const U8 *src, Ind len) {
-  return fmt_bytes_into(FMT_BUF, arr_cap(FMT_BUF), src, len);
+  return fmt_bytes_into(FMT_BUF, sizeof(FMT_BUF), src, len);
 }
 
 /* clang-format off */
 
 static char *fmt_char                   (char                   val) {return spf("%c",         val);}
-static char *fmt_char_unsigned          (char unsigned          val) {return spf("%x",         val);}
-static char *fmt_char_signed            (char signed            val) {return spf("%d",         val);}
+static char *fmt_char_unsigned          (char unsigned          val) {return spf("%hhx",       val);}
+static char *fmt_char_signed            (char signed            val) {return spf("%hhd",       val);}
 static char *fmt_int_short_unsigned     (int short unsigned     val) {return spf("0x%04hx",    val);}
 static char *fmt_int_short_signed       (int short signed       val) {return spf("%hd",        val);}
 static char *fmt_int_unsigned           (int unsigned           val) {return spf("0x%08x",     val);}
@@ -202,6 +202,7 @@ static char *fmt_double                 (double                 val) {return spf
 static char *fmt_double_long            (double long            val) {return spf("%Lf",        val);}
 static char *fmt_ptr                    (void const *           val) {return spf("%p",         val);}
 static char *fmt_chars                  (char const *           val) {return spf("\"%s\"",     val);}
+static char *fmt_wchars                 (wchar_t const *        val) {return spf("\"%ls\"",    val);}
 
 /* clang-format on */
 

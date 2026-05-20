@@ -8,7 +8,6 @@
 !/*.txt
 !/makefile
 !/unlicense
-!/clib
 !/comp
 !/mach
 !/forth
@@ -16,6 +15,11 @@
 !/talks
 !/sublime
 !/examples
+
+!/clib
+/clib/*
+!/clib/.h
+!/clib/.c
 
 # Should be listed last.
 .*

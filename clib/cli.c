@@ -65,7 +65,7 @@ static Err cli_key_val(const char *src, const char **key, const char **val) {
   aver(key_len > 0 && key_len < IND_MAX);
 
   static char buf[256] = {};
-  const auto  buf_cap  = arr_cap(buf);
+  const auto  buf_cap  = sizeof(buf);
 
   if ((Ind)key_len >= buf_cap) {
     return err_cli_key_over(src, (Ind)key_len, buf_cap);

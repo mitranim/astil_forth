@@ -103,10 +103,10 @@ typedef span_of(F64)  F64_span;
 
 #define stack_push(...) stack_push_inner(UNIQ_IDENT, __VA_ARGS__)
 
-#define stack_pop(stack)                  \
-  ({                                      \
-    assert((stack)->top < (stack)->ceil); \
-    *(--(stack)->top);                    \
+#define stack_pop(stack)                   \
+  ({                                       \
+    assert((stack)->top > (stack)->floor); \
+    *(--(stack)->top);                     \
   })
 
 #define stack_push_raw_inner(                                          \

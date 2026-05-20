@@ -101,6 +101,7 @@
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP
+31     let: ASM_REG_ZR
 0b0000 let: ASM_EQ
 0b0001 let: ASM_NE
 0b0010 let: ASM_CS
@@ -453,6 +454,12 @@
   0b1_0_0_01011_00_0_00000_000000_00000_00000 or
 ;
 
+\ adds Xd, Xn, Xm
+: asm_adds_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_add_reg
+  0b0_0_1_00000000000000000000000000000 or
+;
+
 \ sub Xd, Xn, <imm12>
 : asm_sub_imm { Xd Xn imm12 -- instr }
   Xd Xn imm12 asm_pattern_arith_imm
@@ -463,6 +470,12 @@
 : asm_sub_reg { Xd Xn Xm -- instr }
   Xd Xn Xm asm_pattern_arith_reg
   0b1_1_0_01011_00_0_00000_000000_00000_00000 or
+;
+
+\ subs Xd, Xn, Xm
+: asm_subs_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_sub_reg
+  0b0_0_1_00000000000000000000000000000 or
 ;
 
 \ sub Xd, Xn, Xm, lsl 3

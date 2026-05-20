@@ -5,12 +5,12 @@ Each stack is surrounded with guards which trigger a segfault when
 touched. This allows relatively fearless `*ptr++`-style operations.
 */
 #pragma once
+#include "./stack.h"
 #include "./err.h"
 #include "./fmt.c"
 #include "./mem.c"
 #include "./mem.h"
 #include "./num.h"
-#include "./stack.h"
 #include <assert.h>
 #include <sys/mman.h>
 #include <sys/sysctl.h>

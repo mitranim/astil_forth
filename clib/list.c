@@ -3,8 +3,8 @@ Replica of Go slices. See example below (`main`).
 Resizing relocates memory; pointers are transient.
 */
 #pragma once
-#include "./err.c"
 #include "./list.h" // IWYU pragma: export
+#include "./err.c"
 #include "./mem.h"
 #include "./misc.h"
 
@@ -34,8 +34,10 @@ static void list_reserve_total_cap_impl(List *tar, Ind size, Ind cap) {
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 
 static void list_reserve_spare_cap_impl(List *tar, Ind size, Ind more) {
+  if (!more) return;
   const auto goal = tar->len + more;
   auto       next = tar->cap;
+  if (!next) next = LIST_INIT_CAP;
   while (next < goal) next *= 2;
   list_reserve_total_cap_impl(tar, size, next);
 }

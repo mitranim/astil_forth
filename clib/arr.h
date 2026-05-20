@@ -8,10 +8,10 @@
 
 #define arr_ceil(arr) (&(arr)[arr_cap(arr)])
 
-#define arr_copy(tar, src)                       \
-  ({                                             \
-    static_assert(arr_cap(src) == arr_cap(tar)); \
-    memcpy(tar, src, arr_cap(src));              \
+#define arr_copy(tar, src)                     \
+  ({                                           \
+    static_assert(sizeof(src) == sizeof(tar)); \
+    memcpy(tar, src, sizeof(src));             \
   })
 
 #define arr_ptr_at_inner(tmp, arr, ind) \
@@ -22,18 +22,6 @@
   })
 
 #define arr_ptr_at(...) arr_ptr_at_inner(UNIQ_IDENT, __VA_ARGS__)
-
-#define arr_set_inner(tmp, arr, ind, src)                    \
-  ({                                                         \
-    const auto tmp = src;                                    \
-    arr_set_impl(arr, arr_cap(arr), ind, &tmp, sizeof(tmp)); \
-  })
-
-/*
-Caution: `ind` is for array elements (non-byte `sizeof`),
-and `src` may be any value that fits within the capacity.
-*/
-#define arr_set(...) arr_set_inner(UNIQ_IDENT, __VA_ARGS__)
 
 // Examples: https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2299.htm
 #define arr_clear(arr) memcpy(arr, (typeof(arr)){}, sizeof(arr));

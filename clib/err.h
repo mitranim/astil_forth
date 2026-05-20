@@ -110,27 +110,27 @@ for `mmap`, whose result is either -1 or an address.
 #endif
 
 // Blame `clang-format` for the horrible ternary fmting.
-#define err_wrapf_inner(tmp_err, tmp_buf, fmt, err, ...)                     \
-  ({                                                                         \
-    const auto tmp_err = err;                                                \
-    const auto tmp_buf = !tmp_err ? nullptr                                  \
-      : tmp_err == ERR_BUF_0      ? ERR_BUF_1                                \
-                                  : ERR_BUF_0;                               \
-    !tmp_err ? nullptr : ({                                                  \
-      snprintf(                                                              \
-        tmp_buf, arr_cap(ERR_BUF_0), fmt, tmp_err __VA_OPT__(, ) __VA_ARGS__ \
-      );                                                                     \
-      tmp_buf;                                                               \
-    });                                                                      \
+#define err_wrapf_inner(tmp_err, tmp_buf, fmt, err, ...)                    \
+  ({                                                                        \
+    const auto tmp_err = err;                                               \
+    const auto tmp_buf = !tmp_err ? nullptr                                 \
+      : tmp_err == ERR_BUF_0      ? ERR_BUF_1                               \
+                                  : ERR_BUF_0;                              \
+    !tmp_err ? nullptr : ({                                                 \
+      snprintf(                                                             \
+        tmp_buf, sizeof(ERR_BUF_0), fmt, tmp_err __VA_OPT__(, ) __VA_ARGS__ \
+      );                                                                    \
+      tmp_buf;                                                              \
+    });                                                                     \
   })
 
 #define err_wrapf(...) err_wrapf_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
-#define buf_fmtf_inner(tmp, buf, fmt, ...)                       \
-  ({                                                             \
-    auto tmp = buf;                                              \
-    snprintf(tmp, arr_cap(buf), fmt __VA_OPT__(, ) __VA_ARGS__); \
-    tmp;                                                         \
+#define buf_fmtf_inner(tmp, buf, fmt, ...)                      \
+  ({                                                            \
+    auto tmp = buf;                                             \
+    snprintf(tmp, sizeof(buf), fmt __VA_OPT__(, ) __VA_ARGS__); \
+    tmp;                                                        \
   })
 
 #define buf_fmtf(...) buf_fmtf_inner(UNIQ_IDENT, __VA_ARGS__)
