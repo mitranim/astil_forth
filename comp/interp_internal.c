@@ -617,24 +617,26 @@ static Err interp_extern_proc(
   try(find_extern(name, &ext_adr));
 
   if (inp_len < 0) {
-    return err_str("negative input parameter count");
+    return errf(FMT_QUOTED ": negative input parameter count", name);
   }
   if (inp_len > ASM_INP_PARAM_REG_LEN) {
-    return err_str("too many input parameters");
+    return errf(FMT_QUOTED ": too many input parameters", name);
   }
   if (out_len < 0) {
-    return err_str("negative output parameter count");
+    return errf(FMT_QUOTED ": negative output parameter count", name);
   }
   if (out_len > 1) {
-    return err_str("too many output parameters");
+    return errf(FMT_QUOTED ": too many output parameters", name);
   }
+
+  const auto wordlist = WORDLIST_EXEC;
 
   const auto sym = stack_push(
     &interp->syms,
     (Sym){
       .type     = SYM_EXTERN,
       .name     = interp->reader->word,
-      .wordlist = WORDLIST_EXEC,
+      .wordlist = wordlist,
       .exter    = ext_adr,
       .inp_len  = (U8)inp_len,
       .out_len  = (U8)out_len,
@@ -642,11 +644,22 @@ static Err interp_extern_proc(
     }
   );
 
-  dict_set(&interp->dict_exec, sym->name.buf, sym);
-
+  const auto dict = &interp->dict_exec;
+  const auto had  = dict_has(dict, sym->name.buf);
   const auto comp = &interp->comp;
   const auto syms = &comp->code.externs;
+
+  dict_set(dict, sym->name.buf, sym);
   comp_register_dysym(syms, sym->name.buf, (U64)ext_adr);
+
+  if (had && !interp->comp.ctx.redefining) {
+    eprintf(
+      "[system] redefined word " FMT_QUOTED " in wordlist %d (as extern)\n",
+      sym->name.buf,
+      wordlist
+    );
+  }
+
   return nullptr;
 }
 
