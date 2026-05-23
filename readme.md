@@ -20,24 +20,27 @@
 
 ## Overview
 
-Astil Forth is a native-code Forth system designed for self-bootstrapping and self-assembling. Uses a custom assembler in both C and Forth code. Currently supports only Arm64.
+Astil Forth is an experimental system which uses Forth as a model for exploring self-bootstrapping, self-assembly, and a unified JIT & AOT execution model. Currently supports only Arm64 + MacOS.
 
 Goals:
-- [x] Explore combined JIT & AOT compilation.
-- [x] Explore viability of single-pass assembly.
-- [x] Easy _self-assembly_ in user/lib code.
-- [x] Implement most of the language in user/lib code outside the compiler.
+- [x] Explore combined JIT execution & AOT snapshotting.
+- [x] Explore self-bootstrap: defining language on the fly in itself.
+- [x] Explore self-assembly in user/library code.
+- [x] Explore single-pass assembly (with fixups).
 - [x] Be usable for scripting.
-- [x] Support native register-based call ABI.
+- [x] Support direct C interop.
 - [x] Avoid a VM or complex IR.
-- [x] Keep the code clear and educational for other compiler amateurs.
-- [ ] Rewrite in Forth to self-host.
+- [x] Keep compiler clear for compiler amateurs.
+- [ ] Eventually rewrite in Forth to self-host.
 
 Non-goals:
 - Following other compiler designs.
 - Portability to multiple ISAs.
+- ANS Forth compatibility.
+- Complex optimizations.
+- Complete stdlib.
 
-Everything was written by me. This is _not_ slopbot-generated.
+No dependencies (other than libc). Uses custom assemblers in both C and Forth code.
 
 I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
 - 2026-Jan: intro to the system, self-assembly showcase, demos — https://www.youtube.com/watch?v=_4U1BR1U_oM
