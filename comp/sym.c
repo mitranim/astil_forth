@@ -1,6 +1,6 @@
 #pragma once
-#include "../clib/set.c"
 #include "./sym.h"
+#include "../clib/set.c"
 
 // clang-format off
 

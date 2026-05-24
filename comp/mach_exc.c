@@ -21,9 +21,9 @@ tables which associate instruction addresses with systack frames and
 catch handlers. But the complexity is not worth it.
 */
 #pragma once
+#include "../clib/mach_exc.c"
 #include "../clib/cli.c"
 #include "../clib/fmt.c"
-#include "../clib/mach_exc.c"
 #include "../clib/mach_misc.h"
 #include "../clib/misc.h"
 #include "./arch.h"

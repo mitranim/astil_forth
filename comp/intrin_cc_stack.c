@@ -327,9 +327,9 @@ static Err intrin_find_word(Interp *interp) {
 
 static Err intrin_inline_word(Interp *interp) {
   constexpr bool catch = false;
-  Sint ptr;
-  Sym *caller;
-  Sym *callee;
+  Sint           ptr;
+  Sym           *caller;
+  Sym           *callee;
 
   try(int_stack_pop(&interp->ints, &ptr));
   try(interp_require_current_sym(interp, &caller));

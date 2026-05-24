@@ -17,11 +17,11 @@ need to setup the stack, which is easily doable via a dedicated
 Mach-O section; maybe later.
 */
 #pragma once
+#include "../clib/mach_o.h"
 #include "../clib/err.h"
 #include "../clib/io.c"
 #include "../clib/mach_codesign.c"
 #include "../clib/mach_misc.c"
-#include "../clib/mach_o.h"
 #include "../clib/mem.c"
 #include "../clib/mem.h"
 #include "../clib/set.c"

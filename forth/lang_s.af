@@ -1655,7 +1655,7 @@ LF CRLF inc c! \ \n
 \ Usage example:
 \
 \   " numbers: %zd %zd %zd" 10 20 30 [ 3 ] logf lf
-:: logf  ( C: len -- )  ( E: fmt …vargs… -- ) xt' printf comp_varcall ;
+:: logf ( C: len -- )  ( E: fmt …vargs… -- ) xt' printf comp_varcall ;
 
 :: elogf ( C: len -- ) ( E: fmt …vargs… -- )
   dup comp_va_beg

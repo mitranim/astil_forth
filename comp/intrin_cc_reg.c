@@ -292,8 +292,8 @@ static Err intrin_find_word(
 
 static Err intrin_inline_word(Sint ptr, Interp *interp) {
   constexpr bool catch = false;
-  Sym *caller;
-  Sym *callee;
+  Sym           *caller;
+  Sym           *callee;
 
   try(interp_require_current_sym(interp, &caller));
   try(interp_sym_by_ptr(interp, ptr, &callee));

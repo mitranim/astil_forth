@@ -1853,8 +1853,8 @@ end
   ( C:        -- <loop_prev> )
   ( LOOP_AUX: -- nop )
 
-  \ Stash prev loop info; make this the topmost loop frame.
-  LOOP_IND @       STACK >s
+  \ Stash prev loop info; replace it, making this the topmost loop frame.
+  LOOP_IND @         STACK >s
   xt' loop_frame_pop STACK >s
   STACK stack_len LOOP_IND !
 
@@ -1879,7 +1879,7 @@ end
 :: loop ( C: -- <loop_prev> loop_beg loop_pop )
   comp_barrier \ Clobber / relocate locals.
   loop_frame_init
-  here            STACK >s
+  here              STACK >s
   xt' loop_base_pop STACK >s
 ;
 
@@ -1888,8 +1888,8 @@ end
 \ Breaks out of any loop.
 :: leave ( LOOP_AUX: -- leave_adr leave_pop )
   comp_barrier \ Clobber / relocate locals.
-  reserve_here LOOP_AUX >s
-  xt' leave_pop  LOOP_AUX >s
+  reserve_here  LOOP_AUX >s
+  xt' leave_pop LOOP_AUX >s
 ;
 
 : while_pop LOOP_AUX if_pop_from ;
@@ -1898,8 +1898,8 @@ end
 :: while ( LOOP_AUX: -- while_adr while_pop )
   " when calling `while`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
-  reserve_here LOOP_AUX >s
-  xt' while_pop  LOOP_AUX >s
+  reserve_here  LOOP_AUX >s
+  xt' while_pop LOOP_AUX >s
 ;
 
 \ Goes back to loop start.
@@ -1930,9 +1930,9 @@ end
 ;
 
 : loop_init_with_cond { loop_beg cond_adr asm_cond }
-  loop_beg             STACK >s
-  cond_adr             STACK >s
-  asm_cond             STACK >s
+  loop_beg               STACK >s
+  cond_adr               STACK >s
+  asm_cond               STACK >s
   xt' loop_pop_with_cond STACK >s
 ;
 

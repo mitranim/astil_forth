@@ -1,11 +1,11 @@
 #pragma once
+#include "./comp.h"
 #include "../clib/dict.c"
 #include "../clib/list.c"
 #include "../clib/num.h"
 #include "../clib/stack.c"
 #include "../clib/str.c"
 #include "./arch.c"
-#include "./comp.h"
 #include "./sym.c"
 
 static Err err_current_sym_not_defining() {
@@ -304,8 +304,8 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   const auto ctx = &comp->ctx;
   if (callee->throws && !ctx->catches) caller->throws = true;
 
-  const auto catch = callee->throws && ctx->catches;
-  bool inlined     = false;
+  const auto catch   = callee->throws && ctx->catches;
+  bool       inlined = false;
 
   switch (callee->type) {
     case SYM_NORM: {

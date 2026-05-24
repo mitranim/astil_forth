@@ -25,6 +25,9 @@ Checks:
   # We have some cyclic includes and that's okay.
   - -misc-header-include-cycle
 
+  # Conflicts with clang-format include sorting.
+  - -llvm-include-order
+
   - -misc-no-recursion # WTF
   - -bugprone-branch-clone
   - -bugprone-invalid-enum-default-initialization

@@ -44,6 +44,7 @@ type for each instruction type. It works and makes the code much clearer, but
 bitfield layout is implementation-defined and non-portable.
 */
 #pragma once
+#include "./arch_arm64.h"
 #include "../clib/bits.c"
 #include "../clib/dict.c"
 #include "../clib/fmt.h"
@@ -51,7 +52,6 @@ bitfield layout is implementation-defined and non-portable.
 #include "../clib/list.c"
 #include "../clib/misc.h"
 #include "../clib/stack.c"
-#include "./arch_arm64.h"
 #include "./comp.h"
 #include "./sym.c"
 
@@ -967,7 +967,8 @@ static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, const Instr *instr)
   const auto write = &comp->code.code_write;
   if (&write->dat[spans->inner] != instr) return false;
 
-  IF_DEBUG(*instr = asm_instr_breakpoint(ASM_CODE_PROLOGUE));
+  // IF_DEBUG(*instr = asm_instr_breakpoint(ASM_CODE_PROLOGUE));
+
   spans->prologue++;
   spans->inner++;
   return true;

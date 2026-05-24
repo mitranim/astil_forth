@@ -37,6 +37,7 @@ WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=af
 WATCH_ALL ?= $(WATCH) -e=c,h,s,af
 WATCH_IMM ?= $(WATCH) --no-vcs-ignore -w=forth -w=$(MAIN) -w=$(MAIN_S)
+FMTABLE ?= $(shell find $(CLIB_DIR) $(COMP_DIR) -type f \( -name '*.h' -or -name '*.c' \))
 ARTIF ?= $(shell find . \( -type d -name '*.dSYM' \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' \) \))
 
 ifeq ($(verb),true)
@@ -248,6 +249,10 @@ $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 .PHONY: bench
 bench:
 	bench/bench.sh
+
+.PHONY: fmt
+fmt:
+	clang-format -i $(FMTABLE)
 
 # Non-configurable for now; usage of `~/.local`
 # is also hardcoded in the interpreter.

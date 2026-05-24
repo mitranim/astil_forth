@@ -65,7 +65,7 @@ import' std:errno.af
   ainf
 ;
 
-: net_listen { port max_conn -- sock }
+: net_listen { port max_conn -- sock } [ true catches ]
   port net_addr_info { ainf }
   -1                 { sock }
   ainf               { next }
