@@ -120,6 +120,7 @@ static Err intrin_recur(Interp *interp) {
   const auto comp = &interp->comp;
   try(comp_validate_recur_args(comp));
   try(comp_append_recur(comp));
+  comp_args_set(comp, sym->out_len);
 
   sym->norm.has_recur = true;
   return nullptr;
