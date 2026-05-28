@@ -8,8 +8,8 @@ import' std:lang.af
 ;
 
 : main { -- exit }
-  36 fib { val }
-  \ " fib(36): " log val log_int lf
+  36 fib { -- }
+  \ 36 fib log_int lf
   0
 ;
 main

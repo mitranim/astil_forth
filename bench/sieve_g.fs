@@ -3,16 +3,15 @@
 4096 constant RUNS
 8192 constant LEN
 create FLAGS LEN allot
-FLAGS LEN + constant EFLAG
 
-: find_prime ( -- num )
-  FLAGS LEN 1 fill
+: find_prime { flags len -- num }
+  flags len 1 fill
   0 3
-  EFLAG FLAGS do
+  flags len + flags do
     i c@ if
       dup i +
-      dup EFLAG < if
-        EFLAG swap do 0 i c! dup +loop
+      dup flags len + < if
+        flags len + swap do 0 i c! dup +loop
       else
         drop
       then
@@ -27,7 +26,7 @@ FLAGS LEN + constant EFLAG
   \ find_prime .
 
   RUNS 0 do
-    find_prime drop
+    FLAGS LEN find_prime drop
   loop
 ;
 main

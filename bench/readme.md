@@ -3,11 +3,124 @@ Microbenchmarks comparing:
 - Register-CC version of Astil Forth in JIT mode.
 - Stack-CC version of Astil Forth in JIT mode.
 - Gforth.
-- (occasional) C (Clang).
-- (occasional) JS (Bun).
+- C (Clang).
+- JS (Bun).
+- Lua (LuaJIT).
+- Common Lisp (SBCL).
+- Python (PyPy and CPython).
 
-Run `./bench.sh`. Requires [`hyperfine`](https://github.com/sharkdp/hyperfine).
+Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces interpreters, and vaguely approaches Clang C with `-O2` (x1.5-x2).
 
-Results: [`bench/result.txt`](./result.txt).
+Naming:
+- `_aot`   -- Astil reg-CC as AOT-compiled executable.
+- `_reg`   -- Astil reg-CC in JIT mode.
+- `_stack` -- Astil stack-CC in JIT mode.
 
-Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces interpreters, and vaguely approaches Clang C with `-O2`.
+Each `_reg` and `_stack` benchmark includes the cost of bootstrapping the entire language first. Reg-CC takes longer to bootstrap because it has more features.
+
+Measurements on M3 Pro.
+
+## VERSIONS
+
+```
+clang 22.1.4
+
+gforth 0.7.3
+
+LuaJIT 2.1.1753364724
+
+Bun 1.3.10
+
+SBCL 2.6.4
+
+[PyPy 7.3.17 with GCC Apple LLVM 16.0.0 (clang-1600.0.26.4)]
+Python 3.10.14 (39dc8d3c85a7, Nov 09 2024, 22:49:03)
+
+Python 3.14.4
+```
+
+## NONE
+
+| Command | Mean [µs] | Min [µs] | Max [µs] | Relative |
+|:---|---:|---:|---:|---:|
+| `none_astil_reg` | 992.2 ± 61.8 | 846.3 | 2331.8 | 1.02 ± 0.07 |
+| `none_astil_stack` | 977.5 ± 28.5 | 846.5 | 1244.4 | 1.00 |
+
+## BASELINE
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `baseline_astil_reg` | 6.5 ± 0.1 | 6.5 | 7.2 | 1.69 ± 0.07 |
+| `baseline_astil_stack` | 4.2 ± 0.0 | 4.1 | 4.4 | 1.08 ± 0.04 |
+| `baseline_gforth` | 3.9 ± 0.2 | 2.5 | 4.1 | 1.00 |
+| `baseline_cl_sbcl` | 12.4 ± 0.3 | 11.5 | 14.7 | 3.21 ± 0.15 |
+
+## BUBBLE
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `bubble_clang` | 19.5 ± 0.1 | 19.4 | 20.0 | 1.00 |
+| `bubble_astil_aot` | 33.5 ± 0.3 | 33.3 | 35.9 | 1.72 ± 0.02 |
+| `bubble_astil_reg` | 39.2 ± 0.2 | 39.0 | 40.1 | 2.01 ± 0.01 |
+| `bubble_astil_stack` | 101.4 ± 0.1 | 101.3 | 101.6 | 5.22 ± 0.03 |
+| `bubble_gforth` | 216.2 ± 9.3 | 205.1 | 228.8 | 11.11 ± 0.48 |
+| `bubble_luajit` | 39.0 ± 1.3 | 37.3 | 43.7 | 2.00 ± 0.07 |
+| `bubble_js_bun` | 38.4 ± 0.2 | 38.0 | 38.9 | 1.97 ± 0.01 |
+| `bubble_cl_sbcl` | 44.6 ± 0.2 | 43.9 | 45.7 | 2.29 ± 0.02 |
+| `bubble_pypy` | 87.9 ± 0.3 | 87.4 | 88.8 | 4.52 ± 0.03 |
+| `bubble_python` | 1745.8 ± 29.0 | 1720.4 | 1802.9 | 89.76 ± 1.55 |
+
+## PRIME SIEVE
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `sieve_clang` | 37.4 ± 0.3 | 37.1 | 39.4 | 1.00 |
+| `sieve_astil_aot` | 62.7 ± 0.4 | 62.2 | 63.9 | 1.68 ± 0.02 |
+| `sieve_astil_reg` | 68.3 ± 0.3 | 67.9 | 69.8 | 1.83 ± 0.02 |
+| `sieve_astil_stack` | 182.8 ± 2.1 | 180.9 | 187.7 | 4.89 ± 0.07 |
+| `sieve_gforth` | 447.8 ± 5.4 | 440.1 | 459.4 | 11.98 ± 0.18 |
+| `sieve_luajit` | 65.6 ± 0.3 | 65.0 | 66.5 | 1.76 ± 0.02 |
+| `sieve_js_bun` | 64.7 ± 0.4 | 63.7 | 66.3 | 1.73 ± 0.02 |
+| `sieve_cl_sbcl` | 71.3 ± 0.4 | 70.8 | 72.6 | 1.91 ± 0.02 |
+| `sieve_pypy` | 164.8 ± 0.5 | 164.1 | 166.0 | 4.41 ± 0.04 |
+| `sieve_python` | 3917.7 ± 9.6 | 3902.0 | 3933.8 | 104.83 ± 0.90 |
+
+## FIB_LOOP
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `fib_loop_clang` | 2.8 ± 0.0 | 2.7 | 3.1 | 1.00 |
+| `fib_loop_astil_aot` | 3.5 ± 0.0 | 3.4 | 3.7 | 1.23 ± 0.02 |
+| `fib_loop_astil_reg` | 9.2 ± 0.0 | 9.1 | 9.6 | 3.22 ± 0.04 |
+| `fib_loop_astil_asm` | 8.4 ± 0.1 | 8.3 | 8.7 | 2.93 ± 0.04 |
+| `fib_loop_astil_stack` | 23.4 ± 0.8 | 22.3 | 25.6 | 8.21 ± 0.30 |
+| `fib_loop_gforth` | 41.8 ± 1.2 | 39.8 | 44.2 | 14.67 ± 0.45 |
+| `fib_loop_luajit` | 9.2 ± 0.1 | 8.3 | 9.5 | 3.24 ± 0.04 |
+| `fib_loop_js_bun` | 13.2 ± 0.3 | 12.1 | 13.9 | 4.64 ± 0.12 |
+| `fib_loop_cl_sbcl` | 15.8 ± 0.2 | 15.2 | 16.8 | 5.55 ± 0.10 |
+| `fib_loop_pypy` | 29.7 ± 1.2 | 25.5 | 31.1 | 10.42 ± 0.44 |
+| `fib_loop_python` | 222.8 ± 1.1 | 221.3 | 224.8 | 78.18 ± 0.91 |
+
+## FIB_LOOP_BIG
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `fib_loop_big_js_bun` | 150.2 ± 2.0 | 146.7 | 154.9 | 1.18 ± 0.02 |
+| `fib_loop_big_cl_sbcl` | 127.5 ± 0.5 | 126.9 | 128.5 | 1.00 |
+| `fib_loop_big_pypy` | 139.2 ± 0.3 | 138.6 | 139.7 | 1.09 ± 0.00 |
+| `fib_loop_big_python` | 572.7 ± 6.6 | 567.6 | 589.9 | 4.49 ± 0.05 |
+
+## FIB_RECURSIVE: fib(36)
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `fib_rec_clang` | 39.3 ± 0.7 | 38.3 | 42.1 | 1.00 |
+| `fib_rec_astil_aot` | 57.9 ± 0.6 | 56.8 | 59.6 | 1.47 ± 0.03 |
+| `fib_rec_astil_reg` | 63.4 ± 0.4 | 62.6 | 64.3 | 1.61 ± 0.03 |
+| `fib_rec_astil_stack` | 265.4 ± 11.8 | 257.0 | 286.6 | 6.75 ± 0.32 |
+| `fib_rec_gforth` | 342.9 ± 6.1 | 332.7 | 350.9 | 8.72 ± 0.22 |
+| `fib_rec_luajit` | 69.4 ± 3.0 | 66.3 | 78.3 | 1.77 ± 0.08 |
+| `fib_rec_js_bun` | 69.1 ± 0.8 | 67.8 | 72.5 | 1.76 ± 0.04 |
+| `fib_rec_cl_sbcl` | 91.3 ± 0.3 | 90.9 | 92.3 | 2.32 ± 0.04 |
+| `fib_rec_pypy` | 139.1 ± 0.3 | 138.5 | 139.7 | 3.54 ± 0.06 |
+| `fib_rec_python` | 1592.0 ± 14.0 | 1571.2 | 1617.5 | 40.50 ± 0.80 |

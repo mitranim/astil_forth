@@ -2,48 +2,44 @@ import' std:lang.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-74755 var:   SEED
 8192  let:   LEN
 LEN   cells: LIST
 
-\ Must be calculated rather than stored in a static constant because it depends
-\ on `LIST`, which is allocated in the compiler-managed data section, and whose
-\ absolute address is different when running in JIT mode versus when running an
-\ AOT-compiled executable.
-: list_ceil { -- adr } LEN cells LIST + ;
+: list_ceil { list len -- adr } len cells list + ;
 
-: pseudo_random { -- val }
-  SEED @ 1309 * 13849 + 65535 and { val }
-  val SEED !
-  val
+: pseudo_random { seed -- seed val }
+  seed 1309 * 13849 + 65535 and { val }
+  val val
 ;
 
-: list_init
-  list_ceil LIST Cell
+: list_init { list len }
+  74755 { seed }
+  list len list_ceil list Cell
   +loop: ptr
-    pseudo_random ptr !
+    seed pseudo_random { seed val }
+    val ptr !
   end
 ;
 
-: list_dump
-  list_ceil LIST Cell
+: list_dump { list len }
+  list len list_ceil list Cell
   +loop: ptr
     ptr @ .
   end
 ;
 
-: list_verify
-  list_ceil -cell
-  LIST Cell
+: list_verify { list len }
+  list len list_ceil -cell
+  list Cell
   +loop: ptr
     ptr @2 > if " [bubble] not sorted" throw end
   end
 ;
 
-: bubble
-  list_ceil LIST Cell
+: bubble { list len }
+  list len list_ceil list Cell
   -loop: ceil_ptr
-    ceil_ptr LIST Cell
+    ceil_ptr list Cell
     +loop: ptr
       ptr @2 > if
         ptr @2 { one two }
@@ -53,15 +49,15 @@ LEN   cells: LIST
   end
 ;
 
-: bubble_sort
-  list_init
-  bubble
-  \ list_dump
-  list_verify
+: bubble_sort { list len }
+  list len list_init
+  list len bubble
+  \ list len list_dump
+  list len list_verify
 ;
 
 : main { -- exit } [ true catches ]
-  bubble_sort { err }
+  LIST LEN bubble_sort { err }
   err ifn 0 ret end
   " error: %s" err elogf elf
   1

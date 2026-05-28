@@ -6,20 +6,16 @@ import' std:lang.af
 8192 let: CAP
 CAP  mem: FLAGS
 
-\ Must be calculated rather than stored in a static constant because it depends
-\ on `FLAGS`, which is allocated in the compiler-managed data section and whose
-\ absolute address is different when running in JIT mode versus when running an
-\ AOT-compiled executable.
-: flags_ceil { -- adr } FLAGS CAP + ;
+: flags_ceil { flags cap -- adr } flags cap + ;
 
-: reset FLAGS CAP 1 fill ;
+: reset { flags cap } flags cap 1 fill ;
 
-: find_prime { -- num }
-  reset
+: find_prime { flags cap -- num }
+  flags cap reset
 
-  flags_ceil 0 3 { ceil num step }
+  flags cap flags_ceil 0 3 { ceil num step }
 
-  ceil FLAGS +for: ptr0
+  ceil flags +for: ptr0
     ptr0 @u8 if
       ptr0 step + { ptr1 }
 
@@ -37,10 +33,10 @@ CAP  mem: FLAGS
 ;
 
 : main { -- exit }
-  \ find_prime .
+  \ FLAGS CAP find_prime log_int lf
 
   RUNS for
-    find_prime { -- }
+    FLAGS CAP find_prime { -- }
   end
 
   0

@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 static int64_t fib(int64_t src) {
@@ -13,8 +12,10 @@ static int64_t escape(int64_t val) {
   return x0;
 }
 
+// #include <stdio.h>
+
 int main(void) {
   const int64_t count = 36;
   escape(fib(escape(count)));
-  // printf("fib(%lld): %lld\n", count, fib(count));
+  // printf("%lld\n", fib(count));
 }

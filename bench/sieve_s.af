@@ -5,18 +5,17 @@ import' std:lang_s.af
 4096        let: RUNS
 8192        let: LEN
 LEN         mem: FLAGS
-FLAGS LEN + let: EFLAG
 
-: find_prime ( -- num )
-  FLAGS LEN 1 fill
+: find_prime { flags len -- num }
+  flags len 1 fill
 
   0 3 ( num step )
 
-  EFLAG FLAGS +for: ptr0
+  flags len + flags +for: ptr0
     ptr0 c@ if
       dup ptr0 +
-      dup EFLAG < if
-        EFLAG swap 2 pick +loop: ptr1 0 ptr1 c! end
+      dup flags len + < if
+        flags len + swap 2 pick +loop: ptr1 0 ptr1 c! end
       else
         drop
       end
@@ -31,7 +30,7 @@ FLAGS LEN + let: EFLAG
   \ find_prime .
 
   RUNS for
-    find_prime drop
+    FLAGS LEN find_prime drop
   end
 ;
 main

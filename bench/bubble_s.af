@@ -2,50 +2,55 @@ import' std:lang_s.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-74755            var:   SEED
 8192             let:   LEN
 LEN              cells: LIST
-LEN cells LIST + let:   CEIL
 
-: pseudo_random ( -- n ) SEED @ 1309 * 13849 + 65535 and dup SEED ! ;
+: list_ceil { list len -- ceil } len cells list + ;
 
-: list_init ( -- )
-  CEIL LIST cell
+: pseudo_random { seed -- seed val }
+  seed 1309 * 13849 + 65535 and { val }
+  val val
+;
+
+: list_init { list len -- }
+  74755 { seed }
+  list len list_ceil list cell
   +loop: ptr
-    pseudo_random ptr !
+    seed pseudo_random { seed val }
+    val ptr !
   end
 ;
 
-: list_dump ( -- )
-  CEIL LIST cell
+: list_dump { list len -- }
+  list len list_ceil list cell
   +loop: ptr
     ptr @ .
   end
 ;
 
-: list_verify ( -- )
-  CEIL -cell
-  LIST cell
+: list_verify { list len -- }
+  list len list_ceil -cell
+  list cell
   +loop: ptr
     ptr @2 > if " [bubble] not sorted" throw end
   end
 ;
 
-: bubble ( -- )
-  CEIL LIST cell
+: bubble { list len -- }
+  list len list_ceil list cell
   -loop: ceil_ptr
-    ceil_ptr LIST cell
+    ceil_ptr list cell
     +loop: ptr
       ptr @2 > if ptr @2 swap ptr !2 end
     end
   end
 ;
 
-: bubble_sort ( -- )
-  list_init
-  bubble
-  \ list_dump
-  list_verify
+: bubble_sort { list len -- }
+  list len list_init
+  list len bubble
+  \ list len list_dump
+  list len list_verify
 ;
 
 \ : bubble_with_flag ( -- )
@@ -72,7 +77,7 @@ LEN cells LIST + let:   CEIL
 \ ;
 
 : main
-  bubble_sort
+  LIST LEN bubble_sort
   " [bubble] done" log lf
 ;
 main

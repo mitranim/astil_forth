@@ -38,7 +38,7 @@ WATCH_PROG ?= $(WATCH) -e=af
 WATCH_ALL ?= $(WATCH) -e=c,h,s,af
 WATCH_IMM ?= $(WATCH) --no-vcs-ignore -w=forth -w=$(MAIN) -w=$(MAIN_S)
 FMTABLE ?= $(shell find $(CLIB_DIR) $(COMP_DIR) -type f \( -name '*.h' -or -name '*.c' \))
-ARTIF ?= $(shell find . \( -type d -name '*.dSYM' \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' \) \))
+ARTIF ?= $(shell find . \( -type d -name '*.dSYM' \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' -or -name '*.plist' \) \))
 
 ifeq ($(verb),true)
 	OK = echo [$@] ok
@@ -269,9 +269,9 @@ INSTALL_DAT  := $(INSTALL_ROOT)/share
 install: build
 	mkdir -p "$(INSTALL_BIN)"
 	mkdir -p "$(INSTALL_DAT)"
-	ln -sf $(shell realpath $(MAIN)) "$(INSTALL_BIN)/astil"
-	ln -sf $(shell realpath $(MAIN_S)) "$(INSTALL_BIN)/astil_s"
-	ln -sfn $(shell realpath ./forth) "$(INSTALL_DAT)/astil"
+	ln -sf "$(shell realpath $(MAIN))" "$(INSTALL_BIN)/astil"
+	ln -sf "$(shell realpath $(MAIN_S))" "$(INSTALL_BIN)/astil_s"
+	ln -sfn "$(shell realpath ./forth)" "$(INSTALL_DAT)/astil"
 	@echo "Symlinked the reg-CC   executable to: \"$(INSTALL_BIN)/astil\"."
 	@echo "Symlinked the stack-CC executable to: \"$(INSTALL_BIN)/astil_s\"."
 	@echo "Symlinked the built-in modules    to: \"$(INSTALL_DAT)/astil\"."

@@ -22,34 +22,34 @@ variable seed ( -- addr )
 
 align create ELEMS elements cells allot
 
-: initiate-list ( -- )
-  ELEMS elements cells + ELEMS do random i ! cell +loop
+: initiate-list { list len -- }
+  initiate-seed
+  list len cells + list do random i ! cell +loop
 ;
 
-: dump-list ( -- )
-  ELEMS elements cells + ELEMS do i @ . cell +loop cr
+: dump-list { list len -- }
+  list len cells + list do i @ . cell +loop cr
 ;
 
-: verify-list ( -- )
-  ELEMS elements 1- cells mybounds do
+: verify-list { list len -- }
+  list len 1- cells mybounds do
     i 2@ > abort" bubble-sort: not sorted"
   cell +loop
 ;
 
-: bubble ( -- )
+: bubble { list len -- }
   \ ." bubbling..." cr
-  elements 1 do
-    ELEMS elements i - cells mybounds do
+  len 1 do
+    list len i - cells mybounds do
       i 2@ > if i 2@ swap i 2! then
     cell +loop
   loop
 ;
 
-: bubble-sort ( -- )
-  initiate-seed
-  initiate-list
-  bubble
-  verify-list
+: bubble-sort { list len -- }
+  list len initiate-list
+  list len bubble
+  list len verify-list
 ;
 
 : bubble-with-flag ( -- )
@@ -69,7 +69,7 @@ align create ELEMS elements cells allot
 \ ;
 
 : main  ( -- )
-  bubble-sort
+  ELEMS elements bubble-sort
   \ bubble-sort-with-flag
 ;
 main

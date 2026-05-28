@@ -25,6 +25,7 @@
 .*
 *.exe
 *.dSYM
+*.plist
 !.git*
 !*ignore
 !*rc
