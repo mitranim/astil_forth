@@ -1,0 +1,5 @@
+\ Must fail to compile: error takes up 1 more reg.
+fun: test_too_many_output_regs_with_err_fail { -- A B C D E F G H }
+  false if test_throw end
+  0 1 2 3 4 5 6 7
+end

@@ -63,6 +63,7 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
 
 static Err interp_begin_definition(Interp *interp) {
   if (interp->comp.ctx.sym) return err_nested_definition(interp);
+  try(interp_snapshot(interp));
   try(interp_read_word(interp));
   return nullptr;
 }

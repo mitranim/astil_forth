@@ -191,3 +191,17 @@ fun_comp: }T
   compile' testing_compiled_end
   ok if true catches end
 end
+
+\ ## Misc assertions
+
+fun: T_err_contains { act exp }
+  act ifn
+    " missing error message; expected error to contain: %s"
+    exp errf throw
+  end
+
+  act exp strstr if ret end
+
+  " expected error message to contain: %s; actual error message: %s"
+  exp act errf throw
+end

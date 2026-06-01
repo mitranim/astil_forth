@@ -23,8 +23,8 @@ static Err interp_snapshot(Interp *interp) {
 }
 
 /*
-Restores the interpreter to a consistent state.
-Should be used when handling errors in REPL mode.
+Restores the interpreter to a known consistent state.
+Should be used when handling REPL and import errors.
 
 TODO: drop currently defined symbol from list and dict.
 Our dicts don't support deletion at the moment.
@@ -49,13 +49,6 @@ static Err interp_rewind(Interp *interp) {
       dict_del(words, sym->buf.name);
     }
   */
-
-  /*
-  Purge the remaining buffered input. Without this, we'd continue interpreting
-  the remainder of a failed script, possibly inside a failed word definition,
-  which is a totally invalid state after rewinding.
-  */
-  if (interp->reader) file_purge(interp->reader->file);
 
   if (!sym) {
     IF_DEBUG(eprintf("[debug] rewound interpreter state\n"));
@@ -107,11 +100,19 @@ but it makes REPL behavior less weird. For example:
 `;` snapshots `10 20 30`. Without the truncation, when `.` underflows,
 rewind resets the (empty) stack to `10 20 30` which feels kinda weird.
 */
-static Err interp_handle_err(Interp *interp, Err err) {
+static Err interp_on_tty_err(Interp *interp, Err err) {
   eprintf(TTY_RED_BEG "error:" TTY_RED_END " %s\n", err);
   if (TRACE) backtrace_print();
   try(interp_rewind(interp));
   stack_trunc(&interp->ints);
+
+  /*
+  Purge the remaining buffered input. Without this, we'd continue interpreting
+  the remainder of a failed script, possibly inside a failed word definition,
+  which is a totally invalid state after rewinding.
+  */
+  if (interp->reader) file_purge(interp->reader->file);
+
   return nullptr;
 }
 
@@ -429,7 +430,7 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
   for (;;) {
     const auto err = interp_err(read, interp_loop(interp));
     if (!err) return nullptr;
-    try(interp_handle_err(interp, err));
+    try(interp_on_tty_err(interp, err));
   }
   return nullptr;
 }
@@ -508,14 +509,19 @@ static Err interp_import_inner(
   const auto read = interp->reader;
   read->file      = file;
   try(str_set(&read->file_path, path));
-  dict_set(imports, path, EMPTY);
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
-  return interp_err(read, interp_loop(interp));
+  try(interp_err(read, interp_loop(interp)));
+  IF_DEBUG(eprintf("[system] done importing file: " FMT_QUOTED "\n", path));
+
+  dict_set(imports, path, EMPTY);
+  return nullptr;
 }
 
 // There better not be a `longjmp` over this.
 static Err interp_import(Interp *interp, const char *path) {
+  try(interp_snapshot(interp));
+
   const auto prev            = interp->reader;
   const auto prev_file       = prev ? prev->file : nullptr;
   const auto prev_path       = prev ? prev->file_path.buf : nullptr;
@@ -528,6 +534,7 @@ static Err interp_import(Interp *interp, const char *path) {
     : interp_import_inner(interp, prev_file, prev_path, path);
 
   interp->reader = prev;
+  if (err) (void)interp_rewind(interp);
   return err;
 }
 
@@ -558,7 +565,7 @@ static Err interp_sym_by_ptr(Interp *interp, Sint ptr, Sym **out) {
   try(interp_validate_sym_ptr(interp, sym));
 
   IF_DEBUG(eprintf(
-    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
+    "[system] validated address %p of symbol " FMT_QUOTED "\n", sym, sym->name.buf
   ));
 
   if (out) *out = sym;

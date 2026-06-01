@@ -1652,28 +1652,54 @@ test_catches_4
 \ Must compile.
 fun: test_max_input_regs { A B C D E F G H -- } end
 
-\ Must fail to compile.
-\ fun: test_too_many_input_regs { A B C D E F G H I -- } end
-
-\ Must compile.
 fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
-T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
+fun: test_max_output_regs [ redefine ]
+  T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
+end
+test_max_output_regs
 
-\ Must fail to compile.
-\ fun: test_too_many_output_regs { -- A B C D E F G H I } end
-
-\ Must compile.
-fun: test_max_output_regs_throw { -- A B C D E F G }
+fun: test_max_output_regs_with_err { -- A B C D E F G }
   false if test_throw end
   0 1 2 3 4 5 6
 end
-T{ test_max_output_regs_throw <T> 0 1 2 3 4 5 6 }T
+fun: test_max_output_regs_with_err [ redefine ]
+  T{ test_max_output_regs_with_err <T> 0 1 2 3 4 5 6 }T
+end
+test_max_output_regs_with_err
 
-\ Must fail to compile: error takes up 1 more reg.
-\ fun: test_too_many_output_regs_throw { -- A B C D E F G H }
-\   false if test_throw end
-\   0 1 2 3 4 5 6 7
-\ end
+fun: test_file_throw_import_catch [ true catches ]
+  import' ./test/test_root_throw.af
+  " test_err" T_err_contains try
+end
+test_file_throw_import_catch
+
+fun: test_too_many_input_regs [ true catches ]
+  import' ./test/test_too_many_input_regs.af
+  " too many input parameters: 8 registers available, 9 parameters requested"
+  T_err_contains try
+end
+test_too_many_input_regs
+
+fun: test_too_many_output_regs [ true catches ]
+  import' ./test/test_too_many_output_regs.af
+  " too many output parameters: 8 registers available, 9 parameters requested"
+  T_err_contains try
+end
+test_too_many_output_regs
+
+fun: test_too_many_output_regs_with_err [ true catches ]
+  import' ./test/test_too_many_output_regs_with_err.af
+  " unable to compile return: too many output parameters: 8 registers are available, 8 are used, but 1 more is required for implicitly returned exception values"
+  T_err_contains try
+end
+test_too_many_output_regs_with_err
+
+fun: test_partial_assign [ true catches ]
+  import' ./test/test_partial_assign.af
+  " in `test_partial_assign_fail`: arity mismatch: assigned 1 of 2 prior values"
+  T_err_contains try
+end
+test_partial_assign
 
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
@@ -1764,8 +1790,12 @@ fun: main_run
   test_catches_3
   test_catches_4_fun_throwing
   test_catches_4
-  T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
-  T{ test_max_output_regs_throw <T> 0 1 2 3 4 5 6 }T
+  test_max_output_regs
+  test_max_output_regs_with_err
+  \ test_file_throw_import_catch          \ interp-only
+  \ test_too_many_input_regs              \ interp-only
+  \ test_too_many_output_regs             \ interp-only
+  \ test_too_many_output_regs_with_err    \ interp-only
 end
 
 fun: main { -- exit } [ true catches ]
