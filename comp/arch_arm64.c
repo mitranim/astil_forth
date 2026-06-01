@@ -962,12 +962,12 @@ Speculative unclobbering assignment of params or locals is one such case.
 
 SYNC[asm_prologue].
 */
-static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, const Instr *instr) {
+static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
   const auto spans = &sym->norm.spans;
   const auto write = &comp->code.code_write;
   if (&write->dat[spans->inner] != instr) return false;
 
-  // IF_DEBUG(*instr = asm_instr_breakpoint(ASM_CODE_PROLOGUE));
+  *instr = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
 
   spans->prologue++;
   spans->inner++;
@@ -1239,12 +1239,11 @@ static Err asm_append_call_norm(
 
   IF_DEBUG(eprintf(
     "[system] in " FMT_QUOTED ": appended call to " FMT_QUOTED
-    " with executable address %p and PC offset " FMT_SINT
-    " (in instruction count)\n",
+    " with executable address %p and PC offset " FMT_SINT "\n",
     caller->name.buf,
     callee->name.buf,
     fun,
-    pc_off
+    (Sint)mul(pc_off, sizeof(Instr))
   ));
   return nullptr;
 }

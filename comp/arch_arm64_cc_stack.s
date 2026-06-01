@@ -1,5 +1,5 @@
 // `.include` doesn't support file-relative paths 😔.
-.include "comp/asm_generated.s"
+.include "generated/asm_generated.s"
 
 /*
 TODO find out if we can move this to `asm_gen.c` and share the number

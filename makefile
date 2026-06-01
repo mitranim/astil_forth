@@ -18,11 +18,11 @@ CLIB_DIR ?= clib
 COMP_DIR ?= comp
 GEN_DIR ?= generated
 ASM_GEN_SRC ?= $(COMP_DIR)/asm_gen.c
-ASM_GEN_OUT ?= $(COMP_DIR)/asm_generated.s
+ASM_GEN_OUT ?= $(GEN_DIR)/asm_generated.s
 MACH_GEN_SRC ?= mach/mach_exc.defs
 MACH_GEN_OUT ?= $(GEN_DIR)/mach_exc.c
 CLIB_SRC ?= $(shell find $(CLIB_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) )
-COMP_SRC ?= $(filter-out $(ASM_GEN_OUT),$(shell find $(COMP_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) ))
+COMP_SRC ?= $(shell find $(COMP_DIR) -type f \( -name '*.c' -or -name '*.h' -or -name '*.s' \) )
 ALL_SRC ?= $(CLIB_SRC) $(COMP_SRC)
 MAIN_SRC ?= $(COMP_DIR)/main.c
 MAIN_S ?= astil_s.exe
@@ -30,7 +30,7 @@ MAIN ?= astil.exe
 TEST_EXE ?= test.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
-WATCH_IGNORE ?= -i=$(GEN_DIR) -i=$(ASM_GEN_OUT)
+WATCH_IGNORE ?= -i=$(GEN_DIR)
 WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
 # WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q --no-vcs-ignore
 WATCH_COMP ?= $(WATCH) -e=c,h,s
@@ -176,6 +176,7 @@ test_s_w:
 # This is easier to define with `make run_c`, but in that case,
 # removing `--silent` or adding any logging breaks the recipe.
 $(ASM_GEN_OUT): $(ASM_GEN_SRC) $(ALL_SRC) $(COMP_DIR)/asm_gen.exe
+	mkdir -p $(GEN_DIR)
 	$(COMP_DIR)/asm_gen.exe > $(ASM_GEN_OUT)
 
 .PHONY: debug
