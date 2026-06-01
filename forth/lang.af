@@ -1449,6 +1449,8 @@ end
 \   end
 \   outside
 \
+\ `end` is generic: it pops one XT from the stack and executes it.
+\
 \ Similarly to Gforth, our conditionals use the Forth data stack
 \ to store control information at compile time. When terminated,
 \ they use this information to "fixup" reserved instructions.
@@ -1464,7 +1466,7 @@ fun: off_from_pc  { adr -- off } here { out } adr out - end \ For backward jumps
 fun: patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 end \ b <off>
 fun: patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 end \ b <off>
 
-fun: if_pop_from   { stack } ( C: prev_fun if_adr  -- )
+fun: if_pop_from { stack } ( C: prev_fun if_adr  -- )
   comp_barrier
   stack s>      { adr }
   adr off_to_pc { off }
@@ -1472,7 +1474,7 @@ fun: if_pop_from   { stack } ( C: prev_fun if_adr  -- )
   stack s> execute
 end
 
-fun: ifn_pop_from  { stack } ( C: prev_fun ifn_adr -- )
+fun: ifn_pop_from { stack } ( C: prev_fun ifn_adr -- )
   comp_barrier
   stack s>      { adr }
   adr off_to_pc { off }

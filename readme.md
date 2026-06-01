@@ -308,7 +308,7 @@ In reg-CC:
 
 ## Performance
 
-See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth vaguely approximates Clang C with `-O2`, while leaving Gforth in the dust. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
+See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth trounces VM interpreters, slightly outpaces other JITs, and vaguely approximates Clang C with `-O2`. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
 
 ## Limitations
 
@@ -372,9 +372,9 @@ Special _semantic_ roles get special _syntactic_ roles:
 - Unusual control-related words begin with `#` or use the `T{ }T` naming style.
 
 Examples:
-- Words which declare: `: :: let: var: to:` and more.
+- Words which declare: `fun: let: var: to:` and more.
   - Syntax highlighters are encouraged to scope the next word like a declaration.
-- Parsing words: `xt' postpone' compile'`.
+- Parsing words: `import' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
 - Unusual control words: `vargs{ }vargs`.
 - Well-known control words don't use special characters: `if else end ret` and several more. Syntax highlighters should hardcode them.

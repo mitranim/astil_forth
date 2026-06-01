@@ -203,6 +203,7 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 \ 2 1 extern: pthread_jit_write_with_callback_np
 
 \ Wraps `pthread_create`, throwing a descriptive error on failure.
+\ The caller must either `thread_join` or `pthread_detach`.
 fun: thread_spawn { fun inp -- thread }
   nil { attr }
   nil { thread }

@@ -3,7 +3,7 @@ import' std:io.af
 import' std:pthread.af
 
 \ Passed to `pthread_spawn` by raw instruction address.
-\ There are no hidden adapters between Forth and libc.
+\ We have no hidden adapters between Forth and libc.
 \
 \ When this word throws, it returns the exception in the first output
 \ register `x0` (because it has no other outputs). Libc takes exactly
@@ -18,7 +18,6 @@ fun: callback
   ( val -- err ) \ Real ABI signature.
 
   " [child] running and throwing" log lf
-
   " mock_error" throw
 end
 

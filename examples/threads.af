@@ -1,0 +1,84 @@
+import' std:lang.af
+import' std:io.af
+import' std:pthread.af
+
+\ Passed to `pthread_spawn` by raw instruction address.
+\ We have no hidden adapters between Forth and libc.
+fun: callback { inout -- err }
+
+  \ No implicit exceptions here.
+  [ true catches ]
+
+  inout @ { path }
+  " [child] checking length of `%s`..." path logf lf
+
+  Fstat alloca        { stat }
+  path stat path_stat { err } \ Automatic catch; zero-cost.
+
+  err ifn
+    \ Store the output back.
+    stat Fstat_size @ inout !
+  end
+
+  \ `main` will check this.
+  err
+end
+
+fun: main
+  \ No implicit exceptions here either.
+  [ true catches ]
+
+  instr' callback  { instr  } \ Raw instruction address.
+  " missing/none"  { path0  } \ Input for `thread0`: missing file.
+  " forth/lang.af" { path1  } \ Input for `thread1`: existing file.
+  path0            { val0   } \ Input-output for `thread0`.
+  path1            { val1   } \ Input-output for `thread1`.
+  ref' val0        { inout0 }
+  ref' val1        { inout1 }
+
+  " [main] spawning thread 0..." log lf
+  instr inout0 thread_spawn { thread0 err0 }
+
+  " [main] spawning thread 1..." log lf
+  instr inout1 thread_spawn { thread1 err1 }
+
+  err0 if
+    " [main] unable to spawn thread 0: %s" err0 logf lf
+  end
+
+  err1 if
+    " [main] unable to spawn thread 1: %s" err1 logf lf
+  end
+
+  \ After spawning a thread, we must either join or detach it.
+  \ Since we've already disabled exceptions via `[ true catches ]`,
+  \ we have assurance that the current function doesn't accidentally
+  \ terminate before we're done with both thread handles.
+
+  err0 ifn
+    " [main] waiting on thread 0..." log lf
+    thread0 thread_join { err0 join_err }
+
+    join_err if
+      " [main] when joining with thread 0: %s" join_err logf lf
+    else err0 elif
+      " [main] error from thread 0: %s" err0 logf lf
+    else
+      " [main] result from thread 0: length of `%s`: %zd" path0 val0 logf lf
+    end
+  end
+
+  err1 ifn
+    " [main] waiting on thread 1..." log lf
+    thread1 thread_join { err1 join_err }
+
+    join_err if
+      " [main] when joining with thread 1: %s" join_err logf lf
+    else err1 elif
+      " [main] error from thread 1: %s" err1 logf lf
+    else
+      " [main] result from thread 1: length of `%s`: %zd" path1 val1 logf lf
+    end
+  end
+end
+main
