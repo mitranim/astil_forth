@@ -50,6 +50,8 @@ I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest 
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can consist of obvious stuff you'd expect, and can learn from.
 
+This system is human-made. Some benchmark files were bot-translated.
+
 ## Show me the code!
 
 IO and conditionals:
@@ -60,8 +62,7 @@ import' std:lang.af
 fun: main
   " hello world!" log lf
 
-  10
-  if
+  10 if
     " branch 0" log lf
   else 20 elif
     " branch 1" log lf
@@ -87,16 +88,20 @@ fun: asm_add_reg { Xd Xn Xm -- instr }
 end
 
 \ add x0, x0, x1
-fun: + { i0 i1 -- i2 } [
-  0                 comp_clobber
-  0 0 1 asm_add_reg comp_instr
-  1                 comp_args_set
-] end
+fun: + { i0 i1 -- i2 }
+  [
+    0                 comp_clobber
+    0 0 1 asm_add_reg comp_instr
+    1                 comp_args_set
+  ]
+end
 
 \ brk 666
-fun: abort [
-  0b110_101_00_001_0000001010011010_000_00 comp_instr
-] end
+fun: abort
+  [
+    0b110_101_00_001_0000001010011010_000_00 comp_instr
+  ]
+end
 ```
 
 Easy AOT compilation; can be used from inside a program, or via CLI flags:
@@ -124,7 +129,7 @@ Most languages ship with a smart, powerful, all-knowing compiler with intrinsic 
 
 On top of that, most languages isolate you from the CPU, or even from the OS, from the get-go. Instead of giving you access to the foundations, and providing a convenient pre-built ramp to the high clouds, _all you get_ is high clouds.
 
-Astil Forth explores the opposite direction. The interpreter / compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language.
+Astil Forth explores the opposite direction. The interpreter / compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language. See [`./forth/lang.af`](./forth/lang.af).
 
 This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth also implements conditionals without compiler support, and makes them much nicer to use, but uses more code.)
 
