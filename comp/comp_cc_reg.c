@@ -304,7 +304,7 @@ static Err err_args_partial(
     "in " FMT_QUOTED
     ": %s: prior values were partially consumed by assignments: " FMT_SINT
     " of " FMT_SINT
-    "; hint: either use more assignments, or use `--` inside braces to discard unused values",
+    "; hint: either assign to more locals, or use `--` inside braces to discard unused values",
     caller,
     action,
     low,
@@ -736,6 +736,16 @@ static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
 }
 
 static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) {
+  const auto ctx = &comp->ctx;
+
+  if (ctx->arg_low) {
+    Sym *sym;
+    try(comp_require_current_sym(comp, &sym));
+    return err_args_partial(
+      sym->name.buf, "unable to push immediate value", ctx->arg_low, ctx->arg_len
+    );
+  }
+
   try(asm_validate_input_param_reg(reg));
   try(comp_clobber_reg(comp, reg));
 
@@ -745,7 +755,6 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) 
   asm_append_imm_to_reg(comp, reg, imm, has_load);
 
   const auto ceil = instrs->len;
-  const auto ctx  = &comp->ctx;
 
   aver(!ctx->reg_vals[reg].type);
 

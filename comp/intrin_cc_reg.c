@@ -48,14 +48,15 @@ static Err intrin_brace(Interp *interp) {
     try(read_word(read));
     const auto word = read->word;
 
-    if (str_eq(&word, "}")) return nullptr;
-    if (str_eq(&word, "--")) break;
+    if (str_eq(&word, "--")) goto discard;
+    if (str_eq(&word, "}")) goto validate;
 
     Local *loc;
     try(comp_local_get_or_make(comp, word, &loc));
     try(comp_append_local_set_next(comp, loc));
   }
 
+discard:
   // Treat the remaining arguments as consumed, and the remaining words after
   // `--` as comments. This allows to use `--` to discard unused values, and
   // makes it syntactically consistent with parameter lists.
@@ -64,7 +65,25 @@ static Err intrin_brace(Interp *interp) {
     try(read_word(read));
     if (str_eq(&read->word, "}")) return nullptr;
   }
-  return nullptr;
+  unreachable();
+
+validate:
+  const auto low = comp->ctx.arg_low;
+  if (!low) return nullptr;
+
+  const auto len = comp->ctx.arg_len;
+  assert(low < len);
+
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
+  return errf(
+    "in " FMT_QUOTED
+    ": arity mismatch: assigned %d of %d prior values; hint: either assign to more locals, or use `--` inside braces to discard unused values",
+    sym->name.buf,
+    low,
+    len
+  );
 }
 
 static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
