@@ -25,7 +25,7 @@ import' std:pthread.af
 \ - Unwinding the stack.
 \ - Randomly clobbering callee-saved registers.
 \ - Otherwise interfering with the caller in any way.
-: callback
+fun: callback
   { inout -- }   \ Official signature.
   ( val -- err ) \ Real ABI signature.
 
@@ -37,9 +37,9 @@ import' std:pthread.af
 
   \ Store the output back.
   stat Fstat_size @ inout !
-;
+end
 
-: main
+fun: main
   instr' callback  { instr } \ Raw instruction address.
   " missing/none"  { path0 } \ Input for `thread0`: missing file.
   " forth/lang.af" { path1 } \ Input for `thread1`: existing file.
@@ -69,5 +69,5 @@ import' std:pthread.af
   else
     " [main] result from thread 1: size of `%s`: %zd" path1 val1 logf lf
   end
-;
+end
 main

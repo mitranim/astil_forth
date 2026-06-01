@@ -71,14 +71,28 @@ static Err intrin_colon_colon(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_colon_named(Interp *interp) {
+static Err intrin_fun(Interp *interp) {
+  try(interp_begin_definition(interp));
+  try(interp_word_begin(interp, WORDLIST_EXEC, interp->reader->word));
+  try(interp_push_semicolon(interp));
+  return nullptr;
+}
+
+static Err intrin_fun_comp(Interp *interp) {
+  try(interp_begin_definition(interp));
+  try(interp_word_begin(interp, WORDLIST_COMP, interp->reader->word));
+  try(interp_push_semicolon(interp));
+  return nullptr;
+}
+
+static Err intrin_define_fun(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
   try(interp_word_begin(interp, WORDLIST_EXEC, name));
   return nullptr;
 }
 
-static Err intrin_colon_colon_named(Interp *interp) {
+static Err intrin_define_fun_comp(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
   try(interp_word_begin(interp, WORDLIST_COMP, name));
@@ -286,7 +300,7 @@ static Err intrin_comp_extern_adr(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_extern_proc(Interp *interp) {
+static Err intrin_extern_fun(Interp *interp) {
   const auto ints = &interp->ints;
 
   Sint out_len;
@@ -296,7 +310,7 @@ static Err intrin_extern_proc(Interp *interp) {
 
   const char *name;
   try(interp_pop_str(interp, &name, nullptr));
-  try(interp_extern_proc(interp, name, inp_len, out_len));
+  try(interp_extern_fun(interp, name, inp_len, out_len));
   return nullptr;
 }
 
@@ -326,14 +340,7 @@ static Err intrin_inline_word(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_execute(Interp *interp) {
-  Sint ptr;
-  Sym *sym;
-  try(int_stack_pop(&interp->ints, &ptr));
-  try(interp_sym_by_ptr(interp, ptr, &sym));
-  try(interp_call_sym(interp, sym));
-  return nullptr;
-}
+static Err intrin_execute(Interp *interp) { return intrin_end(interp); }
 
 static Err intrin_comp_named_local(Interp *interp) {
   const char *name;

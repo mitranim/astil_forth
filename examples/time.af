@@ -1,7 +1,7 @@
 import' std:lang.af
 import' std:time.af
 
-: main
+fun: main
   \ Allocate a C-compatible struct on the system stack,
   \ and get the address. We can now use it with `libc`.
   Timespec alloca { inst }
@@ -18,5 +18,5 @@ import' std:time.af
 
   " CPU  elapsed: " log clock log_int lf
   " Unix seconds: " log nil time log_int lf
-;
+end
 main

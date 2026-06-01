@@ -106,14 +106,26 @@ static Err intrin_colon_colon(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_colon_named(Sint buf, Sint len, Interp *interp) {
+static Err intrin_fun(Interp *interp) {
+  try(intrin_colon(interp));
+  try(interp_push_semicolon(interp));
+  return nullptr;
+}
+
+static Err intrin_fun_comp(Interp *interp) {
+  try(intrin_colon_colon(interp));
+  try(interp_push_semicolon(interp));
+  return nullptr;
+}
+
+static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_word_begin(interp, WORDLIST_EXEC, name));
   return nullptr;
 }
 
-static Err intrin_colon_colon_named(Sint buf, Sint len, Interp *interp) {
+static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_word_begin(interp, WORDLIST_COMP, name));
@@ -282,11 +294,11 @@ static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_extern_proc(
+static Err intrin_extern_fun(
   Sint buf, Sint len, Sint inp_len, Sint out_len, Interp *interp
 ) {
   try(interp_validate_string(buf, len));
-  try(interp_extern_proc(interp, (const char *)buf, inp_len, out_len));
+  try(interp_extern_fun(interp, (const char *)buf, inp_len, out_len));
   return nullptr;
 }
 
@@ -712,7 +724,7 @@ static const USED auto INTRIN_DEBUG_CTX = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_DEBUG_CTX_IMM = (Sym){
+static const USED auto INTRIN_DEBUG_CTX_COMP = (Sym){
   .name.buf  = "#debug_ctx",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_debug_ctx,

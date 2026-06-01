@@ -4,7 +4,7 @@
     "keys": ["'"],
     "command": "insert",
     "args": {"characters": "'"},
-    "context": [{"key": "selector", "operand": "source.forth"}],
+    "context": [{"key": "selector", "operand": "source.astil_forth"}],
   },
   // More consistent auto-pairing of double quotes.
   // Sublime's default is too conservative for Forth.
@@ -13,73 +13,11 @@
     "command": "insert_snippet",
     "args": {"contents": "\"$0\""},
     "context": [
-      {"key": "selector", "operand": "source.forth"},
+      {"key": "selector", "operand": "source.astil_forth"},
       {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
       {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
       {"key": "following_text", "operator": "not_regex_contains", "operand": "^\"", "match_all": true},
       {"key": "preceding_text", "operator": "not_regex_contains", "operand": "\"$", "match_all": true},
-    ],
-  },
-  // Inserts `:` and `;` together, making it easier to create words.
-  {
-    "keys": ["primary+shift+;"],
-    "command": "insert_snippet",
-    "args": {"contents": ": $0\n;"},
-    "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
-      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
-      {"key": "preceding_text", "operator": "regex_match", "operand": "^", "match_all": true},
-      {"key": "following_text", "operator": "regex_match", "operand": "$", "match_all": true},
-    ],
-  },
-  {
-    "keys": ["primary+shift+;"],
-    "command": "insert",
-    "args": {"characters": ":"},
-    "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
-      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
-      {"key": "preceding_text", "operator": "regex_match", "operand": "^:+", "match_all": true},
-      {"key": "following_text", "operator": "regex_match", "operand": "$", "match_all": true},
-    ],
-  },
-  // Manually space-out parens.
-  {
-    "keys": [" "],
-    "command": "insert_snippet",
-    "args": {"contents": " $0 "},
-    "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
-      {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
-      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
-      {"key": "preceding_text", "operator": "regex_contains", "operand": "\\($", "match_all": true},
-      {"key": "following_text", "operator": "regex_contains", "operand": "^\\)", "match_all": true},
-    ],
-  },
-  // Manually space-out brackets.
-  {
-    "keys": [" "],
-    "command": "insert_snippet",
-    "args": {"contents": " $0 "},
-    "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
-      {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
-      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
-      {"key": "preceding_text", "operator": "regex_contains", "operand": "\\[$", "match_all": true},
-      {"key": "following_text", "operator": "regex_contains", "operand": "^\\]", "match_all": true},
-    ],
-  },
-  // Manually space-out braces.
-  {
-    "keys": [" "],
-    "command": "insert_snippet",
-    "args": {"contents": " $0 "},
-    "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
-      {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
-      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
-      {"key": "preceding_text", "operator": "regex_contains", "operand": "{$", "match_all": true},
-      {"key": "following_text", "operator": "regex_contains", "operand": "^}", "match_all": true},
     ],
   },
   // Automatically space-out parens.
@@ -88,7 +26,7 @@
     "command": "insert_snippet",
     "args": {"contents": "( $0 )"},
     "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
       {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
       {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
       {"key": "preceding_text", "operator": "not_regex_contains", "operand": "\\S$", "match_all": true},
@@ -101,7 +39,7 @@
     "command": "insert_snippet",
     "args": {"contents": "[ $0 ]"},
     "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
       {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
       {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
       {"key": "preceding_text", "operator": "not_regex_contains", "operand": "\\S$", "match_all": true},
@@ -114,11 +52,61 @@
     "command": "insert_snippet",
     "args": {"contents": "{ $0 }"},
     "context": [
-      {"key": "selector", "operator": "equal", "operand": "source.forth - string - comment"},
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
       {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
       {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
       {"key": "preceding_text", "operator": "not_regex_contains", "operand": "\\S$", "match_all": true},
       {"key": "following_text", "operator": "not_regex_contains", "operand": "^\\S", "match_all": true},
+    ],
+  },
+  // Manually space-out parens.
+  {
+    "keys": [" "],
+    "command": "insert_snippet",
+    "args": {"contents": " $0 "},
+    "context": [
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
+      {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
+      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
+      {"key": "preceding_text", "operator": "regex_contains", "operand": "\\($", "match_all": true},
+      {"key": "following_text", "operator": "regex_contains", "operand": "^\\)", "match_all": true},
+    ],
+  },
+  // Manually space-out brackets.
+  {
+    "keys": [" "],
+    "command": "insert_snippet",
+    "args": {"contents": " $0 "},
+    "context": [
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
+      {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
+      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
+      {"key": "preceding_text", "operator": "regex_contains", "operand": "\\[$", "match_all": true},
+      {"key": "following_text", "operator": "regex_contains", "operand": "^\\]", "match_all": true},
+    ],
+  },
+  // Manually space-out braces.
+  {
+    "keys": [" "],
+    "command": "insert_snippet",
+    "args": {"contents": " $0 "},
+    "context": [
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
+      {"key": "setting.auto_match_enabled", "operator": "equal", "operand": true},
+      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
+      {"key": "preceding_text", "operator": "regex_contains", "operand": "{$", "match_all": true},
+      {"key": "following_text", "operator": "regex_contains", "operand": "^}", "match_all": true},
+    ],
+  },
+  {
+    "keys": ["primary+shift+;"],
+    "command": "insert_snippet",
+    "args": {"contents": "fun: $0\nend"},
+    "context": [
+      {"key": "selector", "operator": "equal", "operand": "source.astil_forth - string - comment"},
+      {"key": "selection_empty", "operator": "equal", "operand": true, "match_all": true},
+      {"key": "preceding_text", "operator": "regex_match", "operand": "^", "match_all": true},
+      {"key": "following_text", "operator": "regex_match", "operand": "$", "match_all": true},
     ],
   },
 ]

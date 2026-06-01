@@ -8,23 +8,23 @@ import' std:lang.af
 \ x16 = 4 -> XNU write syscall.
 \
 \ Inspired by Cosmopolitan Libc: https://justine.lol/cosmopolitan.
-: sys_write { fd str len } [
+fun: sys_write { fd str len } [
   0                comp_clobber \ x0 clobber = kernel return value.
   8                comp_clobber \ x8 clobber = Linux sysno.
   8 64 asm_mov_imm comp_instr   \ mov x8, 64
   16 4 asm_mov_imm comp_instr   \ mov x16, 4
        asm_svc     comp_instr   \ svc 666
-] ;
+] end
 
 flush
 STDOUT s" hello world! (using syscall)" sys_write
 STDOUT CRLF 2 sys_write
 
-: bool_str { val -- str }
+fun: bool_str { val -- str }
   val
   if " true" ret end
   " false"
-;
+end
 
 " bool_str(false): " log false bool_str log lf
 " bool_str(true):  " log true  bool_str log lf

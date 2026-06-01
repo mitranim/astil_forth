@@ -1,6 +1,6 @@
 import' std:lang.af
 
-: reverse { str len }
+fun: reverse { str len }
   str           { floor }
   str len + dec { ceil }
 
@@ -13,14 +13,14 @@ import' std:lang.af
     ++:   floor
     --:   ceil
   end
-;
+end
 
-: main
+fun: main
   s" 0123456789abcdef" { str len }
   str log lf
   str len reverse
   str log lf
-;
+end
 
 main
 \ fedcba9876543210

@@ -9,7 +9,7 @@
 \ Johns Hopkins University/Applied Physics Laboratory.
 
 \ MM forth2c doesn't have it !
-: mybounds  over + swap ;
+: mybounds over + swap ;
 
 \ 1 cells Constant cell
 
@@ -68,7 +68,7 @@ align create ELEMS elements cells allot
 \   verify-list
 \ ;
 
-: main  ( -- )
+: main ( -- )
   ELEMS elements bubble-sort
   \ bubble-sort-with-flag
 ;

@@ -6,7 +6,7 @@ import' std:lang_s.af
 8192        let: LEN
 LEN         mem: FLAGS
 
-: find_prime { flags len -- num }
+fun: find_prime { flags len -- num }
   flags len 1 fill
 
   0 3 ( num step )
@@ -24,21 +24,21 @@ LEN         mem: FLAGS
     2 +
   end
   drop
-;
+end
 
-: main
+fun: main
   \ find_prime .
 
   RUNS for
     FLAGS LEN find_prime drop
   end
-;
+end
 main
 
 (
 Runs notably slower.
 
-: find_prime
+fun: find_prime
   FLAGS LEN 1 fill
 
   0 3 { num step }
@@ -58,5 +58,5 @@ Runs notably slower.
   end
 
   num
-;
+end
 )

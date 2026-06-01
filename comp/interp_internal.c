@@ -622,7 +622,7 @@ static Err interp_extern_adr(Interp *interp, const char *name) {
   return nullptr;
 }
 
-static Err interp_extern_proc(
+static Err interp_extern_fun(
   Interp *interp, const char *name, Sint inp_len, Sint out_len
 ) {
   void *ext_adr;
@@ -746,4 +746,10 @@ static Err interp_validate_string(Sint buf, Sint len) {
   try(interp_validate_data_len(len));
   aver((Ind)len == strlen((const char *)buf));
   return nullptr;
+}
+
+static Err interp_push_semicolon(Interp *interp) {
+  const auto sym = dict_get(&interp->dict_comp, ";");
+  if (sym) return int_stack_push(&interp->ints, (Sint)sym);
+  return err_str("missing word `;`");
 }

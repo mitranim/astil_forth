@@ -15,7 +15,7 @@ import' std:pthread.af
 
 \ Passed to `pthread_spawn` by raw instruction address.
 \ There are no hidden adapters between Forth and libc.
-: callback { inout -- err }
+fun: callback { inout -- err }
 
   \ No implicit exceptions here.
   [ true catches ]
@@ -33,9 +33,9 @@ import' std:pthread.af
 
   \ `main` will check this.
   err
-;
+end
 
-: main
+fun: main
   \ No implicit exceptions here either.
   [ true catches ]
 
@@ -84,5 +84,5 @@ import' std:pthread.af
       " [main] result from thread 1: size of `%s`: %zd" path1 val1 logf lf
     end
   end
-;
+end
 main

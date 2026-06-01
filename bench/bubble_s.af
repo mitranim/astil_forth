@@ -2,41 +2,41 @@ import' std:lang_s.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-8192             let:   LEN
-LEN              cells: LIST
+8192 let:   LEN
+LEN  cells: LIST
 
-: list_ceil { list len -- ceil } len cells list + ;
+fun: list_ceil { list len -- ceil } len cells list + end
 
-: pseudo_random { seed -- seed val }
-  seed 1309 * 13849 + 65535 and { val }
-  val val
-;
+fun: pseudo_random { seed -- val }
+  seed 1309 * 13849 + 65535 and
+end
 
-: list_init { list len -- }
+fun: list_init { list len -- }
   74755 { seed }
   list len list_ceil list cell
   +loop: ptr
-    seed pseudo_random { seed val }
-    val ptr !
+    seed pseudo_random { seed }
+    seed ptr !
   end
-;
+end
 
-: list_dump { list len -- }
+fun: list_dump { list len -- }
   list len list_ceil list cell
   +loop: ptr
-    ptr @ .
+    ptr @ log_int space
   end
-;
+  lf
+end
 
-: list_verify { list len -- }
+fun: list_verify { list len -- }
   list len list_ceil -cell
   list cell
   +loop: ptr
     ptr @2 > if " [bubble] not sorted" throw end
   end
-;
+end
 
-: bubble { list len -- }
+fun: bubble { list len -- }
   list len list_ceil list cell
   -loop: ceil_ptr
     ceil_ptr list cell
@@ -44,16 +44,16 @@ LEN              cells: LIST
       ptr @2 > if ptr @2 swap ptr !2 end
     end
   end
-;
+end
 
-: bubble_sort { list len -- }
+fun: bubble_sort { list len -- }
   list len list_init
   list len bubble
   \ list len list_dump
   list len list_verify
-;
+end
 
-\ : bubble_with_flag ( -- )
+\ fun: bubble_with_flag ( -- )
 \   CEIL LIST cell
 \   -loop: ceil_ptr
 \     true to: flag
@@ -69,15 +69,15 @@ LEN              cells: LIST
 \
 \     flag if leave end
 \   end
-\ ;
+\ end
 
-\ : addrs
+\ fun: addrs
 \   " LIST: " log LIST .sc
 \   " CEIL: " log CEIL .sc
-\ ;
+\ end
 
-: main
+fun: main
   LIST LEN bubble_sort
   " [bubble] done" log lf
-;
+end
 main

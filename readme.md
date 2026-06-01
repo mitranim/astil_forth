@@ -57,7 +57,7 @@ IO and conditionals:
 ```forth
 import' std:lang.af
 
-: main
+fun: main
   " hello world!" log lf
 
   10
@@ -72,7 +72,7 @@ import' std:lang.af
   12 0 +for: ind
     " current number: %zd" ind logf lf
   end
-;
+end
 
 main
 ```
@@ -81,31 +81,31 @@ Easy self-assembly (Arm64):
 
 ```forth
 \ add Xd, Xn, Xm
-: asm_add_reg { Xd Xn Xm -- instr }
+fun: asm_add_reg { Xd Xn Xm -- instr }
   Xd Xn Xm asm_pattern_arith_reg
   0b1_0_0_01011_00_0_00000_000000_00000_00000 or
-;
+end
 
 \ add x0, x0, x1
-: + { i0 i1 -- i2 } [
+fun: + { i0 i1 -- i2 } [
   0                 comp_clobber
   0 0 1 asm_add_reg comp_instr
   1                 comp_args_set
-] ;
+] end
 
 \ brk 666
-: abort [
+fun: abort [
   0b110_101_00_001_0000001010011010_000_00 comp_instr
-] ;
+] end
 ```
 
 Easy AOT compilation; can be used from inside a program, or via CLI flags:
 
 ```forth
-: main { -- exit }
+fun: main { -- exit }
   " hello world!" log lf
   0
-;
+end
 
 xt' main           \ Reference to the entry point.
 " out.exe"         \ Where to put the executable.
@@ -113,6 +113,8 @@ compile_executable
 
 \ Run `./out.exe` in your shell to print the message.
 ```
+
+Traditional style `: word ;` is also availble, but `fun: word end` is preferred for stylistic reasons and consistency with control structures, which are also terminated with `end`.
 
 ## Why
 
@@ -152,7 +154,7 @@ Fun note. AOT compilation in Astil Forth might be the "fastest" of any language,
 
 ## Easy C interop
 
-It's trivial to declare and call external procedures, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang.af`](./forth/lang.af) and [`./forth/lang_s.af`](./forth/lang_s.af).
+It's trivial to declare and call external functions, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang.af`](./forth/lang.af) and [`./forth/lang_s.af`](./forth/lang_s.af).
 
 The reg-CC version of Astil Forth, the default one, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
 
@@ -161,23 +163,23 @@ The reg-CC version of Astil Forth, the default one, uses the native calling conv
 1 0 extern: puts
 2 1 extern: strcmp
 
-: main
+fun: main
   " hello world!" puts
   " one" " two" strcmp .
-;
+end
 main
 ```
 
 ## Exceptions done right: ABI compatibility
 
-When using the register-based calling convention, you can _opt out of exceptions_ inside any procedure. This reveals all error values, transforming them from exceptions. It's an implicit "catch" with procedure-level granularity.
+When using the register-based calling convention, you can _opt out of exceptions_ inside any function. This reveals all error values, transforming them from exceptions. It's an implicit "catch" with function-level granularity.
 
 ```forth
-: word [ true catches ]
+fun: word [ true catches ]
   word0 {           err }
   word1 { val0      err }
   word2 { val1 val2 err }
-;
+end
 ```
 
 Under the hood, an exception is a Go-style error value, implicitly appended to the success outputs. By default it's invisible and treated as an exception. When you "catch", the compiler reveals the error value, and skips the instructions it would normally insert to handle the error. A call becomes Go-style, as shown above. The caller has to check the error.
@@ -278,7 +280,7 @@ Should be usable as a library in another C/C++ program. The "main" file is only 
 
 In this codebase, all C files directly include each other by relative paths, with `#pragma once`. It should be possible to simply clone the repo into a submodule and include `comp/interp.c` which provides the top-level API and includes all other files it needs.
 
-Many procedure names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every procedure is declared as `static`.
+Many function names are "namespaced", but many other symbols are not; you may need to create a separate translation unit to avoid pollution. Almost every function is declared as `static`.
 
 ## Tricks and optimizations
 
@@ -286,7 +288,7 @@ I consider this a "mildly optimizing" compiler. It maintains the convenience of 
 
 In both reg-CC and stack-CC:
 - Avoid emitting unnecessary prologue and epilogue.
-- Inline small leaf procedures.
+- Inline small leaf functions.
 - Delay undecidable instructions, patch them in a fixup pass.
   - Used for prologue, `ret try throw recur`, and more.
 
@@ -309,7 +311,7 @@ See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC versi
 
 A core premise of this system is forward-only single-pass compilation. This keeps it simple, while still allowing a degree of low-hanging optimizations, such as basic register allocation and inlining. Some instructions are reserved in the first pass, and patched in a fixup post-pass.
 
-This approach is at odds with most advanced compiler optimizations, which rely on building and analyzing intermediary representations before assembling. Complex compilers end up with multiple IR levels, and multiple passes. Complexity interferes with self-assembly; simply vomiting instructions into the procedure body no longer suffices; the code must now emit the first-pass IR instead of regular instructions.
+This approach is at odds with most advanced compiler optimizations, which rely on building and analyzing intermediary representations before assembling. Complex compilers end up with multiple IR levels, and multiple passes. Complexity interferes with self-assembly; simply vomiting instructions into the function body no longer suffices; the code must now emit the first-pass IR instead of regular instructions.
 
 I had a go, and bounced off the complexity. How to keep an optimizing compiler simple?
 
@@ -329,6 +331,14 @@ Numeric literals are unambiguous: anything that begins with `[+-]?\d` must be a 
 
 Non-decimal numeric literals are denoted with `0b 0o 0x`. Radix prefixes are case-sensitive. Numbers may contain cosmetic `_` separators. There is no `hex` mode. There is no support for `& # % $` prefixes.
 
+Words are preferred over punctuation (except delimiters):
+
+```
+' -> xt'
+: -> fun:
+; -> end
+```
+
 Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
@@ -337,7 +347,7 @@ More ergonomic control flow structures:
 - Any amount of `else elif` is terminated with a single `end`.
 - Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
-Because the system uses native procedure calls, there is no return stack; see below.
+Because the system uses native function calls, there is no return stack; see below.
 
 There is no `state` or `does>`. Instead, the system uses two wordlists:
 - "exec" — execution-time words; not immediate.
@@ -349,7 +359,7 @@ Exceptions are strings (error messages) rather than numeric codes.
 
 Booleans are `0 1` rather than `0 -1`.
 
-Modifier words like `catches` and `comp_only` can only be used inside colon definitions.
+Modifier words like `catches` and `comp_only` can only be used inside function definitions.
 
 Special _semantic_ roles get special _syntactic_ roles:
 - Word-parsing words which declare end with `:`.

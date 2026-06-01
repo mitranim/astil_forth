@@ -6,11 +6,11 @@ import' std:lang.af
 8192 let: CAP
 CAP  mem: FLAGS
 
-: flags_ceil { flags cap -- adr } flags cap + ;
+fun: flags_ceil { flags cap -- adr } flags cap + end
 
-: reset { flags cap } flags cap 1 fill ;
+fun: reset { flags cap } flags cap 1 fill end
 
-: find_prime { flags cap -- num }
+fun: find_prime { flags cap -- num }
   flags cap reset
 
   flags cap flags_ceil 0 3 { ceil num step }
@@ -30,9 +30,9 @@ CAP  mem: FLAGS
   end
 
   num
-;
+end
 
-: main { -- exit }
+fun: main { -- exit }
   \ FLAGS CAP find_prime log_int lf
 
   RUNS for
@@ -40,5 +40,5 @@ CAP  mem: FLAGS
   end
 
   0
-;
+end
 main

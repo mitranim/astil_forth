@@ -6,24 +6,24 @@ import' ./lang.af
 \
 \ Example tests:
 \
-\   T{ 10 20    <T> 10 20    } \ OK
-\   T{ 10 20    <T> 10 20 30 } \ fail
-\   T{ 10 20 30 <T> 10 20    } \ fail
+\   T{ 10 20    <T> 10 20    }T \ OK
+\   T{ 10 20    <T> 10 20 30 }T \ fail
+\   T{ 10 20 30 <T> 10 20    }T \ fail
 \
 \ Internal note. In intepretation, testing uses the default stack,
 \ provided by the interpreter (`STACK`). In compiled code, testing
 \ uses its own custom stack for compatibility with AOT compilation.
 
-: testing_stack_eq { len0 len1 len stk -- equal }
+fun: testing_stack_eq { len0 len1 len stk -- equal }
   len 0 +for: ind
     ind len0 + stk stack_at @ { one }
     ind len1 + stk stack_at @ { two }
     one two <> if false ret end
   end
   true
-;
+end
 
-: testing_stack_log { len0 len1 len2 stk }
+fun: testing_stack_log { len0 len1 len2 stk }
   " T{ " elog
 
   len1 len0 +for: ind
@@ -39,7 +39,7 @@ import' ./lang.af
   end
 
   " }T" elog elf
-;
+end
 
 \ ## Interpretation-mode test routines (top level)
 
@@ -47,19 +47,19 @@ import' ./lang.af
 0 var: T_ST_LEN_0 \ Stack length at `T{`.
 0 var: T_ST_LEN_1 \ Stack length at `<T>`.
 
-: testing_interp_reset { stk }
+fun: testing_interp_reset { stk }
   T_ST_LEN_0 @ stk stack_len_set
   T_ST_LEN_0 off!
   T_ST_LEN_1 off!
-;
+end
 
-: T{  STACK stack_len T_ST_LEN_0 ! ;
-: <T> STACK stack_len T_ST_LEN_1 ! ;
+fun: T{  STACK stack_len T_ST_LEN_0 ! end
+fun: <T> STACK stack_len T_ST_LEN_1 ! end
 
 \ 10 20   T{   30 40   <T>   50 60   }T
 \         ^ len0 = 2   ^ len1 = 4    ^ len2 = 6
 \                      ^ rel0 = 2    ^ rel1 = 2
-: }T
+fun: }T
   STACK         { stk  }
   stk stack_len { len2 } \ Length at `}T`.
   T_ST_LEN_1 @  { len1 } \ Stack length at `<T>`.
@@ -83,7 +83,7 @@ import' ./lang.af
   stk testing_interp_reset
   " test failure" throw
   unreachable
-;
+end
 
 \ ## Compilation-mode test routines (inside words)
 
@@ -106,19 +106,19 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
 \ valid again.
 \
 \ TODO: general solution for similar cases.
-: testing_stack_init_aot
+fun: testing_stack_init_aot
   has_interp if ret end
   TEST_STACK_INITED_AOT @ if ret end
   32 TEST_STACK stack_init
   TEST_STACK_INITED_AOT on!
-;
+end
 
-: testing_compiled_reset
+fun: testing_compiled_reset
   TEST_STACK stack_clear
   TEST_ARG_LEN off!
-;
+end
 
-: testing_compile_push_args { len }
+fun: testing_compile_push_args { len }
   len ifn ret end
 
   len     { stk_reg }
@@ -130,9 +130,9 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
   TEST_STACK stk_reg         comp_page_addr
   len        stk_reg top_reg comp_args_to_stack
   0                          comp_args_set
-;
+end
 
-:: T{
+fun_comp: T{
   " when calling `T{`" 0 comp_args_valid
 
   TEST_ARG_LEN @ if
@@ -146,16 +146,16 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
   ok if false catches end
   compile' testing_stack_init_aot
   ok if true catches end
-;
+end
 
-:: <T>
+fun_comp: <T>
   comp_args_get { len }
   len testing_compile_push_args
   len TEST_ARG_LEN !
-;
+end
 
 \ Modified from `}T` to be more suitable for compiled code in reg-CC.
-: testing_compiled_end { arg_len } [ true catches ]
+fun: testing_compiled_end { arg_len } [ true catches ]
   TEST_STACK  { stk  }
   0           { len0 } \ T{
   arg_len     { len1 } \ <T>
@@ -173,9 +173,9 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
   testing_compiled_reset
   " test failure" throw
   unreachable
-;
+end
 
-:: }T
+fun_comp: }T
   TEST_ARG_LEN @ { len }
   TEST_ARG_LEN off!
 
@@ -190,4 +190,4 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
   ok if false catches end
   compile' testing_compiled_end
   ok if true catches end
-;
+end

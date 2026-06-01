@@ -13,11 +13,11 @@ import' ./http_util.af
 128  let: MAX_CONN
 4096 buf: READ_BUF
 
-: write_opt { fd buf len } fd buf len write { -- } ;
-: write_eol { fd }         fd CRLF 2 write_opt     ; \ \r\n
+fun: write_opt { fd buf len } fd buf len write { -- } end
+fun: write_eol { fd }         fd CRLF 2 write_opt     end \ \r\n
 
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
-: read_req { conn buf cap -- len }
+fun: read_req { conn buf cap -- len }
   0 { len }
 
   loop
@@ -35,9 +35,9 @@ import' ./http_util.af
   end
 
   len
-;
+end
 
-: respond_conn { conn }
+fun: respond_conn { conn }
   READ_BUF              { buf cap }
   conn buf cap read_req { len }
 
@@ -51,9 +51,9 @@ import' ./http_util.af
   conn buf len               write_opt conn write_eol
 
   " [srv] echoed request back to client" elog elf
-;
+end
 
-: handle_conn { conn }
+fun: handle_conn { conn }
   \ Switch into "C mode" where exceptions are disabled.
   \ Words which "throw" really just return an error as the last output.
   [ true catches ]
@@ -69,13 +69,13 @@ import' ./http_util.af
   conn close is_err if
     errno " [srv] unable to close connection" os_err elog elf
   end
-;
+end
 
-: main
+fun: main
   " 2345"                  { port }
   instr' handle_conn       { handler }
   port MAX_CONN net_listen { sock }
   sock handler net_accept_loop
   sock sock_close \ Unreachable.
-;
+end
 main

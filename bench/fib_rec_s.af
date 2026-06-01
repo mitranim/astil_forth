@@ -1,14 +1,14 @@
 import' std:lang_s.af
 
-: fib { ind -- out }
+fun: fib { ind -- out }
   ind 1 <= if 1 ret end
   ind 1 - recur
   ind 2 - recur
   +
-;
+end
 
-: main
+fun: main
   36 fib
   \ " fib(36): " log log_int lf
-;
+end
 main

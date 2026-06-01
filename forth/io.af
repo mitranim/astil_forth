@@ -102,7 +102,7 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 3 1 extern: writev  ( fdes iov iov_len     -- len )
 4 1 extern: pwritev ( fdes iov iov_len off -- len )
 
-\ Note: `fread`, `fwrite` and some other procs are defined in `lang.af`.
+\ Note: `fread`, `fwrite` and some other funcs are defined in `lang.af`.
 2 1 extern: fopen    ( path mode      -- file )
 2 1 extern: fdopen   ( fdes mode      -- file )
 3 1 extern: freopen  ( path mode file -- file )
@@ -128,33 +128,33 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 
 \ TODO: translate `<unistd.h>`.
 
-: io_err { action path -- str }
+fun: io_err { action path -- str }
   errno { code }
   code strerror { msg }
   msg if
     " unable to %s `%s`; code: %d; msg: %s" action path code msg errf ret
   end
   " unable to %s `%s`; code: %s" action path code errf
-;
+end
 
-: fd_stat { fd path stat_adr }
+fun: fd_stat { fd path stat_adr }
   fd stat_adr fstat
   if " stat" path io_err throw end
-;
+end
 
-: path_stat { path stat_adr }
+fun: path_stat { path stat_adr }
   path stat_adr stat
   if " stat" path io_err throw end
-;
+end
 
-: fd_open { path mode -- fd }
+fun: fd_open { path mode -- fd }
   path mode open { out }
   out is_err if " open" path io_err throw end
   out
-;
+end
 
-: file_open { path mode -- file }
+fun: file_open { path mode -- file }
   path mode fopen { file }
   file ifn " open" path io_err throw end
   file
-;
+end

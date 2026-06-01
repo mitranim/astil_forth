@@ -1,7 +1,7 @@
 %YAML 1.2
 ---
 version: 2
-scope: source.forth meta.astil.forth
+scope: source.astil_forth
 file_extensions: [af, f]
 
 variables:
@@ -31,7 +31,7 @@ variables:
   keyword: |-
     (?x:
       ret|recur|
-      if|ifn|else|elif|elifn|end|
+      if|ifn|else|elif|elifn|case|do|end|
       loop|for|while|until|leave|cont|
       throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
       try|try[_]{{word}}|{{word}}[_]try|
@@ -206,6 +206,7 @@ contexts:
     - match: '{{word_begin}};{{word_end}}'
       scope: punctuation.terminator.forth
 
+  # Somewhat deprecated. TODO consider removing all "colon" stuff.
   colon-match:
     - match: '{{word_begin}}:+{{word_end}}'
       scope: keyword.declaration.function.forth
@@ -235,7 +236,9 @@ contexts:
     - include: main
 
   # The meta scope makes it so that `expand_selection {"to": "scope"}`
-  # can select the entire colon definition.
+  # can select the entire colon definition. Unfortunately we're unable
+  # to use this trick for `fun: name end` definitions because we can't
+  # special-case all openers which are terminated by `end`.
   colon-meta-pop:
     - meta_scope: meta.colon.forth
     - match: ''
