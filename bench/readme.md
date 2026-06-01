@@ -18,7 +18,9 @@ Naming:
 
 Each `_reg` and `_stack` benchmark includes the cost of bootstrapping the entire language first. Reg-CC takes longer to bootstrap because it has more features.
 
-Measurements on M3 Pro.
+In many benchmarks, _startup time skews the measurement_. Adjust them by the "baseline" metrics when comparing.
+
+All measurements were done on M3 Pro.
 
 ## VERSIONS
 
@@ -50,10 +52,14 @@ Python 3.14.4
 
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
-| `baseline_astil_reg` | 6.5 ± 0.1 | 6.5 | 7.2 | 1.69 ± 0.07 |
-| `baseline_astil_stack` | 4.2 ± 0.0 | 4.1 | 4.4 | 1.08 ± 0.04 |
-| `baseline_gforth` | 3.9 ± 0.2 | 2.5 | 4.1 | 1.00 |
-| `baseline_cl_sbcl` | 12.4 ± 0.3 | 11.5 | 14.7 | 3.21 ± 0.15 |
+| `baseline_astil_reg` | 6.8 ± 0.3 | 6.4 | 8.5 | 3.57 ± 0.50 |
+| `baseline_astil_stack` | 4.4 ± 0.3 | 4.0 | 6.3 | 2.30 ± 0.34 |
+| `baseline_gforth` | 2.8 ± 0.2 | 2.5 | 5.6 | 1.48 ± 0.23 |
+| `baseline_luajit` | 1.9 ± 0.3 | 1.3 | 2.7 | 1.00 |
+| `baseline_js_bun` | 3.2 ± 0.2 | 2.7 | 4.2 | 1.70 ± 0.24 |
+| `baseline_cl_sbcl` | 12.0 ± 0.8 | 10.8 | 15.0 | 6.31 ± 0.94 |
+| `baseline_pypy` | 14.7 ± 0.9 | 14.1 | 25.6 | 7.72 ± 1.13 |
+| `baseline_python` | 16.5 ± 1.3 | 15.2 | 21.4 | 8.65 ± 1.33 |
 
 ## BUBBLE
 

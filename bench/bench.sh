@@ -19,7 +19,7 @@ MATCHED=false
 GEN=generated
 
 ALL_FILES='
-  astil.exe astil_s.exe gforth sbcl
+  astil.exe astil_s.exe gforth luajit bun sbcl pypy3 python3
   forth/lang.af forth/lang_s.af
   bench/bubble.c bench/bubble.af bench/bubble_s.af bench/bubble_g.fs bench/bubble.lua bench/bubble.mjs bench/bubble.lisp bench/bubble.py
   bench/sieve.c bench/sieve.af bench/sieve_s.af bench/sieve_g.fs bench/sieve.lua bench/sieve.mjs bench/sieve.lisp bench/sieve.py
@@ -100,8 +100,20 @@ run_section() {
       gforth)
         set -- "$@" --command-name baseline_gforth 'gforth -e bye'
         ;;
+      luajit)
+        set -- "$@" --command-name baseline_luajit 'luajit -e ""'
+        ;;
+      bun)
+        set -- "$@" --command-name baseline_js_bun 'bun -e ""'
+        ;;
       sbcl)
         set -- "$@" --command-name baseline_cl_sbcl 'sbcl --noinform --non-interactive'
+        ;;
+      pypy3)
+        set -- "$@" --command-name baseline_pypy 'pypy3 -c ""'
+        ;;
+      python3)
+        set -- "$@" --command-name baseline_python 'python3 -c ""'
         ;;
       forth/lang.af)
         set -- "$@" --command-name baseline_astil_reg './astil.exe forth/lang.af'
@@ -291,7 +303,7 @@ run_section NONE \
   astil.exe astil_s.exe
 
 run_section BASELINE \
-  forth/lang.af forth/lang_s.af gforth sbcl
+  forth/lang.af forth/lang_s.af gforth luajit bun sbcl pypy3 python3
 
 run_section BUBBLE \
   bench/bubble.c bench/bubble.af bench/bubble_s.af bench/bubble_g.fs bench/bubble.lua bench/bubble.mjs bench/bubble.lisp bench/bubble.py
