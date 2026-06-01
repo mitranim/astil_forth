@@ -384,16 +384,23 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
   switch (sym->type) {
     case SYM_NORM: break;
     case SYM_INTRIN:
-      return errf(
-        "unable to disassemble " FMT_QUOTED " which is a compiler intrinsic",
-        sym->name.buf
+      eprintf(
+        "[system] unable to disassemble " FMT_QUOTED
+        " in wordlist %d (%s), which is a compiler intrinsic\n",
+        sym->name.buf,
+        sym->wordlist,
+        wordlist_name(sym->wordlist)
       );
+      return nullptr;
     case SYM_EXTERN:
-      return errf(
-        "unable to disassemble " FMT_QUOTED
-        " which is a dynamically-linked external symbol",
-        sym->name.buf
+      eprintf(
+        "[system] unable to disassemble " FMT_QUOTED
+        " in wordlist %d (%s), which is a dynamically-linked external symbol\n",
+        sym->name.buf,
+        sym->wordlist,
+        wordlist_name(sym->wordlist)
       );
+      return nullptr;
     default: unreachable();
   }
 
