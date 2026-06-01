@@ -194,7 +194,7 @@ static Err interp_call_intrin(Interp *interp, const Sym *sym) {
 
   IF_DEBUG(eprintf(
     "[system] done called intrinsic word " FMT_QUOTED
-    "; stack pointer after call: %p; error: %s\n",
+    "; stack pointer after call: %p; error: %p\n",
     sym->name.buf,
     interp->ints.top,
     err
@@ -551,6 +551,18 @@ static Err interp_validate_sym_ptr(Interp *interp, Sym *sym) {
   const auto syms = &interp->syms;
   if (sym >= syms->floor && sym < syms->ceil) return nullptr;
   return err_sym_out_bounds(syms->floor, syms->ceil, sym);
+}
+
+static Err interp_sym_by_ptr(Interp *interp, Sint ptr, Sym **out) {
+  const auto sym = (Sym *)ptr;
+  try(interp_validate_sym_ptr(interp, sym));
+
+  IF_DEBUG(eprintf(
+    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
+  ));
+
+  if (out) *out = sym;
+  return nullptr;
 }
 
 static Err interp_parse_until(

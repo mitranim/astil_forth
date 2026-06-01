@@ -84,8 +84,8 @@ static Err print_disasm(const void *src, Ind len) {
   deferred(chars_deinit) char *buf = malloc(buf_cap);
   fmt_bytes_hex_into(buf, buf_cap, src, len);
 
-  const auto  proc   = "llvm-mc";
-  char *const argv[] = {proc, "--disassemble", "--hex", nullptr};
+  const auto  exe    = "llvm-mc";
+  char *const argv[] = {exe, "--disassemble", "--hex", nullptr};
   pid_t       pid;
   int         status;
 
@@ -93,7 +93,7 @@ static Err print_disasm(const void *src, Ind len) {
   try(wait_pid(pid, &status));
 
   if (status || DEBUG) {
-    eprintf("[debug] %s exited with code %d\n", proc, status);
+    eprintf("[debug] %s exited with code %d\n", exe, status);
   }
   return nullptr;
 }

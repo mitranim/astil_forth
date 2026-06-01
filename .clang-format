@@ -3,7 +3,7 @@ UseTab: Never
 IndentWidth: 2
 PPIndentWidth: 2
 IndentWrappedFunctionNames: false
-IndentGotoLabels: true
+IndentGotoLabels: true # TODO use `InnerIndent` in version 23+.
 IndentCaseLabels: true
 ObjCBlockIndentWidth: 2
 ContinuationIndentWidth: 2

@@ -217,18 +217,6 @@ static Err intrin_comp_page_load(Sint adr, Sint reg, Interp *interp) {
   return nullptr;
 }
 
-static Err interp_sym_by_ptr(Interp *interp, Sint ptr, Sym **out) {
-  const auto sym = (Sym *)ptr;
-  try(interp_validate_sym_ptr(interp, sym));
-
-  IF_DEBUG(eprintf(
-    "[system] found address of symbol " FMT_QUOTED ": %p\n", sym->name.buf, sym
-  ));
-
-  if (out) *out = sym;
-  return nullptr;
-}
-
 static Err intrin_comp_call(Sint ptr, Interp *interp) {
   Sym *sym;
   try(interp_sym_by_ptr(interp, ptr, &sym));
