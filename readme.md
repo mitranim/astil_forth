@@ -50,7 +50,7 @@ I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest 
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can consist of obvious stuff you'd expect, and can learn from.
 
-This system is human-made. Some benchmark files were bot-translated.
+Some benchmark files were bot-translated. The rest is **human-made**.
 
 ## Show me the code!
 
