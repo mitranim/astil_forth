@@ -1,0 +1,27 @@
+import' std:lang_s.af
+
+fun: reverse { str len -- }
+  str           { low }
+  str len + dec { high }
+
+  loop
+    low high < while
+    low c@ { tmp }
+    high c@ low c!
+    tmp high c!
+    ++: low
+    --: high
+  end
+end
+
+fun: main
+  s" 0123456789abcdef" { str len }
+
+  1 22 lsl inc for
+    str len reverse
+  end
+
+  \ str log lf
+  \ fedcba9876543210
+end
+main

@@ -109,6 +109,18 @@ bench("sieve_cl_sbcl", "bench/sieve.lisp", "sbcl --script bench/sieve.lisp", too
 bench("sieve_pypy", "bench/sieve.py", "pypy3 bench/sieve.py", tools=("pypy3",))
 bench("sieve_python", "bench/sieve.py", "python3 bench/sieve.py", tools=("python3",))
 
+section("REVERSE STRING")
+bench("reverse_string_clang", "bench/reverse_string.c", "bench/reverse_string.exe", setup=c_exe("bench/reverse_string.c", "bench/reverse_string.exe"), tools=("clang",))
+bench("reverse_string_astil_aot", "bench/reverse_string.af", "bench/reverse_string_astil.exe", setup=aot("bench/reverse_string.af", "bench/reverse_string_astil.exe"), tools=("clang",))
+bench("reverse_string_astil_reg", "bench/reverse_string.af", "./astil.exe bench/reverse_string.af", setup=(BUILD,), tools=("clang",))
+bench("reverse_string_astil_stack", "bench/reverse_string_s.af", "./astil_s.exe bench/reverse_string_s.af", setup=(BUILD,), tools=("clang",))
+bench("reverse_string_gforth", "bench/reverse_string_g.fs", "gforth bench/reverse_string_g.fs -e bye", tools=("gforth",))
+bench("reverse_string_luajit", "bench/reverse_string.lua", "luajit bench/reverse_string.lua", tools=("luajit",))
+bench("reverse_string_js_bun", "bench/reverse_string.mjs", "bun run bench/reverse_string.mjs", tools=("bun",))
+bench("reverse_string_cl_sbcl", "bench/reverse_string.lisp", "sbcl --script bench/reverse_string.lisp", tools=("sbcl",))
+bench("reverse_string_pypy", "bench/reverse_string.py", "pypy3 bench/reverse_string.py", tools=("pypy3",))
+bench("reverse_string_python", "bench/reverse_string.py", "python3 bench/reverse_string.py", tools=("python3",))
+
 section("FIB_LOOP")
 bench("fib_loop_clang", "bench/fib_loop.c", "bench/fib_loop.exe", setup=c_exe("bench/fib_loop.c", "bench/fib_loop.exe"), tools=("clang",))
 bench("fib_loop_astil_aot", "bench/fib_loop.af", "bench/fib_loop_astil.exe", setup=aot("bench/fib_loop.af", "bench/fib_loop_astil.exe"), tools=("clang",))
