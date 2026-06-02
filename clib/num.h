@@ -1,8 +1,10 @@
 #pragma once
 #include "./err.h"
+#include <inttypes.h>
+#include <limits.h>
 
-typedef size_t  Uint;
-typedef ssize_t Sint;
+typedef uintptr_t Uint;
+typedef intptr_t  Sint;
 
 typedef uint8_t U8;
 typedef int8_t  S8;
@@ -19,11 +21,13 @@ typedef int64_t  S64;
 typedef float  F32;
 typedef double F64;
 
-static constexpr Uint UINT_MIN = 0;
-static constexpr Uint UINT_MAX = SIZE_MAX;
+// Weird `U_` naming avoids collision with `UINT_MAX`,
+// which is defined in `limits.h` for `unsigned int`.
+static constexpr Uint U_INT_MIN = 0;
+static constexpr Uint U_INT_MAX = UINTPTR_MAX;
 
-static constexpr Sint SINT_MAX = (Sint)(((Uint)-1) >> (Uint)1);
-static constexpr Sint SINT_MIN = -SINT_MAX - (Sint)1;
+static constexpr Sint S_INT_MAX = INTPTR_MAX;
+static constexpr Sint S_INT_MIN = INTPTR_MIN;
 
 /*
 Unsigned index smaller than a pointer. Unlike a signed index or a pointer-sized
@@ -33,31 +37,25 @@ crashes instead of accessing unrelated memory.
 
 Suggested by Eskil: https://www.youtube.com/watch?v=sfrnU3-EpPI&t=2517
 */
-// clang-format off
-#if SIZE_MAX == 0xFFFFFFFFFFFFFFFFull // sizeof(size_t) == 8
+#if UINT_MAX < UINTPTR_MAX
 
-typedef uint32_t Ind;
+typedef unsigned int Ind;
+static constexpr Ind IND_MIN = 0;
+static constexpr Ind IND_MAX = UINT_MAX;
 #define FMT_IND "%u"
-static constexpr Ind IND_MAX = UINT32_MAX;
 
-#elif SIZE_MAX == 0xFFFFFFFFull // sizeof(size_t) == 4
+#else // sizeof(unsigned)
 
-typedef uint16_t Ind;
-#define FMT_IND "%u"
-static constexpr Ind IND_MAX = UINT16_MAX;
+typedef Uint         Ind;
+static constexpr Ind IND_MIN = 0;
+static constexpr Ind IND_MAX = U_INT_MAX;
+#define FMT_IND FMT_UINT
 
-#else // SIZE_MAX
+#endif // sizeof(unsigned)
 
-typedef Uint Ind;
-#define FMT_IND "%zu"
-static constexpr Ind IND_MAX = SIZE_MAX;
-
-#endif // SIZE_MAX
-// clang-format on
-
-#define FMT_UINT "%zu"
-#define FMT_SINT "%zd"
-#define FMT_UINT_HEX "0x%zx"
+#define FMT_UINT "%" PRIuPTR
+#define FMT_SINT "%" PRIdPTR
+#define FMT_UINT_HEX "0x%" PRIxPTR
 
 // Also see "standard" printing macros with obscure names in `inttypes.h`.
 #define FMT_U8 "%d"
