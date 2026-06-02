@@ -481,7 +481,11 @@ static void intrin_debug_ctx(Interp *interp) {
     "[debug]   arguments consumed: %d\n"
     "[debug]   data stack len:     " FMT_SINT
     "\n"
-    "[debug]   clobber:            %s\n",
+    "[debug]   clobber:            %s\n"
+    "[debug]   redefining:         %s\n"
+    "[debug]   compiling:          %s\n"
+    "[debug]   has_alloca:         %s\n"
+    "[debug]   catches:            %s\n",
     name,
     sym,
     inp_len,
@@ -489,7 +493,11 @@ static void intrin_debug_ctx(Interp *interp) {
     ctx->arg_len,
     ctx->arg_low,
     stack_len(&interp->ints),
-    uint32_to_bit_str((U32)sym->clobber)
+    uint32_to_bit_str((U32)sym->clobber),
+    bool_str(ctx->redefining),
+    bool_str(ctx->compiling),
+    bool_str(ctx->has_alloca),
+    bool_str(ctx->catches)
   );
 
   if (loc_len) {
