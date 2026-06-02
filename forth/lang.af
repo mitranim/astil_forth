@@ -1449,14 +1449,15 @@ end
 \   end
 \   outside
 \
-\ `end` is generic: it pops one XT from the stack and executes it.
-\
 \ Similarly to Gforth, our conditionals use the Forth data stack
 \ to store control information at compile time. When terminated,
 \ they use this information to "fixup" reserved instructions.
 \
-\ Unlike other Forth systems, we also support chains
-\ of "elif" terminated with a single "end".
+\ Unlike other Forth systems, we also support chains of "elif",
+\ terminated with a single "end", which is generic: it pops one
+\ XT from the stack and executes it. The XT can pop another one,
+\ popping multiple control frames in a chain. We terminate such
+\ chains by prepending a `nop` XT.
 
 fun: pop_execute STACK s> execute end
 fun: reserve_instr ASM_PLACEHOLDER comp_instr end
@@ -1467,7 +1468,7 @@ fun: patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 end \ b <of
 fun: patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 end \ b <off>
 
 fun: if_pop_from { stack } ( C: prev_fun if_adr  -- )
-  comp_barrier
+  comp_barrier \ Clobber / relocate locals.
   stack s>      { adr }
   adr off_to_pc { off }
   0 off asm_cmp_branch_zero adr !32 \ cbz x0, <else|end>
@@ -1485,6 +1486,25 @@ end
 fun: if_pop  STACK if_pop_from  end
 fun: ifn_pop STACK ifn_pop_from end
 
+\ TODO: define more variants like `=if` with fewer instructions.
+fun_comp: if ( C: -- nop adr fun ) ( E: pred -- )
+  " when calling `if`" 1 comp_args_valid 0 comp_args_set
+
+  comp_barrier
+  xt' nop      STACK >s \ Terminate the `end` pop-chain.
+  reserve_here STACK >s
+  xt' if_pop   STACK >s
+end
+
+fun_comp: ifn ( C: -- nop adr fun ) ( E: pred -- )
+  " when calling `ifn`" 1 comp_args_valid 0 comp_args_set
+
+  comp_barrier
+  xt' nop      STACK >s
+  reserve_here STACK >s
+  xt' ifn_pop  STACK >s
+end
+
 fun: else_pop_from { stack } ( C: prev_fun else_adr -- )
   comp_barrier
   stack s> patch_branch_forward
@@ -1493,53 +1513,31 @@ end
 
 fun: else_pop STACK else_pop_from end
 
-fun: elif_pop comp_barrier pop_execute end
-
-fun: elif_init ( C: -- exec_fun elif_adr ) ( E: pred -- )
-  comp_barrier \ Clobber / relocate locals.
-  reserve_here { adr }
-  xt' elif_pop STACK >s
-  adr          STACK >s
-end
-
-fun_comp: elif ( C: -- exec_fun elif_adr elif_fun ) ( E: pred -- )
+fun_comp: elif ( C: -- adr fun ) ( E: pred -- )
   " when calling `elif`" 1 comp_args_valid 0 comp_args_set
-  elif_init xt' if_pop STACK >s
+
+  comp_barrier
+  reserve_here STACK >s
+  xt' if_pop   STACK >s
 end
 
-fun_comp: elifn ( C: -- exec_fun elifn_adr elifn_fun ) ( E: pred -- )
+fun_comp: elifn ( C: -- adr fun ) ( E: pred -- )
   " when calling `elifn`" 1 comp_args_valid 0 comp_args_set
-  elif_init xt' ifn_pop STACK >s
+
+  comp_barrier
+  reserve_here STACK >s
+  xt' ifn_pop  STACK >s
 end
 
-fun: if_init ( C: -- nop ) xt' nop STACK >s end
-
-\ With this strange setup, `end` pops the top control frame,
-\ which pops the next control frame, and so on. This allows us
-\ to pop any amount of control constructs with a single `end`.
-\ Prepending `nop` terminates this chain.
-\
-\ TODO: define more variants like `=if` with fewer instructions.
-fun_comp: if ( C: -- cond done_fun exec_fun if_adr if_fun ) ( E: pred -- )
-  " when calling `if`" 1 comp_args_valid 0 comp_args_set
-  if_init elif_init xt' if_pop STACK >s
-end
-
-fun_comp: ifn ( C: -- cond done_fun exec_fun ifn_adr ifn_fun ) ( E: pred -- )
-  " when calling `ifn`" 1 comp_args_valid 0 comp_args_set
-  if_init elif_init xt' ifn_pop STACK >s
-end
-
-fun_comp: else ( C: exec_fun if_adr if_fun -- else_adr else_fun )
+fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
   " when calling `else`" 0 comp_args_valid
   comp_barrier \ Clobber / relocate locals.
   reserve_here { else_adr }
 
   STACK s> { if_fun }
   STACK s> { if_adr }
-  STACK stack_drop \ Drop `exec_fun`.
 
-  xt' nop      STACK >s \ Replace `exec_fun` to prevent further chaining.
+  xt' nop      STACK >s \ Terminate chaining from `if_fun`.
   if_adr       STACK >s
   if_fun       execute
   else_adr     STACK >s
