@@ -17,7 +17,7 @@ static Err interp_parse_params(Interp *interp) {
   const auto word = read->word;
 
   if (!str_eq(&word, "{")) {
-    reader_backtrack_word(read);
+    reader_back_push_word(read);
     return nullptr;
   }
 

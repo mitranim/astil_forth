@@ -321,7 +321,7 @@ static Err interp_loop(Interp *interp) {
       case CHAR_WHITESPACE: continue;
 
       case CHAR_DECIMAL: {
-        reader_backtrack(read, next);
+        reader_back_push(read, next);
         try(read_interp_num(interp));
         continue;
       }
@@ -330,8 +330,8 @@ static Err interp_loop(Interp *interp) {
       case CHAR_ARITH: {
         U8 next_next;
         try(read_ascii_printable(read, &next_next));
-        reader_backtrack(read, next_next);
-        reader_backtrack(read, next);
+        reader_back_push(read, next_next);
+        reader_back_push(read, next);
 
         if (HEAD_CHAR_KIND[next_next] == CHAR_DECIMAL) {
           try(read_interp_num(interp));
@@ -343,7 +343,7 @@ static Err interp_loop(Interp *interp) {
       }
 
       case CHAR_WORD: {
-        reader_backtrack(read, next);
+        reader_back_push(read, next);
         try(read_interp_word(interp));
         continue;
       }
@@ -576,7 +576,6 @@ static Err interp_parse_until(
   Interp *interp, U8 delim, const char **out_buf, Ind *out_len
 ) {
   const auto read = interp->reader;
-  read_skip_space(read);
   try(read_until_char(read, (U8)delim));
 
   // IF_DEBUG(eprintf(

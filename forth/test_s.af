@@ -574,6 +574,15 @@ fun: test_to
 end
 test_to
 
+fun: test_empty_comment
+  \ `\` immediately followed by newline: this used to skip the NEXT line.
+  \
+  10 20 30
+  { one two three }
+  T{ one two three <T> 10 20 30 }T
+end
+test_empty_comment
+
 fun: test_locals
   T{          { }                                     <T>          }T
   T{          { -- }                                  <T>          }T

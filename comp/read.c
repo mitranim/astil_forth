@@ -25,20 +25,19 @@ static Err reader_err(Reader *read, Err err) {
   );
 }
 
-// TODO clearer name.
-static U8 reader_unpeek(Reader *read) {
+static U8 reader_back_pop(Reader *read) {
   const auto buf = &read->back;
   return buf->len ? buf->buf[buf->len-- - 1] : (U8)0;
 }
 
-static void reader_backtrack(Reader *read, U8 val) {
+static void reader_back_push(Reader *read, U8 val) {
   str_push(&read->back, val);
 }
 
-static void reader_backtrack_word(Reader *read) {
+static void reader_back_push_word(Reader *read) {
   const auto word = &read->word;
   while (word->len) {
-    reader_backtrack(read, word->buf[--word->len]);
+    reader_back_push(read, word->buf[--word->len]);
   }
 }
 
@@ -46,8 +45,10 @@ static void reader_backtrack_word(Reader *read) {
 // 255 = EOF
 static U8 normalize_char(U8 val) { return val == 254 || val == 255 ? 0 : val; }
 
-// For internal use by the reader. External code should
-// use `read_ascii_printable` or `read_char`.
+/*
+For internal use by the reader. Other code should use
+`read_ascii_printable` or `read_char`.
+*/
 static U8 read_next_char(Reader *read) {
   const auto next = normalize_char((U8)fgetc(read->file));
 
@@ -84,22 +85,25 @@ static U8 read_next_char(Reader *read) {
 }
 
 static U8 read_char(Reader *read) {
-  const auto next = reader_unpeek(read);
+  const auto next = reader_back_pop(read);
   if (next) return next;
   return read_next_char(read);
-}
-
-static Err err_unsupported_char(Sint code) {
-  return errf("unsupported character code " FMT_SINT, code);
 }
 
 /*
 static U8 reader_peek(Reader *read) {
   const auto buf = &read->back;
-  if (!buf->len) reader_backtrack(read, read_next_char(read));
-  return buf->buf[buf->len - 1];
+  if (buf->len) return buf->buf[buf->len];
+
+  const auto byte      = read_next_char(read);
+  buf->buf[buf->len++] = byte;
+  return byte;
 }
 */
+
+static Err err_unsupported_char(Sint code) {
+  return errf("unsupported character code " FMT_SINT, code);
+}
 
 static Err validate_char_ascii_printable(Sint code) {
   if (!(code >= 0 && code < 256)) return err_unsupported_char(code);
@@ -121,15 +125,6 @@ static Err read_ascii_printable(Reader *read, U8 *out) {
   *out = next;
   return nullptr;
 }
-
-/*
-static Err reader_peek_ascii_printable(Reader *read, U8 *out) {
-  const auto next = reader_peek(read);
-  try(validate_char_ascii_printable(next));
-  *out = next;
-  return nullptr;
-}
-*/
 
 static Err err_not_digit(U8 val) {
   return errf(
@@ -185,7 +180,7 @@ static Err read_num_internal(
       }
 
       case DIGIT_BREAK: {
-        reader_backtrack(read, head);
+        reader_back_push(read, head);
         goto done;
       }
 
@@ -270,7 +265,7 @@ static Err read_num(Reader *read, Sint *out) {
         return read_num_internal(read, num, 0, radix, false, out);
       }
       default: {
-        reader_backtrack(read, head);
+        reader_back_push(read, head);
         break;
       }
     }
@@ -288,14 +283,14 @@ static Err err_word_len(const Reader *read, U8 len) {
 static void read_skip_space(Reader *read) {
   const auto next = read_char(read);
   if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) return;
-  reader_backtrack(read, next);
+  reader_back_push(read, next);
 }
 
 static void read_skip_whitespace(Reader *read) {
   for (;;) {
     const auto next = read_char(read);
     if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) continue;
-    reader_backtrack(read, next);
+    reader_back_push(read, next);
     break;
   }
 }
@@ -312,7 +307,7 @@ static Err read_word(Reader *read) {
     try(read_ascii_printable(read, &byte));
 
     if (WORD_CHAR_KIND[byte] != CHAR_WORD) {
-      reader_backtrack(read, byte);
+      reader_back_push(read, byte);
       break;
     }
 

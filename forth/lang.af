@@ -1110,7 +1110,6 @@ fun_comp: char' ( C: "str" -- ) ( E: -- char )
   char reg comp_load
 end
 
-\ Interpretation semantics of standard `s"`.
 fun: parse_str  { -- cstr len } char' " parse end
 fun: parse_cstr { -- cstr     } parse_str { cstr -- } cstr end
 
@@ -1142,13 +1141,13 @@ fun: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr end
 \ until the next `parse` invocation. In compilation mode, the string buffer
 \ is statically allocated and unique. The string is always null-terminated,
 \ and can be safely passed to many `libc` functions by pointer alone.
-fun:      s" { -- cstr len } ( E: "str" -- cstr len ) parse_str end
-fun_comp: s" ( C: "str" -- ) ( E: -- cstr len )       parse_comp_str end
+fun:      s" { -- cstr len } ( E: "str" -- cstr len ) char { -- } parse_str      end
+fun_comp: s" ( C: "str" -- ) ( E: -- cstr len )       char { -- } parse_comp_str end
 
 \ C-style string literal. Like `s"` but returns only the address
 \ without the length. The string is always null-terminated.
-fun:      " { -- cstr }     ( E: "str" -- cstr ) parse_cstr end
-fun_comp: " ( C: "str" -- ) ( E: -- cstr )       parse_comp_cstr end
+fun:      " { -- cstr }     ( E: "str" -- cstr ) char { -- } parse_cstr      end
+fun_comp: " ( C: "str" -- ) ( E: -- cstr )       char { -- } parse_comp_cstr end
 
 \ ## External functions and symbols
 
