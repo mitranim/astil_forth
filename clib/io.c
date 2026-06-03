@@ -205,7 +205,7 @@ static void file_purge(FILE *file) {
 /*
 #include "./mem.c"
 
-int main(void) {
+int main() {
   {
     deferred(file_deinit) FILE *file = nullptr;
     file                          = stdin; // OK to "close"

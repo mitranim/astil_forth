@@ -234,7 +234,7 @@ static Err bool_decode(const char *src, bool *out) {
 }
 
 /*
-int main(void) {
+int main() {
   printf("%s\n", uint64_to_bit_str(0b00000000000000001111111111111111LL));
   printf("%s\n", uint64_to_bit_str(0b11111111111111110000000000000000LL));
 
@@ -250,7 +250,7 @@ int main(void) {
 */
 
 /*
-int main(void) {
+int main() {
   {
     U32 val = 0x01234567;
     printf("0x%s\n", fmt_bytes_hex((const U8 *)&val, sizeof(val)));
@@ -269,7 +269,7 @@ int main(void) {
 */
 
 /*
-int main(void) {
+int main() {
   {
     U64 val = 0x0123456789abcdef;
     printf("%s\n", fmt_any(val));

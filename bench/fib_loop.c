@@ -23,7 +23,7 @@ static uint64_t escape(uint64_t val) {
 
 // #include <stdio.h>
 
-int main(void) {
+int main() {
   const uint64_t count = 1 << 16;
   for (uint64_t ind = 0; ind < escape(count); ind++) {
     escape(fib(escape(91)));

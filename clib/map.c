@@ -47,7 +47,7 @@ static void map_eprint_repr(const Map *map) {
 #include <limits.h>
 #include <stdio.h>
 
-int main(void) {
+int main() {
   deferred(map_deinit) map_of(Sint, Uint) map = {};
   // map_eprint_repr((const Map *)&map);
 

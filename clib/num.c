@@ -34,7 +34,7 @@ static Ind round_up_pow2_Ind(Ind src) {
 /*
 #include <stdio.h>
 
-int main(void) {
+int main() {
   for (Ind ind = 0; ind < 21; ind++) {
     printf(
       "round_up_pow2_Ind(" FMT_IND "): " FMT_IND "\n", ind, round_up_pow2_Ind(ind)

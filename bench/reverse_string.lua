@@ -2,6 +2,14 @@
 
 local bit = require("bit")
 
+local function string_chars(str)
+  local out = {}
+  for ind = 1, #str do
+    out[ind] = str:sub(ind, ind)
+  end
+  return out
+end
+
 local function reverse(str)
   local low = 1
   local high = #str
@@ -19,4 +27,4 @@ local function run(str, runs)
   -- print(table.concat(str))
 end
 
-run({"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"}, bit.lshift(1, 22) + 1)
+run(string_chars("0123456789abcdef"), bit.lshift(1, 22) + 1)

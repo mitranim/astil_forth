@@ -52,7 +52,7 @@ static void bubble(int64_t *list, int32_t len) {
   }
 }
 
-int main(void) {
+int main() {
   int64_t list[LEN];
 
   list_init(list, LEN);

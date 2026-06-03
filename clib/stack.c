@@ -27,7 +27,7 @@ static Err stack_deinit(void *stack) {
   return nullptr;
 }
 
-static Err err_stack_no_len(void) {
+static Err err_stack_no_len() {
   return err_str("unable to allocate stack: missing length");
 }
 
@@ -124,7 +124,7 @@ static Err int_stack_push(Sint_stack *tar, Sint val) {
 /*
 #include <stdio.h>
 
-static Err run(void) {
+static Err run() {
   deferred(stack_deinit) stack_of(Uint) stack = {};
 
   Stack_opt opt = {.len = 8};
@@ -155,5 +155,5 @@ static Err run(void) {
   return nullptr;
 }
 
-int main(void) { try_main(run()); }
+int main() { try_main(run()); }
 */

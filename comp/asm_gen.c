@@ -14,7 +14,7 @@ used with `clang -S`; we parsed the output. Then Clang
 completely changed the syntax of generated statements.
 Printing this ourselves is way less fragile.
 */
-int main(void) {
+int main() {
   printf(".set INTERP_INTS_FLOOR, %d\n", (int)INTERP_INTS_FLOOR);
   printf(".set INTERP_INTS_TOP, %d\n", (int)INTERP_INTS_TOP);
 }

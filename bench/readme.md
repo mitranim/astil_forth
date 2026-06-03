@@ -9,7 +9,7 @@ Microbenchmarks comparing:
 - Common Lisp (SBCL).
 - Python (PyPy and CPython).
 
-Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces VM interpreters, slightly outpaces other JITs, and vaguely approaches Clang C with `-O2` (x1.5-x2).
+Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces VM interpreters, slightly outpaces other JITs (due to being untyped), and vaguely approaches Clang C with `-O2` (x1.5-x2).
 
 Naming:
 - `_aot`   -- Astil reg-CC as AOT-compiled executable.

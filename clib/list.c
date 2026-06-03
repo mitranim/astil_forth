@@ -106,7 +106,7 @@ static bool is_list_elem_impl(
 #include "./num.h"
 #include <stdio.h>
 
-int main(void) {
+int main() {
   deferred(list_deinit) list_of(Uint) list = {};
 
   // list_head(&list); // crash

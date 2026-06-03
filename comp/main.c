@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static void print_help(void) {
+static void print_help() {
   fputs(
     "Astil Forth -- an experimental Forth system.\n"
     "Currently runs only on Apple Silicon. Usage:\n"

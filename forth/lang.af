@@ -1051,7 +1051,7 @@ fun: stack_drop { stack      } 1 stack stack_len- end
 \
 \ Mind the backwards order:
 \
-\   10 20 30 >>s
+\   10 20 30 stack >>s
 \   stack s> . \ 30
 \   stack s> . \ 20
 \   stack s> . \ 10

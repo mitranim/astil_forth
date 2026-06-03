@@ -379,7 +379,7 @@ static void interp_welcome(Interp *interp) {
 #include <limits.h>
 #include <mach-o/dyld.h>
 
-static const char *get_exec_path(void) {
+static const char *get_exec_path() {
   static thread_local char path[PATH_MAX];
   uint32_t                 size = arr_cap(path);
   if (_NSGetExecutablePath(path, &size)) return nullptr;
@@ -387,7 +387,7 @@ static const char *get_exec_path(void) {
 }
 
 #else  // __APPLE__
-static const char *get_exec_path(void) { return nullptr; }
+static const char *get_exec_path() { return nullptr; }
 #endif // __APPLE__
 
 static Err interp_eval(Interp *interp, const char *code) {

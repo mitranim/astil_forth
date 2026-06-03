@@ -143,7 +143,7 @@ static void set_eprint_repr(Set *set) {
 #include <limits.h>
 #include <stdio.h>
 
-int main(void) {
+int main() {
   deferred(set_deinit) set_of(Sint) set = {};
   // set_eprint_repr((Set *)&set);
 

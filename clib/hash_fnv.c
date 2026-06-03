@@ -47,7 +47,7 @@ static Fnv_hash reverse_bytes(Fnv_hash src) {
 /*
 #include <stdio.h>
 
-int main(void) {
+int main() {
   printf(FMT_UINT "\n", fnv_hash_str(":"));
   printf(FMT_UINT "\n", fnv_hash_str(strdup(";")));
   printf(FMT_UINT "\n", fnv_hash_str(";"));

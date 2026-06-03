@@ -40,4 +40,4 @@ static char *mach_ver_to_str(U32 src) {
   return MACH_VER_BUF;
 }
 
-// int main(void) { puts(mach_ver_to_str(mach_ver(1234, 56, 78))); }
+// int main() { puts(mach_ver_to_str(mach_ver(1234, 56, 78))); }

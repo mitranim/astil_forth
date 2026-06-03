@@ -308,7 +308,7 @@ In reg-CC:
 
 ## Performance
 
-See [`./bench`](./bench). In the few available microbenchmarks, the reg-CC version of Astil Forth trounces VM interpreters, slightly outpaces other JITs, and vaguely approximates Clang C with `-O2`. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
+See [`./bench`](./bench). Summary: in these _very limited_ microbenchmarks, the reg-CC version of Astil Forth trounces VM interpreters, slightly outpaces other JITs (due to being untyped), and vaguely approximates Clang C with `-O2`. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
 
 ## Limitations
 

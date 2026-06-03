@@ -60,7 +60,7 @@ static void *ptr_at(void *src, Ind ind, Ind size) {
   return (U8 *)src + mem_size(ind, size);
 }
 
-static Err err_mmap(void) {
+static Err err_mmap() {
   const auto code = errno;
   return errf(
     "unable to map memory; code: %d; message: %s", code, strerror(code)
@@ -308,7 +308,7 @@ int main(int argc, const char *argv[]) {
 */
 
 /*
-int main(void) {
+int main() {
   deferred(buf_deinit) Buf buf = {};
 
   buf_append(&buf, 1234);
@@ -320,7 +320,7 @@ int main(void) {
 */
 
 /*
-int main(void) {
+int main() {
   deferred(mpage_deinit) void *page;
   try_main(mpage_init(&page, 0x10000));
 

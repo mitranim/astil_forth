@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-static void backtrace_capture(void) {
+static void backtrace_capture() {
   BT_BUF_LEN = backtrace(BT_BUF, arr_cap(BT_BUF));
 }
 
@@ -25,7 +25,7 @@ static void backtrace_print() {
 }
 
 [[noreturn]]
-static void abort_traced(void) {
+static void abort_traced() {
   backtrace_capture();
   backtrace_print();
   abort();

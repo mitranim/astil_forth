@@ -45,7 +45,7 @@ static int64_t find_prime(uint8_t *flags, int32_t cap) {
 
 // #include <stdio.h>
 
-int main(void) {
+int main() {
   uint8_t flags[CAP];
 
   for (int32_t ind = 0; ind < RUNS; ind++) {
