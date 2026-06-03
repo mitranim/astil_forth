@@ -381,6 +381,139 @@ fun: test_conditionals
 end
 test_conditionals
 
+fun: switch_empty { val -- out }
+  val switch end
+  val 2 *
+end
+
+fun: test_switch_empty
+  T{ 0  switch_empty <T> 0  }T
+  T{ 10 switch_empty <T> 20 }T
+  T{ 20 switch_empty <T> 40 }T
+end
+test_switch_empty
+
+fun: switch_body_only { val -- one two three }
+  -1 -1 { one two }
+  val switch
+    10 { one }
+    20 5 + { two }
+  end
+  one val two
+end
+
+fun: test_switch_body_only
+  T{ -1  switch_body_only <T> 10 -1 25 }T
+  T{ 30  switch_body_only <T> 10 30 25 }T
+  T{ 40  switch_body_only <T> 10 40 25 }T
+end
+test_switch_body_only
+
+fun: switch_ret { val -- out }
+  val switch
+    10 case 100 ret end
+    20 case 200 ret end
+    30 case 300 ret end
+    val 2 * ret
+  end
+  unreachable
+  nil
+end
+
+fun: test_switch_ret
+  T{ 0   switch_ret <T> 0   }T
+  T{ 10  switch_ret <T> 100 }T
+  T{ 20  switch_ret <T> 200 }T
+  T{ 30  switch_ret <T> 300 }T
+  T{ 123 switch_ret <T> 246 }T
+end
+test_switch_ret
+
+fun: switch_assign { val -- out }
+  val switch
+    10 case 100 { val } end
+    20 case 200 { val } end
+    30 case 300 { val } end
+    val 2 * { val }
+  end
+  val
+end
+
+fun: test_switch_assign
+  T{ 0   switch_assign <T> 0   }T
+  T{ 10  switch_assign <T> 100 }T
+  T{ 20  switch_assign <T> 200 }T
+  T{ 30  switch_assign <T> 300 }T
+  T{ 123 switch_assign <T> 246 }T
+end
+test_switch_assign
+
+fun: switch_inner_statements { val -- out one two three four }
+  -1 -1 -1 -1 -1 { out one two three four }
+  val switch
+    40 { one }
+    10 case 100 { out } end
+    50 { two }
+    20 case 200 { out } end
+    60 { three }
+    30 case 300 { out } end
+    70 { four }
+  end
+  out one two three four
+end
+
+fun: test_switch_inner_statements
+  T{ -1  switch_inner_statements <T> -1  40 50 60 70 }T
+  T{ 10  switch_inner_statements <T> 100 40 -1 -1 -1 }T
+  T{ 20  switch_inner_statements <T> 200 40 50 -1 -1 }T
+  T{ 30  switch_inner_statements <T> 300 40 50 60 -1 }T
+  T{ 123 switch_inner_statements <T> -1  40 50 60 70 }T
+end
+test_switch_inner_statements
+
+fun: switch_nested_if { val flag -- out }
+  -1 { out }
+  val switch
+    10 case flag if 100 { out } else 300 { out } end end
+    20 case flag if 200 { out } else 400 { out } end end
+    999 { out }
+  end
+  out
+end
+
+fun: test_switch_nested_if
+  T{ 10 true  switch_nested_if <T> 100 }T
+  T{ 10 false switch_nested_if <T> 300 }T
+  T{ 20 true  switch_nested_if <T> 200 }T
+  T{ 0  true  switch_nested_if <T> 999 }T
+end
+test_switch_nested_if
+
+fun: switch_nested { one two -- out }
+  -1 { out }
+  one switch
+    1 case
+      two switch
+        10 case 110 { out } end
+        20 case 120 { out } end
+        199 { out }
+      end
+    end
+    2 case 200 { out } end
+    999 { out }
+  end
+  out
+end
+
+fun: test_switch_nested
+  T{ 1 10 switch_nested <T> 110 }T
+  T{ 1 20 switch_nested <T> 120 }T
+  T{ 1 30 switch_nested <T> 199 }T
+  T{ 2 10 switch_nested <T> 200 }T
+  T{ 3 10 switch_nested <T> 999 }T
+end
+test_switch_nested
+
 fun: recursive_fun { val -- val }
   val 13 <= if val ret end
   val dec recur
@@ -1725,6 +1858,13 @@ fun: main_run
   test_local_ref_volatile_with_inputs
   test_local_ref_volatile_with_outputs
   test_conditionals
+  test_switch_empty
+  test_switch_body_only
+  test_switch_ret
+  test_switch_assign
+  test_switch_inner_statements
+  test_switch_nested_if
+  test_switch_nested
   test_recursion
   \ test_sleep_loop
   test_loop_leave

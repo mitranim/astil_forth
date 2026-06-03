@@ -1543,6 +1543,60 @@ fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
   xt' else_pop STACK >s
 end
 
+fun: switch_pop ( C: next_pop val_loc -- )
+  comp_barrier
+  STACK stack_drop
+  pop_execute
+end
+
+fun_comp: switch ( C: -- nop val_loc switch_pop ) ( E: val -- )
+  " when calling `switch`" 1 comp_args_valid 0 comp_args_set
+
+  comp_anon_local { val_loc }
+
+  0 val_loc comp_local_set \ mov <val>, x0 | str x0, [FP, <val>]
+  xt' nop        STACK >s
+  val_loc        STACK >s
+  xt' switch_pop STACK >s
+end
+
+fun: case_pop
+  ( C: val_loc switch_pop adr_beg -- adr_end else_pop val_loc switch_pop )
+
+  comp_barrier
+  STACK s>          { adr_beg    }
+  STACK s>          { switch_pop }
+  STACK s>          { val_loc    }
+  reserve_here      { adr_end    }
+  adr_beg off_to_pc { off        }
+
+  off ASM_NE asm_branch_cond adr_beg !32 \ b.ne <case_end>
+
+  adr_end      STACK >s \ b <switch_end>
+  xt' else_pop STACK >s
+  val_loc      STACK >s
+  switch_pop   STACK >s
+end
+
+fun_comp: case
+  ( C: val_loc switch_pop -- val_loc switch_pop adr_beg case_pop )
+  ( E: pred -- )
+
+  " when calling `case`" 1 comp_args_valid 0 comp_args_set
+
+  STACK s> { switch_pop }
+  STACK s> { val_loc }
+
+  1 val_loc       comp_local_get \ mov x1, <val> | ldr x1, [FP, <val>]
+  0 1 asm_cmp_reg comp_instr     \ cmp x0, x1
+  comp_barrier                   \ Clobber / relocate locals.
+
+  val_loc      STACK >s
+  switch_pop   STACK >s
+  reserve_here STACK >s  \ b.ne <case_end>
+  xt' case_pop STACK >s
+end
+
 \ ## Pretend types
 \
 \ We don't have a real type system, but it can still be useful
