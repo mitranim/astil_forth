@@ -91,6 +91,21 @@ Python 3.14.4
 | `sieve_pypy` | 164.8 ± 0.5 | 164.1 | 166.0 | 4.41 ± 0.04 |
 | `sieve_python` | 3917.7 ± 9.6 | 3902.0 | 3933.8 | 104.83 ± 0.90 |
 
+## REVERSE STRING
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `reverse_string_clang` | 14.5 ± 2.0 | 12.7 | 28.8 | 1.00 |
+| `reverse_string_astil_aot` | 30.0 ± 1.3 | 28.6 | 39.6 | 2.07 ± 0.30 |
+| `reverse_string_astil_reg` | 35.9 ± 2.1 | 34.5 | 53.8 | 2.48 ± 0.37 |
+| `reverse_string_astil_stack` | 240.1 ± 7.9 | 232.6 | 251.0 | 16.60 ± 2.32 |
+| `reverse_string_gforth` | 527.3 ± 1.1 | 525.6 | 529.3 | 36.45 ± 4.94 |
+| `reverse_string_luajit` | 43.6 ± 2.1 | 42.1 | 59.2 | 3.01 ± 0.43 |
+| `reverse_string_js_bun` | 36.8 ± 1.4 | 35.4 | 44.7 | 2.54 ± 0.36 |
+| `reverse_string_cl_sbcl` | 100.3 ± 3.8 | 97.4 | 116.8 | 6.93 ± 0.98 |
+| `reverse_string_pypy` | 133.0 ± 4.8 | 129.8 | 153.8 | 9.20 ± 1.29 |
+| `reverse_string_python` | 1665.9 ± 12.0 | 1645.3 | 1681.5 | 115.15 ± 15.64 |
+
 ## FIB_LOOP
 
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |

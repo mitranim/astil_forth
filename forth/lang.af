@@ -1691,8 +1691,8 @@ end
 
 \ Begins a definition; terminate with `end`.
 fun: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
-  parse_word   { str len }
-  str strdup   { str }
+  parse_word     { str len }
+  str strdup     { str }
   xt' struct_pop { fun }
   str len 0 0 fun
 end
@@ -2191,7 +2191,7 @@ fun: comp_va_beg { ceil floor }
 end
 
 \ Short for "compile variadic arguments end".
-fun: comp_va_end { len -- }
+fun: comp_va_end { len }
   len >=0 if
     len cells 16 align_up { off }
     ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
@@ -2341,10 +2341,12 @@ fun_comp: wrapf ( C: fmt …varargs… err -- str )
   compile' wrapf_args
 
   0 buf_loc  comp_local_set \ str x0, [x29, <buf>]
-  xt' snprintf comp_call      \ blr <fun>
+  xt' snprintf comp_call    \ blr <fun>
   len off -  comp_va_end    \ Restore SP.
   0 buf_loc  comp_local_get \ ldr x0, [x29, <buf>]
 end
+
+fun: fatal { err } " fatal: %s" err elogf elf abort end
 
 \ ## OS error stuff
 \
@@ -2678,3 +2680,19 @@ fun_comp: --: ( C: "name" -- ) ( E: -- ) xt' dec " --" comp_loc_mut end
 
 \ Comptime analogue of top-level `import'`.
 fun_comp: import' parse_word comp_str compile' import end
+
+\ Chooses a non-zero value, preferring the second input.
+fun: fallback { one two -- fallback } [
+  0                     comp_clobber
+  1 0 asm_cmp_imm       comp_instr \ cmp x1, 0
+  0 1 0 ASM_NE asm_csel comp_instr \ csel x0, x1, x0, ne
+  1                     comp_args_set
+] end
+
+\ TODO support any amount of inputs.
+fun_comp: fallback: ( E: one two -- fallback )
+  compile' fallback
+  parse_word comp_named_local { loc }
+  0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
+  0     comp_args_set
+end

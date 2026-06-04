@@ -1187,6 +1187,32 @@ fun: test_int_to_cell
 end
 test_int_to_cell
 
+fun: test_fallback
+  T{ 0  0  fallback <T> 0  }T
+  T{ 0  1  fallback <T> 1  }T
+  T{ 1  0  fallback <T> 1  }T
+  T{ 0  -1 fallback <T> -1 }T
+  T{ -1 0  fallback <T> -1 }T
+  T{ 0  10 fallback <T> 10 }T
+  T{ 10 0  fallback <T> 10 }T
+  T{ 10 20 fallback <T> 20 }T
+  T{ 20 10 fallback <T> 10 }T
+end
+test_fallback
+
+fun: test_fallback_decl
+  T{ 0  0  fallback: val val <T> 0  }T
+  T{ 0  1  fallback: val val <T> 1  }T
+  T{ 1  0  fallback: val val <T> 1  }T
+  T{ 0  -1 fallback: val val <T> -1 }T
+  T{ -1 0  fallback: val val <T> -1 }T
+  T{ 0  10 fallback: val val <T> 10 }T
+  T{ 10 0  fallback: val val <T> 10 }T
+  T{ 10 20 fallback: val val <T> 20 }T
+  T{ 20 10 fallback: val val <T> 10 }T
+end
+test_fallback_decl
+
 fun: test_vargs_printf
   10 20 30 vargs{ " numbers (should be 10 20 30): %zd %zd %zd" printf }vargs
   { printed }
@@ -1901,6 +1927,8 @@ fun: main_run
   test_cstr_eq
   test_cstr_less
   test_int_to_cell
+  test_fallback
+  test_fallback_decl
   \ test_vargs_printf
   \ test_logf
   \ test_elogf

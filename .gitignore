@@ -11,7 +11,6 @@
 !/comp
 !/mach
 !/forth
-!/bench
 !/talks
 !/sublime
 !/examples
@@ -20,6 +19,17 @@
 /clib/*
 !/clib/.h
 !/clib/.c
+
+!/bench
+/bench/*
+!/bench/*.md
+!/bench/*.c
+!/bench/*.af
+!/bench/*.fs
+!/bench/*.lua
+!/bench/*.mjs
+!/bench/*.lisp
+!/bench/*.py
 
 # Should be listed last.
 .*
