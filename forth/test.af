@@ -1,5 +1,6 @@
 import' ./lang.af
 import' ./testing.af
+import' ./arena.af
 
 \ This test suite for reg-CC is written differently from the test suite for
 \ stack-CC, because of the various checks and restrictions in the compiler.
@@ -1869,6 +1870,110 @@ fun: test_partial_assign [ true catches ]
 end
 test_partial_assign
 
+fun: test_arena_unprot { adr } adr ARENA_PAGE_MIN mem_unprot end
+
+\ BOT-GENERATED
+fun: test_arena_alloc
+  Arena alloca { arn }
+  arn arena_init
+
+  T{ arn stack_len_bytes <T> 0   }T
+  T{ arn Arena_low @     <T> nil }T
+
+  1 arn arena_alloc { adr0 }
+  arn Arena_low @ { page0 }
+
+  T{ page0 stack_cap_bytes <T> ARENA_PAGE_MIN }T
+  T{ page0 stack_len_bytes <T> 1              }T
+  T{ arn   stack_len_bytes <T> Stack          }T
+
+  7 arn arena_alloc { adr1 }
+
+  T{ arn Arena_low @       <T> page0          }T
+  T{ adr1 adr0 -           <T> FUND_ALIGN     }T
+  T{ page0 stack_len_bytes <T> FUND_ALIGN 7 + }T
+  T{ arn stack_len_bytes   <T> Stack          }T
+
+  ARENA_PAGE_MIN arn arena_alloc { adr2 }
+  arn Arena_low @ { page1 }
+
+  T{ page1 page0 <>        <T> true                }T
+  T{ page1 stack_cap_bytes <T> ARENA_PAGE_MIN      }T
+  T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN      }T
+  T{ adr2                  <T> page1 Stack_floor @ }T
+  T{ arn stack_len_bytes   <T> Stack 2 *           }T
+
+  arn arena_deinit
+end
+test_arena_alloc
+
+\ BOT-GENERATED
+fun: test_arena_trunc
+  Arena alloca { arn }
+  arn arena_init
+
+  7 arn arena_alloc { adr0 }
+  arn Arena_low @ { page0 }
+  page0 Stack_floor @ { floor0 }
+
+  ARENA_PAGE_MIN arn arena_alloc { adr1 }
+  arn Arena_low @ { page1 }
+
+  T{ arn stack_len_bytes   <T> Stack 2 *      }T
+  T{ page0 stack_len_bytes <T> 7              }T
+  T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN }T
+
+  arn arena_trunc
+
+  T{ arn stack_len_bytes   <T> Stack 2 * }T
+  T{ arn Arena_low @       <T> page0     }T
+  T{ page0 stack_len_bytes <T> 0         }T
+  T{ page1 stack_len_bytes <T> 0         }T
+
+  11 arn arena_alloc { adr2 }
+
+  T{ adr2                <T> floor0    }T
+  T{ arn Arena_low @     <T> page0     }T
+  T{ arn stack_len_bytes <T> Stack 2 * }T
+
+  arn arena_deinit
+end
+test_arena_trunc
+
+\ BOT-GENERATED
+fun: test_arena_deinit
+  Arena alloca { arn }
+  arn arena_init
+
+  128 arn arena_alloc { adr0 }
+  ARENA_PAGE_MIN arn arena_alloc { adr1 }
+
+  arn arena_deinit
+
+  T{ arn stack_len_bytes <T> 0   }T
+  T{ arn Arena_low @     <T> nil }T
+
+  adr1 catch' test_arena_unprot { err }
+  T{ err <>0 <T> true }T
+  err " unable to mprotect" T_err_contains
+end
+test_arena_deinit
+
+\ BOT-GENERATED
+fun: test_arena_errors
+  Arena alloca { arn }
+  arn arena_init
+
+  0 arn catch' arena_alloc { adr err }
+  T{ err <>0 <T> true }T
+  err " unable to allocate: size is zero" T_err_contains
+
+  nil arena_trunc
+  nil arena_deinit
+  arn arena_deinit
+end
+test_arena_errors
+
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
 \ interpreter-only features (currently none).
@@ -1973,6 +2078,10 @@ fun: main_run
   \ test_too_many_input_regs              \ interp-only
   \ test_too_many_output_regs             \ interp-only
   \ test_too_many_output_regs_with_err    \ interp-only
+  test_arena_alloc
+  test_arena_trunc
+  test_arena_deinit
+  test_arena_errors
 end
 
 fun: main { -- exit } [ true catches ]
