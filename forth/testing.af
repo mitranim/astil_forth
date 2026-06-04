@@ -16,8 +16,8 @@ import' ./lang.af
 
 fun: testing_stack_eq { len0 len1 len stk -- equal }
   len 0 +for: ind
-    ind len0 + stk stack_at @ { one }
-    ind len1 + stk stack_at @ { two }
+    ind len0 + stk stack_cell_at @ { one }
+    ind len1 + stk stack_cell_at @ { two }
     one two <> if false ret end
   end
   true
@@ -27,14 +27,14 @@ fun: testing_stack_log { len0 len1 len2 stk }
   " T{ " elog
 
   len1 len0 +for: ind
-    ind stk stack_at @ { val }
+    ind stk stack_cell_at @ { val }
     " %zd " val elogf
   end
 
   " <T> " elog
 
   len2 ind +for: ind
-    ind stk stack_at @ { val }
+    ind stk stack_cell_at @ { val }
     " %zd " val elogf
   end
 
@@ -48,24 +48,24 @@ end
 0 var: T_ST_LEN_1 \ Stack length at `<T>`.
 
 fun: testing_interp_reset { stk }
-  T_ST_LEN_0 @ stk stack_len_set
+  T_ST_LEN_0 @ stk stack_len_cells_set
   T_ST_LEN_0 off!
   T_ST_LEN_1 off!
 end
 
-fun: T{  STACK stack_len T_ST_LEN_0 ! end
-fun: <T> STACK stack_len T_ST_LEN_1 ! end
+fun: T{  STACK stack_len_cells T_ST_LEN_0 ! end
+fun: <T> STACK stack_len_cells T_ST_LEN_1 ! end
 
 \ 10 20   T{   30 40   <T>   50 60   }T
 \         ^ len0 = 2   ^ len1 = 4    ^ len2 = 6
 \                      ^ rel0 = 2    ^ rel1 = 2
 fun: }T
-  STACK         { stk  }
-  stk stack_len { len2 } \ Length at `}T`.
-  T_ST_LEN_1 @  { len1 } \ Stack length at `<T>`.
-  T_ST_LEN_0 @  { len0 } \ Stack length at `T{`.
-  len1 len0 -   { rel0 } \ Relative length before `<T>`.
-  len2 len1 -   { rel1 } \ Relative length after `<T>`.
+  STACK               { stk  }
+  stk stack_len_cells { len2 } \ Length at `}T`.
+  T_ST_LEN_1 @        { len1 } \ Stack length at `<T>`.
+  T_ST_LEN_0 @        { len0 } \ Stack length at `T{`.
+  len1 len0 -         { rel0 } \ Relative length before `<T>`.
+  len2 len1 -         { rel1 } \ Relative length after `<T>`.
 
   \ Does the stack length match?
   rel0 rel1 =
@@ -90,7 +90,7 @@ end
 Stack mem: TEST_STACK
 false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
 
-32 TEST_STACK stack_init
+32 cells TEST_STACK stack_init
 
 \ Captured at `<T>`, used only in compilation. We could have used
 \ the regular control stack for this, but using a dedicated place
@@ -114,7 +114,7 @@ fun: testing_stack_init_aot
 end
 
 fun: testing_compiled_reset
-  TEST_STACK stack_clear
+  TEST_STACK stack_trunc
   TEST_ARG_LEN off!
 end
 

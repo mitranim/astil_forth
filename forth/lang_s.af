@@ -895,7 +895,7 @@ fun: sp! ( adr -- ) [
 \ Stack introspection doesn't need to be optimal.
 fun: sp_at         ( ind    -- ptr ) cells sp0 + end
 fun: stack_len     (        -- len ) sp sp0 - /cells end
-fun: stack_clear   ( …      -- )     sp0 sp! end
+fun: stack_trunc   ( …      -- )     sp0 sp! end
 fun: stack_set_len ( … len  -- … )   sp_at sp! end
 fun: stack+        ( … diff -- … )   dec cells sp swap + sp! end
 fun: stack-        ( … diff -- … )   inc cells sp swap - sp! end
@@ -1007,9 +1007,6 @@ fun: mem: ( C: cap "name" -- ) ( E: -- adr )
     asm_push_x1 comp_instr     \ str x1, [x27], 8
   }word
 end
-
-\ Shortcut for the standard idiom `create <name> N cells allot`.
-fun: cells: ( C: len "name" -- ) ( E: -- adr ) cells execute' mem: end
 
 \ ## Locals: basic
 \
@@ -1745,7 +1742,7 @@ fun: .s
   end
 end
 
-fun: .sc .s stack_clear end
+fun: .sc .s stack_trunc end
 
 \ ## More memory stuff
 

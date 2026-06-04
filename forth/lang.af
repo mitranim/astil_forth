@@ -1005,6 +1005,7 @@ fun: comp_load_off { off } ( E: adr -- adr )
   1 comp_args_set
 end
 
+fun: stack?      { stack -- bool  } stack @ <>0 end
 fun: stack_floor { stack -- floor } [ STACK_OFF_FLOOR comp_load_off ] end
 fun: stack_top   { stack -- top   } [ STACK_OFF_TOP   comp_load_off ] end
 fun: stack_ceil  { stack -- ceil  } [ STACK_OFF_CEIL  comp_load_off ] end
@@ -1026,26 +1027,40 @@ fun: stack_top! { top stack } [
   0 1 asm_stack_top_store comp_instr
 ] end
 
-fun: stack_at { ind stack  -- adr } ind cells { off } stack stack_floor off + end
-
-fun: stack_len { stack -- len }
-  stack stack_floor { floor }
-  stack stack_top floor - /cells
+fun: stack_cell_at { ind stack  -- adr }
+  ind cells { off } stack stack_floor off +
 end
 
-fun: stack_cap { stack -- len }
+fun: stack_len_bytes { stack -- len }
   stack stack_floor { floor }
-  stack stack_ceil floor - /cells
+  stack stack_top floor -
 end
 
-fun: stack_clear   { stack     } stack stack_floor stack stack_top! end
-fun: stack_len_set { len stack } len stack stack_at stack stack_top! end
+fun: stack_cap_bytes { stack -- len }
+  stack stack_floor { floor }
+  stack stack_ceil floor -
+end
 
-fun: stack_len+ { diff stack } stack stack_len diff + stack stack_len_set end
-fun: stack_len- { diff stack } stack stack_len diff - stack stack_len_set end
-fun: stack_drop { stack      } 1 stack stack_len- end
+fun: stack_len_cells { stack -- len } stack stack_len_bytes /cells end
+fun: stack_cap_cells { stack -- len } stack stack_cap_bytes /cells end
 
-\ Pops from a stack. Usage:
+fun: stack_trunc { stack } stack stack_floor stack stack_top! end
+
+fun: stack_len_cells_set { len stack }
+  len stack stack_cell_at stack stack_top!
+end
+
+fun: stack_len_cells+ { diff stack }
+  stack stack_len_cells diff + stack stack_len_cells_set
+end
+
+fun: stack_len_cells- { diff stack }
+  stack stack_len_cells diff - stack stack_len_cells_set
+end
+
+fun: stack_drop_cell { stack } 1 stack stack_len_cells- end
+
+\ Pops a cell from a stack. Usage:
 \
 \   stack s> { val }
 \
@@ -1068,7 +1083,7 @@ fun: s> { stack -- val } [
   1 comp_args_set
 ] end
 
-\ Pushes to a stack.
+\ Pushes a cell to a stack.
 \
 \ Also see `:: >>s` defined later in this file.
 \ Unlike this version, it's variadic.
@@ -1333,9 +1348,6 @@ fun: mem: { cap } ( C: "name" -- ) ( E: -- adr )
   [ false comp_only ]
 end
 
-\ Shortcut for the standard idiom `create <name> N cells allot`.
-fun: cells: { len } ( C: "name" -- ) ( E: -- adr ) len cells execute' mem: end
-
 \ ## IO
 \
 \ Having access to `libc` spares us from having to implement
@@ -1545,7 +1557,7 @@ end
 
 fun: switch_pop ( C: next_pop val_loc -- )
   comp_barrier
-  STACK stack_drop
+  STACK stack_drop_cell
   pop_execute
 end
 
@@ -1676,6 +1688,9 @@ end
 \ Note that load / store is type-specific. Fields which are't cell-sized
 \ must be loaded and stored using dedicated typed operators.
 
+\ Maximum alignment needed for any scalar value on our target ISA.
+16 let: FUND_ALIGN
+
 \ Used internally.
 fun: struct_pop ( C: str len max_align off -- )
   STACK s> { off }
@@ -1726,7 +1741,7 @@ fun: field: { max_align off fun size len -- align off_next fun }
   \ Since structs are intended for C interop, alignment of every field
   \ must match the platform's C ABI. So far, ABI compat seems to hold,
   \ but has NOT been tested thoroughly enough.
-  size Cell min            { field_align }
+  size FUND_ALIGN min      { field_align }
   off field_align align_up { field_off }
 
   \ Execution-time semantics.
@@ -1808,12 +1823,15 @@ end
 \ Initializes a stack with guards. Note: the memory is acquired from the OS
 \ and is NOT managed by the compiler. When used for global variables, their
 \ state is not preserved in AOT compilation.
-fun: stack_init { len stack }
-  len cells PAGE_SIZE align_up { size }
-  PAGE_SIZE 1 lsl size +       { bytelen } \ + space for 2 guards
-  bytelen PROT_NONE mem_map    { cellar }
-  cellar PAGE_SIZE +           { floor }
-  floor size +                 { ceil }
+\
+\ This is the preferred way to acquire memory pages from the OS.
+\ Size is counted in bytes; to allocate cells, use `size cells`.
+fun: stack_init { size stack }
+  size PAGE_SIZE align_up   { size }
+  PAGE_SIZE 1 lsl size +    { bytelen } \ + space for 2 guards
+  bytelen PROT_NONE mem_map { cellar }
+  cellar PAGE_SIZE +        { floor }
+  floor size +              { ceil }
   floor size mem_unprot
 
   bytelen stack Stack_bytelen !
@@ -1838,8 +1856,14 @@ fun: stack_deinit { stack }
   nil stack Stack_ceil    !
 end
 
+\ Redefine to skip nil stack.
+fun: stack_trunc { stack } [ redefine ]
+  stack ifn ret end
+  stack stack_trunc
+end
+
 fun: stack_repr { stack }
-  stack ifn " [debug] stack: nil" elog elf ret end
+  stack ifn " [debug] stack is nil" elog elf ret end
 
   " [debug] stack           " elog stack                 debug_arg
   " [debug] Stack_bytelen @ " elog stack Stack_bytelen @ debug_arg
@@ -1850,9 +1874,9 @@ fun: stack_repr { stack }
 end
 
 \ For JIT use only. TODO: AOT compatibility.
-fun: stack: { len } ( C: "name" -- ) ( E: -- stack )
+fun: stack: { size } ( C: "name" -- ) ( E: -- stack )
   Stack malloc { adr }
-  len adr stack_init
+  size adr stack_init
   adr execute' let:
 end
 
@@ -1874,7 +1898,7 @@ end
 
 \ Control stack for auxiliary loop constructs like
 \ `leave` and `while` which push their frames here.
-1024 stack: LOOP_AUX
+1024 cells stack: LOOP_AUX
 
 \ Position of the topmost loop frame on the control stack.
 \ Each loop pushes at least the following frame:
@@ -1894,7 +1918,7 @@ end
 fun: loop_frame_adr { -- adr }
   LOOP_IND @ { frame }
   frame ifn " missing loop frame" throw end
-  frame STACK stack_at
+  frame STACK stack_cell_at
 end
 
 fun: loop_frame_pop
@@ -1911,9 +1935,9 @@ fun: loop_frame_init
   ( LOOP_AUX: -- nop )
 
   \ Stash prev loop info; replace it, making this the topmost loop frame.
-  LOOP_IND @         STACK >s
-  xt' loop_frame_pop STACK >s
-  STACK stack_len LOOP_IND !
+  LOOP_IND @            STACK >s
+  xt' loop_frame_pop    STACK >s
+  STACK stack_len_cells LOOP_IND !
 
   \ Terminator for `loop_frame_pop`.
   xt' nop LOOP_AUX >s
@@ -2491,8 +2515,8 @@ fun: log_int  { num } " %zd" num logf end
 fun: log_cell { num } " %zd 0x%zx" num num logf end
 fun: .        { num } num log_cell lf end
 
-fun: stack_log { stack }
-  stack stack_len { len }
+fun: stack_log_cells { stack }
+  stack stack_len_cells { len }
 
   len ifn
     " stack is empty" log lf
@@ -2508,14 +2532,14 @@ fun: stack_log { stack }
 
   len 0 +for: ind
     space space
-    ind stack stack_at @ log_cell
+    ind stack stack_cell_at @ log_cell
     " <%zd>" ind logf
     lf
   end
 end
 
-fun: .s STACK stack_log end
-fun: .sc .s STACK stack_clear end
+fun: .s STACK stack_log_cells end
+fun: .sc .s STACK stack_trunc end
 
 \ ## Interpreter internals
 \

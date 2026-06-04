@@ -88,26 +88,26 @@ fun: test_stack_primitives
   Stack alloca { stk }
   Stack stk memzero
 
-  T{ stk stack_len <T> 0 }T
-  T{ stk stack_cap <T> 0 }T
+  T{ stk stack_len_cells <T> 0 }T
+  T{ stk stack_cap_cells <T> 0 }T
 
   32 stk stack_init
 
-  T{ stk stack_len <T> 0    }T
-  T{ stk stack_cap <T> 2048 }T \ Adjusted to mem page size.
+  T{ stk stack_len_cells <T> 0    }T
+  T{ stk stack_cap_cells <T> 2048 }T \ Adjusted to mem page size.
 
   10 stk >s
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 10 }T
-  T{ stk stack_len <T> 0  }T
+  T{ stk stack_len_cells <T> 1  }T
+  T{ stk s>              <T> 10 }T
+  T{ stk stack_len_cells <T> 0  }T
 
   20 stk >s
   30 stk >s
-  T{ stk stack_len <T> 2  }T
-  T{ stk s>        <T> 30 }T
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 20 }T
-  T{ stk stack_len <T> 0  }T
+  T{ stk stack_len_cells <T> 2  }T
+  T{ stk s>              <T> 30 }T
+  T{ stk stack_len_cells <T> 1  }T
+  T{ stk s>              <T> 20 }T
+  T{ stk stack_len_cells <T> 0  }T
 
   stk stack_deinit
 end
@@ -117,37 +117,37 @@ fun: test_to_stack_variadic
   Stack alloca { stk }
   32 stk stack_init
 
-  T{ stk stack_len <T> 0 }T
+  T{ stk stack_len_cells <T> 0 }T
 
   10 stk >>s
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 10 }T
-  T{ stk stack_len <T> 0  }T
+  T{ stk stack_len_cells <T> 1  }T
+  T{ stk s>              <T> 10 }T
+  T{ stk stack_len_cells <T> 0  }T
 
   666 stk >>s
-  T{ stk stack_len <T> 1   }T
-  T{ stk s>        <T> 666 }T
-  T{ stk stack_len <T> 0   }T
+  T{ stk stack_len_cells <T> 1   }T
+  T{ stk s>              <T> 666 }T
+  T{ stk stack_len_cells <T> 0   }T
 
-  T{ stk stack_len <T> 0 }T
+  T{ stk stack_len_cells <T> 0 }T
   stk >>s
-  T{ stk stack_len <T> 0 }T
+  T{ stk stack_len_cells <T> 0 }T
 
   20 30 stk >>s
-  T{ stk stack_len <T> 2  }T
-  T{ stk s>        <T> 30 }T
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 20 }T
-  T{ stk stack_len <T> 0  }T
+  T{ stk stack_len_cells <T> 2  }T
+  T{ stk s>              <T> 30 }T
+  T{ stk stack_len_cells <T> 1  }T
+  T{ stk s>              <T> 20 }T
+  T{ stk stack_len_cells <T> 0  }T
 
   40 50 60 stk >>s
-  T{ stk stack_len <T> 3  }T
-  T{ stk s>        <T> 60 }T
-  T{ stk stack_len <T> 2  }T
-  T{ stk s>        <T> 50 }T
-  T{ stk stack_len <T> 1  }T
-  T{ stk s>        <T> 40 }T
-  T{ stk stack_len <T> 0  }T
+  T{ stk stack_len_cells <T> 3  }T
+  T{ stk s>              <T> 60 }T
+  T{ stk stack_len_cells <T> 2  }T
+  T{ stk s>              <T> 50 }T
+  T{ stk stack_len_cells <T> 1  }T
+  T{ stk s>              <T> 40 }T
+  T{ stk stack_len_cells <T> 0  }T
 
   stk stack_deinit
 end
@@ -157,24 +157,24 @@ fun: test_stack_braces
   Stack alloca { stk }
   32 stk stack_init
 
-  T{ stk stack_len <T> 0 }T
+  T{ stk stack_len_cells <T> 0 }T
   stk stack{ }
-  T{ stk stack_len <T> 0 }T
+  T{ stk stack_len_cells <T> 0 }T
 
   10 stk >>s
-  T{ stk stack_len <T> 1 }T
+  T{ stk stack_len_cells <T> 1 }T
   stk stack{ one }
-  T{ stk stack_len one <T> 0 10 }T
+  T{ stk stack_len_cells one <T> 0 10 }T
 
   10 20 stk >>s
-  T{ stk stack_len <T> 2 }T
+  T{ stk stack_len_cells <T> 2 }T
   stk stack{ one two }
-  T{ stk stack_len one two <T> 0 10 20 }T
+  T{ stk stack_len_cells one two <T> 0 10 20 }T
 
   10 20 30 stk >>s
-  T{ stk stack_len <T> 3 }T
+  T{ stk stack_len_cells <T> 3 }T
   stk stack{ one two three }
-  T{ stk stack_len one two three <T> 0 10 20 30 }T
+  T{ stk stack_len_cells one two three <T> 0 10 20 30 }T
 
   stk stack_deinit
 end

@@ -2,8 +2,8 @@ import' std:lang_s.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-8192 let:   LEN
-LEN  cells: LIST
+8192      let: LEN
+LEN cells mem: LIST
 
 fun: list_ceil { list len -- ceil } len cells list + end
 
