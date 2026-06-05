@@ -822,7 +822,7 @@ fun: test_loop_countdown
   T{
     8 0 1
     -loop: ind
-      ++: len
+      inc: len
     end
     len ind
   <T>
@@ -830,33 +830,33 @@ fun: test_loop_countdown
   }T
 
   0 { len }
-  T{ 8 0 2 -loop: ind ++: len end len ind <T> 4 -2 }T
+  T{ 8 0 2 -loop: ind inc: len end len ind <T> 4 -2 }T
 
   0 { len }
-  T{ 8 0 3 -loop: ind ++: len end len ind <T> 2 -1 }T
+  T{ 8 0 3 -loop: ind inc: len end len ind <T> 2 -1 }T
 
   0 { len }
-  T{ 8 0 4 -loop: ind ++: len end len ind <T> 2 -4 }T
+  T{ 8 0 4 -loop: ind inc: len end len ind <T> 2 -4 }T
 
   0 { len }
-  T{ 8 0 5 -loop: ind ++: len end len ind <T> 1 -2 }T
+  T{ 8 0 5 -loop: ind inc: len end len ind <T> 1 -2 }T
 
   0 { len }
-  T{ 8 0 6 -loop: ind ++: len end len ind <T> 1 -4 }T
+  T{ 8 0 6 -loop: ind inc: len end len ind <T> 1 -4 }T
 
   0 { len }
-  T{ 8 0 7 -loop: ind ++: len end len ind <T> 1 -6 }T
+  T{ 8 0 7 -loop: ind inc: len end len ind <T> 1 -6 }T
 
   0 { len }
-  T{ 8 0 8 -loop: ind ++: len end len ind <T> 1 -8 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 0 9 -loop: ind ++: len end len ind <T> 0 -1 }T
+  T{ 8 0 8 -loop: ind inc: len end len ind <T> 1 -8 }T
 
   \ Out of range from the start.
   0 { len }
-  T{ 8 0 10 -loop: ind ++: len end len ind <T> 0 -2 }T
+  T{ 8 0 9 -loop: ind inc: len end len ind <T> 0 -1 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 0 10 -loop: ind inc: len end len ind <T> 0 -2 }T
 end
 test_loop_countdown
 
@@ -868,7 +868,7 @@ fun: test_loop_countup
   T{
     8 0 1
     +loop: ind
-      ++: len
+      inc: len
     end
     len ind
   <T>
@@ -876,36 +876,36 @@ fun: test_loop_countup
   }T
 
   0 { len }
-  T{ 8 0 2 +loop: ind ++: len end len ind <T> 4 8 }T
+  T{ 8 0 2 +loop: ind inc: len end len ind <T> 4 8 }T
 
   0 { len }
-  T{ 8 0 3 +loop: ind ++: len end len ind <T> 3 9 }T
+  T{ 8 0 3 +loop: ind inc: len end len ind <T> 3 9 }T
 
   0 { len }
-  T{ 8 0 4 +loop: ind ++: len end len ind <T> 2 8 }T
+  T{ 8 0 4 +loop: ind inc: len end len ind <T> 2 8 }T
 
   0 { len }
-  T{ 8 0 5 +loop: ind ++: len end len ind <T> 2 10 }T
+  T{ 8 0 5 +loop: ind inc: len end len ind <T> 2 10 }T
 
   0 { len }
-  T{ 8 0 6 +loop: ind ++: len end len ind <T> 2 12 }T
+  T{ 8 0 6 +loop: ind inc: len end len ind <T> 2 12 }T
 
   0 { len }
-  T{ 8 0 7 +loop: ind ++: len end len ind <T> 2 14 }T
+  T{ 8 0 7 +loop: ind inc: len end len ind <T> 2 14 }T
 
   0 { len }
-  T{ 8 0 8 +loop: ind ++: len end len ind <T> 1 8 }T
+  T{ 8 0 8 +loop: ind inc: len end len ind <T> 1 8 }T
 
   0 { len }
-  T{ 8 0 9 +loop: ind ++: len end len ind <T> 1 9 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 8 1 +loop: ind ++: len end len ind <T> 0 8 }T
+  T{ 8 0 9 +loop: ind inc: len end len ind <T> 1 9 }T
 
   \ Out of range from the start.
   0 { len }
-  T{ 8 9 1 +loop: ind ++: len end len ind <T> 0 9 }T
+  T{ 8 8 1 +loop: ind inc: len end len ind <T> 0 8 }T
+
+  \ Out of range from the start.
+  0 { len }
+  T{ 8 9 1 +loop: ind inc: len end len ind <T> 0 9 }T
 end
 test_loop_countup
 

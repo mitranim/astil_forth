@@ -249,7 +249,12 @@ static Err err_word_undefined(const char *name) {
 }
 
 static Err err_word_undefined_in_wordlist(const char *name, Wordlist list) {
-  return errf("word " FMT_QUOTED " not found in wordlist %d", name, list);
+  return errf(
+    "word " FMT_QUOTED " not found in wordlist %d (%s)",
+    name,
+    list,
+    wordlist_name(list)
+  );
 }
 
 static Err err_word_undefined_in_each_wordlist(const char *name) {

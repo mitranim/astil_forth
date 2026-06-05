@@ -9,8 +9,8 @@ fun: reverse { str len -- }
     low c@ { tmp }
     high c@ low c!
     tmp high c!
-    ++: low
-    --: high
+    inc: low
+    dec: high
   end
 end
 

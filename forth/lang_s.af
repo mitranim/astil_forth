@@ -747,11 +747,11 @@ fun: max ( i1 i2 -- i1|i2 ) [
                asm_push_x1   comp_instr \ str x1, [x27], 8
 ] end
 
-fun: cell 8 end
+fun: CELL 8 end
 fun: cells  ( len  -- size ) 3 lsl end
 fun: /cells ( size -- len  ) 3 asr end
-fun: +cell  ( adr  -- adr  ) cell + end
-fun: -cell  ( adr  -- adr  ) cell - end
+fun: +cell  ( adr  -- adr  ) CELL + end
+fun: -cell  ( adr  -- adr  ) CELL - end
 
 \ ## Assembler continued
 
@@ -978,8 +978,8 @@ fun: let: ( C: val -- ) ( E: -- val ) word{ comp_push }word end
 \ Similar to standard `variable`.
 fun: var: ( C: init "name" -- ) ( E: -- adr )
   word{
-    sp cell -                  \ Address of the `init` value.
-    cell        alloc_data     ( -- adr )
+    sp CELL -                  \ Address of the `init` value.
+    CELL        alloc_data     ( -- adr )
     1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     asm_push_x1 comp_instr     \ str x1, [x27], 8
     drop                       \ Don't need the `init` value anymore.
@@ -1535,15 +1535,15 @@ end
 
 \ For compiling words which modify a local by applying the given function.
 fun: comp_loc_mut ( C: fun "name" -- ) ( E: -- )
-  parse_word comp_named_local { loc }
-  loc comp_local_get_push
+  parse_word comp_named_local
+  dup comp_local_get_push
   comp_call
-  loc comp_pop_local_set
+  comp_pop_local_set
 end
 
-\ Usage: `++: some_val`.
-fun_comp: ++: ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
-fun_comp: --: ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
+\ Usage: `inc: some_val`.
+fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
+fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
 
 fun: within { num one two -- bool }
   one num >
@@ -1618,7 +1618,8 @@ end
 fun: comp_va_end ( C: len -- )
   dup >=0 if
     cells 16 align_up
-    ASM_REG_SP ASM_REG_SP rot asm_add_imm comp_instr \ add sp, sp, <off>
+    ASM_REG_SP ASM_REG_SP rot
+    asm_add_imm comp_instr \ add sp, sp, <off>
   else
     drop
   end
@@ -1627,7 +1628,7 @@ end
 \ Sets up arguments for a variadic call. Assumes the Apple Arm64 ABI,
 \ where vargs use the systack. Usage example:
 \
-\   : some_word
+\   fun: some_word
 \     10 20 30 [ 3 ] vargs{ " numbers: %zd %zd %zd" printf }vargs lf
 \   end
 \
@@ -1640,8 +1641,8 @@ fun_comp: }vargs ( C: len --     ) ( E: <systack_pop   )     comp_va_end end
 \ The given function must have exactly that arity.
 fun: comp_varcall ( C: len fun -- ) ( E: …args… …vargs… -- )
   over comp_va_beg
-       comp_call
-       comp_va_end
+  comp_call
+  comp_va_end
 end
 
 \ Format-print to stdio. `logf` prints to `stdout`. `elogf` prints to `stderr`.

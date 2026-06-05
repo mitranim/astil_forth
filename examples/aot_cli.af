@@ -34,7 +34,7 @@ main
 \
 \ In the Forth REPL:
 \
-\   : main { -- exit } " hello world!" log lf 0 end
+\   fun: main { -- exit } " hello world!" log lf 0 end
 \   \ Then hit Ctrl+D (not Ctrl+C) to terminate stdin.
 \
 \ In your shell:

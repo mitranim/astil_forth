@@ -37,7 +37,7 @@ fun: next_word { wlist -- XT } ( "word" -- XT ) parse_word wlist find_word end
 \ "XT" is short for "execution token".
 \ `xt'` is renamed from standard `'`.
 \ Each execution token is a `Sym*`.
-fun:      xt_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push end
+fun: xt_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push end
 fun:      xt'  {    -- XT } (    "word" -- ) 1 next_word end \ WORDLIST_EXEC
 fun:      xt'' {    -- XT } (    "word" -- ) 2 next_word end \ WORDLIST_COMP
 fun_comp: xt'  ( E: -- XT ) ( C: "word" -- ) 1 xt_next   end \ WORDLIST_EXEC
@@ -731,14 +731,12 @@ fun: max { i0 i1 -- i0|i1 } [
 fun: align_down { len wid -- len } wid negate len and end
 fun: align_up   { len wid -- len } wid dec len + wid align_down end
 
-\ Named in Titlecase for consistency with pretend "types"
-\ defined later, such as `U8`, `S64`, `Cint`, and so on.
-8 let: Cell
+8 let: CELL
 
 fun: cells  { len  -- size } len 3 lsl  end
 fun: /cells { size -- len  } size 3 asr end
-fun: +cell  { adr  -- adr  } adr Cell + end
-fun: -cell  { adr  -- adr  } adr Cell - end
+fun: +cell  { adr  -- adr  } adr CELL + end
+fun: -cell  { adr  -- adr  } adr CELL - end
 
 \ ## Assembler continued
 
@@ -936,6 +934,7 @@ end
 
 fun: @2 { adr -- val0 val1 } [
   0                         comp_clobber
+  1                         comp_clobber
   0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
   2                         comp_args_set
 ] end
@@ -1291,13 +1290,15 @@ fun: init_data_word { name name_len adr }
   semicolon
 end
 
-\ Similar to standard `variable`, but takes an initial value like `let:`.
-fun: var: { val } ( C: "name" -- ) ( E: -- ptr )
-  parse_word { str len }
-  nil Cell alloc_data { adr }
+fun: var_init { str len val }
+  nil CELL alloc_data { adr }
   val adr !
   str len adr init_data_word
-  [ false comp_only ]
+end
+
+\ Similar to standard `variable`, but takes an initial value like `let:`.
+fun: var: { val } ( C: "name" -- ) ( E: -- ptr )
+  parse_word val var_init [ false comp_only ]
 end
 
 fun: comp_buf { adr cap } ( E: -- adr cap )
@@ -2224,7 +2225,7 @@ end
 
 \ Sets up variadic arguments following the C ABI. Usage example:
 \
-\   : some_word
+\   fun: some_word
 \     10 20 30 vargs{ " numbers: %zd %zd %zd" printf }vargs lf
 \   end
 \
@@ -2287,14 +2288,14 @@ fun_comp: strf ( E: buf cap fmt …vargs… -- buf ) xt' snprintf 3 comp_varcall
 \
 \ Examples:
 \
-\   : word { -- one two } " some_error" throw end
+\   fun: word { -- one two } " some_error" throw end
 \
-\   : throwing
+\   fun: throwing
 \     word { one two }
 \     catch' word { one two err }
 \   end
 \
-\   : non_throwing [ true catches ]
+\   fun: non_throwing [ true catches ]
 \     word { one two err } \ Implicit catch.
 \   end
 
@@ -2322,7 +2323,7 @@ fun_comp: errf ( E: fmt …vargs… -- err )
   execute''  ERR_BUF_0              \ mov x0, <buf>
   execute''  ERR_CAP                \ mov x1, <cap>
   3          comp_args_set          \ Assume x2 is useful.
-  xt' snprintf comp_call              \ blr <fun>
+  xt' snprintf comp_call            \ blr <fun>
   0          comp_args_set          \ Ignore output length.
   len off -  comp_va_end            \ Restore SP.
   execute''  ERR_BUF_0              \ mov x0, <buf>
@@ -2688,7 +2689,7 @@ fun: comp_loc_mut { fun name } ( C: "name" -- ) ( E: -- )
   parse_word comp_named_local { loc }
 
   comp_args_get if
-  " arity mismatch in `%s`: expected no arguments" name errf throw
+    " arity mismatch in `%s`: expected no arguments" name errf throw
   end
 
   0 loc comp_local_get \ mov x0, <loc> | ldr x0, [FP, <loc>]
@@ -2698,9 +2699,9 @@ fun: comp_loc_mut { fun name } ( C: "name" -- ) ( E: -- )
   0     comp_args_set
 end
 
-\ Increment or decrement a local. Usage: `++: some_val`.
-fun_comp: ++: ( C: "name" -- ) ( E: -- ) xt' inc " ++" comp_loc_mut end
-fun_comp: --: ( C: "name" -- ) ( E: -- ) xt' dec " --" comp_loc_mut end
+\ Increment or decrement a local. Usage: `inc: some_val`.
+fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' inc " inc:" comp_loc_mut end
+fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' dec " dec:" comp_loc_mut end
 
 \ Comptime analogue of top-level `import'`.
 fun_comp: import' parse_word comp_str compile' import end

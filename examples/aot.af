@@ -36,7 +36,7 @@ xt' main " out.exe" compile_executable
 \
 \ In the Forth REPL:
 \
-\   : main { -- exit } " hello world!" log lf 0 end
+\   fun: main { -- exit } " hello world!" log lf 0 end
 \   xt' main " out.exe" compile_executable
 \   \ Then hit Ctrl+D (not Ctrl+C) to exit.
 \
@@ -59,9 +59,9 @@ xt' main " out.exe" compile_executable
 \
 \ Forth:
 \
-\   : main { -- exit } " hello world! (first)" log lf 0 end
+\   fun: main { -- exit } " hello world! (first)" log lf 0 end
 \   xt' main " out0.exe" compile_executable
-\   : main { -- exit } " hello world! (second)" log lf 0 end
+\   fun: main { -- exit } " hello world! (second)" log lf 0 end
 \   \ [system] redefined word `main` in wordlist 1
 \   xt' main " out1.exe" compile_executable
 \   \ Hit Ctrl+D to exit.

@@ -13,7 +13,9 @@ end
 
 fun: list_init { list len -- }
   74755 { seed }
-  list len list_ceil list cell
+  list len list_ceil
+  list
+  CELL
   +loop: ptr
     seed pseudo_random { seed }
     seed ptr !
@@ -21,7 +23,7 @@ fun: list_init { list len -- }
 end
 
 fun: list_dump { list len -- }
-  list len list_ceil list cell
+  list len list_ceil list CELL
   +loop: ptr
     ptr @ log_int space
   end
@@ -30,16 +32,19 @@ end
 
 fun: list_verify { list len -- }
   list len list_ceil -cell
-  list cell
+  list
+  CELL
   +loop: ptr
     ptr @2 > if " [bubble] not sorted" throw end
   end
 end
 
 fun: bubble { list len -- }
-  list len list_ceil list cell
+  list len list_ceil
+  list
+  CELL
   -loop: ceil_ptr
-    ceil_ptr list cell
+    ceil_ptr list CELL
     +loop: ptr
       ptr @2 > if ptr @2 swap ptr !2 end
     end
@@ -54,11 +59,11 @@ fun: bubble_sort { list len -- }
 end
 
 \ fun: bubble_with_flag ( -- )
-\   CEIL LIST cell
+\   CEIL LIST CELL
 \   -loop: ceil_ptr
 \     true to: flag
 \
-\     ceil_ptr LIST cell
+\     ceil_ptr LIST CELL
 \     +loop: ptr
 \       ptr @2 >
 \       if
