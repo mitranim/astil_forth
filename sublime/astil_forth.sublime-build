@@ -1,0 +1,15 @@
+{
+  "selector": "source.astil_forth",
+  "cmd": ["astil", "$file"],
+  "file_regex": "position:[\t ]+(...*?):(\\d+):(\\d+)",
+  "variants": [
+    {
+      "name": "trace",
+      "cmd": ["astil", "--trace=true", "$file"],
+    },
+    {
+      "name": "stack-cc",
+      "cmd": ["astil_s", "$file"],
+    },
+  ]
+}
