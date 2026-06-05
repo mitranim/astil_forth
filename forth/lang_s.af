@@ -1081,11 +1081,9 @@ end
 3 0 extern: strlcpy ( dst src buf_len -- )
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
 
-fun: move    ( src dst len  -- ) swap_over strncpy end
-fun: fill    ( buf len char -- ) swap memset end
-fun: blank   ( buf len      -- ) 32 fill end
-fun: erase   ( buf len      -- ) 0 fill end
-fun: memzero ( len buf      -- ) swap 0 swap memset end
+fun: move  ( src dst len  -- ) swap_over strncpy end
+fun: fill  ( buf len char -- ) swap memset end
+fun: erase ( buf len      -- ) 0 fill end
 
 \ See `ccompare` below for null-terminated strings.
 fun: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp end

@@ -1187,6 +1187,9 @@ end
 \
 \ Compiler also provides `alloca` intrinsically.
 
+\ Maximum alignment needed for any value on Arm64.
+16 let: FUND_ALIGN
+
 2 1 extern: calloc  ( len size -- addr )
 1 1 extern: malloc  ( size -- addr )
 1 0 extern: free    ( addr -- )
@@ -1195,6 +1198,7 @@ end
 3 0 extern: memmove ( dst src len -- )
 
 1 1 extern: strdup  ( cstr -- cstr )
+2 1 extern: strndup ( cstr len -- cstr )
 1 1 extern: strlen  ( cstr -- len )
 2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
 3 1 extern: strncmp ( str0 str1 len -- cmp )
@@ -1202,11 +1206,9 @@ end
 3 0 extern: strlcpy ( dst src buf_len -- )
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
 
-fun: move    { src dst len  } dst src len strncpy end
-fun: fill    { buf len char } buf char len memset end
-fun: blank   { buf len      } buf len 32 fill end
-fun: erase   { buf len      } buf len 0 fill end
-fun: memzero { len buf      } buf 0 len memset end
+fun: move  { src dst len  } dst src len strncpy end
+fun: fill  { buf len char } buf char len memset end
+fun: erase { buf len      } buf len 0 fill end
 
 \ See `ccompare` below for null-terminated strings.
 fun: compare { str0 len0 str1 len1 -- direction }
@@ -1610,71 +1612,150 @@ fun_comp: case
   xt' case_pop STACK >s
 end
 
-\ ## Pretend types
+\ ## Types
 \
-\ We don't have a real type system, but it can still be useful
-\ to use type names, which simply return sizes, similar to the
-\ existing practice of `cell`/`cells`. The pretend type `Cell`
-\ is defined earlier.
+\ We define type descriptors with size and alignment information.
+\ This allows us to provide `struct:` with proper field alignment
+\ compatible with C, for easier libc interop.
 
-\ Sizeof of various numbers. Assumes Arm64 + Apple ABI.
+\ Internal tool for type definitions. Each type is represented with the
+\ structure listed below. Since we do not yet have `struct:` because it
+\ can only be defined later, we get / set fields via hardcoded offsets.
+\
+\ SYNC[type_fields].
+\
+\   struct: Type
+\     Cell 1 field: Type_size
+\     Cell 1 field: Type_align
+\     U8   0 field: Type_name  \ Variable length; null-terminated.
+\   end
+\
+\ Types are defined with shortcuts `int: arr: struct: opaque:`.
+\
+\ Most of the time size and alignment should be accessed via the
+\ `sizeof'` and `alignof'` shortcuts, which inline the values at
+\ compile time, without loading the type descriptors at runtime.
+fun: def_type { name name_len size align }
+  name_len inc       { name_cap }
+  2 cells name_cap + { type_size }
+
+  nil type_size alloc_data { type }
+
+  \ SYNC[type_fields].
+  type             { type_size }
+  type +cell       { type_align }
+  type_align +cell { type_name }
+
+  size type_size !
+  align type_align !
+  type_name name name_cap strlcpy
+  name name_len type init_data_word
+
+  [ false comp_only ]
+end
+
+fun: int: { size } ( C: "name" -- ) ( E: -- type )
+  parse_word size size def_type
+end
+
+fun: opaque: { size align } ( C: "name" -- ) ( E: -- type )
+  parse_word size align def_type
+end
+
+fun: sizeof { type -- size } type @ end
+
+fun: sizeof' { -- size } ( C: "type" -- )
+  WORDLIST_EXEC next_word execute STACK s> sizeof
+end
+
+fun_comp: sizeof' ( C: "type" -- ) ( E: -- size )
+  execute' sizeof' comp_push
+end
+
+fun: alignof { type -- align } type +cell @ end
+
+fun: alignof' { -- align } ( C: "type" -- )
+  WORDLIST_EXEC next_word execute STACK s> alignof
+end
+
+fun_comp: alignof' ( C: "type" -- ) ( E: -- align )
+  execute' alignof' comp_push
+end
+
+fun_comp: alloca' ( C: "type" -- ) ( E: -- adr )
+  execute'' sizeof' execute'' alloca
+end
+
+\ ### Integer types
+\
+\ Assumes Arm64 + Apple ABI.
 \
 \ "S" stands for "signed integer", "U" for "unsigned integer".
 \
-\ Note: when converting shorter negative numbers to our `Cell`,
+\ When converting shorter signed integers to wider ones,
 \ they must be sign-extended. See `int_to_cell` for `S32`.
 \
 \ When accessing memory, use the appropriately sized/typed memory operators.
 \ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
 \ Both are stored with `!32`. Aliases like `Cint` get their own "operators".
 \ See memory ops above.
-1 let: U8
-1 let: S8
-2 let: U16
-2 let: S16
-4 let: U32
-4 let: S32
-8 let: U64
-8 let: S64
-8 let: Adr
-8 let: Cstr \ char*
-4 let: Cint
-4 let: Cuint
-8 let: Clong
-8 let: Culong
+1 int: U8
+1 int: S8
+2 int: U16
+2 int: S16
+4 int: U32
+4 int: S32
+8 int: U64
+8 int: S64
+8 int: Adr
+8 int: Cell \ classic Forth name for machine word
+8 int: Cstr \ char*
+4 int: Cint
+4 int: Cuint
+8 int: Clong
+8 int: Culong
 
-\ Defines a pretend "array type" which is just capacity. Usage:
+\ ### Array types
+
+\ Usage:
 \
-\   U8 128    arr: Some_type
-\   Some_type mem: SOME_BUF
+\   U8 128   arr: Some_arr
+\   Some_arr mem: SOME_BUF
 \
-\ This should NOT be used for struct fields, because it loses alignment
-\ information. Misuse can violate the C struct ABI. Arrays only need to
-\ be aligned to element width. For example, an array of `U8` only needs
-\ to be aligned to 1 byte, meaning no padding after the previous field.
-fun: arr: { size len -- } ( C: "name" -- ) ( E: -- cap )
-  size len * execute' let:
+\ An array's alignment is equal to the alignment of its element type.
+\ An array type can be used in a struct field, although that's usually
+\ unnecessary, because each struct field is declared exactly the same
+\ way as an array type:
+\
+\   Elem_type 32 arr:   Some_arr
+\   Elem_type 32 field: Some_field
+\   Some_arr  1  field: Some_field
+fun: arr: { type len -- } ( C: "name" -- ) ( E: -- type )
+  type sizeof len * { size }
+  type alignof      { align }
+  parse_word size align def_type
 end
 
-\ ## Pretend struct types
+\ ### Struct types
 \
-\ Structs allow C interop. Fields are aligned and padded to match the C ABI.
-\
-\ The name of a struct "type" returns its size. The name of a "field"
-\ is a compile-time word which computes its offset from an address.
-\ To get an offset from zero, provide zero.
-\
-\ Basic usage:
+\ Structs allow C interop. Fields are aligned
+\ and padded to match the C ABI. Basic usage:
 \
 \   struct: Type
 \     S32 1  field: Type_field0
 \     U8  32 field: Type_field1
 \   end
 \
-\   Type alloca { adr }
+\   sizeof' Type alloca { adr }
 \
 \       adr Type_field0 @
 \   123 adr Type_field0 !
+\
+\ The name of a struct type returns an actual `Type`.
+\ When allocating, use `sizeof'` to get the size instead.
+\
+\ The name of each field is a compile-time word which calculates its
+\ offset from an address. To get an offset from zero, provide zero.
 \
 \ Normally, a verb consumes all arguments; a field appears to have arity 1.
 \ But these fields are not exactly verbs; multiple fields can be accessed in
@@ -1689,27 +1770,25 @@ end
 \ Note that load / store is type-specific. Fields which are't cell-sized
 \ must be loaded and stored using dedicated typed operators.
 
-\ Maximum alignment needed for any scalar value on our target ISA.
-16 let: FUND_ALIGN
-
-\ Used internally.
-fun: struct_pop ( C: str len max_align off -- )
+\ For internal use, invoked by `end`.
+fun: struct_pop ( C: name name_len align off -- )
   STACK s> { off }
-  STACK s> { max_align }
-  STACK s> { len }
-  STACK s> { str }
+  STACK s> { align }
+  STACK s> { name_len }
+  STACK s> { name }
 
-  off max_align align_up { size }
-  str len size let_init
-  str free \ String was `strdup`'d.
+  off align align_up { size }
+  name name_len size align def_type
+  name free
+
   [ false comp_only ]
 end
 
 \ Begins a definition; terminate with `end`.
 fun: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
-  parse_word     { str len }
-  str strdup     { str }
-  xt' struct_pop { fun }
+  parse_word      { str len }
+  str len strndup { str }
+  xt' struct_pop  { fun }
   str len 0 0 fun
 end
 
@@ -1717,6 +1796,7 @@ end
 fun: struct_field_comp { off }
   comp_args_get { len }
   len ifn " struct field must be preceded by struct pointer" throw end
+  off ifn ret end
 
   \ Offset is computed into the same register that held the address.
   len dec { reg }
@@ -1724,7 +1804,7 @@ fun: struct_field_comp { off }
   reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
 end
 
-\ Every field takes two inputs: type size, like `U8`, and element count.
+\ Every field takes two inputs: type decl, like `U8`, and element count.
 \ This allows us to align fields to element size rather than total size.
 \
 \ A field becomes a word `( struct_adr -- field_adr )` which computes
@@ -1733,37 +1813,46 @@ end
 \ their size and type. For example, signed 32-bit integers `S32` must
 \ be stored with `!32` and loaded with `@s32`, which sign-extends the
 \ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
-fun: field: { max_align off fun size len -- align off_next fun }
+fun: field: { max_align off fun type len -- align off_next fun }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
 
-  parse_word { name_buf name_len }
+  parse_word { name name_len }
 
   \ Since structs are intended for C interop, alignment of every field
-  \ must match the platform's C ABI. So far, ABI compat seems to hold,
-  \ but has NOT been tested thoroughly enough.
-  size FUND_ALIGN min      { field_align }
+  \ must match the platform's C ABI. So far, ABI compat seems to hold.
+  \ We still need more comprehensive tests.
+  type alignof             { field_align }
   off field_align align_up { field_off }
 
   \ Execution-time semantics.
-  name_buf name_len define_fun
+  name name_len define_fun
     1 1 comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
-    field_off comp_push
-    compile' +
+    field_off if
+      field_off comp_push
+      compile' +
+    end
   semicolon
 
   \ Compile-time semantics.
-  name_buf name_len define_fun_comp
+  name name_len define_fun_comp
     field_off comp_push
     compile' struct_field_comp
   semicolon
 
-  size len * field_off + { next_off }
-  max_align size max     { max_align }
-  max_align next_off fun
+  type sizeof len * field_off + { off_next }
+  max_align field_align max     { max_align }
+  max_align off_next fun
 
   [ false comp_only ]
+end
+
+\ Can finally define the type layout officially.
+struct: Type
+  Cell 1 field: Type_size
+  Cell 1 field: Type_align
+  U8   0 field: Type_name  \ Variable width; null-terminated.
 end
 
 \ ## More memory stuff
@@ -1876,7 +1965,7 @@ end
 
 \ For JIT use only. TODO: AOT compatibility.
 fun: stack: { size } ( C: "name" -- ) ( E: -- stack )
-  Stack malloc { adr }
+  sizeof' Stack malloc { adr }
   size adr stack_init
   adr execute' let:
 end
@@ -2587,13 +2676,11 @@ end
 fun_comp: instr'  ( C: "name" -- ) ( E: -- instr ) WORDLIST_EXEC comp_word_instr end
 fun_comp: instr'' ( C: "name" -- ) ( E: -- instr ) WORDLIST_COMP comp_word_instr end
 
-Cell let: Interp_bitset
-
 \ SYNC[hash_table_structure].
 struct: Interp_dict
   U32 1 field: Interp_dict_len
   U32 1 field: Interp_dict_cap
-  Adr 1 field: Interp_dict_bits \ Interp_bitset*
+  Adr 1 field: Interp_dict_bits \ Cell*
   Adr 1 field: Interp_dict_keys \ char**
   Adr 1 field: Interp_dict_vals \ Sym**
 end
@@ -2629,7 +2716,7 @@ fun: wordlist_log { dict list_num list_name }
   dict Interp_dict_cap  @u32 { cap }
   dict Interp_dict_keys @    { keys }
   dict Interp_dict_bits @    { bitsets }
-  Interp_bitset 8 *          { bitset_size }
+  8 cells                    { bitset_size }
 
   \ See C `dict_has` (with some indirections):
   \

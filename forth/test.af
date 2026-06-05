@@ -86,8 +86,10 @@ T{ 10 STACK s> <T> 10 }T
 \ Stack operations are tested early because they're used by conditionals,
 \ loops, and testing utils themselves, which makes testing kinda cycling.
 fun: test_stack_primitives
-  Stack alloca { stk }
-  Stack stk memzero
+  T{ sizeof' Stack <T> 40 }T
+
+  alloca' Stack { stk }
+  stk sizeof' Stack erase
 
   T{ stk stack_len_cells <T> 0 }T
   T{ stk stack_cap_cells <T> 0 }T
@@ -115,7 +117,7 @@ end
 test_stack_primitives
 
 fun: test_to_stack_variadic
-  Stack alloca { stk }
+  alloca' Stack { stk }
   32 stk stack_init
 
   T{ stk stack_len_cells <T> 0 }T
@@ -155,7 +157,7 @@ end
 test_to_stack_variadic
 
 fun: test_stack_braces
-  Stack alloca { stk }
+  alloca' Stack { stk }
   32 stk stack_init
 
   T{ stk stack_len_cells <T> 0 }T
@@ -1304,9 +1306,7 @@ fun: test_wrapf
 end
 test_wrapf
 
-fun: test_alloca_cell
-  Cell alloca { ptr }
-
+fun: test_alloca { ptr }
   T{ ptr @ <T> ptr @ }T \ Should not segfault. The value is undefined.
 
   123 ptr !
@@ -1314,6 +1314,12 @@ fun: test_alloca_cell
 
   234 ptr !
   T{ ptr @ <T> 234 }T
+end
+
+fun: test_alloca_cell
+  CELL         alloca test_alloca
+  sizeof' Cell alloca test_alloca
+  alloca' Cell        test_alloca
 end
 test_alloca_cell
 
@@ -1372,34 +1378,58 @@ fun: test_alloca_dynamic { size0 size1 }
 end
 32 64 test_alloca_dynamic
 
-1 1 arr: Arr0
-2 1 arr: Arr1
-3 1 arr: Arr2
-1 2 arr: Arr3
-1 3 arr: Arr4
-2 3 arr: Arr5
-3 3 arr: Arr6
+1 1 opaque: Opaq_1_1
+2 2 opaque: Opaq_2_2
+3 1 opaque: Opaq_3_1
+5 1 opaque: Opaq_5_1
+
+Opaq_1_1 1 arr: Arr0
+Opaq_2_2 1 arr: Arr1
+Opaq_3_1 1 arr: Arr2
+Opaq_1_1 2 arr: Arr3
+Opaq_1_1 3 arr: Arr4
+Opaq_2_2 3 arr: Arr5
+Opaq_3_1 3 arr: Arr6
 
 fun: test_array_sizes
-  T{ Arr0 <T> 1 }T
-  T{ Arr1 <T> 2 }T
-  T{ Arr2 <T> 3 }T
-  T{ Arr3 <T> 2 }T
-  T{ Arr4 <T> 3 }T
-  T{ Arr5 <T> 6 }T
-  T{ Arr6 <T> 9 }T
+  T{ sizeof' Opaq_1_1 <T> 1 }T
+  T{ sizeof' Opaq_2_2 <T> 2 }T
+  T{ sizeof' Opaq_3_1 <T> 3 }T
+  T{ sizeof' Opaq_5_1 <T> 5 }T
+
+  T{ alignof' Opaq_1_1 <T> 1 }T
+  T{ alignof' Opaq_2_2 <T> 2 }T
+  T{ alignof' Opaq_3_1 <T> 1 }T
+  T{ alignof' Opaq_5_1 <T> 1 }T
+
+  T{ sizeof' Arr0 <T> 1 }T
+  T{ sizeof' Arr1 <T> 2 }T
+  T{ sizeof' Arr2 <T> 3 }T
+  T{ sizeof' Arr3 <T> 2 }T
+  T{ sizeof' Arr4 <T> 3 }T
+  T{ sizeof' Arr5 <T> 6 }T
+  T{ sizeof' Arr6 <T> 9 }T
+
+  T{ alignof' Arr0 <T> 1 }T
+  T{ alignof' Arr1 <T> 2 }T
+  T{ alignof' Arr2 <T> 1 }T
+  T{ alignof' Arr3 <T> 1 }T
+  T{ alignof' Arr4 <T> 1 }T
+  T{ alignof' Arr5 <T> 2 }T
+  T{ alignof' Arr6 <T> 1 }T
 end
 test_array_sizes
 
 struct: Typ
-  8 1 field: Typ_field0
-  4 1 field: Typ_field1
+  U64 1 field: Typ_field0
+  U32 1 field: Typ_field1
 end
 
 \ Field alignment and padding needs to match C.
 \ We test alignment for a lot more cases below.
 fun: test_struct_fields_basic
-  T{     Typ        <T> 16  }T
+  T{ sizeof'  Typ   <T> 16  }T
+  T{ alignof' Typ   <T> 8   }T
   T{ 0   Typ_field0 <T> 0   }T
   T{ 0   Typ_field1 <T> 8   }T
   T{ 123 Typ_field0 <T> 123 }T
@@ -1410,8 +1440,8 @@ end
 test_struct_fields_basic
 
 fun: test_struct_fields_load_store
-  Typ alloca { ptr }
-  Typ ptr memzero
+  alloca' Typ { ptr }
+  ptr sizeof' Typ erase
 
   T{ ptr Typ_field0 <T> ptr     }T
   T{ ptr Typ_field1 <T> ptr 8 + }T
@@ -1437,7 +1467,8 @@ test_struct_fields_load_store
 struct: Typ0 end
 
 fun: test_struct_0
-  T{ Typ0 <T> 0 }T
+  T{ sizeof'  Typ0 <T> 0 }T
+  T{ alignof' Typ0 <T> 0 }T
 end
 test_struct_0
 
@@ -1446,7 +1477,8 @@ struct: Typ1
 end
 
 fun: test_struct_1
-  T{ Typ1           <T> 1   }T
+  T{ sizeof'  Typ1  <T> 1   }T
+  T{ alignof' Typ1  <T> 1   }T
   T{ 123 Typ1_field <T> 123 }T
 end
 test_struct_1
@@ -1457,7 +1489,8 @@ struct: Typ2
 end
 
 fun: test_struct_2
-  T{ Typ2            <T> 8   }T
+  T{ sizeof'  Typ2   <T> 8   }T
+  T{ alignof' Typ2   <T> 4   }T
   T{ 123 Typ2_field0 <T> 123 }T
   T{ 123 Typ2_field1 <T> 127 }T
 end
@@ -1469,7 +1502,10 @@ struct: Typ3
 end
 
 fun: test_struct_3
-  T{ Typ3            <T> 8   }T
+  T{ sizeof'  Typ3   <T> 8   }T
+  T{ alignof' Typ3   <T> 4   }T
+  T{ nil Typ3_field0 <T> 0   }T
+  T{ nil Typ3_field1 <T> 4   }T
   T{ 123 Typ3_field0 <T> 123 }T
   T{ 123 Typ3_field1 <T> 127 }T
 end
@@ -1482,7 +1518,8 @@ struct: Typ4
 end
 
 fun: test_struct_4
-  T{ Typ4            <T> 16  }T
+  T{ sizeof'  Typ4   <T> 16  }T
+  T{ alignof' Typ4   <T> 8   }T
   T{ 123 Typ4_field0 <T> 123 }T
   T{ 123 Typ4_field1 <T> 127 }T
   T{ 123 Typ4_field2 <T> 131 }T
@@ -1496,7 +1533,8 @@ struct: Typ5
 end
 
 fun: test_struct_5
-  T{ Typ5            <T> 16  }T
+  T{ sizeof'  Typ5   <T> 16  }T
+  T{ alignof' Typ5   <T> 8   }T
   T{ 123 Typ5_field0 <T> 123 }T
   T{ 123 Typ5_field1 <T> 127 }T
   T{ 123 Typ5_field2 <T> 131 }T
@@ -1510,7 +1548,8 @@ struct: Typ6
 end
 
 fun: test_struct_6
-  T{ Typ6            <T> 24  }T
+  T{ sizeof'  Typ6   <T> 24  }T
+  T{ alignof' Typ6   <T> 8   }T
   T{ 123 Typ6_field0 <T> 123 }T
   T{ 123 Typ6_field1 <T> 131 }T
   T{ 123 Typ6_field2 <T> 139 }T
@@ -1525,7 +1564,8 @@ struct: Typ7
 end
 
 fun: test_struct_7
-  T{ Typ7            <T> 24  }T
+  T{ sizeof'  Typ7   <T> 24  }T
+  T{ alignof' Typ7   <T> 8   }T
   T{ 123 Typ7_field0 <T> 123 }T
   T{ 123 Typ7_field1 <T> 131 }T
   T{ 123 Typ7_field2 <T> 135 }T
@@ -1541,7 +1581,8 @@ struct: Typ8
 end
 
 fun: test_struct_8
-  T{ Typ8            <T> 8   }T
+  T{ sizeof'  Typ8   <T> 8   }T
+  T{ alignof' Typ8   <T> 4   }T
   T{ 123 Typ8_field0 <T> 123 }T
   T{ 123 Typ8_field1 <T> 124 }T
   T{ 123 Typ8_field2 <T> 125 }T
@@ -1555,7 +1596,8 @@ struct: Typ9
 end
 
 fun: test_struct_9
-  T{ Typ9            <T> 129 }T
+  T{ sizeof'  Typ9   <T> 129 }T
+  T{ alignof' Typ9   <T> 1   }T
   T{ 123 Typ9_field0 <T> 123 }T
   T{ 123 Typ9_field1 <T> 124 }T
 end
@@ -1569,7 +1611,8 @@ struct: Typ10
 end
 
 fun: test_struct_10
-  T{ Typ10            <T> 144 }T
+  T{ sizeof'  Typ10   <T> 144 }T
+  T{ alignof' Typ10   <T> 4   }T
   T{ 123 Typ10_field0 <T> 123 }T
   T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
   T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
@@ -1578,12 +1621,13 @@ end
 test_struct_10
 
 struct: Typ11
-  5   3 field: Typ11_field0
-  U64 1 field: Typ11_field1
+  Opaq_5_1 3 field: Typ11_field0
+  U64      1 field: Typ11_field1
 end
 
 fun: test_struct_11
-  T{ Typ11            <T> 24  }T
+  T{ sizeof'  Typ11   <T> 24  }T
+  T{ alignof' Typ11   <T> 8   }T
   T{ 123 Typ11_field0 <T> 123 }T
   T{ 123 Typ11_field1 <T> 139 }T
 end
@@ -1900,7 +1944,7 @@ fun: test_arena_unprot { adr } adr ARENA_PAGE_MIN mem_unprot end
 
 \ BOT-GENERATED
 fun: test_arena_alloc
-  Arena alloca { arn }
+  alloca' Arena { arn }
   arn arena_init
 
   T{ arn stack_len_bytes <T> 0   }T
@@ -1911,14 +1955,14 @@ fun: test_arena_alloc
 
   T{ page0 stack_cap_bytes <T> ARENA_PAGE_MIN }T
   T{ page0 stack_len_bytes <T> 1              }T
-  T{ arn   stack_len_bytes <T> Stack          }T
+  T{ arn   stack_len_bytes <T> sizeof' Stack  }T
 
   7 arn arena_alloc { adr1 }
 
   T{ arn Arena_low @       <T> page0          }T
   T{ adr1 adr0 -           <T> FUND_ALIGN     }T
   T{ page0 stack_len_bytes <T> FUND_ALIGN 7 + }T
-  T{ arn stack_len_bytes   <T> Stack          }T
+  T{ arn stack_len_bytes   <T> sizeof' Stack  }T
 
   ARENA_PAGE_MIN arn arena_alloc { adr2 }
   arn Arena_low @ { page1 }
@@ -1927,7 +1971,7 @@ fun: test_arena_alloc
   T{ page1 stack_cap_bytes <T> ARENA_PAGE_MIN      }T
   T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN      }T
   T{ adr2                  <T> page1 Stack_floor @ }T
-  T{ arn stack_len_bytes   <T> Stack 2 *           }T
+  T{ arn stack_len_bytes   <T> sizeof' Stack 2 *   }T
 
   arn arena_deinit
 end
@@ -1935,7 +1979,7 @@ test_arena_alloc
 
 \ BOT-GENERATED
 fun: test_arena_trunc
-  Arena alloca { arn }
+  alloca' Arena { arn }
   arn arena_init
 
   7 arn arena_alloc { adr0 }
@@ -1945,22 +1989,22 @@ fun: test_arena_trunc
   ARENA_PAGE_MIN arn arena_alloc { adr1 }
   arn Arena_low @ { page1 }
 
-  T{ arn stack_len_bytes   <T> Stack 2 *      }T
-  T{ page0 stack_len_bytes <T> 7              }T
-  T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN }T
+  T{ arn stack_len_bytes   <T> sizeof' Stack 2 * }T
+  T{ page0 stack_len_bytes <T> 7                 }T
+  T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN    }T
 
   arn arena_trunc
 
-  T{ arn stack_len_bytes   <T> Stack 2 * }T
-  T{ arn Arena_low @       <T> page0     }T
-  T{ page0 stack_len_bytes <T> 0         }T
-  T{ page1 stack_len_bytes <T> 0         }T
+  T{ arn stack_len_bytes   <T> sizeof' Stack 2 * }T
+  T{ arn Arena_low @       <T> page0             }T
+  T{ page0 stack_len_bytes <T> 0                 }T
+  T{ page1 stack_len_bytes <T> 0                 }T
 
   11 arn arena_alloc { adr2 }
 
-  T{ adr2                <T> floor0    }T
-  T{ arn Arena_low @     <T> page0     }T
-  T{ arn stack_len_bytes <T> Stack 2 * }T
+  T{ adr2                <T> floor0            }T
+  T{ arn Arena_low @     <T> page0             }T
+  T{ arn stack_len_bytes <T> sizeof' Stack 2 * }T
 
   arn arena_deinit
 end
@@ -1968,7 +2012,7 @@ test_arena_trunc
 
 \ BOT-GENERATED
 fun: test_arena_deinit
-  Arena alloca { arn }
+  alloca' Arena { arn }
   arn arena_init
 
   128 arn arena_alloc { adr0 }
@@ -1987,7 +2031,7 @@ test_arena_deinit
 
 \ BOT-GENERATED
 fun: test_arena_errors
-  Arena alloca { arn }
+  alloca' Arena { arn }
   arn arena_init
 
   0 arn catch' arena_alloc { adr err }

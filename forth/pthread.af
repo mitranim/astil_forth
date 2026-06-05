@@ -16,40 +16,40 @@ import' ./lang.af
 \ `pthread_t`. Used by value except in "create".
 \ Can be used as a local addressed via `ref'`.
 \ See usage in `examples/threads_*.f`.
-Adr let: Pthread
+sizeof' Adr int: Pthread
 
-\ Opaque `sizeof(pthread_attr_t)`. Used by reference.
-64 let: Pthread_attr
+\ `pthread_attr_t`; used by reference.
+64 8 opaque: Pthread_attr
 
-\ Opaque `sizeof(pthread_cond_t)`. Used by reference.
-48 let: Pthread_cond
+\ `pthread_cond_t`; used by reference.
+48 8 opaque: Pthread_cond
 
-\ Opaque `sizeof(pthread_condattr_t)`. Used by reference.
-16 let: Pthread_cond_attr
+\ `pthread_condattr_t`; used by reference.
+16 8 opaque: Pthread_cond_attr
 
-\ Opaque `sizeof(struct sched_param)`. Used by reference.
-8 let: Pthread_sched_param
+\ `struct sched_param`; used by reference.
+8 4 opaque: Pthread_sched_param
 
-\ Opaque `sizeof(pthread_once_t)`. Used by reference.
-16 let: Pthread_once
+\ `pthread_once_t`; used by reference.
+16 8 opaque: Pthread_once
 
-\ `pthread_key_t`. Used by value except in "create".
-Cell let: Pthread_key
+\ `pthread_key_t`; used by value except in "create".
+CELL int: Pthread_key
 
-\ Opaque `sizeof(pthread_mutexattr_t)`. Used by reference.
-16 let: Pthread_mutex_attr
+\ `pthread_mutexattr_t`; used by reference.
+16 8 opaque: Pthread_mutex_attr
 
-\ Opaque `sizeof(pthread_mutex_t)`. Used by reference.
-64 let: Pthread_mutex
+\ `pthread_mutex_t`; used by reference.
+64 8 opaque: Pthread_mutex
 
-\ Opaque `sizeof(pthread_rwlockattr_t)`. Used by reference.
-24 let: Pthread_rwlock_attr
+\ `pthread_rwlockattr_t`; used by reference.
+24 8 opaque: Pthread_rwlock_attr
 
-\ Opaque `sizeof(pthread_rwlock_t)`. Used by reference.
-200 let: Pthread_rwlock
+\ `pthread_rwlock_t`; used by reference.
+200 8 opaque: Pthread_rwlock
 
-\ `sigset_t`. Sometimes used by reference.
-U32 let: Sigset
+\ `sigset_t`; sometimes used by reference.
+U32 int: Sigset
 
 \ ## Constants
 

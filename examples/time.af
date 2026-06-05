@@ -4,7 +4,7 @@ import' std:time.af
 fun: main
   \ Allocate a C-compatible struct on the system stack,
   \ and get the address. We can now use it with `libc`.
-  Timespec alloca { inst }
+  alloca' Timespec { inst }
 
   CLOCK_MONOTONIC inst clock_gettime " unable to get time" os_try
 

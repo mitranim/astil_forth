@@ -12,7 +12,7 @@ fun: callback { inout -- err }
   inout @ { path }
   " [child] checking length of `%s`..." path logf lf
 
-  Fstat alloca        { stat }
+  alloca' Fstat       { stat }
   path stat path_stat { err } \ Automatic catch; zero-cost.
 
   err ifn

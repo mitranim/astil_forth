@@ -12,7 +12,7 @@ struct: Arena
   Adr   1 field: Arena_low   \ `Stack*` of active page
 end
 
-fun: arena_init { arn } Arena arn memzero end
+fun: arena_init { arn } arn sizeof' Arena erase end
 
 fun: arena_deinit { arn } [ true catches ]
   arn ifn ret end
@@ -21,7 +21,7 @@ fun: arena_deinit { arn } [ true catches ]
   arn Stack_top   @ { ceil }
   nil               { err }
 
-  ceil floor Stack +loop: page
+  ceil floor sizeof' Stack +loop: page
     page stack_deinit err fallback { err }
   end
 
@@ -36,7 +36,7 @@ fun: arena_trunc { arn } [ true catches ]
   arn Stack_floor @ { floor }
   arn Stack_top   @ { ceil }
 
-  ceil floor Stack +loop: page
+  ceil floor sizeof' Stack +loop: page
     page stack_trunc
   end
 
@@ -51,9 +51,9 @@ fun: arena_alloc { size arn -- adr }
   nil             { page }
   nil             { adr }
 
-  arn stack? ifn ARENA_PAGES Stack * arn stack_init end
+  arn stack? ifn ARENA_PAGES sizeof' Stack * arn stack_init end
 
-  ceil low Stack +loop: page
+  ceil low sizeof' Stack +loop: page
     page Stack_ceil @ { ceil }
     page Stack_top  @ FUND_ALIGN align_up { top }
     ceil top - size >= if top { adr } leave end
@@ -62,7 +62,7 @@ fun: arena_alloc { size arn -- adr }
   adr ifn
     arn Stack_top @ { page }
     size ARENA_PAGE_MIN max page stack_init
-    page Stack + arn Stack_top !
+    page sizeof' Stack + arn Stack_top !
     page Stack_top @ { adr }
   end
 
