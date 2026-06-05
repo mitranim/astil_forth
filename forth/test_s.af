@@ -125,16 +125,20 @@ end
 test_loop_while_leave
 
 fun: test_loop_until
-  T{ loop                      false until <T>    }T
-  T{ loop 10                   false until <T> 10 }T
-  T{ loop 10 leave             true  until <T> 10 }T
-  T{ loop 10 leave leave       true  until <T> 10 }T
-  T{ loop 10 leave leave leave true  until <T> 10 }T
-  T{ loop 10 leave leave leave leave until <T> 10 }T
+  T{ loop             true  until <T> }T
+  T{ loop leave       true  until <T> }T
+  T{ loop leave       false until <T> }T
+  T{ loop leave leave false until <T> }T
+
+  T{
+    12 loop dup dec dup 7 < until
+    <T>
+    12 11 10 9 8 7 6
+  }T
 
   T{
     12
-    loop dec dup dup 6 > until
+    loop dec dup dup 7 < until
     drop
     <T>
     11 10 9 8 7 6
@@ -145,17 +149,11 @@ fun: test_loop_until
     loop
       dec dup
       dup 8 > while
-      dup 6 >
+      dup 7 <
     until
     drop
     <T>
     11 10 9 8
-  }T
-
-  T{
-    12 loop dup dec dup until
-    <T>
-    12 11 10 9 8 7 6 5 4 3 2 1 0
   }T
 end
 test_loop_until

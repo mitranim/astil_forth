@@ -640,21 +640,41 @@ end
 test_loop_while_leave
 
 fun: test_loop_until
-  T{ -1 { val } loop                              false until val <T> -1 }T
-  T{ -1 { val } loop 10 { val }                   false until val <T> 10 }T
-  T{ -1 { val } loop 10 { val } leave             true  until val <T> 10 }T
-  T{ -1 { val } loop 10 { val } leave leave       true  until val <T> 10 }T
-  T{ -1 { val } loop 10 { val } leave leave leave true  until val <T> 10 }T
+  \ Loops indefinitely. How to test?
+  \ loop false until
 
-  T{ 12 { val } loop val dec { val } val     until val <T> 0 }T
-  T{ 12 { val } loop val dec { val } val 6 > until val <T> 6 }T
+  T{ loop             true  until <T> }T
+  T{ loop leave       true  until <T> }T
+  T{ loop leave       false until <T> }T
+  T{ loop leave leave false until <T> }T
+
+  T{ -1 { val } loop      10 { val } val     until val <T> 10 }T
+  T{ 0  { val } loop val inc { val } val     until val <T> 1  }T
+  T{ 0  { val } loop val dec { val } val     until val <T> -1 }T
+  T{ 12 { val } loop val dec { val } val 6 < until val <T> 5  }T
 
   T{
     12 { val }
-    loop val dec { val } val 8 > while val 6 > until
+    loop
+      val dec { val }
+      val 5 > while
+      val 9 <
+    until
     val
   <T>
     8
+  }T
+
+  T{
+    12 { val }
+    loop
+      val dec { val }
+      val 9 > while
+      val 5 <
+    until
+    val
+  <T>
+    9
   }T
 end
 test_loop_until

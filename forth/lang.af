@@ -1995,7 +1995,7 @@ fun_comp: cont loop_frame_adr @ loop_back end \ b <beg>
 fun_comp: until ( C: fun -- )
   " when calling `until`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
-  0 8 asm_cmp_branch_zero comp_instr \ cbnz x0, 8
+  0 8 asm_cmp_branch_not_zero comp_instr \ cbnz x0, 8
   pop_execute
 end
 

@@ -1249,8 +1249,8 @@ end
 
 \ Assumes that the top control frame is from `loop`.
 fun_comp: until ( C: prev… <loop> -- )
-      asm_pop_x1          comp_instr \ ldr x1, [x27, -8]!
-  1 8 asm_cmp_branch_zero comp_instr \ cbnz x1, 8
+      asm_pop_x1              comp_instr \ ldr x1, [x27, -8]!
+  1 8 asm_cmp_branch_not_zero comp_instr \ cbnz x1, 8
   execute
 end
 
@@ -1528,7 +1528,7 @@ fun_comp: {
   end
 
   \ After `--`: skip all words which aren't `}`.
-  loop parse_word s" }" str<> until
+  loop parse_word s" }" str= until
 
   loc_len }
 end
