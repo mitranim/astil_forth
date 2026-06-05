@@ -1589,10 +1589,16 @@ fun: test_struct_11
 end
 test_struct_11
 
-fun: test_catch_invalid
-  \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
-  \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
+fun: test_catch_invalid [ true catches ]
+  import' ./test/test_catch_invalid_exec.af
+  " useless attempt to catch an error when calling word `nop` which does not throw"
+  T_err_contains try
+
+  import' ./test/test_catch_invalid_comp.af
+  " word `nop` not found in wordlist 2 (WORDLIST_COMP)"
+  T_err_contains try
 end
+test_catch_invalid
 
 fun: test_throw " test_err" throw end
 
@@ -2079,6 +2085,7 @@ fun: main_run
   test_struct_9
   test_struct_10
   test_struct_11
+  \ test_catch_invalid \ interp-only
   test_catch_0
   test_catch_1
   test_catch_2
