@@ -225,6 +225,12 @@ fun: has_interp { -- bool } [
   1                           comp_args_set
 ] end
 
+\ brk <imm16>
+fun: asm_brk { imm16 -- instr }
+  imm16 5 lsl
+  0b110_101_00_001_0000000000000000_000_00 or
+end
+
 \ Shared by a lot of load and store instructions. 64-bit only.
 fun: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
   Xt2                    10 lsl { Xt2 }
@@ -758,10 +764,26 @@ fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
   0b0_01_101_1_0_00000_00000000000000_00000 or
 end
 
+\ adr Xd, <imm21>
+fun: asm_adr { Xd imm21 -- instr }
+  imm21 0b11 and                 { low }
+  imm21 2 lsr 19 bit_trunc 5 lsl { high }
+  high low or Xd or
+  0b0_00_100_00_0000000000000000000_00000 or
+end
+
 \ br Xn
 fun: asm_branch_to_reg { Xn -- instr }
   Xn 5 lsl
   0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 or
+end
+
+\ bl imm26
+\
+\ Requires caution to avoid messing up the link register.
+fun: asm_branch_link_off { imm26 -- instr }
+  imm26 2 lsr 26 bit_trunc \ Implicitly times 4.
+  0b100_101_00000000000000000000000000 or
 end
 
 \ blr Xn
@@ -1475,9 +1497,9 @@ end
 
 fun: pop_execute STACK s> execute end
 fun: reserve_instr ASM_PLACEHOLDER comp_instr end
-fun: reserve_here {     -- adr } here { out } ASM_PLACEHOLDER comp_instr out end
-fun: off_to_pc    { adr -- off } here             adr - end \ For forward jumps.
-fun: off_from_pc  { adr -- off } here { out } adr out - end \ For backward jumps.
+fun: reserve_here {     -- adr } here_write { out } ASM_PLACEHOLDER comp_instr out end
+fun: off_to_pc    { adr -- off } here_write             adr - end \ For forward jumps.
+fun: off_from_pc  { adr -- off } here_write { out } adr out - end \ For backward jumps.
 fun: patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 end \ b <off>
 fun: patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 end \ b <off>
 
@@ -2051,7 +2073,7 @@ end
 fun_comp: loop ( C: -- <loop_prev> loop_beg loop_pop )
   comp_barrier \ Clobber / relocate locals.
   loop_frame_init
-  here              STACK >s
+  here_write        STACK >s
   xt' loop_base_pop STACK >s
 end
 
@@ -2125,13 +2147,13 @@ fun: for_loop_countdown_init
   loop_frame_init
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { loop_beg }                \ `end` jumps here.
+  here_write { loop_beg }          \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
   0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
   comp_barrier                     \ Tell compiler to commit "local set".
   0 asm_cmp_zero    comp_instr     \ cmp x0, 0
-  here { cond_adr } reserve_instr  \ b.lt <end>
+  here_write { cond_adr } reserve_instr \ b.lt <end>
 
   loop_beg cond_adr loop_init_countdown
 end
@@ -2189,14 +2211,14 @@ fun_comp: +for:
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
   comp_barrier                     \ Clobber / relocate locals.
   20 asm_branch     comp_instr     \ b <cmp>
-  here { loop_beg }                \ `end` jumps here.
+  here_write { loop_beg }          \ `end` jumps here.
   0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
   1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
   1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
   1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
   comp_barrier                     \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
-  here { cond_adr } reserve_instr  \ b.le <end>
+  here_write { cond_adr } reserve_instr \ b.le <end>
 
   loop_beg cond_adr loop_init_countup
 end
@@ -2217,7 +2239,7 @@ fun_comp: -loop:
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
   comp_barrier                     \ Clobber / relocate locals.
-  here { loop_beg }                \ `end` jumps here.
+  here_write { loop_beg }          \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
   1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
@@ -2225,7 +2247,7 @@ fun_comp: -loop:
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
   comp_barrier                     \ Tell compiler to commit "local set".
   0 1   asm_cmp_reg comp_instr     \ cmp <cur>, <lim>
-  here { cond_adr } reserve_instr  \ b.lt <end>
+  here_write { cond_adr } reserve_instr \ b.lt <end>
 
   loop_beg cond_adr loop_init_countdown
 end
@@ -2255,7 +2277,7 @@ fun_comp: +loop:
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
   comp_barrier                     \ Clobber / relocate locals.
   24 asm_branch     comp_instr     \ b <cmp>
-  here { loop_beg }                \ `end` jumps here.
+  here_write { loop_beg }          \ `end` jumps here.
   0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
   1 cur             comp_local_get \ mov x1, <cur>  | ldr x1, [FP, <cur>]
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
@@ -2263,7 +2285,7 @@ fun_comp: +loop:
   1 cur             comp_local_set \ mov <cur>, x1  | str x1, [FP, <cur>]
   comp_barrier                     \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
-  here { cond_adr } reserve_instr  \ b.le <end>
+  here_write { cond_adr } reserve_instr \ b.le <end>
   loop_beg cond_adr loop_init_countup
 end
 
@@ -2635,31 +2657,68 @@ fun: .sc .s STACK stack_trunc end
 \
 \ Internal stuff not exposed via intrinsics.
 
+\ SYNC[set_fields].
+struct: Interp_set
+  U32 1 field: Interp_set_len
+  U32 1 field: Interp_set_cap
+  Adr 1 field: Interp_set_bits \ Cell*
+  Adr 1 field: Interp_set_vals \ Sym**
+end
+
 \ SYNC[word_str].
 struct: Sym_word
   U32 1   field: Sym_word_len
   U8  128 field: Sym_word_buf
 end
 
+\ SYNC[sym_fields].
+struct: Sym_instrs
+  U32 1 field: Sym_instrs_floor
+  U32 1 field: Sym_instrs_prologue
+  U32 1 field: Sym_instrs_inner
+  U32 1 field: Sym_instrs_epi_ok
+  U32 1 field: Sym_instrs_epi_err
+  U32 1 field: Sym_instrs_ret
+  U32 1 field: Sym_instrs_data
+  U32 1 field: Sym_instrs_ceil
+end
+
+\ SYNC[sym_fields].
+struct: Sym_norm
+  Adr        1 field: Sym_norm_exec
+  Sym_instrs 1 field: Sym_norm_spans
+  U8         1 field: Sym_norm_inlinable
+  U8         1 field: Sym_norm_has_loads
+  U8         1 field: Sym_norm_has_recur
+  U8         1 field: Sym_norm_has_alloca
+end
+
 \ Word metadata defined internally by the interpreter.
 \ Also execution token returned by `xt'` and `xt''`.
-\ Caution: this struct definition is incomplete.
 \
 \ SYNC[sym_fields].
 struct: Sym
-  Cint     1 field: Sym_type
-  Sym_word 1 field: Sym_name
-  U8       1 field: Sym_wordlist
-  Adr      1 field: Sym_instr \ Executable address.
-
-  \ ... Other fields elided until we need them.
+  Cint       1 field: Sym_type
+  Sym_word   1 field: Sym_name
+  U8         1 field: Sym_wordlist
+  Sym_norm   1 field: Sym_union   \ Begins with executable instruction address.
+  Interp_set 1 field: Sym_callees \ set_of(Sym*)
+  Interp_set 1 field: Sym_callers \ set_of(Sym*)
+  Cell       1 field: Sym_clobber \ `Bits`
+  U8         1 field: Sym_inp_len
+  U8         1 field: Sym_out_len
+  U8         1 field: Sym_throws
+  U8         1 field: Sym_comp_only
+  U8         1 field: Sym_interp_only
 end
+
+\ SYNC[sym_fields].
+fun: sym_instr { XT -- instr } XT Sym_union @ end
 
 \ For internal use below.
 fun: comp_word_instr { wordlist } ( C: "name" -- ) ( E: -- instr )
   wordlist next_word comp_push
-  execute'' Sym_instr
-  execute'' @
+  compile' sym_instr
 end
 
 \ Similar to `xt'` and `xt''`, but instead of returning an execution token,
@@ -2673,6 +2732,7 @@ end
 \ to reveal all exceptions as error values (and handle them). Otherwise,
 \ if a callback prematurely terminates via exception, the error will be
 \ silently ignored by the foreign caller.
+fun: instr' { -- instr } execute' xt' sym_instr end
 fun_comp: instr'  ( C: "name" -- ) ( E: -- instr ) WORDLIST_EXEC comp_word_instr end
 fun_comp: instr'' ( C: "name" -- ) ( E: -- instr ) WORDLIST_COMP comp_word_instr end
 
@@ -2742,6 +2802,96 @@ end
 fun: words
   interp Interp_dict_exec WORDLIST_EXEC " WORDLIST_EXEC" wordlist_log
   interp Interp_dict_comp WORDLIST_COMP " WORDLIST_COMP" wordlist_log
+end
+
+\ ## Indirect functions
+\
+\ Support for indirect functions, analogous to the standard `defer`,
+\ which can be used to emulate forward declarations, at the cost of
+\ dispatch overhead. Intended mainly for mutual recursion.
+\
+\ Usage example:
+\
+\   1 0 true indirect: SOME_FUNC some_func
+\
+\   fun: some_func { inp } [ redefine ] " some_err" throw end
+\
+\   SOME_FUNC indirect_to' some_func
+
+struct: Indir_decl
+  Cell 1 field: Indir_decl_off \ Could be `S32`, but needs changes elsewhere.
+  Adr  1 field: Indir_decl_instr
+  U8   1 field: Indir_decl_inp
+  U8   1 field: Indir_decl_out
+  U8   1 field: Indir_decl_throws
+end
+
+fun: indirect: { inp out throwing } ( C: "var_name" "fun_name" -- )
+  nil sizeof' Indir_decl alloc_data { decl }
+
+  inp      decl Indir_decl_inp    !b
+  out      decl Indir_decl_out    !b
+  throwing decl Indir_decl_throws !b
+
+  parse_word { str len }
+  str len decl init_data_word
+
+  parse_word define_fun
+    inp out comp_signature_set
+    throwing throws
+    comp_clobber_volatile
+
+    ASM_REG_SCRATCH { R_off } \ Holds offsets.
+    R_off inc       { R_adr } \ Holds address of `br <implementation>` instruction.
+
+    decl R_off comp_page_addr                 \ adrp x8, @page ; add x8, @pageoff
+    R_off R_off 0     asm_load_off comp_instr \ ldr x8, [x8]
+    R_adr 8           asm_adr      comp_instr \ adr x9, offsetof `br`
+    R_off R_off R_adr asm_add_reg  comp_instr \ add x8, x8, x9
+    here_exec decl Indir_decl_instr !
+    R_off  asm_branch_to_reg       comp_instr \ br <implementation>
+    123    asm_brk                 comp_instr \ brk 123 -- unreachable
+
+    out comp_args_set
+  semicolon
+
+  [ false comp_only ]
+end
+
+\ This would be a 1-liner without signature checks and error messages.
+fun: indirect_to { decl xt_to }
+  decl Indir_decl_inp @b { decl_inp }
+  xt_to Sym_inp_len     @b { sym_inp }
+  xt_to Sym_name           { name }
+
+  decl_inp sym_inp <> if
+    " unable to indirect to `%s`: input count: %zd <> %zd"
+    name decl_inp sym_inp errf throw
+  end
+
+  decl Indir_decl_out @b { decl_out }
+  xt_to Sym_out_len     @b { sym_out }
+
+  decl_out sym_out <> if
+    " unable to indirect to `%s`: output count: %zd <> %zd"
+    name decl_out sym_out errf throw
+  end
+
+  decl Indir_decl_throws @b { decl_throws }
+  xt_to Sym_throws         @b { sym_throws }
+
+  decl_throws sym_throws <> if
+    " unable to indirect to `%s`: throws: %zd <> %zd"
+    name decl_throws sym_throws errf throw
+  end
+
+  decl Indir_decl_instr @ { instr_adr }
+  xt_to sym_instr instr_adr - decl Indir_decl_off !
+end
+
+fun: indirect_to' { decl } ( C: "name" -- )
+  WORDLIST_EXEC next_word { XT }
+  decl XT indirect_to
 end
 
 \ ## Misc

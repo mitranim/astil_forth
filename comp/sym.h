@@ -51,9 +51,9 @@ typedef struct Sym {
 
   Sym_set callees;     // Dependencies in compiled code.
   Sym_set callers;     // Dependents in compiled code.
+  Bits    clobber;     // Clobbers these regs; also includes inps, outs, err.
   U8      inp_len;     // Input parameter count.
   U8      out_len;     // Output parameter count.
-  Bits    clobber;     // Clobbers these regs; also includes inps, outs, err.
   bool    throws;      // Requires exception handling in callers.
   bool    comp_only;   // Can only be used between `:` and `;`.
   bool    interp_only; // Forbidden in AOT executables.

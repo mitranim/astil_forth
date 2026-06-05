@@ -1111,9 +1111,9 @@ fun: str<>   ( str0 len0 str1 len1 -- bool      ) compare <>0 end
 \ of "elif" terminated with a single "end".
 
 fun: reserve_instr ASM_PLACEHOLDER comp_instr end
-fun: reserve_cond ( -- adr )     asm_pop_x1 comp_instr here reserve_instr end
-fun: off_to_pc    ( adr -- off ) here swap - end \ For forward jumps.
-fun: off_from_pc  ( adr -- off ) here      - end \ For backward jumps.
+fun: reserve_cond ( -- adr )     asm_pop_x1 comp_instr here_write reserve_instr end
+fun: off_to_pc    ( adr -- off ) here_write swap - end \ For forward jumps.
+fun: off_from_pc  ( adr -- off ) here_write      - end \ For backward jumps.
 fun: patch_branch_forward ( adr -- ) dup off_to_pc asm_branch swap !32 end \ b <off>
 fun: patch_branch_back    ( adr -- ) off_from_pc   asm_branch swap !32 end \ b <off>
 
@@ -1150,7 +1150,7 @@ fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward execute end
 
 fun_comp: else
   ( C: exec_fun if_adr if_fun -- else_adr else_fun )
-  here to: adr reserve_instr
+  here_write to: adr reserve_instr
   xt' nop 2 bury \ Disable `exec_fun` to prevent "if" from chaining.
   execute      \ Pop just the top frame.
   adr xt' else_pop
@@ -1228,14 +1228,14 @@ fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end execute'' end end
 fun_comp: loop
   ( C: -- frame_ind frame_fun … loop_adr loop_fun )
   \ Control frame is split:   ↑ auxiliary constructs like "leave" go here.
-  loop_frame_init here xt' loop_pop
+  loop_frame_init here_write xt' loop_pop
 end
 
 \ Breaks out of any loop.
 fun_comp: leave
   ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
   stack_len to: len
-  here reserve_instr xt' else_pop len loop_aux
+  here_write reserve_instr xt' else_pop len loop_aux
 end
 
 \ Breaks out of any loop.
@@ -1284,12 +1284,12 @@ fun: for_countdown_loop_init
   loop_frame_init
   cur comp_pop_local_set \ Grab the initial ceiling value.
 
-  here to: loop_adr
-  1 cur asm_local_get comp_instr    \ ldr x1, [FP, <cur>]
-  1     asm_cmp_zero  comp_instr    \ cmp x1, 0
-  here to: cond_adr   reserve_instr \ b.<cond> <end>
-  1 1 1 asm_sub_imm   comp_instr    \ sub x1, x1, 1
-  1 cur asm_local_set comp_instr    \ str x1, [FP, <cur>]
+  here_write to: loop_adr
+  1 cur asm_local_get     comp_instr    \ ldr x1, [FP, <cur>]
+  1     asm_cmp_zero      comp_instr    \ cmp x1, 0
+  here_write to: cond_adr reserve_instr \ b.<cond> <end>
+  1 1 1 asm_sub_imm       comp_instr    \ sub x1, x1, 1
+  1 cur asm_local_set     comp_instr    \ str x1, [FP, <cur>]
 
   loop_adr cond_adr xt' for_countdown_loop_pop
 end
@@ -1342,12 +1342,12 @@ fun: comp_count_loop_init ( loc_cur loc_lim -- loop_adr cond_adr loc_cur )
   to: lim
   to: cur
 
-  here to: loop_adr
+  here_write to: loop_adr
   1 cur asm_local_get comp_instr \ ldr x1, [FP, <loc>]
   2 lim asm_local_get comp_instr \ ldr x2, [FP, <loc>]
   1 2   asm_cmp_reg   comp_instr \ cmp x1, x2
 
-  here to: cond_adr
+  here_write to: cond_adr
   reserve_instr \ b.<cond> <end>
   loop_adr cond_adr cur
 end
@@ -1420,18 +1420,18 @@ fun_comp: -loop:
   lim  comp_pop_local_set
   cur  comp_pop_local_set
 
-  here to: loop_adr
+  here_write to: loop_adr
 
   \ We can almost use `comp_count_loop_init` here,
   \ but this loop wants subtraction at the start.
   \ TODO use `ldp` for adjacent offsets.
-  1 cur  asm_local_get comp_instr    \ ldr x1, [FP, <ceil_off>]
-  2 lim  asm_local_get comp_instr    \ ldr x2, [FP, <floor_off>]
-  3 step asm_local_get comp_instr    \ ldr x3, [FP, <step_off>]
-  1 1 3  asm_sub_reg   comp_instr    \ sub x1, x1, x3
-  1 2    asm_cmp_reg   comp_instr    \ cmp x1, x2
-  here to: cond_adr    reserve_instr \ b.lt <end>
-  1 cur  asm_local_set comp_instr    \ str x1, [FP, <ceil_off>]
+  1 cur  asm_local_get    comp_instr    \ ldr x1, [FP, <ceil_off>]
+  2 lim  asm_local_get    comp_instr    \ ldr x2, [FP, <floor_off>]
+  3 step asm_local_get    comp_instr    \ ldr x3, [FP, <step_off>]
+  1 1 3  asm_sub_reg      comp_instr    \ sub x1, x1, x3
+  1 2    asm_cmp_reg      comp_instr    \ cmp x1, x2
+  here_write to: cond_adr reserve_instr \ b.lt <end>
+  1 cur  asm_local_set    comp_instr    \ str x1, [FP, <ceil_off>]
 
   loop_adr cond_adr xt' loop_countdown_pop
 end

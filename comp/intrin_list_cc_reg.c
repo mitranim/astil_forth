@@ -41,13 +41,15 @@ static const USED Sym INTRIN[] = {
   INTRIN_TRY,              // try
   INTRIN_THROW,            // throw
   INTRIN_CATCH,            // catch
+  INTRIN_THROWS,           // throws
   INTRIN_CATCHES,          // catches
   INTRIN_GET_CATCHES,      // get_catches
   INTRIN_COMP_ONLY,        // comp_only
   INTRIN_INTERP_ONLY,      // interp_only
   INTRIN_INLINE,           // inline
   INTRIN_REDEFINE,         // redefine
-  INTRIN_HERE,             // here
+  INTRIN_HERE_WRITE,       // here_write
+  INTRIN_HERE_EXEC,        // here_exec
   INTRIN_COMP_INSTR,       // comp_instr
   INTRIN_COMP_LOAD,        // comp_load
   INTRIN_ALLOC_DATA,       // alloc_data

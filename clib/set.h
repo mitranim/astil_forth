@@ -2,6 +2,7 @@
 #include "./num.h"
 
 // Opaque set header. Vals are treated as opaque byte chunks.
+// SYNC[set_fields].
 typedef struct {
   Ind   len;
   Ind   cap;
@@ -9,6 +10,7 @@ typedef struct {
   void *vals;
 } Set;
 
+// SYNC[set_fields].
 #define set_of(Elem) \
   struct {           \
     Ind   len;       \

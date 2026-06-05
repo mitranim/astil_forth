@@ -132,6 +132,15 @@ static Err intrin_catch(Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_throws(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  Sint val;
+  try(int_stack_pop(&interp->ints, &val));
+  sym->throws = !!val;
+  return nullptr;
+}
+
 static Err intrin_catches(Interp *interp) {
   Sint val;
   try(int_stack_pop(&interp->ints, &val));
@@ -168,12 +177,27 @@ static Err intrin_interp_only(Interp *interp) {
 }
 
 /*
-Caution: unlike in other Forth systems, `here` is not an executable address.
-Executable code is copied to a different memory page when finalizing a word.
+Caution: unlike most Forth systems, because of Apple's W^X restrictions,
+we use two code heaps: writable and executable. Control structures often
+patch up instructions in the writable heap during word compilation. When
+a word is finalized, by copying its instructions to the executable heap,
+any further modifications of its range in the writable heap become nops.
 */
-static Err intrin_here(Interp *interp) {
+static Err intrin_here_write(Interp *interp) {
   try(int_stack_push(
     &interp->ints, (Sint)(comp_code_next_writable_instr(&interp->comp.code))
+  ));
+  return nullptr;
+}
+
+/*
+Returns an address in the executable heap corresponding to the next instruction
+in the writable heap during word compilation. The returned address does NOT yet
+contain a valid instruction, but may be stashed for later use.
+*/
+static Err intrin_here_exec(Interp *interp) {
+  try(int_stack_push(
+    &interp->ints, (Sint)(comp_code_next_prog_counter(&interp->comp.code))
   ));
   return nullptr;
 }

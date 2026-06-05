@@ -290,9 +290,9 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   name:            %s\n"
         "[debug]   wordlist:        %d (%s)\n"
 #ifndef CALL_CONV_STACK
+        "[debug]   clobber:         0b%s\n"
         "[debug]   inp_len:         %d\n"
         "[debug]   out_len:         %d\n"
-        "[debug]   clobber:         0b%s\n"
 #endif
         "[debug]   throws:          %s\n"
         "[debug]   comp_only:       %s\n"
@@ -312,9 +312,9 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         sym->wordlist,
         list_name,
 #ifndef CALL_CONV_STACK
+        uint32_to_bit_str((U32)sym->clobber),
         sym->inp_len,
         sym->out_len,
-        uint32_to_bit_str((U32)sym->clobber),
 #endif
         bool_str(sym->throws),
         bool_str(sym->comp_only),
@@ -592,6 +592,15 @@ static const USED auto INTRIN_CATCH = (Sym){
   .throws   = true,
 };
 
+static const USED auto INTRIN_THROWS = (Sym){
+  .name.buf  = "throws",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_throws,
+  .inp_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
 static const USED auto INTRIN_CATCHES = (Sym){
   .name.buf  = "catches",
   .wordlist  = WORDLIST_EXEC,
@@ -642,10 +651,19 @@ static const USED auto INTRIN_REDEFINE = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_HERE = (Sym){
-  .name.buf  = "here",
+static const USED auto INTRIN_HERE_WRITE = (Sym){
+  .name.buf  = "here_write",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_here,
+  .intrin    = (void *)intrin_here_write,
+  .out_len   = 1,
+  .throws    = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_HERE_EXEC = (Sym){
+  .name.buf  = "here_exec",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_here_exec,
   .out_len   = 1,
   .throws    = true,
   .comp_only = true,

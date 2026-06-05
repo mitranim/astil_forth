@@ -19,6 +19,7 @@ typedef list_of(Instr) Instr_list;
 typedef span_of(Instr) Instr_span;
 
 // All fields are offsets in the instruction heaps.
+// SYNC[sym_fields].
 typedef struct {
   Ind floor;    // Setup instructions; some may be skipped.
   Ind prologue; // Actual start; somewhere in `[floor,inner]`.
