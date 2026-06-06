@@ -79,13 +79,12 @@ analogous to a GOT (global offset table) in executable formats.
 */
 typedef struct {
   Instr_heap exec;                            // 4 MiB; executable code.
-  U8         guard_0[MEM_PAGE];               // PROT_NONE
   U8         data[1u << 18u];                 // 256 KiB; mutable values.
-  U8         guard_1[MEM_PAGE];               // PROT_NONE
+  U8         guard_0[MEM_PAGE];               // PROT_NONE
   U64        externs[MEM_PAGE / sizeof(U64)]; // Addresses of external symbols.
-  U8         guard_2[MEM_PAGE];               // PROT_NONE
+  U8         guard_1[MEM_PAGE];               // PROT_NONE
   U64        intrins[MEM_PAGE / sizeof(U64)]; // Addresses of intrinsic procs.
-  U8         guard_3[MEM_PAGE];               // PROT_NONE
+  U8         guard_2[MEM_PAGE];               // PROT_NONE
 } Comp_heap;
 
 // Invariants: `.addrs.len == stack_len(.names) == .inds.len`.

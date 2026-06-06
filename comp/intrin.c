@@ -424,7 +424,7 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
   return nullptr;
 }
 
-static Err debug_word(Interp *interp) {
+static Err debug_word_tick(Interp *interp) {
   try(interp_read_word(interp));
   const auto name = interp->reader->word.buf;
 
@@ -902,10 +902,10 @@ static const USED auto INTRIN_DEBUG_MEM = (Sym){
   .throws   = true,
 };
 
-static const USED auto INTRIN_DEBUG_WORD = (Sym){
+static const USED auto INTRIN_DEBUG_WORD_TICK = (Sym){
   .name.buf = "debug'",
   .wordlist = WORDLIST_COMP,
-  .intrin   = (void *)debug_word,
+  .intrin   = (void *)debug_word_tick,
   .throws   = true,
 };
 

@@ -483,6 +483,18 @@ static Err intrin_compile_executable(Sint main, Sint path, Interp *interp) {
   return nullptr;
 }
 
+static Err debug_mem(Sint adr, Interp *) {
+  debug_mem_at((const Uint *)adr);
+  return nullptr;
+}
+
+static Err debug_word(Sint ptr, Interp *interp) {
+  Sym *sym;
+  try(interp_sym_by_ptr(interp, ptr, &sym));
+  interp_repr_sym(interp, sym);
+  return nullptr;
+}
+
 static void intrin_debug_ctx(Interp *interp) {
   const auto ctx     = &interp->comp.ctx;
   const auto locs    = &ctx->locals;
@@ -605,11 +617,6 @@ static void intrin_debug_arg(Sint val, Interp *) {
     (Uint)val,
     uint64_to_bit_str((Uint)val)
   );
-}
-
-static Err debug_mem(Sint adr, Interp *) {
-  debug_mem_at((const Uint *)adr);
-  return nullptr;
 }
 
 // The "missing" fields are set in `sym_init_intrin`.
@@ -743,6 +750,14 @@ static const USED auto INTRIN_COMPILE_EXECUTABLE = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_compile_executable,
   .inp_len  = 2,
+  .throws   = true,
+};
+
+static const USED auto INTRIN_DEBUG_WORD = (Sym){
+  .name.buf = "debug_word",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)debug_word,
+  .inp_len  = 1,
   .throws   = true,
 };
 

@@ -401,3 +401,20 @@ static Err debug_mem(Interp *interp) {
   debug_mem_at((const Uint *)adr);
   return nullptr;
 }
+
+static Err debug_word(Interp *interp) {
+  Sint ptr;
+  Sym *sym;
+  try(int_stack_pop(&interp->ints, &ptr));
+  try(interp_sym_by_ptr(interp, ptr, &sym));
+  interp_repr_sym(interp, sym);
+  return nullptr;
+}
+
+static const USED auto INTRIN_DEBUG_WORD = (Sym){
+  .name.buf = "debug_word",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)debug_word,
+  .inp_len  = 1,
+  .throws   = true,
+};
