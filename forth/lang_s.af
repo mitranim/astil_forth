@@ -1614,7 +1614,7 @@ end
 
 \ Short for "compile variadic arguments end".
 fun: comp_va_end ( C: len -- )
-  dup >=0 if
+  dup if
     cells 16 align_up
     ASM_REG_SP ASM_REG_SP rot
     asm_add_imm comp_instr \ add sp, sp, <off>

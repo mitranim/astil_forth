@@ -376,7 +376,7 @@ Examples:
   - Syntax highlighters are encouraged to scope the next word like a declaration.
 - Parsing words: `import' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
-- Unusual control words: `vargs{ }vargs`.
+- Unusual control words: `T{ }T`.
 - Well-known control words don't use special characters: `if else end ret` and several more. Syntax highlighters should hardcode them.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names. These are commonly used as delimiters, like `T{ }T`.

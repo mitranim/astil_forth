@@ -1263,6 +1263,7 @@ fun: test_strf
   STR_BUF { str -- }
   T{ str " numbers: 10 20 30" cstr= <T> true }T
 end
+test_strf
 
 fun: test_errf
   ERR_BUF_0 { buf }
@@ -1280,8 +1281,8 @@ end
 \ test_errf_throw
 
 fun: test_wrapf
-  " one" nil      wrapf { err0 }
-  " two: %s" err0 wrapf { err1 }
+  nil  " one"          wrapf { err0 }
+  err0 " two: %s" err0 wrapf { err1 }
 
   \ err0 logf lf
   \ err1 logf lf
@@ -1289,7 +1290,7 @@ fun: test_wrapf
   T{ err0 " one"      cstr= <T> true }T
   T{ err1 " two: one" cstr= <T> true }T
 
-  " three: %s" err1 wrapf { err2 }
+  err1 " three: %s" err1 wrapf { err2 }
 
   \ `wrapf` rotates two string buffers.
   T{ err0 err2 = <T> true  }T
@@ -1297,7 +1298,7 @@ fun: test_wrapf
 
   T{ err2 " three: two: one" cstr= <T> true }T
 
-  " four: %zd: %s" 123 err2 wrapf { err3 }
+  err2 " four: %zd: %s" 123 err2 wrapf { err3 }
 
   T{ err3 err0 = <T> false }T
   T{ err3 err1 = <T> true  }T
@@ -2107,6 +2108,7 @@ fun: main_run
   \ test_vargs_printf
   \ test_logf
   \ test_elogf
+  test_strf
   test_errf
   \ test_errf_throw
   test_wrapf

@@ -97,6 +97,7 @@ end
 \ of various arithmetic words used by the assembler.
 
 4      let: ASM_INSTR_SIZE
+8      let: ASM_PARAM_LEN_MAX
 8      let: ASM_REG_SCRATCH \ Dangerous; high chance of collision.
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
@@ -1026,6 +1027,7 @@ fun: comp_load_off { off } ( E: adr -- adr )
   1 comp_args_set
 end
 
+\ Note: `stack_top` is the top EMPTY cell, not a full one.
 fun: stack?      { stack -- bool  } stack @ <>0 end
 fun: stack_floor { stack -- floor } [ STACK_OFF_FLOOR comp_load_off ] end
 fun: stack_top   { stack -- top   } [ STACK_OFF_TOP   comp_load_off ] end
@@ -1041,7 +1043,7 @@ fun: asm_stack_top_store { out stack -- instr }
   out stack STACK_OFF_TOP asm_store_unscaled_off
 end
 
-fun: s@ { stack -- val } stack stack_top @ end
+fun: stack@ { stack -- val } stack stack_top -cell @ end
 
 fun: stack_top! { top stack } [
   \ stur <top>, [<stack>, STACK_OFF_TOP]
@@ -1120,19 +1122,19 @@ fun: >s { val stack } [
 
 \ ## System stack stuff
 
-\ For debugging.
-fun: systack_ptr { -- sp } [
-  0 comp_clobber
-  0 ASM_REG_SP 0 asm_add_imm comp_instr \ add x0, sp, 0 | mov x0, sp
-  1 comp_args_set
-] end
+fun_comp: systack_ptr ( E: -- sp )
+  comp_next_arg_reg ASM_REG_SP 0 asm_add_imm comp_instr
+  \ add <reg>, sp, 0 | mov <reg>, sp
+end
 
-\ For debugging.
-fun: sysstack_frame_ptr { -- fp } [
-  0 comp_clobber
-  0 ASM_REG_FP asm_mov_reg comp_instr \ mov x0, x29
-  1 comp_args_set
-] end
+fun: systack_ptr { -- sp } systack_ptr end
+
+fun_comp: sysstack_frame_ptr ( E: -- fp )
+  comp_next_arg_reg ASM_REG_FP asm_mov_reg comp_instr
+  \ mov <reg>, x29
+end
+
+fun: sysstack_frame_ptr { -- fp } sysstack_frame_ptr end
 
 \ ## Characters and strings
 
@@ -1413,13 +1415,14 @@ fun_comp: stderr ( E: -- adr ) comp_extern_adr' __stderrp execute'' @ end
 1 1 extern: fpurge           ( file              -- err        )
 
 \ Variadic formatting words; see vararg support below.
-\ Also see `eprintf` which is defined there as well.
-1 1 extern: printf   (         fmt … -- len|err )
-2 1 extern: fprintf  ( file    fmt … -- len|err )
-2 1 extern: sprintf  ( buf     fmt … -- len|err )
-3 1 extern: snprintf ( buf cap fmt … -- len|err )
-2 1 extern: asprintf ( buf_adr fmt … -- len|err )
-2 1 extern: dprintf  ( fd      fmt … -- len|err )
+1 1 extern: printf    ( fmt               … -- len|err )
+2 1 extern: fprintf   ( file fmt          … -- len|err )
+2 1 extern: sprintf   ( buf fmt           … -- len|err )
+3 1 extern: snprintf  ( buf cap fmt       … -- len|err )
+2 1 extern: asprintf  ( buf_adr fmt       … -- len|err )
+2 1 extern: dprintf   ( fd fmt            … -- len|err )
+3 1 extern: vfprintf  ( file fmt vlist    … -- len|err )
+4 1 extern: vsnprintf ( buf cap fmt vlist … -- len|err )
 
 fun: eputchar { char -- -1 } char stderr fputc              end \ Symmetry with `putchar`.
 fun: logc     { char }       char putchar            { -- } end \ Renamed from `emit`.
@@ -1435,37 +1438,6 @@ fun: elf                     LF eputchar             { -- } end
 fun: space                   32 putchar              { -- } end
 fun: espace                  32 eputchar             { -- } end
 fun: fprint { str len file } str 1 len file fwrite   { -- } end
-
-\ Analogue of `printf` missing from libc. Writes to standard error.
-\
-\ Slightly tricky to define correctly. We need to forward variadic arguments to
-\ the `fprintf` call without accidentally modifying their storage. Under the
-\ ABI we currently support, this means not modifying the SP, not touching the
-\ stack, and not changing the LR. We hide the call so the compiler doesn't
-\ create a frame record. However, we still need to inform the compiler about
-\ scratch register clobbers.
-\
-\ The hoops we jump through, just because libc doesn't provide `eprintf`.
-\ On the bright side, this does not have any meaningful runtime overhead.
-fun: eprintf { fmt } ( E: fmt …vargs… -- )
-  \ Relocate `fmt` before we clobber `x0` with `stderr`.
-  [
-    1 0 asm_mov_reg comp_instr    \ mov x1, x0 -- `fmt`
-    0               comp_args_set \ Allow `stderr` to go in `x0`, below.
-  ]
-
-  stderr              \ adrp x0, <off> ; ldr x0, [x0, <off>] ; ldr x0, [x0]
-  [ 2 comp_args_set ] \ Reveal to the compiler that `x1` holds something.
-  extern_adr' fprintf \ adrp x2, <off> ; ldr x2, [x2, <off>]
-
-  [
-                        comp_clobber_volatile
-    2 asm_branch_to_reg comp_instr \ br <fprintf>
-    0                   comp_args_set
-  ]
-
-  unreachable \ brk 666
-end
 
 \ ## Conditionals
 \
@@ -2303,32 +2275,42 @@ fun: cstr=  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare =0 end
 fun: cstr<  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <0 end
 fun: cstr<> { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <>0 end
 
-\ ## Varargs and formatting
+\ ## Vargs and formatting
+
+4096    let: ERR_CAP
+ERR_CAP mem: ERR_BUF_0
+ERR_CAP mem: ERR_BUF_1
 
 \ Short for "compile variadic arguments begin". Assumes the Apple Arm64 ABI
-\ where varargs always use the systack. Modifies the SP which must be later
+\ where vargs always use the systack. Modifies the SP, which must be later
 \ restored with `comp_va_end`. Doesn't clobber any registers.
 \
 \ We always store pairs and modify the SP by 16, because Arm64 requires the SP
 \ to be aligned to 16 when accessing memory. When length is odd, we also store
 \ an unused junk value from an unused register, which is fine.
 \
-\ Floor = index of first varg, ceiling = index just after vargs.
-\ If floor >= ceiling, there are no variadic arguments.
-fun: comp_va_beg { ceil floor }
+\ `floor` is the count of non-vargs preceding vargs.
+\ The layout is always `( …non-vargs… …vargs… )`.
+\ `diff` must be passed to `comp_va_end`.
+fun: comp_va_beg { floor -- diff }
+  comp_args_get           { ceil }
   ceil floor - 2 align_up { diff }
   diff floor +            { ceil }
+
   ceil floor 2
   -loop: ind
     ind     { Xd }
     ind inc { Xt }
     Xd Xt ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp Xd, Xt, [sp, -16]!
   end
+
+  floor comp_args_set
+  diff
 end
 
 \ Short for "compile variadic arguments end".
 fun: comp_va_end { len }
-  len >=0 if
+  len if
     len cells 16 align_up { off }
     ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
   end
@@ -2340,39 +2322,80 @@ end
 \     10 20 30 vargs{ " numbers: %zd %zd %zd" printf }vargs lf
 \   end
 \
-\ Caution: varargs can only be used in direct calls to variadic functions.
+\ Caution: vargs can only be used in direct calls to variadic functions.
 \ Indirect calls DO NOT WORK because stack pointer is changed by calls.
-fun_comp: vargs{ ( C: -- len ) ( E: <systack_push> )
-  comp_args_get { len }
-  0             { off }
-  len off comp_va_beg
-  len STACK >s
-  off comp_args_set
-end
+fun_comp: vargs{ ( C: -- len ) ( E: <systack_push> ) 0 comp_va_beg STACK >s end
 
 \ Restores the SP after a variadic call. See `vargs{`.
 fun_comp: }vargs ( C: len -- ) ( E: <systack_pop> ) STACK s> comp_va_end end
 
-\ The given offset is how many non-vargs precede the vargs.
-\ The given function must take exactly that many non-vargs,
-\ and exactly as many vargs as are available in param regs.
-fun: comp_varcall { fun off } ( E: …args… …vargs… -- )
-  comp_args_get { len }
-  len off   comp_va_beg
-  off       comp_args_set
-  fun       comp_call
-  0         comp_args_set
-  len off - comp_va_end
+\ Formats into a given buffer, with null-termination. Usage:
+\
+\   BUF CAP " codes: %zd %zd %zd" 10 20 30 str_prnf
+fun_comp: str_prnf ( E: buf cap fmt …vargs… -- )
+  3 comp_va_beg { len }
+  compile' snprintf
+  len comp_va_end
+  0 comp_args_set
 end
 
-fun_comp: logf  ( E: fmt …vargs… -- ) xt' printf  1 comp_varcall end
-fun_comp: elogf ( E: fmt …vargs… -- ) xt' eprintf 1 comp_varcall end
+\ Same as `str_prnf` but also returns the given buffer.
+fun_comp: strf ( E: buf cap fmt …vargs… -- buf )
+  comp_anon_local { loc }
+  0 loc comp_local_set
+  execute'' str_prnf
+  0 loc comp_local_get
+  1 comp_args_set
+end
 
-\ Formats into a given string buffer. Returns the same buffer address.
-\ String is null-terminated. Usage:
-\
-\   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] strf
-fun_comp: strf ( E: buf cap fmt …vargs… -- buf ) xt' snprintf 3 comp_varcall end
+\ Prepends `pre_len` args to current args. Inputs are passed on the control
+\ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
+fun: comp_args_prepend { pre_len } ( …pre… -- )
+  pre_len ifn ret end
+
+  comp_args_get { post_len }
+
+  post_len pre_len + { arg_len }
+
+  arg_len ASM_PARAM_LEN_MAX > if
+    ERR_BUF_0 ERR_CAP
+    " in `comp_args_prepend`: too many total args: %zd > %zd"
+    arg_len ASM_PARAM_LEN_MAX strf throw
+  end
+
+  arg_len pre_len +for: reg reg comp_clobber end
+
+  post_len -for: reg_src
+    reg_src pre_len + { reg_out }
+    reg_out reg_src asm_mov_reg comp_instr \ mov <out>, <src>
+  end
+
+  pre_len -for: reg
+    reg comp_args_set
+    STACK s> execute
+  end
+
+  arg_len comp_args_set
+end
+
+fun_comp: logf ( E: fmt …vargs… -- )
+  1 comp_va_beg { len }
+  compile' printf
+  len comp_va_end
+  0 comp_args_set
+end
+
+fun_comp: elogf ( E: fmt …vargs… -- )
+  1 comp_va_beg { len }
+
+  xt'' stderr STACK >s
+  1 comp_args_prepend
+  execute'' systack_ptr
+  compile' vfprintf
+
+  len comp_va_end
+  0 comp_args_set
+end
 
 \ ## Exceptions
 \
@@ -2416,70 +2439,48 @@ fun: throw { err } err throw end
 fun_comp: catch'  WORDLIST_EXEC catch end
 fun_comp: catch'' WORDLIST_COMP catch end
 
-4096    let: ERR_CAP
-ERR_CAP mem: ERR_BUF_0
-ERR_CAP mem: ERR_BUF_1
-
-\ Usage example:
-\
-\  " error codes: %zd %zd %zd" 10 20 30 errf throw
 fun_comp: errf ( E: fmt …vargs… -- err )
-  comp_args_get { len }
-  1             { off }
+  1 comp_va_beg { len }
 
-  len off    comp_va_beg
-  2          comp_clobber
-  2 0        asm_mov_reg comp_instr \ mov x2, x0
-  0          comp_args_set          \ Assume `x0` is used up.
-  execute''  ERR_BUF_0              \ mov x0, <buf>
-  execute''  ERR_CAP                \ mov x1, <cap>
-  3          comp_args_set          \ Assume x2 is useful.
-  xt' snprintf comp_call            \ blr <fun>
-  0          comp_args_set          \ Ignore output length.
-  len off -  comp_va_end            \ Restore SP.
-  execute''  ERR_BUF_0              \ mov x0, <buf>
+  xt'' ERR_BUF_0 STACK >s
+  xt'' ERR_CAP   STACK >s
+  2 comp_args_prepend
+
+  execute'' systack_ptr
+  compile' vsnprintf
+
+  len comp_va_end
+  0 comp_args_set
+  execute'' ERR_BUF_0
 end
 
-fun: wrapf_args { fmt err -- buf cap fmt }
+fun: wrapf_args { err fmt -- buf cap fmt }
   err ERR_BUF_0 = if ERR_BUF_1 ERR_CAP fmt ret end
   ERR_BUF_0 ERR_CAP fmt
 end
 
-\ Wraps a prior error with an additional message. The last argument must
-\ always be the previous error, and the format string should include the
-\ `%s` for it, usually after the additional context. Usage example:
+\ Wraps a prior error with an additional message.
+\ The prior error must always be provided as the
+\ first argument before the format, and should
+\ usually ALSO be provided in the format vargs.
+\ Usage example:
 \
-\   " unable to blah (error code: %zd): %s" code err wrapf throw
+\   err " unable to blah (error code: %zd): %s" code err wrapf throw
 \
-\ This allows to create an error with `errf"` and repeatedly wrap
-\ it with more context by implicitly rotating the string buffers.
-fun_comp: wrapf ( C: fmt …varargs… err -- str )
-  comp_args_get { len }
-
-  len 2 < if
-    " unable to `wrapf`: need at least 2 arguments: the format string (first) and the previous error (last); got %zd arguments instead"
-    len errf throw
-  end
-
-  comp_anon_local { buf_loc }
-  len dec         { err_reg }
-  1               { off     } \ Vargs begin after `fmt`.
-
-  len off comp_va_beg
-
-  err_reg 1 <> if
-    1 comp_clobber
-    1 err_reg asm_mov_reg comp_instr \ mov x1, <err>
-  end
-
-  2 comp_args_set
+\ Passing the error as the first argument allows us
+\ to rotate error format buffers. You can create an
+\ error with `errf` and wrap it repeatedly.
+fun_comp: wrapf ( C: err fmt …vargs… -- str )
+  comp_anon_local { buf }
+  2 comp_va_beg   { len }
 
   compile' wrapf_args
+  0 buf comp_local_set
+  compile' snprintf
 
-  0 buf_loc  comp_local_set \ str x0, [x29, <buf>]
-  xt' snprintf comp_call    \ blr <fun>
-  len off -  comp_va_end    \ Restore SP.
-  0 buf_loc  comp_local_get \ ldr x0, [x29, <buf>]
+  len comp_va_end
+  0 buf comp_local_get
+  1 comp_args_set
 end
 
 fun: fatal { err } " fatal: %s" err elogf elf abort end
