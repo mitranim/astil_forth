@@ -308,6 +308,10 @@ static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
   try(interp_validate_string(buf, len));
   try(interp_extern_adr(interp, (const char *)buf));
 
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->norm.has_loads = true;
+
   const auto comp = &interp->comp;
   U8         reg;
   try(comp_next_arg_reg(comp, &reg));

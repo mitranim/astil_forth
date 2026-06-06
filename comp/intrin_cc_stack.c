@@ -316,6 +316,10 @@ static Err intrin_comp_extern_adr(Interp *interp) {
   try(interp_pop_str(interp, &name, nullptr));
   try(interp_extern_adr(interp, name));
 
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->norm.has_loads = true;
+
   const auto            comp = &interp->comp;
   static constexpr auto reg  = ASM_SCRATCH_REG_8;
   asm_append_dysym_load(comp, name, reg, &comp->code.externs);
