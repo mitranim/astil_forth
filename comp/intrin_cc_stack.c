@@ -370,7 +370,7 @@ static Err intrin_inline_word(Interp *interp) {
 
 static Err intrin_execute(Interp *interp) { return intrin_end(interp); }
 
-static Err intrin_comp_named_local(Interp *interp) {
+static Err intrin_comp_local_named(Interp *interp) {
   const char *name;
   Ind         len;
   try(interp_pop_str(interp, &name, &len));
@@ -388,7 +388,7 @@ static Err intrin_comp_named_local(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_anon_local(Interp *interp) {
+static Err intrin_comp_local_anon(Interp *interp) {
   const auto comp = &interp->comp;
   const auto loc  = comp_local_anon(comp);
 

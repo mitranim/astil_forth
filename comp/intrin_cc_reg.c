@@ -433,7 +433,7 @@ static Err intrin_comp_clobber(Sint reg, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_named_local(
+static Err intrin_comp_local_named(
   Sint buf, Sint len, Interp *interp, const Local **out
 ) {
   try(interp_validate_string(buf, len));
@@ -443,7 +443,7 @@ static Err intrin_comp_named_local(
   return nullptr;
 }
 
-static Err intrin_comp_anon_local(Interp *interp, const Local **out) {
+static Err intrin_comp_local_anon(Interp *interp, const Local **out) {
   const auto comp = &interp->comp;
   const auto loc  = comp_local_anon(comp);
   if (out) *out = local_token(loc);

@@ -46,8 +46,8 @@ static const USED Sym INTRIN[] = {
   INTRIN_FIND_WORD,        // find_word
   INTRIN_INLINE_WORD,      // inline_word
   INTRIN_EXECUTE,          // execute
-  INTRIN_COMP_NAMED_LOCAL, // comp_named_local
-  INTRIN_COMP_ANON_LOCAL,  // comp_anon_local
+  INTRIN_COMP_LOCAL_NAMED, // comp_local_named
+  INTRIN_COMP_LOCAl_ANON,  // comp_local_anon
   INTRIN_DEBUG_ON,         // debug_on
   INTRIN_DEBUG_OFF,        // debug_off
   INTRIN_DEBUG_FLUSH,      // debug_flush

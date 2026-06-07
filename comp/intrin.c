@@ -814,20 +814,20 @@ static const USED auto INTRIN_EXECUTE = (Sym){
   .throws   = true,
 };
 
-static const USED auto INTRIN_COMP_NAMED_LOCAL = (Sym){
-  .name.buf  = "comp_named_local",
+static const USED auto INTRIN_COMP_LOCAL_NAMED = (Sym){
+  .name.buf  = "comp_local_named",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_named_local,
+  .intrin    = (void *)intrin_comp_local_named,
   .inp_len   = 2,
   .out_len   = 1,
   .throws    = true,
   .comp_only = true,
 };
 
-static const USED auto INTRIN_COMP_ANON_LOCAL = (Sym){
-  .name.buf  = "comp_anon_local",
+static const USED auto INTRIN_COMP_LOCAl_ANON = (Sym){
+  .name.buf  = "comp_local_anon",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_anon_local,
+  .intrin    = (void *)intrin_comp_local_anon,
   .out_len   = 1,
   .throws    = true,
   .comp_only = true,

@@ -937,9 +937,11 @@ static Err comp_alloca_const(Comp *comp, Reg_val val) {
 // and x0, x0, 0xfffffffffffffff0
 // mov sp, x0
 static Err comp_alloca_dynamic(Comp *comp) {
-  asm_append_sub_reg_ext(comp, ASM_PARAM_REG_0, ASM_REG_SP, ASM_PARAM_REG_0);
-  asm_append_sp_align(comp, ASM_PARAM_REG_0);
-  asm_append_add_imm(comp, ASM_REG_SP, ASM_PARAM_REG_0, 0);
+  const auto reg = ASM_PARAM_REG_0;
+  try(comp_clobber_reg(comp, reg));
+  asm_append_sub_reg_ext(comp, reg, ASM_REG_SP, reg);
+  asm_append_sp_align(comp, reg);
+  asm_append_add_imm(comp, ASM_REG_SP, reg, 0);
   return nullptr;
 }
 

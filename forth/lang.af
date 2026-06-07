@@ -1257,7 +1257,7 @@ fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
 \
 \ SYNC[asm_local_addressing].
 fun_comp: ref' ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_named_local comp_local_off { off }
+  parse_word comp_local_named comp_local_off { off }
   comp_next_arg_reg { reg }
   reg ASM_REG_FP off asm_add_imm comp_instr \ add <reg>, FP, <off>
 end
@@ -1575,7 +1575,7 @@ end
 fun_comp: switch ( C: -- nop val_loc switch_pop ) ( E: val -- )
   " when calling `switch`" 1 comp_args_valid 0 comp_args_set
 
-  comp_anon_local { val_loc }
+  comp_local_anon { val_loc }
 
   0 val_loc comp_local_set \ mov <val>, x0 | str x0, [FP, <val>]
   xt' nop        STACK >s
@@ -1584,16 +1584,16 @@ fun_comp: switch ( C: -- nop val_loc switch_pop ) ( E: val -- )
 end
 
 fun: case_pop
-  ( C: val_loc switch_pop adr_beg -- adr_end else_pop val_loc switch_pop )
+  ( C: val_loc switch_pop case_adr -- adr_end else_pop val_loc switch_pop )
 
   comp_barrier
-  STACK s>          { adr_beg    }
-  STACK s>          { switch_pop }
-  STACK s>          { val_loc    }
-  reserve_here      { adr_end    }
-  adr_beg off_to_pc { off        }
+  STACK s>           { case_adr   }
+  STACK s>           { switch_pop }
+  STACK s>           { val_loc    }
+  reserve_here       { adr_end    }
+  case_adr off_to_pc { off        }
 
-  off ASM_NE asm_branch_cond adr_beg !32 \ b.ne <case_end>
+  off ASM_NE asm_branch_cond case_adr !32 \ b.ne <case_end>
 
   adr_end      STACK >s \ b <switch_end>
   xt' else_pop STACK >s
@@ -1602,7 +1602,7 @@ fun: case_pop
 end
 
 fun_comp: case
-  ( C: val_loc switch_pop -- val_loc switch_pop adr_beg case_pop )
+  ( C: val_loc switch_pop -- val_loc switch_pop case_adr case_pop )
   ( E: pred -- )
 
   " when calling `case`" 1 comp_args_valid 0 comp_args_set
@@ -1716,7 +1716,7 @@ end
 8 int: U64
 8 int: S64
 8 int: Adr
-8 int: Cell \ classic Forth name for machine word
+8 int: Cell \ Classic Forth name for machine word. Interpreted as signed.
 8 int: Cstr \ char*
 4 int: Cint
 4 int: Cuint
@@ -2162,7 +2162,7 @@ fun_comp: for
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
   " when calling `for`" 1 comp_args_valid 0 comp_args_set
-  comp_anon_local for_loop_countdown_init
+  comp_local_anon for_loop_countdown_init
 end
 
 \ Like `for` but requires a local name to make the index
@@ -2177,7 +2177,7 @@ fun_comp: -for:
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
   " when calling `-for:`" 1 comp_args_valid 0 comp_args_set
-  parse_word comp_named_local for_loop_countdown_init
+  parse_word comp_local_named for_loop_countdown_init
 end
 
 \ Count-up loop with the range `[floor,ceil)`. Usage:
@@ -2190,8 +2190,8 @@ fun_comp: +for:
   " when calling `+for:`" 2 comp_args_valid 0 comp_args_set
 
   loop_frame_init
-  comp_anon_local             { lim } \ ceil  = limit
-  parse_word comp_named_local { cur } \ floor = cursor
+  comp_local_anon             { lim } \ ceil  = limit
+  parse_word comp_local_named { cur } \ floor = cursor
 
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
@@ -2217,9 +2217,9 @@ fun_comp: -loop:
   " when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
   loop_frame_init
 
-  parse_word comp_named_local { cur } \ ceil  = cursor
-  comp_anon_local             { lim } \ floor = limit
-  comp_anon_local             { step }
+  parse_word comp_local_named { cur } \ ceil  = cursor
+  comp_local_anon             { lim } \ floor = limit
+  comp_local_anon             { step }
 
   0 cur             comp_local_set \ mov <cur>,  x0 | str x0, [FP, <cur>]
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
@@ -2254,9 +2254,9 @@ fun_comp: +loop:
   " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
   loop_frame_init
 
-  comp_anon_local             { lim } \ ceil  = limit
-  parse_word comp_named_local { cur } \ floor = cursor
-  comp_anon_local             { step }
+  comp_local_anon             { lim } \ ceil  = limit
+  parse_word comp_local_named { cur } \ floor = cursor
+  comp_local_anon             { step }
 
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
@@ -2343,38 +2343,16 @@ fun_comp: vargs{ ( C: -- len ) ( E: <systack_push> ) 0 comp_va_beg STACK >s end
 \ Restores the SP after a variadic call. See `vargs{`.
 fun_comp: }vargs ( C: len -- ) ( E: <systack_pop> ) STACK s> comp_va_end end
 
-\ Formats into a given buffer, with null-termination. Usage:
-\
-\   BUF CAP " codes: %zd %zd %zd" 10 20 30 str_prnf
-fun_comp: str_prnf ( E: buf cap fmt …vargs… -- )
-  3 comp_va_beg { len }
-  compile' snprintf
-  len comp_va_end
-  0 comp_args_set
-end
-
-\ Same as `str_prnf` but also returns the given buffer.
-fun_comp: strf ( E: buf cap fmt …vargs… -- buf )
-  comp_anon_local { loc }
-  0 loc comp_local_set
-  execute'' str_prnf
-  0 loc comp_local_get
-  1 comp_args_set
-end
-
 \ Prepends `pre_len` args to current args. Inputs are passed on the control
 \ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
 fun: comp_args_prepend { pre_len } ( …pre… -- )
   pre_len ifn ret end
 
-  comp_args_get { post_len }
-
+  comp_args_get      { post_len }
   post_len pre_len + { arg_len }
 
   arg_len ASM_PARAM_LEN_MAX > if
-    ERR_BUF_0 ERR_CAP
-    " in `comp_args_prepend`: too many total args: %zd > %zd"
-    arg_len ASM_PARAM_LEN_MAX strf throw
+    " in `comp_args_prepend`: too many total args" throw
   end
 
   arg_len pre_len +for: reg reg comp_clobber end
@@ -2485,7 +2463,7 @@ end
 \ to rotate error format buffers. You can create an
 \ error with `errf` and wrap it repeatedly.
 fun_comp: wrapf ( C: err fmt …vargs… -- str )
-  comp_anon_local { buf }
+  comp_local_anon { buf }
   2 comp_va_beg   { len }
 
   compile' wrapf_args
@@ -2494,7 +2472,6 @@ fun_comp: wrapf ( C: err fmt …vargs… -- str )
 
   len comp_va_end
   0 buf comp_local_get
-  1 comp_args_set
 end
 
 fun: fatal { err } " fatal: %s" err elogf elf abort end
@@ -2540,6 +2517,53 @@ end
 \ Like `os_try`, but for Posix functions which directly
 \ return an `errno` code on failure and zero on success.
 fun: posix_try { code ctx } code if code ctx os_err throw end end
+
+\ ## Formatting continued
+
+\ For functions like `snprintf` which return length or error sentinel.
+\ Assumes length has already been sign-extended from `Cint`.
+fun: validate_format_len { len -- len|throw }
+  len >=0 if len ret end
+
+  errno { code }
+  code strerror { msg }
+  msg if
+    " unable to format string; code: %d; msg: %s" code msg errf throw
+  else
+    " unable to format string; code: %s" code errf throw
+  end
+
+  nil
+end
+
+\ Formats into a given buffer, with null-termination. Usage:
+\
+\   BUF CAP " codes: %zd %zd %zd" 10 20 30 str_prnf
+fun_comp: str_prnf ( E: buf cap fmt …vargs… -- len|err )
+  3 comp_va_beg { len }
+  compile' snprintf
+  len comp_va_end
+  compile' int_to_cell
+  compile' validate_format_len
+end
+
+\ Like `str_prnf`, but returns the given buffer,
+\ instead of formatted length or error sentinel.
+fun_comp: strf ( E: buf cap fmt …vargs… -- buf )
+  comp_local_anon { loc }
+  0 loc comp_local_set
+  execute'' str_prnf
+  0 loc comp_local_get
+end
+
+fun_comp: fmtf ( E: file fmt …vargs… )
+  2 comp_va_beg { len }
+  compile' fprintf
+  len comp_va_end
+  compile' int_to_cell
+  compile' validate_format_len
+  0 comp_args_set
+end
 
 \ ## Stack manipulation continued
 
@@ -2610,7 +2634,7 @@ fun_comp: stack{ ( E: stack -- )
       " unsupported `--` in `stack{`" throw
     end
 
-    str len comp_named_local STACK >s
+    str len comp_local_named STACK >s
     locs inc { locs }
   end
 
@@ -2916,12 +2940,10 @@ fun: execute_raw { fun } [ 0 asm_branch_link_reg comp_instr ] end
 
 \ Takes any amount of args where the last arg is assumed to be a raw
 \ instruction address (function pointer). Invokes that function with
-\ the preceding args. Does not support output parameters.
+\ the preceding args. Does not support output params or exceptions.
 \
-\ TODO: tell the compiler about the call. Without that, caller-callee relation
-\ is hidden; exceptions and outputs are ignored; the caller is not guaranteed
-\ to have a prologue and epilogue; if the caller is a leaf, this clobbers the
-\ link register of the caller's caller.
+\ TODO: tell the compiler about the call. We want the compiler
+\ to emit prologue and epilogue, track clobbers, and so on.
 \
 \ TODO: verify that clobbering works properly.
 fun_comp: execute_raw ( C: …args… fun -- ) ( E: …args… fun -- )
@@ -2934,9 +2956,7 @@ fun_comp: execute_raw ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_clobber_volatile
   0 comp_args_set
 
-  \ The extra frame record is a little bit wasteful, but avoids crashing
-  \ in leaf functions. The compiler doesn't know about the caller-callee
-  \ relationship here, and elides frame records in leaves.
+  \ The frame record is a workaround for "leaf" functions using `execute_raw`.
   \
   \   stp x29, x30, [sp, #-16]!
   \   blr <fun>
@@ -2948,7 +2968,7 @@ end
 
 \ For compiling words which modify a local by applying the given function.
 fun: comp_loc_mut { fun name } ( C: "name" -- ) ( E: -- )
-  parse_word comp_named_local { loc }
+  parse_word comp_local_named { loc }
 
   comp_args_get if
     " arity mismatch in `%s`: expected no arguments" name errf throw
@@ -2979,7 +2999,7 @@ fun: fallback { one two -- fallback } [
 \ TODO support any amount of inputs.
 fun_comp: fallback: ( E: one two -- fallback )
   compile' fallback
-  parse_word comp_named_local { loc }
+  parse_word comp_local_named { loc }
   0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
   0     comp_args_set
 end

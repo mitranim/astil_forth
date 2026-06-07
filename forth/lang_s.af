@@ -1031,7 +1031,7 @@ end
 
 \ Stores a value to a local, declaring the local if necessary.
 fun_comp: to: ( C: "name" -- ) ( E: val -- )
-  parse_word comp_named_local comp_pop_local_set
+  parse_word comp_local_named comp_pop_local_set
 end
 
 \ Returns the address of a local (on the system stack),
@@ -1039,7 +1039,7 @@ end
 \
 \ SYNC[asm_local_addressing].
 fun_comp: ref: ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_named_local
+  parse_word comp_local_named
   1 swap ASM_REG_FP swap asm_add_imm comp_instr \ add x1, FP, <loc>
   1                      asm_push1   comp_instr \ str x1, [x27], 8
 end
@@ -1309,7 +1309,7 @@ end
 fun_comp: for
   ( C: -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
-  comp_anon_local for_countdown_loop_init
+  comp_local_anon for_countdown_loop_init
 end
 
 \ Like `for` but requires a local name to make the index
@@ -1322,7 +1322,7 @@ end
 fun_comp: -for:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
-  parse_word comp_named_local for_countdown_loop_init
+  parse_word comp_local_named for_countdown_loop_init
 end
 
 fun: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_cur -- )
@@ -1364,8 +1364,8 @@ fun_comp: +for:
   ( E: ceil floor -- )
   loop_frame_init
 
-  comp_anon_local             to: lim \ ceil  = limit
-  parse_word comp_named_local to: cur \ floor = cursor
+  comp_local_anon             to: lim \ ceil  = limit
+  parse_word comp_local_named to: cur \ floor = cursor
 
   cur     comp_pop_local_set
   lim     comp_pop_local_set
@@ -1393,9 +1393,9 @@ fun_comp: +loop:
   ( E: ceil floor step -- )
   loop_frame_init
 
-  comp_anon_local             to: lim \ ceil  = limit
-  parse_word comp_named_local to: cur \ floor = cursor
-  comp_anon_local             to: step
+  comp_local_anon             to: lim \ ceil  = limit
+  parse_word comp_local_named to: cur \ floor = cursor
+  comp_local_anon             to: step
 
   step    comp_pop_local_set
   cur     comp_pop_local_set
@@ -1412,9 +1412,9 @@ fun_comp: -loop:
   ( E: ceil floor step -- )
   loop_frame_init
 
-  parse_word comp_named_local to: cur \ ceil  = cursor
-  comp_anon_local             to: lim \ floor = limit
-  comp_anon_local             to: step
+  parse_word comp_local_named to: cur \ ceil  = cursor
+  comp_local_anon             to: lim \ floor = limit
+  comp_local_anon             to: step
 
   step comp_pop_local_set
   lim  comp_pop_local_set
@@ -1520,7 +1520,7 @@ fun_comp: {
     s" --" str len str<> while \ `--` to `}` is a comment.
 
     \ Resulting local token is used by `}` which we're about to call.
-    str len comp_named_local ( -- loc_tok )
+    str len comp_local_named ( -- loc_tok )
 
     loc_len inc to: loc_len
   end
@@ -1533,7 +1533,7 @@ end
 
 \ For compiling words which modify a local by applying the given function.
 fun: comp_loc_mut ( C: fun "name" -- ) ( E: -- )
-  parse_word comp_named_local
+  parse_word comp_local_named
   dup comp_local_get_push
   comp_call
   comp_pop_local_set
