@@ -100,7 +100,7 @@ static Err intrin_semicolon(Interp *interp) {
     eputs("[debug] compiled:");
     interp_repr_sym(interp, sym);
 
-    // const auto read = interp->reader;
+    // const auto read = interp_reader(interp);
     // eprintf(
     //   "[system] [reader] position " FMT_UINT "; %s:" FMT_UINT ":" FMT_UINT "\n",
     //   READ_POS_ARGS(read)
@@ -141,7 +141,7 @@ static Err interp_catch(Interp *interp, Wordlist wordlist) {
   try(interp_wordlist(interp, wordlist, &dict));
   try(interp_read_word(interp));
 
-  const auto name = interp->reader->word.buf;
+  const auto name = interp_reader(interp)->word.buf;
   const auto sym  = dict_get(dict, name);
   if (!sym) return err_word_undefined_in_wordlist(name, wordlist);
 
@@ -183,7 +183,7 @@ static Err err_char_eof() {
 }
 
 static Err interp_char(Interp *interp, char *out) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   U8         byte;
 
   try(read_ascii_printable(read, &byte));
@@ -194,14 +194,14 @@ static Err interp_char(Interp *interp, char *out) {
 
 static Err interp_parse_word(Interp *interp, const char **out_buf, Ind *out_len) {
   try(interp_read_word(interp));
-  const auto word = &interp->reader->word;
+  const auto word = &interp_reader(interp)->word;
   if (out_buf) *out_buf = word->buf;
   if (out_len) *out_len = word->len;
   return nullptr;
 }
 
 static Err intrin_import_tick(Interp *interp) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   try(read_word(read));
   try(interp_import(interp, (const char *)read->word.buf));
   return nullptr;
@@ -426,7 +426,7 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
 
 static Err debug_word_tick(Interp *interp) {
   try(interp_read_word(interp));
-  const auto name = interp->reader->word.buf;
+  const auto name = interp_reader(interp)->word.buf;
 
   const auto exec = dict_get(&interp->dict_exec, name);
   if (exec) interp_repr_sym(interp, exec);
@@ -440,7 +440,7 @@ static Err debug_word_tick(Interp *interp) {
 
 static Err debug_dis(Interp *interp) {
   try(interp_read_word(interp));
-  const auto name = interp->reader->word.buf;
+  const auto name = interp_reader(interp)->word.buf;
 
   const auto exec = dict_get(&interp->dict_exec, name);
   if (exec) try(interp_disasm_sym(interp, exec));

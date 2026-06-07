@@ -11,6 +11,11 @@ typedef struct {
   Sym_stack  syms;
 } Interp_snap;
 
+// Per-module state, created for each import.
+typedef struct {
+  Reader reader;
+} Module_ctx;
+
 /*
 Every compiler is an interpreter.
 Every Forth interpreter is a compiler.
@@ -30,7 +35,7 @@ typedef struct {
   Sym_dict    dict_exec; // Wordlist `WORDLIST_EXEC`.
   Sym_dict    dict_comp; // Wordlist `WORDLIST_COMP`.
   Sym_stack   syms;      // Defined symbols.
-  Reader     *reader;    // Each input file has its own parser state.
+  Module_ctx *module;    // Context of the foremost module being read.
   Str_set     imports;   // Realpaths of already-imported files.
   Comp        comp;      // Code and compilation context.
   Interp_snap snap;      // Stable snapshot for rewinding.

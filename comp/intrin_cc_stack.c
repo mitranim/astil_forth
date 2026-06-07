@@ -61,26 +61,26 @@ static Err interp_valid_name(Interp *interp, Word_str *out) {
 
 static Err intrin_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_EXEC, interp->reader->word));
+  try(interp_word_begin(interp, WORDLIST_EXEC, interp_reader(interp)->word));
   return nullptr;
 }
 
 static Err intrin_colon_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_COMP, interp->reader->word));
+  try(interp_word_begin(interp, WORDLIST_COMP, interp_reader(interp)->word));
   return nullptr;
 }
 
 static Err intrin_fun(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_EXEC, interp->reader->word));
+  try(interp_word_begin(interp, WORDLIST_EXEC, interp_reader(interp)->word));
   try(interp_push_semicolon(interp));
   return nullptr;
 }
 
 static Err intrin_fun_comp(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_COMP, interp->reader->word));
+  try(interp_word_begin(interp, WORDLIST_COMP, interp_reader(interp)->word));
   try(interp_push_semicolon(interp));
   return nullptr;
 }

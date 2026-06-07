@@ -18,10 +18,10 @@ static bool interp_valid(const Interp *interp) {
     is_aligned(&interp->syms) &&
     is_aligned(&interp->dict_exec) &&
     is_aligned(&interp->dict_comp) &&
-    is_aligned(&interp->reader) &&
+    is_aligned(&interp->module) &&
     is_aligned(&interp->snap) &&
     comp_valid(&interp->comp) &&
-    reader_valid(interp->reader) &&
+    reader_valid(interp_reader_const(interp)) &&
     stack_valid((const Stack *)&interp->ints) &&
     stack_valid((const Stack *)&interp->syms) &&
     dict_valid((const Dict *)&interp->dict_exec) &&

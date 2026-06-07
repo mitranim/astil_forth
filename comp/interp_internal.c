@@ -64,6 +64,14 @@ static Err interp_rewind(Interp *interp) {
   return nullptr;
 }
 
+static Reader *interp_reader(Interp *interp) {
+  return interp && interp->module ? &interp->module->reader : nullptr;
+}
+
+static const Reader *interp_reader_const(const Interp *interp) {
+  return interp && interp->module ? &interp->module->reader : nullptr;
+}
+
 /*
 Chuck circa June 1970 (PPOL): "type the offending word"; "reset all stacks".
 
@@ -111,7 +119,8 @@ static Err interp_on_tty_err(Interp *interp, Err err) {
   the remainder of a failed script, possibly inside a failed word definition,
   which is a totally invalid state after rewinding.
   */
-  if (interp->reader) file_purge(interp->reader->file);
+  const auto read = interp_reader(interp);
+  if (read) file_purge(read->file);
 
   return nullptr;
 }
@@ -141,7 +150,7 @@ static Err interp_wordlist(Interp *interp, Wordlist val, Sym_dict **out) {
 
 static Err read_interp_num(Interp *interp) {
   Sint num;
-  try(read_num(interp->reader, &num));
+  try(read_num(interp_reader(interp), &num));
 
   IF_DEBUG(eprintf("[system] read number: " FMT_SINT "\n", num));
 
@@ -171,7 +180,7 @@ static Err interp_call_norm(Interp *interp, const Sym *sym) {
     " at instruction address %p (" READ_POS_FMT ")\n",
     sym->name.buf,
     fun,
-    READ_POS_ARGS(interp->reader)
+    READ_POS_ARGS(interp_reader(interp))
   ));
 
   const auto err = asm_call_norm(interp, sym);
@@ -298,7 +307,7 @@ static Err interp_word(Interp *interp, Word_str word) {
 }
 
 static Err read_interp_word(Interp *interp) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   try(read_word(read));
 
   const auto word = read->word;
@@ -315,7 +324,7 @@ static Err interp_err(Reader *read, const Err err) {
 }
 
 static Err interp_loop(Interp *interp) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
 
   for (;;) {
     U8 next;
@@ -404,16 +413,16 @@ static Err interp_eval(Interp *interp, const char *code) {
   deferred(file_deinit) FILE *file = fmemopen(buf, strlen(code), "r");
   if (!file) return err_str("unable to fmemopen");
 
-  Reader next = {};
-  next.file   = file;
-  try(str_set(&next.file_path, "<eval>"));
+  Module_ctx next  = {};
+  next.reader.file = file;
+  try(str_set(&next.reader.file_path, "<eval>"));
 
-  Reader *prev   = interp->reader;
-  interp->reader = &next;
+  Module_ctx *prev = interp->module;
+  interp->module   = &next;
 
-  const auto err = interp_err(&next, interp_loop(interp));
+  const auto err = interp_err(&next.reader, interp_loop(interp));
 
-  interp->reader = prev;
+  interp->module = prev;
   return err;
 }
 
@@ -421,7 +430,7 @@ static Err interp_import_stdio(Interp *interp, const char *path) {
   deferred(file_deinit) FILE *file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
 
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   read->file      = file;
   try(str_set(&read->file_path, path));
 
@@ -511,7 +520,7 @@ static Err interp_import_inner(
   deferred(file_deinit) FILE *file = fopen(path, "r");
   if (!file) return err_file_unable_to_open(path);
 
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   read->file      = file;
   try(str_set(&read->file_path, path));
 
@@ -527,24 +536,24 @@ static Err interp_import_inner(
 static Err interp_import(Interp *interp, const char *path) {
   try(interp_snapshot(interp));
 
-  const auto prev            = interp->reader;
-  const auto prev_file       = prev ? prev->file : nullptr;
-  const auto prev_path       = prev ? prev->file_path.buf : nullptr;
+  const auto prev            = interp->module;
+  const auto prev_file       = prev ? prev->reader.file : nullptr;
+  const auto prev_path       = prev ? prev->reader.file_path.buf : nullptr;
   const auto stdio_file_path = file_path_stdio(path);
-  Reader     next            = {};
-  interp->reader             = &next;
+  Module_ctx next            = {};
+  interp->module             = &next;
 
   const auto err = stdio_file_path
     ? interp_import_stdio(interp, stdio_file_path)
     : interp_import_inner(interp, prev_file, prev_path, path);
 
-  interp->reader = prev;
+  interp->module = prev;
   if (err) (void)interp_rewind(interp);
   return err;
 }
 
 static Err interp_read_word(Interp *interp) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   try(read_word(read));
   IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", read->word.buf));
   return nullptr;
@@ -580,7 +589,7 @@ static Err interp_sym_by_ptr(Interp *interp, Sint ptr, Sym **out) {
 static Err interp_parse_until(
   Interp *interp, U8 delim, const char **out_buf, Ind *out_len
 ) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   try(read_until_char(read, (U8)delim));
 
   // IF_DEBUG(eprintf(
@@ -658,7 +667,7 @@ static Err interp_extern_fun(
     &interp->syms,
     (Sym){
       .type     = SYM_EXTERN,
-      .name     = interp->reader->word,
+      .name     = interp_reader(interp)->word,
       .wordlist = wordlist,
       .exter    = ext_adr,
       .inp_len  = (U8)inp_len,

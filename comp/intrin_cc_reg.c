@@ -11,7 +11,7 @@ The braces immediately following `: <name>` are used for parameters,
 while the braces anywhere else are used for assignments.
 */
 static Err interp_parse_params(Interp *interp) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
 
   try(read_word(read));
   const auto word = read->word;
@@ -41,7 +41,7 @@ static Err interp_parse_params(Interp *interp) {
 }
 
 static Err intrin_brace(Interp *interp) {
-  const auto read = interp->reader;
+  const auto read = interp_reader(interp);
   const auto comp = &interp->comp;
 
   for (;;) {
@@ -94,14 +94,14 @@ static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
 
 static Err intrin_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_EXEC, interp->reader->word));
+  try(interp_word_begin(interp, WORDLIST_EXEC, interp_reader(interp)->word));
   try(interp_parse_params(interp));
   return nullptr;
 }
 
 static Err intrin_colon_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_COMP, interp->reader->word));
+  try(interp_word_begin(interp, WORDLIST_COMP, interp_reader(interp)->word));
   try(interp_parse_params(interp));
   return nullptr;
 }

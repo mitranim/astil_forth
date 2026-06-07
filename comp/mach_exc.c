@@ -98,7 +98,7 @@ static void Mach_thread_state_repr(const Mach_thread_state *val) {
 
 static void recovery_log_ctx(const Interp *interp) {
   if (!interp_valid(interp)) return;
-  const auto read = interp->reader;
+  const auto read = interp_reader_const(interp);
   if (!reader_valid(read)) return;
   eprintf(SYS_REC_FMT "position: " READ_POS_FMT "\n", READ_POS_ARGS(read));
 
