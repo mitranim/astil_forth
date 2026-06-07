@@ -1535,7 +1535,7 @@ end
 fun: comp_loc_mut ( C: fun "name" -- ) ( E: -- )
   parse_word comp_local_named
   dup comp_local_get_push
-  comp_call
+  swap comp_call
   comp_pop_local_set
 end
 
@@ -1669,30 +1669,17 @@ end
 
 \ ## Exceptions
 \
-\ The compiler provides the following exception intrinsics:
+\ The compiler provides the following exception-related intrinsics:
 \ - `try`
 \ - `throw`
 \ - `catch`
-\ - `catches`
 \
-\ At the ABI level, each exception is an additional return value.
-\ An exception is placed into the next output parameter register
-\ immediately following the last regular output value, similarly
-\ to how errors are returned in Go. Unlike Go, we implicitly use
-\ exception semantics for errors. By default, when a word throws,
-\ the returned error is implicitly re-thrown in the caller. This
-\ behavior can be suppressed with `catch'`, which simply reveals
-\ the error value, and avoids emitting the "try" instructions.
+\ The stack-CC version of our system uses `x0` as an exception register,
+\ matching the ABI convention in our C code, where many functions return
+\ `Err`, which is a null-terminated string pointer.
 \
-\ Since in stack-CC all regular words are "nullary" in the ABI sense,
-\ the exception register is always `x0`. The exception value, if any,
-\ is a string address. This matches the ABI convention of our C code.
-\
-\ We also support blanket implicit catch via the `catches` annotation.
-\ It disables implicit rethrow and reveals exceptions as error values.
-\ This mode may look superficially like Go. It's actually closer to C,
-\ because there is NO support for panics and no hidden stack unwinder.
-\ In such words, control flow is entirely local and obvious from code.
+\ In contrast, the reg-CC version (see `./lang.af`) doesn't really
+\ have exceptions; it puts errors into word signatures, as params.
 
 fun_comp: catch'  WORDLIST_EXEC catch end
 fun_comp: catch'' WORDLIST_COMP catch end

@@ -56,7 +56,6 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->fp_off);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
-  ptr_clear(&ctx->catches);
 }
 
 // SYNC[comp_ctx_rewind].
@@ -83,7 +82,6 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->redefining = prev->redefining;
   next->compiling  = prev->compiling;
   next->has_alloca = prev->has_alloca;
-  next->catches    = prev->catches;
 
   stack_rewind(&prev->locals, &next->locals);
   dict_trunc((Dict *)&next->local_dict);
@@ -121,7 +119,7 @@ static Err comp_call_intrin(Interp *interp, const Sym *callee) {
   typedef Err(Fun)(Interp *);
   const auto fun = (Fun *)callee->intrin;
   const auto err = fun(interp);
-  if (callee->throws) return err;
+  if (callee->has_err) return err;
   return nullptr;
 }
 
@@ -137,7 +135,7 @@ static void comp_add_clobbers(Sym *caller, const Sym *callee) {
 }
 
 static Err comp_append_call_norm(
-  Comp *comp, const Sym *callee, bool catch, bool *inlined
+  Comp *comp, const Sym *callee, bool err_mode, bool *inlined
 ) {
   IF_DEBUG(aver(callee->type == SYM_NORM));
 
@@ -145,22 +143,22 @@ static Err comp_append_call_norm(
   try(comp_require_current_sym(comp, &caller));
 
   if (callee->norm.inlinable) {
-    try(comp_inline_sym(comp, caller, callee, catch));
+    try(comp_inline_sym(comp, caller, callee, err_mode));
     if (inlined) *inlined = true;
   }
   else {
-    try(asm_append_call_norm(comp, caller, callee, catch));
+    try(asm_append_call_norm(comp, caller, callee, err_mode));
     if (inlined) *inlined = false;
   }
   comp_add_clobbers(caller, callee);
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool catch) {
+static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool err_mode) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
-  try(asm_append_call_intrin(comp, caller, callee, catch));
+  try(asm_append_call_intrin(comp, caller, callee, err_mode));
   comp_add_clobbers(caller, callee);
   return nullptr;
 }

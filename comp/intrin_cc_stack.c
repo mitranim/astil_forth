@@ -105,6 +105,7 @@ static Err intrin_recur(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   try(comp_append_recur(&interp->comp));
+  if (sym->has_err) asm_append_err_reg_try(&interp->comp);
   sym->norm.has_recur = true;
   return nullptr;
 }
@@ -112,7 +113,7 @@ static Err intrin_recur(Interp *interp) {
 static Err intrin_try(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  sym->throws = true;
+  try(sym_has_err_set(sym, true, "compile `try`"));
   asm_append_pop_try(&interp->comp);
   return nullptr;
 }
@@ -120,7 +121,7 @@ static Err intrin_try(Interp *interp) {
 static Err intrin_throw(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  sym->throws = true;
+  try(sym_has_err_set(sym, true, "compile `throw`"));
   asm_append_pop_throw(&interp->comp);
   return nullptr;
 }
@@ -137,20 +138,7 @@ static Err intrin_throws(Interp *interp) {
   try(interp_require_current_sym(interp, &sym));
   Sint val;
   try(int_stack_pop(&interp->ints, &val));
-  sym->throws = !!val;
-  return nullptr;
-}
-
-static Err intrin_catches(Interp *interp) {
-  Sint val;
-  try(int_stack_pop(&interp->ints, &val));
-
-  interp->comp.ctx.catches = !!val;
-  return nullptr;
-}
-
-static Err intrin_get_catches(Interp *interp) {
-  try(int_stack_push(&interp->ints, interp->comp.ctx.catches));
+  try(sym_has_err_set(sym, !!val, "set `throws`"));
   return nullptr;
 }
 
@@ -415,10 +403,26 @@ static Err debug_word(Interp *interp) {
   return nullptr;
 }
 
+/*
+Note: the input-output count is ignored in stack-CC.
+It's specified only for vain consistency with reg-CC.
+*/
+
+static const USED auto INTRIN_THROWS = (Sym){
+  .name.buf  = "throws",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_throws,
+  .inp_len   = 1,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
 static const USED auto INTRIN_DEBUG_WORD = (Sym){
   .name.buf = "debug_word",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_word,
   .inp_len  = 1,
-  .throws   = true,
+  .out_len  = 1,
+  .has_err  = true,
 };

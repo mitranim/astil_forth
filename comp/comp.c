@@ -67,10 +67,10 @@ static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
 }
 
 static Err comp_inline_sym(
-  Comp *comp, Sym *caller, const Sym *callee, bool catch
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
   try(comp_require_current_sym(comp, nullptr));
-  try(asm_inline_sym(comp, caller, callee, catch));
+  try(asm_inline_sym(comp, caller, callee, err_mode));
   return nullptr;
 }
 
@@ -295,25 +295,41 @@ static void *comp_find_extern(Comp *comp, const char *name) {
   return list_elem_ptr(&syms->addrs, ind);
 }
 
+static Err err_no_output_for_try(const Sym *caller, const Sym *callee) {
+  return errf(
+    "in " FMT_QUOTED " (%s): unable to compile call to " FMT_QUOTED
+    ": caller has no error output for implicit `try_all`",
+    caller->name.buf,
+    wordlist_name(caller->wordlist),
+    callee->name.buf
+  );
+}
+
 static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   sym_auto_comp_only(caller, callee);
   sym_auto_interp_only(caller, callee);
 
-  const auto ctx = &comp->ctx;
-  if (callee->throws && !ctx->catches) caller->throws = true;
+#ifdef CALL_CONV_STACK
+  bool err_mode = false; // no catch
+#else
+  bool err_mode = false; // no auto-try
+  if (callee->has_err && comp->ctx.try_all) {
+    if (!caller->has_err) return err_no_output_for_try(caller, callee);
+    err_mode = true; // yes auto-try
+  }
+#endif // CALL_CONV_STACK
 
-  const auto catch   = callee->throws && ctx->catches;
-  bool       inlined = false;
+  bool inlined = false;
 
   switch (callee->type) {
     case SYM_NORM: {
-      try(comp_append_call_norm(comp, callee, catch, &inlined));
+      try(comp_append_call_norm(comp, callee, err_mode, &inlined));
       break;
     }
     case SYM_INTRIN: {
-      try(comp_append_call_intrin(comp, callee, catch));
+      try(comp_append_call_intrin(comp, callee, err_mode));
       break;
     }
     case SYM_EXTERN: {
@@ -552,22 +568,21 @@ static Err comp_validate_main(const Sym *main) {
     );
   }
 
-  if (main->throws) {
-    return errf(
-      "unable to build executable: entry point " FMT_QUOTED
-      " throws;\n"
-      "hint 0: handle all exceptions, log the errors, return 0 on success and non-zero on error;\n"
-      "hint 1: use [ true catches ] at the beginning to auto-catch",
-      main->name.buf
-    );
-  }
-
   if (main->out_len != 1) {
     return errf(
       "unable to build executable: entry point must return exactly one output (exit code); " FMT_QUOTED
       " returns %d outputs",
       main->name.buf,
       main->out_len
+    );
+  }
+
+  if (main->has_err) {
+    return errf(
+      "unable to build executable: entry point " FMT_QUOTED
+      " has an error output;\n"
+      "hint: handle all errors; return 0 on success and non-0 on error;\n",
+      main->name.buf
     );
   }
 

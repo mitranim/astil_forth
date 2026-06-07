@@ -1,22 +1,26 @@
 ## TOC
 
-* [Overview](#overview)
-* [Show me the code!](#show-me-the-code)
-* [Why](#why)
-* [Easy C interop](#easy-c-interop)
-* [Exceptions done right](#exceptions-done-right-abi-compatibility)
-* [CLI](#cli)
-* [Structure](#structure)
-* [Sublime Text](#sublime-text)
-* [Library](#library)
-* [Tricks and optimizations](#tricks-and-optimizations)
-* [Performance](#performance)
-* [Limitations](#limitations)
-* [Non-standard](#non-standard)
-* [Lessons](#lessons)
-* [What is JIT](#what-is-jit)
-* [What is compilation](#what-is-compilation)
-* [Name](#name)
+- [TOC](#toc)
+- [Overview](#overview)
+- [Show me the code!](#show-me-the-code)
+- [Why](#why)
+  - [Always extensible](#always-extensible)
+  - [Always fast](#always-fast)
+- [Easy C interop](#easy-c-interop)
+- [Errors done right: ergonomics and ABI](#errors-done-right-ergonomics-and-abi)
+- [CLI](#cli)
+- [Structure](#structure)
+- [Sublime Text](#sublime-text)
+- [Library](#library)
+- [Tricks and optimizations](#tricks-and-optimizations)
+- [Performance](#performance)
+- [Limitations](#limitations)
+- [Non-standard](#non-standard)
+- [Why so much C code](#why-so-much-c-code)
+- [Lessons](#lessons)
+- [What is JIT](#what-is-jit)
+- [What is compilation](#what-is-compilation)
+- [Name](#name)
 
 ## Overview
 
@@ -40,6 +44,8 @@ Non-goals:
 - Complex optimizations.
 - Complete stdlib.
 
+The system is mostly human-made. Bots were employed for knowledge search, reviews, tests, and some refactorings.
+
 No dependencies (other than libc). Uses custom assemblers in both C and Forth code.
 
 I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
@@ -49,8 +55,6 @@ I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest 
 - [`./talks`](./talks) directory: presentation notes with more details.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can consist of obvious stuff you'd expect, and can learn from.
-
-Compiler / language / docs are **human-made**. Some benchmarks and tests are bot-generated, and always marked as such.
 
 ## Show me the code!
 
@@ -175,23 +179,57 @@ end
 main
 ```
 
-## Exceptions done right: ABI compatibility
+## Errors done right: ergonomics and ABI
 
-When using the register-based calling convention, you can _opt out of exceptions_ inside any function. This reveals all error values, transforming them from exceptions. It's an implicit "catch" with function-level granularity.
+In reg-CC, our error handling combines ergonomics and ABI compatibility:
+- An error is just a C-style string pointer.
+- An error is the last output param (Go-style).
+- Shortcuts `try throw` for local control (Swift-style).
+- `try_all` for opting into implicit "try".
+- Callers receive errors as values, even if callees "throw".
+- Works across ABI boundaries between languages.
+- No unwinder; all control is local.
+
+By convention, if the last output parameter is named _exactly_ `err`, the compiler knows it's an error; this is similar to Swift's `throws` annotation. Either way, by default, errors are explicit values:
 
 ```forth
-fun: word [ true catches ]
-  word0 {           err }
-  word1 { val0      err }
-  word2 { val1 val2 err }
+fun: word { -- err }
+  word0 { err }           err if err ret end
+  word1 { val0 err }      err if err ret end
+  word2 { val1 val2 err } err if err ret end
+  nil
 end
 ```
 
-Under the hood, an exception is a Go-style error value, implicitly appended to the success outputs. By default it's invisible and treated as an exception. When you "catch", the compiler reveals the error value, and skips the instructions it would normally insert to handle the error. A call becomes Go-style, as shown above. The caller has to check the error.
+`try` consumes errors and returns early:
 
-The resulting system is an exact inverse of Go (and Rust). By default, errors are exceptions and don't clutter the code. When you want explicit errors, it's _for real_, without hidden panics. There is no separate panic mechanism, no stack unwinder. At the ABI level, caller code always has local control.
+```forth
+fun: word { -- err }
+  word0 try
+  word1 try { val0 }
+  word2 try { val1 val2 }
+  nil
+end
+```
 
-The best part is cross-language ABI compatibility. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to `libc` and guarantee no surprises, such as a panic handler unwinding the C stack.
+`try_all` makes this implicit, allowing even shorter code. `try_all` in file root affects the current file (and no other). `try_all` inside a word affects _only_ that word. However, it does _not_ remove errors from signatures. The signature of every word precisely describes its ABI.
+
+```forth
+true try_all
+
+fun: word { -- err }
+  word0
+  word1 { val0 }
+  word2 { val1 val2 }
+  nil
+end
+
+fun: word [ false try_all ] end \ Only inside this word.
+```
+
+The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally). Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
+
+The above doesn't quite apply to stack-CC, which still treats errors as "exceptions".
 
 ## CLI
 
@@ -324,7 +362,7 @@ I had a go, and bounced off the complexity. How to keep an optimizing compiler s
 
 - Currently only Apple Silicon (MacOS + Arm64).
 - Vocabulary / stdlib is somewhat limited.
-- Exceptions print only C traces, not Forth traces. (Opt-in via `--trace`.)
+- Top-level exceptions print only C traces, not Forth traces. (Opt-in via `--trace`.)
 
 ## Non-standard
 
@@ -360,11 +398,11 @@ There is no `state` or `does>`. Instead, the system uses two wordlists:
 
 Each word can be defined _twice_: an "exec" variant and a "comp" variant. In compilation mode, the "comp" variant is used first. In interpretation mode, the "exec" variant is used first. When finding a word by name, the caller must choose the wordlist, and thus the variant.
 
-Exceptions are strings (error messages) rather than numeric codes.
+Errors are strings (error messages) rather than numeric codes.
 
 Booleans are `0 1` rather than `0 -1`.
 
-Modifier words like `catches` and `comp_only` can only be used inside function definitions.
+Word-modifiers like `comp_only` are used inside definitions, not outside. Modifiers executed in file scope (`try_all`) affect an entire file.
 
 Special _semantic_ roles get special _syntactic_ roles:
 - Word-parsing words which declare end with `:`.

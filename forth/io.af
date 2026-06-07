@@ -13,9 +13,11 @@ import' ./time.af \ Defines `Timespec`.
 \ and some wrappers which throw descriptive errors.
 \
 \ Procedures which return -1 on error should usually
-\ be followed by the test `is_err` or `os_try`:
+\ be followed by `os_err?`. When testing the output
+\ manually, use the test `is_err_flag`.
 \
-\   some_word " unable to blah" os_try
+\   some_word " unable to blah" os_err? { err }
+\   some_word " unable to blah" os_err? try
 
 \ `struct stat`. Used by reference.
 struct: Fstat
@@ -78,13 +80,13 @@ end
 0x40000000            let: O_EXEC    \ open file for execute only
 O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 
-\ In all definitions below, `code` means `(Cint)-1` on failure;
-\ should be tested with `is_err` or `os_try`.
-2 1 extern: open  ( path flag -- fdes|code )
-1 1 extern: close ( fdes      -- code      )
-2 1 extern: fstat ( fdes stat -- code      )
-2 1 extern: lstat ( path stat -- code      )
-2 1 extern: stat  ( path stat -- code      )
+\ In all definitions below, `flag` means `(Cint)-1` on failure;
+\ should be tested with `os_err?` or `is_err_flag`.
+2 1 extern: open  ( path flag -- fdes|flag )
+1 1 extern: close ( fdes      -- flag      )
+2 1 extern: fstat ( fdes stat -- flag      )
+2 1 extern: lstat ( path stat -- flag      )
+2 1 extern: stat  ( path stat -- flag      )
 
 1 1 extern: fgetc            ( file -- char|eof32 )
 1 1 extern: getc_unlocked    ( file -- char|eof32 )
@@ -107,28 +109,28 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 2 1 extern: fdopen   ( fdes mode      -- file )
 3 1 extern: freopen  ( path mode file -- file )
 3 1 extern: fmemopen ( buf cap mode   -- file )
-1 1 extern: fclose   ( file           -- code )
+1 1 extern: fclose   ( file           -- flag )
 
-2 1 extern: fgetpos ( file pos_adr    -- code     )
-2 1 extern: fsetpos ( file pos_adr    -- code     )
-3 1 extern: fseek   ( file off whence -- code     )
-3 1 extern: fseeko  ( file off whence -- code     )
-1 1 extern: ftell   ( file            -- off|code )
-1 1 extern: ftello  ( file            -- off|code )
+2 1 extern: fgetpos ( file pos_adr    -- flag     )
+2 1 extern: fsetpos ( file pos_adr    -- flag     )
+3 1 extern: fseek   ( file off whence -- flag     )
+3 1 extern: fseeko  ( file off whence -- flag     )
+1 1 extern: ftell   ( file            -- off|flag )
+1 1 extern: ftello  ( file            -- off|flag )
 1 0 extern: rewind  ( file            --          )
 
 1 0 extern: clearerr          ( file --      )
 1 0 extern: clearerr_unlocked ( file --      )
-1 1 extern: feof              ( file -- code )
-1 1 extern: feof_unlocked     ( file -- code )
-1 1 extern: ferror            ( file -- code )
-1 1 extern: ferror_unlocked   ( file -- code )
-1 1 extern: fileno            ( file -- code )
-1 1 extern: fileno_unlocked   ( file -- code )
+1 1 extern: feof              ( file -- flag )
+1 1 extern: feof_unlocked     ( file -- flag )
+1 1 extern: ferror            ( file -- flag )
+1 1 extern: ferror_unlocked   ( file -- flag )
+1 1 extern: fileno            ( file -- flag )
+1 1 extern: fileno_unlocked   ( file -- flag )
 
 \ TODO: translate `<unistd.h>`.
 
-fun: io_err { action path -- str }
+fun: io_err { action path -- err_str }
   errno { code }
   code strerror { msg }
   msg if
@@ -137,24 +139,26 @@ fun: io_err { action path -- str }
   " unable to %s `%s`; code: %s" action path code errf
 end
 
-fun: fd_stat { fd path stat_adr }
+fun: fd_stat { fd path stat_adr -- err }
   fd stat_adr fstat
   if " stat" path io_err throw end
+  nil
 end
 
-fun: path_stat { path stat_adr }
+fun: path_stat { path stat_adr -- err }
   path stat_adr stat
   if " stat" path io_err throw end
+  nil
 end
 
-fun: fd_open { path mode -- fd }
+fun: fd_open { path mode -- fd err }
   path mode open { out }
-  out is_err if " open" path io_err throw end
-  out
+  out is_err_flag if " open" path io_err throw end
+  out nil
 end
 
-fun: file_open { path mode -- file }
+fun: file_open { path mode -- file err }
   path mode fopen { file }
   file ifn " open" path io_err throw end
-  file
+  file nil
 end

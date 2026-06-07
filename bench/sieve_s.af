@@ -2,9 +2,9 @@ import' std:lang_s.af
 
 \ Adapted from Gforth's `sieve.fs`.
 
-4096        let: RUNS
-8192        let: LEN
-LEN         mem: FLAGS
+4096 let: RUNS
+8192 let: LEN
+LEN  mem: FLAGS
 
 fun: find_prime { flags len -- num }
   flags len 1 fill
@@ -27,7 +27,7 @@ fun: find_prime { flags len -- num }
 end
 
 fun: main
-  \ find_prime .
+  \ FLAGS LEN find_prime .
 
   RUNS for
     FLAGS LEN find_prime drop

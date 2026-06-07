@@ -5,7 +5,7 @@ import' std:errno.af
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
 fun: sock_close { sock }
-  sock close is_err if
+  sock close is_err_flag if
     errno " [srv] unable to close socket" os_err elog elf
   end
 end
@@ -16,28 +16,28 @@ fun: sock_bind_opt { info max_conn -- sock }
   info Addrinfo_protocol @ { prot }
   fam type prot socket     { sock }
 
-  sock is_err if -1 ret end
+  sock is_err_flag if -1 ret end
 
   \ `setsockopt` requires non-nil option address.
   alloca' Cint { opt }
   nil opt !cint
 
   sock SOL_SOCKET SO_REUSEADDR opt sizeof' Cint setsockopt
-  is_err if
+  is_err_flag if
     sock sock_close
     errno " [srv] unable to `setsockopt`" os_err elog elf
     -1 ret
   end
 
   sock info Addrinfo_addr @ info Addrinfo_addrlen @ bind
-  is_err if
+  is_err_flag if
     sock sock_close
     errno " [srv] unable to bind socket" os_err elog elf
     -1 ret
   end
 
   sock max_conn listen
-  is_err if
+  is_err_flag if
     sock sock_close
     errno " [srv] unable to listen on socket" os_err elog elf
     -1 ret
@@ -47,7 +47,7 @@ fun: sock_bind_opt { info max_conn -- sock }
 end
 
 \ Result is `Addrinfo *` and should be freed with `freeaddrinfo`.
-fun: net_addr_info { port -- ainf }
+fun: net_addr_info { port -- ainf err }
   alloca' Addrinfo { hint }
   hint sizeof' Addrinfo erase
   AF_UNSPEC   hint Addrinfo_family   !
@@ -62,29 +62,29 @@ fun: net_addr_info { port -- ainf }
     " [srv] unable to listen on port %s; code: %zd; msg; %s" port code msg errf throw
   end
 
-  ainf
+  ainf nil
 end
 
-fun: net_listen { port max_conn -- sock }
-  port net_addr_info { ainf }
-  -1                 { sock }
-  ainf               { next }
+fun: net_listen { port max_conn -- sock err }
+  port net_addr_info try { ainf }
+  -1   { sock }
+  ainf { next }
 
   loop
     next while
     next max_conn sock_bind_opt { sock }
     next Addrinfo_next @ { next }
-    sock is_err ifn leave end
+    sock is_err_flag ifn leave end
   end
 
   ainf freeaddrinfo
 
-  sock is_err if
+  sock is_err_flag if
     " [srv] unable to listen on :%s" port errf throw
   end
 
   " [srv] listening on http://localhost:%s" port elogf elf
-  sock
+  sock nil
 end
 
 \ This is single-threaded. A real server should handle clients concurrently.
@@ -98,7 +98,7 @@ fun: net_accept_loop { sock handler }
     sizeof' Sockaddr_storage size !cuint
     sock addr size accept { conn }
 
-    conn is_err if
+    conn is_err_flag if
       errno { code }
       code EINTR = if cont end
       code strerror { msg }

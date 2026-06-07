@@ -2,37 +2,34 @@ import' ./lang.af
 import' ./testing.af
 import' ./arena.af
 
-\ This test suite for reg-CC is written differently from the test suite for
-\ stack-CC, because of the various checks and restrictions in the compiler.
-\ Control flow structures are not allowed to "return" or "push" any values.
-\ The amount of arguments before and after `<T>` is checked at compile time
-\ which means we can't write tests which repeatedly "push" values in a loop
-\ then check the resulting list of values. We just check the final results.
-\
 \ We test both JIT-compiled and AOT-compiled modes.
 \ For AOT, every test must be called in `main_run`.
+
+true try_all
 
 T{       <T>       }T
 T{ 10    <T> 10    }T
 T{ 10 20 <T> 10 20 }T
 
-fun: test_test
+fun: test_test { -- err }
   T{       <T>       }T
   T{ 10    <T> 10    }T
   T{ 10 20 <T> 10 20 }T
+  nil
 end
 test_test
 
-fun: test_empty_comment
+fun: test_empty_comment { -- err }
   \ `\` immediately followed by newline: this used to skip the NEXT line.
   \
   10 20 30
   { one two three }
   T{ one two three <T> 10 20 30 }T
+  nil
 end
 test_empty_comment
 
-fun: test_locals
+fun: test_locals { -- err }
   T{          { }                                     <T>          }T
   T{          { -- }                                  <T>          }T
   T{ 10       { }                                     <T> 10       }T
@@ -74,6 +71,7 @@ fun: test_locals
   T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
   T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
   T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
+  nil
 end
 test_locals
 
@@ -85,7 +83,7 @@ T{ 10 STACK s> <T> 10 }T
 
 \ Stack operations are tested early because they're used by conditionals,
 \ loops, and testing utils themselves, which makes testing kinda cycling.
-fun: test_stack_primitives
+fun: test_stack_primitives { -- err }
   T{ sizeof' Stack <T> 40 }T
 
   alloca' Stack { stk }
@@ -113,10 +111,11 @@ fun: test_stack_primitives
   T{ stk stack_len_cells <T> 0  }T
 
   stk stack_deinit
+  nil
 end
 test_stack_primitives
 
-fun: test_to_stack_variadic
+fun: test_to_stack_variadic { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
@@ -153,10 +152,11 @@ fun: test_to_stack_variadic
   T{ stk stack_len_cells <T> 0  }T
 
   stk stack_deinit
+  nil
 end
 test_to_stack_variadic
 
-fun: test_stack_braces
+fun: test_stack_braces { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
@@ -180,10 +180,11 @@ fun: test_stack_braces
   T{ stk stack_len_cells one two three <T> 0 10 20 30 }T
 
   stk stack_deinit
+  nil
 end
 test_stack_braces
 
-fun: test_local_ref
+fun: test_local_ref { -- err }
   ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
   sysstack_frame_ptr { FP }
 
@@ -203,24 +204,27 @@ fun: test_local_ref
   21 adr0 ! 32 adr1 ! 43 adr2 !
   T{ val0   val1   val2   <T> 21 32 43 }T
   T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
+  nil
 end
 test_local_ref
 
-fun: test_local_ref_volatile_immediate_read
+fun: test_local_ref_volatile_immediate_read { -- err }
   123                 \ mov x0, 123
   { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
   ref' val { adr }    \ add x0, x29, 16
   T{ adr @ <T> 123 }T \ no junk data
+  nil
 end
 test_local_ref_volatile_immediate_read
 
-fun: test_local_ref_volatile_delayed_read
+fun: test_local_ref_volatile_delayed_read { -- err }
   123                 \ mov x0, 123
   { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
   234                 \ Clobber x0; compiler emits a fixup.
   { -- }
   ref' val { adr }    \ add x0, x29, 16
   T{ adr @ <T> 123 }T \ no junk data
+  nil
 end
 test_local_ref_volatile_delayed_read
 
@@ -228,7 +232,7 @@ fun: bang_with_more_inputs { val adr x2 x3 x4 } val adr ! end
 
 \ Taking a local's address makes it volatile. Temporary register associations
 \ may be silently invalidated by `!`, with the compiler none the wiser.
-fun: test_local_ref_volatile_with_inputs
+fun: test_local_ref_volatile_with_inputs { -- err }
   123      { val } \ mov x0, 123 ; str x0, [x29, #16]
   ref' val { adr } \ add x0, x29, 16
 
@@ -247,12 +251,13 @@ fun: test_local_ref_volatile_with_inputs
   \ Valid:   `ldr x0, [x29, 16]`.
   T{ val   <T> 234 }T
   T{ adr @ <T> 234 }T
+  nil
 end
 test_local_ref_volatile_with_inputs
 
 fun: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next end
 
-fun: test_local_ref_volatile_with_outputs
+fun: test_local_ref_volatile_with_outputs { -- err }
   123      { val } \ mov x0, 123 ; str x0, [x29, #16]
   ref' val { adr } \ add x0, x29, 16
 
@@ -279,10 +284,11 @@ fun: test_local_ref_volatile_with_outputs
   \ Invalid: `mov x0, x2`.
   \ Valid:   `ldr x0, [x29, 16]`.
   T{ val <T> 567 }T
+  nil
 end
 test_local_ref_volatile_with_outputs
 
-fun: test_conditionals
+fun: test_conditionals { -- err }
   \ false if 10      end \ Must fail to compile.
   \ false if else 10 end \ Must fail to compile.
 
@@ -381,6 +387,7 @@ fun: test_conditionals
   <T>
     10
   }T
+  nil
 end
 test_conditionals
 
@@ -389,10 +396,11 @@ fun: switch_empty { val -- out }
   val 2 *
 end
 
-fun: test_switch_empty
+fun: test_switch_empty { -- err }
   T{ 0  switch_empty <T> 0  }T
   T{ 10 switch_empty <T> 20 }T
   T{ 20 switch_empty <T> 40 }T
+  nil
 end
 test_switch_empty
 
@@ -405,10 +413,11 @@ fun: switch_body_only { val -- one two three }
   one val two
 end
 
-fun: test_switch_body_only
-  T{ -1  switch_body_only <T> 10 -1 25 }T
-  T{ 30  switch_body_only <T> 10 30 25 }T
-  T{ 40  switch_body_only <T> 10 40 25 }T
+fun: test_switch_body_only { -- err }
+  T{ -1 switch_body_only <T> 10 -1 25 }T
+  T{ 30 switch_body_only <T> 10 30 25 }T
+  T{ 40 switch_body_only <T> 10 40 25 }T
+  nil
 end
 test_switch_body_only
 
@@ -423,12 +432,13 @@ fun: switch_ret { val -- out }
   nil
 end
 
-fun: test_switch_ret
+fun: test_switch_ret { -- err }
   T{ 0   switch_ret <T> 0   }T
   T{ 10  switch_ret <T> 100 }T
   T{ 20  switch_ret <T> 200 }T
   T{ 30  switch_ret <T> 300 }T
   T{ 123 switch_ret <T> 246 }T
+  nil
 end
 test_switch_ret
 
@@ -442,12 +452,13 @@ fun: switch_assign { val -- out }
   val
 end
 
-fun: test_switch_assign
+fun: test_switch_assign { -- err }
   T{ 0   switch_assign <T> 0   }T
   T{ 10  switch_assign <T> 100 }T
   T{ 20  switch_assign <T> 200 }T
   T{ 30  switch_assign <T> 300 }T
   T{ 123 switch_assign <T> 246 }T
+  nil
 end
 test_switch_assign
 
@@ -465,12 +476,13 @@ fun: switch_inner_statements { val -- out one two three four }
   out one two three four
 end
 
-fun: test_switch_inner_statements
+fun: test_switch_inner_statements { -- err }
   T{ -1  switch_inner_statements <T> -1  40 50 60 70 }T
   T{ 10  switch_inner_statements <T> 100 40 -1 -1 -1 }T
   T{ 20  switch_inner_statements <T> 200 40 50 -1 -1 }T
   T{ 30  switch_inner_statements <T> 300 40 50 60 -1 }T
   T{ 123 switch_inner_statements <T> -1  40 50 60 70 }T
+  nil
 end
 test_switch_inner_statements
 
@@ -484,11 +496,12 @@ fun: switch_nested_if { val flag -- out }
   out
 end
 
-fun: test_switch_nested_if
+fun: test_switch_nested_if { -- err }
   T{ 10 true  switch_nested_if <T> 100 }T
   T{ 10 false switch_nested_if <T> 300 }T
   T{ 20 true  switch_nested_if <T> 200 }T
   T{ 0  true  switch_nested_if <T> 999 }T
+  nil
 end
 test_switch_nested_if
 
@@ -508,12 +521,13 @@ fun: switch_nested { one two -- out }
   out
 end
 
-fun: test_switch_nested
+fun: test_switch_nested { -- err }
   T{ 1 10 switch_nested <T> 110 }T
   T{ 1 20 switch_nested <T> 120 }T
   T{ 1 30 switch_nested <T> 199 }T
   T{ 2 10 switch_nested <T> 200 }T
   T{ 3 10 switch_nested <T> 999 }T
+  nil
 end
 test_switch_nested
 
@@ -522,24 +536,78 @@ fun: recursive_fun { val -- val }
   val dec recur
 end
 
-fun: test_recursion
+fun: test_recursion { -- err }
   T{ 123 recursive_fun <T> 13 }T
+  nil
 end
 test_recursion
+
+fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
+  val ifn 100 nil ret end
+  val 3 = if 0 " recur_err_non_try" ret end
+  val dec recur
+end
+
+fun: recur_err_manual_try_fun { val -- out err } [ false try_all ]
+  val ifn 100 nil ret end
+  val 3 = if 0 " recur_err_manual" ret end
+  val dec recur try { out }
+  out nil
+end
+
+fun: recur_err_auto_try_fun { val -- out err } [ true try_all ]
+  val ifn 100 nil ret end
+  val 3 = if 0 " recur_err_auto" ret end
+  val dec recur { out }
+  out nil
+end
+
+fun: test_recur_with_err { -- err }
+  [ false try_all ]
+
+  T{ 2 recur_err_non_try_fun { out0 err0 } <T>         }T
+  T{ out0 err0                             <T> 100 nil }T
+  T{ 4 recur_err_non_try_fun { out1 err1 } <T>         }T
+  T{ " recur_err_non_try" err1 cstr=       <T> true    }T
+
+  [ true try_all ]
+
+  T{ 2 catch' recur_err_manual_try_fun               <T> 100 nil }T
+  T{ 4 catch' recur_err_manual_try_fun { out2 err2 } <T>         }T
+  T{ " recur_err_manual" err2 cstr=                  <T> true    }T
+
+  T{ 2 catch' recur_err_auto_try_fun <T> 100 nil }T
+
+  [ false try_all ]
+
+  T{ 4 recur_err_auto_try_fun { out3 err3 } err3 <>0 <T> true }T
+
+  [ true try_all ]
+
+  T{
+    4 catch' recur_err_auto_try_fun { out4 err4 }
+    " recur_err_auto" err4 cstr=
+    <T>
+    true
+  }T
+  nil
+end
+test_recur_with_err
 
 1 0 extern: sleep
 
 fun: test_sleep_loop loop " sleeping" log lf 1 sleep end end
 \ test_sleep_loop
 
-fun: test_loop_leave
+fun: test_loop_leave { -- err }
   T{ -1 { val } loop            leave abort             end val <T> -1 }T
   T{ -1 { val } loop 10 { val } leave abort             end val <T> 10 }T
   T{ -1 { val } loop 10 { val } leave abort leave abort end val <T> 10 }T
+  nil
 end
 test_loop_leave
 
-fun: test_loop_nested
+fun: test_loop_nested { -- err }
   T{
     -1 { one }
     -2 { two }
@@ -557,10 +625,11 @@ fun: test_loop_nested
   <T>
     10 20 30
   }T
+  nil
 end
 test_loop_nested
 
-fun: test_loop_while
+fun: test_loop_while { -- err }
   T{
     -1 { val }
     loop false while 10 { val } end
@@ -628,20 +697,22 @@ fun: test_loop_while
   <T>
     0
   }T
+  nil
 end
 test_loop_while
 
-fun: test_loop_while_leave
+fun: test_loop_while_leave { -- err }
   T{ -1 { val } loop            false while 10 { val } leave end val <T> -1 }T
   T{ -1 { val } loop            true  while 10 { val } leave end val <T> 10 }T
   T{ -1 { val } loop 10 { val } false while 20 { val } leave end val <T> 10 }T
   T{ -1 { val } loop 10 { val } true  while 20 { val } leave end val <T> 20 }T
   T{ -1 { val } loop 10 { val } true  while leave 20 { val } end val <T> 10 }T
   T{ -1 { val } loop leave 10 { val } true  while 20 { val } end val <T> -1 }T
+  nil
 end
 test_loop_while_leave
 
-fun: test_loop_until
+fun: test_loop_until { -- err }
   \ Loops indefinitely. How to test?
   \ loop false until
 
@@ -678,10 +749,11 @@ fun: test_loop_until
   <T>
     9
   }T
+  nil
 end
 test_loop_until
 
-fun: test_loop_for
+fun: test_loop_for { -- err }
   \ Should terminate right away.
   T{ -12 for end <T> }T
   T{ -1  for end <T> }T
@@ -736,13 +808,14 @@ fun: test_loop_for
   <T>
     5
   }T
+  nil
 end
 test_loop_for
 
 \ A countdown loop walks the range [floor,ceil), in the backwards direction.
 \ We retain the index local after the loop with an out-of-range value, which
 \ is always -1 in this case.
-fun: test_loop_for_countdown
+fun: test_loop_for_countdown { -- err }
   T{ -12 -for: ind end <T> }T
   T{ -1  -for: ind end <T> }T
   T{ 0   -for: ind end <T> }T
@@ -773,10 +846,11 @@ fun: test_loop_for_countdown
   <T>
     7
   }T
+  nil
 end
 test_loop_for_countdown
 
-fun: test_loop_for_countup
+fun: test_loop_for_countup { -- err }
   T{ -1 -1 +for: ind end ind <T> -1 }T
   T{ -1 -2 +for: ind end ind <T> -1 }T
   T{  0 -2 +for: ind end ind <T>  0 }T
@@ -835,10 +909,11 @@ fun: test_loop_for_countup
   <T>
     6
   }T
+  nil
 end
 test_loop_for_countup
 
-fun: test_loop_countdown
+fun: test_loop_countdown { -- err }
   0 { len }
 
   T{
@@ -879,12 +954,13 @@ fun: test_loop_countdown
   \ Out of range from the start.
   0 { len }
   T{ 8 0 10 -loop: ind inc: len end len ind <T> 0 -2 }T
+  nil
 end
 test_loop_countdown
 
 \ When the loop terminates, the "ind" local holds an out-of-range value.
 \ If the value is out of range at the start, it should remain unchanged.
-fun: test_loop_countup
+fun: test_loop_countup { -- err }
   0 { len }
 
   T{
@@ -928,10 +1004,11 @@ fun: test_loop_countup
   \ Out of range from the start.
   0 { len }
   T{ 8 9 1 +loop: ind inc: len end len ind <T> 0 9 }T
+  nil
 end
 test_loop_countup
 
-fun: test_loop_countup_nested
+fun: test_loop_countup_nested { -- err }
   T{
     4 0 1 +loop: one
       7 one 1 +loop: two end
@@ -940,6 +1017,7 @@ fun: test_loop_countup_nested
   <T>
     4 7
   }T
+  nil
 end
 test_loop_countup_nested
 
@@ -951,7 +1029,7 @@ fun: test_cont_loop_basic
 end
 test_cont_loop_basic
 
-fun: test_cont_loop
+fun: test_cont_loop { -- err }
   -1 { len }
   loop
     len inc { len }
@@ -959,10 +1037,11 @@ fun: test_cont_loop
     leave
   end
   T{ len <T> 7 }T
+  nil
 end
 test_cont_loop
 
-fun: test_cont_for
+fun: test_cont_for { -- err }
   7 for cont end \ Should terminate.
 
   0 { len }
@@ -972,17 +1051,19 @@ fun: test_cont_for
     leave
   end
   T{ len <T> 7 }T
+  nil
 end
 test_cont_for
 
 \ Should terminate.
-fun: test_cont_for_countup
+fun: test_cont_for_countup { -- err }
   12 0 +for: ind cont end
   T{ ind <T> 12 }T
+  nil
 end
 test_cont_for_countup
 
-fun: test_cont_loop_countdown
+fun: test_cont_loop_countdown { -- err }
   8 0 1 -loop: ind cont end \ Should terminate.
   T{ ind <T> -1 }T
 
@@ -996,10 +1077,11 @@ fun: test_cont_loop_countdown
   <T>
     3
   }T
+  nil
 end
 test_cont_loop_countdown
 
-fun: test_cont_loop_countup
+fun: test_cont_loop_countup { -- err }
   8 0 1 +loop: ind cont end \ Should terminate.
   T{ ind <T> 8 }T
 
@@ -1013,13 +1095,14 @@ fun: test_cont_loop_countup
   <T>
     5
   }T
+  nil
 end
 test_cont_loop_countup
 
 123 var: VAR
 
 \ Load/store is used internally by testing utils. The test is kinda cyclic.
-fun: test_load_store
+fun: test_load_store { -- err }
   has_interp if
     T{ VAR @ <T> 123 }T
   else
@@ -1030,18 +1113,20 @@ fun: test_load_store
   T{ VAR @     <T> 234 }T
   T{ 345 VAR ! <T>     }T
   T{ VAR @     <T> 345 }T
+  nil
 end
 test_load_store
 
-fun: test_negate
+fun: test_negate { -- err }
   T{ 0    negate <T> 0    }T
   T{ 123  negate <T> -123 }T
   T{ -123 negate <T> 123  }T
+  nil
 end
 test_negate
 
 \ `=` is used by the testing tools, so this test is almost meaningless.
-fun: test_equal
+fun: test_equal { -- err }
   T{  0    0   = <T> 1 }T
   T{  0    123 = <T> 0 }T
   T{  123  0   = <T> 0 }T
@@ -1050,10 +1135,11 @@ fun: test_equal
   T{  123 -123 = <T> 0 }T
   T{ -123 -123 = <T> 1 }T
   T{  123  123 = <T> 1 }T
+  nil
 end
 test_equal
 
-fun: test_not_equal
+fun: test_not_equal { -- err }
   T{  0    0   <> <T> 0 }T
   T{  0    123 <> <T> 1 }T
   T{  123  0   <> <T> 1 }T
@@ -1062,10 +1148,11 @@ fun: test_not_equal
   T{  123 -123 <> <T> 1 }T
   T{ -123 -123 <> <T> 0 }T
   T{  123  123 <> <T> 0 }T
+  nil
 end
 test_not_equal
 
-fun: test_greater
+fun: test_greater { -- err }
   T{  0    0   > <T> 0 }T
   T{  0    123 > <T> 0 }T
   T{  123  0   > <T> 1 }T
@@ -1074,10 +1161,11 @@ fun: test_greater
   T{  123 -123 > <T> 1 }T
   T{ -123 -123 > <T> 0 }T
   T{  123  123 > <T> 0 }T
+  nil
 end
 test_greater
 
-fun: test_lesser
+fun: test_lesser { -- err }
   T{  0    0   < <T> 0 }T
   T{  0    123 < <T> 1 }T
   T{  123  0   < <T> 0 }T
@@ -1086,10 +1174,11 @@ fun: test_lesser
   T{  123 -123 < <T> 0 }T
   T{ -123 -123 < <T> 0 }T
   T{  123  123 < <T> 0 }T
+  nil
 end
 test_lesser
 
-fun: test_lesser_equal
+fun: test_lesser_equal { -- err }
   T{  0    0    <= <T> 1 }T
   T{  0    123  <= <T> 1 }T
   T{  123  0    <= <T> 0 }T
@@ -1098,10 +1187,11 @@ fun: test_lesser_equal
   T{  123 -123  <= <T> 0 }T
   T{ -123 -123  <= <T> 1 }T
   T{  123  123  <= <T> 1 }T
+  nil
 end
 test_lesser_equal
 
-fun: test_greater_equal
+fun: test_greater_equal { -- err }
   T{  0    0    >= <T> 1 }T
   T{  0    123  >= <T> 0 }T
   T{  123  0    >= <T> 1 }T
@@ -1110,18 +1200,20 @@ fun: test_greater_equal
   T{  123 -123  >= <T> 1 }T
   T{ -123 -123  >= <T> 1 }T
   T{  123  123  >= <T> 1 }T
+  nil
 end
 test_greater_equal
 
-fun: test_arith
+fun: test_arith { -- err }
   T{ 234 123 - <T> 111   }T
   T{ 234 123 + <T> 357   }T
   T{ 234 123 * <T> 28782 }T
   T{ 234 123 / <T> 1     }T
+  nil
 end
 test_arith
 
-fun: test_mod
+fun: test_mod { -- err }
   T{ 12 1 mod <T> 0 }T
   T{ 12 2 mod <T> 0 }T
   T{ 12 3 mod <T> 0 }T
@@ -1131,10 +1223,11 @@ fun: test_mod
   T{ 12 7 mod <T> 5 }T
   T{ 12 8 mod <T> 4 }T
   T{ 12 9 mod <T> 3 }T
+  nil
 end
 test_mod
 
-fun: test_slash_mod
+fun: test_slash_mod { -- err }
   T{ 12 1 /mod <T> 0 12 }T
   T{ 12 2 /mod <T> 0 6  }T
   T{ 12 3 /mod <T> 0 4  }T
@@ -1144,17 +1237,19 @@ fun: test_slash_mod
   T{ 12 7 /mod <T> 5 1  }T
   T{ 12 8 /mod <T> 4 1  }T
   T{ 12 9 /mod <T> 3 1  }T
+  nil
 end
 test_slash_mod
 
-fun: test_abs
+fun: test_abs { -- err }
   T{    0 abs <T>   0 }T
   T{ -123 abs <T> 123 }T
   T{  123 abs <T> 123 }T
+  nil
 end
 test_abs
 
-fun: test_min
+fun: test_min { -- err }
   T{  123  234 min <T>  123 }T
   T{  234  123 min <T>  123 }T
   T{  0    123 min <T>  0   }T
@@ -1163,10 +1258,11 @@ fun: test_min
   T{ -123  0   min <T> -123 }T
   T{ -123  234 min <T> -123 }T
   T{  234 -123 min <T> -123 }T
+  nil
 end
 test_min
 
-fun: test_max
+fun: test_max { -- err }
   T{  123  234 max <T>  234 }T
   T{  234  123 max <T>  234 }T
   T{  0    123 max <T>  123 }T
@@ -1175,26 +1271,29 @@ fun: test_max
   T{ -123  0   max <T>  0   }T
   T{ -123  234 max <T>  234 }T
   T{  234 -123 max <T>  234 }T
+  nil
 end
 test_max
 
-fun: test_cstr_eq
+fun: test_cstr_eq { -- err }
   T{ nil           nil    cstr= <T> true  }T
   T{ nil           " one" cstr= <T> false }T
   T{ " one"        nil    cstr= <T> false }T
   T{ " one" strdup " two" cstr= <T> false }T
   T{ " two" strdup " one" cstr= <T> false }T
   T{ " one" strdup " one" cstr= <T> true  }T
+  nil
 end
 test_cstr_eq
 
-fun: test_cstr_less
+fun: test_cstr_less { -- err }
   T{ nil           nil    cstr< <T> false }T
   T{ nil           " one" cstr< <T> true  }T
   T{ " one"        nil    cstr< <T> false }T
   T{ " one" strdup " two" cstr< <T> true  }T
   T{ " two" strdup " one" cstr< <T> false }T
   T{ " one" strdup " one" cstr< <T> false }T
+  nil
 end
 test_cstr_less
 
@@ -1203,14 +1302,15 @@ fun: int32_negative { -- val } [
   1 comp_args_set
 ] end
 
-fun: test_int_to_cell
+fun: test_int_to_cell { -- err }
   T{ int32_negative             <T> 0xffff_ffff           }T
   T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
   T{ int32_negative int_to_cell <T> -1                    }T
+  nil
 end
 test_int_to_cell
 
-fun: test_fallback
+fun: test_fallback { -- err }
   T{ 0  0  fallback <T> 0  }T
   T{ 0  1  fallback <T> 1  }T
   T{ 1  0  fallback <T> 1  }T
@@ -1220,10 +1320,11 @@ fun: test_fallback
   T{ 10 0  fallback <T> 10 }T
   T{ 10 20 fallback <T> 20 }T
   T{ 20 10 fallback <T> 10 }T
+  nil
 end
 test_fallback
 
-fun: test_fallback_decl
+fun: test_fallback_decl { -- err }
   T{ 0  0  fallback: val val <T> 0  }T
   T{ 0  1  fallback: val val <T> 1  }T
   T{ 1  0  fallback: val val <T> 1  }T
@@ -1233,16 +1334,18 @@ fun: test_fallback_decl
   T{ 10 0  fallback: val val <T> 10 }T
   T{ 10 20 fallback: val val <T> 20 }T
   T{ 20 10 fallback: val val <T> 10 }T
+  nil
 end
 test_fallback_decl
 
-fun: test_vargs_printf
+fun: test_vargs_printf { -- err }
   10 20 30 vargs{ " numbers (should be 10 20 30): %zd %zd %zd" printf }vargs
   { printed }
   lf
 
   s" numbers (should be 10 20 30): 10 20 30" { __ len }
   T{ printed <T> len }T
+  nil
 end
 \ test_vargs_printf
 
@@ -1258,32 +1361,34 @@ end
 
 4096 buf: STR_BUF
 
-fun: test_strf
+fun: test_strf { -- err }
   STR_BUF " numbers: %zd %zd %zd" 10 20 30 strf
   STR_BUF { str -- }
   T{ str " numbers: 10 20 30" cstr= <T> true }T
+  nil
 end
 test_strf
 
-fun: test_errf
+fun: test_errf { -- err }
   ERR_BUF_0 { buf }
 
   T{ " codes: %zd %zd %zd" 10 20 30 errf <T> buf  }T
   T{ " codes: 10 20 30" buf cstr=        <T> true }T
   T{ " codes: %zd %zd %zd" 40 50 60 errf <T> buf  }T
   T{ " codes: 40 50 60" buf cstr=        <T> true }T
+  nil
 end
 test_errf
 
-fun: test_errf_throw
-  " codes: %zd %zd %zd" 10 20 30 errf throw
+fun: test_errf_throw { -- err }
+  " codes: %zd %zd %zd" 10 20 30 errf
 end
 \ test_errf_throw
 
 \ Our "try" is atypical compared to verbs: instead of consuming all outputs,
 \ it "pops" only the last one, assuming it to be error or nil. By accident,
 \ we also allow to "push" subsequent arguments. Works exactly like a stack.
-fun: test_try_multiple
+fun: test_try_multiple { -- err }
   T{ nil try <T> }T
   T{ nil nil try try <T> }T
   T{ nil try nil try <T> }T
@@ -1294,10 +1399,11 @@ fun: test_try_multiple
   T{ 10 20 nil nil try try <T> 10 20 }T
   T{ 10 20 nil try nil try <T> 10 20 }T
   T{ 10 20 nil try nil try nil <T> 10 20 nil }T
+  nil
 end
 test_try_multiple
 
-fun: test_wrapf
+fun: test_wrapf { -- err }
   nil  " one"          wrapf { err0 }
   err0 " two: %s" err0 wrapf { err1 }
 
@@ -1321,10 +1427,11 @@ fun: test_wrapf
   T{ err3 err1 = <T> true  }T
   T{ err3 err2 = <T> false }T
   T{ err3 " four: 123: three: two: one" cstr= <T> true }T
+  nil
 end
 test_wrapf
 
-fun: test_alloca { ptr }
+fun: test_alloca { ptr -- err }
   T{ ptr @ <T> ptr @ }T \ Should not segfault. The value is undefined.
 
   123 ptr !
@@ -1332,16 +1439,19 @@ fun: test_alloca { ptr }
 
   234 ptr !
   T{ ptr @ <T> 234 }T
+
+  nil
 end
 
-fun: test_alloca_cell
+fun: test_alloca_cell { -- err }
   CELL         alloca test_alloca
   sizeof' Cell alloca test_alloca
   alloca' Cell        test_alloca
+  nil
 end
 test_alloca_cell
 
-fun: test_alloca_align
+fun: test_alloca_align { -- err }
   systack_ptr { SP }
   1  alloca   { adr0 }
   2  alloca   { adr1 }
@@ -1364,12 +1474,13 @@ fun: test_alloca_align
   T{ adr3 <T> SP 64 - }T
   T{ adr4 <T> SP 80 - }T
   T{ adr5 <T> SP 112 - }T
+  nil
 end
 test_alloca_align
 
 65536 let: SIZE_BIG
 
-fun: test_alloca_big
+fun: test_alloca_big { -- err }
   SIZE_BIG alloca { adr0 }
   SIZE_BIG alloca { adr1 }
   SIZE_BIG alloca { adr2 }
@@ -1380,10 +1491,11 @@ fun: test_alloca_big
 
   T{ adr0 adr1 - <T> SIZE_BIG }T
   T{ adr1 adr2 - <T> SIZE_BIG }T
+  nil
 end
 test_alloca_big
 
-fun: test_alloca_dynamic { size0 size1 }
+fun: test_alloca_dynamic { size0 size1 -- err }
   systack_ptr  { SP   }
   size0 alloca { adr0 }
   size1 alloca { adr1 }
@@ -1393,6 +1505,7 @@ fun: test_alloca_dynamic { size0 size1 }
 
   adr0 @ { -- } \ Should not segfault.
   adr1 @ { -- } \ Should not segfault.
+  nil
 end
 32 64 test_alloca_dynamic
 
@@ -1409,7 +1522,7 @@ Opaq_1_1 3 arr: Arr4
 Opaq_2_2 3 arr: Arr5
 Opaq_3_1 3 arr: Arr6
 
-fun: test_array_sizes
+fun: test_array_sizes { -- err }
   T{ sizeof' Opaq_1_1 <T> 1 }T
   T{ sizeof' Opaq_2_2 <T> 2 }T
   T{ sizeof' Opaq_3_1 <T> 3 }T
@@ -1435,6 +1548,7 @@ fun: test_array_sizes
   T{ alignof' Arr4 <T> 1 }T
   T{ alignof' Arr5 <T> 2 }T
   T{ alignof' Arr6 <T> 1 }T
+  nil
 end
 test_array_sizes
 
@@ -1445,7 +1559,7 @@ end
 
 \ Field alignment and padding needs to match C.
 \ We test alignment for a lot more cases below.
-fun: test_struct_fields_basic
+fun: test_struct_fields_basic { -- err }
   T{ sizeof'  Typ   <T> 16  }T
   T{ alignof' Typ   <T> 8   }T
   T{ 0   Typ_field0 <T> 0   }T
@@ -1454,10 +1568,11 @@ fun: test_struct_fields_basic
   T{ 234 Typ_field0 <T> 234 }T
   T{ 123 Typ_field1 <T> 131 }T
   T{ 234 Typ_field1 <T> 242 }T
+  nil
 end
 test_struct_fields_basic
 
-fun: test_struct_fields_load_store
+fun: test_struct_fields_load_store { -- err }
   alloca' Typ { ptr }
   ptr sizeof' Typ erase
 
@@ -1479,14 +1594,16 @@ fun: test_struct_fields_load_store
   T{    ptr Typ_field1 @ <T> 20 }T
   T{ 40 ptr Typ_field1 ! <T>    }T
   T{    ptr Typ_field1 @ <T> 40 }T
+  nil
 end
 test_struct_fields_load_store
 
 struct: Typ0 end
 
-fun: test_struct_0
+fun: test_struct_0 { -- err }
   T{ sizeof'  Typ0 <T> 0 }T
   T{ alignof' Typ0 <T> 0 }T
+  nil
 end
 test_struct_0
 
@@ -1494,10 +1611,11 @@ struct: Typ1
   U8 1 field: Typ1_field
 end
 
-fun: test_struct_1
+fun: test_struct_1 { -- err }
   T{ sizeof'  Typ1  <T> 1   }T
   T{ alignof' Typ1  <T> 1   }T
   T{ 123 Typ1_field <T> 123 }T
+  nil
 end
 test_struct_1
 
@@ -1506,11 +1624,12 @@ struct: Typ2
   U32 1 field: Typ2_field1
 end
 
-fun: test_struct_2
+fun: test_struct_2 { -- err }
   T{ sizeof'  Typ2   <T> 8   }T
   T{ alignof' Typ2   <T> 4   }T
   T{ 123 Typ2_field0 <T> 123 }T
   T{ 123 Typ2_field1 <T> 127 }T
+  nil
 end
 test_struct_2
 
@@ -1519,13 +1638,14 @@ struct: Typ3
   U8  1 field: Typ3_field1
 end
 
-fun: test_struct_3
+fun: test_struct_3 { -- err }
   T{ sizeof'  Typ3   <T> 8   }T
   T{ alignof' Typ3   <T> 4   }T
   T{ nil Typ3_field0 <T> 0   }T
   T{ nil Typ3_field1 <T> 4   }T
   T{ 123 Typ3_field0 <T> 123 }T
   T{ 123 Typ3_field1 <T> 127 }T
+  nil
 end
 test_struct_3
 
@@ -1535,12 +1655,13 @@ struct: Typ4
   U64 1 field: Typ4_field2
 end
 
-fun: test_struct_4
+fun: test_struct_4 { -- err }
   T{ sizeof'  Typ4   <T> 16  }T
   T{ alignof' Typ4   <T> 8   }T
   T{ 123 Typ4_field0 <T> 123 }T
   T{ 123 Typ4_field1 <T> 127 }T
   T{ 123 Typ4_field2 <T> 131 }T
+  nil
 end
 test_struct_4
 
@@ -1550,12 +1671,13 @@ struct: Typ5
   U64 1 field: Typ5_field2
 end
 
-fun: test_struct_5
+fun: test_struct_5 { -- err }
   T{ sizeof'  Typ5   <T> 16  }T
   T{ alignof' Typ5   <T> 8   }T
   T{ 123 Typ5_field0 <T> 123 }T
   T{ 123 Typ5_field1 <T> 127 }T
   T{ 123 Typ5_field2 <T> 131 }T
+  nil
 end
 test_struct_5
 
@@ -1565,12 +1687,13 @@ struct: Typ6
   U8  1 field: Typ6_field2
 end
 
-fun: test_struct_6
+fun: test_struct_6 { -- err }
   T{ sizeof'  Typ6   <T> 24  }T
   T{ alignof' Typ6   <T> 8   }T
   T{ 123 Typ6_field0 <T> 123 }T
   T{ 123 Typ6_field1 <T> 131 }T
   T{ 123 Typ6_field2 <T> 139 }T
+  nil
 end
 test_struct_6
 
@@ -1581,13 +1704,14 @@ struct: Typ7
   U8  1 field: Typ7_field3
 end
 
-fun: test_struct_7
+fun: test_struct_7 { -- err }
   T{ sizeof'  Typ7   <T> 24  }T
   T{ alignof' Typ7   <T> 8   }T
   T{ 123 Typ7_field0 <T> 123 }T
   T{ 123 Typ7_field1 <T> 131 }T
   T{ 123 Typ7_field2 <T> 135 }T
   T{ 123 Typ7_field3 <T> 139 }T
+  nil
 end
 test_struct_7
 
@@ -1598,13 +1722,14 @@ struct: Typ8
   U32 1 field: Typ8_field3
 end
 
-fun: test_struct_8
+fun: test_struct_8 { -- err }
   T{ sizeof'  Typ8   <T> 8   }T
   T{ alignof' Typ8   <T> 4   }T
   T{ 123 Typ8_field0 <T> 123 }T
   T{ 123 Typ8_field1 <T> 124 }T
   T{ 123 Typ8_field2 <T> 125 }T
   T{ 123 Typ8_field3 <T> 127 }T
+  nil
 end
 test_struct_8
 
@@ -1613,11 +1738,12 @@ struct: Typ9
   U8 128 field: Typ9_field1
 end
 
-fun: test_struct_9
+fun: test_struct_9 { -- err }
   T{ sizeof'  Typ9   <T> 129 }T
   T{ alignof' Typ9   <T> 1   }T
   T{ 123 Typ9_field0 <T> 123 }T
   T{ 123 Typ9_field1 <T> 124 }T
+  nil
 end
 test_struct_9
 
@@ -1628,13 +1754,14 @@ struct: Typ10
   U8  128 field: Typ10_field3
 end
 
-fun: test_struct_10
+fun: test_struct_10 { -- err }
   T{ sizeof'  Typ10   <T> 144 }T
   T{ alignof' Typ10   <T> 4   }T
   T{ 123 Typ10_field0 <T> 123 }T
   T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
   T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
   T{ 123 Typ10_field3 <T> 139 }T
+  nil
 end
 test_struct_10
 
@@ -1643,15 +1770,16 @@ struct: Typ11
   U64      1 field: Typ11_field1
 end
 
-fun: test_struct_11
+fun: test_struct_11 { -- err }
   T{ sizeof'  Typ11   <T> 24  }T
   T{ alignof' Typ11   <T> 8   }T
   T{ 123 Typ11_field0 <T> 123 }T
   T{ 123 Typ11_field1 <T> 139 }T
+  nil
 end
 test_struct_11
 
-fun: test_catch_invalid [ true catches ]
+fun: test_catch_invalid { -- err } [ false try_all ]
   import' ./test/test_catch_invalid_exec.af
   " useless attempt to catch an error when calling word `nop` which does not throw"
   T_err_contains try
@@ -1659,32 +1787,42 @@ fun: test_catch_invalid [ true catches ]
   import' ./test/test_catch_invalid_comp.af
   " word `nop` not found in wordlist 2 (WORDLIST_COMP)"
   T_err_contains try
+
+  import' ./test/test_catch_requires_try_all.af
+  " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
+  T_err_contains try
+
+  nil
 end
 test_catch_invalid
 
-fun: test_throw " test_err" throw end
+\ Also equivalent to:
+\
+\   fun: test_throw { -- err } " test_err" end
+fun: test_throw { -- err } " test_err" throw nil end
 
-fun: test_catch_0_val { -- val }
+fun: test_catch_0_val { -- val err }
   false if test_throw end
-  123
+  123 nil
 end
 
-fun: test_catch_0
+fun: test_catch_0 { -- err }
   T{ test_catch_0_val          <T> 123     }T
   T{ catch' test_catch_0_val   <T> 123 nil }T
   T{ catch' test_throw { err } <T>         }T
-  T{ " test_err" err cstr=    <T> true    }T
+  T{ " test_err" err cstr=     <T> true    }T
+  nil
 end
 test_catch_0
 
-fun: test_catch_1_cond { one -- two }
-  one if one 2 * ret end
+fun: test_catch_1_cond { one -- two err }
+  one if one 2 * nil ret end
   test_throw
   unreachable
-  nil
+  nil nil
 end
 
-fun: test_catch_1
+fun: test_catch_1 { -- err }
   T{ 123 test_catch_1_cond                    <T> 246     }T
   T{ 123 catch' test_catch_1_cond             <T> 246 nil }T
   T{ 0   catch' test_catch_1_cond { val err } <T>         }T
@@ -1692,25 +1830,26 @@ fun: test_catch_1
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
+  nil
 end
 test_catch_1
 
-fun: test_catch_2_cond { one two -- three four }
+fun: test_catch_2_cond { one two -- three four err }
   one <>0 { ok0 }
   two <>0 { ok1 }
 
   ok0 ok1 and if
     one two + { three }
     two one - { four  }
-    three four ret
+    three four nil ret
   end
 
   test_throw
   unreachable
-  nil nil
+  nil nil nil
 end
 
-fun: test_catch_2
+fun: test_catch_2 { -- err }
   T{ 13 25 test_catch_2_cond        <T> 38 12     }T
   T{ 13 25 catch' test_catch_2_cond <T> 38 12 nil }T
 
@@ -1725,243 +1864,277 @@ fun: test_catch_2
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err 0 }T
+  nil
 end
 test_catch_2
 
-\ Procedures with `catches` never throw IMPLICITLY but we allow to throw
-\ EXPLICITLY. The compiler marks the function as "throwing", in addition
-\ to "catching". Callers handle its exception as usual.
-fun: test_catches_and_throws_fun [ true catches ]
+\ Words can disable file-scoped `try_all` and return their error output
+\ explicitly. Callers then handle the error value as an ordinary output.
+fun: test_disabling_try_all_fun { -- err } [ false try_all ]
   test_throw { err_ignore }
-  " different_test_err" throw
+  " different_test_err"
 end
 
-\ Note: when testing `catches`, we have to replace `}T` with `}T`
-\ because `}T` throws on test failures, and `catches` reveals those
-\ exceptions as values. The code wouldn't compile without `try` due
-\ to arity mismatch.
-fun: test_catches_and_throws [ true catches ]
-  test_catches_and_throws_fun { err }
+fun: test_disabling_try_all { -- err } [ false try_all ]
+  test_disabling_try_all_fun { err }
   T{ " different_test_err" err cstr= <T> true }T
+  nil
 end
-test_catches_and_throws
+test_disabling_try_all
 
-fun: test_catches_0
-  [ true catches ]
-
-  test_throw   { err0 }
+fun: test_explicit_err_0 { -- err } [ false try_all ]
+  test_throw  { err0 }
   " test_err" { err1 }
 
   T{ err0 err1 =     <T> false }T
   T{ err0 err1 cstr= <T> true  }T
+  nil
 end
-test_catches_0
+test_explicit_err_0
 
-fun: test_catches_1_fun { one -- two }
+fun: test_explicit_err_1_fun { one -- two err }
   one ifn test_throw end
-  one 2 *
+  one 2 * nil
 end
 
-\ Compare with `test_catches_1` which is the actual test.
-fun: test_catches_1_fun_throwing
-  \ 0 test_catches_1_fun { -- } \ Must throw.
+\ Compare with `test_explicit_err_1` which is the actual test.
+fun: test_explicit_err_1_fun_throwing { -- err }
+  \ [ true try_all ] 0 test_explicit_err_1_fun { -- } \ Must throw.
 
-  T{ 123 test_catches_1_fun { val } <T>     }T
-  T{ val                            <T> 246 }T
-  T{ 123 test_catches_1_fun         <T> 246 }T
+  T{ 123 test_explicit_err_1_fun { val } <T>     }T
+  T{ val                                 <T> 246 }T
+  T{ 123 test_explicit_err_1_fun         <T> 246 }T
+  nil
 end
-test_catches_1_fun_throwing
+test_explicit_err_1_fun_throwing
 
-fun: test_catches_1
-  [ true catches ]
+fun: test_explicit_err_1 { -- err } [ false try_all ]
 
-  T{ 0 test_catches_1_fun { val err } <T>      }T
-  T{ " test_err" err cstr=            <T> true }T
+  T{ 0 test_explicit_err_1_fun { val err } <T>      }T
+  T{ " test_err" err cstr=                 <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
 
-  T{ 123 test_catches_1_fun { val err } <T>         }T
-  T{ val err                            <T> 246 nil }T
-  T{ 123 test_catches_1_fun             <T> 246 nil }T
+  T{ 123 test_explicit_err_1_fun { val err } <T>         }T
+  T{ val err                                 <T> 246 nil }T
+  T{ 123 test_explicit_err_1_fun             <T> 246 nil }T
+  nil
 end
-test_catches_1
+test_explicit_err_1
 
-fun: test_catches_2_fun { one two -- three }
+fun: test_explicit_err_2_fun { one two -- three err }
   one ifn test_throw end
-  one two +
+  one two + nil
 end
 
-\ Compare with `test_catches_2` which is the actual test.
-fun: test_catches_2_fun_throwing
-  \ 0 123 test_catches_2_fun { -- } \ Must throw.
+\ Compare with `test_explicit_err_2` which is the actual test.
+fun: test_explicit_err_2_fun_throwing { -- err }
+  \ [ true try_all ] 0 123 test_explicit_err_2_fun { -- } \ Must throw.
 
-  T{ 11 22 test_catches_2_fun { val } <T>    }T
-  T{ val                              <T> 33 }T
-  T{ 11 22 test_catches_2_fun         <T> 33 }T
+  T{ 11 22 test_explicit_err_2_fun { val } <T>    }T
+  T{ val                                   <T> 33 }T
+  T{ 11 22 test_explicit_err_2_fun         <T> 33 }T
 
-  T{ 11 0 test_catches_2_fun { val } <T>    }T
-  T{ val                             <T> 11 }T
-  T{ 11 0 test_catches_2_fun         <T> 11 }T
+  T{ 11 0 test_explicit_err_2_fun { val } <T>    }T
+  T{ val                                  <T> 11 }T
+  T{ 11 0 test_explicit_err_2_fun         <T> 11 }T
+  nil
 end
-test_catches_2_fun_throwing
+test_explicit_err_2_fun_throwing
 
-fun: test_catches_2
-  [ true catches ]
-
-  T{ 0 11 test_catches_2_fun { val err } <T>      }T
-  T{ " test_err" err cstr=               <T> true }T
+fun: test_explicit_err_2 { -- err } [ false try_all ]
+  T{ 0 11 test_explicit_err_2_fun { val err } <T>      }T
+  T{ " test_err" err cstr=                    <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
 
-  T{ 11 22 test_catches_2_fun { val err } <T>        }T
-  T{ val err                              <T> 33 nil }T
-  T{ 11 22 test_catches_2_fun             <T> 33 nil }T
+  T{ 11 22 test_explicit_err_2_fun { val err } <T>        }T
+  T{ val err                                   <T> 33 nil }T
+  T{ 11 22 test_explicit_err_2_fun             <T> 33 nil }T
 
-  T{ 11 0 test_catches_2_fun { val err } <T>        }T
-  T{ val err                             <T> 11 nil }T
-  T{ 11 0 test_catches_2_fun             <T> 11 nil }T
+  T{ 11 0 test_explicit_err_2_fun { val err } <T>        }T
+  T{ val err                                  <T> 11 nil }T
+  T{ 11 0 test_explicit_err_2_fun             <T> 11 nil }T
+  nil
 end
-test_catches_2
+test_explicit_err_2
 
-fun: test_catches_3_fun { one -- two three }
+fun: test_explicit_err_3_fun { one -- two three err }
   one ifn test_throw end
   one 2 *    { two }
   one negate { three }
-  two three
+  two three nil
 end
 
-\ Compare with `test_catches_3` which is the actual test.
-fun: test_catches_3_fun_throwing
-  \ 0 test_catches_3_fun { -- } \ Must throw.
+\ Compare with `test_explicit_err_3` which is the actual test.
+fun: test_explicit_err_3_fun_throwing { -- err }
+  \ [ true try_all ] 0 test_explicit_err_3_fun { -- } \ Must throw.
 
   T{ 123 negate <T> -123 }T
 
-  T{ 123 test_catches_3_fun { one two } <T>          }T
-  T{ one two                            <T> 246 -123 }T
-  T{ 123 test_catches_3_fun             <T> 246 -123 }T
+  T{ 123 test_explicit_err_3_fun { one two } <T>          }T
+  T{ one two                                 <T> 246 -123 }T
+  T{ 123 test_explicit_err_3_fun             <T> 246 -123 }T
+  nil
 end
-test_catches_3_fun_throwing
+test_explicit_err_3_fun_throwing
 
-fun: test_catches_3
-  [ true catches ]
-
+fun: test_explicit_err_3 { -- err } [ false try_all ]
   T{
     \ Predictable state of regs x0 x1 x2.
     123 234 345 { -- }
-    0 test_catches_3_fun { one two err }
+    0 test_explicit_err_3_fun { one two err }
     <T>
   }T
-  T{ " test_err" err cstr=                <T> true }T
+  T{ " test_err" err cstr= <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
   T{ two <T> 234 }T
 
-  T{ 123 test_catches_3_fun { one two err } <T>              }T
-  T{ one two err                            <T> 246 -123 nil }T
-  T{ 123 test_catches_3_fun                 <T> 246 -123 nil }T
+  T{ 123 test_explicit_err_3_fun { one two err } <T>              }T
+  T{ one two err                                 <T> 246 -123 nil }T
+  T{ 123 test_explicit_err_3_fun                 <T> 246 -123 nil }T
+  nil
 end
-test_catches_3
+test_explicit_err_3
 
-fun: test_catches_4_fun { one two -- three four }
+fun: test_explicit_err_4_fun { one two -- three four err }
   one ifn test_throw end
   one two + { three }
   two one - { four }
-  three four
+  three four nil
 end
 
-\ Compare with `test_catches_4` which is the actual test.
-fun: test_catches_4_fun_throwing
-  \ 0 123 test_catches_4_fun { -- } \ Must throw.
+\ Compare with `test_explicit_err_4` which is the actual test.
+fun: test_explicit_err_4_fun_throwing { -- err }
+  \ [ true try_all ] 0 123 test_explicit_err_4_fun { -- } \ Must throw.
 
-  T{ 13 25 test_catches_4_fun { one two } <T>       }T
-  T{ one two                              <T> 38 12 }T
-  T{ 13 25 test_catches_4_fun             <T> 38 12 }T
+  T{ 13 25 test_explicit_err_4_fun { one two } <T>       }T
+  T{ one two                                   <T> 38 12 }T
+  T{ 13 25 test_explicit_err_4_fun             <T> 38 12 }T
 
-  T{ 13 0 test_catches_4_fun { one two } <T>        }T
-  T{ one two                             <T> 13 -13 }T
-  T{ 13 0 test_catches_4_fun             <T> 13 -13 }T
+  T{ 13 0 test_explicit_err_4_fun { one two } <T>        }T
+  T{ one two                                  <T> 13 -13 }T
+  T{ 13 0 test_explicit_err_4_fun             <T> 13 -13 }T
+  nil
 end
-test_catches_4_fun_throwing
+test_explicit_err_4_fun_throwing
 
-fun: test_catches_4
-  [ true catches ]
-
-  T{ 0 13 test_catches_4_fun { one two err } <T>      }T
-  T{ " test_err" err cstr=                   <T> true }T
+fun: test_explicit_err_4 { -- err } [ false try_all ]
+  T{ 0 13 test_explicit_err_4_fun { one two err } <T>      }T
+  T{ " test_err" err cstr=                        <T> true }T
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
   T{ two <T> 13  }T
 
-  T{ 13 25 test_catches_4_fun { one two err } <T>           }T
-  T{ one two err                              <T> 38 12 nil }T
-  T{ 13 25 test_catches_4_fun                 <T> 38 12 nil }T
+  T{ 13 25 test_explicit_err_4_fun { one two err } <T>           }T
+  T{ one two err                                   <T> 38 12 nil }T
+  T{ 13 25 test_explicit_err_4_fun                 <T> 38 12 nil }T
 
-  T{ 13 0 test_catches_4_fun { one two err } <T>            }T
-  T{ one two err                             <T> 13 -13 nil }T
-  T{ 13 0 test_catches_4_fun                 <T> 13 -13 nil }T
+  T{ 13 0 test_explicit_err_4_fun { one two err } <T>            }T
+  T{ one two err                                  <T> 13 -13 nil }T
+  T{ 13 0 test_explicit_err_4_fun                 <T> 13 -13 nil }T
+  nil
 end
-test_catches_4
+test_explicit_err_4
 
 \ Must compile.
 fun: test_max_input_regs { A B C D E F G H -- } end
 
 fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
-fun: test_max_output_regs [ redefine ]
+fun: test_max_output_regs { -- err } [ redefine ]
   T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
+  nil
 end
 test_max_output_regs
 
-fun: test_max_output_regs_with_err { -- A B C D E F G }
+fun: test_max_output_regs_with_err { -- A B C D E F G err }
   false if test_throw end
-  0 1 2 3 4 5 6
+  0 1 2 3 4 5 6 nil
 end
-fun: test_max_output_regs_with_err [ redefine ]
+fun: test_max_output_regs_with_err { -- err } [ redefine ]
   T{ test_max_output_regs_with_err <T> 0 1 2 3 4 5 6 }T
+  nil
 end
 test_max_output_regs_with_err
 
-fun: test_file_throw_import_catch [ true catches ]
+fun: test_file_throw_import_catch { -- err } [ false try_all ]
   import' ./test/test_root_throw.af
-  " test_err" T_err_contains try
+  " test_err" T_err_contains
 end
 test_file_throw_import_catch
 
-fun: test_too_many_input_regs [ true catches ]
+fun: test_signature_err_auto_callee { -- err } nil end
+
+fun: test_signature_err_auto { -- err }
+  T{ xt' test_signature_err_auto_callee Sym_has_err @b <T> true }T
+  T{ xt' test_signature_err_auto_callee Sym_out_len @b <T> 1    }T
+  nil
+end
+test_signature_err_auto
+
+fun: test_has_err_not_auto_marked_callee { -- err } nil end
+
+fun: test_has_err_not_auto_marked_caller { -- err_str } [ false try_all ]
+  test_has_err_not_auto_marked_callee
+end
+
+fun: test_has_err_not_auto_marked { -- err }
+  T{ xt' test_has_err_not_auto_marked_callee Sym_has_err @b <T> true  }T
+  T{ xt' test_has_err_not_auto_marked_caller Sym_has_err @b <T> false }T
+  nil
+end
+test_has_err_not_auto_marked
+
+fun: test_has_err_not_contagious { -- err } [ false try_all ]
+  import' ./test/test_has_err_not_contagious.af
+  " caller has no error output for implicit `try_all`"
+  T_err_contains
+end
+test_has_err_not_contagious
+
+fun: test_throw_requires_err { -- err } [ false try_all ]
+  import' ./test/test_throw_requires_err.af
+  " unable to `throw`: current word has no error output"
+  T_err_contains
+end
+test_throw_requires_err
+
+fun: test_too_many_input_regs { -- err } [ false try_all ]
   import' ./test/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
-  T_err_contains try
+  T_err_contains
 end
 test_too_many_input_regs
 
-fun: test_too_many_output_regs [ true catches ]
+fun: test_too_many_output_regs { -- err } [ false try_all ]
   import' ./test/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
-  T_err_contains try
+  T_err_contains
 end
 test_too_many_output_regs
 
-fun: test_too_many_output_regs_with_err [ true catches ]
+fun: test_too_many_output_regs_with_err { -- err } [ false try_all ]
   import' ./test/test_too_many_output_regs_with_err.af
-  " unable to compile return: too many output parameters: 8 registers are available, 8 are used, but 1 more is required for implicitly returned exception values"
-  T_err_contains try
+  " too many output parameters: 8 registers available, 9 parameters requested"
+  T_err_contains
 end
 test_too_many_output_regs_with_err
 
-fun: test_partial_assign [ true catches ]
+fun: test_partial_assign { -- err } [ false try_all ]
   import' ./test/test_partial_assign.af
   " in `test_partial_assign_fail`: arity mismatch: assigned 1 of 2 prior values"
-  T_err_contains try
+  T_err_contains
 end
 test_partial_assign
 
-fun: test_arena_unprot { adr } adr ARENA_PAGE_MIN mem_unprot end
+fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN mem_unprot nil end
 
-\ BOT-GENERATED
-fun: test_arena_alloc
+fun: test_arena_alloc { -- err }
   alloca' Arena { arn }
   arn arena_init
 
@@ -1992,11 +2165,11 @@ fun: test_arena_alloc
   T{ arn stack_len_bytes   <T> sizeof' Stack 2 *   }T
 
   arn arena_deinit
+  nil
 end
 test_arena_alloc
 
-\ BOT-GENERATED
-fun: test_arena_trunc
+fun: test_arena_trunc { -- err }
   alloca' Arena { arn }
   arn arena_init
 
@@ -2025,11 +2198,11 @@ fun: test_arena_trunc
   T{ arn stack_len_bytes <T> sizeof' Stack 2 * }T
 
   arn arena_deinit
+  nil
 end
 test_arena_trunc
 
-\ BOT-GENERATED
-fun: test_arena_deinit
+fun: test_arena_deinit { -- err }
   alloca' Arena { arn }
   arn arena_init
 
@@ -2044,11 +2217,11 @@ fun: test_arena_deinit
   adr1 catch' test_arena_unprot { err }
   T{ err <>0 <T> true }T
   err " unable to mprotect" T_err_contains
+  nil
 end
 test_arena_deinit
 
-\ BOT-GENERATED
-fun: test_arena_errors
+fun: test_arena_errors { -- err }
   alloca' Arena { arn }
   arn arena_init
 
@@ -2059,13 +2232,14 @@ fun: test_arena_errors
   nil arena_trunc
   nil arena_deinit
   arn arena_deinit
+  nil
 end
 test_arena_errors
 
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
 \ interpreter-only features (currently none).
-fun: main_run
+fun: main_run { -- err }
   test_test
   test_locals
   test_stack_primitives
@@ -2085,6 +2259,7 @@ fun: main_run
   test_switch_nested_if
   test_switch_nested
   test_recursion
+  test_recur_with_err
   \ test_sleep_loop
   test_loop_leave
   test_loop_nested
@@ -2152,19 +2327,23 @@ fun: main_run
   test_catch_0
   test_catch_1
   test_catch_2
-  test_catches_and_throws
-  test_catches_0
-  test_catches_1_fun_throwing
-  test_catches_1
-  test_catches_2_fun_throwing
-  test_catches_2
-  test_catches_3_fun_throwing
-  test_catches_3
-  test_catches_4_fun_throwing
-  test_catches_4
+  test_disabling_try_all
+  test_explicit_err_0
+  test_explicit_err_1_fun_throwing
+  test_explicit_err_1
+  test_explicit_err_2_fun_throwing
+  test_explicit_err_2
+  test_explicit_err_3_fun_throwing
+  test_explicit_err_3
+  test_explicit_err_4_fun_throwing
+  test_explicit_err_4
   test_max_output_regs
   test_max_output_regs_with_err
+  \ test_signature_err_auto               \ interp-only
+  \ test_has_err_not_auto_marked          \ interp-only
+  \ test_has_err_not_contagious           \ interp-only
   \ test_file_throw_import_catch          \ interp-only
+  \ test_throw_requires_err               \ interp-only
   \ test_too_many_input_regs              \ interp-only
   \ test_too_many_output_regs             \ interp-only
   \ test_too_many_output_regs_with_err    \ interp-only
@@ -2172,9 +2351,10 @@ fun: main_run
   test_arena_trunc
   test_arena_deinit
   test_arena_errors
+  nil
 end
 
-fun: main { -- exit } [ true catches ]
+fun: main { -- exit } [ false try_all ]
   main_run { err }
 
   err ifn

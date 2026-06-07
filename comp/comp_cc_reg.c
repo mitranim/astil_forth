@@ -113,7 +113,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
-  ptr_clear(&ctx->catches);
+  ptr_clear(&ctx->try_all);
 }
 
 // SYNC[comp_ctx_rewind].
@@ -144,7 +144,7 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->redefining = prev->redefining;
   next->compiling  = prev->compiling;
   next->has_alloca = prev->has_alloca;
-  next->catches    = prev->catches;
+  next->try_all    = prev->try_all;
 
   stack_rewind(&prev->locals, &next->locals);
   dict_trunc((Dict *)&next->local_dict);
@@ -257,7 +257,7 @@ static void comp_local_evict(Comp *comp, Local *loc) {
   const auto type = loc->location;
   if (type == LOC_MEM) return;
 
-  // Locations are undecided until finalizing the procedure at the semicolon.
+  // Locations are undecided until finalizing the function at the semicolon.
   aver(type == LOC_UNKNOWN);
 
   comp_local_alloc_mem(comp, loc);
@@ -298,27 +298,27 @@ static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
 }
 
 static Err err_args_partial(
-  const char *caller, const char *action, Sint low, Sint len
+  const Sym *sym, const char *action, Sint low, Sint len
 ) {
   return errf(
     "in " FMT_QUOTED
-    ": %s: prior values were partially consumed by assignments: " FMT_SINT
+    " (%s): %s: prior values were partially consumed by assignments: " FMT_SINT
     " of " FMT_SINT
     "; hint: either assign to more locals, or use `--` inside braces to discard unused values",
-    caller,
+    sym->name.buf,
+    wordlist_name(sym->wordlist),
     action,
     low,
     len
   );
 }
 
-static Err err_args_arity(
-  const char *caller, const char *action, Sint req, Sint ava
-) {
+static Err err_args_arity(const Sym *sym, const char *action, Sint req, Sint ava) {
   return errf(
-    "in " FMT_QUOTED ": %s: arity mismatch: required: " FMT_SINT
+    "in " FMT_QUOTED " (%s): %s: arity mismatch: required: " FMT_SINT
     ", provided: " FMT_SINT,
-    caller,
+    sym->name.buf,
+    wordlist_name(sym->wordlist),
     action,
     req,
     ava
@@ -332,10 +332,9 @@ static Err comp_validate_args(Comp *comp, const char *action, Sint req) {
   const auto ctx     = &comp->ctx;
   const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
-  const auto name    = sym->name.buf;
 
-  if (arg_low) return err_args_partial(name, action, arg_low, arg_len);
-  if (req != arg_len) return err_args_arity(name, action, req, arg_len);
+  if (arg_low) return err_args_partial(sym, action, arg_low, arg_len);
+  if (req != arg_len) return err_args_arity(sym, action, req, arg_len);
   return nullptr;
 }
 
@@ -353,13 +352,13 @@ static Err comp_validate_ret_args(Comp *comp) {
   try(comp_require_current_sym(comp, &sym));
   try(comp_validate_args(comp, "unable to compile return", sym->out_len));
 
-  if (!sym->throws) return nullptr;
-  if (sym->out_len < ASM_OUT_PARAM_REG_LEN) return nullptr;
+  if (!sym->has_err) return nullptr;
+  if (sym->out_len) return nullptr;
 
   return errf(
-    "unable to compile return: too many output parameters: %d registers are available, %d are used, but 1 more is required for implicitly returned exception values",
-    ASM_OUT_PARAM_REG_LEN,
-    sym->out_len
+    "unable to compile return: " FMT_QUOTED
+    " has error output but returns no outputs",
+    sym->name.buf
   );
 }
 
@@ -408,8 +407,8 @@ static void comp_clear_param_reg(Comp *comp, U8 reg) {
 }
 
 /*
-Must be invoked whenever a register needs to be used for ANYTHING
-other than the current procedure's input or output parameters.
+Must be invoked whenever a register is used for ANYTHING
+other than the current word's input or output parameters.
 Examples:
 
 - An input argument for the next call.
@@ -435,21 +434,21 @@ static Err comp_clobber_regs(Comp *comp, Bits clob) {
 static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
   /*
   The callee's clobber list must include all of its auxiliary side-effectful
-  clobbers and its exception register if any. But its inputs and outputs may
-  or may not be considered clobbers. For example, an unary identity function
-  which takes one value and returns it as-is doesn't really clobber anything.
-  Placing its input in `x0` before the call may have clobbered a local which
-  was previously in `x0`, but if the input came from another local, which is
-  now associated with `x0`, it should not be clobbered by the call.
+  clobbers. But its inputs and outputs may or may not be considered clobbers.
+  For example an unary "identity" function which takes one value and returns
+  it as-is doesn't really clobber anything. Placing its input in `x0` before
+  the call may have clobbered a local which was previously in `x0`, but when
+  the input comes from another local, which is now associated with `x0`, the
+  second local should not be clobbered by such a call.
 
-  In contrast, "intrin" and "extern" procedures always include
-  input and output parameter registers in their clobber lists.
+  In contrast, "intrin" and "extern" functions are assumed to always
+  clobber all volatile registers, including input and output params,
+  because they're opaque to us.
   */
   try(comp_clobber_regs(comp, callee->clobber));
 
-  // Exceptions implicitly use an additional output register.
-  if (callee->throws) {
-    try(comp_clobber_reg(comp, callee->out_len));
+  if (callee->has_err) {
+    try(comp_clobber_reg(comp, callee->out_len - 1));
   }
 
   /*
@@ -742,7 +741,7 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) 
     Sym *sym;
     try(comp_require_current_sym(comp, &sym));
     return err_args_partial(
-      sym->name.buf, "unable to push immediate value", ctx->arg_low, ctx->arg_len
+      sym, "unable to push immediate value", ctx->arg_low, ctx->arg_len
     );
   }
 
@@ -797,21 +796,20 @@ TODO: for x64, we'll need a more general approach.
 See the comment at the top of this file.
 */
 static Err comp_after_append_call(
-  Comp *comp, const Sym *caller, const Sym *callee, bool catch
+  Comp *comp, const Sym *caller, const Sym *callee, bool auto_try
 ) {
   (void)caller;
 
   const auto ctx = &comp->ctx;
 
   /*
-  An exception, if any, is always returned in the last output register.
-  `asm_append_call_norm` decides how to handle it depending on whether
-  the caller prefers automatic "catch"; we can also force a "catch".
-  Here we only need to adjust the argument count when "catching".
+  An error, if any, is returned in the last output GPR. By default errors are
+  visible. We also support blanket implicit "try" via "try_all". In that case,
+  `asm_append_call_norm` and `asm_append_call_intrin` auto-insert the "try".
+  Here we just hide the error since it's been checked already.
   */
-  if (catch) {
-    aver(callee->throws);
-    ctx->arg_len = callee->out_len + 1;
+  if (auto_try && callee->has_err) {
+    ctx->arg_len = callee->out_len - 1;
   }
   else {
     ctx->arg_len = callee->out_len;
@@ -828,7 +826,7 @@ static void comp_clear_args(Comp *comp) {
 }
 
 static Err comp_append_call_norm(
-  Comp *comp, const Sym *callee, bool catch, bool *inlined
+  Comp *comp, const Sym *callee, bool err_mode, bool *inlined
 ) {
   IF_DEBUG(aver(callee->type == SYM_NORM));
 
@@ -837,25 +835,25 @@ static Err comp_append_call_norm(
   try(comp_before_append_call(comp, callee));
 
   if (callee->norm.inlinable) {
-    try(asm_inline_sym(comp, caller, callee, catch));
+    try(asm_inline_sym(comp, caller, callee, err_mode));
     if (inlined) *inlined = true;
   }
   else {
-    try(asm_append_call_norm(comp, caller, callee, catch));
+    try(asm_append_call_norm(comp, caller, callee, err_mode));
     if (inlined) *inlined = false;
   }
 
-  try(comp_after_append_call(comp, caller, callee, catch));
+  try(comp_after_append_call(comp, caller, callee, err_mode));
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool catch) {
+static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool err_mode) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  try(asm_append_call_intrin(comp, caller, callee, catch));
-  try(comp_after_append_call(comp, caller, callee, catch));
+  try(asm_append_call_intrin(comp, caller, callee, err_mode));
+  try(comp_after_append_call(comp, caller, callee, err_mode));
   return nullptr;
 }
 
@@ -867,8 +865,8 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
   try(comp_before_append_call(comp, callee));
   asm_append_call_extern(comp, caller, callee);
 
-  constexpr bool catch = false;
-  try(comp_after_append_call(comp, caller, callee, catch));
+  constexpr bool err_mode = false;
+  try(comp_after_append_call(comp, caller, callee, err_mode));
   return nullptr;
 }
 
@@ -883,14 +881,13 @@ static Err comp_barrier(Comp *comp) {
   const auto   ctx     = &comp->ctx;
   const auto   arg_low = ctx->arg_low;
   const auto   arg_len = ctx->arg_len;
-  const auto   name    = sym->name.buf;
   constexpr U8 ceil    = arr_cap(ctx->reg_vals);
 
   if (arg_low) {
-    return err_args_partial(name, "in control flow", arg_low, arg_len);
+    return err_args_partial(sym, "in control flow", arg_low, arg_len);
   }
   if (arg_len) {
-    return err_args_arity(name, "in control flow", 0, arg_len);
+    return err_args_arity(sym, "in control flow", 0, arg_len);
   }
   for (U8 reg = 0; reg < ceil; reg++) {
     comp_clear_param_reg(comp, reg);
@@ -981,7 +978,12 @@ Examples without and with `try`:
   word2 try { val val }
 */
 static Err comp_append_try(Comp *comp, const Sym *sym) {
-  aver(sym->throws);
+  if (!sym->has_err) {
+    return errf(
+      "in " FMT_QUOTED ": unable to `try`: current word has no error output",
+      sym->name.buf
+    );
+  }
 
   const auto ctx     = &comp->ctx;
   const auto name    = sym->name.buf;
@@ -989,7 +991,7 @@ static Err comp_append_try(Comp *comp, const Sym *sym) {
   const auto arg_len = ctx->arg_len;
 
   if (arg_low) {
-    return err_args_partial(name, "unable to `try`", arg_low, arg_len);
+    return err_args_partial(sym, "unable to `try`", arg_low, arg_len);
   }
 
   if (!arg_len) {
@@ -1009,7 +1011,12 @@ static Err comp_append_try(Comp *comp, const Sym *sym) {
 }
 
 static Err comp_append_throw(Comp *comp, const Sym *sym) {
-  aver(sym->throws);
+  if (!sym->has_err) {
+    return errf(
+      "in " FMT_QUOTED ": unable to `throw`: current word has no error output",
+      sym->name.buf
+    );
+  }
   try(comp_validate_args(comp, "unable to `throw`", 1));
   comp_clear_args(comp);
 

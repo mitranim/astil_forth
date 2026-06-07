@@ -1,5 +1,6 @@
-fun_comp: \ 10 parse { -- } end
-fun_comp: ( 41 parse { -- } end
+1 try_all
+fun_comp: \ { -- err } 10 parse { -- } 0 end
+fun_comp: ( { -- err } 41 parse { -- } 0 end
 
 \ Can use comments now!
 \
@@ -30,58 +31,75 @@ fun: nop end
 \ seeks in the compile-time wordlist.
 
 \ Non-immediate replacement for standard `literal`.
-fun: comp_push { val } ( E: -- val ) comp_next_arg_reg { reg } val reg comp_load end
+fun: comp_push { val -- err } ( E: -- val )
+  comp_next_arg_reg { reg }
+  val reg comp_load
+  0
+end
 
-fun: next_word { wlist -- XT } ( "word" -- XT ) parse_word wlist find_word end
+fun: next_word { wlist -- XT err } ( "word" -- XT )
+  parse_word wlist find_word 0
+end
 
 \ "XT" is short for "execution token".
 \ `xt'` is renamed from standard `'`.
 \ Each execution token is a `Sym*`.
-fun: xt_next { wlist } ( "word" -- ) ( E: -- XT ) wlist next_word comp_push end
-fun:      xt'  {    -- XT } (    "word" -- ) 1 next_word end \ WORDLIST_EXEC
-fun:      xt'' {    -- XT } (    "word" -- ) 2 next_word end \ WORDLIST_COMP
-fun_comp: xt'  ( E: -- XT ) ( C: "word" -- ) 1 xt_next   end \ WORDLIST_EXEC
-fun_comp: xt'' ( E: -- XT ) ( C: "word" -- ) 2 xt_next   end \ WORDLIST_COMP
-
-fun: inline_next { wlist } ( "word" -- ) ( E: <word> )
-  wlist next_word inline_word
+fun: xt_next { wlist -- err } ( "word" -- ) ( E: -- XT )
+  wlist next_word comp_push 0
 end
-fun_comp: inline'  1 inline_next end
-fun_comp: inline'' 2 inline_next end
+
+fun: xt'  { -- XT err } ( "word" -- ) 1 next_word 0 end \ WORDLIST_EXEC
+fun: xt'' { -- XT err } ( "word" -- ) 2 next_word 0 end \ WORDLIST_COMP
+
+fun_comp: xt'  { -- err } ( E: -- XT ) ( C: "word" -- ) 1 xt_next 0 end \ WORDLIST_EXEC
+fun_comp: xt'' { -- err } ( E: -- XT ) ( C: "word" -- ) 2 xt_next 0 end \ WORDLIST_COMP
+
+fun: inline_next { wlist -- err } ( "word" -- ) ( E: <word> )
+  wlist next_word inline_word 0
+end
+
+fun_comp: inline'  { -- err } 1 inline_next 0 end
+fun_comp: inline'' { -- err } 2 inline_next 0 end
 
 \ "execute" is renamed from standard "postpone".
 \ Also see `execute_raw` for raw instruction addresses.
-fun: execute_next { wlist } ( "word" -- ) ( E: <word> )
-  wlist next_word comp_call
+fun: execute_next { wlist -- err } ( "word" -- ) ( E: <word> )
+  wlist next_word comp_call 0
 end
-fun_comp: execute'  1 execute_next end
-fun_comp: execute'' 2 execute_next end
 
-fun: compile_next { wlist } ( "word" -- )
-  wlist next_word comp_push xt' comp_call comp_call
+fun_comp: execute'  { -- err } 1 execute_next 0 end
+fun_comp: execute'' { -- err } 2 execute_next 0 end
+
+fun: compile_next { wlist -- err } ( "word" -- )
+  wlist next_word comp_push xt' comp_call comp_call 0
 end
-fun_comp: compile'  1 compile_next end
-fun_comp: compile'' 2 compile_next end
 
-fun: semicolon execute'' ; end
+fun_comp: compile'  { -- err } 1 compile_next 0 end
+fun_comp: compile'' { -- err } 2 compile_next 0 end
 
-fun: let_init { str len val } ( C: "name" -- ) ( E: -- val )
+fun: semicolon { -- err } execute'' ; 0 end
+
+fun: let_init { str len val -- err } ( C: "name" -- ) ( E: -- val )
   \ Execution-time semantics.
   str len define_fun
-    0 1 comp_signature_set ( E: -- val )
+    0 1 0 comp_signature_set ( -- val )
     val comp_push
   semicolon
 
   \ Compile-time semantics.
   str len define_fun_comp
+    0 try_all
+    0 1 1 comp_signature_set ( -- err )
     val comp_push compile' comp_push
   semicolon
+  0
 end
 
 \ Similar to standard `constant`.
-fun: let: { val } ( C: "name" -- ) ( E: -- val )
+fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   parse_word val let_init
   [ 0 comp_only ]
+  0
 end
 
 0 let: nil
@@ -122,8 +140,13 @@ end
 666    let: ASM_PLACEHOLDER
 
 \ SYNC[asm_reg_interp].
-fun:      ASM_REG_INTERP { -- reg } 28 end
-fun_comp: ASM_REG_INTERP true interp_only ASM_REG_INTERP comp_push end
+fun: ASM_REG_INTERP { -- reg } 28 end
+
+fun_comp: ASM_REG_INTERP { -- err }
+  true interp_only
+  ASM_REG_INTERP comp_push
+  nil
+end
 
 \ Bitwise arithmetic needed for the early stages of the self-assembler.
 
@@ -805,18 +828,20 @@ fun: asm_orr_bit { Xd Xn bit -- instr }
   0b1_01_100100_1_000000_000000_00000_00000 or
 end
 
-fun: asm_comp_cset_reg { cond } ( E: i0 i1 -- bool )
+fun: asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
   0                  comp_clobber
   0 1    asm_cmp_reg comp_instr \ cmp x0, x1
   0 cond asm_cset    comp_instr \ cset x0, <cond>
   1                  comp_args_set
+  nil
 end
 
-fun: asm_comp_cset_zero { cond } ( E: num -- bool )
+fun: asm_comp_cset_zero { cond -- err } ( E: num -- bool )
   0                   comp_clobber
   0      asm_cmp_zero comp_instr \ cmp x0, 0
   0 cond asm_cset     comp_instr \ cset x0, <cond>
   1                   comp_args_set
+  nil
 end
 
 \ sbfm Xd, Xn, immr, imms
@@ -876,20 +901,21 @@ fun: odd { i0 -- bool } i0 1 and end
 \ can be convenient at times. TODO reconsider.
 \
 \ TODO validate there's an input.
-fun: comp_mem_load { size opc }
+fun: comp_mem_load { size opc -- err }
   comp_args_get dec { reg }
   reg comp_clobber
   \ ldr<size> <reg>, [<reg>]
   reg reg 0 size opc asm_load_store_imm comp_instr
+  nil
 end
 
 \ Generically defines a load word for the given size / type.
-fun: load: { size opc } ( C: "name" -- )  ( E: adr -- val )
+fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
   parse_word { str len }
 
   \ Execution-time semantics.
   str len define_fun
-    1 1 comp_signature_set ( E: adr -- val )
+    1 1 false comp_signature_set ( E: adr -- val )
     0 comp_clobber
     0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
     1 comp_args_set
@@ -897,24 +923,28 @@ fun: load: { size opc } ( C: "name" -- )  ( E: adr -- val )
 
   \ Compile-time semantics.
   str len define_fun_comp
+    false try_all
+    0 1 true comp_signature_set
     size     comp_push
     opc      comp_push
     compile' comp_mem_load
   semicolon
 
   [ false comp_only ]
+  nil
 end
 
 \ Generically defines a store word for the given size / type.
 \ Execution-time semantics only. The compiler always inlines.
-fun: store: { size } ( C: "name" -- ) ( E: val adr -- )
+fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
   parse_word define_fun
-    2 0 comp_signature_set
+    2 0 false comp_signature_set
     \ str<size> r0, [x1]
     0 1 0 size 0b00 asm_load_store_imm comp_instr
   semicolon
 
   [ false comp_only ]
+  nil
 end
 
 0b00 0b01 load:  @u8 \ Renamed from standard `c@`.
@@ -1013,18 +1043,20 @@ fun: on!  { adr } true  adr ! end
 \ Not available when running in AOT-compiled mode.
 \
 \ SYNC[interp_stack_offset].
-fun_comp: STACK ( E: -- adr )
+fun_comp: STACK { -- err } ( E: -- adr )
   \ mov <arg>, x28
   comp_next_arg_reg ASM_REG_INTERP asm_mov_reg comp_instr
   true interp_only
+  nil
 end
 
 fun: STACK { -- adr } STACK end
 
-fun: comp_load_off { off } ( E: adr -- adr )
+fun: comp_load_off { off -- err } ( E: adr -- adr )
   0 comp_clobber
   0 0 off asm_load_unscaled_off comp_instr \ ldur x0, [x0, <off>]
   1 comp_args_set
+  nil
 end
 
 \ Note: `stack_top` is the top EMPTY cell, not a full one.
@@ -1122,56 +1154,65 @@ fun: >s { val stack } [
 
 \ ## System stack stuff
 
-fun_comp: systack_ptr ( E: -- sp )
-  comp_next_arg_reg ASM_REG_SP 0 asm_add_imm comp_instr
+fun_comp: systack_ptr { -- err } ( E: -- sp )
   \ add <reg>, sp, 0 | mov <reg>, sp
+  comp_next_arg_reg ASM_REG_SP 0 asm_add_imm comp_instr
+  nil
 end
 
 fun: systack_ptr { -- sp } systack_ptr end
 
-fun_comp: sysstack_frame_ptr ( E: -- fp )
-  comp_next_arg_reg ASM_REG_FP asm_mov_reg comp_instr
+fun_comp: sysstack_frame_ptr { -- err } ( E: -- fp )
   \ mov <reg>, x29
+  comp_next_arg_reg ASM_REG_FP asm_mov_reg comp_instr
+  nil
 end
 
 fun: sysstack_frame_ptr { -- fp } sysstack_frame_ptr end
 
 \ ## Characters and strings
 
-fun: parse_char { -- char } parse_word { buf -- } buf @u8 end
+fun: parse_char { -- char err } parse_word { buf -- } buf @u8 nil end
 
-fun: char' { -- char } ( E: "str" -- char ) parse_char end
+fun: char' { -- char err } ( E: "str" -- char ) parse_char nil end
 
-fun_comp: char' ( C: "str" -- ) ( E: -- char )
+fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
   parse_char        { char }
   comp_next_arg_reg { reg }
   char reg comp_load
+  nil
 end
 
-fun: parse_str  { -- cstr len } char' " parse end
-fun: parse_cstr { -- cstr     } parse_str { cstr -- } cstr end
+fun: parse_str  { -- cstr len err } char' " parse nil end
+fun: parse_cstr { -- cstr err     } parse_str { cstr -- } cstr nil end
 
 \ The parser ensures null-termination of the given string.
-fun: comp_str { buf len } ( E: -- cstr len )
+fun: comp_str { buf len -- err } ( E: -- cstr len )
   len inc            { cap } \ Reserve terminating null byte.
   buf cap alloc_data { adr }
   comp_next_arg_reg  { RS }
   comp_next_arg_reg  { RL }
   adr RS comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
   len RL comp_load      \ ldr RL, <len>
+  nil
 end
 
 \ Compilation semantics of standard `s"`.
-fun: parse_comp_str ( C: "str" -- ) ( E: -- cstr len ) parse_str comp_str end
+fun: parse_comp_str { -- err } ( C: "str" -- ) ( E: -- cstr len )
+  parse_str comp_str nil
+end
 
-fun: comp_cstr { buf len } ( E: -- cstr )
+fun: comp_cstr { buf len -- err } ( E: -- cstr )
   len inc            { cap } \ Reserve terminating null byte.
   buf cap alloc_data { adr }
   comp_next_arg_reg  { reg }
   adr reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
+  nil
 end
 
-fun: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr end
+fun: parse_comp_cstr { -- err } ( C: "str" -- ) ( E: -- cstr )
+  parse_str comp_cstr nil
+end
 
 \ Parses the input until the terminating quote, and returns the address and
 \ length of the resulting string. In interpretation mode, the string buffer
@@ -1179,29 +1220,37 @@ fun: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr end
 \ until the next `parse` invocation. In compilation mode, the string buffer
 \ is statically allocated and unique. The string is always null-terminated,
 \ and can be safely passed to many `libc` functions by pointer alone.
-fun:      s" { -- cstr len } ( E: "str" -- cstr len ) char { -- } parse_str      end
-fun_comp: s" ( C: "str" -- ) ( E: -- cstr len )       char { -- } parse_comp_str end
+fun: s" { -- cstr len err } ( E: "str" -- cstr len )
+  char { -- } parse_str nil
+end
+fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- cstr len )
+  char { -- } parse_comp_str nil
+end
 
 \ C-style string literal. Like `s"` but returns only the address
 \ without the length. The string is always null-terminated.
-fun:      " { -- cstr }     ( E: "str" -- cstr ) char { -- } parse_cstr      end
-fun_comp: " ( C: "str" -- ) ( E: -- cstr )       char { -- } parse_comp_cstr end
+fun: " { -- cstr err } ( E: "str" -- cstr )
+  char { -- } parse_cstr nil
+end
+fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr )
+  char { -- } parse_comp_cstr nil
+end
 
 \ ## External functions and symbols
 
 \ Finds an extern symbol by name and declares it as a function.
-fun: extern: { inp_len out_len } ( C: "name" -- ) ( E: …inps -- …outs )
-  parse_word inp_len out_len extern_fun
+fun: extern: { inp_len out_len -- err } ( C: "name" -- ) ( E: …inps -- …outs )
+  parse_word inp_len out_len extern_fun nil
 end
 
 \ Finds an extern symbol by name and returns its address.
-fun_comp: extern_adr' ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_extern_adr
+fun_comp: extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_extern_adr nil
 end
 
 \ Indirect version of `extern_adr'`: compiles its usage into another word.
-fun_comp: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_str compile' comp_extern_adr
+fun_comp: comp_extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
+  parse_word comp_str compile' comp_extern_adr nil
 end
 
 \ ## Memory
@@ -1256,13 +1305,14 @@ fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
 \ So in practice, it doesn't really declare.
 \
 \ SYNC[asm_local_addressing].
-fun_comp: ref' ( C: "name" -- ) ( E: -- adr )
+fun_comp: ref' { -- err } ( C: "name" -- ) ( E: -- adr )
   parse_word comp_local_named comp_local_off { off }
   comp_next_arg_reg { reg }
   reg ASM_REG_FP off asm_add_imm comp_instr \ add <reg>, FP, <off>
+  nil
 end
 
-fun: comp_clobber_params
+fun: comp_clobber_params { -- err }
   0 comp_clobber \ x0
   1 comp_clobber \ x1
   2 comp_clobber \ x2
@@ -1271,9 +1321,10 @@ fun: comp_clobber_params
   5 comp_clobber \ x5
   6 comp_clobber \ x6
   7 comp_clobber \ x7
+  nil
 end
 
-fun: comp_clobber_scratch
+fun: comp_clobber_scratch { -- err }
   8  comp_clobber \ x8
   9  comp_clobber \ x9
   10 comp_clobber \ x10
@@ -1282,13 +1333,15 @@ fun: comp_clobber_scratch
   13 comp_clobber \ x13
   14 comp_clobber \ x14
   15 comp_clobber \ x15
+  nil
 end
 
 \ External calls are assumed to clobber all caller-saved GPRs.
 \ This is used when compiling words which call external funcs.
-fun: comp_clobber_volatile
+fun: comp_clobber_volatile { -- err }
   comp_clobber_params
   comp_clobber_scratch
+  nil
 end
 
 \ ## Variables, buffers, extern vars
@@ -1300,38 +1353,45 @@ end
 \
 \ Used for taking an address of a data entry
 \ in the code heap allocated via `alloc_data`.
-fun: comp_next_page_addr { adr } ( E: -- adr )
+fun: comp_next_page_addr { adr -- err } ( E: -- adr )
   comp_next_arg_reg { reg }
   adr reg comp_page_addr
+  nil
 end
 
-fun: init_data_word { name name_len adr }
+fun: init_data_word { name name_len adr -- err }
   name name_len define_fun
-    0 1 comp_signature_set ( E: -- ptr )
+    0 1 false comp_signature_set ( E: -- ptr )
     adr comp_next_page_addr
   semicolon
 
   name name_len define_fun_comp
+    false try_all
+    0 1 true comp_signature_set
     adr comp_push compile' comp_next_page_addr
   semicolon
+
+  nil
 end
 
-fun: var_init { str len val }
+fun: var_init { str len val -- err }
   nil CELL alloc_data { adr }
   val adr !
   str len adr init_data_word
+  nil
 end
 
 \ Similar to standard `variable`, but takes an initial value like `let:`.
-fun: var: { val } ( C: "name" -- ) ( E: -- ptr )
-  parse_word val var_init [ false comp_only ]
+fun: var: { val -- err } ( C: "name" -- ) ( E: -- ptr )
+  parse_word val var_init nil [ false comp_only ]
 end
 
-fun: comp_buf { adr cap } ( E: -- adr cap )
+fun: comp_buf { adr cap -- err } ( E: -- adr cap )
   comp_next_arg_reg { RA }
   comp_next_arg_reg { RL }
   adr RA comp_page_addr
   cap RL comp_load
+  nil
 end
 
 \ Similar to the standard idiom `create <name> N allot`.
@@ -1349,30 +1409,34 @@ end
 \ The address CHANGES from JIT to AOT. This means: it must not be
 \ stored in another static variable, or used to derive an address
 \ which would be stored in another static variable.
-fun: buf: { cap } ( C: "name" -- ) ( E: -- adr cap )
+fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
   parse_word { str len }
   nil cap alloc_data { adr }
 
   str len define_fun
-    0 2 comp_signature_set ( E: -- ptr cap )
+    0 2 false comp_signature_set ( E: -- ptr cap )
     adr cap comp_buf
   semicolon
 
   str len define_fun_comp
+    false try_all
+    0 1 true comp_signature_set
     adr comp_push cap comp_push compile' comp_buf
   semicolon
 
   [ false comp_only ]
+  nil
 end
 
 \ Shortcut for the standard idiom `create <name> N allot`.
 \ Unlike the standard idiom, this also zeroes the memory.
 \ Like `buf:` but doesn't return capacity.
 \ Also see `buf:` for warnings about AOT.
-fun: mem: { cap } ( C: "name" -- ) ( E: -- adr )
+fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- adr )
   nil cap alloc_data { adr }
   parse_word adr init_data_word
   [ false comp_only ]
+  nil
 end
 
 \ Shortcut for creating string "constants". Typical use:
@@ -1382,11 +1446,12 @@ end
 \
 \ Reason: literal strings in root scope are transient.
 \ They always refer to the start of the reader buffer.
-fun: str: { str }
+fun: str: { str -- err }
   str strlen inc { cap }
   str cap alloc_data { adr }
   parse_word adr init_data_word
   [ false comp_only ]
+  nil
 end
 
 \ ## IO
@@ -1407,14 +1472,21 @@ end
 CR CRLF     !8 \ \r
 LF CRLF inc !8 \ \n
 
-fun:      stdin {    -- adr } extern_adr'      __stdinp @ end
-fun_comp: stdin ( E: -- adr ) comp_extern_adr' __stdinp execute'' @ end
+fun: stdin  { -- adr } extern_adr' __stdinp  @ end
+fun: stdout { -- adr } extern_adr' __stdoutp @ end
+fun: stderr { -- adr } extern_adr' __stderrp @ end
 
-fun:      stdout {    -- adr } extern_adr'      __stdoutp @ end
-fun_comp: stdout ( E: -- adr ) comp_extern_adr' __stdoutp execute'' @ end
+fun_comp: stdin { -- err } ( E: -- adr )
+  comp_extern_adr' __stdinp execute'' @ nil
+end
 
-fun:      stderr {    -- adr } extern_adr'      __stderrp @ end
-fun_comp: stderr ( E: -- adr ) comp_extern_adr' __stderrp execute'' @ end
+fun_comp: stdout { -- err } ( E: -- adr )
+  comp_extern_adr' __stdoutp execute'' @ nil
+end
+
+fun_comp: stderr { -- err } ( E: -- adr )
+  comp_extern_adr' __stderrp execute'' @ nil
+end
 
 4 1 extern: fread            ( buf size len file -- len        )
 4 1 extern: fwrite           ( buf size len file -- len        )
@@ -1481,77 +1553,91 @@ fun: fprint { str len file } str 1 len file fwrite   { -- } end
 \ popping multiple control frames in a chain. We terminate such
 \ chains by prepending a `nop` XT.
 
-fun: pop_execute STACK s> execute end
-fun: reserve_instr ASM_PLACEHOLDER comp_instr end
-fun: reserve_here {     -- adr } here_write { out } ASM_PLACEHOLDER comp_instr out end
-fun: off_to_pc    { adr -- off } here_write             adr - end \ For forward jumps.
-fun: off_from_pc  { adr -- off } here_write { out } adr out - end \ For backward jumps.
-fun: patch_branch_forward { adr } adr off_to_pc   asm_branch adr !32 end \ b <off>
-fun: patch_branch_back    { adr } adr off_from_pc asm_branch adr !32 end \ b <off>
+fun: pop_execute { -- err } STACK s> execute nil end
+fun: reserve_instr { -- err } ASM_PLACEHOLDER comp_instr nil end
 
-fun: if_pop_from { stack } ( C: prev_fun if_adr  -- )
+fun: reserve_here { -- adr err }
+  here_write { out } ASM_PLACEHOLDER comp_instr out nil
+end
+
+\ For forward jumps.
+fun: off_to_pc { adr -- off err } here_write adr - nil end
+
+\ For backward jumps.
+fun: off_from_pc { adr -- off err } here_write { out } adr out - nil end
+
+ \ b <off>
+fun: patch_branch_forward { adr -- err } adr off_to_pc asm_branch adr !32 nil end
+
+ \ b <off>
+fun: patch_branch_back { adr -- err } adr off_from_pc asm_branch adr !32 nil end
+
+fun: if_pop_from { stack -- err } ( C: prev_fun if_adr  -- )
   comp_barrier \ Clobber / relocate locals.
   stack s>      { adr }
   adr off_to_pc { off }
   0 off asm_cmp_branch_zero adr !32 \ cbz x0, <else|end>
   stack s> execute
+  nil
 end
 
-fun: ifn_pop_from { stack } ( C: prev_fun ifn_adr -- )
+fun: ifn_pop_from { stack -- err } ( C: prev_fun ifn_adr -- )
   comp_barrier
   stack s>      { adr }
   adr off_to_pc { off }
   0 off asm_cmp_branch_not_zero adr !32 \ cbnz x0, <else|end>
   stack s> execute
+  nil
 end
 
-fun: if_pop  STACK if_pop_from  end
-fun: ifn_pop STACK ifn_pop_from end
+fun: if_pop  { -- err } STACK if_pop_from  nil end
+fun: ifn_pop { -- err } STACK ifn_pop_from nil end
 
 \ TODO: define more variants like `=if` with fewer instructions.
-fun_comp: if ( C: -- nop adr fun ) ( E: pred -- )
+fun_comp: if { -- err } ( C: -- nop adr fun ) ( E: pred -- )
   " when calling `if`" 1 comp_args_valid 0 comp_args_set
-
   comp_barrier
   xt' nop      STACK >s \ Terminate the `end` pop-chain.
   reserve_here STACK >s
   xt' if_pop   STACK >s
+  nil
 end
 
-fun_comp: ifn ( C: -- nop adr fun ) ( E: pred -- )
+fun_comp: ifn { -- err } ( C: -- nop adr fun ) ( E: pred -- )
   " when calling `ifn`" 1 comp_args_valid 0 comp_args_set
-
   comp_barrier
   xt' nop      STACK >s
   reserve_here STACK >s
   xt' ifn_pop  STACK >s
+  nil
 end
 
-fun: else_pop_from { stack } ( C: prev_fun else_adr -- )
+fun: else_pop_from { stack -- err } ( C: prev_fun else_adr -- )
   comp_barrier
   stack s> patch_branch_forward
   stack s> execute
+  nil
 end
 
-fun: else_pop STACK else_pop_from end
+fun: else_pop { -- err } STACK else_pop_from nil end
 
-fun_comp: elif ( C: -- adr fun ) ( E: pred -- )
+fun_comp: elif { -- err } ( C: -- adr fun ) ( E: pred -- )
   " when calling `elif`" 1 comp_args_valid 0 comp_args_set
-
   comp_barrier
   reserve_here STACK >s
   xt' if_pop   STACK >s
+  nil
 end
 
-fun_comp: elifn ( C: -- adr fun ) ( E: pred -- )
+fun_comp: elifn { -- err } ( C: -- adr fun ) ( E: pred -- )
   " when calling `elifn`" 1 comp_args_valid 0 comp_args_set
-
   comp_barrier
   reserve_here STACK >s
   xt' ifn_pop  STACK >s
+  nil
 end
 
-fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
+fun_comp: else { -- err } ( C: if_adr if_fun -- else_adr else_fun )
   " when calling `else`" 0 comp_args_valid
   comp_barrier \ Clobber / relocate locals.
   reserve_here { else_adr }
@@ -1564,15 +1650,17 @@ fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
   if_fun       execute
   else_adr     STACK >s
   xt' else_pop STACK >s
+  nil
 end
 
-fun: switch_pop ( C: next_pop val_loc -- )
+fun: switch_pop { -- err } ( C: next_pop val_loc -- )
   comp_barrier
   STACK stack_drop_cell
   pop_execute
+  nil
 end
 
-fun_comp: switch ( C: -- nop val_loc switch_pop ) ( E: val -- )
+fun_comp: switch { -- err } ( C: -- nop val_loc switch_pop ) ( E: val -- )
   " when calling `switch`" 1 comp_args_valid 0 comp_args_set
 
   comp_local_anon { val_loc }
@@ -1581,9 +1669,10 @@ fun_comp: switch ( C: -- nop val_loc switch_pop ) ( E: val -- )
   xt' nop        STACK >s
   val_loc        STACK >s
   xt' switch_pop STACK >s
+  nil
 end
 
-fun: case_pop
+fun: case_pop { -- err }
   ( C: val_loc switch_pop case_adr -- adr_end else_pop val_loc switch_pop )
 
   comp_barrier
@@ -1599,9 +1688,10 @@ fun: case_pop
   xt' else_pop STACK >s
   val_loc      STACK >s
   switch_pop   STACK >s
+  nil
 end
 
-fun_comp: case
+fun_comp: case { -- err }
   ( C: val_loc switch_pop -- val_loc switch_pop case_adr case_pop )
   ( E: pred -- )
 
@@ -1618,6 +1708,7 @@ fun_comp: case
   switch_pop   STACK >s
   reserve_here STACK >s  \ b.ne <case_end>
   xt' case_pop STACK >s
+  nil
 end
 
 \ ## Types
@@ -1643,7 +1734,7 @@ end
 \ Most of the time size and alignment should be accessed via the
 \ `sizeof'` and `alignof'` shortcuts, which inline the values at
 \ compile time, without loading the type descriptors at runtime.
-fun: def_type { name name_len size align }
+fun: def_type { name name_len size align -- err }
   name_len inc       { name_cap }
   2 cells name_cap + { type_size }
 
@@ -1660,38 +1751,39 @@ fun: def_type { name name_len size align }
   name name_len type init_data_word
 
   [ false comp_only ]
+  nil
 end
 
-fun: int: { size } ( C: "name" -- ) ( E: -- type )
-  parse_word size size def_type
+fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
+  parse_word size size def_type nil
 end
 
-fun: opaque: { size align } ( C: "name" -- ) ( E: -- type )
-  parse_word size align def_type
+fun: opaque: { size align -- err } ( C: "name" -- ) ( E: -- type )
+  parse_word size align def_type nil
 end
 
 fun: sizeof { type -- size } type @ end
 
-fun: sizeof' { -- size } ( C: "type" -- )
-  WORDLIST_EXEC next_word execute STACK s> sizeof
+fun: sizeof' { -- size err } ( C: "type" -- )
+  WORDLIST_EXEC next_word execute STACK s> sizeof nil
 end
 
-fun_comp: sizeof' ( C: "type" -- ) ( E: -- size )
-  execute' sizeof' comp_push
+fun_comp: sizeof' { -- err } ( C: "type" -- ) ( E: -- size )
+  execute' sizeof' comp_push nil
 end
 
 fun: alignof { type -- align } type +cell @ end
 
-fun: alignof' { -- align } ( C: "type" -- )
-  WORDLIST_EXEC next_word execute STACK s> alignof
+fun: alignof' { -- align err } ( C: "type" -- )
+  WORDLIST_EXEC next_word execute STACK s> alignof nil
 end
 
-fun_comp: alignof' ( C: "type" -- ) ( E: -- align )
-  execute' alignof' comp_push
+fun_comp: alignof' { -- err } ( C: "type" -- ) ( E: -- align )
+  execute' alignof' comp_push nil
 end
 
-fun_comp: alloca' ( C: "type" -- ) ( E: -- adr )
-  execute'' sizeof' execute'' alloca
+fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
+  execute'' sizeof' execute'' alloca nil
 end
 
 \ ### Integer types
@@ -1738,10 +1830,11 @@ end
 \   Elem_type 32 arr:   Some_arr
 \   Elem_type 32 field: Some_field
 \   Some_arr  1  field: Some_field
-fun: arr: { type len -- } ( C: "name" -- ) ( E: -- type )
+fun: arr: { type len -- err } ( C: "name" -- ) ( E: -- type )
   type sizeof len * { size }
   type alignof      { align }
   parse_word size align def_type
+  nil
 end
 
 \ ### Struct types
@@ -1779,7 +1872,7 @@ end
 \ must be loaded and stored using dedicated typed operators.
 
 \ For internal use, invoked by `end`.
-fun: struct_pop ( C: name name_len align off -- )
+fun: struct_pop { -- err } ( C: name name_len align off -- )
   STACK s> { off }
   STACK s> { align }
   STACK s> { name_len }
@@ -1790,26 +1883,28 @@ fun: struct_pop ( C: name name_len align off -- )
   name free
 
   [ false comp_only ]
+  nil
 end
 
 \ Begins a definition; terminate with `end`.
-fun: struct: { -- str len align off fun } ( C: "name" -- ) ( E: -- size )
+fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
   parse_word      { str len }
   str len strndup { str }
   xt' struct_pop  { fun }
-  str len 0 0 fun
+  str len 0 0 fun nil
 end
 
 \ Compile field access: compute offset from address.
-fun: struct_field_comp { off }
+fun: struct_field_comp { off -- err }
   comp_args_get { len }
   len ifn " struct field must be preceded by struct pointer" throw end
-  off ifn ret end
+  off ifn nil ret end
 
   \ Offset is computed into the same register that held the address.
   len dec { reg }
   reg                     comp_clobber \ Disassociate locals from this reg.
   reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
+  nil
 end
 
 \ Every field takes two inputs: type decl, like `U8`, and element count.
@@ -1821,7 +1916,7 @@ end
 \ their size and type. For example, signed 32-bit integers `S32` must
 \ be stored with `!32` and loaded with `@s32`, which sign-extends the
 \ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
-fun: field: { max_align off fun type len -- align off_next fun }
+fun: field: { max_align off fun type len -- align off_next fun err }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
 
@@ -1835,23 +1930,21 @@ fun: field: { max_align off fun type len -- align off_next fun }
 
   \ Execution-time semantics.
   name name_len define_fun
-    1 1 comp_signature_set ( E: struct_adr -- field_adr )
+    1 1 false comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
-    field_off if
-      field_off comp_push
-      compile' +
-    end
+    field_off if field_off comp_push compile' + end
   semicolon
 
   \ Compile-time semantics.
   name name_len define_fun_comp
-    field_off comp_push
-    compile' struct_field_comp
+    false try_all
+    0 1 true comp_signature_set
+    field_off comp_push compile' struct_field_comp
   semicolon
 
   type sizeof len * field_off + { off_next }
   max_align field_align max     { max_align }
-  max_align off_next fun
+  max_align off_next fun nil
 
   [ false comp_only ]
 end
@@ -1873,7 +1966,7 @@ end
 \ Should NOT be used for addresses returned by the `mmap`.
 \ Its error sentinel is 64-bit -1. The returned address
 \ may accidentally have the `int32` sign bit set.
-fun: is_err { int -- bool } int int_to_cell -1 = end
+fun: is_err_flag { int -- bool } int int_to_cell -1 = end
 
 6 1 extern: mmap     ( adr size pflag mflag fd off -- adr )
 2 1 extern: munmap   ( adr size )
@@ -1886,22 +1979,24 @@ fun: is_err { int -- bool } int int_to_cell -1 = end
 2     let: MAP_PRIVATE
 4096  let: MAP_ANON
 
-fun: mem_map { size pflag -- addr }
+fun: mem_map { size pflag -- addr err }
   MAP_ANON MAP_PRIVATE or { mflag }
   0 size pflag mflag -1 0 mmap { addr }
   addr -1 = if " unable to mmap" throw end
-  addr
+  addr nil
 end
 
-fun: mem_unmap { addr size }
+fun: mem_unmap { addr size -- err }
   addr size munmap
-  is_err if " unable to munmap" throw end
+  is_err_flag if " unable to munmap" throw end
+  nil
 end
 
-fun: mem_unprot { addr size }
+fun: mem_unprot { addr size -- err }
   PROT_READ PROT_WRITE or { pflag }
   addr size pflag mprotect
-  is_err if " unable to mprotect" throw end
+  is_err_flag if " unable to mprotect" throw end
+  nil
 end
 
 \ ## Stacks continued
@@ -1924,7 +2019,7 @@ end
 \
 \ This is the preferred way to acquire memory pages from the OS.
 \ Size is counted in bytes; to allocate cells, use `size cells`.
-fun: stack_init { size stack }
+fun: stack_init { size stack -- err }
   size PAGE_SIZE align_up   { size }
   PAGE_SIZE 1 lsl size +    { bytelen } \ + space for 2 guards
   bytelen PROT_NONE mem_map { cellar }
@@ -1937,10 +2032,11 @@ fun: stack_init { size stack }
   floor   stack Stack_floor   !
   floor   stack Stack_top     !
   ceil    stack Stack_ceil    !
+  nil
 end
 
-fun: stack_deinit { stack }
-  stack ifn ret end
+fun: stack_deinit { stack -- err }
+  stack ifn nil ret end
 
   stack Stack_bytelen @ { bytelen }
   stack Stack_cellar  @ { cellar }
@@ -1952,6 +2048,7 @@ fun: stack_deinit { stack }
   nil stack Stack_floor   !
   nil stack Stack_top     !
   nil stack Stack_ceil    !
+  nil
 end
 
 \ Redefine to skip nil stack.
@@ -1972,10 +2069,11 @@ fun: stack_repr { stack }
 end
 
 \ For JIT use only. TODO: AOT compatibility.
-fun: stack: { size } ( C: "name" -- ) ( E: -- stack )
+fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
   sizeof' Stack malloc { adr }
   size adr stack_init
   adr execute' let:
+  nil
 end
 
 \ ## Loops
@@ -2013,19 +2111,20 @@ end
 \ is often shortened to `<loop_prev>`.
 0 var: LOOP_IND
 
-fun: loop_frame_adr { -- adr }
+fun: loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
   frame ifn " missing loop frame" throw end
-  frame STACK stack_cell_at
+  frame STACK stack_cell_at nil
 end
 
-fun: loop_frame_pop
+fun: loop_frame_pop { -- err }
   ( LOOP_AUX: …aux…         -- )
   ( C:        prev_loop_ind -- )
 
   comp_barrier
   LOOP_AUX s> execute    \ Pop all auxiliaries until a terminating `nop`.
   STACK    s> LOOP_IND !
+  nil
 end
 
 fun: loop_frame_init
@@ -2041,62 +2140,68 @@ fun: loop_frame_init
   xt' nop LOOP_AUX >s
 end
 
-fun: loop_back { adr }
+fun: loop_back { adr -- err }
   comp_barrier                          \ Clobber / relocate locals.
   adr off_from_pc asm_branch comp_instr \ b <beg>
+  nil
 end
 
 \ Pops the "base" loop frame described in comment for `LOOP_IND`.
 \ Loops which push larger frames simply pop-off extra data first.
-fun: loop_base_pop
+fun: loop_base_pop { -- err }
   ( LOOP_AUX: …aux…                -- )
   ( C:        <loop_prev> loop_beg -- )
   comp_barrier
   STACK s> loop_back \ b <beg>
   STACK s> execute   \ Run `loop_frame_pop`.
+  nil
 end
 
-fun_comp: loop ( C: -- <loop_prev> loop_beg loop_pop )
+fun_comp: loop { -- err } ( C: -- <loop_prev> loop_beg loop_pop )
   comp_barrier \ Clobber / relocate locals.
   loop_frame_init
   here_write        STACK >s
   xt' loop_base_pop STACK >s
+  nil
 end
 
-fun: leave_pop LOOP_AUX else_pop_from end
+fun: leave_pop { -- err } LOOP_AUX else_pop_from nil end
 
 \ Breaks out of any loop.
-fun_comp: leave ( LOOP_AUX: -- leave_adr leave_pop )
+fun_comp: leave { -- err } ( LOOP_AUX: -- leave_adr leave_pop )
   comp_barrier \ Clobber / relocate locals.
   reserve_here  LOOP_AUX >s
   xt' leave_pop LOOP_AUX >s
+  nil
 end
 
-fun: while_pop LOOP_AUX if_pop_from end
+fun: while_pop { -- err } LOOP_AUX if_pop_from nil end
 
 \ Breaks out of any loop.
-fun_comp: while ( LOOP_AUX: -- while_adr while_pop )
+fun_comp: while { -- err } ( LOOP_AUX: -- while_adr while_pop )
   " when calling `while`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   reserve_here  LOOP_AUX >s
   xt' while_pop LOOP_AUX >s
+  nil
 end
 
 \ Goes back to loop start.
-fun_comp: cont loop_frame_adr @ loop_back end \ b <beg>
+fun_comp: cont { -- err } loop_frame_adr @ loop_back nil end \ b <beg>
 
 \ Like regular Forth `until`, but usable with any loop.
 \ Alternative loop terminator; replaces `end`. Example:
 \
 \   loop false until
-fun_comp: until ( C: fun -- )
+fun_comp: until { -- err } ( C: fun -- )
   " when calling `until`" 1 comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   0 8 asm_cmp_branch_not_zero comp_instr \ cbnz x0, 8
   pop_execute
+  nil
 end
 
-fun: loop_pop_with_cond
+fun: loop_pop_with_cond { -- err }
   ( LOOP_AUX: …aux… -- )
   ( C: <loop_prev> loop_beg cond_adr asm_cond -- )
   STACK s> { asm_cond }
@@ -2107,6 +2212,7 @@ fun: loop_pop_with_cond
 
   \ Retropatch `b.<cond> <end>`.
   cond_adr off_to_pc asm_cond asm_branch_cond cond_adr !32
+  nil
 end
 
 fun: loop_init_with_cond { loop_beg cond_adr asm_cond }
@@ -2125,7 +2231,7 @@ fun: loop_init_countup { loop_beg cond_adr }
 end
 
 fun: for_loop_countdown_init
-  { cur }
+  { cur -- err }
   ( C: -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
@@ -2142,6 +2248,7 @@ fun: for_loop_countdown_init
   here_write { cond_adr } reserve_instr \ b.lt <end>
 
   loop_beg cond_adr loop_init_countdown
+  nil
 end
 
 \ A count-down-by-one loop with the range `[0,ceil)`.
@@ -2157,12 +2264,13 @@ end
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
-fun_comp: for
+fun_comp: for { -- err }
   ( C: -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
   " when calling `for`" 1 comp_args_valid 0 comp_args_set
   comp_local_anon for_loop_countdown_init
+  nil
 end
 
 \ Like `for` but requires a local name to make the index
@@ -2172,19 +2280,20 @@ end
 \   -for: ind
 \     ind .
 \   end
-fun_comp: -for:
+fun_comp: -for: { -- err }
   ( C: "name" -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
   " when calling `-for:`" 1 comp_args_valid 0 comp_args_set
   parse_word comp_local_named for_loop_countdown_init
+  nil
 end
 
 \ Count-up loop with the range `[floor,ceil)`. Usage:
 \
 \   ceil floor +for: ind       end
 \   123  45    +for: ind ind . end
-fun_comp: +for:
+fun_comp: +for: { -- err }
   ( C: "name" -- <loop_prev> loop_beg cond_adr asm_cond loc_cur loop_pop )
   ( E: ceil floor -- )
   " when calling `+for:`" 2 comp_args_valid 0 comp_args_set
@@ -2207,10 +2316,11 @@ fun_comp: +for:
   here_write { cond_adr } reserve_instr \ b.le <end>
 
   loop_beg cond_adr loop_init_countup
+  nil
 end
 
 \ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
-fun_comp: -loop:
+fun_comp: -loop: { -- err }
   ( C: "name" -- <loop_prev> loop_beg cond_adr asm_cond loop_pop )
   ( E: ceil floor step -- )
   ( LOOP_AUX: -- nop )
@@ -2236,6 +2346,7 @@ fun_comp: -loop:
   here_write { cond_adr } reserve_instr \ b.lt <end>
 
   loop_beg cond_adr loop_init_countdown
+  nil
 end
 
 \ Similar to the standard `?do ... +loop`, but terminated with an `end`
@@ -2248,7 +2359,7 @@ end
 \ holding a value which is out of range. For example, if
 \ `ceil floor step` is `7 3 2`, the loop iterates twice,
 \ with indexes `3` and `5`, and the index outside is `8`.
-fun_comp: +loop:
+fun_comp: +loop: { -- err }
   ( C: "name" -- <loop_prev> loop_beg cond_adr loc_cur loc_step loop_pop )
   ( E: ceil floor step -- )
   " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
@@ -2273,6 +2384,7 @@ fun_comp: +loop:
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here_write { cond_adr } reserve_instr \ b.le <end>
   loop_beg cond_adr loop_init_countup
+  nil
 end
 
 \ ## String comparison continued
@@ -2306,7 +2418,7 @@ ERR_CAP mem: ERR_BUF_1
 \ `floor` is the count of non-vargs preceding vargs.
 \ The layout is always `( …non-vargs… …vargs… )`.
 \ `diff` must be passed to `comp_va_end`.
-fun: comp_va_beg { floor -- diff }
+fun: comp_va_beg { floor -- diff err }
   comp_args_get           { ceil }
   ceil floor - 2 align_up { diff }
   diff floor +            { ceil }
@@ -2319,15 +2431,16 @@ fun: comp_va_beg { floor -- diff }
   end
 
   floor comp_args_set
-  diff
+  diff nil
 end
 
 \ Short for "compile variadic arguments end".
-fun: comp_va_end { len }
+fun: comp_va_end { len -- err }
   len if
     len cells 16 align_up { off }
     ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
   end
+  nil
 end
 
 \ Sets up variadic arguments following the C ABI. Usage example:
@@ -2338,15 +2451,19 @@ end
 \
 \ Caution: vargs can only be used in direct calls to variadic functions.
 \ Indirect calls DO NOT WORK because stack pointer is changed by calls.
-fun_comp: vargs{ ( C: -- len ) ( E: <systack_push> ) 0 comp_va_beg STACK >s end
+fun_comp: vargs{ { -- err } ( C: -- len ) ( E: <systack_push> )
+  0 comp_va_beg STACK >s nil
+end
 
 \ Restores the SP after a variadic call. See `vargs{`.
-fun_comp: }vargs ( C: len -- ) ( E: <systack_pop> ) STACK s> comp_va_end end
+fun_comp: }vargs { -- err } ( C: len -- ) ( E: <systack_pop> )
+  STACK s> comp_va_end nil
+end
 
 \ Prepends `pre_len` args to current args. Inputs are passed on the control
 \ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
-fun: comp_args_prepend { pre_len } ( …pre… -- )
-  pre_len ifn ret end
+fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
+  pre_len ifn nil ret end
 
   comp_args_get      { post_len }
   post_len pre_len + { arg_len }
@@ -2368,16 +2485,18 @@ fun: comp_args_prepend { pre_len } ( …pre… -- )
   end
 
   arg_len comp_args_set
+  nil
 end
 
-fun_comp: logf ( E: fmt …vargs… -- )
+fun_comp: logf { -- err } ( E: fmt …vargs… -- )
   1 comp_va_beg { len }
   compile' printf
   len comp_va_end
   0 comp_args_set
+  nil
 end
 
-fun_comp: elogf ( E: fmt …vargs… -- )
+fun_comp: elogf { -- err } ( E: fmt …vargs… -- )
   1 comp_va_beg { len }
 
   xt'' stderr STACK >s
@@ -2387,51 +2506,59 @@ fun_comp: elogf ( E: fmt …vargs… -- )
 
   len comp_va_end
   0 comp_args_set
+  nil
 end
 
-\ ## Exceptions
+\ ## Errors
 \
-\ The compiler provides the following exception intrinsics:
+\ The compiler provides the following error-related intrinsics:
 \ - `try`
 \ - `throw`
 \ - `catch`
-\ - `catches`
+\ - `try_all`
 \
-\ At the ABI level, each exception is an additional return value.
-\ An exception is placed into the next output parameter register
-\ immediately following the last regular output value, similarly
-\ to how errors are returned in Go. Unlike Go, we implicitly use
-\ exception semantics for errors. By default, when a word throws,
-\ the returned error is implicitly re-thrown in the caller. This
-\ behavior can be suppressed with `catch'`, which simply reveals
-\ the error value, and avoids emitting the "try" instructions.
+\ Errors are plain outputs, always explicitly declared in signatures.
+\ By convention, if the last output parameter is named exactly `err`,
+\ the compiler marks that word as having an error; see `Sym_has_err`.
 \
-\ We also support blanket implicit catch via the `catches` annotation.
-\ It disables implicit rethrow and reveals exceptions as error values.
-\ This mode may look superficially like Go. It is actualy closer to C,
-\ because there is NO support for panics and no hidden stack unwinder.
-\ In such words, control flow is entirely local and obvious from code.
+\ By default, all control flow is explicit. Errors are visible,
+\ handled just like other outputs. We also support Swift-style
+\ `try` and `throw` which are entirely local. They're basically
+\ like `ret`, but without having to list the non-error outputs.
+\
+\ We also support `try_all`, which is a blanket auto-try, where
+\ a "try" is implicitly inserted when calling "erroring" words.
+\ It's opt-in and opt-out per-file and per-word.
+\
+\ `catch` serves ONLY to suppress `try_all` for a single call.
+\ By default, without `try_all`, `catch` doesn't even compile.
 \
 \ Examples:
 \
-\   fun: word { -- one two } " some_error" throw end
-\
-\   fun: throwing
-\     word { one two }
-\     catch' word { one two err }
+\   fun: inner { -- one two err }
+\     " some_error" throw
+\     10 20 nil
 \   end
 \
-\   fun: non_throwing [ true catches ]
-\     word { one two err } \ Implicit catch.
+\   fun: outer
+\     inner { one two err }
+\     inner try { one two }
+\     [ true try_all ]
+\     inner { one two } \ Implicit "try".
 \   end
 
-\ Interp-mode wrapper for intrinsic `throw`.
-fun: throw { err } err throw end
+\ Interp-mode version of `throw`, to complement compile-time intrinsic.
+fun: throw { err }
+  [
+    1 1 true comp_signature_set
+    1 comp_args_set
+  ]
+end
 
-fun_comp: catch'  WORDLIST_EXEC catch end
-fun_comp: catch'' WORDLIST_COMP catch end
+fun_comp: catch'  { -- err } WORDLIST_EXEC catch nil end
+fun_comp: catch'' { -- err } WORDLIST_COMP catch nil end
 
-fun_comp: errf ( E: fmt …vargs… -- err )
+fun_comp: errf { -- err } ( E: fmt …vargs… -- err )
   1 comp_va_beg { len }
 
   xt'' ERR_BUF_0 STACK >s
@@ -2444,6 +2571,7 @@ fun_comp: errf ( E: fmt …vargs… -- err )
   len comp_va_end
   0 comp_args_set
   execute'' ERR_BUF_0
+  nil
 end
 
 fun: wrapf_args { err fmt -- buf cap fmt }
@@ -2462,7 +2590,7 @@ end
 \ Passing the error as the first argument allows us
 \ to rotate error format buffers. You can create an
 \ error with `errf` and wrap it repeatedly.
-fun_comp: wrapf ( C: err fmt …vargs… -- str )
+fun_comp: wrapf { -- err } ( C: err fmt …vargs… -- str )
   comp_local_anon { buf }
   2 comp_va_beg   { len }
 
@@ -2472,6 +2600,7 @@ fun_comp: wrapf ( C: err fmt …vargs… -- str )
 
   len comp_va_end
   0 buf comp_local_get
+  nil
 end
 
 fun: fatal { err } " fatal: %s" err elogf elf abort end
@@ -2495,8 +2624,8 @@ fun: fatal { err } " fatal: %s" err elogf elf abort end
 fun: errno { -- code } __error @s32 end
 
 \ `code` comes from from `errno`, `ferror`, Posix functions, etc.
-\ See `is_err` earlier in this file for detecting -1 error codes.
-fun: os_err { code ctx -- err }
+\ See `is_err_flag` earlier in this file for detecting -1 error codes.
+fun: os_err { code ctx -- err_str }
   code strerror { msg }
   msg if
     " %s; code: %zd; msg: %s" ctx code msg errf ret
@@ -2508,22 +2637,19 @@ end
 \ `-1` and set `errno` on failure. Usage:
 \
 \   0 1 extern: some_fun
-\   some_fun " unable to do X" os_try
-fun: os_try { int ctx }
-  int is_err ifn ret end
-  errno ctx os_err throw
-end
+\   some_fun " unable to do X" os_err? try
+fun: os_err? { int ctx -- err } int is_err_flag if errno ctx os_err ret end nil end
 
-\ Like `os_try`, but for Posix functions which directly
-\ return an `errno` code on failure and zero on success.
-fun: posix_try { code ctx } code if code ctx os_err throw end end
+\ Like `os_err?`, but for Posix functions which directly
+\ return an `errno` code on failure, and zero on success.
+fun: posix_err? { code ctx -- err } code if code ctx os_err ret end nil end
 
 \ ## Formatting continued
 
 \ For functions like `snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
-fun: validate_format_len { len -- len|throw }
-  len >=0 if len ret end
+fun: validate_format_len { len -- len err }
+  len >=0 if len nil ret end
 
   errno { code }
   code strerror { msg }
@@ -2533,36 +2659,39 @@ fun: validate_format_len { len -- len|throw }
     " unable to format string; code: %s" code errf throw
   end
 
-  nil
+  nil nil
 end
 
 \ Formats into a given buffer, with null-termination. Usage:
 \
 \   BUF CAP " codes: %zd %zd %zd" 10 20 30 str_prnf
-fun_comp: str_prnf ( E: buf cap fmt …vargs… -- len|err )
+fun_comp: str_prnf { -- err } ( E: buf cap fmt …vargs… -- len|err )
   3 comp_va_beg { len }
   compile' snprintf
   len comp_va_end
   compile' int_to_cell
   compile' validate_format_len
+  nil
 end
 
 \ Like `str_prnf`, but returns the given buffer,
 \ instead of formatted length or error sentinel.
-fun_comp: strf ( E: buf cap fmt …vargs… -- buf )
+fun_comp: strf { -- err } ( E: buf cap fmt …vargs… -- buf )
   comp_local_anon { loc }
   0 loc comp_local_set
   execute'' str_prnf
   0 loc comp_local_get
+  nil
 end
 
-fun_comp: fmtf ( E: file fmt …vargs… )
+fun_comp: fmtf { -- err } ( E: file fmt …vargs… )
   2 comp_va_beg { len }
   compile' fprintf
   len comp_va_end
   compile' int_to_cell
   compile' validate_format_len
   0 comp_args_set
+  nil
 end
 
 \ ## Stack manipulation continued
@@ -2576,8 +2705,8 @@ end
 \ stur <top>, [<stk>, STACK_OFF_TOP]
 \
 \ Should usually be followed with `0 comp_args_set`.
-fun: comp_args_to_stack { len stk_reg top_reg } ( E: …args… -- )
-  len ifn ret end
+fun: comp_args_to_stack { len stk_reg top_reg -- err } ( E: …args… -- )
+  len ifn nil ret end
 
   top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
@@ -2586,6 +2715,7 @@ fun: comp_args_to_stack { len stk_reg top_reg } ( E: …args… -- )
   end
 
   top_reg stk_reg asm_stack_top_store comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
+  nil
 end
 
 \ Variadic alternative to `>s`:
@@ -2593,7 +2723,7 @@ end
 \   10 20 30 some_stack >>s
 \
 \ TODO drop: too error-prone.
-fun_comp: >>s ( E: …args… stack -- )
+fun_comp: >>s { -- err } ( E: …args… stack -- )
   comp_args_get { len }
 
   len ifn
@@ -2603,19 +2733,20 @@ fun_comp: >>s ( E: …args… stack -- )
 
   len dec { len }
   len comp_args_set
-  len ifn ret end
+  len ifn nil ret end
 
   len             { stk_reg }
   ASM_REG_SCRATCH { top_reg }
   len stk_reg top_reg comp_args_to_stack
   0 comp_args_set
+  nil
 end
 
 \ Variadic assignment of locals from the stack:
 \
 \   10 20 30 some_stack >>s
 \   some_stack stack{ ten twenty thirty }
-fun_comp: stack{ ( E: stack -- )
+fun_comp: stack{ { -- err } ( E: stack -- )
   comp_args_get { len }
 
   len 1 <> if
@@ -2639,7 +2770,7 @@ fun_comp: stack{ ( E: stack -- )
   end
 
   0 comp_args_set
-  locs ifn ret end
+  locs ifn nil ret end
 
   0 { stk_reg }
   1 { top_reg }
@@ -2658,6 +2789,7 @@ fun_comp: stack{ ( E: stack -- )
   end
 
   top_reg stk_reg asm_stack_top_store comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
+  nil
 end
 
 \ ## Stack printing
@@ -2746,7 +2878,7 @@ struct: Sym
   Cell       1 field: Sym_clobber \ `Bits`
   U8         1 field: Sym_inp_len
   U8         1 field: Sym_out_len
-  U8         1 field: Sym_throws
+  U8         1 field: Sym_has_err
   U8         1 field: Sym_comp_only
   U8         1 field: Sym_interp_only
 end
@@ -2755,9 +2887,10 @@ end
 fun: sym_instr { XT -- instr } XT Sym_union @ end
 
 \ For internal use below.
-fun: comp_word_instr { wordlist } ( C: "name" -- ) ( E: -- instr )
+fun: comp_word_instr { wordlist -- err } ( C: "name" -- ) ( E: -- instr )
   wordlist next_word comp_push
   compile' sym_instr
+  nil
 end
 
 \ Similar to `xt'` and `xt''`, but instead of returning an execution token,
@@ -2766,14 +2899,15 @@ end
 \
 \ Intended for callbacks passed to foreign callers
 \ such as `pthread_create` or `qsort`.
-\
-\ Note: callbacks passed to foreign callers should use `[ true catches ]`
-\ to reveal all exceptions as error values (and handle them). Otherwise,
-\ if a callback prematurely terminates via exception, the error will be
-\ silently ignored by the foreign caller.
-fun: instr' { -- instr } execute' xt' sym_instr end
-fun_comp: instr'  ( C: "name" -- ) ( E: -- instr ) WORDLIST_EXEC comp_word_instr end
-fun_comp: instr'' ( C: "name" -- ) ( E: -- instr ) WORDLIST_COMP comp_word_instr end
+fun: instr' { -- instr err } execute' xt' sym_instr nil end
+
+fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
+  WORDLIST_EXEC comp_word_instr nil
+end
+
+fun_comp: instr'' { -- err } ( C: "name" -- ) ( E: -- instr )
+  WORDLIST_COMP comp_word_instr nil
+end
 
 \ SYNC[hash_table_structure].
 struct: Interp_dict
@@ -2851,9 +2985,9 @@ end
 \
 \ Usage example:
 \
-\   1 0 true indirect: SOME_FUNC some_func
+\   1 1 false indirect: SOME_FUNC some_func
 \
-\   fun: some_func { inp } [ redefine ] " some_err" throw end
+\   fun: some_func { inp -- out } [ redefine ] inp end
 \
 \   SOME_FUNC indirect_to' some_func
 
@@ -2862,22 +2996,21 @@ struct: Indir_decl
   Adr  1 field: Indir_decl_instr
   U8   1 field: Indir_decl_inp
   U8   1 field: Indir_decl_out
-  U8   1 field: Indir_decl_throws
+  U8   1 field: Indir_decl_has_err
 end
 
-fun: indirect: { inp out throwing } ( C: "var_name" "fun_name" -- )
+fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
   nil sizeof' Indir_decl alloc_data { decl }
 
-  inp      decl Indir_decl_inp    !b
-  out      decl Indir_decl_out    !b
-  throwing decl Indir_decl_throws !b
+  inp     decl Indir_decl_inp     !b
+  out     decl Indir_decl_out     !b
+  has_err decl Indir_decl_has_err !b
 
   parse_word { str len }
   str len decl init_data_word
 
   parse_word define_fun
-    inp out comp_signature_set
-    throwing throws
+    inp out has_err comp_signature_set
     comp_clobber_volatile
 
     ASM_REG_SCRATCH { R_off } \ Holds offsets.
@@ -2895,10 +3028,11 @@ fun: indirect: { inp out throwing } ( C: "var_name" "fun_name" -- )
   semicolon
 
   [ false comp_only ]
+  nil
 end
 
 \ This would be a 1-liner without signature checks and error messages.
-fun: indirect_to { decl xt_to }
+fun: indirect_to { decl xt_to -- err }
   decl Indir_decl_inp @b { decl_inp }
   xt_to Sym_inp_len     @b { sym_inp }
   xt_to Sym_name           { name }
@@ -2916,21 +3050,22 @@ fun: indirect_to { decl xt_to }
     name decl_out sym_out errf throw
   end
 
-  decl Indir_decl_throws @b { decl_throws }
-  xt_to Sym_throws         @b { sym_throws }
+  decl Indir_decl_has_err @b { decl_has_err }
+  xt_to Sym_has_err       @b { sym_has_err }
 
-  decl_throws sym_throws <> if
-    " unable to indirect to `%s`: throws: %zd <> %zd"
-    name decl_throws sym_throws errf throw
+  decl_has_err sym_has_err <> if
+    " unable to indirect to `%s`: has_err: %zd <> %zd"
+    name decl_has_err sym_has_err errf throw
   end
 
   decl Indir_decl_instr @ { instr_adr }
   xt_to sym_instr instr_adr - decl Indir_decl_off !
+  nil
 end
 
-fun: indirect_to' { decl } ( C: "name" -- )
+fun: indirect_to' { decl -- err } ( C: "name" -- )
   WORDLIST_EXEC next_word { XT }
-  decl XT indirect_to
+  decl XT indirect_to nil
 end
 
 \ ## Misc
@@ -2939,14 +3074,14 @@ end
 fun: execute_raw { fun } [ 0 asm_branch_link_reg comp_instr ] end
 
 \ Takes any amount of args where the last arg is assumed to be a raw
-\ instruction address (function pointer). Invokes that function with
-\ the preceding args. Does not support output params or exceptions.
+\ instruction address, known in C as "function pointer". Invokes the
+\ function with the preceding args. Assumes no outputs or errors.
 \
 \ TODO: tell the compiler about the call. We want the compiler
 \ to emit prologue and epilogue, track clobbers, and so on.
 \
 \ TODO: verify that clobbering works properly.
-fun_comp: execute_raw ( C: …args… fun -- ) ( E: …args… fun -- )
+fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_args_get { len }
 
   len ifn
@@ -2964,10 +3099,11 @@ fun_comp: execute_raw ( C: …args… fun -- ) ( E: …args… fun -- )
   ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre comp_instr
   len dec asm_branch_link_reg comp_instr
   ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr
+  nil
 end
 
 \ For compiling words which modify a local by applying the given function.
-fun: comp_loc_mut { fun name } ( C: "name" -- ) ( E: -- )
+fun: comp_loc_mut { fun name -- err } ( C: "name" -- ) ( E: -- )
   parse_word comp_local_named { loc }
 
   comp_args_get if
@@ -2979,14 +3115,21 @@ fun: comp_loc_mut { fun name } ( C: "name" -- ) ( E: -- )
   fun   comp_call      \ blr <fun>
   0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
   0     comp_args_set
+  nil
 end
 
-\ Increment or decrement a local. Usage: `inc: some_val`.
-fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' inc " inc:" comp_loc_mut end
-fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' dec " dec:" comp_loc_mut end
+\ Increment a local: `inc: some_val`.
+fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
+  xt' inc " inc:" comp_loc_mut nil
+end
+
+\ Decrement a local: `inc: some_val`.
+fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
+  xt' dec " dec:" comp_loc_mut nil
+end
 
 \ Comptime analogue of top-level `import'`.
-fun_comp: import' parse_word comp_str compile' import end
+fun_comp: import' { -- err } parse_word comp_str compile' import nil end
 
 \ Chooses a non-zero value, preferring the second input.
 fun: fallback { one two -- fallback } [
@@ -2997,9 +3140,10 @@ fun: fallback { one two -- fallback } [
 ] end
 
 \ TODO support any amount of inputs.
-fun_comp: fallback: ( E: one two -- fallback )
+fun_comp: fallback: { -- err } ( E: one two -- fallback )
   compile' fallback
   parse_word comp_local_named { loc }
   0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
   0     comp_args_set
+  nil
 end

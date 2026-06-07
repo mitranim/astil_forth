@@ -1,0 +1,6 @@
+fun: test_catch_requires_try_all_inner { -- err } " test_err" end
+
+\ Must fail to compile: "catch" requires implicit "try".
+fun: test_catch_requires_try_all_outer
+  catch' test_catch_requires_try_all_inner
+end

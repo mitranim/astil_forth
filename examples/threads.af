@@ -5,15 +5,11 @@ import' std:pthread.af
 \ Passed to `pthread_spawn` by raw instruction address.
 \ We have no hidden adapters between Forth and libc.
 fun: callback { inout -- err }
-
-  \ No implicit exceptions here.
-  [ true catches ]
-
   inout @ { path }
   " [child] checking length of `%s`..." path logf lf
 
   alloca' Fstat       { stat }
-  path stat path_stat { err } \ Automatic catch; zero-cost.
+  path stat path_stat { err }
 
   err ifn
     \ Store the output back.
@@ -25,9 +21,6 @@ fun: callback { inout -- err }
 end
 
 fun: main
-  \ No implicit exceptions here either.
-  [ true catches ]
-
   instr' callback  { instr  } \ Raw instruction address.
   " missing/none"  { path0  } \ Input for `thread0`: missing file.
   " forth/lang.af" { path1  } \ Input for `thread1`: existing file.
@@ -51,9 +44,8 @@ fun: main
   end
 
   \ After spawning a thread, we must either join or detach it.
-  \ Since we've already disabled exceptions via `[ true catches ]`,
-  \ we have assurance that the current function doesn't accidentally
-  \ terminate before we're done with both thread handles.
+  \ Since this word handles thread creation errors explicitly,
+  \ it won't terminate until done with both thread handles.
 
   err0 ifn
     " [main] waiting on thread 0..." log lf

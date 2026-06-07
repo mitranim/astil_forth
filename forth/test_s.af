@@ -39,6 +39,26 @@ fun: test_recursion ( val -- val )
 end
 T{ 123 test_recursion <T> 13 }T
 
+fun: recur_throw_callee ( val -- val )
+  [ true throws ]
+  dup ifn drop 100 ret end
+  dup 3 = if drop " recur_err_stack" throw end
+  dec recur
+end
+
+fun: test_recur_throw
+  T{ 2 catch' recur_throw_callee         <T> 100 nil }T
+  T{ 4 catch' recur_throw_callee { err } <T>         }T
+  T{ " recur_err_stack" err cstr=        <T> true    }T
+end
+test_recur_throw
+
+fun: test_recur_late_throw_invalid
+  s" ./test/test_stack_recur_then_throw.af" catch' import { err }
+  err " hint: add `[ true throws ]` before `recur`" T_err_contains
+end
+test_recur_late_throw_invalid
+
 1 0 extern: sleep
 
 fun: test_sleep_loop loop " sleeping" log lf 1 sleep end end
@@ -697,169 +717,5 @@ fun: test_catch_2
   T{ " test_err" err cstr=                  <T> true        }T
 end
 test_catch_2
-
-\ Procedures with `catches` never throw IMPLICITLY but we allow to throw
-\ EXPLICITLY. The compiler marks the function as "throwing", in addition
-\ to "catching". Callers handle its exception as usual.
-fun: test_catches_and_throws_fun [ true catches ]
-  test_throw { err_ignore }
-  " different_test_err" throw
-end
-
-\ Note: in stack-CC, when using `catches`, EVERY call to EVERY word
-\ pushes an error to the stack. When the callee doesn't throw, the
-\ error is nil. This way, we don't have to remember which words do
-\ and do not throw, but we have to remember to use `try`.
-fun: test_catches_and_throws [ true catches ]
-  test_catches_and_throws_fun { err }
-  T{ " different_test_err" err cstr= try <T> 1 }T
-end
-test_catches_and_throws
-
-fun: test_catches_0
-  [ true catches ]
-
-  test_throw   { err0 }
-  " test_err" { err1 }
-
-  T{ err0 err1     = try <T> 0 }T
-  T{ err0 err1 cstr= try <T> 1 }T
-end
-test_catches_0
-
-fun: test_catches_1_fun { one -- two }
-  one ifn test_throw end
-  one 2 *
-end
-
-\ Compare with `test_catches_1` which is the actual test.
-fun: test_catches_1_fun_throwing
-  \ 0 test_catches_1_fun { -- } \ Must throw.
-
-  T{ 123 test_catches_1_fun { val } <T>     }T
-  T{ val                            <T> 246 }T
-  T{ 123 test_catches_1_fun         <T> 246 }T
-end
-test_catches_1_fun_throwing
-
-fun: test_catches_1
-  [ true catches ]
-
-  \ Note: when the callee throws, it fails to push a return value
-  \ to the stack. We can't `{ val err }` because of stack underflow.
-  \ After catching, the stack is in a partially undefined state: the
-  \ error is definitely there, but what else was pushed, is unknown.
-  \ This is a problem with stack-CC in general. Compare reg-CC tests.
-  T{ 0 test_catches_1_fun { err } <T>   }T
-  T{ " test_err" err cstr= try    <T> 1 }T
-
-  T{ 123 test_catches_1_fun { val err } <T>       }T
-  T{ val err                            <T> 246 0 }T
-  T{ 123 test_catches_1_fun             <T> 246 0 }T
-end
-test_catches_1
-
-fun: test_catches_2_fun { one two -- three }
-  one ifn test_throw end
-  one two +
-end
-
-\ Compare with `test_catches_2` which is the actual test.
-fun: test_catches_2_fun_throwing
-  \ 0 123 test_catches_2_fun { -- } \ Must throw.
-
-  T{ 11 22 test_catches_2_fun { val } <T>    }T
-  T{ val                              <T> 33 }T
-  T{ 11 22 test_catches_2_fun         <T> 33 }T
-
-  T{ 11 0 test_catches_2_fun { val } <T>    }T
-  T{ val                             <T> 11 }T
-  T{ 11 0 test_catches_2_fun         <T> 11 }T
-end
-test_catches_2_fun_throwing
-
-fun: test_catches_2
-  [ true catches ]
-
-  T{ 0 11 test_catches_2_fun { err } <T>   }T
-  T{ " test_err" err cstr= try       <T> 1 }T
-
-  T{ 11 22 test_catches_2_fun { val err } <T>      }T
-  T{ val err                              <T> 33 0 }T
-  T{ 11 22 test_catches_2_fun             <T> 33 0 }T
-
-  T{ 11 0 test_catches_2_fun { val err } <T>      }T
-  T{ val err                             <T> 11 0 }T
-  T{ 11 0 test_catches_2_fun             <T> 11 0 }T
-end
-test_catches_2
-
-fun: test_catches_3_fun { one -- two three }
-  one ifn test_throw end
-  one 2 *    { two }
-  one negate { three }
-  two three
-end
-
-\ Compare with `test_catches_3` which is the actual test.
-fun: test_catches_3_fun_throwing
-  \ 0 test_catches_3_fun { -- } \ Must throw.
-
-  T{ 123 negate <T> -123 }T
-
-  T{ 123 test_catches_3_fun { one two } <T>          }T
-  T{ one two                            <T> 246 -123 }T
-  T{ 123 test_catches_3_fun             <T> 246 -123 }T
-end
-test_catches_3_fun_throwing
-
-fun: test_catches_3
-  [ true catches ]
-
-  T{ 0 test_catches_3_fun { err } <T>   }T
-  T{ " test_err" err cstr= try    <T> 1 }T
-
-  T{ 123 test_catches_3_fun { one two err } <T>            }T
-  T{ one two err                            <T> 246 -123 0 }T
-  T{ 123 test_catches_3_fun                 <T> 246 -123 0 }T
-end
-test_catches_3
-
-fun: test_catches_4_fun { one two -- three four }
-  one ifn test_throw end
-  one two + { three }
-  two one - { four }
-  three four
-end
-
-\ Compare with `test_catches_4` which is the actual test.
-fun: test_catches_4_fun_throwing
-  \ 0 123 test_catches_4_fun { -- } \ Must throw.
-
-  T{ 13 25 test_catches_4_fun { one two } <T>       }T
-  T{ one two                              <T> 38 12 }T
-  T{ 13 25 test_catches_4_fun             <T> 38 12 }T
-
-  T{ 13 0 test_catches_4_fun { one two } <T>        }T
-  T{ one two                             <T> 13 -13 }T
-  T{ 13 0 test_catches_4_fun             <T> 13 -13 }T
-end
-test_catches_4_fun_throwing
-
-fun: test_catches_4
-  [ true catches ]
-
-  T{ 0 13 test_catches_4_fun { err } <T>   }T
-  T{ " test_err" err cstr= try       <T> 1 }T
-
-  T{ 13 25 test_catches_4_fun { one two err } <T>         }T
-  T{ one two err                              <T> 38 12 0 }T
-  T{ 13 25 test_catches_4_fun                 <T> 38 12 0 }T
-
-  T{ 13 0 test_catches_4_fun { one two err } <T>          }T
-  T{ one two err                             <T> 13 -13 0 }T
-  T{ 13 0 test_catches_4_fun                 <T> 13 -13 0 }T
-end
-test_catches_4
 
 " [test] ok" log lf

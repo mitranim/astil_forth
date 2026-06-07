@@ -1,0 +1,7 @@
+\ Must fail to compile: `try_all` cannot auto-add an error output to caller.
+fun: test_has_err_not_contagious_callee { -- err } nil end
+
+fun: test_has_err_not_contagious_fail
+  [ true try_all ]
+  test_has_err_not_contagious_callee
+end

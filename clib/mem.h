@@ -22,7 +22,7 @@ static constexpr Ind MEM_PAGE = 1u << 14u; // 16 KiB
 
 /*
 Resizable buffer. Same as `list_of(U8)`; see `./list.h` and `./list.c`.
-Comes with additional procedures and macros for appending binary data.
+Comes with additional functions and macros for appending binary data.
 Must be zero-initialized before first use.
 */
 typedef struct {

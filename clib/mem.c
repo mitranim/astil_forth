@@ -120,7 +120,7 @@ Usage:
 
 Value must be zero-initialized via `{}`.
 
-The procedure is idempotent and may be called explicitly
+The function is idempotent and may be called explicitly
 before the deferred invocation, any amount of times.
 */
 static void buf_deinit(Buf *buf) {

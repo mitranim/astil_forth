@@ -19,6 +19,8 @@ static const USED Sym INTRIN[] = {
   INTRIN_COMP_LOCAL_GET,     // comp_local_get
   INTRIN_COMP_LOCAL_SET,     // comp_local_set
   INTRIN_COMP_LOCAL_OFF,     // comp_local_off
+  INTRIN_TRY_ALL,            // try_all
+  INTRIN_GET_TRY_ALL,        // get_try_all
   INTRIN_ALLOCA,             // alloca
   INTRIN_COMPILE_EXECUTABLE, // compile_executable
   INTRIN_DEBUG_CTX,          // debug_ctx
@@ -41,9 +43,6 @@ static const USED Sym INTRIN[] = {
   INTRIN_TRY,              // try
   INTRIN_THROW,            // throw
   INTRIN_CATCH,            // catch
-  INTRIN_THROWS,           // throws
-  INTRIN_CATCHES,          // catches
-  INTRIN_GET_CATCHES,      // get_catches
   INTRIN_COMP_ONLY,        // comp_only
   INTRIN_INTERP_ONLY,      // interp_only
   INTRIN_INLINE,           // inline

@@ -11,14 +11,14 @@ SYNC[asm_magic].
 ASM_MAGIC: .8byte 0xabcdFEEDabcdFACE
 
 /*
-See the C prototype for the procedure signature.
+See the C prototype for the function signature.
 
 See `./arch_arm64.h` for definitions of special registers.
 
 If the word "throws", the error is returned in `x0`. This register is set to
-`nullptr` in C before the call. For calls of procedures which may "throw" by
+`nullptr` in C before the call. For calls of functions which may "throw" by
 returning an error pointer, the compiler inserts a conditional branch instr.
-For calls of procedures which don't return an error pointer, the compiler
+For calls of functions which don't return an error pointer, the compiler
 inserts an instruction which zeroes `x0`, since it's caller-saved.
 
 Registers x29-x30 are FP-LR and used for frame records and returns.
@@ -58,7 +58,7 @@ what they're supposed to had been at `asm_call_forth_epilogue`,
 and sets the PC to transfer control here for trace capture.
 
 The handler also provides an error pointer which we have to stash
-to avoid clobber by the backtrace procedure.
+to avoid clobbering by the backtrace function.
 */
 asm_call_forth_trace:
   str x0, [sp, -16]!

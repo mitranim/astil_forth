@@ -85,7 +85,7 @@ static Err err_inline_early_ret(const Sym *sym) {
 
 static Err err_inline_not_leaf(const Sym *sym) {
   return errf(
-    "unable to inline word " FMT_QUOTED ": not a leaf procedure", sym->name.buf
+    "unable to inline word " FMT_QUOTED ": not a leaf function", sym->name.buf
   );
 }
 

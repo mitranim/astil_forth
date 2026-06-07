@@ -1,5 +1,5 @@
 /*
-This file defines assembly procedures for Arm64 for the variant
+This file defines assembly functions for Arm64 for the variant
 of our Forth system which uses the native procedure call ABI.
 
 Compare `./arch_arm64_cc_stack.c` which uses a stack-based callvention.
@@ -59,7 +59,6 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
   This construct lets us support:
 
   - Multiple output parameters.
-  - Returning an error / exception as an additional output.
   - Special interpreter register.
 
   Our alternative stack-based calling convention uses an additional
@@ -102,19 +101,21 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
                      "cc",
                      "memory");
 
-  if (out_len > 0) try(int_stack_push(ints, x0));
-  if (out_len > 1) try(int_stack_push(ints, x1));
-  if (out_len > 2) try(int_stack_push(ints, x2));
-  if (out_len > 3) try(int_stack_push(ints, x3));
-  if (out_len > 4) try(int_stack_push(ints, x4));
-  if (out_len > 5) try(int_stack_push(ints, x5));
-  if (out_len > 6) try(int_stack_push(ints, x6));
-  if (out_len > 7) try(int_stack_push(ints, x7));
+  const auto reg_out_len = sym->has_err ? out_len - 1 : out_len;
+
+  if (reg_out_len > 0) try(int_stack_push(ints, x0));
+  if (reg_out_len > 1) try(int_stack_push(ints, x1));
+  if (reg_out_len > 2) try(int_stack_push(ints, x2));
+  if (reg_out_len > 3) try(int_stack_push(ints, x3));
+  if (reg_out_len > 4) try(int_stack_push(ints, x4));
+  if (reg_out_len > 5) try(int_stack_push(ints, x5));
+  if (reg_out_len > 6) try(int_stack_push(ints, x6));
+  if (reg_out_len > 7) try(int_stack_push(ints, x7));
 
   Err err = nullptr;
 
-  if (sym->throws) {
-    switch (out_len) {
+  if (sym->has_err) {
+    switch (out_len - 1) {
       case 0: {
         err = (Err)x0;
         break;
@@ -179,8 +180,10 @@ TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
   aver(inp < ASM_INP_PARAM_REG_LEN);
   inps[inp++] = (Sint)interp;
 
+  const U8 reg_out_len = sym->has_err ? sym->out_len - 1 : sym->out_len;
+
   Ind out = 0;
-  while (out < sym->out_len) {
+  while (out < reg_out_len) {
     aver((inp + out) < ASM_INP_PARAM_REG_LEN);
     inps[inp + out] = (Sint)&outs[out];
     out++;
@@ -193,56 +196,47 @@ TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
     inps[0], inps[1], inps[2], inps[3], inps[4], inps[5], inps[6], inps[7]
   );
 
-  if (sym->throws) try(err);
+  if (sym->has_err) try(err);
 
   out = 0;
-  while (out < sym->out_len) {
+  while (out < reg_out_len) {
     try(int_stack_push(ints, outs[out++]));
   }
   return nullptr;
 }
 
 static S8 asm_sym_err_reg(const Sym *sym) {
-  if (!sym->throws) return -1;
+  if (!sym->has_err) return -1;
 
   switch (sym->type) {
-    case SYM_NORM:   return (S8)sym->out_len;
-    case SYM_INTRIN: return ASM_PARAM_REG_0;
+    case SYM_NORM:   return (S8)(sym->out_len - 1);
+    case SYM_INTRIN: return (S8)(sym->out_len - 1);
     case SYM_EXTERN: unreachable();
     default:         unreachable();
   }
 }
 
 static void asm_append_sym_epilogue_ok(Comp *comp, Sym *sym) {
-  if (!sym->throws) return;
-  const auto reg = asm_sym_err_reg(sym);
-  aver(reg >= 0);
-  asm_append_zero_reg(comp, (U8)reg);
+  (void)comp;
+  (void)sym;
 }
 
 /*
-Procedures which "throw" actually return the exception in the
-next output GPR, immediately after the last non-error result.
-An alternative, which we tried earlier, is to use a dedicated
-callee-saved register for all exceptions.
+In the reg-CC version of our system, an error is a regular output,
+always explicitly declared and returned in the next GPR after the
+non-error outputs.
 
-When using a dedicated exception register:
-- "try" is always 1 instruction: `cbnz <err>, <epi>`.
-- "catch" is always 2 instructions: `mov` and `eor`.
-- ABI incompatibility: have to stash and restore the register
-  at the boundaries between external and internal procedures,
-  which requires KNOWING where the boundaries are.
+This approach wins on simplicity and ABI interop. Signatures reflect the ABI.
+We can pass callbacks to `libc` and they just work. A C program could declare
+a function type such as, for example, `Err Func(intptr_t)`, obtain a pointer
+to a Forth word with that signature, and call it as-is, without glue.
 
-When using a regular output register:
-- "try" is between 1 and 3 instructions.
-- "catch" is completely free.
-- Perfect ABI compatibility: no clobbering of callee-saved registers.
+We also provide shortcuts `try throw` for returning an error locally,
+very similar to Swift, and our own unique setting `try_all` setting,
+causes the compiler to implicitly insert "try" for errors, reducing
+error-handling noise; it's opt-in and keeps errors in signatures.
 
-Using a regular output register ultimately wins out by making it possible
-to pass arbitrary procedures as callbacks to libc, without having to tell
-the compiler to stash and restore the error register, which would be easy
-to forget. That said, we also recommend using `catches` in such callbacks
-to ensure exceptions are not ignored, which is also easy to forget...
+The cost of "try" here is between 1 and 3 instructions on Arm64.
 */
 static void asm_append_try(
   Comp *comp,
@@ -286,29 +280,19 @@ static void asm_append_try(
 }
 
 /*
-Must be used after compiling every call to a non-extern procedure.
+Must be used after compiling every call to a non-extern function.
 
-When "catching", we don't need to do anything, because all values are already
-in the expected registers. The effect of "catch" is to append the "exception"
-to the list of outputs, which is handled in `comp_cc_reg.c`.
+In reg-CC, this doesn't ever "catch"; the name simply mirrors
+stack-CC, where it does; this is invoked from a generic file
+shared by both implementations.
 */
 static Err asm_append_try_catch(
-  Comp *comp, Sym *caller, const Sym *callee, bool force_catch
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode_auto_try
 ) {
-  if (force_catch) {
-    if (!callee->throws) {
-      return err_catch_no_throw(callee->name.buf);
-    }
-    return nullptr;
-  }
+  if (!err_mode_auto_try) return nullptr;
+  if (!callee->has_err) return nullptr;
 
-  const auto ctx = &comp->ctx;
-  if (!callee->throws) return nullptr;
-  if (ctx->catches) return nullptr;
-
-  caller->throws = true;
-
-  const auto caller_reg = caller->out_len;
+  const U8   caller_reg = caller->out_len - 1;
   const auto callee_reg = asm_sym_err_reg(callee);
 
   IF_DEBUG(aver(callee_reg >= 0));
@@ -347,18 +331,18 @@ chunks. For example, when an output of an intrinsic describes a register and
 is `U8` in C, using `U8*` for the output is wrong; C would compile to `strb`
 when storing the output, resulting in the 7 upper bytes of the receiving
 address (under little endian) to be garbage. We need ALL stores of output
-values to be word-sized. Intrinsic procedures must define their output
+values to be word-sized. Intrinsic functions must define their output
 pointers appropriately.
 */
 static Err asm_append_call_intrin(
-  Comp *comp, Sym *caller, const Sym *callee, bool catch
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
   aver(callee->type == SYM_INTRIN);
 
-  const auto inps   = callee->inp_len;
-  const auto outs   = callee->out_len;
-  const auto size   = sizeof(Sint);
-  const auto sp_off = asm_align_sp_off(size * outs);
+  const U8  inps   = callee->inp_len;
+  const U8  outs   = callee->has_err ? callee->out_len - 1 : callee->out_len;
+  const Ind size   = sizeof(Sint);
+  const Ind sp_off = asm_align_sp_off(mul(size, outs));
 
   asm_append_mov_reg(comp, callee->inp_len, ASM_REG_INTERP);
 
@@ -369,7 +353,7 @@ static Err asm_append_call_intrin(
     while (out < outs) {
       U8 reg = inps + 1 + out;
       aver(reg < ASM_INP_PARAM_REG_LEN);
-      asm_append_add_imm(comp, reg, ASM_REG_SP, out * size);
+      asm_append_add_imm(comp, reg, ASM_REG_SP, mul(out, size));
       out++;
     }
   }
@@ -380,7 +364,11 @@ static Err asm_append_call_intrin(
   asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.intrins);
   asm_append_branch_link_to_reg(comp, reg);
   if (sp_off) asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);
-  try(asm_append_try_catch(comp, caller, callee, catch));
+
+  if (callee->has_err && outs) {
+    aver(outs < ASM_OUT_PARAM_REG_LEN);
+    asm_append_mov_reg(comp, outs, ASM_PARAM_REG_0);
+  }
 
   if (sp_off) {
     U8 reg = 0;
@@ -392,6 +380,8 @@ static Err asm_append_call_intrin(
       reg++;
     }
   }
+
+  try(asm_append_try_catch(comp, caller, callee, err_mode));
 
   asm_register_call(comp, caller);
   return nullptr;
@@ -455,9 +445,9 @@ static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
 
 /*
 We accumulate clobbers of volatile registers from ALL sources across the entire
-procedure and always treat these registers as temporary, meaning that no locals
-across the procedure receive them as their locations, even when their lifetimes
-do not overlap with clobbers. Dirty but simple way of avoiding an additional IR
+function, and always treat these registers as temporary, meaning that no locals
+across the function would be assigned to these locations, even for locals whose
+lifetimes do not overlap with clobbers. Simple way of avoiding an additional IR
 and data flow analysis.
 */
 static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
@@ -466,7 +456,7 @@ static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
   const auto ctx = &comp->ctx;
 
   /*
-  In recursive procedures, we can't use caller-saved scratch registers as
+  In recursive functions, we can't use caller-saved scratch registers as
   "stable" local locations because they get clobbered by recursive calls.
   */
   if (!sym->norm.has_recur && ctx->vol_regs) {

@@ -63,16 +63,17 @@ fun: }T
   unreachable
 end
 
-\ When testing words which specify `[ true catches ]`,
-\ we need to disable auto-catch for every testing word,
-\ otherwise we'd have to pepper test code with `try`.
-fun: T_compile_without_catch ( C: XT -- )
-  get_catches { ok }
-  ok if false catches end
-  comp_call
-  ok if true catches end
-end
+fun: T_err_contains ( act exp -- )
+  to: exp
+  to: act
 
-fun_comp: T{  xt' T{  T_compile_without_catch end
-fun_comp: <T> xt' <T> T_compile_without_catch end
-fun_comp: }T  xt' }T  T_compile_without_catch end
+  act ifn
+    " missing error message; expected error to contain: %s" exp [ 1 ] errf
+    throw
+  end
+
+  act exp strstr if ret end
+
+  " expected error message to contain: %s; actual error message: %s"
+  exp act [ 2 ] errf throw
+end

@@ -21,8 +21,6 @@ static const USED Sym INTRIN[] = {
   INTRIN_THROW,            // throw
   INTRIN_CATCH,            // catch
   INTRIN_THROWS,           // throws
-  INTRIN_CATCHES,          // catches
-  INTRIN_GET_CATCHES,      // get_catches
   INTRIN_COMP_ONLY,        // comp_only
   INTRIN_INTERP_ONLY,      // interp_only
   INTRIN_INLINE,           // inline

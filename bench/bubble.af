@@ -33,13 +33,14 @@ fun: list_dump { list len }
   lf
 end
 
-fun: list_verify { list len }
+fun: list_verify { list len -- err }
   list len list_ceil -cell
   list
   CELL
   +loop: ptr
     ptr @2 > if " [bubble] not sorted" throw end
   end
+  nil
 end
 
 fun: bubble { list len }
@@ -57,14 +58,14 @@ fun: bubble { list len }
   end
 end
 
-fun: bubble_sort { list len }
+fun: bubble_sort { list len -- err }
   list len list_init
   list len bubble
   \ list len list_dump
   list len list_verify
 end
 
-fun: main { -- exit } [ true catches ]
+fun: main { -- exit }
   LIST LEN bubble_sort { err }
   err ifn 0 ret end
   " error: %s" err elogf elf

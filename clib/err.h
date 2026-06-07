@@ -44,7 +44,7 @@ typedef Err Err_fun(void);
 #endif
 
 /*
-For procedures which return 0/-1 and set `errno`.
+For functions which return 0/-1 and set `errno`.
 
 Discards the value in case of non-error, which makes this unsuitable
 for `mmap`, whose result is either -1 or an address.
@@ -55,7 +55,7 @@ for `mmap`, whose result is either -1 or an address.
   ((expr) == -1 ? err_from_errno(errno, #expr, __func__, __FILE__, __LINE__) \
                 : nullptr)
 
-// For procedures which directly return errno or 0.
+// For functions which directly return errno or 0.
 #define try_errno_posix(expr) try(err_errno_posix(expr))
 
 #define err_errno_posix_inner(tmp, expr)                                      \

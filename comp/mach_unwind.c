@@ -106,6 +106,9 @@ Assumptions:
 - Every "catch" can be ignored.
 - Deferred cleanup can be ignored.
 - If the faulty PC is in Forth, the call chain contains `asm_call_forth`.
+
+TODO: extract frame-walking and frame-reporting;
+report when handling Mach exceptions in reg-CC.
 */
 static Err mach_unwind_thread(
   const Interp *interp, const char *msg, Mach_thread_state *state
@@ -120,10 +123,10 @@ static Err mach_unwind_thread(
 
   const auto leaf_lr = (const Instr *)state->lr;
 
-  // Leaf procedure without its own frame record.
+  // Leaf function without its own frame record.
   if (comp_code_is_instr_ours(code, pc_new) && frame->caller != leaf_lr) {
     IF_DEBUG(eprintf(
-      "[system] [unwind] frame -1: leaf procedure without a frame; PC: %p -> %p; LR: %p -> %p\n",
+      "[system] [unwind] frame -1: leaf function without a frame; PC: %p -> %p; LR: %p -> %p\n",
       pc_new,
       leaf_lr,
       (void *)state->lr,

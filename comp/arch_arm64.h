@@ -33,7 +33,7 @@ typedef struct {
 
 /*
 Maximum register-only input/output count supported by C under Arm64 ABI.
-Using this on procedures with fewer actual inputs or outputs is harmless.
+Using this on functions with fewer actual inputs or outputs is harmless.
 */
 typedef Sint(Extern_fun)(Sint, Sint, Sint, Sint, Sint, Sint, Sint, Sint);
 

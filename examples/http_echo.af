@@ -17,14 +17,14 @@ fun: write_opt { fd buf len } fd buf len write { -- } end
 fun: write_eol { fd }         fd CRLF 2 write_opt     end \ \r\n
 
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
-fun: read_req { conn buf cap -- len }
+fun: read_req { conn buf cap -- len err }
   0 { len }
 
   loop
     conn buf cap read { wrote }
-    wrote ifn len ret end
+    wrote ifn len nil ret end
 
-    wrote is_err if
+    wrote is_err_flag if
       errno { code }
       code EINTR = if cont end
       code " unable to read request" os_err throw
@@ -34,12 +34,12 @@ fun: read_req { conn buf cap -- len }
     leave
   end
 
-  len
+  len nil
 end
 
-fun: respond_conn { conn }
-  READ_BUF              { buf cap }
-  conn buf cap read_req { len }
+fun: respond_conn { conn -- err }
+  READ_BUF                  { buf cap }
+  conn buf cap read_req try { len }
 
   " [srv] incoming request:" elog elf elf
   STDERR buf len write_opt elf
@@ -51,13 +51,10 @@ fun: respond_conn { conn }
   conn buf len               write_opt conn write_eol
 
   " [srv] echoed request back to client" elog elf
+  nil
 end
 
 fun: handle_conn { conn }
-  \ Switch into "C mode" where exceptions are disabled.
-  \ Words which "throw" really just return an error as the last output.
-  [ true catches ]
-
   conn respond_conn { err }
 
   err if
@@ -66,16 +63,17 @@ fun: handle_conn { conn }
 
   " [srv] closing connection" elog elf elf
 
-  conn close is_err if
+  conn close is_err_flag if
     errno " [srv] unable to close connection" os_err elog elf
   end
 end
 
-fun: main
-  " 2345"                  { port }
-  instr' handle_conn       { handler }
-  port MAX_CONN net_listen { sock }
+fun: main { -- err }
+  " 2345" { port }
+  instr' handle_conn { handler }
+  port MAX_CONN net_listen try { sock }
   sock handler net_accept_loop
   sock sock_close \ Unreachable.
+  nil
 end
 main

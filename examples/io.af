@@ -7,11 +7,11 @@ import' std:io.af
 
 \ ## Stat
 
-fun: example_file_stat
+fun: example_file_stat { -- err }
   " examples/io.af" { path }
   alloca' Fstat     { stat }
 
-  path stat path_stat
+  path stat path_stat try
 
   stat Fstat_size @    { size }
   stat Fstat_mtimespec { mtime }
@@ -20,6 +20,8 @@ fun: example_file_stat
   " [example0] path:        %s"  path logf lf
   " [example0] file size:   %zd" size logf lf
   " [example0] last change: %zd" secs logf lf
+
+  nil
 end
 example_file_stat
 
@@ -31,21 +33,23 @@ example_file_stat
 
 128 mem: BUF
 
-fun: example_seek_and_thou_shall_find
-  " examples/io.af"   { path }
-  path " r" file_open { file }
+fun: example_seek_and_thou_shall_find { -- err }
+  " examples/io.af"       { path }
+  path " r" file_open try { file }
 
-  \ Disable exceptions from here, so we can close the file reliably.
-  [ true catches ]
+  \ Example of disabling implicit "try" to ensure visible control flow.
+  \ This lets us be confident in cleanup code paths.
+  \
+  \ Technically redundant here because implicit "try" has
+  \ NOT been enabled in this example file; the setting is
+  \ per-word and per-file, not across the whole system.
+  [ false try_all ]
 
   37 91 { off cap }
 
-  file off 0 fseek is_err if
+  file off 0 fseek is_err_flag if
     file fclose { -- }
-
-    \ Explicit inline `throw` is perfectly fine. It's just like `ret`,
-    \ but doesn't zero-out the exception register.
-    " seek file" path io_err throw
+    " seek file" path io_err ret
   end
 
   BUF sizeof' U8 cap file fread { len }
@@ -53,13 +57,14 @@ fun: example_seek_and_thou_shall_find
   file fclose { -- }
 
   len cap <> if
-    code " unable to read file" os_err throw
+    code " unable to read file" os_err ret
   end
 
   lf
   " [example1] partial content of `%s`:" path logf lf lf
 
   BUF log lf
+  nil
 end
 example_seek_and_thou_shall_find
 

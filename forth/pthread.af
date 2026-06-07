@@ -7,9 +7,10 @@ import' ./lang.af
 \ Translated from C definitions and only partially tested.
 \
 \ Posix words directly return an OS error code on failure.
-\ They should usually be followed by `posix_try"`:
+\ Should always be followed by error check:
 \
-\   some_fun " unable to do X" posix_try
+\   some_fun " unable to do X" posix_err? { err }
+\   some_fun " unable to do X" posix_err? try
 
 \ ## Types
 
@@ -204,19 +205,19 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 
 \ Wraps `pthread_create`, throwing a descriptive error on failure.
 \ The caller must either `thread_join` or `pthread_detach`.
-fun: thread_spawn { fun inp -- thread }
+fun: thread_spawn { fun inp -- thread err }
   nil { attr }
   nil { thread }
 
   ref' thread attr fun inp pthread_create
-  " unable to spawn thread" posix_try
-  thread
+  " unable to spawn thread" posix_err? { err }
+  thread err
 end
 
 \ Wraps `pthread_join`, throwing a descriptive error on failure.
-fun: thread_join { thread -- out }
+fun: thread_join { thread -- out err }
   nil { out }
   thread ref' out pthread_join
-  " unable to join with thread" posix_try
-  out
+  " unable to join with thread" posix_err? { err }
+  out err
 end

@@ -14,7 +14,7 @@ fun: reverse { str len }
   end
 end
 
-fun: main { -- exit } [ true catches ]
+fun: main { -- exit }
   s" 0123456789abcdef" { str len }
 
   1 22 lsl inc for
@@ -26,5 +26,4 @@ fun: main { -- exit } [ true catches ]
 
   0
 end
-
 main

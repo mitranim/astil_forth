@@ -232,11 +232,11 @@ static Err imm_signed(Sint src, U8 wid, Instr *out) {
 }
 
 /*
-We assume we're calling a C procedure, and we're doing that from C
+We assume we're calling a C function, and we're doing that from C
 which limits us to just 1 output, despite more supported by Arm64.
 We could get around that by using an inline asm call and listing a
 giant clobber list, but there's no point since `libc` doesn't have
-any procedures with multiple outputs.
+any functions with multiple outputs.
 
 Note: this works identically for both of our callventions.
 */
@@ -899,7 +899,7 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   });
 
   /*
-  We generally prefer to skip frame records in leaf procedures,
+  We generally prefer to skip frame records in leaf functions,
   but if any locals are used, we have to create one, because we
   address them relatively to the FP. A smarter compiler would
   switch to SP-relative addressing, but that would require more
@@ -1088,7 +1088,7 @@ static Instr asm_maybe_mov_imm_to_reg(
 /*
 Many immediates can be encoded inline inside a `mov`, sometimes with a shift.
 For immediates which do not fit, we reserve space for an instruction and emit
-a fixup record; when finalizing a procedure, we place the immediate after the
+a fixup record; when finalizing a function, we place the immediate after the
 body and rewrite the instruction with `ldr <off>`. There are other approaches.
 Many compilers place constants into a dedicated section in the executable and
 fold / dedup them, which should be better for the CPU cache. Some immediates
@@ -1224,7 +1224,7 @@ static Err err_catch_no_throw(const char *callee) {
 #endif
 
 static Err asm_append_call_norm(
-  Comp *comp, Sym *caller, const Sym *callee, bool catch
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
   const auto code = &comp->code;
   try(comp_code_ensure_sym_ready(code, callee));
@@ -1235,7 +1235,7 @@ static Err asm_append_call_norm(
   aver(comp_code_is_instr_ours(code, fun));
   asm_append_branch_link_to_offset(comp, pc_off);
   asm_register_call(comp, caller);
-  try(asm_append_try_catch(comp, caller, callee, catch));
+  try(asm_append_try_catch(comp, caller, callee, err_mode));
 
   IF_DEBUG(eprintf(
     "[system] in " FMT_QUOTED ": appended call to " FMT_QUOTED
@@ -1249,7 +1249,9 @@ static Err asm_append_call_norm(
 }
 
 // Simple, naive inlining without support for relocation.
-static Err asm_inline_sym(Comp *comp, Sym *caller, const Sym *callee, bool catch) {
+static Err asm_inline_sym(
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
+) {
   try(validate_sym_inlinable(callee));
 
   const auto spans  = &callee->norm.spans;
@@ -1261,7 +1263,7 @@ static Err asm_inline_sym(Comp *comp, Sym *caller, const Sym *callee, bool catch
     list_push(instrs, instrs->dat[ind]);
   }
 
-  try(asm_append_try_catch(comp, caller, callee, catch));
+  try(asm_append_try_catch(comp, caller, callee, err_mode));
 
   IF_DEBUG({
     if (floor == ceil) {
@@ -1339,7 +1341,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   const auto write = &code->code_write;
   const auto spans = &sym->norm.spans;
 
-  if (sym->throws) {
+  if (sym->has_err) {
     const auto reg = asm_sym_err_reg(sym);
     if (reg >= 0) bits_add_to(&sym->clobber, (U8)reg);
   }
@@ -1358,7 +1360,7 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   spans->data = write->len;
   asm_fixup(comp, sym);
 
-  // Execution never reaches this. Makes it easier to tell procedures apart.
+  // Execution never reaches this. Makes it easier to tell functions apart.
   spans->ceil = write->len;
   IF_DEBUG(asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM));
 

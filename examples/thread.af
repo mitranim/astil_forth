@@ -4,32 +4,22 @@ import' std:pthread.af
 
 \ Passed to `pthread_spawn` by raw instruction address.
 \ We have no hidden adapters between Forth and libc.
-\
-\ When this word throws, it returns the exception in the first output
-\ register `x0` (because it has no other outputs). Libc takes exactly
-\ this one output and returns it to `main` on `thread_join`.
-\
-\ Our "exceptions" DON'T do any of:
-\ - Unwinding the stack.
-\ - Randomly clobbering callee-saved registers.
-\ - Otherwise interfering with the caller in any way.
-fun: callback
-  { ignored -- } \ Official signature.
-  ( val -- err ) \ Real ABI signature.
-
-  " [child] running and throwing" log lf
-  " mock_error" throw
+fun: callback { ignored -- err }
+  " [child] running; returning error" log lf
+  " mock_error"
 end
 
-fun: main
+fun: main { -- err }
   instr' callback { instr } \ Raw instruction address.
 
   " [main] spawning..." log lf
-  instr nil thread_spawn { thread }
+  instr nil thread_spawn try { thread }
 
   " [main] joining..." log lf
-  thread thread_join { err }
+  thread thread_join try { err }
 
   " [main] received error: %s" err logf lf
+
+  nil
 end
 main

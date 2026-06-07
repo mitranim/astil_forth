@@ -14,6 +14,8 @@ import' ./lang.af
 \ provided by the interpreter (`STACK`). In compiled code, testing
 \ uses its own custom stack for compatibility with AOT compilation.
 
+true try_all
+
 fun: testing_stack_eq { len0 len1 len stk -- equal }
   len 0 +for: ind
     ind len0 + stk stack_cell_at @ { one }
@@ -59,7 +61,7 @@ fun: <T> STACK stack_len_cells T_ST_LEN_1 ! end
 \ 10 20   T{   30 40   <T>   50 60   }T
 \         ^ len0 = 2   ^ len1 = 4    ^ len2 = 6
 \                      ^ rel0 = 2    ^ rel1 = 2
-fun: }T
+fun: }T { -- err }
   STACK               { stk  }
   stk stack_len_cells { len2 } \ Length at `}T`.
   T_ST_LEN_1 @        { len1 } \ Stack length at `<T>`.
@@ -72,7 +74,7 @@ fun: }T
   if
     \ Does the content match?
     len0 len1 rel1 stk testing_stack_eq
-    if stk testing_interp_reset ret end
+    if stk testing_interp_reset nil ret end
   else
     " [test] stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 elogf elf
   end
@@ -83,6 +85,7 @@ fun: }T
   stk testing_interp_reset
   " test failure" throw
   unreachable
+  nil
 end
 
 \ ## Compilation-mode test routines (inside words)
@@ -106,11 +109,12 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
 \ valid again.
 \
 \ TODO: general solution for similar cases.
-fun: testing_stack_init_aot
-  has_interp if ret end
-  TEST_STACK_INITED_AOT @ if ret end
+fun: testing_stack_init_aot { -- err }
+  has_interp if nil ret end
+  TEST_STACK_INITED_AOT @ if nil ret end
   32 TEST_STACK stack_init
   TEST_STACK_INITED_AOT on!
+  nil
 end
 
 fun: testing_compiled_reset
@@ -118,8 +122,8 @@ fun: testing_compiled_reset
   TEST_ARG_LEN off!
 end
 
-fun: testing_compile_push_args { len }
-  len ifn ret end
+fun: testing_compile_push_args { len -- err }
+  len ifn nil ret end
 
   len     { stk_reg }
   len inc { top_reg }
@@ -130,9 +134,10 @@ fun: testing_compile_push_args { len }
   TEST_STACK stk_reg         comp_page_addr
   len        stk_reg top_reg comp_args_to_stack
   0                          comp_args_set
+  nil
 end
 
-fun_comp: T{
+fun_comp: T{ { -- err }
   " when calling `T{`" 0 comp_args_valid
 
   TEST_ARG_LEN @ if
@@ -140,32 +145,31 @@ fun_comp: T{
     throw
   end
 
-  \ Briefly disabling auto-catching allows testing to work
-  \ seamlessly in tests annotated with `[ true catches ]`.
-  get_catches { ok }
-  ok if false catches end
+  \ Treat test error as "exception".
+  get_try_all { prev }
+  true try_all
   compile' testing_stack_init_aot
-  ok if true catches end
+  prev try_all
+
+  nil
 end
 
-fun_comp: <T>
+fun_comp: <T> { -- err }
   comp_args_get { len }
   len testing_compile_push_args
   len TEST_ARG_LEN !
+  nil
 end
 
 \ Modified from `}T` to be more suitable for compiled code in reg-CC.
-fun: testing_compiled_end { arg_len } [ true catches ]
+fun: testing_compiled_end { arg_len -- err } [ false try_all ]
   TEST_STACK  { stk  }
   0           { len0 } \ T{
   arg_len     { len1 } \ <T>
   arg_len 2 * { len2 } \ }T
 
   len0 len1 arg_len stk testing_stack_eq
-  if
-    testing_compiled_reset
-    ret
-  end
+  if testing_compiled_reset nil ret end
 
   " [test] mismatch: " elog
   len0 len1 len2 stk testing_stack_log
@@ -173,9 +177,10 @@ fun: testing_compiled_end { arg_len } [ true catches ]
   testing_compiled_reset
   " test failure" throw
   unreachable
+  nil
 end
 
-fun_comp: }T
+fun_comp: }T { -- err }
   TEST_ARG_LEN @ { len }
   TEST_ARG_LEN off!
 
@@ -184,24 +189,27 @@ fun_comp: }T
   len testing_compile_push_args
   len comp_push
 
-  \ Briefly disabling auto-catching allows testing to work
-  \ seamlessly in tests annotated with `[ true catches ]`.
-  get_catches { ok }
-  ok if false catches end
+  \ Treat test error as "exception".
+  get_try_all { prev }
+  true try_all
   compile' testing_compiled_end
-  ok if true catches end
+  prev try_all
+
+  nil
 end
 
 \ ## Misc assertions
 
-fun: T_err_contains { act exp }
+fun: T_err_contains { act exp -- err }
   act ifn
     " missing error message; expected error to contain: %s"
     exp errf throw
   end
 
-  act exp strstr if ret end
+  act exp strstr if nil ret end
 
   " expected error message to contain: %s; actual error message: %s"
   exp act errf throw
+
+  nil
 end

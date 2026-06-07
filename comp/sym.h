@@ -54,7 +54,7 @@ typedef struct Sym {
   Bits    clobber;     // Clobbers these regs; also includes inps, outs, err.
   U8      inp_len;     // Input parameter count.
   U8      out_len;     // Output parameter count.
-  bool    throws;      // Requires exception handling in callers.
+  bool    has_err;     // Last output is an error, or intrinsic returns `Err`.
   bool    comp_only;   // Can only be used between `:` and `;`.
   bool    interp_only; // Forbidden in AOT executables.
 } Sym;

@@ -1,5 +1,5 @@
 /*
-This file defines assembly procedures for Arm64 for the variant of our Forth
+This file defines assembly functions for Arm64 for the variant of our Forth
 system which uses the Forth data stack for its calling convention.
 
 Compare `./arch_arm64_cc_reg.c` which uses the native reg-based callvention.
@@ -71,7 +71,7 @@ static void asm_append_local_write(Comp *comp, Ind off) {
 }
 
 static S8 asm_sym_err_reg(const Sym *sym) {
-  if (!sym->throws) return -1;
+  if (!sym->has_err) return -1;
   return ASM_REG_ERR;
 }
 
@@ -91,17 +91,38 @@ static void asm_append_pop_try(Comp *comp) {
   asm_append_fixup_try(comp, ASM_REG_ERR); // cbnz <err>, <err_epi>
 }
 
+static void asm_append_err_reg_try(Comp *comp) {
+  asm_append_fixup_try(comp, ASM_REG_ERR); // cbnz <err>, <err_epi>
+}
+
 static void asm_append_pop_throw(Comp *comp) {
   asm_append_stack_pop_into(comp, ASM_REG_ERR);
   asm_append_fixup_throw(comp); // b <err_epi>
 }
 
-// Must be used after compiling every call to a non-extern procedure.
+static Err sym_has_err_set(Sym *sym, bool val, const char *action) {
+  if (sym->has_err == val) return nullptr;
+
+  if (sym->norm.has_recur) {
+    return errf(
+      "in " FMT_QUOTED
+      ": unable to %s after `recur`: hint: add `[ true "
+      "throws ]` before `recur`",
+      sym->name.buf,
+      action
+    );
+  }
+
+  sym->has_err = val;
+  return nullptr;
+}
+
+// Must be used after compiling every call to a non-extern function.
 static Err asm_append_try_catch(
-  Comp *comp, Sym *caller, const Sym *callee, bool force_catch
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode_catch
 ) {
-  if (force_catch) {
-    if (!callee->throws) {
+  if (err_mode_catch) {
+    if (!callee->has_err) {
       return err_catch_no_throw(callee->name.buf);
     }
 
@@ -112,27 +133,13 @@ static Err asm_append_try_catch(
     return nullptr;
   }
 
-  if (callee->throws) {
-    caller->throws = true;
+  if (callee->has_err) {
+    try(sym_has_err_set(caller, true, "auto-propagate error"));
     asm_append_fixup_try(comp, ASM_REG_ERR); // cbnz <err>, <err_epi>
     return nullptr;
   }
 
-  /*
-  In stack-CC, `catches` makes EVERY call return an error value.
-  If the callee doesn't throw, the error is always nil but it's
-  on the stack regardless. This avoids having to remember which
-  words throw and which ones don't; check error after each call.
-  Note that when a word throws, it likely fails to push outputs
-  to the stack. After catching, the stack state below the error
-  is basically undefined.
-  */
-  if (comp->ctx.catches) {
-    // `sp` acts as a zero value here.
-    asm_append_stack_push_from(comp, ASM_REG_SP);
-    return nullptr;
-  }
-
+  (void)comp;
   return nullptr;
 }
 
@@ -153,7 +160,7 @@ TODO: words which contain such calls may not appear in compiled executables.
 We detect these calls and set `Sym.interp_only` for later use.
 */
 static Err asm_append_call_intrin(
-  Comp *comp, Sym *caller, const Sym *callee, bool catch
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
 
@@ -165,7 +172,7 @@ static Err asm_append_call_intrin(
   asm_append_branch_link_to_reg(comp, reg);
   asm_register_call(comp, caller);
   asm_append_call_intrin_after(comp);
-  try(asm_append_try_catch(comp, caller, callee, catch));
+  try(asm_append_try_catch(comp, caller, callee, err_mode));
   return nullptr;
 }
 
@@ -196,8 +203,8 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
   if (out_len) asm_append_stack_push_from(comp, ASM_REG_ERR);
 
   /*
-  Extern procedures always clobber the error register. We don't need to
-  zero it here, because that's done in the epilogue in the success case.
+  Extern functions always clobber the error register. We don't need to
+  zero it here because that's done in the epilogue in the success case.
   See `asm_append_sym_epilogue_ok`.
   */
 }

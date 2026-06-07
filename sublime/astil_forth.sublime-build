@@ -4,6 +4,10 @@
   "file_regex": "position:[\t ]+(...*?):(\\d+):(\\d+)",
   "variants": [
     {
+      "name": "std:lang.af",
+      "cmd": ["astil", "std:lang.af", "$file"],
+    },
+    {
       "name": "trace",
       "cmd": ["astil", "--trace=true", "$file"],
     },

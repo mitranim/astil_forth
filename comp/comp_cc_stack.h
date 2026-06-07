@@ -32,5 +32,4 @@ typedef struct {
   bool       redefining; // Temporarily suppress "redefined" diagnostic.
   bool       compiling;  // Turned on by `:` and `]`, turned off by `[`.
   bool       has_alloca; // True if SP is dynamically adjusted in the body.
-  bool       catches;    // Automatically "catch" returned exceptions.
 } Comp_ctx;

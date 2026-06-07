@@ -38,9 +38,8 @@ static Err interp_rewind(Interp *interp) {
   stack_rewind(&prev->syms, &interp->syms);
 
   /*
-  TODO: support deletion in dicts.
-  For now, accessing a partially-defined word
-  after recovering from an exception is UB.
+  TODO: support deletion in dicts. For now, accessing a partially
+  defined word after recovering from an error is UB.
 
     const auto len_next = (Ind)stack_len(syms);
     const auto words = &interp->words;
@@ -214,7 +213,7 @@ static Err interp_call_intrin(Interp *interp, const Sym *sym) {
 
 static Err interp_call_extern(Interp *interp, const Sym *sym) {
   IF_DEBUG(eprintf(
-    "[system] calling external procedure " FMT_QUOTED
+    "[system] calling external function " FMT_QUOTED
     " at address %p; inp_len: %d; out_len: %d\n",
     sym->name.buf,
     sym->exter,
@@ -225,7 +224,7 @@ static Err interp_call_extern(Interp *interp, const Sym *sym) {
   const auto err = asm_call_extern(&interp->ints, sym);
 
   IF_DEBUG(eprintf(
-    "[system] done called extern procedure " FMT_QUOTED "\n", sym->name.buf
+    "[system] done called extern function " FMT_QUOTED "\n", sym->name.buf
   ));
   return err;
 }

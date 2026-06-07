@@ -14,6 +14,7 @@ typedef struct {
 // Per-module state, created for each import.
 typedef struct {
   Reader reader;
+  bool   try_all;
 } Module_ctx;
 
 /*
