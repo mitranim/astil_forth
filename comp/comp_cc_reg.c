@@ -964,11 +964,53 @@ static Err comp_alloca(Comp *comp) {
   return nullptr;
 }
 
-static Err comp_append_try_or_throw(
-  Comp *comp, const Sym *sym, const char *msg, void(asm_append)(Comp *)
-) {
+/*
+Examples without and with `try`:
+
+  fun: word0 { -- err }              err end
+  fun: word1 { -- val err }    10    err end
+  fun: word2 { -- val val err} 10 20 err end
+
+  word0 { err }
+  word1 { val err }
+  word2 { val val err }
+
+  err   try
+  word0 try
+  word1 try { val }
+  word2 try { val val }
+*/
+static Err comp_append_try(Comp *comp, const Sym *sym) {
   aver(sym->throws);
-  try(comp_validate_args(comp, msg, 1));
+
+  const auto ctx     = &comp->ctx;
+  const auto name    = sym->name.buf;
+  const auto arg_low = ctx->arg_low;
+  const auto arg_len = ctx->arg_len;
+
+  if (arg_low) {
+    return err_args_partial(name, "unable to `try`", arg_low, arg_len);
+  }
+
+  if (!arg_len) {
+    return errf(
+      "in " FMT_QUOTED ": unable to `try`: need at least one argument", name
+    );
+  }
+
+  const auto src_reg = (U8)(arg_len - 1);
+  const auto tar_reg = (U8)asm_sym_err_reg(sym);
+  validate_param_reg(src_reg);
+  validate_param_reg(tar_reg);
+  asm_append_try(comp, tar_reg, src_reg);
+
+  ctx->arg_len--;
+  return nullptr;
+}
+
+static Err comp_append_throw(Comp *comp, const Sym *sym) {
+  aver(sym->throws);
+  try(comp_validate_args(comp, "unable to `throw`", 1));
   comp_clear_args(comp);
 
   const auto src_reg = ASM_PARAM_REG_0;
@@ -980,24 +1022,8 @@ static Err comp_append_try_or_throw(
     asm_append_mov_reg(comp, (U8)tar_reg, (U8)src_reg);
   }
 
-  asm_append(comp);
+  asm_append_fixup_throw(comp);
   return nullptr;
-}
-
-static void comp_asm_append_try(Comp *comp) {
-  asm_append_fixup_try(comp, ASM_PARAM_REG_0);
-}
-
-static Err comp_append_try(Comp *comp, const Sym *sym) {
-  return comp_append_try_or_throw(
-    comp, sym, "unable to `try`", comp_asm_append_try
-  );
-}
-
-static Err comp_append_throw(Comp *comp, const Sym *sym) {
-  return comp_append_try_or_throw(
-    comp, sym, "unable to `throw`", asm_append_fixup_throw
-  );
 }
 
 /*

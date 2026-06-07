@@ -244,47 +244,44 @@ the compiler to stash and restore the error register, which would be easy
 to forget. That said, we also recommend using `catches` in such callbacks
 to ensure exceptions are not ignored, which is also easy to forget...
 */
-static void asm_append_try(Comp *comp, const Sym *caller, const Sym *callee) {
-  IF_DEBUG(aver(caller->throws));
-  IF_DEBUG(aver(callee->throws));
-
-  const auto reg = asm_sym_err_reg(callee);
-  IF_DEBUG(aver(reg >= 0));
-
-  const auto callee_err = (U8)reg;
-  const auto caller_err = caller->out_len;
-
-  if (caller_err == callee_err) {
-    // cbnz <err>, <epi_err>
-    asm_append_fixup_try(comp, caller_err);
+static void asm_append_try(
+  Comp *comp,
+  U8    tar_reg, // Current word's (caller's) error register.
+  U8    src_reg  // Error register we're testing.
+) {
+  if (tar_reg == src_reg) {
+    // cbnz <reg>, <epi_reg>
+    asm_append_fixup_try(comp, tar_reg);
     return;
   }
 
   /*
-  Often, error register doesn't match, and we're allowed to immediately
-  clobber the caller's error register because it's not among the callee
-  output registers.
+  Most of the time, "try" happens against multiple outputs,
+  where the last output is an error. When testing an error,
+  we are not allowed to clobber any prior outputs. However,
+  if the target error register is higher, we can renumerate
+  without clobbering the prior values.
 
-    mov  <calleR_err>, <calleE_err>
-    cbnz <calleR_err>, <epi_err>
+    mov  <tar_reg>, <src_reg>
+    cbnz <tar_reg>, <epi_reg>
   */
-  if (caller->out_len >= callee->out_len || callee->type == SYM_INTRIN) {
-    asm_append_mov_reg(comp, caller_err, callee_err);
-    asm_append_fixup_try(comp, caller_err);
+  if (tar_reg > src_reg) {
+    asm_append_mov_reg(comp, tar_reg, src_reg);
+    asm_append_fixup_try(comp, tar_reg);
     return;
   }
 
   /*
-  If the caller's error register is among the callee's
-  output registers, we must handle it more carefully.
+  If the target error register is among the outputs preceding
+  the source error register, we must handle it more carefully.
 
-    cbz <calleE_err>, <rest>
-    mov <calleR_err>, <calleE_err>
-    b   <epi_err>
+    cbz <src_reg>, <rest>
+    mov <tar_reg>, <src_reg>
+    b   <epi_reg>
     <rest>: proceeed
   */
-  asm_append_compare_branch_zero(comp, callee_err, 3);
-  asm_append_mov_reg(comp, caller_err, callee_err);
+  asm_append_compare_branch_zero(comp, src_reg, 3);
+  asm_append_mov_reg(comp, tar_reg, src_reg);
   asm_append_fixup_throw(comp);
 }
 
@@ -310,7 +307,13 @@ static Err asm_append_try_catch(
   if (ctx->catches) return nullptr;
 
   caller->throws = true;
-  asm_append_try(comp, caller, callee);
+
+  const auto caller_reg = caller->out_len;
+  const auto callee_reg = asm_sym_err_reg(callee);
+
+  IF_DEBUG(aver(callee_reg >= 0));
+
+  asm_append_try(comp, caller_reg, (U8)callee_reg);
   return nullptr;
 }
 

@@ -1280,6 +1280,23 @@ fun: test_errf_throw
 end
 \ test_errf_throw
 
+\ Our "try" is atypical compared to verbs: instead of consuming all outputs,
+\ it "pops" only the last one, assuming it to be error or nil. By accident,
+\ we also allow to "push" subsequent arguments. Works exactly like a stack.
+fun: test_try_multiple
+  T{ nil try <T> }T
+  T{ nil nil try try <T> }T
+  T{ nil try nil try <T> }T
+  T{ 10 nil try <T> 10 }T
+  T{ 20 nil nil try try <T> 20 }T
+  T{ 20 nil nil try nil try <T> 20 nil }T
+  T{ 10 20 nil try <T> 10 20 }T
+  T{ 10 20 nil nil try try <T> 10 20 }T
+  T{ 10 20 nil try nil try <T> 10 20 }T
+  T{ 10 20 nil try nil try nil <T> 10 20 nil }T
+end
+test_try_multiple
+
 fun: test_wrapf
   nil  " one"          wrapf { err0 }
   err0 " two: %s" err0 wrapf { err1 }

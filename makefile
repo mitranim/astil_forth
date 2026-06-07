@@ -31,7 +31,7 @@ TEST_EXE ?= test.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
 WATCH_IGNORE ?= -i=$(GEN_DIR)
-WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q
+WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q $(watch)
 # WATCH ?= watchexec $(and $(CLEAR),-c) $(WATCH_IGNORE) -r -d=1ms -n -q --no-vcs-ignore
 WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=af
@@ -112,11 +112,11 @@ run_s:
 #   make run_w args='forth/test.af -'
 .PHONY: run_w
 run_w:
-	$(WATCH_IMM) -- $(MAKE) run
+	$(WATCH_ALL) -- $(MAKE) run
 
 .PHONY: run_s_w
 run_s_w:
-	$(WATCH_IMM) -- $(MAKE) run_s
+	$(WATCH_ALL) -- $(MAKE) run_s
 
 $(MAIN): $(ALL_SRC)
 	$(CC) $(CFLAGS) $(MAIN_SRC) -o $@
