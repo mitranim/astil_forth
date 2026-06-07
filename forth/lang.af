@@ -1375,6 +1375,20 @@ fun: mem: { cap } ( C: "name" -- ) ( E: -- adr )
   [ false comp_only ]
 end
 
+\ Shortcut for creating string "constants". Typical use:
+\
+\   " one" str: STR_ONE
+\   " two" str: STR_TWO
+\
+\ Reason: literal strings in root scope are transient.
+\ They always refer to the start of the reader buffer.
+fun: str: { str }
+  str strlen inc { cap }
+  str cap alloc_data { adr }
+  parse_word adr init_data_word
+  [ false comp_only ]
+end
+
 \ ## IO
 \
 \ Having access to `libc` spares us from having to implement
