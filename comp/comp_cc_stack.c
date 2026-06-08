@@ -134,9 +134,7 @@ static void comp_add_clobbers(Sym *caller, const Sym *callee) {
   if (bits_has(callee->clobber, reg)) bits_add_to(&caller->clobber, reg);
 }
 
-static Err comp_append_call_norm(
-  Comp *comp, const Sym *callee, bool err_mode, bool *inlined
-) {
+static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
   IF_DEBUG(aver(callee->type == SYM_NORM));
 
   Sym *caller;
@@ -144,30 +142,32 @@ static Err comp_append_call_norm(
 
   if (callee->norm.inlinable) {
     try(comp_inline_sym(comp, caller, callee, err_mode));
-    if (inlined) *inlined = true;
   }
   else {
     try(asm_append_call_norm(comp, caller, callee, err_mode));
-    if (inlined) *inlined = false;
+    sym_register_call(caller, callee);
   }
+
   comp_add_clobbers(caller, callee);
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool err_mode) {
+static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(asm_append_call_intrin(comp, caller, callee, err_mode));
   comp_add_clobbers(caller, callee);
+  sym_register_call(caller, callee);
   return nullptr;
 }
 
-static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
+static Err comp_append_call_extern(Comp *comp, Sym *callee) {
   IF_DEBUG(aver(callee->type == SYM_EXTERN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   asm_append_call_extern(comp, caller, callee);
   comp_add_clobbers(caller, callee);
+  sym_register_call(caller, callee);
   return nullptr;
 }

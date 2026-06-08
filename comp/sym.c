@@ -136,3 +136,8 @@ static const char *wordlist_name(Wordlist val) {
     default:            return "unknown wordlist";
   }
 }
+
+static void sym_register_call(Sym *caller, Sym *callee) {
+  set_add(&caller->callees, callee);
+  set_add(&callee->callers, caller);
+}

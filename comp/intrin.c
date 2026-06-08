@@ -174,7 +174,7 @@ static Err interp_catch(Interp *interp, Wordlist wordlist) {
 
   switch (sym->type) {
     case SYM_NORM: {
-      try(comp_append_call_norm(comp, sym, err_mode, nullptr));
+      try(comp_append_call_norm(comp, sym, err_mode));
       return nullptr;
     }
     case SYM_INTRIN: {

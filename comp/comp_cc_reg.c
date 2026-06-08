@@ -825,9 +825,7 @@ static void comp_clear_args(Comp *comp) {
   ctx->arg_low   = 0;
 }
 
-static Err comp_append_call_norm(
-  Comp *comp, const Sym *callee, bool err_mode, bool *inlined
-) {
+static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
   IF_DEBUG(aver(callee->type == SYM_NORM));
 
   Sym *caller;
@@ -836,28 +834,28 @@ static Err comp_append_call_norm(
 
   if (callee->norm.inlinable) {
     try(asm_inline_sym(comp, caller, callee, err_mode));
-    if (inlined) *inlined = true;
   }
   else {
     try(asm_append_call_norm(comp, caller, callee, err_mode));
-    if (inlined) *inlined = false;
+    sym_register_call(caller, callee);
   }
 
   try(comp_after_append_call(comp, caller, callee, err_mode));
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, const Sym *callee, bool err_mode) {
+static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
   IF_DEBUG(aver(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
   try(asm_append_call_intrin(comp, caller, callee, err_mode));
   try(comp_after_append_call(comp, caller, callee, err_mode));
+  sym_register_call(caller, callee);
   return nullptr;
 }
 
-static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
+static Err comp_append_call_extern(Comp *comp, Sym *callee) {
   IF_DEBUG(aver(callee->type == SYM_EXTERN));
 
   Sym *caller;
@@ -867,6 +865,7 @@ static Err comp_append_call_extern(Comp *comp, const Sym *callee) {
 
   constexpr bool err_mode = false;
   try(comp_after_append_call(comp, caller, callee, err_mode));
+  sym_register_call(caller, callee);
   return nullptr;
 }
 

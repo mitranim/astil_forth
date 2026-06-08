@@ -321,11 +321,9 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   }
 #endif // CALL_CONV_STACK
 
-  bool inlined = false;
-
   switch (callee->type) {
     case SYM_NORM: {
-      try(comp_append_call_norm(comp, callee, err_mode, &inlined));
+      try(comp_append_call_norm(comp, callee, err_mode));
       break;
     }
     case SYM_INTRIN: {
@@ -337,11 +335,6 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
       break;
     }
     default: unreachable();
-  }
-
-  if (!inlined) {
-    set_add(&caller->callees, callee);
-    set_add(&callee->callers, caller);
   }
 
   IF_DEBUG(eprintf(
