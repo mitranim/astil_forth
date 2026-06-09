@@ -53,7 +53,7 @@ static Err validate_callees_can_compile(Sym_set *visited, const Sym *sym) {
 }
 
 static void encode_got_section(const Comp *comp, Buf *buf) {
-  const auto cap = stack_len(&comp->code.externs.names);
+  const auto cap = comp->code.externs.addrs.len;
 
   for (Ind ind = 0; ind < cap; ind++) {
     // 4-byte distance to next fixup; 0 = end of chain.
@@ -84,15 +84,15 @@ be replaced with addresses by the dylinker.
 static void encode_linkedit_section(
   const Comp *comp, U64 text_seg_vm_off, U64 got_vm_off, Buf *buf
 ) {
-  const auto code          = &comp->code;
-  const auto exts          = &code->externs;
-  const auto imports_count = (Ind)stack_len(&exts->names);
-  const auto base_len      = buf->len;
+  const auto code         = &comp->code;
+  const auto exts         = &code->externs;
+  const auto extern_count = code->externs.addrs.len;
+  const auto base_len     = buf->len;
 
   constexpr U32 img_off = sizeof(Mach_fixup_head);
   constexpr U32 seg_off = img_off + sizeof(Mach_fixup_img_5);
   constexpr U32 imp_off = seg_off + sizeof(Mach_fixup_seg);
-  const U32     sym_off = imp_off + (sizeof(Mach_fixup_import) * imports_count);
+  const U32     sym_off = imp_off + (sizeof(Mach_fixup_import) * extern_count);
 
   buf_append(
     buf,
@@ -100,20 +100,22 @@ static void encode_linkedit_section(
       .starts_offset  = img_off,
       .imports_offset = imp_off,
       .symbols_offset = sym_off,
-      .imports_count  = imports_count,
+      .imports_count  = extern_count,
       .imports_format = MFI_IMPORT,
     }
   );
+
+  const auto got_off = !!extern_count * (seg_off - img_off);
 
   buf_append(
     buf,
     (Mach_fixup_img_5){
       .seg_count          = 5,
-      .seg_info_offset[0] = 0,                 // __PAGEZERO   → no fixup
-      .seg_info_offset[1] = 0,                 // __TEXT       → no fixup
-      .seg_info_offset[2] = 0,                 // __DATA       → no fixup
-      .seg_info_offset[3] = seg_off - img_off, // __DATA_CONST → __got
-      .seg_info_offset[4] = 0,                 // __LINKEDIT   → no fixup
+      .seg_info_offset[0] = 0,       // __PAGEZERO   → no fixup
+      .seg_info_offset[1] = 0,       // __TEXT       → no fixup
+      .seg_info_offset[2] = 0,       // __DATA       → no fixup
+      .seg_info_offset[3] = got_off, // __DATA_CONST → __got
+      .seg_info_offset[4] = 0,       // __LINKEDIT   → no fixup
     }
   );
 
@@ -178,10 +180,15 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   /*
   We build the image piece-by-piece, but some of the sizes and offsets have to
   be calculated in advance, because they're specified in the headers upfront.
+
+  `cmd_count` must match the sections, and the sections must match what we
+  specify in `encode_linkedit_section`. Currently it hardcodes the sections
+  so they must all be present, even if empty.
   */
 
   // Must match the commands below.
-  constexpr auto cmd_count = 11;
+
+  constexpr U8 cmd_count = 11;
 
   // Must match the commands below.
   constexpr U32 cmd_size = 0 +                      //
@@ -358,7 +365,6 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     offsetof(Comp_heap, exec.instrs);
 
   aver(data_vm_off + data_vm_size <= got_vm_off);
-
   aver(is_aligned_to(got_file_off, MEM_PAGE));
   aver(is_aligned_to(got_file_size, MEM_PAGE));
   aver(is_aligned_to(got_vm_off, MEM_PAGE));
@@ -528,6 +534,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
 
   buf_append_bytes(buf, linkedit.dat, linkedit.len);
   aver(buf->len == linkedit_file_off + linkedit.len);
+
   buf_zeropad_to(buf, sig_file_off);
   aver(buf->len == sig_file_off);
 
