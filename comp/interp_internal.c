@@ -425,12 +425,12 @@ static Err interp_eval(Interp *interp, const char *code) {
   return err;
 }
 
-static Err interp_import_stdio(Interp *interp, const char *path) {
-  deferred(file_deinit) FILE *file = fopen(path, "r");
-  if (!file) return err_file_unable_to_open(path);
-
+static Err interp_import_stdin(Interp *interp) {
+  const auto path = "/dev/stdin";
+  const auto file = stdin;
   const auto read = interp_reader(interp);
-  read->file      = file;
+
+  read->file = file;
   try(str_set(&read->file_path, path));
 
   const auto tty = isatty(fileno(file));
@@ -535,15 +535,15 @@ static Err interp_import_inner(
 static Err interp_import(Interp *interp, const char *path) {
   try(interp_snapshot(interp));
 
-  const auto prev            = interp->module;
-  const auto prev_file       = prev ? prev->reader.file : nullptr;
-  const auto prev_path       = prev ? prev->reader.file_path.buf : nullptr;
-  const auto stdio_file_path = file_path_stdio(path);
-  Module_ctx next            = {};
-  interp->module             = &next;
+  const auto prev      = interp->module;
+  const auto prev_file = prev ? prev->reader.file : nullptr;
+  const auto prev_path = prev ? prev->reader.file_path.buf : nullptr;
 
-  const auto err = stdio_file_path
-    ? interp_import_stdio(interp, stdio_file_path)
+  Module_ctx next = {};
+  interp->module  = &next;
+
+  const auto err = is_path_stdin(path)
+    ? interp_import_stdin(interp)
     : interp_import_inner(interp, prev_file, prev_path, path);
 
   interp->module = prev;

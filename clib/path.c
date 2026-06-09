@@ -93,19 +93,13 @@ static bool is_path_stdin(const char *path) {
   return !strcmp(path, "-") || !strcmp(path, "/dev/stdin");
 }
 
-/*
-Normalizes the path so the file can be opened,
-and returns a statically allocated string.
-*/
-static const char *file_path_stdio(const char *path) {
-  if (is_path_stdin(path)) {
-    return "/dev/stdin";
-  }
-  if (!strcmp(path, "/dev/stdout")) {
-    return "/dev/stdout";
-  }
-  if (!strcmp(path, "/dev/stderr")) {
-    return "/dev/stderr";
-  }
-  return nullptr;
-}
+// /*
+// Normalizes the path so the file can be opened,
+// and returns a statically allocated string.
+// */
+// static const char *file_path_stdio(const char *path) {
+//   if (is_path_stdin(path)) return "/dev/stdin";
+//   if (!strcmp(path, "/dev/stdout")) return "/dev/stdout";
+//   if (!strcmp(path, "/dev/stderr")) return "/dev/stderr";
+//   return nullptr;
+// }
