@@ -20,4 +20,4 @@ local function run(depth, runs)
   -- print(string.format("%f", fib(depth)))
 end
 
-run(91, bit.lshift(1, 16))
+run(91, bit.lshift(1, 20))

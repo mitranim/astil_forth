@@ -21,6 +21,7 @@ HYPERFINE_OPTS = [
     "--shell=none",
 ]
 
+CLEAN = ("make", "clean")
 BUILD = ("make", "PROD=true", "build")
 
 TOOLS = {
@@ -135,6 +136,11 @@ bench("fib_loop_pypy", "bench/fib_loop.py", "pypy3 bench/fib_loop.py", tools=("p
 bench("fib_loop_python", "bench/fib_loop.py", "python3 bench/fib_loop.py", tools=("python3",))
 
 section("FIB_LOOP_BIG")
+bench("fib_loop_big_clang", "bench/fib_loop_big.c", "bench/fib_loop_big.exe", setup=c_exe("bench/fib_loop_big.c", "bench/fib_loop_big.exe"), tools=("clang",))
+bench("fib_loop_big_astil_asm_aot", "bench/fib_loop_big_asm.af", "bench/fib_loop_big_astil_asm.exe", setup=aot("bench/fib_loop_big_asm.af", "bench/fib_loop_big_astil_asm.exe"), tools=("clang",))
+bench("fib_loop_big_astil_asm_reg", "bench/fib_loop_big_asm.af", "./astil.exe bench/fib_loop_big_asm.af", setup=(BUILD,), tools=("clang",))
+bench("fib_loop_big_astil_aot", "bench/fib_loop_big.af", "bench/fib_loop_big_astil.exe", setup=aot("bench/fib_loop_big.af", "bench/fib_loop_big_astil.exe"), tools=("clang",))
+bench("fib_loop_big_astil_reg", "bench/fib_loop_big.af", "./astil.exe bench/fib_loop_big.af", setup=(BUILD,), tools=("clang",))
 bench("fib_loop_big_js_bun", "bench/fib_loop_big.mjs", "bun run bench/fib_loop_big.mjs", tools=("bun",))
 bench("fib_loop_big_cl_sbcl", "bench/fib_loop_big.lisp", "sbcl --script bench/fib_loop_big.lisp", tools=("sbcl",))
 bench("fib_loop_big_pypy", "bench/fib_loop_big.py", "pypy3 bench/fib_loop_big.py", tools=("pypy3",))
@@ -221,6 +227,10 @@ def unique_setup(items: list[Bench]) -> list[tuple[str, ...]]:
     return result
 
 
+def uses_astil(items: list[Bench]) -> bool:
+    return any("astil" in item.name for item in items)
+
+
 def selected_tools(items: list[Bench]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
@@ -278,6 +288,11 @@ def main() -> int:
         return 2
 
     os.chdir(ROOT)
+
+    if uses_astil(items):
+        progress(show_progress, "setup " + " ".join(CLEAN))
+        run(CLEAN)
+
     GEN.mkdir(exist_ok=True)
     output = Path(args.output)
     if not output.is_absolute():

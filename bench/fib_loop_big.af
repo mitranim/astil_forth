@@ -1,0 +1,90 @@
+import' std:lang.af
+
+\ BOT-TRANSLATED.
+\
+\ Emulates 128-bit integers in 64-bit GPRs.
+
+fun: u< { left right -- bool } [
+  0                    comp_clobber
+  0 1      asm_cmp_reg comp_instr \ cmp x0, x1
+  0 ASM_CC asm_cset    comp_instr \ cset x0, cc
+  1                    comp_args_set
+] end
+
+fun: int128_add { lo0 hi0 lo1 hi1 -- lo hi }
+  lo0 lo1 + { lo }
+  lo lo0 u< { carry }
+  hi0 hi1 + carry + { hi }
+  lo hi
+end
+
+fun: fib { depth -- lo hi }
+  0 0 1 0 { prev_lo prev_hi next_lo next_hi }
+  depth for
+    prev_lo prev_hi next_lo next_hi int128_add { sum_lo sum_hi }
+    next_lo next_hi { prev_lo prev_hi }
+    sum_lo sum_hi { next_lo next_hi }
+  end
+  next_lo next_hi
+end
+
+fun: bigint_divmod10_step { quo bit rem -- quo rem }
+  rem 1 lsl bit + { rem }
+  quo 1 lsl       { quo }
+  rem 10 >= if
+    rem 10 - { rem }
+    quo inc  { quo }
+  end
+  quo rem
+end
+
+fun: bigint_divmod10 { lo hi -- qlo qhi rem }
+  0 0 0 { qlo qhi rem }
+
+  hi { word }
+  64 for
+    word 63 lsr { bit }
+    qhi bit rem bigint_divmod10_step { qhi rem }
+    word 1 lsl { word }
+  end
+
+  lo { word }
+  64 for
+    word 63 lsr { bit }
+    qlo bit rem bigint_divmod10_step { qlo rem }
+    word 1 lsl { word }
+  end
+
+  qlo qhi rem
+end
+
+fun: bigint_log_decimal { lo hi }
+  40 alloca { buf }
+  buf 40 +  { ptr }
+
+  lo hi or ifn
+    48 logc
+    ret
+  end
+
+  loop
+    lo hi bigint_divmod10 { qlo qhi rem }
+    ptr dec { ptr }
+    rem 48 + ptr !8
+    qlo { lo }
+    qhi { hi }
+    lo hi or ifn leave end
+  end
+
+  buf 40 + ptr
+  +for: pos
+    pos @u8 logc
+  end
+end
+
+fun: main { -- exit }
+  1 18 lsl for 184 fib { -- } end
+  \ 184 fib bigint_log_decimal lf
+  0
+end
+main

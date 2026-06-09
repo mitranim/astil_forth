@@ -16,4 +16,4 @@ def run(depth, runs):
     runs -= 1
   # print(fib(depth))
 
-run(234, 1 << 16)
+run(184, 1 << 18)

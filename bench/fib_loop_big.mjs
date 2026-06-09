@@ -16,4 +16,4 @@ function run(depth, runs) {
   // console.log(fib(depth))
 }
 
-run(234, (1 << 16))
+run(184, (1 << 18))

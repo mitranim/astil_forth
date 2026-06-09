@@ -33,7 +33,7 @@ fun: run { count }
 end
 
 fun: main { -- exit }
-  1 16 lsl run
+  1 20 lsl run
   \ 91 fib log_int lf
   0
 end

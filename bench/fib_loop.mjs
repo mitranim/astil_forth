@@ -17,4 +17,4 @@ function run(depth, runs) {
 }
 
 // Note: the result is slightly incorrect due to limited integer precision.
-run(91, (1 << 16))
+run(91, (1 << 20))

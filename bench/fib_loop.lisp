@@ -23,4 +23,4 @@
   ; (princ (fib depth)) (write-char #\newline)
 )
 
-(run 91 (ash 1 16))
+(run 91 (ash 1 20))

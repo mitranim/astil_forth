@@ -124,12 +124,19 @@ Python 3.14.4
 
 ## FIB_LOOP_BIG
 
+C and Astil benchmarks use uint128. JS/CL/Python use actual bigints.
+
 | Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 |:---|---:|---:|---:|---:|
-| `fib_loop_big_js_bun` | 150.2 ± 2.0 | 146.7 | 154.9 | 1.18 ± 0.02 |
-| `fib_loop_big_cl_sbcl` | 127.5 ± 0.5 | 126.9 | 128.5 | 1.00 |
-| `fib_loop_big_pypy` | 139.2 ± 0.3 | 138.6 | 139.7 | 1.09 ± 0.00 |
-| `fib_loop_big_python` | 572.7 ± 6.6 | 567.6 | 589.9 | 4.49 ± 0.05 |
+| `fib_loop_big_clang` | 16.9 ± 1.3 | 15.2 | 20.4 | 1.00 |
+| `fib_loop_big_astil_asm_aot` | 17.0 ± 0.4 | 16.5 | 19.2 | 1.01 ± 0.08 |
+| `fib_loop_big_astil_asm_reg` | 23.3 ± 0.5 | 22.6 | 24.8 | 1.38 ± 0.11 |
+| `fib_loop_big_astil_aot` | 63.1 ± 1.6 | 61.2 | 65.6 | 3.73 ± 0.31 |
+| `fib_loop_big_astil_reg` | 69.5 ± 1.3 | 68.0 | 71.8 | 4.11 ± 0.33 |
+| `fib_loop_big_js_bun` | 415.1 ± 1.9 | 412.2 | 417.7 | 24.54 ± 1.94 |
+| `fib_loop_big_cl_sbcl` | 330.1 ± 0.7 | 329.0 | 330.9 | 19.52 ± 1.54 |
+| `fib_loop_big_pypy` | 358.8 ± 1.6 | 356.3 | 362.3 | 21.22 ± 1.68 |
+| `fib_loop_big_python` | 1719.9 ± 5.6 | 1710.3 | 1729.1 | 101.70 ± 8.04 |
 
 ## FIB_RECURSIVE: fib(36)
 

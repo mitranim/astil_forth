@@ -1,0 +1,98 @@
+import' std:lang.af
+
+\ BOT-TRANSLATED.
+\
+\ Emulates 128-bit integers in 64-bit GPRs.
+
+\ adc Xd, Xn, Xm
+fun: asm_adc_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_11010000_00000_000000_00000_00000 or
+end
+
+fun: fib { depth -- lo hi } [
+  0 comp_clobber
+  1 comp_clobber
+  2 comp_clobber
+  3 comp_clobber
+  4 comp_clobber
+  5 comp_clobber
+  6 comp_clobber
+
+  4 0   asm_mov_reg             comp_instr \ mov  x4, x0
+  0 1   asm_mov_imm             comp_instr \ mov  x0, 1
+  1     asm_zero_reg            comp_instr \ eor  x1, x1, x1
+  2     asm_zero_reg            comp_instr \ eor  x2, x2, x2
+  3     asm_zero_reg            comp_instr \ eor  x3, x3, x3
+  5 0   asm_mov_reg             comp_instr \ mov  x5, x0 -- <loop>
+  6 1   asm_mov_reg             comp_instr \ mov  x6, x1
+  0 0 2 asm_adds_reg            comp_instr \ adds x0, x0, x2
+  1 1 3 asm_adc_reg             comp_instr \ adc  x1, x1, x3
+  2 5   asm_mov_reg             comp_instr \ mov  x2, x5
+  3 6   asm_mov_reg             comp_instr \ mov  x3, x6
+  4 4 1 asm_sub_imm             comp_instr \ sub  x4, x4, 1
+  4 -28 asm_cmp_branch_not_zero comp_instr \ cbnz x4, <loop>
+
+  2 comp_args_set
+] end
+
+fun: bigint_divmod10_step { quo bit rem -- quo rem }
+  rem 1 lsl bit + { rem }
+  quo 1 lsl       { quo }
+  rem 10 >= if
+    rem 10 - { rem }
+    quo inc  { quo }
+  end
+  quo rem
+end
+
+fun: bigint_divmod10 { lo hi -- qlo qhi rem }
+  0 0 0 { qlo qhi rem }
+
+  hi { word }
+  64 for
+    word 63 lsr { bit }
+    qhi bit rem bigint_divmod10_step { qhi rem }
+    word 1 lsl { word }
+  end
+
+  lo { word }
+  64 for
+    word 63 lsr { bit }
+    qlo bit rem bigint_divmod10_step { qlo rem }
+    word 1 lsl { word }
+  end
+
+  qlo qhi rem
+end
+
+fun: bigint_log_decimal { lo hi }
+  40 alloca { buf }
+  buf 40 +  { ptr }
+
+  lo hi or ifn
+    48 logc
+    ret
+  end
+
+  loop
+    lo hi bigint_divmod10 { qlo qhi rem }
+    ptr dec { ptr }
+    rem 48 + ptr !8
+    qlo { lo }
+    qhi { hi }
+    lo hi or ifn leave end
+  end
+
+  buf 40 + ptr
+  +for: pos
+    pos @u8 logc
+  end
+end
+
+fun: main { -- exit }
+  1 18 lsl for 184 fib { -- } end
+  \ 184 fib bigint_log_decimal lf
+  0
+end
+main

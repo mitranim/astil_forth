@@ -9,7 +9,7 @@ fun: fib { ind -- out }
 end
 
 fun: main
-  1 16 lsl
+  1 20 lsl
   for 91 fib drop end
   \ 91 fib log_int lf
 end

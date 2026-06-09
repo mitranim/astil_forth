@@ -5,7 +5,7 @@
 ;
 
 : main
-  1 16 lshift \ runs
+  1 20 lshift \ runs
   0 ?do 91 fib drop loop
   \ 91 fib . cr
 ;
