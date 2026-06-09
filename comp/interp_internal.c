@@ -7,7 +7,6 @@
 #include "./read.c"
 #include <dlfcn.h>
 #include <stdio.h>
-#include <termios.h>
 
 static Err comp_snapshot(const Comp *prev, Comp *next) {
   try(comp_ctx_snapshot(&prev->ctx, &next->ctx));
@@ -112,15 +111,6 @@ static Err interp_on_tty_err(Interp *interp, Err err) {
   if (TRACE) backtrace_print();
   try(interp_rewind(interp));
   stack_trunc(&interp->ints);
-
-  /*
-  Purge the remaining buffered input. Without this, we'd continue interpreting
-  the remainder of a failed script, possibly inside a failed word definition,
-  which is a totally invalid state after rewinding.
-  */
-  const auto read = interp_reader(interp);
-  if (read) file_purge(read->file);
-
   return nullptr;
 }
 
@@ -307,9 +297,9 @@ static Err interp_word(Interp *interp, Word_str word) {
 
 static Err read_interp_word(Interp *interp) {
   const auto read = interp_reader(interp);
-  try(read_word(read));
+  Word_str   word;
+  try(read_valid_word(read, &word));
 
-  const auto word = read->word;
   IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", word.buf));
 
   return interp_word(interp, word);
@@ -325,8 +315,9 @@ static Err interp_err(Reader *read, const Err err) {
 static Err interp_loop(Interp *interp) {
   const auto read = interp_reader(interp);
 
-  for (;;) {
-    U8 next;
+  while (reader_has_more(read)) {
+    const auto beg = read->pos;
+    U8         next;
     try(read_ascii_printable(read, &next));
 
     switch (HEAD_CHAR_KIND[next]) {
@@ -334,7 +325,7 @@ static Err interp_loop(Interp *interp) {
       case CHAR_WHITESPACE: continue;
 
       case CHAR_DECIMAL: {
-        reader_back_push(read, next);
+        read->pos = beg;
         try(read_interp_num(interp));
         continue;
       }
@@ -343,20 +334,20 @@ static Err interp_loop(Interp *interp) {
       case CHAR_ARITH: {
         U8 next_next;
         try(read_ascii_printable(read, &next_next));
-        reader_back_push(read, next_next);
-        reader_back_push(read, next);
 
         if (HEAD_CHAR_KIND[next_next] == CHAR_DECIMAL) {
+          read->pos = beg;
           try(read_interp_num(interp));
           continue;
         }
 
+        read->pos = beg;
         try(read_interp_word(interp));
         continue;
       }
 
       case CHAR_WORD: {
-        reader_back_push(read, next);
+        read->pos = beg;
         try(read_interp_word(interp));
         continue;
       }
@@ -403,48 +394,52 @@ static const char *get_exec_path() {
 static const char *get_exec_path() { return nullptr; }
 #endif // __APPLE__
 
-static Err interp_eval(Interp *interp, const char *code) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-qual"
-  const auto buf = (void *)code;
-#pragma clang diagnostic pop
+static Err interp_eval(Interp *interp, const char *src) {
+  const auto len  = (Ind)strlen(src);
+  Module_ctx next = {};
+  next.reader     = (Reader){.src = src, .len = len, .path = "<eval>"};
 
-  deferred(file_deinit) FILE *file = fmemopen(buf, strlen(code), "r");
-  if (!file) return err_str("unable to fmemopen");
+  Module_ctx *prev     = interp->module;
+  interp->module       = &next;
+  defer interp->module = prev;
 
-  Module_ctx next  = {};
-  next.reader.file = file;
-  try(str_set(&next.reader.file_path, "<eval>"));
-
-  Module_ctx *prev = interp->module;
-  interp->module   = &next;
-
-  const auto err = interp_err(&next.reader, interp_loop(interp));
-
-  interp->module = prev;
-  return err;
+  return interp_err(&next.reader, interp_loop(interp));
 }
 
 static Err interp_import_stdin(Interp *interp) {
   const auto path = "/dev/stdin";
   const auto file = stdin;
   const auto read = interp_reader(interp);
+  const auto fdes = STDIN_FILENO;
+  const auto tty  = isatty(fdes);
 
-  read->file = file;
-  try(str_set(&read->file_path, path));
-
-  const auto tty = isatty(fileno(file));
   if (tty) interp_welcome(interp);
 
   IF_DEBUG(eprintf("[system] reading code from stdio: " FMT_QUOTED "\n", path));
 
-  if (!tty) return interp_err(read, interp_loop(interp));
+  if (!tty) {
+    deferred(chars_deinit) char *src = nullptr;
+    Uint                         len;
+    try(file_stream_read_text(path, file, &src, &len));
+    if (!len) return nullptr;
+
+    *read = (Reader){.src = src, .len = (Ind)len, .path = path, .tty = tty};
+    return interp_err(read, interp_loop(interp));
+  }
 
   for (;;) {
+    deferred(chars_deinit) char *src = nullptr;
+    Uint                         len;
+    try(fd_read_available_text(path, fdes, &src, &len));
+    if (!len) return nullptr;
+
+    *read = (Reader){.src = src, .len = (Ind)len, .path = path, .tty = tty};
     const auto err = interp_err(read, interp_loop(interp));
-    if (!err) return nullptr;
+
+    if (!err) continue;
     try(interp_on_tty_err(interp, err));
   }
+
   return nullptr;
 }
 
@@ -484,12 +479,11 @@ static char *resolve_import_path(const char *prev, const char *next) {
 }
 
 static Err interp_import_inner(
-  Interp *interp, FILE *prev_file, const char *prev, const char *next
+  Interp *interp, bool prev_tty, const char *prev, const char *next
 ) {
-  if (prev_file && isatty(fileno(prev_file))) prev = nullptr;
+  if (prev_tty) prev = nullptr;
 
-  // Owned by `interp.imports`, freed in `interp_deinit`.
-  const auto path = resolve_import_path(prev, next);
+  deferred(chars_deinit) char *path = resolve_import_path(prev, next);
 
   if (!path) {
     const auto code = errno;
@@ -512,22 +506,23 @@ static Err interp_import_inner(
       next,
       path
     ));
-    free(path);
     return nullptr;
   }
 
-  deferred(file_deinit) FILE *file = fopen(path, "r");
-  if (!file) return err_file_unable_to_open(path);
+  deferred(chars_deinit) char *src = nullptr;
+  Uint                         len;
+  try(file_read_text(path, &src, &len));
 
   const auto read = interp_reader(interp);
-  read->file      = file;
-  try(str_set(&read->file_path, path));
+
+  *read = (Reader){.src = src, .len = (Ind)len, .path = path};
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
   try(interp_err(read, interp_loop(interp)));
   IF_DEBUG(eprintf("[system] done importing file: " FMT_QUOTED "\n", path));
 
-  dict_set(imports, path, EMPTY);
+  dict_set(imports, path, EMPTY); // Owns the path now.
+  path = nullptr;                 // No `free` on success.
   return nullptr;
 }
 
@@ -536,25 +531,24 @@ static Err interp_import(Interp *interp, const char *path) {
   try(interp_snapshot(interp));
 
   const auto prev      = interp->module;
-  const auto prev_file = prev ? prev->reader.file : nullptr;
-  const auto prev_path = prev ? prev->reader.file_path.buf : nullptr;
-
-  Module_ctx next = {};
-  interp->module  = &next;
+  const auto prev_path = prev ? prev->reader.path : nullptr;
+  const auto prev_tty  = prev && prev->reader.tty;
+  Module_ctx next      = {};
+  interp->module       = &next;
+  defer interp->module = prev;
 
   const auto err = is_path_stdin(path)
     ? interp_import_stdin(interp)
-    : interp_import_inner(interp, prev_file, prev_path, path);
+    : interp_import_inner(interp, prev_tty, prev_path, path);
 
-  interp->module = prev;
   if (err) (void)interp_rewind(interp);
   return err;
 }
 
-static Err interp_read_word(Interp *interp) {
+static Err interp_read_word(Interp *interp, Word_str *out) {
   const auto read = interp_reader(interp);
-  try(read_word(read));
-  IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", read->word.buf));
+  try(read_valid_word(read, out));
+  IF_DEBUG(eprintf("[system] read word: " FMT_QUOTED "\n", out->buf));
   return nullptr;
 }
 
@@ -589,18 +583,16 @@ static Err interp_parse_until(
   Interp *interp, U8 delim, const char **out_buf, Ind *out_len
 ) {
   const auto read = interp_reader(interp);
-  try(read_until_char(read, (U8)delim));
+  Ind        len;
+  try(read_until_char(read, (U8)delim, out_buf, &len));
 
   // IF_DEBUG(eprintf(
-  //   "[system] parsed until delim " FMT_CHAR "; length: " FMT_UINT
-  //   "; string: %s\n",
+  //   "[system] parsed until delim " FMT_CHAR_QUOTED "; length: " FMT_UINT "\n",
   //   (int)delim,
-  //   read->buf.len,
-  //   read->buf.buf
+  //   len
   // ));
 
-  if (out_buf) *out_buf = read->buf.buf;
-  if (out_len) *out_len = read->buf.len;
+  if (out_len) *out_len = len;
 
   // IF_DEBUG({
   //   const auto ints = &interp->ints;
@@ -661,12 +653,14 @@ static Err interp_extern_fun(
   }
 
   const auto wordlist = WORDLIST_EXEC;
+  Word_str   word;
+  try(valid_word(name, (Ind)strlen(name), &word));
 
   const auto sym = stack_push(
     &interp->syms,
     (Sym){
       .type     = SYM_EXTERN,
-      .name     = interp_reader(interp)->word,
+      .name     = word,
       .wordlist = wordlist,
       .exter    = ext_adr,
       .inp_len  = (U8)inp_len,
@@ -760,10 +754,9 @@ static Err interp_validate_data_len(Sint val) {
   return errf("invalid data length: " FMT_SINT, val);
 }
 
-static Err interp_validate_string(Sint buf, Sint len) {
+static Err interp_validate_buf_len(Sint buf, Sint len) {
   try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
-  aver((Ind)len == strlen((const char *)buf));
   return nullptr;
 }
 

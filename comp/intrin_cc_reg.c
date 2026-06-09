@@ -16,20 +16,20 @@ while the braces anywhere else are used for assignments.
 */
 static Err interp_parse_params(Interp *interp) {
   const auto read = interp_reader(interp);
+  const auto beg  = read->pos;
 
-  try(read_word(read));
-  const auto word = read->word;
+  Word_str word;
+  try(read_valid_word(read, &word));
 
   if (!str_eq(&word, "{")) {
-    reader_back_push_word(read);
+    read->pos = beg;
     return nullptr;
   }
 
   const auto comp = &interp->comp;
 
   for (;;) {
-    try(read_word(read));
-    const auto word = read->word;
+    try(read_valid_word(read, &word));
     if (str_eq(&word, "}")) return nullptr;
     if (str_eq(&word, "--")) break;
     try(comp_add_input_param(comp, word));
@@ -41,8 +41,7 @@ static Err interp_parse_params(Interp *interp) {
   bool has_err = false;
 
   for (;;) {
-    try(read_word(read));
-    const auto word = read->word;
+    try(read_valid_word(read, &word));
     if (str_eq(&word, "}")) break;
     try(comp_add_output_param(comp, word, nullptr));
     has_err = str_eq(&word, "err");
@@ -67,8 +66,8 @@ static Err intrin_brace(Interp *interp) {
   try(comp_require_current_sym(comp, &sym));
 
   for (;;) {
-    try(read_word(read));
-    const auto word = read->word;
+    Word_str word;
+    try(read_valid_word(read, &word));
 
     if (str_eq(&word, "--")) goto discard;
     if (str_eq(&word, "}")) goto validate;
@@ -79,9 +78,10 @@ static Err intrin_brace(Interp *interp) {
   }
 
 discard:
-  try(read_word(read));
+  Word_str word;
+  try(read_valid_word(read, &word));
 
-  if (str_eq(&read->word, "}")) {
+  if (str_eq(&word, "}")) {
     if (comp->ctx.arg_low <= comp->ctx.arg_len) {
       comp->ctx.arg_low = comp->ctx.arg_len = 0;
       return nullptr;
@@ -111,21 +111,25 @@ validate:
 }
 
 static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
-  try(interp_validate_string(buf, len));
+  try(interp_validate_buf_len(buf, len));
   try(valid_word((const char *)buf, (Ind)len, out));
   return nullptr;
 }
 
 static Err intrin_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_EXEC, interp_reader(interp)->word));
+  Word_str name;
+  try(interp_read_word(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_EXEC, name));
   try(interp_parse_params(interp));
   return nullptr;
 }
 
 static Err intrin_colon_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_COMP, interp_reader(interp)->word));
+  Word_str name;
+  try(interp_read_word(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_COMP, name));
   try(interp_parse_params(interp));
   return nullptr;
 }
@@ -301,14 +305,16 @@ static Err intrin_comp_call(Sint ptr, Interp *interp) {
   return comp_append_call_sym(&interp->comp, sym);
 }
 
-static Err intrin_char(Interp *interp, Sint *out) {
+static Err intrin_read_char(Interp *interp, Sint *out) {
   char byte;
   try(interp_char(interp, &byte));
   if (out) *out = byte;
   return nullptr;
 }
 
-static Err intrin_parse(Sint delim, Interp *interp, const char **buf, Sint *len) {
+static Err intrin_read_until_char(
+  Sint delim, Interp *interp, const char **buf, Sint *len
+) {
   Ind len_tmp;
   try(validate_char_ascii_printable(delim));
   try(interp_parse_until(interp, (U8)delim, buf, &len_tmp));
@@ -317,7 +323,7 @@ static Err intrin_parse(Sint delim, Interp *interp, const char **buf, Sint *len)
 }
 
 // Technically not fundamental. TODO implement in Forth via intrinsic `char`.
-static Err intrin_parse_word(Interp *interp, const char **buf, Sint *len) {
+static Err intrin_read_word(Interp *interp, const char **buf, Sint *len) {
   Ind len_tmp;
   try(interp_parse_word(interp, buf, &len_tmp));
   if (len) *len = len_tmp;
@@ -325,14 +331,17 @@ static Err intrin_parse_word(Interp *interp, const char **buf, Sint *len) {
 }
 
 static Err intrin_import(Sint buf, Sint len, Interp *interp) {
-  try(interp_validate_string(buf, len));
-  try(interp_import(interp, (const char *)buf));
-  return nullptr;
+  try(interp_validate_buf_len(buf, len));
+  const auto path = str_alloc_copy((const char *)buf, (Ind)len);
+  const auto err  = interp_import(interp, path);
+  free(path);
+  return err;
 }
 
 static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
-  try(interp_validate_string(buf, len));
-  try(interp_extern_adr(interp, (const char *)buf));
+  Word_str name;
+  try(interp_valid_name(buf, len, &name));
+  try(interp_extern_adr(interp, name.buf));
 
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
@@ -341,23 +350,25 @@ static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
   const auto comp = &interp->comp;
   U8         reg;
   try(comp_next_arg_reg(comp, &reg));
-  asm_append_dysym_load(comp, (const char *)buf, reg, &comp->code.externs);
+  asm_append_dysym_load(comp, name.buf, reg, &comp->code.externs);
   return nullptr;
 }
 
 static Err intrin_extern_fun(
   Sint buf, Sint len, Sint inp_len, Sint out_len, Interp *interp
 ) {
-  try(interp_validate_string(buf, len));
-  try(interp_extern_fun(interp, (const char *)buf, inp_len, out_len));
+  Word_str name;
+  try(interp_valid_name(buf, len, &name));
+  try(interp_extern_fun(interp, name.buf, inp_len, out_len));
   return nullptr;
 }
 
 static Err intrin_find_word(
   Sint buf, Sint len, Wordlist wordlist, Interp *interp, const Sym **sym
 ) {
-  try(interp_validate_string(buf, len));
-  try(interp_find_word(interp, (const char *)buf, wordlist, sym));
+  Word_str name;
+  try(interp_valid_name(buf, len, &name));
+  try(interp_find_word(interp, name.buf, wordlist, sym));
   return nullptr;
 }
 
@@ -473,7 +484,7 @@ static Err intrin_comp_clobber(Sint reg, Interp *interp) {
 static Err intrin_comp_local_named(
   Sint buf, Sint len, Interp *interp, const Local **out
 ) {
-  try(interp_validate_string(buf, len));
+  try(interp_validate_buf_len(buf, len));
   Local *loc;
   try(interp_get_local(interp, (const char *)buf, (Ind)len, &loc));
   if (out) *out = local_token(loc);

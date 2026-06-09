@@ -1276,6 +1276,15 @@ fun: test_cstr_eq { -- err }
 end
 test_cstr_eq
 
+fun: test_str_slice { -- err }
+  T{ s" one" s" two" str= <T> false }T
+  nil
+end
+test_str_slice
+
+fun: first_str_head { str0 len0 str1 len1 -- char } str0 @u8 end
+T{ s" one" s" two" first_str_head <T> char' o }T
+
 fun: test_cstr_less { -- err }
   T{ nil           nil    cstr< <T> false }T
   T{ nil           " one" cstr< <T> true  }T
@@ -2229,6 +2238,15 @@ fun: test_arena_errors { -- err }
   nil
 end
 test_arena_errors
+
+fun: test_word_len_over { -- err }
+  s" ./test/test_word_len_over.af" catch' import { err }
+  err " word length 128 exceeds max word length 127" T_err_contains
+  nil
+end
+test_word_len_over
+
+s" ./test/test_import_empty.af" import
 
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on

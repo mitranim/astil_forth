@@ -20,6 +20,10 @@
 !/clib/*.h
 !/clib/*.c
 
+!/scripts
+/scripts/*
+!/scripts/*.py
+
 !/bench
 /bench/*
 !/bench/*.md

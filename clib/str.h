@@ -15,9 +15,6 @@ State contract: `len < buf_len && buf[len] == 0`.
     char buf[buf_len];   \
   }
 
-// SYNC[word_str].
-typedef str_buf(128) Word_str;
-
 // Same as `buf_len` given to the type.
 #define str_cap(str) ((Ind)(sizeof((str)->buf)))
 

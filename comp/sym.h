@@ -5,6 +5,7 @@
 #include "../clib/stack.h"
 #include "../clib/str.h"
 #include "./arch.h"
+#include "./read.h"
 
 typedef struct Sym           Sym;
 typedef set_of(struct Sym *) Sym_set;

@@ -11,12 +11,24 @@ and with our `str_buf` buffers in particular.
 
 static Err err_str_buf_over(const char *src, Uint len, Ind cap) {
   return errf(
-    "string " FMT_QUOTED " overlows buffer capacity; len = " FMT_UINT
-    ", cap = " FMT_IND,
-    src,
+    "string (length " FMT_UINT ") exceeds target buffer capacity " FMT_IND
+    "; source: %s",
     len,
-    cap
+    cap,
+    src
   );
+}
+
+/*
+The name is a bit ambiguous with `str_set`, which is
+a questionable tool anyway. TODO disambiguate better.
+*/
+static Err cstr_set(char *out_buf, Ind out_cap, const char *src, Ind src_len) {
+  aver(out_cap);
+  if (src_len > out_cap) return err_str_buf_over(src, src_len, out_cap);
+  memcpy(out_buf, src, src_len);
+  out_buf[src_len] = '\0';
+  return nullptr;
 }
 
 static Err str_set_impl(char *out_buf, Ind *out_len, const char *src, Ind cap) {
@@ -38,28 +50,15 @@ static bool str_eq_impl(const char *buf, Ind len, const char *tar) {
   return ind == len && tar[ind] == '\0';
 }
 
-static char *str_alloc_copy(const char *src, Ind src_len) {
-  if (!src || !src_len) return nullptr;
-  const auto buf_len = src_len + 1;
-  const auto out     = malloc(buf_len);
-  const auto out_len = strlcpy(out, src, buf_len);
-  aver(out_len == src_len);
+static char *str_alloc_copy(const char *src, Ind len) {
+  if (!src || !len) return nullptr;
+
+  char *out = malloc(len + 1);
+  if (!out) return nullptr;
+
+  memcpy(out, src, len);
+  out[len] = '\0';
   return out;
-}
-
-static Err err_word_len_mismatch(Word_str *word, Ind len) {
-  return errf(
-    "length mismatch in word " FMT_QUOTED ": " FMT_IND " vs " FMT_IND,
-    word->buf,
-    word->len,
-    len
-  );
-}
-
-static Err valid_word(const char *buf, Ind len, Word_str *word) {
-  try(str_set(word, buf));
-  if (word->len == len) return nullptr;
-  return err_word_len_mismatch(word, len);
 }
 
 static bool is_char_alnum(char val) {

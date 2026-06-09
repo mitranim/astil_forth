@@ -312,7 +312,7 @@ error, which doesn't fit into the C ABI.
 So instead, we stack-allocate outputs and pass pointers to them.
 The interpreter pointer is placed between inputs and outputs.
 
-Example call of `intrin_parse`:
+Example call of `intrin_read_until_char`:
 
   mov x0, <char>           -- input
   mov x1, x28              -- interp

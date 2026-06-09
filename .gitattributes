@@ -1,3 +1,4 @@
 *.af linguist-language=Forth
 *.h linguist-language=C
 bench/** -linguist-detectable
+scripts/** -linguist-detectable

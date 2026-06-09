@@ -13,8 +13,8 @@ import' ./http_util.af
 128  let: MAX_CONN
 4096 buf: READ_BUF
 
-fun: write_opt { fd buf len } fd buf len write { -- } end
-fun: write_eol { fd }         fd CRLF 2 write_opt     end \ \r\n
+fun: write_opt { fdes buf len } fdes buf len write { -- } end
+fun: write_eol { fdes }         fdes CRLF 2 write_opt     end \ \r\n
 
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
 fun: read_req { conn buf cap -- len err }

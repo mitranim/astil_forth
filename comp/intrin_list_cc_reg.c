@@ -56,9 +56,9 @@ static const USED Sym INTRIN[] = {
   INTRIN_COMP_PAGE_LOAD,   // comp_page_load
   INTRIN_COMP_CALL,        // comp_call
   INTRIN_QUIT,             // quit
-  INTRIN_CHAR,             // char
-  INTRIN_PARSE,            // parse
-  INTRIN_PARSE_WORD,       // parse_word
+  INTRIN_READ_CHAR,        // read_char
+  INTRIN_READ_UNTIL_CHAR,  // read_until_char
+  INTRIN_READ_WORD,        // read_word
   INTRIN_IMPORT,           // import
   INTRIN_IMPORT_TICK,      // import'
   INTRIN_EXTERN_ADR,       // extern_adr

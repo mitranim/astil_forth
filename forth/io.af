@@ -139,8 +139,8 @@ fun: io_err { action path -- err_str }
   " unable to %s `%s`; code: %s" action path code errf
 end
 
-fun: fd_stat { fd path stat_adr -- err }
-  fd stat_adr fstat
+fun: fd_stat { fdes path stat_adr -- err }
+  fdes stat_adr fstat
   if " stat" path io_err throw end
   nil
 end
@@ -151,7 +151,7 @@ fun: path_stat { path stat_adr -- err }
   nil
 end
 
-fun: fd_open { path mode -- fd err }
+fun: fd_open { path mode -- fdes err }
   path mode open { out }
   out is_err_flag if " open" path io_err throw end
   out nil

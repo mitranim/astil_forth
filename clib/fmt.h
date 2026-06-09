@@ -3,7 +3,7 @@
 
 // #define FMT_QUOTED "\"%s\""
 #define FMT_QUOTED "`%s`"
-#define FMT_CHAR "\"%c\""
+#define FMT_CHAR_QUOTED "`%c`"
 
 #define repr_struct(val) __builtin_dump_struct(val, fprintf, stderr)
 

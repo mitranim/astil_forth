@@ -1,6 +1,6 @@
 fun: drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] end
-fun_comp: \ 10 parse drop2 end
-fun_comp: ( 41 parse drop2 end
+fun_comp: \ 10 read_until_char drop2 end
+fun_comp: ( 41 read_until_char drop2 end
 
 \ Can use comments now!
 \
@@ -539,7 +539,7 @@ fun: comp_push ( C: num -- ) ( E: -- num )
   asm_push_x1 comp_instr \ str x1, [x27], 8
 end
 
-fun: next_word ( wlist "word" -- exec_tok ) parse_word find_word end
+fun: next_word ( wlist "word" -- exec_tok ) read_word find_word end
 
 fun:      xt_next ( C: wlist "word" -- ) ( E: -- exec_tok ) next_word comp_push end
 fun_comp: xt'  WORDLIST_EXEC xt_next end
@@ -900,61 +900,6 @@ fun: stack_set_len ( … len  -- … )   sp_at sp! end
 fun: stack+        ( … diff -- … )   dec cells sp swap + sp! end
 fun: stack-        ( … diff -- … )   inc cells sp swap - sp! end
 
-\ ## Characters and strings
-
-fun: c@ ( str -- char ) [
-        asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
-  1 1 0 asm_load_byte_off comp_instr \ ldrb x1, [x1]
-        asm_push_x1       comp_instr \ str x1, [x27], 8
-] end
-
-fun: c! ( char adr -- ) [
-        asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
-] end
-
-fun: parse_char ( "str" -- char ) parse_word drop c@ end
-
-fun:      char' ( E: "str" -- char )           parse_char end
-fun_comp: char' ( C: "str" -- ) ( E: -- char ) parse_char comp_push end
-
-\ Interpretation semantics of standard `s"`.
-fun: parse_str ( E: "str" -- cstr len ) char' " parse end
-
-\ The parser ensures null-termination of the given string.
-fun: comp_str ( C: buf len -- ) ( E: -- cstr len )
-  tuck                          ( len buf len )
-  inc                           \ Reserve terminating null byte.
-  alloc_data 1   comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  2              comp_load      \ ldr x2, <len>
-  asm_push_x1_x2 comp_instr     \ stp x1, x2, [x27], 16
-end
-
-\ Compilation semantics of standard `s"`.
-fun: parse_comp_str ( C: "str" -- ) ( E: -- cstr len ) parse_str comp_str end
-
-fun: comp_cstr ( C: buf len -- ) ( E: -- cstr )
-  inc                         \ Reserve terminating null byte.
-  alloc_data 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1  comp_instr     \ str x1, [x27], 8
-end
-
-fun: parse_comp_cstr ( C: "str" -- ) ( E: -- cstr ) parse_str comp_cstr end
-
-\ Parses the input until the terminating quote, and returns the address and
-\ length of the resulting string. In interpretation mode, the string buffer
-\ is reused for each call to `parse`, so the resulting string is only valid
-\ until the next `parse` invocation. In compilation mode, the string buffer
-\ is statically allocated and unique. The string is always null-terminated,
-\ and can be safely passed to many `libc` functions by pointer alone.
-fun:      s" ( E: "str" -- cstr len )           char drop parse_str      end
-fun_comp: s" ( C: "str" -- ) ( E: -- cstr len ) char drop parse_comp_str end
-
-\ C-style string literal. Like `s"` but returns only the address
-\ without the length. The string is always null-terminated.
-fun:      " ( E: "str" -- cstr )           char drop parse_str drop  end
-fun_comp: " ( C: "str" -- ) ( E: -- cstr ) char drop parse_comp_cstr end
-
 \ ## Variables
 \
 \ Unlike in ANS Forth, variables take an initial value.
@@ -1031,7 +976,7 @@ end
 
 \ Stores a value to a local, declaring the local if necessary.
 fun_comp: to: ( C: "name" -- ) ( E: val -- )
-  parse_word comp_local_named comp_pop_local_set
+  read_word comp_local_named comp_pop_local_set
 end
 
 \ Returns the address of a local (on the system stack),
@@ -1039,26 +984,16 @@ end
 \
 \ SYNC[asm_local_addressing].
 fun_comp: ref: ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_local_named
+  read_word comp_local_named
   1 swap ASM_REG_FP swap asm_add_imm comp_instr \ add x1, FP, <loc>
   1                      asm_push1   comp_instr \ str x1, [x27], 8
 end
 
-\ ## External functions and symbols
+\ ## External functions
 
 \ Finds an extern symbol by name and declares it as a function.
 fun: extern: ( C: inp_len out_len "name" -- ) ( E: …inps -- …outs )
-  parse_word swap2 extern_fun
-end
-
-\ Finds an extern symbol by name and returns its address.
-fun_comp: extern_adr' ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_extern_adr
-end
-
-\ Indirect version of `extern_adr'`: compiles its usage into another word.
-fun_comp: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_str compile' comp_extern_adr
+  read_word swap2 extern_fun
 end
 
 \ ## Memory
@@ -1090,6 +1025,84 @@ fun: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp end
 fun: str=    ( str0 len0 str1 len1 -- bool      ) compare =0 end
 fun: str<    ( str0 len0 str1 len1 -- bool      ) compare <0 end
 fun: str<>   ( str0 len0 str1 len1 -- bool      ) compare <>0 end
+
+\ ## Characters and strings
+
+fun: c@ ( str -- char ) [
+        asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
+  1 1 0 asm_load_byte_off comp_instr \ ldrb x1, [x1]
+        asm_push_x1       comp_instr \ str x1, [x27], 8
+] end
+
+fun: c! ( char adr -- ) [
+        asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
+] end
+
+fun: parse_char ( "str" -- char ) read_word drop c@ end
+
+fun:      char' ( E: "str" -- char )           parse_char end
+fun_comp: char' ( C: "str" -- ) ( E: -- char ) parse_char comp_push end
+
+fun: parse_str ( E: "str" -- str len ) char' " read_until_char end
+
+fun: comp_alloc_cstr ( buf len -- cstr )
+  to: len to: buf
+  buf len inc alloc_data to: adr
+  nil adr len + c!
+  adr
+end
+
+\ Copies a string and appends a terminating null byte.
+fun: comp_str ( C: buf len -- ) ( E: -- str len )
+  tuck                           ( len buf len )
+  comp_alloc_cstr 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  2               comp_load      \ ldr x2, <len>
+  asm_push_x1_x2  comp_instr     \ stp x1, x2, [x27], 16
+end
+
+fun: comp_cstr ( C: buf len -- ) ( E: -- cstr )
+  comp_alloc_cstr 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  asm_push_x1     comp_instr       \ str x1, [x27], 8
+end
+
+\ Parses the input until the terminating quote, and returns the address and
+\ length of the resulting string. In interpretation mode, the string points
+\ into the transient reader input and is not null-terminated. In compilation
+\ mode, the string is statically allocated, unique, and null-terminated.
+fun:      s" ( E: "str" -- str len )           read_char drop parse_str end
+fun_comp: s" ( C: "str" -- ) ( E: -- str len ) read_char drop parse_str comp_str end
+
+4096 buf: ROOT_STR_BUF
+
+\ C-style string literal. Like `s"` but returns only the address without the
+\ length. The string is always null-terminated. In interpretation mode, this
+\ reuses the same buffer for each call, and the string may be truncated.
+fun: " ( E: "str" -- cstr )
+  read_char drop parse_str to: len to: src
+  ROOT_STR_BUF to: cap to: buf
+  len cap min to: len
+  buf src len memcpy
+  nil buf len + c!
+  buf
+end
+
+\ Unlike interpretation-mode `"`, this allocates a unique string
+\ in the compiler-managed data region and compiles a PC-relative
+\ reference to it.
+fun_comp: " ( C: "str" -- ) ( E: -- cstr ) read_char drop parse_str comp_cstr end
+
+\ ## External symbols
+
+\ Finds an extern symbol by name and returns its address.
+fun_comp: extern_adr' ( C: "name" -- ) ( E: -- adr )
+  read_word comp_extern_adr
+end
+
+\ Indirect version of `extern_adr'`: compiles its usage into another word.
+fun_comp: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
+  read_word comp_str compile' comp_extern_adr
+end
 
 \ ## Conditionals
 \
@@ -1322,7 +1335,7 @@ end
 fun_comp: -for:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
-  parse_word comp_local_named for_countdown_loop_init
+  read_word comp_local_named for_countdown_loop_init
 end
 
 fun: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_cur -- )
@@ -1364,8 +1377,8 @@ fun_comp: +for:
   ( E: ceil floor -- )
   loop_frame_init
 
-  comp_local_anon             to: lim \ ceil  = limit
-  parse_word comp_local_named to: cur \ floor = cursor
+  comp_local_anon            to: lim \ ceil  = limit
+  read_word comp_local_named to: cur \ floor = cursor
 
   cur     comp_pop_local_set
   lim     comp_pop_local_set
@@ -1393,9 +1406,9 @@ fun_comp: +loop:
   ( E: ceil floor step -- )
   loop_frame_init
 
-  comp_local_anon             to: lim \ ceil  = limit
-  parse_word comp_local_named to: cur \ floor = cursor
-  comp_local_anon             to: step
+  comp_local_anon            to: lim \ ceil  = limit
+  read_word comp_local_named to: cur \ floor = cursor
+  comp_local_anon            to: step
 
   step    comp_pop_local_set
   cur     comp_pop_local_set
@@ -1412,9 +1425,9 @@ fun_comp: -loop:
   ( E: ceil floor step -- )
   loop_frame_init
 
-  parse_word comp_local_named to: cur \ ceil  = cursor
-  comp_local_anon             to: lim \ floor = limit
-  comp_local_anon             to: step
+  read_word comp_local_named to: cur \ ceil  = cursor
+  comp_local_anon            to: lim \ floor = limit
+  comp_local_anon            to: step
 
   step comp_pop_local_set
   lim  comp_pop_local_set
@@ -1513,7 +1526,7 @@ fun_comp: {
   0 to: loc_len
 
   loop
-    parse_word to: len to: str
+    read_word to: len to: str
     s" }" str len str=
     if loc_len } ret end
 
@@ -1526,14 +1539,14 @@ fun_comp: {
   end
 
   \ After `--`: skip all words which aren't `}`.
-  loop parse_word s" }" str= until
+  loop read_word s" }" str= until
 
   loc_len }
 end
 
 \ For compiling words which modify a local by applying the given function.
 fun: comp_loc_mut ( C: fun "name" -- ) ( E: -- )
-  parse_word comp_local_named
+  read_word comp_local_named
   dup comp_local_get_push
   swap comp_call
   comp_pop_local_set
@@ -1737,8 +1750,8 @@ fun: .sc .s stack_trunc end
 
 fun: errno ( -- err ) __error @32 end \ TODO switch to `ldrsw`.
 
-6 1 extern: mmap     ( adr len pflag mflag fd off -- adr )
-3 1 extern: mprotect ( adr len pflag              -- err )
+6 1 extern: mmap     ( adr len pflag mflag fdes off -- adr )
+3 1 extern: mprotect ( adr len pflag                -- err )
 
 16384 let: PAGE_SIZE
 0     let: PROT_NONE
@@ -1800,4 +1813,4 @@ end
 \ ## Misc
 
 \ Comptime analogue of top-level `import'`.
-fun_comp: import' parse_word comp_str compile' import end
+fun_comp: import' read_word comp_str compile' import end

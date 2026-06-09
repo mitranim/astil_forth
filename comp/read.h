@@ -1,9 +1,9 @@
 #pragma once
 #include "../clib/num.h"
 #include "../clib/str.h"
-#include <stdio.h>
 
-typedef str_buf(4096) Read_buf;
+// SYNC[word_str].
+typedef str_buf(128) Word_str;
 
 typedef struct {
   Ind ind;
@@ -11,23 +11,19 @@ typedef struct {
   Ind col;
 } Read_pos;
 
-typedef str_buf(256) Path_str;
-
 typedef struct {
-  FILE    *file;
-  Path_str file_path;
-  Read_pos pos;
-  Read_pos word_pos; // Last non-whitespace.
-  Word_str word;     // Used for word names.
-  Read_buf buf;      // Used for arbitrary text.
-  Read_buf back;     // Backtrack buffer.
-  U8       last;     // Last read char.
+  const char *src;
+  Ind         len;
+  Ind         pos;
+  const char *path;
+  bool        tty;
 } Reader;
 
 #define READ_POS_FMT "%s:" FMT_IND ":" FMT_IND
 
+// TODO avoid double parsing.
 #define READ_POS_ARGS(read) \
-  (read)->file_path.buf, (read)->word_pos.row, (read)->word_pos.col
+  (read)->path, reader_pos(read).row, reader_pos(read).col
 
 typedef enum : U8 {
   CHAR_EOF = 1,

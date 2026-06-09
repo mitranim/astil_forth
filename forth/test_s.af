@@ -526,6 +526,8 @@ T{ " one" strdup " two" cstr= <T> false }T
 T{ " two" strdup " one" cstr= <T> false }T
 T{ " one" strdup " one" cstr= <T> true  }T
 
+T{ s" one" s" two" str= <T> false }T
+
 T{ nil           nil    cstr< <T> false }T
 T{ nil           " one" cstr< <T> true  }T
 T{ " one"        nil    cstr< <T> false }T
@@ -549,11 +551,11 @@ fun: test_elogf
 end
 \ test_elogf
 
-4096 buf: STR_BUF
+4096 buf: TEST_STRF_BUF
 
 fun: test_strf
-  STR_BUF " numbers: %zd %zd %zd" 10 20 30 [ 3 ] strf
-  T{ STR_BUF s" numbers: 10 20 30" str= <T> true }T
+  TEST_STRF_BUF " numbers: %zd %zd %zd" 10 20 30 [ 3 ] strf
+  T{ TEST_STRF_BUF s" numbers: 10 20 30" str= <T> true }T
 end
 test_strf
 
@@ -712,5 +714,13 @@ fun: test_catch_2
   err " test_err" T_str_eq
 end
 test_catch_2
+
+fun: test_word_len_over
+  s" ./test/test_word_len_over.af" catch' import { err }
+  err " word length 128 exceeds max word length 127" T_err_contains
+end
+test_word_len_over
+
+s" ./test/test_import_empty.af" import
 
 " [test] ok" log lf

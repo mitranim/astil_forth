@@ -7,15 +7,43 @@
 #include "./read_head_char_kind.h"
 #include "./read_word_char_kind.h"
 #include <execinfo.h>
-#include <stdio.h>
 #include <string.h>
 
 static bool reader_valid(const Reader *read) {
-  return read && is_aligned(read) && is_aligned(&read->file) && read->file;
+  return read && is_aligned(read) && is_aligned(&read->src) && read->src;
+}
+
+static bool reader_has_more(const Reader *read) {
+  return read->pos < read->len;
+}
+
+static Read_pos reader_pos(const Reader *read) {
+  Read_pos pos = {
+    .ind = read ? read->pos : 0,
+    .row = 1,
+    .col = 1,
+  };
+
+  if (!reader_valid(read)) return pos;
+
+  U8 last = 0;
+  for (Ind ind = 0; ind < read->pos && ind < read->len; ind++) {
+    const auto next = (U8)read->src[ind];
+    if ((next == '\n' && last != '\r') || last == '\r') {
+      pos.row++;
+      pos.col = 1;
+    }
+    else {
+      pos.col++;
+    }
+    last = next;
+  }
+
+  return pos;
 }
 
 static Err reader_err(Reader *read, Err err) {
-  if (!err || !reader_valid(read) || !read->pos.ind) return err;
+  if (!err || !reader_valid(read) || !read->pos) return err;
 
   return err_wrapf(
     "%s\n"
@@ -23,22 +51,6 @@ static Err reader_err(Reader *read, Err err) {
     err,
     READ_POS_ARGS(read)
   );
-}
-
-static U8 reader_back_pop(Reader *read) {
-  const auto buf = &read->back;
-  return buf->len ? buf->buf[buf->len-- - 1] : (U8)0;
-}
-
-static void reader_back_push(Reader *read, U8 val) {
-  str_push(&read->back, val);
-}
-
-static void reader_back_push_word(Reader *read) {
-  const auto word = &read->word;
-  while (word->len) {
-    reader_back_push(read, word->buf[--word->len]);
-  }
 }
 
 // 254 = Ctrl+D
@@ -49,57 +61,21 @@ static U8 normalize_char(U8 val) { return val == 254 || val == 255 ? 0 : val; }
 For internal use by the reader. Other code should use
 `read_ascii_printable` or `read_char`.
 */
-static U8 read_next_char(Reader *read) {
-  const auto next = normalize_char((U8)fgetc(read->file));
+static U8 read_char(Reader *read) {
+  const U8 next = read->pos < read->len
+    ? normalize_char((U8)read->src[read->pos++])
+    : (U8)0;
 
   // IF_DEBUG(eprintf("[system] read char code: %d\n", next));
   // IF_DEBUG(eprintf("[system] read char: %c\n", next));
 
-  /*
-  Row/col counting is why we don't use `ungetc` for pushback:
-  it would be impossible to tell if the next read character
-  has already been read.
-
-  Assumes pure ASCII. TODO support UTF-8.
-  */
-
-  const auto last = read->last;
-  auto       pos  = read->pos;
-
-  if (!pos.row) pos.row = 1;
-  if (!pos.col) pos.col = 1;
-  pos.ind++;
-
-  if ((next == '\n' && last != '\r') || last == '\r') {
-    pos.row++;
-    pos.col = 1;
-  }
-  else {
-    pos.col++;
-  }
-
-  if (WORD_CHAR_KIND[next] == CHAR_WORD) read->word_pos = pos;
-  read->pos  = pos;
-  read->last = next;
   return next;
 }
 
-static U8 read_char(Reader *read) {
-  const auto next = reader_back_pop(read);
-  if (next) return next;
-  return read_next_char(read);
+// Note: avoid backtracking on EOF.
+static void reader_backtrack(Reader *read) {
+  if (read->pos) read->pos--;
 }
-
-/*
-static U8 reader_peek(Reader *read) {
-  const auto buf = &read->back;
-  if (buf->len) return buf->buf[buf->len];
-
-  const auto byte      = read_next_char(read);
-  buf->buf[buf->len++] = byte;
-  return byte;
-}
-*/
 
 static Err err_unsupported_char(Sint code) {
   return errf("unsupported character code " FMT_SINT, code);
@@ -128,13 +104,14 @@ static Err read_ascii_printable(Reader *read, U8 *out) {
 
 static Err err_not_digit(U8 val) {
   return errf(
-    "unexpected non-digit character " FMT_CHAR " after numeric literal", val
+    "unexpected non-digit character " FMT_CHAR_QUOTED " after numeric literal",
+    val
   );
 }
 
 static Err err_digit_radix(U8 dig, U8 val, Sint radix) {
   return errf(
-    "malformed numeric literal: digit %d from character " FMT_CHAR
+    "malformed numeric literal: digit %d from character " FMT_CHAR_QUOTED
     " is outside radix " FMT_SINT,
     dig,
     val,
@@ -180,7 +157,7 @@ static Err read_num_internal(
       }
 
       case DIGIT_BREAK: {
-        reader_back_push(read, head);
+        if (head) reader_backtrack(read);
         goto done;
       }
 
@@ -265,7 +242,7 @@ static Err read_num(Reader *read, Sint *out) {
         return read_num_internal(read, num, 0, radix, false, out);
       }
       default: {
-        reader_back_push(read, head);
+        if (head) reader_backtrack(read);
         break;
       }
     }
@@ -274,90 +251,91 @@ static Err read_num(Reader *read, Sint *out) {
   return read_num_internal(read, num * sign, sign, 10, true, out);
 }
 
-static Err err_word_len(const Reader *read, U8 len) {
-  return errf(
-    "word " FMT_QUOTED " exceeds max word length %d", read->word.buf, len
-  );
-}
-
-static void read_skip_space(Reader *read) {
-  const auto next = read_char(read);
-  if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) return;
-  reader_back_push(read, next);
-}
-
 static void read_skip_whitespace(Reader *read) {
   for (;;) {
     const auto next = read_char(read);
+    if (!next) break;
     if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) continue;
-    reader_back_push(read, next);
+    reader_backtrack(read);
     break;
   }
 }
 
-// Invalidates the earlier state of `read->word`.
-static Err read_word(Reader *read) {
-  read_skip_whitespace(read);
-
-  const auto word = &read->word;
-  str_trunc(word);
-
-  for (;;) {
-    U8 byte;
-    try(read_ascii_printable(read, &byte));
-
-    if (WORD_CHAR_KIND[byte] != CHAR_WORD) {
-      reader_back_push(read, byte);
-      break;
-    }
-
-    if (str_push(word, byte)) {
-      return err_word_len(read, str_cap(word) - 1);
-    }
-  }
-
-  if (!word->len) return err_str("failed to read a word");
-  str_terminate(word);
-  return nullptr;
-}
-
-static Err err_read_eof(U8 delim) {
-  return errf("unexpected EOF while looking for delimiter " FMT_CHAR, delim);
-}
-
-static Err err_read_buf_over(U8 delim) {
+static Err err_word_len(Ind len, Ind cap) {
   return errf(
-    "reader buffer overflow while looking for delimiter " FMT_CHAR, delim
+    "word length " FMT_IND " exceeds max word length " FMT_IND, len, cap - 1
   );
 }
 
-static Err read_until_char(Reader *read, U8 delim) {
-  const auto buf = &read->buf;
-  str_trunc(buf);
+static Err valid_word(const char *src, Ind len, Word_str *out_word) {
+  const auto cap = str_cap(out_word);
+  if (len >= cap) return err_word_len(len, cap);
+  try(cstr_set(out_word->buf, str_cap(out_word), src, len));
+  out_word->len = len;
+  return nullptr;
+}
+
+static Err read_word(Reader *read, const char **out_buf, Ind *out_len) {
+  read_skip_whitespace(read);
+
+  const auto beg = read->pos;
 
   for (;;) {
-    auto next = read_char(read);
+    U8 head;
+    try(read_ascii_printable(read, &head));
 
-    if (next == delim) {
-      str_terminate(buf);
-      return nullptr;
-    }
-
-    if (!next) return err_read_eof(delim);
-
-    if (str_push(buf, next)) {
-      return err_read_buf_over(delim);
+    if (WORD_CHAR_KIND[head] != CHAR_WORD) {
+      if (head) reader_backtrack(read);
+      break;
     }
   }
 
-  return err_read_buf_over(delim);
+  const auto len = read->pos - beg;
+  if (!len) return err_str("failed to read a word");
+  if (out_buf) *out_buf = read->src + beg;
+  if (out_len) *out_len = len;
+  return nullptr;
+}
+
+static Err read_valid_word(Reader *read, Word_str *out) {
+  const char *buf;
+  Ind         len;
+  try(read_word(read, &buf, &len));
+  return valid_word(buf, len, out);
+}
+
+static Err err_read_eof(U8 delim) {
+  return errf(
+    "unexpected EOF while looking for delimiter " FMT_CHAR_QUOTED, delim
+  );
+}
+
+static Err read_until_char(
+  Reader *read, U8 delim, const char **out_buf, Ind *out_len
+) {
+  const auto beg = read->pos;
+
+  for (;;) {
+    auto next = read_char(read);
+    if (!next) return err_read_eof(delim);
+
+    IF_DEBUG(aver(beg < read->pos));
+
+    if (next != delim) continue;
+    if (out_buf) *out_buf = read->src + beg;
+    if (out_len) *out_len = read->pos - beg - 1;
+    return nullptr;
+  }
+
+  unreachable();
 }
 
 // TODO: expose an intrinsic with this.
 static Err read_until_word(Reader *read, const char *delim) {
   for (;;) {
-    try(read_word(read));
-    if (str_eq(&read->word, delim)) break;
+    Word_str word;
+    try(read_valid_word(read, &word));
+    if (str_eq(&word, delim)) break;
   }
   return nullptr;
 }

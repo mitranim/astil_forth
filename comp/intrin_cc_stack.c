@@ -36,7 +36,7 @@ static Err interp_pop_str(Interp *interp, const char **out_buf, Ind *out_len) {
   Sint buf;
   try(int_stack_pop(ints, &len));
   try(int_stack_pop(ints, &buf));
-  try(interp_validate_string(buf, len));
+  try(interp_validate_buf_len(buf, len));
 
   if (out_buf) *out_buf = (const char *)buf;
   if (out_len) *out_len = (Ind)len;
@@ -61,26 +61,34 @@ static Err interp_valid_name(Interp *interp, Word_str *out) {
 
 static Err intrin_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_EXEC, interp_reader(interp)->word));
+  Word_str name;
+  try(interp_read_word(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_EXEC, name));
   return nullptr;
 }
 
 static Err intrin_colon_colon(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_COMP, interp_reader(interp)->word));
+  Word_str name;
+  try(interp_read_word(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_COMP, name));
   return nullptr;
 }
 
 static Err intrin_fun(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_EXEC, interp_reader(interp)->word));
+  Word_str name;
+  try(interp_read_word(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_EXEC, name));
   try(interp_push_semicolon(interp));
   return nullptr;
 }
 
 static Err intrin_fun_comp(Interp *interp) {
   try(interp_begin_definition(interp));
-  try(interp_word_begin(interp, WORDLIST_COMP, interp_reader(interp)->word));
+  Word_str name;
+  try(interp_read_word(interp, &name));
+  try(interp_word_begin(interp, WORDLIST_COMP, name));
   try(interp_push_semicolon(interp));
   return nullptr;
 }
@@ -250,7 +258,7 @@ static Err intrin_comp_call(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_char(Interp *interp) {
+static Err intrin_read_char(Interp *interp) {
   char out;
   try(interp_char(interp, &out));
   try(int_stack_push(&interp->ints, out));
@@ -258,15 +266,15 @@ static Err intrin_char(Interp *interp) {
 }
 
 /*
-Technically not fundamental and possible to write in Forth with `intrin_char`,
+Technically not fundamental and possible to write in Forth with `intrin_read_char`,
 but requires conditionals, character comparison, and a loop, none of which are
 available early in the bootstrap process. Neither is the self-assembler, which
 means we'd have to hardcode instructions in binary.
 
-TODO: use `intrin_char` in Forth to implement a more powerful version
+TODO: use `intrin_read_char` in Forth to implement a more powerful version
 which uses a string rather than a char as a delimiter.
 */
-static Err intrin_parse(Interp *interp) {
+static Err intrin_read_until_char(Interp *interp) {
   const auto ints = &interp->ints;
 
   Sint delim;
@@ -282,7 +290,7 @@ static Err intrin_parse(Interp *interp) {
 }
 
 // Technically not fundamental. TODO implement in Forth via intrinsic `char`.
-static Err intrin_parse_word(Interp *interp) {
+static Err intrin_read_word(Interp *interp) {
   const auto  ints = &interp->ints;
   const char *buf;
   Ind         len;
@@ -294,15 +302,18 @@ static Err intrin_parse_word(Interp *interp) {
 
 static Err intrin_import(Interp *interp) {
   const char *path;
-  try(interp_pop_str(interp, &path, nullptr));
-  try(interp_import(interp, path));
-  return nullptr;
+  Ind         len;
+  try(interp_pop_str(interp, &path, &len));
+  const auto copy = str_alloc_copy(path, len);
+  const auto err  = interp_import(interp, copy);
+  free(copy);
+  return err;
 }
 
 static Err intrin_comp_extern_adr(Interp *interp) {
-  const char *name;
-  try(interp_pop_str(interp, &name, nullptr));
-  try(interp_extern_adr(interp, name));
+  Word_str name;
+  try(interp_valid_name(interp, &name));
+  try(interp_extern_adr(interp, name.buf));
 
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
@@ -310,7 +321,7 @@ static Err intrin_comp_extern_adr(Interp *interp) {
 
   const auto            comp = &interp->comp;
   static constexpr auto reg  = ASM_SCRATCH_REG_8;
-  asm_append_dysym_load(comp, name, reg, &comp->code.externs);
+  asm_append_dysym_load(comp, name.buf, reg, &comp->code.externs);
   asm_append_stack_push_from(comp, reg);
 
   return nullptr;
@@ -324,21 +335,21 @@ static Err intrin_extern_fun(Interp *interp) {
   try(int_stack_pop(ints, &out_len));
   try(int_stack_pop(ints, &inp_len));
 
-  const char *name;
-  try(interp_pop_str(interp, &name, nullptr));
-  try(interp_extern_fun(interp, name, inp_len, out_len));
+  Word_str name;
+  try(interp_valid_name(interp, &name));
+  try(interp_extern_fun(interp, name.buf, inp_len, out_len));
   return nullptr;
 }
 
 static Err intrin_find_word(Interp *interp) {
-  const char *name;
-  try(interp_pop_str(interp, &name, nullptr));
+  Word_str name;
+  try(interp_valid_name(interp, &name));
 
   Sint wordlist;
   try(int_stack_pop(&interp->ints, &wordlist));
 
   const Sym *sym;
-  try(interp_find_word(interp, name, (Wordlist)wordlist, &sym));
+  try(interp_find_word(interp, name.buf, (Wordlist)wordlist, &sym));
   try(int_stack_push(&interp->ints, (Sint)sym));
   return nullptr;
 }

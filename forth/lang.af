@@ -1,6 +1,6 @@
 1 try_all
-fun_comp: \ { -- err } 10 parse { -- } 0 end
-fun_comp: ( { -- err } 41 parse { -- } 0 end
+fun_comp: \ { -- err } 10 read_until_char { -- } 0 end
+fun_comp: ( { -- err } 41 read_until_char { -- } 0 end
 
 \ Can use comments now!
 \
@@ -30,6 +30,11 @@ fun: nop end
 \ one tick seeks in the regular wordlist, and double tick
 \ seeks in the compile-time wordlist.
 
+\ Finds an extern symbol by name and declares it as a function.
+fun: extern: { inp_len out_len -- err } ( C: "name" -- ) ( E: …inps -- …outs )
+  read_word inp_len out_len extern_fun 0
+end
+
 \ Non-immediate replacement for standard `literal`.
 fun: comp_push { val -- err } ( E: -- val )
   comp_next_arg_reg { reg }
@@ -38,7 +43,7 @@ fun: comp_push { val -- err } ( E: -- val )
 end
 
 fun: next_word { wlist -- XT err } ( "word" -- XT )
-  parse_word wlist find_word 0
+  read_word wlist find_word 0
 end
 
 \ "XT" is short for "execution token".
@@ -97,7 +102,7 @@ end
 
 \ Similar to standard `constant`.
 fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
-  parse_word val let_init
+  read_word val let_init
   [ 0 comp_only ]
   0
 end
@@ -911,7 +916,7 @@ end
 
 \ Generically defines a load word for the given size / type.
 fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
-  parse_word { str len }
+  read_word { str len }
 
   \ Execution-time semantics.
   str len define_fun
@@ -937,7 +942,7 @@ end
 \ Generically defines a store word for the given size / type.
 \ Execution-time semantics only. The compiler always inlines.
 fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
-  parse_word define_fun
+  read_word define_fun
     2 0 false comp_signature_set
     \ str<size> r0, [x1]
     0 1 0 size 0b00 asm_load_store_imm comp_instr
@@ -1169,88 +1174,102 @@ fun_comp: sysstack_frame_ptr { -- err } ( E: -- fp )
 end
 
 fun: sysstack_frame_ptr { -- fp } sysstack_frame_ptr end
+\ ## Global variables and buffers
 
-\ ## Characters and strings
-
-fun: parse_char { -- char err } parse_word { buf -- } buf @u8 nil end
-
-fun: char' { -- char err } ( E: "str" -- char ) parse_char nil end
-
-fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
-  parse_char        { char }
+\ Asks for a register and compiles this idiom:
+\
+\   adrp <reg>, <page>
+\   add <reg>, <reg>, <pageoff>
+\
+\ Used for taking an address of a data entry
+\ in the code heap allocated via `alloc_data`.
+fun: comp_next_page_addr { adr -- err } ( E: -- adr )
   comp_next_arg_reg { reg }
-  char reg comp_load
+  adr reg comp_page_addr
   nil
 end
 
-fun: parse_str  { -- cstr len err } char' " parse nil end
-fun: parse_cstr { -- cstr err     } parse_str { cstr -- } cstr nil end
+fun: init_data_word { name name_len adr -- err }
+  name name_len define_fun
+    0 1 false comp_signature_set ( E: -- ptr )
+    adr comp_next_page_addr
+  semicolon
 
-\ The parser ensures null-termination of the given string.
-fun: comp_str { buf len -- err } ( E: -- cstr len )
-  len inc            { cap } \ Reserve terminating null byte.
-  buf cap alloc_data { adr }
-  comp_next_arg_reg  { RS }
-  comp_next_arg_reg  { RL }
-  adr RS comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
-  len RL comp_load      \ ldr RL, <len>
+  name name_len define_fun_comp
+    false try_all
+    0 1 true comp_signature_set
+    adr comp_push compile' comp_next_page_addr
+  semicolon
+
+  [ false comp_only ]
   nil
 end
 
-\ Compilation semantics of standard `s"`.
-fun: parse_comp_str { -- err } ( C: "str" -- ) ( E: -- cstr len )
-  parse_str comp_str nil
-end
-
-fun: comp_cstr { buf len -- err } ( E: -- cstr )
-  len inc            { cap } \ Reserve terminating null byte.
-  buf cap alloc_data { adr }
-  comp_next_arg_reg  { reg }
-  adr reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
+fun: var_init { str len val -- err }
+  nil CELL alloc_data { adr }
+  val adr !
+  str len adr init_data_word
   nil
 end
 
-fun: parse_comp_cstr { -- err } ( C: "str" -- ) ( E: -- cstr )
-  parse_str comp_cstr nil
+\ Similar to standard `variable`, but takes an initial value like `let:`.
+fun: var: { val -- err } ( C: "name" -- ) ( E: -- ptr )
+  read_word val var_init nil
 end
 
-\ Parses the input until the terminating quote, and returns the address and
-\ length of the resulting string. In interpretation mode, the string buffer
-\ is reused for each call to `parse`, so the resulting string is only valid
-\ until the next `parse` invocation. In compilation mode, the string buffer
-\ is statically allocated and unique. The string is always null-terminated,
-\ and can be safely passed to many `libc` functions by pointer alone.
-fun: s" { -- cstr len err } ( E: "str" -- cstr len )
-  char { -- } parse_str nil
-end
-fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- cstr len )
-  char { -- } parse_comp_str nil
+\ Shortcut for the standard idiom `create <name> N allot`.
+\ Unlike the standard idiom, this also zeroes the memory.
+\ Like `buf:` but doesn't return capacity.
+\ Also see `buf:` for warnings about AOT.
+fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- adr )
+  nil cap alloc_data { adr }
+  read_word adr init_data_word
+  nil
 end
 
-\ C-style string literal. Like `s"` but returns only the address
-\ without the length. The string is always null-terminated.
-fun: " { -- cstr err } ( E: "str" -- cstr )
-  char { -- } parse_cstr nil
-end
-fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr )
-  char { -- } parse_comp_cstr nil
-end
-
-\ ## External functions and symbols
-
-\ Finds an extern symbol by name and declares it as a function.
-fun: extern: { inp_len out_len -- err } ( C: "name" -- ) ( E: …inps -- …outs )
-  parse_word inp_len out_len extern_fun nil
+fun: comp_buf { adr cap -- err } ( E: -- adr cap )
+  comp_next_arg_reg { RA }
+  comp_next_arg_reg { RL }
+  adr RA comp_page_addr
+  cap RL comp_load
+  nil
 end
 
-\ Finds an extern symbol by name and returns its address.
-fun_comp: extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_extern_adr nil
+fun: buf_init { adr cap -- err }
+  read_word { str len }
+
+  str len define_fun
+    0 2 false comp_signature_set ( E: -- ptr cap )
+    adr cap comp_buf
+  semicolon
+
+  str len define_fun_comp
+    false try_all
+    0 1 true comp_signature_set
+    adr comp_push cap comp_push compile' comp_buf
+  semicolon
+
+  [ false comp_only ]
+  nil
 end
 
-\ Indirect version of `extern_adr'`: compiles its usage into another word.
-fun_comp: comp_extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_str compile' comp_extern_adr nil
+\ Similar to the standard idiom `create <name> N allot`.
+\ Creates a global variable which refers to a buffer of
+\ at least the given size in bytes, initialized to zero.
+\
+\ TODO dedup code with `init_data_word`.
+\
+\ The buffer is allocated in the compiler-managed data region,
+\ which is preserved in AOT compilation. Changes to this data
+\ made during interpretation persist into the AOT executable.
+\
+\ The variable does NOT hold a fixed address. Instead, it compiles
+\ instructions to calculate the address using PC-relative offsets.
+\ The address CHANGES from JIT to AOT. This means: it must not be
+\ stored in another static variable, or used to derive an address
+\ which would be stored in another static variable.
+fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
+  nil cap alloc_data cap buf_init nil
 end
 
 \ ## Memory
@@ -1294,7 +1313,106 @@ fun: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0 end
 fun: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 end
 fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
 
-\ ## Some compilation-related stuff
+\ ## Characters and strings
+
+\ FIXME rename
+fun: parse_char { -- char err } read_word { buf -- } buf @u8 nil end
+
+fun: char' { -- char err } ( E: "str" -- char ) parse_char nil end
+
+fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
+  parse_char        { char }
+  comp_next_arg_reg { reg }
+  char reg comp_load
+  nil
+end
+
+fun: parse_str { -- str len err } char' " read_until_char nil end
+
+fun: comp_alloc_cstr { buf len -- cstr err }
+  len inc            { cap } \ Reserve terminating null byte.
+  buf cap alloc_data { adr }
+  adr len +          { ceil }
+  nil ceil !b
+  adr nil
+end
+
+\ Copies a string and appends a terminating null byte.
+fun: comp_str { buf len -- err } ( E: -- cstr len )
+  buf len comp_alloc_cstr { adr }
+  comp_next_arg_reg       { RS }
+  comp_next_arg_reg       { RL }
+  adr RS comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
+  len RL comp_load      \ ldr RL, <len>
+  nil
+end
+
+fun: comp_cstr { buf len -- err } ( E: -- cstr )
+  comp_next_arg_reg { reg }
+  buf len comp_alloc_cstr
+  reg comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
+  nil
+end
+
+\ Parses the input until the terminating quote, and returns the address and
+\ length of the resulting string. In interpretation mode, the string points
+\ into the transient reader input and is not null-terminated. In compilation
+\ mode, the string is statically allocated, unique, and null-terminated.
+fun: s" { -- str len err } ( E: "str" -- str len )
+  read_char { -- } parse_str nil
+end
+fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len )
+  read_char { -- } parse_str comp_str nil
+end
+
+4096 buf: ROOT_STR_BUF
+
+\ C-style string literal. Like `s"` but returns only the address without the
+\ length. The string is always null-terminated. In interpretation mode, this
+\ reuses the same buffer for each call, and the string may be truncated.
+fun: " { -- cstr err } ( E: "str" -- cstr )
+  read_char { -- }
+  parse_str { src len }
+  ROOT_STR_BUF { buf cap }
+  len cap min { len }
+  buf src len memcpy
+  buf len + { ceil }
+  nil ceil !b
+  buf nil
+end
+
+\ Unlike interpretation-mode `"`, this allocates a unique string
+\ in the compiler-managed data region and compiles a PC-relative
+\ reference to it.
+fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr )
+  read_char { -- } parse_str comp_cstr nil
+end
+
+\ Shortcut for creating string "constants". Typical use:
+\
+\   " one" str: STR_ONE
+\   " two" str: STR_TWO
+\
+\ Reason: literal strings in root scope are transient.
+\ They always refer to the start of the reader buffer.
+fun: str: { str -- err }
+  str strlen inc { cap }
+  str cap alloc_data { adr }
+  read_word adr init_data_word
+  nil
+end
+
+\ ## Compilation-related words continued
+
+\ Finds an extern symbol by name and returns its address.
+fun_comp: extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
+  read_word comp_extern_adr nil
+end
+
+\ Indirect version of `extern_adr'`: compiles its usage into another word.
+fun_comp: comp_extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
+  read_word comp_str compile' comp_extern_adr nil
+end
 
 \ Returns the address of a local (on the system stack).
 \ Often avoids the need for `alloca`.
@@ -1306,7 +1424,7 @@ fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
 \
 \ SYNC[asm_local_addressing].
 fun_comp: ref' { -- err } ( C: "name" -- ) ( E: -- adr )
-  parse_word comp_local_named comp_local_off { off }
+  read_word comp_local_named comp_local_off { off }
   comp_next_arg_reg { reg }
   reg ASM_REG_FP off asm_add_imm comp_instr \ add <reg>, FP, <off>
   nil
@@ -1393,118 +1511,6 @@ end
 fun_comp: catch'  { -- err } WORDLIST_EXEC catch nil end
 fun_comp: catch'' { -- err } WORDLIST_COMP catch nil end
 
-\ ## Variables, buffers, extern vars
-
-\ Asks for a register and compiles this idiom:
-\
-\   adrp <reg>, <page>
-\   add <reg>, <reg>, <pageoff>
-\
-\ Used for taking an address of a data entry
-\ in the code heap allocated via `alloc_data`.
-fun: comp_next_page_addr { adr -- err } ( E: -- adr )
-  comp_next_arg_reg { reg }
-  adr reg comp_page_addr
-  nil
-end
-
-fun: init_data_word { name name_len adr -- err }
-  name name_len define_fun
-    0 1 false comp_signature_set ( E: -- ptr )
-    adr comp_next_page_addr
-  semicolon
-
-  name name_len define_fun_comp
-    false try_all
-    0 1 true comp_signature_set
-    adr comp_push compile' comp_next_page_addr
-  semicolon
-
-  [ false comp_only ]
-  nil
-end
-
-fun: var_init { str len val -- err }
-  nil CELL alloc_data { adr }
-  val adr !
-  str len adr init_data_word
-  nil
-end
-
-\ Similar to standard `variable`, but takes an initial value like `let:`.
-fun: var: { val -- err } ( C: "name" -- ) ( E: -- ptr )
-  parse_word val var_init nil
-end
-
-\ Shortcut for the standard idiom `create <name> N allot`.
-\ Unlike the standard idiom, this also zeroes the memory.
-\ Like `buf:` but doesn't return capacity.
-\ Also see `buf:` for warnings about AOT.
-fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- adr )
-  nil cap alloc_data { adr }
-  parse_word adr init_data_word
-  nil
-end
-
-fun: comp_buf { adr cap -- err } ( E: -- adr cap )
-  comp_next_arg_reg { RA }
-  comp_next_arg_reg { RL }
-  adr RA comp_page_addr
-  cap RL comp_load
-  nil
-end
-
-fun: buf_init { adr cap -- err }
-  parse_word { str len }
-
-  str len define_fun
-    0 2 false comp_signature_set ( E: -- ptr cap )
-    adr cap comp_buf
-  semicolon
-
-  str len define_fun_comp
-    false try_all
-    0 1 true comp_signature_set
-    adr comp_push cap comp_push compile' comp_buf
-  semicolon
-
-  [ false comp_only ]
-  nil
-end
-
-\ Similar to the standard idiom `create <name> N allot`.
-\ Creates a global variable which refers to a buffer of
-\ at least the given size in bytes, initialized to zero.
-\
-\ TODO dedup code with `init_data_word`.
-\
-\ The buffer is allocated in the compiler-managed data region,
-\ which is preserved in AOT compilation. Changes to this data
-\ made during interpretation persist into the AOT executable.
-\
-\ The variable does NOT hold a fixed address. Instead, it compiles
-\ instructions to calculate the address using PC-relative offsets.
-\ The address CHANGES from JIT to AOT. This means: it must not be
-\ stored in another static variable, or used to derive an address
-\ which would be stored in another static variable.
-fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
-  nil cap alloc_data cap buf_init nil
-end
-
-\ Shortcut for creating string "constants". Typical use:
-\
-\   " one" str: STR_ONE
-\   " two" str: STR_TWO
-\
-\ Reason: literal strings in root scope are transient.
-\ They always refer to the start of the reader buffer.
-fun: str: { str -- err }
-  str strlen inc { cap }
-  str cap alloc_data { adr }
-  parse_word adr init_data_word
-  nil
-end
-
 \ ## IO
 \
 \ Having access to `libc` spares us from having to implement
@@ -1557,7 +1563,7 @@ end
 2 1 extern: sprintf   ( buf fmt           … -- len|err )
 3 1 extern: snprintf  ( buf cap fmt       … -- len|err )
 2 1 extern: asprintf  ( buf_adr fmt       … -- len|err )
-2 1 extern: dprintf   ( fd fmt            … -- len|err )
+2 1 extern: dprintf   ( fdes fmt          … -- len|err )
 3 1 extern: vfprintf  ( file fmt vlist    … -- len|err )
 4 1 extern: vsnprintf ( buf cap fmt vlist … -- len|err )
 
@@ -1773,11 +1779,11 @@ fun: def_type { name name_len size align -- err }
 end
 
 fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
-  parse_word size size def_type nil
+  read_word size size def_type nil
 end
 
 fun: opaque: { size align -- err } ( C: "name" -- ) ( E: -- type )
-  parse_word size align def_type nil
+  read_word size align def_type nil
 end
 
 fun: sizeof { type -- size } type @ end
@@ -1851,7 +1857,7 @@ end
 fun: arr: { type len -- err } ( C: "name" -- ) ( E: -- type )
   type sizeof len * { size }
   type alignof      { align }
-  parse_word size align def_type
+  read_word size align def_type
   nil
 end
 
@@ -1906,7 +1912,7 @@ end
 
 \ Begins a definition; terminate with `end`.
 fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
-  parse_word      { str len }
+  read_word       { str len }
   str len strndup { str }
   xt' struct_pop  { fun }
   str len 0 0 fun nil
@@ -1938,7 +1944,7 @@ fun: field: { max_align off fun type len -- align off_next fun err }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
 
-  parse_word { name name_len }
+  read_word { name name_len }
 
   \ Since structs are intended for C interop, alignment of every field
   \ must match the platform's C ABI. So far, ABI compat seems to hold.
@@ -1986,7 +1992,7 @@ end
 \ may accidentally have the `int32` sign bit set.
 fun: is_err_flag { int -- bool } int int_to_cell -1 = end
 
-6 1 extern: mmap     ( adr size pflag mflag fd off -- adr )
+6 1 extern: mmap     ( adr size pflag mflag fdes off -- adr )
 2 1 extern: munmap   ( adr size )
 3 1 extern: mprotect ( adr size pflag -- err )
 
@@ -2277,7 +2283,7 @@ fun_comp: -for: { -- loop_beg cond_adr asm_cond loop_pop err }
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
   " when calling `-for:`" 1 comp_args_valid 0 comp_args_set
-  parse_word comp_local_named for_loop_countdown_init nil
+  read_word comp_local_named for_loop_countdown_init nil
 end
 
 \ Count-up loop with the range `[floor,ceil)`. Usage:
@@ -2291,8 +2297,8 @@ fun_comp: +for: { -- loop_beg cond_adr asm_cond loop_pop err }
   " when calling `+for:`" 2 comp_args_valid 0 comp_args_set
 
   loop_frame_init
-  comp_local_anon             { lim } \ ceil  = limit
-  parse_word comp_local_named { cur } \ floor = cursor
+  comp_local_anon            { lim } \ ceil  = limit
+  read_word comp_local_named { cur } \ floor = cursor
 
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
@@ -2319,9 +2325,9 @@ fun_comp: -loop: { -- loop_beg cond_adr asm_cond loop_pop err }
   " when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
 
   loop_frame_init
-  parse_word comp_local_named { cur } \ ceil  = cursor
-  comp_local_anon             { lim } \ floor = limit
-  comp_local_anon             { step }
+  read_word comp_local_named { cur } \ ceil  = cursor
+  comp_local_anon            { lim } \ floor = limit
+  comp_local_anon            { step }
 
   0 cur             comp_local_set \ mov <cur>,  x0 | str x0, [FP, <cur>]
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
@@ -2357,9 +2363,9 @@ fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
   " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
 
   loop_frame_init
-  comp_local_anon             { lim } \ ceil  = limit
-  parse_word comp_local_named { cur } \ floor = cursor
-  comp_local_anon             { step }
+  comp_local_anon            { lim } \ ceil  = limit
+  read_word comp_local_named { cur } \ floor = cursor
+  comp_local_anon            { step }
 
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
@@ -2702,7 +2708,7 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   0 { locs }
 
   loop
-    parse_word { str len }
+    read_word { str len }
 
     s" }"  str len str= if leave end
 
@@ -2951,10 +2957,10 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
   out     decl Indir_decl_out     !b
   has_err decl Indir_decl_has_err !b
 
-  parse_word { str len }
+  read_word { str len }
   str len decl init_data_word
 
-  parse_word define_fun
+  read_word define_fun
     inp out has_err comp_signature_set
     comp_clobber_volatile
 
@@ -3049,7 +3055,7 @@ end
 
 \ For compiling words which modify a local by applying the given function.
 fun: comp_loc_mut { fun name -- err } ( C: "name" -- ) ( E: -- )
-  parse_word comp_local_named { loc }
+  read_word comp_local_named { loc }
 
   comp_args_get if
     " arity mismatch in `%s`: expected no arguments" name errf throw
@@ -3074,7 +3080,7 @@ fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 \ Comptime analogue of top-level `import'`.
-fun_comp: import' { -- err } parse_word comp_str compile' import nil end
+fun_comp: import' { -- err } read_word comp_str compile' import nil end
 
 \ Chooses a non-zero value, preferring the second input.
 fun: fallback { one two -- fallback } [
@@ -3087,7 +3093,7 @@ fun: fallback { one two -- fallback } [
 \ TODO support any amount of inputs.
 fun_comp: fallback: { -- err } ( E: one two -- fallback )
   compile' fallback
-  parse_word comp_local_named { loc }
+  read_word comp_local_named { loc }
   0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
   0     comp_args_set
   nil

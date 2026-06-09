@@ -67,7 +67,6 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
 static Err interp_begin_definition(Interp *interp) {
   if (interp->comp.ctx.sym) return err_nested_definition(interp);
   try(interp_snapshot(interp));
-  try(interp_read_word(interp));
   return nullptr;
 }
 
@@ -150,9 +149,10 @@ static Err err_catch_no_try_all(const char *name) {
 static Err interp_catch(Interp *interp, Wordlist wordlist) {
   Sym_dict *dict;
   try(interp_wordlist(interp, wordlist, &dict));
-  try(interp_read_word(interp));
+  Word_str word;
+  try(interp_read_word(interp, &word));
 
-  const auto name = interp_reader(interp)->word.buf;
+  const auto name = word.buf;
   const auto sym  = dict_get(dict, name);
   if (!sym) return err_word_undefined_in_wordlist(name, wordlist);
   if (!sym->has_err) return err_catch_no_throw(name);
@@ -232,17 +232,13 @@ static Err interp_char(Interp *interp, char *out) {
 }
 
 static Err interp_parse_word(Interp *interp, const char **out_buf, Ind *out_len) {
-  try(interp_read_word(interp));
-  const auto word = &interp_reader(interp)->word;
-  if (out_buf) *out_buf = word->buf;
-  if (out_len) *out_len = word->len;
-  return nullptr;
+  return read_word(interp_reader(interp), out_buf, out_len);
 }
 
 static Err intrin_import_tick(Interp *interp) {
-  const auto read = interp_reader(interp);
-  try(read_word(read));
-  try(interp_import(interp, (const char *)read->word.buf));
+  Word_str path;
+  try(interp_read_word(interp, &path));
+  try(interp_import(interp, path.buf));
   return nullptr;
 }
 
@@ -464,8 +460,9 @@ static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
 }
 
 static Err debug_word_tick(Interp *interp) {
-  try(interp_read_word(interp));
-  const auto name = interp_reader(interp)->word.buf;
+  Word_str word;
+  try(interp_read_word(interp, &word));
+  const auto name = word.buf;
 
   const auto exec = dict_get(&interp->dict_exec, name);
   if (exec) interp_repr_sym(interp, exec);
@@ -478,8 +475,9 @@ static Err debug_word_tick(Interp *interp) {
 }
 
 static Err debug_dis(Interp *interp) {
-  try(interp_read_word(interp));
-  const auto name = interp_reader(interp)->word.buf;
+  Word_str word;
+  try(interp_read_word(interp, &word));
+  const auto name = word.buf;
 
   const auto exec = dict_get(&interp->dict_exec, name);
   if (exec) try(interp_disasm_sym(interp, exec));
@@ -768,27 +766,30 @@ static const USED auto INTRIN_QUIT = (Sym){
   .has_err  = true,
 };
 
-static const USED auto INTRIN_CHAR = (Sym){
-  .name.buf = "char",
+// Renamed from standard Forth `char`.
+static const USED auto INTRIN_READ_CHAR = (Sym){
+  .name.buf = "read_char",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_char,
+  .intrin   = (void *)intrin_read_char,
   .out_len  = 1,
   .has_err  = true,
 };
 
-static const USED auto INTRIN_PARSE = (Sym){
-  .name.buf = "parse",
+// Renamed from standard Forth `parse`.
+static const USED auto INTRIN_READ_UNTIL_CHAR = (Sym){
+  .name.buf = "read_until_char",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_parse,
+  .intrin   = (void *)intrin_read_until_char,
   .inp_len  = 1,
   .out_len  = 3,
   .has_err  = true,
 };
 
-static const USED auto INTRIN_PARSE_WORD = (Sym){
-  .name.buf = "parse_word",
+// Renamed from standard Forth `parse-name`.
+static const USED auto INTRIN_READ_WORD = (Sym){
+  .name.buf = "read_word",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_parse_word,
+  .intrin   = (void *)intrin_read_word,
   .out_len  = 3,
   .has_err  = true,
 };
