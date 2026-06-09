@@ -31,6 +31,12 @@ static Err err_stack_no_len() {
   return err_str("unable to allocate stack: missing length");
 }
 
+static Err err_no_page_size(int size) {
+  return errf(
+    "unable to obtain page size via `getpagesize`; got unexpected value %d", size
+  );
+}
+
 /*
 Stack is surrounded by inaccessible guards.
 Underflow or overflow triggers a segfault.
@@ -42,20 +48,17 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Ind val_size) {
   const auto len = opt ? opt->len : 0;
   if (!len) return err_stack_no_len();
 
-  const auto page_size = getpagesize();
-  aver(page_size >= 0 && page_size < INT_MAX);
-  static_assert(sizeof(typeof(page_size)) <= sizeof(Ind));
+  const int page = getpagesize();
+  if (!(page >= 0 && page < INT_MAX)) return err_no_page_size(page);
 
-  const auto guard_size = (Ind)page_size;
-  const auto data_size  = val_size * len;
-  const auto total_size = __builtin_align_up(
-    (guard_size + data_size + guard_size), (Ind)page_size
-  );
+  const auto page_size  = (Ind)page;
+  const auto data_size  = __builtin_align_up(mul(val_size, len), page_size);
+  const auto total_size = page_size + data_size + page_size;
 
   const auto cellar = mem_map(total_size, 0);
   if (cellar == MAP_FAILED) return err_mmap();
 
-  const auto floor = (U8 *)cellar + guard_size;
+  const auto floor = (U8 *)cellar + page_size;
   try(mem_protect(floor, data_size, PROT_READ | PROT_WRITE));
 
   *(Stack *)out = (Stack){

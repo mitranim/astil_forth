@@ -6,6 +6,10 @@
 // #include "./intrin.c"
 // #endif
 
+static Err err_redundant_param_skip(const char *name) {
+  return errf("in " FMT_QUOTED ": redundant `--` without output params", name);
+}
+
 /*
 The braces immediately following `: <name>` are used for parameters,
 while the braces anywhere else are used for assignments.
@@ -31,6 +35,9 @@ static Err interp_parse_params(Interp *interp) {
     try(comp_add_input_param(comp, word));
   }
 
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
   bool has_err = false;
 
   for (;;) {
@@ -47,12 +54,17 @@ static Err interp_parse_params(Interp *interp) {
     sym->has_err = true;
   }
 
+  if (!sym->out_len) return err_redundant_param_skip(sym->name.buf);
   return nullptr;
 }
 
 static Err intrin_brace(Interp *interp) {
   const auto read = interp_reader(interp);
   const auto comp = &interp->comp;
+  const auto ctx  = &comp->ctx;
+
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
 
   for (;;) {
     try(read_word(read));
@@ -67,25 +79,27 @@ static Err intrin_brace(Interp *interp) {
   }
 
 discard:
-  // Treat the remaining arguments as consumed, and the remaining words after
-  // `--` as comments. This allows to use `--` to discard unused values, and
-  // makes it syntactically consistent with parameter lists.
-  comp->ctx.arg_low = comp->ctx.arg_len = 0;
-  for (;;) {
-    try(read_word(read));
-    if (str_eq(&read->word, "}")) return nullptr;
+  try(read_word(read));
+
+  if (str_eq(&read->word, "}")) {
+    if (comp->ctx.arg_low <= comp->ctx.arg_len) {
+      comp->ctx.arg_low = comp->ctx.arg_len = 0;
+      return nullptr;
+    }
+
+    return err_str(
+      "redundant `--` in assignment without any remaining arguments to skip"
+    );
   }
-  unreachable();
+
+  return err_str("`--` in assignment should be followed by `}`");
 
 validate:
-  const auto low = comp->ctx.arg_low;
+  const auto low = ctx->arg_low;
   if (!low) return nullptr;
 
-  const auto len = comp->ctx.arg_len;
+  const auto len = ctx->arg_len;
   assert(low < len);
-
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
 
   return errf(
     "in " FMT_QUOTED
@@ -262,6 +276,11 @@ static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp, const U8 **adr)
   return nullptr;
 }
 
+/*
+TODO: drop `intrin_comp_page_addr` and `intrin_comp_page_load`.
+Program code now has both `here_write` and `here_exec`, and can
+calculate the offsets on its own.
+*/
 static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));
   try(asm_validate_reg(reg));

@@ -632,7 +632,6 @@ fun: test_locals
   T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
   T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
   T{ 10 20    { -- one two }                          <T> 10 20    }T
-  T{ 10 20    { one two -- three } one one two        <T> 10 10 20 }T
   T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
   T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
   T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T

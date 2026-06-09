@@ -42,7 +42,6 @@ fun: test_locals { -- err }
   T{ 20       { one }              one                <T> 20       }T
   T{ 30       { one }              one one            <T> 30 30    }T
   T{ 40       { one -- }           one one            <T> 40 40    }T
-  T{ 10       { -- one }                              <T>          }T
   T{ 10 20    { one two }          one two            <T> 10 20    }T
   T{ 10 20    { one two }                             <T>          }T
   T{ 10 20    { one two -- }                          <T>          }T
@@ -57,16 +56,10 @@ fun: test_locals { -- err }
   T{ 30 40    { one two }          one one two        <T> 30 30 40 }T
   T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
   T{ 30 40    { one --     }       one one            <T> 30 30    }T
-  T{ 30 40    { one -- two }       one one            <T> 30 30    }T
   T{ 10 20    { one --     }       one one            <T> 10 10    }T
-  T{ 10 20    { one -- two }       one one            <T> 10 10    }T
-  T{ 10 20    { -- one two }                          <T>          }T
-  T{ 30 40    { one two -- three } one one two        <T> 30 30 40 }T
   T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
   T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
   T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
-  T{ 10 20 30 { -- one two three }                    <T>          }T
-  T{ 40 50 60 { -- one two three }                    <T>          }T
   T{ 10 20 30 { -- }                                  <T>          }T
   T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
   T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
@@ -2043,7 +2036,7 @@ end
 test_explicit_err_4
 
 \ Must compile.
-fun: test_max_input_regs { A B C D E F G H -- } end
+fun: test_max_input_regs { A B C D E F G H } end
 
 fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
 fun: test_max_output_regs { -- err } [ redefine ]

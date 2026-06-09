@@ -18,7 +18,7 @@ fun: fib { src -- out } [
   1 comp_args_set
 ] end
 
-fun: run { count -- }
+fun: run { count }
   [
     9 comp_clobber
     9 0 asm_mov_reg comp_instr \ mov x9, x0

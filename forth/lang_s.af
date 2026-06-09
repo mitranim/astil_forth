@@ -986,6 +986,16 @@ fun: var: ( C: init "name" -- ) ( E: -- adr )
   }word
 end
 
+\ Shortcut for the standard idiom `create <name> N allot`.
+\ Like `buf:` but doesn't return capacity.
+fun: mem: ( C: cap "name" -- ) ( E: -- adr )
+  word{
+    nil swap    alloc_data     ( -- adr )
+    1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+    asm_push_x1 comp_instr     \ str x1, [x27], 8
+  }word
+end
+
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
 \ at least the given capacity in bytes.
@@ -995,16 +1005,6 @@ fun: buf: ( C: cap "name" -- ) ( E: -- adr cap )
     1            comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     asm_push_x1  comp_instr     \ str x1, [x27], 8
                  comp_push      \ str <cap>, [x27], 8
-  }word
-end
-
-\ Shortcut for the standard idiom `create <name> N allot`.
-\ Like `buf:` but doesn't return capacity.
-fun: mem: ( C: cap "name" -- ) ( E: -- adr )
-  word{
-    nil swap    alloc_data     ( -- adr )
-    1           comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-    asm_push_x1 comp_instr     \ str x1, [x27], 8
   }word
 end
 
