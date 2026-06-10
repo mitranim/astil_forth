@@ -63,6 +63,25 @@ fun: }T
   unreachable
 end
 
+fun: T_str_eq ( act exp -- )
+  to: exp
+  to: act
+
+  exp ifn
+    act ifn ret end
+    " expected string to be nil; got: %s" act [ 1 ] errf throw
+  end
+
+  act ifn
+    " unexpected nil string; expected: %s" exp [ 1 ] errf throw
+  end
+
+  act exp cstr= if ret end
+
+  \ TODO format with newlines; our reader doesn't support escapes yet.
+  " expected string: %s; actual string: %s" exp act [ 2 ] errf throw
+end
+
 fun: T_err_contains ( act exp -- )
   to: exp
   to: act

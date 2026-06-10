@@ -49,7 +49,7 @@ end
 fun: test_recur_throw
   T{ 2 catch' recur_throw_callee         <T> 100 nil }T
   T{ 4 catch' recur_throw_callee { err } <T>         }T
-  T{ " recur_err_stack" err cstr=        <T> true    }T
+  err " recur_err_stack" T_str_eq
 end
 test_recur_throw
 
@@ -558,17 +558,13 @@ end
 test_strf
 
 fun: test_errf
-  T{ ERR_BUF " " cstr= <T> true }T
+  ERR_BUF " " T_str_eq
 
-  T{
-    " codes: %zd %zd %zd" 10 20 30 [ 3 ] errf
-    " codes: 10 20 30"
-    cstr=
-  <T>
-    true
-  }T
+  " codes: %zd %zd %zd" 10 20 30 [ 3 ] errf
+  " codes: 10 20 30"
+  T_str_eq
 
-  T{ ERR_BUF " codes: 10 20 30" cstr= <T> true }T
+  ERR_BUF " codes: 10 20 30" T_str_eq
 end
 test_errf
 
@@ -681,7 +677,7 @@ fun: test_catch_0
   T{ test_catch_0_val          <T> 123     }T
   T{ catch' test_catch_0_val   <T> 123 nil }T
   T{ catch' test_throw { err } <T>         }T
-  T{ " test_err" err cstr=     <T> true    }T
+  err " test_err" T_str_eq
 end
 test_catch_0
 
@@ -695,7 +691,7 @@ fun: test_catch_1
   T{ 123 test_catch_1_cond                <T> 246     }T
   T{ 123 catch' test_catch_1_cond         <T> 246 nil }T
   T{ 0   catch' test_catch_1_cond { err } <T>         }T
-  T{ " test_err" err cstr=                <T> true    }T
+  err " test_err" T_str_eq
 end
 test_catch_1
 
@@ -709,11 +705,11 @@ fun: test_catch_2
   T{ 11 22 test_catch_2_cond                <T> 242 242     }T
   T{ 11 22 catch' test_catch_2_cond         <T> 242 242 nil }T
 
-  T{ 0  22 catch' test_catch_2_cond { err } <T>             }T
-  T{ " test_err" err cstr=                  <T> true        }T
+  T{ 0  22 catch' test_catch_2_cond { err } <T> }T
+  err " test_err" T_str_eq
 
-  T{ 11 0  catch' test_catch_2_cond { err } <T>             }T
-  T{ " test_err" err cstr=                  <T> true        }T
+  T{ 11 0  catch' test_catch_2_cond { err } <T> }T
+  err " test_err" T_str_eq
 end
 test_catch_2
 

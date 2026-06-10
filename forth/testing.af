@@ -200,6 +200,22 @@ end
 
 \ ## Misc assertions
 
+fun: T_str_eq { act exp -- err }
+  exp ifn
+    act ifn nil ret end
+    " expected string to be nil; got: %s" act errf throw
+  end
+
+  act ifn
+    " unexpected nil string; expected: %s" exp errf throw
+  end
+
+  act exp cstr= if nil ret end
+
+  \ TODO format with newlines; our reader doesn't support escapes yet.
+  " expected string: %s; actual string: %s" exp act errf
+end
+
 fun: T_err_contains { act exp -- err }
   act ifn
     " missing error message; expected error to contain: %s"

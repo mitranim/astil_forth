@@ -561,13 +561,13 @@ fun: test_recur_with_err { -- err }
   T{ 2 recur_err_non_try_fun { out0 err0 } <T>         }T
   T{ out0 err0                             <T> 100 nil }T
   T{ 4 recur_err_non_try_fun { out1 err1 } <T>         }T
-  T{ " recur_err_non_try" err1 cstr=       <T> true    }T
+  err1 " recur_err_non_try" T_str_eq try
 
   [ true try_all ]
 
   T{ 2 catch' recur_err_manual_try_fun               <T> 100 nil }T
   T{ 4 catch' recur_err_manual_try_fun { out2 err2 } <T>         }T
-  T{ " recur_err_manual" err2 cstr=                  <T> true    }T
+  err2 " recur_err_manual" T_str_eq
 
   T{ 2 catch' recur_err_auto_try_fun <T> 100 nil }T
 
@@ -577,12 +577,9 @@ fun: test_recur_with_err { -- err }
 
   [ true try_all ]
 
-  T{
-    4 catch' recur_err_auto_try_fun { out4 err4 }
-    " recur_err_auto" err4 cstr=
-    <T>
-    true
-  }T
+  4 catch' recur_err_auto_try_fun { out4 err4 }
+  err4 " recur_err_auto" T_str_eq
+
   nil
 end
 test_recur_with_err
@@ -1352,12 +1349,13 @@ fun: test_elogf
 end
 \ test_elogf
 
-4096 buf: STR_BUF
-
 fun: test_strf { -- err }
-  STR_BUF " numbers: %zd %zd %zd" 10 20 30 strf
-  STR_BUF { str -- }
-  T{ str " numbers: 10 20 30" cstr= <T> true }T
+  4096 { cap }
+  4096 alloca { buf }
+
+  T{ buf cap " numbers: %zd %zd %zd" 10 20 30 strf <T> buf }T
+  buf " numbers: 10 20 30" T_str_eq
+
   nil
 end
 test_strf
@@ -1365,10 +1363,12 @@ test_strf
 fun: test_errf { -- err }
   ERR_BUF_0 { buf }
 
-  T{ " codes: %zd %zd %zd" 10 20 30 errf <T> buf  }T
-  T{ " codes: 10 20 30" buf cstr=        <T> true }T
-  T{ " codes: %zd %zd %zd" 40 50 60 errf <T> buf  }T
-  T{ " codes: 40 50 60" buf cstr=        <T> true }T
+  T{ " codes: %zd %zd %zd" 10 20 30 errf <T> buf }T
+  buf " codes: 10 20 30" T_str_eq
+
+  T{ " codes: %zd %zd %zd" 40 50 60 errf <T> buf }T
+  buf " codes: 40 50 60" T_str_eq
+
   nil
 end
 test_errf
@@ -1403,8 +1403,8 @@ fun: test_wrapf { -- err }
   \ err0 logf lf
   \ err1 logf lf
 
-  T{ err0 " one"      cstr= <T> true }T
-  T{ err1 " two: one" cstr= <T> true }T
+  err0 " one"      T_str_eq
+  err1 " two: one" T_str_eq
 
   err1 " three: %s" err1 wrapf { err2 }
 
@@ -1412,14 +1412,16 @@ fun: test_wrapf { -- err }
   T{ err0 err2 = <T> true  }T
   T{ err0 err1 = <T> false }T
 
-  T{ err2 " three: two: one" cstr= <T> true }T
+  err2 " three: two: one" T_str_eq
 
   err2 " four: %zd: %s" 123 err2 wrapf { err3 }
 
   T{ err3 err0 = <T> false }T
   T{ err3 err1 = <T> true  }T
   T{ err3 err2 = <T> false }T
-  T{ err3 " four: 123: three: two: one" cstr= <T> true }T
+
+  err3 " four: 123: three: two: one" T_str_eq
+
   nil
 end
 test_wrapf
@@ -1803,7 +1805,7 @@ fun: test_catch_0 { -- err }
   T{ test_catch_0_val          <T> 123     }T
   T{ catch' test_catch_0_val   <T> 123 nil }T
   T{ catch' test_throw { err } <T>         }T
-  T{ " test_err" err cstr=     <T> true    }T
+  err " test_err" T_str_eq
   nil
 end
 test_catch_0
@@ -1819,7 +1821,8 @@ fun: test_catch_1 { -- err }
   T{ 123 test_catch_1_cond                    <T> 246     }T
   T{ 123 catch' test_catch_1_cond             <T> 246 nil }T
   T{ 0   catch' test_catch_1_cond { val err } <T>         }T
-  T{ " test_err" err cstr=                    <T> true    }T
+
+  err " test_err" T_str_eq
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
@@ -1847,13 +1850,13 @@ fun: test_catch_2 { -- err }
   T{ 13 25 catch' test_catch_2_cond <T> 38 12 nil }T
 
   T{ 0  13 catch' test_catch_2_cond { one two err } <T>      }T
-  T{ " test_err" err cstr=                          <T> true }T
+  err " test_err" T_str_eq
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err true }T
 
   T{ 12 0  catch' test_catch_2_cond { one two err } <T>      }T
-  T{ " test_err" err cstr=                          <T> true }T
+  err " test_err" T_str_eq
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err 0 }T
@@ -1870,8 +1873,7 @@ end
 
 fun: test_disabling_try_all { -- err } [ false try_all ]
   test_disabling_try_all_fun { err }
-  T{ " different_test_err" err cstr= <T> true }T
-  nil
+  err " different_test_err" T_str_eq
 end
 test_disabling_try_all
 
@@ -1879,9 +1881,8 @@ fun: test_explicit_err_0 { -- err } [ false try_all ]
   test_throw  { err0 }
   " test_err" { err1 }
 
-  T{ err0 err1 =     <T> false }T
-  T{ err0 err1 cstr= <T> true  }T
-  nil
+  T{ err0 err1 = <T> false }T
+  err0 err1 T_str_eq
 end
 test_explicit_err_0
 
@@ -1903,8 +1904,8 @@ test_explicit_err_1_fun_throwing
 
 fun: test_explicit_err_1 { -- err } [ false try_all ]
 
-  T{ 0 test_explicit_err_1_fun { val err } <T>      }T
-  T{ " test_err" err cstr=                 <T> true }T
+  T{ 0 test_explicit_err_1_fun { val err } <T> }T
+  err " test_err" T_str_eq try
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
@@ -1937,8 +1938,8 @@ end
 test_explicit_err_2_fun_throwing
 
 fun: test_explicit_err_2 { -- err } [ false try_all ]
-  T{ 0 11 test_explicit_err_2_fun { val err } <T>      }T
-  T{ " test_err" err cstr=                    <T> true }T
+  T{ 0 11 test_explicit_err_2_fun { val err } <T> }T
+  err " test_err" T_str_eq try
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
@@ -1981,7 +1982,7 @@ fun: test_explicit_err_3 { -- err } [ false try_all ]
     0 test_explicit_err_3_fun { one two err }
     <T>
   }T
-  T{ " test_err" err cstr= <T> true }T
+  err " test_err" T_str_eq try
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
@@ -2017,8 +2018,8 @@ end
 test_explicit_err_4_fun_throwing
 
 fun: test_explicit_err_4 { -- err } [ false try_all ]
-  T{ 0 13 test_explicit_err_4_fun { one two err } <T>      }T
-  T{ " test_err" err cstr=                        <T> true }T
+  T{ 0 13 test_explicit_err_4_fun { one two err } <T> }T
+  err " test_err" T_str_eq try
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one <T> err }T
