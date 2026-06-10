@@ -17,8 +17,8 @@
 
 !/clib
 /clib/*
-!/clib/.h
-!/clib/.c
+!/clib/*.h
+!/clib/*.c
 
 !/bench
 /bench/*
