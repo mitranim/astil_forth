@@ -2839,6 +2839,8 @@ struct: Sym
   U8         1 field: Sym_interp_only
 end
 
+fun: sym_name { XT -- str } XT Sym_name Sym_word_buf end
+
 \ SYNC[sym_fields].
 fun: sym_instr { XT -- instr } XT Sym_union @ end
 
@@ -2991,7 +2993,7 @@ end
 fun: indirect_to { decl xt_to -- err }
   decl Indir_decl_inp @b { decl_inp }
   xt_to Sym_inp_len     @b { sym_inp }
-  xt_to Sym_name           { name }
+  xt_to sym_name           { name }
 
   decl_inp sym_inp <> if
     " unable to indirect to `%s`: input count: %zd <> %zd"
