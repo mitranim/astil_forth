@@ -1321,13 +1321,12 @@ fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
 
 \ ## Characters and strings
 
-\ FIXME rename
-fun: parse_char { -- char err } read_word { buf -- } buf @u8 nil end
+fun: read_word_char { -- char err } read_word { buf -- } buf @u8 nil end
 
-fun: char' { -- char err } ( E: "str" -- char ) parse_char nil end
+fun: char' { -- char err } ( E: "str" -- char ) read_word_char nil end
 
 fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
-  parse_char        { char }
+  read_word_char    { char }
   comp_next_arg_reg { reg }
   char reg comp_load
   nil
@@ -1759,12 +1758,12 @@ end
 \
 \ Types are defined with shortcuts `int: arr: struct: opaque:`.
 \
-\ Most of the time size and alignment should be accessed via the
-\ `sizeof'` and `alignof'` shortcuts, which inline the values at
-\ compile time, without loading the type descriptors at runtime.
+\ Most of the time size and alignment should be accessed via
+\ `size'` and `align'` shortcuts, which inline the values at
+\ compile time, without loading type descriptors at runtime.
 \
 \ SYNC[type_fields].
-fun: def_type { name name_len size align -- err }
+fun: define_type { name name_len size align -- err }
   name_len inc             { name_cap }
   2 cells name_cap +       { full_size }
   nil full_size alloc_data { type }
@@ -1779,35 +1778,35 @@ fun: def_type { name name_len size align -- err }
 end
 
 fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
-  read_word size size def_type nil
+  read_word size size define_type nil
 end
 
 fun: opaque: { size align -- err } ( C: "name" -- ) ( E: -- type )
-  read_word size align def_type nil
+  read_word size align define_type nil
 end
 
 fun: sizeof { type -- size } type @ end
 
-fun: sizeof' { -- size err } ( C: "type" -- )
+fun: size' { -- size err } ( C: "type" -- )
   WORDLIST_EXEC next_word execute STACK s> sizeof nil
 end
 
-fun_comp: sizeof' { -- err } ( C: "type" -- ) ( E: -- size )
-  execute' sizeof' comp_push nil
+fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
+  execute' size' comp_push nil
 end
 
 fun: alignof { type -- align } type +cell @ end
 
-fun: alignof' { -- align err } ( C: "type" -- )
+fun: align' { -- align err } ( C: "type" -- )
   WORDLIST_EXEC next_word execute STACK s> alignof nil
 end
 
-fun_comp: alignof' { -- err } ( C: "type" -- ) ( E: -- align )
-  execute' alignof' comp_push nil
+fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
+  execute' align' comp_push nil
 end
 
 fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
-  execute'' sizeof' execute'' alloca nil
+  execute'' size' execute'' alloca nil
 end
 
 \ ### Integer types
@@ -1857,7 +1856,7 @@ end
 fun: arr: { type len -- err } ( C: "name" -- ) ( E: -- type )
   type sizeof len * { size }
   type alignof      { align }
-  read_word size align def_type
+  read_word size align define_type
   nil
 end
 
@@ -1871,13 +1870,13 @@ end
 \     U8  32 field: Type_field1
 \   end
 \
-\   sizeof' Type alloca { adr }
+\   size' Type alloca { adr }
 \
 \       adr Type_field0 @
 \   123 adr Type_field0 !
 \
 \ The name of a struct type returns an actual `Type`.
-\ When allocating, use `sizeof'` to get the size instead.
+\ When allocating, use `size'` to get the size instead.
 \
 \ The name of each field is a compile-time word which calculates its
 \ offset from an address. To get an offset from zero, provide zero.
@@ -1903,7 +1902,7 @@ fun: struct_pop { -- err } ( C: name name_len align off -- )
   STACK s> { name }
 
   off align align_up { size }
-  name name_len size align def_type
+  name name_len size align define_type
   name free
 
   [ false comp_only ]
@@ -1996,16 +1995,21 @@ fun: is_err_flag { int -- bool } int int_to_cell -1 = end
 2 1 extern: munmap   ( adr size )
 3 1 extern: mprotect ( adr size pflag -- err )
 
-16384 let: PAGE_SIZE \ TODO: ask the OS.
-0     let: PROT_NONE
-1     let: PROT_READ
-2     let: PROT_WRITE
-2     let: MAP_PRIVATE
-4096  let: MAP_ANON
+16384 let: PAGE_SIZE
+
+0 let: PROT_NONE
+1 let: PROT_READ
+2 let: PROT_WRITE
+3 let: PROT_RW
+4 let: PROT_EXEC
+5 let: PROT_RE
+
+2    let: MAP_PRIVATE
+4096 let: MAP_ANON
+4098 let: MAP_DEFAULT
 
 fun: mem_map { size pflag -- addr err }
-  MAP_ANON MAP_PRIVATE or { mflag }
-  0 size pflag mflag -1 0 mmap { addr }
+  0 size pflag MAP_DEFAULT -1 0 mmap { addr }
   addr -1 = if " unable to mmap" throw end
   addr nil
 end
@@ -2016,12 +2020,13 @@ fun: mem_unmap { addr size -- err }
   nil
 end
 
-fun: mem_unprot { addr size -- err }
-  PROT_READ PROT_WRITE or { pflag }
+fun: mem_prot { addr size pflag -- err }
   addr size pflag mprotect
   is_err_flag if " unable to mprotect" throw end
   nil
 end
+
+fun: mem_unprot { addr size -- err } addr size PROT_RW catch' mem_prot end
 
 \ ## Stacks continued
 
@@ -2094,7 +2099,7 @@ end
 
 \ For JIT use only. TODO: AOT compatibility.
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
-  sizeof' Stack malloc { adr }
+  size' Stack malloc { adr }
   size adr stack_init
   adr execute' let:
   nil
@@ -2767,7 +2772,7 @@ fun: stack_log_cells { stack }
   len 0 +for: ind
     space space
     ind stack stack_cell_at @ log_cell
-    " <%zd>" ind logf
+    "  <%zd>" ind logf
     lf
   end
 end
@@ -2951,7 +2956,7 @@ struct: Indir_decl
 end
 
 fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
-  nil sizeof' Indir_decl alloc_data { decl }
+  nil size' Indir_decl alloc_data { decl }
 
   inp     decl Indir_decl_inp     !b
   out     decl Indir_decl_out     !b

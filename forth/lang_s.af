@@ -1039,10 +1039,10 @@ fun: c! ( char adr -- ) [
   1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
 ] end
 
-fun: parse_char ( "str" -- char ) read_word drop c@ end
+fun: read_word_char ( "str" -- char ) read_word drop c@ end
 
-fun:      char' ( E: "str" -- char )           parse_char end
-fun_comp: char' ( C: "str" -- ) ( E: -- char ) parse_char comp_push end
+fun:      char' ( E: "str" -- char )           read_word_char end
+fun_comp: char' ( C: "str" -- ) ( E: -- char ) read_word_char comp_push end
 
 fun: parse_str ( E: "str" -- str len ) char' " read_until_char end
 

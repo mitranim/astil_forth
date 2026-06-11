@@ -22,7 +22,7 @@ fun: sock_bind_opt { info max_conn -- sock }
   alloca' Cint { opt }
   nil opt !cint
 
-  sock SOL_SOCKET SO_REUSEADDR opt sizeof' Cint setsockopt
+  sock SOL_SOCKET SO_REUSEADDR opt size' Cint setsockopt
   is_err_flag if
     sock sock_close
     errno " [srv] unable to `setsockopt`" os_err elog elf
@@ -49,7 +49,7 @@ end
 \ Result is `Addrinfo *` and should be freed with `freeaddrinfo`.
 fun: net_addr_info { port -- ainf err }
   alloca' Addrinfo { hint }
-  hint sizeof' Addrinfo erase
+  hint size' Addrinfo erase
   AF_UNSPEC   hint Addrinfo_family   !
   SOCK_STREAM hint Addrinfo_socktype !
   AI_PASSIVE  hint Addrinfo_flags    !
@@ -94,8 +94,8 @@ fun: net_accept_loop { sock handler }
   alloca' Cuint            { size }
 
   loop
-    addr sizeof' Sockaddr_storage erase
-    sizeof' Sockaddr_storage size !cuint
+    addr size' Sockaddr_storage erase
+    size' Sockaddr_storage size !cuint
     sock addr size accept { conn }
 
     conn is_err_flag if

@@ -52,7 +52,7 @@ fun: example_seek_and_thou_shall_find { -- err }
     " seek file" path io_err ret
   end
 
-  BUF sizeof' U8 cap file fread { len }
+  BUF size' U8 cap file fread { len }
   file ferror { code }
   file fclose { -- }
 

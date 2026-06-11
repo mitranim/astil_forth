@@ -90,7 +90,7 @@ end
 
 \ ## Compilation-mode test routines (inside words)
 
-sizeof' Stack mem: TEST_STACK
+size' Stack mem: TEST_STACK
 false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
 
 32 cells TEST_STACK stack_init

@@ -70,8 +70,7 @@ static Err mprotect_jit(void *addr, Ind len) {
 }
 
 static Err jit_before_write(void *addr, Ind len) {
-  try_errno(mprotect(addr, len, PROT_READ | PROT_WRITE));
-  return nullptr;
+  return err_errno(mprotect(addr, len, PROT_READ | PROT_WRITE));
 }
 
 static Err jit_after_write(void *addr, Ind len) {
