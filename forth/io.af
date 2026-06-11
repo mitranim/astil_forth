@@ -134,9 +134,31 @@ fun: io_err { action path -- err_str }
   errno { code }
   code strerror { msg }
   msg if
-    " unable to %s `%s`; code: %d; msg: %s" action path code msg errf ret
+    action " unable to %s `%s`; code: %d; msg: %s"
+    action path code msg wrapf ret
   end
-  " unable to %s `%s`; code: %s" action path code errf
+  action " unable to %s `%s`; code: %s" action path code wrapf
+end
+
+fun: file_err { action file -- err }
+  nil nil { code msg }
+
+  file ferror if
+    errno { code }
+    code strerror { msg }
+  end
+
+  msg if
+    msg " file error: %s; code: %zd; msg: %s"
+    action code msg wrapf ret
+  end
+
+  code if
+    msg " file error: %s; code: %zd"
+    action code msg wrapf ret
+  end
+
+  msg " file error: %s" msg wrapf
 end
 
 fun: fd_stat { fdes path stat_adr -- err }
@@ -161,4 +183,15 @@ fun: file_open { path mode -- file err }
   path mode fopen { file }
   file ifn " open" path io_err throw end
   file nil
+end
+
+fun: file_write_char { file char -- err }
+  char file fputc is_err_flag ifn nil ret end
+  " failed to write char" file file_err
+end
+
+fun: file_write_bytes { file buf len -- err }
+  buf 1 len file fwrite { out }
+  out len = if nil ret end
+  " wrote %zd instead of %zd bytes" out len errf file file_err
 end
