@@ -1021,7 +1021,7 @@ fun: fill  ( buf len char -- ) swap memset end
 fun: erase ( buf len      -- ) 0 fill end
 
 \ See `ccompare` below for null-terminated strings.
-fun: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp end
+fun: compare ( str0 len0 str1 len1 -- direction ) rot max strncmp end
 fun: str=    ( str0 len0 str1 len1 -- bool      ) compare =0 end
 fun: str<    ( str0 len0 str1 len1 -- bool      ) compare <0 end
 fun: str<>   ( str0 len0 str1 len1 -- bool      ) compare <>0 end

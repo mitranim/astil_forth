@@ -1310,7 +1310,7 @@ fun: erase { buf len      } buf len 0 fill end
 
 \ See `ccompare` below for null-terminated strings.
 fun: compare { str0 len0 str1 len1 -- direction }
-  len0 len1 min { len }
+  len0 len1 max { len }
   str0 str1 len strncmp
 end
 
