@@ -1,0 +1,60 @@
+import' std:lang.af
+
+\ To receive CLI args and env, declare them as arguments in `main`.
+\ Our compiler doesn't validate the input signature of `main`.
+\ AOT-compiled programs receive args straight from the OS.
+
+fun: main { argc argv envp -- exit }
+  has_interp if
+    " [main] mode: JIT" log lf
+  else
+    " [main] mode: AOT" log lf
+  end
+
+  argc if
+    " [main] args (%zd):" argc logf lf
+
+    argc 0 +for: ind
+      ind cells argv + @ { arg }
+      " arg %zd: %s" ind arg logf lf
+    end
+  else
+    " [main] args: empty" log lf
+  end
+
+  \ Optional: dump env.
+  false if
+    envp if
+      " [main] env:" log lf
+
+      loop
+        envp @ { pair }
+        pair while
+        " pair: %s" pair logf lf
+        envp +cell { envp }
+      end
+    end
+  end
+
+  0
+end
+
+\ In JIT mode, pass arbitrary args yourself.
+\ Note that you don't _have_ to call `main`.
+0 nil nil main
+
+\ Usage:
+\
+\   astil examples/aot_args.af --build=out.exe
+\   ./out.exe one two three
+\
+\ Output:
+\
+\ [main] mode: JIT
+\ [main] args: empty
+\ [main] mode: AOT
+\ [main] args (4):
+\ arg 0: ./out.exe
+\ arg 1: one
+\ arg 2: two
+\ arg 3: three
