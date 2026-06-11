@@ -126,6 +126,7 @@ end
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP
 31     let: ASM_REG_ZR
+4095   let: ASM_MAX_IMM12 \ Shared by many instructions.
 0b0000 let: ASM_EQ
 0b0001 let: ASM_NE
 0b0010 let: ASM_CS
@@ -1917,17 +1918,55 @@ fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
   str len 0 0 fun nil
 end
 
-\ Compile field access: compute offset from address.
+\ Compile field access, which computes address + offset.
 fun: struct_field_comp { off -- err }
   comp_args_get { len }
   len ifn " struct field must be preceded by struct pointer" throw end
   off ifn nil ret end
 
-  \ Offset is computed into the same register that held the address.
-  len dec { reg }
-  reg                     comp_clobber \ Disassociate locals from this reg.
-  reg reg off asm_add_imm comp_instr   \ add <reg>, <reg>, <off>
+  \ Same reg: replace prior address with address + offset.
+  len dec { adr_reg }
+  adr_reg comp_clobber \ Disassociate locals from this reg.
+
+  off ASM_MAX_IMM12 <= if
+    adr_reg adr_reg off asm_add_imm comp_instr \ add <adr>, <adr>, <off>
+  else
+    comp_scratch_reg { off_reg }
+    off off_reg comp_load \ mov <reg>, <imm> | ldr <reg>, <some_off>
+    adr_reg adr_reg off_reg asm_add_reg comp_instr \ add <adr>, <adr>, <off>
+  end
+
   nil
+end
+
+\ For internal use.
+fun: struct_field_define
+  { name name_len struct_align align off type len -- align off err }
+  ( E: struct_adr -- field_adr )
+
+  \ Since structs are intended for C interop, alignment of every field
+  \ must match the platform's C ABI. So far, ABI compat seems to hold.
+  \ We still need more comprehensive tests.
+  off align align_up { off }
+
+  \ Execution-time semantics.
+  name name_len define_fun
+    1 1 false comp_signature_set ( E: struct_adr -- field_adr )
+    1 comp_args_set
+    off if off comp_push compile' + end
+  semicolon
+
+  \ Compile-time semantics.
+  name name_len define_fun_comp
+    false try_all
+    0 1 true comp_signature_set
+    off comp_push compile' struct_field_comp
+  semicolon
+
+  type sizeof len * off + { off }
+  struct_align align max off nil
+
+  [ false comp_only ]
 end
 
 \ Every field takes two inputs: type decl, like `U8`, and element count.
@@ -1939,37 +1978,21 @@ end
 \ their size and type. For example, signed 32-bit integers `S32` must
 \ be stored with `!32` and loaded with `@s32`, which sign-extends the
 \ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
-fun: field: { max_align off fun type len -- align off_next fun err }
+fun: field: { struct_align off fun type len -- align off fun err }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
 
-  read_word { name name_len }
+  type alignof { align }
+  read_word struct_align align off type len
+  struct_field_define fun nil
+end
 
-  \ Since structs are intended for C interop, alignment of every field
-  \ must match the platform's C ABI. So far, ABI compat seems to hold.
-  \ We still need more comprehensive tests.
-  type alignof             { field_align }
-  off field_align align_up { field_off }
+fun: field_aligned: { struct_align off fun type len align -- align off fun err }
+  ( C: "name" -- )
+  ( E: struct_adr -- field_adr )
 
-  \ Execution-time semantics.
-  name name_len define_fun
-    1 1 false comp_signature_set ( E: struct_adr -- field_adr )
-    1 comp_args_set
-    field_off if field_off comp_push compile' + end
-  semicolon
-
-  \ Compile-time semantics.
-  name name_len define_fun_comp
-    false try_all
-    0 1 true comp_signature_set
-    field_off comp_push compile' struct_field_comp
-  semicolon
-
-  type sizeof len * field_off + { off_next }
-  max_align field_align max     { max_align }
-  max_align off_next fun nil
-
-  [ false comp_only ]
+  read_word struct_align align off type len
+  struct_field_define fun nil
 end
 
 \ Can finally define the type layout officially.
