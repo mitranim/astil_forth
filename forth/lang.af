@@ -130,7 +130,9 @@ end
 0b0000 let: ASM_EQ
 0b0001 let: ASM_NE
 0b0010 let: ASM_CS
+0b0010 let: ASM_HS
 0b0011 let: ASM_CC
+0b0011 let: ASM_LO
 0b0100 let: ASM_MI
 0b0101 let: ASM_PL
 0b0110 let: ASM_VS
@@ -225,6 +227,17 @@ fun: asm_cset { Xd cond -- instr }
   cond 1 xor 12 lsl { cond }
   Xd cond or
   0b1_0_0_11010100_11111_0000_0_1_11111_00000 or
+end
+
+\ ccmp Xd, Xm, <nzcv>, <cond>
+fun: asm_ccmp_reg { Xn Xm nzcv cond -- instr }
+  Xm   16 lsl { Xm }
+  cond 12 lsl { cond }
+  Xn   5 lsl
+  Xm   or
+  cond or
+  nzcv or
+  0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 or
 end
 
 fun: <>0 { int -- bool } [
@@ -3128,3 +3141,64 @@ fun_comp: fallback: { -- err } ( E: one two -- fallback )
   0     comp_args_set
   nil
 end
+
+\ For internal use below. Each `ccmp` runs only if previous test didn't pass;
+\ otherwise it sets condition flags to our `nzcv` fallback. The final `cset`
+\ sets the final bool based on resulting flags.
+fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
+  ( E: val …preds… -- bool )
+
+  comp_args_get { len }
+
+  len 3 < if
+    " `%s` requires at least 3 inputs: value to test, and predicates" name errf throw
+  end
+
+  0 1 asm_cmp_reg comp_instr \ cmp x0, x1
+
+  len 2 +for: pred
+    \ ccmp x0, xN, <nzcv>, <cond>
+    0 pred nzcv cond_each asm_ccmp_reg comp_instr
+  end
+
+  0 comp_clobber
+  0 cond_end asm_cset comp_instr \ cset x0, <cond>
+  1 comp_args_set
+  nil
+end
+
+0b1000 let: ASM_NZCV_N
+0b0100 let: ASM_NZCV_Z
+0b0010 let: ASM_NZCV_C
+0b0001 let: ASM_NZCV_V
+0b0100 let: ASM_NZCV_EQ_OK \ Z=1
+0b0000 let: ASM_NZCV_NE_OK \ Z=0
+0b0000 let: ASM_NZCV_LO_OK \ C=0
+0b0010 let: ASM_NZCV_HS_OK \ C=1
+0b0010 let: ASM_NZCV_HI_OK \ C=1 Z=0
+0b0000 let: ASM_NZCV_LS_OK \ C=0 -> LS true
+0b1000 let: ASM_NZCV_LT_OK \ N=1 V=0
+0b0000 let: ASM_NZCV_GE_OK \ N=0 V=0
+0b0000 let: ASM_NZCV_GT_OK \ Z=0 N=V=0
+0b0100 let: ASM_NZCV_LE_OK \ Z=1
+
+false try_all
+fun_comp: =any    { -- err } " =any"    ASM_NE ASM_NZCV_EQ_OK ASM_EQ comp_cmp_many end
+fun_comp: =none   { -- err } " =none"   ASM_NE ASM_NZCV_EQ_OK ASM_NE comp_cmp_many end
+fun_comp: u<any   { -- err } " u<any"   ASM_HS ASM_NZCV_LO_OK ASM_LO comp_cmp_many end
+fun_comp: u>=any  { -- err } " u>=any"  ASM_LO ASM_NZCV_HS_OK ASM_HS comp_cmp_many end
+fun_comp: u>any   { -- err } " u>any"   ASM_LS ASM_NZCV_HI_OK ASM_HI comp_cmp_many end
+fun_comp: u<=any  { -- err } " u<=any"  ASM_HI ASM_NZCV_LS_OK ASM_LS comp_cmp_many end
+fun_comp: u<none  { -- err } " u<none"  ASM_HS ASM_NZCV_LO_OK ASM_HS comp_cmp_many end
+fun_comp: u>=none { -- err } " u>=none" ASM_LO ASM_NZCV_HS_OK ASM_LO comp_cmp_many end
+fun_comp: u>none  { -- err } " u>none"  ASM_LS ASM_NZCV_HI_OK ASM_LS comp_cmp_many end
+fun_comp: u<=none { -- err } " u<=none" ASM_HI ASM_NZCV_LS_OK ASM_HI comp_cmp_many end
+fun_comp: <any    { -- err } " <any"    ASM_GE ASM_NZCV_LT_OK ASM_LT comp_cmp_many end
+fun_comp: >=any   { -- err } " >=any"   ASM_LT ASM_NZCV_GE_OK ASM_GE comp_cmp_many end
+fun_comp: >any    { -- err } " >any"    ASM_LE ASM_NZCV_GT_OK ASM_GT comp_cmp_many end
+fun_comp: <=any   { -- err } " <=any"   ASM_GT ASM_NZCV_LE_OK ASM_LE comp_cmp_many end
+fun_comp: <none   { -- err } " <none"   ASM_GE ASM_NZCV_LT_OK ASM_GE comp_cmp_many end
+fun_comp: >=none  { -- err } " >=none"  ASM_LT ASM_NZCV_GE_OK ASM_LT comp_cmp_many end
+fun_comp: >none   { -- err } " >none"   ASM_LE ASM_NZCV_GT_OK ASM_LE comp_cmp_many end
+fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT comp_cmp_many end
+true try_all
