@@ -12,9 +12,10 @@ Microbenchmarks comparing:
 Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces VM interpreters, slightly outpaces other JITs (due to being untyped), and vaguely approaches Clang C with `-O2` (x1.5-x2).
 
 Naming:
-- `_aot`   -- Astil reg-CC as AOT-compiled executable.
-- `_reg`   -- Astil reg-CC in JIT mode.
-- `_stack` -- Astil stack-CC in JIT mode.
+- `_aot`     -- Astil reg-CC as AOT-compiled executable.
+- `_reg`     -- Astil reg-CC in JIT mode.
+- `_asm_aot` -- Astil reg-CC in AOT mode.
+- `_stack`   -- Astil stack-CC in JIT mode.
 
 Each `_reg` and `_stack` benchmark includes the cost of bootstrapping the entire language first. Reg-CC takes longer to bootstrap because it has more features.
 
@@ -113,7 +114,7 @@ Python 3.14.4
 | `fib_loop_clang` | 2.8 ± 0.0 | 2.7 | 3.1 | 1.00 |
 | `fib_loop_astil_aot` | 3.5 ± 0.0 | 3.4 | 3.7 | 1.23 ± 0.02 |
 | `fib_loop_astil_reg` | 9.2 ± 0.0 | 9.1 | 9.6 | 3.22 ± 0.04 |
-| `fib_loop_astil_asm` | 8.4 ± 0.1 | 8.3 | 8.7 | 2.93 ± 0.04 |
+| `fib_loop_astil_asm_aot` | 8.4 ± 0.1 | 8.3 | 8.7 | 2.93 ± 0.04 |
 | `fib_loop_astil_stack` | 23.4 ± 0.8 | 22.3 | 25.6 | 8.21 ± 0.30 |
 | `fib_loop_gforth` | 41.8 ± 1.2 | 39.8 | 44.2 | 14.67 ± 0.45 |
 | `fib_loop_luajit` | 9.2 ± 0.1 | 8.3 | 9.5 | 3.24 ± 0.04 |
