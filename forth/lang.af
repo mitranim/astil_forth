@@ -1001,6 +1001,12 @@ fun: !2 { val0 val1 adr } [
   0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
 ] end
 
+fun: !at { val adr off } [
+  \ str x0, [x1, x2]
+  0 1 2 0 asm_store_with_register_off comp_instr
+  0 comp_args_set
+] end
+
 fun: off! { adr } false adr ! end
 fun: on!  { adr } true  adr ! end
 
@@ -1745,8 +1751,6 @@ end
 \ structure listed below. Since we do not yet have `struct:` because it
 \ can only be defined later, we get / set fields via hardcoded offsets.
 \
-\ SYNC[type_fields].
-\
 \   struct: Type
 \     Cell 1 field: Type_size
 \     Cell 1 field: Type_align
@@ -1758,20 +1762,16 @@ end
 \ Most of the time size and alignment should be accessed via the
 \ `sizeof'` and `alignof'` shortcuts, which inline the values at
 \ compile time, without loading the type descriptors at runtime.
+\
+\ SYNC[type_fields].
 fun: def_type { name name_len size align -- err }
-  name_len inc       { name_cap }
-  2 cells name_cap + { type_size }
+  name_len inc             { name_cap }
+  2 cells name_cap +       { full_size }
+  nil full_size alloc_data { type }
 
-  nil type_size alloc_data { type }
-
-  \ SYNC[type_fields].
-  type             { type_size }
-  type +cell       { type_align }
-  type_align +cell { type_name }
-
-  size type_size !
-  align type_align !
-  type_name name name_cap strlcpy
+  size type !
+  align type CELL !at
+  2 cells type + name name_cap strlcpy
   name name_len type init_data_word
 
   [ false comp_only ]
