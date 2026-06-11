@@ -1,7 +1,10 @@
 {
   "selector": "source.astil_forth",
   "cmd": ["astil", "$file"],
-  "file_regex": "position:[\t ]+(...*?):(\\d+):(\\d+)",
+
+  // Uncomment if you like sticky error messages.
+  // "file_regex": "position:[\t ]+(...*?):(\\d+):(\\d+)",
+
   "variants": [
     {
       "name": "std:lang.af",
