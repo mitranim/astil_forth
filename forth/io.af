@@ -185,12 +185,12 @@ fun: file_open { path mode -- file err }
   file nil
 end
 
-fun: file_write_char { file char -- err }
+fun: file_write_char { char file -- err }
   char file fputc is_err_flag ifn nil ret end
   " failed to write char" file file_err
 end
 
-fun: file_write_bytes { file buf len -- err }
+fun: file_write_bytes { buf len file -- err }
   buf 1 len file fwrite { out }
   out len = if nil ret end
   " wrote %zd instead of %zd bytes" out len errf file file_err
