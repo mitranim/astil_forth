@@ -1346,8 +1346,6 @@ fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
   nil
 end
 
-fun: parse_str { -- str len err } char' " read_until_char nil end
-
 fun: comp_alloc_cstr { buf len -- cstr err }
   len inc            { cap } \ Reserve terminating null byte.
   buf cap alloc_data { adr }
@@ -1378,20 +1376,24 @@ end
 \ into the transient reader input and is not null-terminated. In compilation
 \ mode, the string is statically allocated, unique, and null-terminated.
 fun: s" { -- str len err } ( E: "str" -- str len )
-  read_char { -- } parse_str nil
+  read_char { -- } char' " read_until_char nil
 end
 fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len )
-  read_char { -- } parse_str comp_str nil
+  read_char { -- } char' " read_until_char comp_str nil
+end
+
+fun: s` { -- str len err } ( E: `str` -- str len )
+  read_char { -- } char' ` read_until_char nil
+end
+fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len )
+  read_char { -- } char' ` read_until_char comp_str nil
 end
 
 4096 buf: ROOT_STR_BUF
 
-\ C-style string literal. Like `s"` but returns only the address without the
-\ length. The string is always null-terminated. In interpretation mode, this
-\ reuses the same buffer for each call, and the string may be truncated.
-fun: " { -- cstr err } ( E: "str" -- cstr )
+fun: read_interp_cstr { delim -- cstr err }
   read_char { -- }
-  parse_str { src len }
+  delim read_until_char { src len }
   ROOT_STR_BUF { buf cap }
   len cap min { len }
   buf src len memcpy
@@ -1400,12 +1402,19 @@ fun: " { -- cstr err } ( E: "str" -- cstr )
   buf nil
 end
 
-\ Unlike interpretation-mode `"`, this allocates a unique string
-\ in the compiler-managed data region and compiles a PC-relative
-\ reference to it.
-fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr )
-  read_char { -- } parse_str comp_cstr nil
+\ Interpretation-mode string "literals" which return null-terminated strings
+\ without length. Reuses the same buffer for each call; may also truncate.
+fun: " { -- cstr err } ( E: "str" -- cstr ) char' " read_interp_cstr nil end
+fun: ` { -- cstr err } ( E: `str` -- cstr ) char' ` read_interp_cstr nil end
+
+\ Reads a string, copies it to compiler-managed data,
+\ and compiles a PC-relative reference to it.
+fun: read_comp_cstr { delim -- err }
+  read_char { -- } delim read_until_char comp_cstr nil
 end
+
+fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr ) char' " read_comp_cstr nil end
+fun_comp: ` { -- err } ( C: `str` -- ) ( E: -- cstr ) char' ` read_comp_cstr nil end
 
 \ Shortcut for creating string "constants". Typical use:
 \
