@@ -455,11 +455,7 @@ static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
 
   const auto ctx = &comp->ctx;
 
-  /*
-  In recursive functions, we can't use caller-saved scratch registers as
-  "stable" local locations because they get clobbered by recursive calls.
-  */
-  if (!sym->norm.has_recur && ctx->vol_regs) {
+  if (ctx->vol_regs) {
     const auto reg = bits_pop_low(&ctx->vol_regs);
 
     if (bits_has(ASM_REGS_VOLATILE, reg)) {

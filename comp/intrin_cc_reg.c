@@ -168,16 +168,14 @@ static Err intrin_ret(Interp *interp) {
   return nullptr;
 }
 
-/*
-Note: recursion affects register allocation.
-See `asm_resolve_local_location`.
-*/
 static Err intrin_recur(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
 
   const auto comp = &interp->comp;
+
   try(comp_validate_recur_args(comp));
+  try(comp_clobber_regs(comp, ASM_REGS_VOLATILE));
   try(comp_append_recur(comp));
   comp_args_set(comp, sym->out_len);
   if (comp->ctx.try_all && sym->has_err) try(comp_append_try(comp, sym));

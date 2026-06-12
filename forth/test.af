@@ -535,6 +535,20 @@ fun: test_recursion { -- err }
 end
 test_recursion
 
+fun: recur_reg_clobber_fun { val -- out }
+  -1 -2   { -- }            \ Unconditionally clobber x0 x1.
+  val ifn 0 ret end
+  val val { ignored saved } \ `ignored` = x0, `saved` = x1, `val` = none
+  0 recur { -- }            \ Must relocate `saved`.
+  saved inc
+end
+
+fun: test_recur_reg_clobber { -- err }
+  T{ 10 recur_reg_clobber_fun <T> 11 }T
+  nil
+end
+test_recur_reg_clobber
+
 fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
   val ifn 100 nil ret end
   val 3 = if 0 " recur_err_non_try" ret end
