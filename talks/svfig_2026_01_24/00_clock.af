@@ -18,7 +18,7 @@ import' std:lang_s.af
 
   loop
     \ Strike-out the previous entry.
-    printed then
+    if printed then
       del_line
       strike_beg mins secs log_time strike_end lf
     end

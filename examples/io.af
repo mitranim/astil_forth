@@ -47,7 +47,7 @@ fun: example_seek_and_thou_shall_find { -- err }
 
   37 91 { off cap }
 
-  file off 0 fseek is_err_flag then
+  if file off 0 fseek is_err_flag then
     file fclose { -- }
     " seek file" path io_err ret
   end
@@ -56,7 +56,7 @@ fun: example_seek_and_thou_shall_find { -- err }
   file ferror { code }
   file fclose { -- }
 
-  len cap <> then
+  if len cap <> then
     code " unable to read file" os_err ret
   end
 

@@ -1,7 +1,0 @@
-fun: test_elif_end { -- err }
-  true then
-    nil ret
-  elif false
-  end
-  nil
-end

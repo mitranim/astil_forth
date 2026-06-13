@@ -1,9 +1,0 @@
-fun: test_elif_else { -- err }
-  true then
-    nil ret
-  elif false
-  else
-    nil ret
-  end
-  nil
-end

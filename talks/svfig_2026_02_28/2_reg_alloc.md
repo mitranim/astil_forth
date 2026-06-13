@@ -255,7 +255,7 @@ Control structures simply clobber the entire "stack" (parameter registers). This
   123 { val }   \ Assigned to x9: non-param location.
 
   \ `then` and `end` clobber param registers and relocate `val`.
-  cond then 234 { val } end
+  if cond then 234 { val } end
 
   val cond { -- } \ x0, x1 <- x9 x8
 ;

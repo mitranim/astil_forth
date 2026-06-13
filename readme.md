@@ -66,7 +66,7 @@ import' std:lang.af
 fun: main
   " hello world!" log lf
 
-  10 then
+  if 10 then
     " branch 0" log lf
   elif 20 then
     " branch 1" log lf
@@ -135,7 +135,7 @@ On top of that, most languages isolate you from the CPU, or even from the OS, fr
 
 Astil Forth explores the opposite direction. The interpreter / compiler provides only the bare minimum of intrinsics for controlling its behavior, and leaves it to the program to define the rest of the language. See [`./forth/lang.af`](./forth/lang.af).
 
-This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. (Astil Forth also implements conditionals without compiler support, and makes them much nicer to use, but uses more code.)
+This is possible because of direct access to compilation. Outside the Forth world, this is nearly unheard of. In the Forth world, this is common and extremely powerful. For an elegant and enlightening read, look at [Frugal Forth](https://github.com/hoytech/frugal), which implements if/then/else conditionals in [3 lines](https://github.com/hoytech/frugal/blob/b3bed9bd85f0f2a23a7f334e0af8dc0392f8c796/init.fs#L99-L101) of user/lib code, with very little compiler support. Astil Forth also implements conditionals without compiler support, in barely a page of code, and makes them _much_ nicer to use than standard Forth.
 
 Unlike Frugal and mature systems such as Gforth, Astil Forth goes straight for machine code. It does not have a VM, bytecode of any kind, or even an IR. I enjoy the simplicity of that, despite the non-portability.
 
@@ -194,9 +194,9 @@ By convention, if the last output parameter is named _exactly_ `err`, the compil
 
 ```forth
 fun: word { -- err }
-  word0 { err }           err then err ret end
-  word1 { val0 err }      err then err ret end
-  word2 { val1 val2 err } err then err ret end
+  word0 { err }           if err then err ret end
+  word1 { val0 err }      if err then err ret end
+  word2 { val1 val2 err } if err then err ret end
   nil
 end
 ```
@@ -386,9 +386,9 @@ Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
 - All conditionals and loops are terminated with `end`. No need to remember other terminators. (`until` is also available.)
-- Conditionals begin with `then` or `zthen`, rather than with `if`. This reads better.
+- Conditionals take the form `if then else end`, which reads much nicer.
 - `elif` is supported.
-- Any amount of `elif cond then` / `elif cond zthen` is terminated with a single `end`.
+- Any amount of conditional branches is terminated with a single `end`.
 - Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
 Because the system uses native function calls, there is no return stack; see below.
@@ -416,7 +416,7 @@ Examples:
 - Parsing words: `import' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
 - Unusual control words: `T{ }T`.
-- Well-known control words don't use special characters: `then zthen else elif end ret` and several more. Syntax highlighters should hardcode them.
+- Well-known control words don't use special characters: `if then else elif end ret` and several more. Syntax highlighters should hardcode them.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names. These are commonly used as delimiters, like `T{ }T`.
 

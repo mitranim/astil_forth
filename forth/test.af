@@ -282,31 +282,31 @@ end
 test_local_ref_volatile_with_outputs
 
 fun: test_conditionals { -- err }
-  \ false then 10      end \ Must fail to compile.
-  \ false then else 10 end \ Must fail to compile.
+  \ if false then 10      end \ Must compile to a skipped branch.
+  \ Bare `false then` is unsupported.
 
-  T{ -1 { val } false then 10 { val } end val <T> -1 }T
-  T{ -1 { val } true  then 10 { val } end val <T> 10 }T
+  T{ -1 { val } if false then 10 { val } end val <T> -1 }T
+  T{ -1 { val } if true  then 10 { val } end val <T> 10 }T
 
-  T{ false then 10 { val } else 20 { val } end val <T> 20 }T
-  T{ true  then 10 { val } else 20 { val } end val <T> 10 }T
+  T{ if false then 10 { val } else 20 { val } end val <T> 20 }T
+  T{ if true  then 10 { val } else 20 { val } end val <T> 10 }T
 
-  T{ -1 { val } false zthen 10 { val } end val <T> 10 }T
-  T{ -1 { val } true  zthen 10 { val } end val <T> -1 }T
+  T{ -1 { val } ifn false then 10 { val } end val <T> 10 }T
+  T{ -1 { val } ifn true  then 10 { val } end val <T> -1 }T
 
-  T{ false zthen 10 { val } else 20 { val } end val <T> 10 }T
-  T{ true  zthen 10 { val } else 20 { val } end val <T> 20 }T
+  T{ ifn false then 10 { val } else 20 { val } end val <T> 10 }T
+  T{ ifn true  then 10 { val } else 20 { val } end val <T> 20 }T
 
   T{
     -1 { val }
-    false then 10 { val } elif false then 20 { val } end val
+    if false then 10 { val } elif false then 20 { val } end val
   <T>
     -1
   }T
 
   T{
     -1 { val }
-    false then 10 { val } elif false then 20 { val } else 30 { val } end
+    if false then 10 { val } elif false then 20 { val } else 30 { val } end
     val
   <T>
     30
@@ -314,14 +314,14 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    false then 10 { val } elif true then 20 { val } end val
+    if false then 10 { val } elif true then 20 { val } end val
   <T>
     20
   }T
 
   T{
     -1 { val }
-    false then 10 { val } elif true then 20 { val } else 30 { val } end
+    if false then 10 { val } elif true then 20 { val } else 30 { val } end
     val
   <T>
     20
@@ -329,14 +329,14 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    true then 10 { val } elif false then 20 { val } end val
+    if true then 10 { val } elif false then 20 { val } end val
   <T>
     10
   }T
 
   T{
     -1 { val }
-    true then 10 { val } elif false then 20 { val } else 30 { val } end
+    if true then 10 { val } elif false then 20 { val } else 30 { val } end
     val
   <T>
     10
@@ -344,14 +344,14 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    false then 10 { val } elif false zthen 20 { val } end val
+    if false then 10 { val } elifn false then 20 { val } end val
   <T>
     20
   }T
 
   T{
     -1 { val }
-    false then 10 { val } elif false zthen 20 { val } else 30 { val } end
+    if false then 10 { val } elifn false then 20 { val } else 30 { val } end
     val
   <T>
     20
@@ -359,14 +359,14 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    false then 10 { val } elif true zthen 20 { val } end val
+    if false then 10 { val } elifn true then 20 { val } end val
   <T>
     -1
   }T
 
   T{
     -1 { val }
-    false then 10 { val } elif true zthen 20 { val } else 30 { val } end
+    if false then 10 { val } elifn true then 20 { val } else 30 { val } end
     val
   <T>
     30
@@ -374,14 +374,14 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    true then 10 { val } elif false zthen 20 { val } end val
+    if true then 10 { val } elifn false then 20 { val } end val
   <T>
     10
   }T
 
   T{
     -1 { val }
-    true then 10 { val } elif false zthen 20 { val } else 30 { val } end
+    if true then 10 { val } elifn false then 20 { val } else 30 { val } end
     val
   <T>
     10
@@ -389,10 +389,10 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    false then
+    if false then
       10 { val }
     else
-      true then
+      if true then
         20 { val }
       end
     end
@@ -404,21 +404,6 @@ fun: test_conditionals { -- err }
   nil
 end
 test_conditionals
-
-fun: test_conditionals_invalid { -- err } [ false try_all ]
-  import' ./test/test_elif_end.af
-  " `elif` must be followed by a condition and `then` or `zthen`"
-  T_err_contains try
-  T{ false then 10 { val } else 20 { val } end val <T> 20 }T
-
-  import' ./test/test_elif_else.af
-  " `elif` must be followed by a condition and `then` or `zthen`"
-  T_err_contains try
-  T{ true then 10 { val } else 20 { val } end val <T> 10 }T
-
-  nil
-end
-test_conditionals_invalid
 
 fun: switch_empty { val -- out }
   val switch end
@@ -518,8 +503,8 @@ test_switch_inner_statements
 fun: switch_nested_if { val flag -- out }
   -1 { out }
   val switch
-    10 case flag then 100 { out } else 300 { out } end end
-    20 case flag then 200 { out } else 400 { out } end end
+    10 case if flag then 100 { out } else 300 { out } end end
+    20 case if flag then 200 { out } else 400 { out } end end
     999 { out }
   end
   out
@@ -561,7 +546,7 @@ end
 test_switch_nested
 
 fun: recursive_fun { val -- val }
-  val 13 <= then val ret end
+  if val 13 <= then val ret end
   val dec recur
 end
 
@@ -573,7 +558,7 @@ test_recursion
 
 fun: recur_reg_clobber_fun { val -- out }
   -1 -2   { -- }            \ Unconditionally clobber x0 x1.
-  val zthen 0 ret end
+  ifn val then 0 ret end
   val val { ignored saved } \ `ignored` = x0, `saved` = x1, `val` = none
   0 recur { -- }            \ Must relocate `saved`.
   saved inc
@@ -586,21 +571,21 @@ end
 test_recur_reg_clobber
 
 fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
-  val zthen 100 nil ret end
-  val 3 = then 0 " recur_err_non_try" ret end
+  ifn val then 100 nil ret end
+  if val 3 = then 0 " recur_err_non_try" ret end
   val dec recur
 end
 
 fun: recur_err_manual_try_fun { val -- out err } [ false try_all ]
-  val zthen 100 nil ret end
-  val 3 = then 0 " recur_err_manual" ret end
+  ifn val then 100 nil ret end
+  if val 3 = then 0 " recur_err_manual" ret end
   val dec recur try { out }
   out nil
 end
 
 fun: recur_err_auto_try_fun { val -- out err } [ true try_all ]
-  val zthen 100 nil ret end
-  val 3 = then 0 " recur_err_auto" ret end
+  ifn val then 100 nil ret end
+  if val 3 = then 0 " recur_err_auto" ret end
   val dec recur { out }
   out nil
 end
@@ -806,7 +791,7 @@ fun: test_loop_for { -- err }
   T{
     0 { val }
     12 for
-      val 5 > then leave end
+      if val 5 > then leave end
       val inc { val }
     end
     val
@@ -860,10 +845,10 @@ fun: test_loop_for_countdown { -- err }
   T{ -1  -for: ind end <T> }T
   T{ 0   -for: ind end <T> }T
 
-  T{ 666 { ind } 12 -for: ind                         end ind <T> -1 }T
-  T{ 666 { ind } 12 -for: ind               leave     end ind <T> 11 }T
-  T{ 666 { ind } 12 -for: ind ind 5 <= then leave end end ind <T> 5  }T
-  T{ 666 { ind } 12 -for: ind ind 5 >       while     end ind <T> 5  }T
+  T{ 666 { ind } 12 -for: ind                            end ind <T> -1 }T
+  T{ 666 { ind } 12 -for: ind                  leave     end ind <T> 11 }T
+  T{ 666 { ind } 12 -for: ind if ind 5 <= then leave end end ind <T> 5  }T
+  T{ 666 { ind } 12 -for: ind    ind 5 >       while     end ind <T> 5  }T
 
   T{
     666 { ind }
@@ -911,7 +896,7 @@ fun: test_loop_for_countup { -- err }
   T{
     -123 { ind }
     12 0 +for: ind
-      ind 5 > then leave end
+      if ind 5 > then leave end
     end
     ind
   <T>
@@ -1073,7 +1058,7 @@ fun: test_cont_loop { -- err }
   -1 { len }
   loop
     len inc { len }
-    len 7 < then cont end
+    if len 7 < then cont end
     leave
   end
   T{ len <T> 7 }T
@@ -1110,7 +1095,7 @@ fun: test_cont_loop_countdown { -- err }
   T{
     8 0 1
     -loop: ind
-      ind 3 > then cont end
+      if ind 3 > then cont end
       leave
     end
     ind
@@ -1128,7 +1113,7 @@ fun: test_cont_loop_countup { -- err }
   T{
     8 0 1
     +loop: ind
-      ind 5 < then cont end
+      if ind 5 < then cont end
       leave
     end
     ind
@@ -1143,7 +1128,7 @@ test_cont_loop_countup
 
 \ Load/store is used internally by testing utils. The test is kinda cyclic.
 fun: test_load_store { -- err }
-  has_interp then
+  if has_interp then
     T{ VAR @ <T> 123 }T
   else
     T{ VAR @ <T> 345 }T \ Preserved in AOT from this test.
@@ -1922,7 +1907,7 @@ test_catch_invalid
 fun: test_throw { -- err } " test_err" throw nil end
 
 fun: test_catch_0_val { -- val err }
-  false then test_throw end
+  if false then test_throw end
   123 nil
 end
 
@@ -1936,7 +1921,7 @@ end
 test_catch_0
 
 fun: test_catch_1_cond { one -- two err }
-  one then one 2 * nil ret end
+  if one then one 2 * nil ret end
   test_throw
   unreachable
   nil nil
@@ -1959,7 +1944,7 @@ fun: test_catch_2_cond { one two -- three four err }
   one <>0 { ok0 }
   two <>0 { ok1 }
 
-  ok0 ok1 and then
+  if ok0 ok1 and then
     one two + { three }
     two one - { four  }
     three four nil ret
@@ -2012,7 +1997,7 @@ end
 test_explicit_err_0
 
 fun: test_explicit_err_1_fun { one -- two err }
-  one zthen test_throw end
+  ifn one then test_throw end
   one 2 * nil
 end
 
@@ -2043,7 +2028,7 @@ end
 test_explicit_err_1
 
 fun: test_explicit_err_2_fun { one two -- three err }
-  one zthen test_throw end
+  ifn one then test_throw end
   one two + nil
 end
 
@@ -2081,7 +2066,7 @@ end
 test_explicit_err_2
 
 fun: test_explicit_err_3_fun { one -- two three err }
-  one zthen test_throw end
+  ifn one then test_throw end
   one 2 *    { two }
   one negate { three }
   two three nil
@@ -2121,7 +2106,7 @@ end
 test_explicit_err_3
 
 fun: test_explicit_err_4_fun { one two -- three four err }
-  one zthen test_throw end
+  ifn one then test_throw end
   one two + { three }
   two one - { four }
   three four nil
@@ -2172,7 +2157,7 @@ end
 test_max_output_regs
 
 fun: test_max_output_regs_with_err { -- A B C D E F G err }
-  false then test_throw end
+  if false then test_throw end
   0 1 2 3 4 5 6 nil
 end
 fun: test_max_output_regs_with_err { -- err } [ redefine ]
@@ -2487,7 +2472,7 @@ end
 fun: main { -- exit } [ false try_all ]
   main_run { err }
 
-  err zthen
+  ifn err then
     " [test] [aot] ok" elog elf
     0 ret
   end

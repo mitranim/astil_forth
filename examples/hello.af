@@ -21,8 +21,7 @@ STDOUT s" hello world! (using syscall)" sys_write
 STDOUT CRLF 2 sys_write
 
 fun: bool_str { val -- str }
-  val
-  then " true" ret end
+  if val then " true" ret end
   " false"
 end
 

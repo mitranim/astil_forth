@@ -1108,12 +1108,12 @@ end
 \
 \ General idea:
 \
-\   then      \ cbz <outside>
+\   if pred then \ cbz <outside>
 \     if_true
 \   end
 \   outside
 \
-\   then      \ cbz <if_false>
+\   if pred then \ cbz <if_false>
 \     if_true
 \   else      \ b <outside>
 \     if_false
@@ -1145,46 +1145,23 @@ fun: ifn_pop ( prev_fun ifn_adr  -- )
   execute
 end
 
-fun_comp: then ( C: -- nop pop adr pop ) ( E: pred -- )
-  xt' nop xt' execute reserve_cond xt' if_pop
-end
+fun_comp: if  xt' nop xt' if_pop  end
+fun_comp: ifn xt' nop xt' ifn_pop end
+fun_comp: then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) reserve_cond swap end
 
-0 var: ELIF
-
-fun: validate_no_elif
-  ELIF @ then
-    ELIF off!
-    " `elif` must be followed by a condition and `then` or `zthen`" throw
-  end
-end
-
-fun: else_pop ( prev_fun else_adr -- ) validate_no_elif patch_branch_forward execute end
-
-fun: conditional_init ( C: -- pop adr )
-  ELIF @ =0 then xt' nop end
-  ELIF off!
-  xt' execute reserve_cond
-end
-
-fun_comp: then ( C: -- prev done_fun? exec_fun if_adr if_fun ) ( E: pred -- ) [ redefine ]
-  conditional_init xt' if_pop
-end
-
-fun_comp: zthen ( C: -- prev done_fun? exec_fun ifn_adr ifn_fun ) ( E: pred -- )
-  conditional_init xt' ifn_pop
-end
+fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward execute end
 
 fun_comp: else
-  validate_no_elif
-  ( C: exec_fun if_adr if_fun -- else_adr else_fun )
+  ( C: if_adr if_fun -- else_adr else_fun )
   here_write to: adr
   reserve_instr
-  xt' nop 2 bury \ Disable `exec_fun` to prevent "then" from chaining.
-  execute        \ Pop just the top frame.
+  xt' nop -rot \ Isolate the top frame to prevent chaining.
+  execute      \ Pop the top frame including the nop.
   adr xt' else_pop
 end
 
-fun_comp: elif execute'' else ELIF on! end
+fun_comp: elif  execute'' else xt' if_pop  end
+fun_comp: elifn execute'' else xt' ifn_pop end
 
 \ ## Loops
 \
@@ -1218,8 +1195,7 @@ fun: loop_aux
             to: stack_len_0
   stack_len to: stack_len_1
 
-  LOOP_FRAME @
-  zthen
+  ifn LOOP_FRAME @ then
     " auxiliary loop constructs require an ancestor loop frame" throw
   end
 
@@ -1289,8 +1265,7 @@ end
 \ with `cont` because they update counters and check bounds at the end, rather
 \ than at the start. The issue was fixed for reg-CC, but not for stack-CC.
 fun_comp: cont
-  LOOP_FRAME @ dup
-  zthen " `cont` requires an ancestor loop frame" throw end
+  ifn LOOP_FRAME @ dup then " `cont` requires an ancestor loop frame" throw end
   sp_at @ loop_end \ b <beg>
 end
 
@@ -1466,7 +1441,7 @@ fun_comp: -loop:
   loop_adr cond_adr xt' loop_countdown_pop
 end
 
-fun: ?dup ( val bool -- val ?val ) then dup end end
+fun: ?dup ( val bool -- val ?val ) if then dup end end
 
 \ ## String comparison continued
 
@@ -1475,9 +1450,9 @@ fun: ccompare ( cstr0 cstr1 -- cmp )
   to: cstr1
   to: cstr0
 
-  cstr0 cstr1 or zthen 0 ret end
-  cstr0 zthen -1 ret end
-  cstr1 zthen +1 ret end
+  ifn cstr0 cstr1 or then 0 ret end
+  ifn cstr0 then -1 ret end
+  ifn cstr1 then +1 ret end
   cstr0 cstr1 strcmp
 end
 
@@ -1544,8 +1519,7 @@ fun_comp: {
 
   loop
     read_word to: len to: str
-    s" }" str len str=
-    then loc_len } ret end
+    if s" }" str len str= then loc_len } ret end
 
     s" --" str len str<> while \ `--` to `}` is a comment.
 
@@ -1626,12 +1600,12 @@ fun: sysstack_frame_ptr ( -- fp ) [
 \ Unlike in reg-CC, we don't just pop-push pairs, because we have to pop
 \ the precise `len` amount of items from the Forth integer stack.
 fun: comp_va_beg ( C: len -- )
-  dup odd then
+  if dup odd then
     xt' dup>systack inline_word
     dec
   end
 
-  dup zthen drop ret end
+  ifn dup then drop ret end
 
   \ Not odd = automatically aligned to 16.
   loop
@@ -1644,7 +1618,7 @@ end
 
 \ Short for "compile variadic arguments end".
 fun: comp_va_end ( C: len -- )
-  dup then
+  if dup then
     cells 16 align_up
     ASM_REG_SP ASM_REG_SP rot
     asm_add_imm comp_instr \ add sp, sp, <off>
@@ -1740,12 +1714,12 @@ fun: .        ( num     -- ) stack_len dec log_cell lf end
 fun: .s
   stack_len to: len
 
-  len zthen
+  ifn len then
     " stack is empty" log lf
     ret
   end
 
-  len <0 then
+  if len <0 then
     " stack length is negative: " log len log_int lf
     ret
   end
@@ -1785,7 +1759,7 @@ end
 fun: mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or      to: mflag
   0 size pflag mflag -1 0 mmap to: addr
-  addr -1 = then mem_map_err throw end
+  if addr -1 = then mem_map_err throw end
   addr
 end
 
@@ -1796,7 +1770,7 @@ end
 
 fun: mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE or mprotect
-  -1 = then mem_unprot_err throw end
+  if -1 = then mem_unprot_err throw end
 end
 
 \ Allocates a guarded buffer: `guard|data|guard`.

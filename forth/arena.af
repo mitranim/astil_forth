@@ -15,7 +15,7 @@ end
 fun: arena_init { arn } arn size' Arena erase end
 
 fun: arena_deinit { arn -- err }
-  arn zthen nil ret end
+  ifn arn then nil ret end
 
   arn Stack_floor @ { floor }
   arn Stack_top   @ { ceil }
@@ -31,7 +31,7 @@ end
 
 \ Truncate every page and reset to first page if any, while keeping capacity.
 fun: arena_trunc { arn }
-  arn zthen ret end
+  ifn arn then ret end
 
   arn Stack_floor @ { floor }
   arn Stack_top   @ { ceil }
@@ -44,24 +44,24 @@ fun: arena_trunc { arn }
 end
 
 fun: arena_alloc { size arn -- adr err }
-  size zthen " unable to allocate: size is zero" throw end
+  ifn size then " unable to allocate: size is zero" throw end
 
   arn Arena_low @ { low }
   arn Stack_top @ { ceil }
   nil             { page }
   nil             { adr }
 
-  arn stack? zthen
+  ifn arn stack? then
     ARENA_PAGES size' Stack * arn stack_init try
   end
 
   ceil low size' Stack +loop: page
     page Stack_ceil @ { ceil }
     page Stack_top  @ FUND_ALIGN align_up { top }
-    ceil top - size >= then top { adr } leave end
+    if ceil top - size >= then top { adr } leave end
   end
 
-  adr zthen
+  ifn adr then
     arn Stack_top @ { page }
     size ARENA_PAGE_MIN max page stack_init try
     page size' Stack + arn Stack_top !

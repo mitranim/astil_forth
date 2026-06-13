@@ -31,7 +31,7 @@ More ergonomic control flow structures:
 - Loop controls like `leave` and `while` are terminated by the same `end` as the loop.
 
 ```forth
-10 #then 20 #elif 30 #then 40 #else 50 #end
+#if 10 #then 20 #elif 30 #then 40 #else 50 #end
 
 #loop true #while #leave #leave #leave #end
 
@@ -82,8 +82,9 @@ compile' some_word
 234 let: CONST
 345 var: VAR
 
+#if
+  some condition
 #then
-  some new input
   #recur
 #end
 ```

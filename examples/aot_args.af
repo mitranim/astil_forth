@@ -5,13 +5,13 @@ import' std:lang.af
 \ AOT-compiled programs receive args straight from the OS.
 
 fun: main { argc argv envp -- exit }
-  has_interp then
+  if has_interp then
     " [main] mode: JIT" log lf
   else
     " [main] mode: AOT" log lf
   end
 
-  argc then
+  if argc then
     " [main] args (%zd):" argc logf lf
 
     argc 0 +for: ind
@@ -23,8 +23,8 @@ fun: main { argc argv envp -- exit }
   end
 
   \ Optional: dump env.
-  false then
-    envp then
+  if false then
+    if envp then
       " [main] env:" log lf
 
       loop

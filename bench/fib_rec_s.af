@@ -1,7 +1,7 @@
 import' std:lang_s.af
 
 fun: fib { ind -- out }
-  ind 1 <= then 1 ret end
+  if ind 1 <= then 1 ret end
   ind 1 - recur
   ind 2 - recur
   +

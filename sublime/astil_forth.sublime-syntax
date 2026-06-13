@@ -31,11 +31,11 @@ variables:
   keyword: |-
     (?x:
       ret|recur|
-      then|zthen|else|elif|switch|case|do|end|
+      if|ifn|then|else|elif|elifn|switch|case|do|end|
       loop|for|while|until|leave|cont|
       throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
       try|try[_]{{word}}|{{word}}[_]try|
-      assert|abort|fatal|quit|exit
+      assert|abort|unreachable|fatal|quit|exit
     )
 
 contexts:

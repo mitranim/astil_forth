@@ -11,7 +11,7 @@ fun: callback { inout -- err }
   alloca' Fstat       { stat }
   path stat path_stat { err }
 
-  err zthen
+  ifn err then
     \ Store the output back.
     stat Fstat_size @ inout !
   end
@@ -35,11 +35,11 @@ fun: main
   " [main] spawning thread 1..." log lf
   instr inout1 thread_spawn { thread1 err1 }
 
-  err0 then
+  if err0 then
     " [main] unable to spawn thread 0: %s" err0 logf lf
   end
 
-  err1 then
+  if err1 then
     " [main] unable to spawn thread 1: %s" err1 logf lf
   end
 
@@ -47,11 +47,11 @@ fun: main
   \ Since this word handles thread creation errors explicitly,
   \ it won't terminate until done with both thread handles.
 
-  err0 zthen
+  ifn err0 then
     " [main] waiting on thread 0..." log lf
     thread0 thread_join { err0 join_err }
 
-    join_err then
+    if join_err then
       " [main] when joining with thread 0: %s" join_err logf lf
     elif err0 then
       " [main] error from thread 0: %s" err0 logf lf
@@ -60,11 +60,11 @@ fun: main
     end
   end
 
-  err1 zthen
+  ifn err1 then
     " [main] waiting on thread 1..." log lf
     thread1 thread_join { err1 join_err }
 
-    join_err then
+    if join_err then
       " [main] when joining with thread 1: %s" join_err logf lf
     elif err1 then
       " [main] error from thread 1: %s" err1 logf lf

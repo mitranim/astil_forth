@@ -133,7 +133,7 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 fun: io_err { action path -- err_str }
   errno { code }
   code strerror { msg }
-  msg then
+  if msg then
     action " unable to %s `%s`; code: %d; msg: %s"
     action path code msg wrapf ret
   end
@@ -143,17 +143,17 @@ end
 fun: file_err { action file -- err_str }
   nil nil { code msg }
 
-  file ferror then
+  if file ferror then
     errno { code }
     code strerror { msg }
   end
 
-  msg then
+  if msg then
     msg " file error: %s; code: %zd; msg: %s"
     action code msg wrapf ret
   end
 
-  code then
+  if code then
     msg " file error: %s; code: %zd"
     action code msg wrapf ret
   end
@@ -162,36 +162,34 @@ fun: file_err { action file -- err_str }
 end
 
 fun: fd_stat { fdes path stat_adr -- err }
-  fdes stat_adr fstat
-  then " stat" path io_err throw end
+  if fdes stat_adr fstat then " stat" path io_err throw end
   nil
 end
 
 fun: path_stat { path stat_adr -- err }
-  path stat_adr stat
-  then " stat" path io_err throw end
+  if path stat_adr stat then " stat" path io_err throw end
   nil
 end
 
 fun: fd_open { path mode -- fdes err }
   path mode open { out }
-  out is_err_flag then " open" path io_err throw end
+  if out is_err_flag then " open" path io_err throw end
   out nil
 end
 
 fun: file_open { path mode -- file err }
   path mode fopen { file }
-  file zthen " open" path io_err throw end
+  ifn file then " open" path io_err throw end
   file nil
 end
 
 fun: file_write_char { char file -- err }
-  char file fputc is_err_flag zthen nil ret end
+  ifn char file fputc is_err_flag then nil ret end
   " failed to write char" file file_err
 end
 
 fun: file_write_bytes { buf len file -- err }
   buf 1 len file fwrite { out }
-  out len = then nil ret end
+  if out len = then nil ret end
   " wrote %zd instead of %zd bytes" out len errf file file_err
 end
