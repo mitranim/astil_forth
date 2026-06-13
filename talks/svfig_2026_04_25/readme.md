@@ -60,7 +60,7 @@ From inside a running program:
 ```forth
 : main { -- exit }
   has_interp
-  if
+  then
     " hello world (JIT mode)!" log lf
   else
     " hello world (AOT-compiled)!" log lf

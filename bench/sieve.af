@@ -16,7 +16,7 @@ fun: find_prime { flags cap -- num }
   flags cap flags_ceil 0 3 { ceil num step }
 
   ceil flags +for: ptr0
-    ptr0 @u8 if
+    ptr0 @u8 then
       ptr0 step + { ptr1 }
 
       ceil ptr0 step +loop: ptr1

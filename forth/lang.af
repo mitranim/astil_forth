@@ -1627,12 +1627,12 @@ fun: fprint { str len file } str 1 len file fwrite   { -- } end
 \ push addresses to the control stack, then patch-up the
 \ instructions in later words like `else` and `end`.
 \
-\   if        \ cbz <outside>
+\   then      \ cbz <outside>
 \     if_true
 \   end
 \   outside
 \
-\   if        \ cbz <if_false>
+\   then      \ cbz <if_false>
 \     if_true
 \   else      \ b <outside>
 \     if_false
@@ -1688,21 +1688,25 @@ end
 fun: if_pop  { -- err } STACK if_pop_from  nil end
 fun: ifn_pop { -- err } STACK ifn_pop_from nil end
 
-fun_comp: if { -- nop adr fun err } ( E: pred -- )
-  1 " when calling `if`" comp_args_valid 0 comp_args_set
+fun_comp: then { -- nop adr pop err } ( E: pred -- )
+  1 " when calling `then`" comp_args_valid 0 comp_args_set
   comp_barrier
   reserve_here { adr }
-  xt' nop adr xt' if_pop nil \ `nop` terminates the `end` pop-chain.
+  xt' nop adr xt' if_pop nil
 end
 
-fun_comp: ifn { -- nop adr fun err } ( E: pred -- )
-  1 " when calling `ifn`" comp_args_valid 0 comp_args_set
-  comp_barrier
-  reserve_here { adr }
-  xt' nop adr xt' ifn_pop nil
+0 var: ELIF
+
+fun: validate_no_elif { -- err }
+  ELIF @ then
+    ELIF off!
+    " `elif` must be followed by a condition and `then` or `zthen`" ret
+  end
+  nil
 end
 
 fun: else_pop_from { stack -- err } ( C: prev_fun else_adr -- )
+  validate_no_elif
   comp_barrier
   stack s> patch_branch_forward
   stack s> execute
@@ -1711,28 +1715,48 @@ end
 
 fun: else_pop { -- err } STACK else_pop_from nil end
 
-fun_comp: elif { -- adr fun err } ( E: pred -- )
-  1 " when calling `elif`" comp_args_valid 0 comp_args_set
+fun: conditional_init { msg -- err }
+  ELIF @ { is_elif }
+  ELIF off!
+  1 msg comp_args_valid
+  0 comp_args_set
   comp_barrier
+  is_elif =0 then xt' nop STACK >s end
+  nil
+end
+
+fun_comp: then { -- adr pop err } ( E: pred -- ) [ redefine ]
+  " when calling `then`" conditional_init
   reserve_here xt' if_pop nil
 end
 
-fun_comp: elifn { -- adr fun err } ( E: pred -- )
-  1 " when calling `elifn`" comp_args_valid 0 comp_args_set
-  comp_barrier
+fun_comp: zthen { -- adr pop err } ( E: pred -- )
+  " when calling `zthen`" conditional_init
   reserve_here xt' ifn_pop nil
 end
 
-fun_comp: else { if_adr if_fun -- else_adr else_fun err }
-  0 " when calling `else`" comp_args_valid
+fun: else_init { if_adr if_fun msg -- adr err }
+  validate_no_elif
+  0 msg comp_args_valid
 
   comp_barrier \ Clobber / relocate locals.
-  reserve_here { else_adr }
+  reserve_here { adr }
 
   xt' nop STACK >s \ Terminate chaining from `if_fun`.
   if_adr  STACK >s
   if_fun  execute
-  else_adr xt' else_pop nil
+  adr nil
+end
+
+fun_comp: else { if_adr if_fun -- else_adr else_fun err }
+  if_adr if_fun " when calling `else`" else_init
+  xt' else_pop nil
+end
+
+fun_comp: elif { if_adr if_fun -- else_adr else_fun err }
+  if_adr if_fun " when calling `elif`" else_init { adr }
+  ELIF on!
+  adr xt' else_pop nil
 end
 
 fun: switch_pop { -- err } ( C: next_pop val_loc -- )
@@ -1954,14 +1978,14 @@ end
 \ Compile field access, which computes address + offset.
 fun: struct_field_comp { off -- err }
   comp_args_get { len }
-  len ifn " struct field must be preceded by struct pointer" throw end
-  off ifn nil ret end
+  len zthen " struct field must be preceded by struct pointer" throw end
+  off zthen nil ret end
 
   \ Same reg: replace prior address with address + offset.
   len dec { adr_reg }
   adr_reg comp_clobber \ Disassociate locals from this reg.
 
-  off ASM_MAX_IMM12 <= if
+  off ASM_MAX_IMM12 <= then
     adr_reg adr_reg off asm_add_imm comp_instr \ add <adr>, <adr>, <off>
   else
     comp_scratch_reg { off_reg }
@@ -1986,7 +2010,7 @@ fun: struct_field_define
   name name_len define_fun
     1 1 false comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
-    off if off comp_push compile' + end
+    off then off comp_push compile' + end
   semicolon
 
   \ Compile-time semantics.
@@ -2066,19 +2090,19 @@ fun: is_err_flag { int -- bool } int int_to_cell -1 = end
 
 fun: mem_map { size pflag -- addr err }
   0 size pflag MAP_DEFAULT -1 0 mmap { addr }
-  addr -1 = if " unable to mmap" throw end
+  addr -1 = then " unable to mmap" throw end
   addr nil
 end
 
 fun: mem_unmap { addr size -- err }
   addr size munmap
-  is_err_flag if " unable to munmap" throw end
+  is_err_flag then " unable to munmap" throw end
   nil
 end
 
 fun: mem_prot { addr size pflag -- err }
   addr size pflag mprotect
-  is_err_flag if " unable to mprotect" throw end
+  is_err_flag then " unable to mprotect" throw end
   nil
 end
 
@@ -2121,12 +2145,12 @@ fun: stack_init { size stack -- err }
 end
 
 fun: stack_deinit { stack -- err }
-  stack ifn nil ret end
+  stack zthen nil ret end
 
   stack Stack_bytelen @ { bytelen }
   stack Stack_cellar  @ { cellar }
 
-  cellar if cellar bytelen mem_unmap end
+  cellar then cellar bytelen mem_unmap end
 
   nil stack Stack_bytelen !
   nil stack Stack_cellar  !
@@ -2138,12 +2162,12 @@ end
 
 \ Redefine to skip nil stack.
 fun: stack_trunc { stack } [ redefine ]
-  stack ifn ret end
+  stack zthen ret end
   stack stack_trunc
 end
 
 fun: stack_repr { stack }
-  stack ifn " [debug] stack is nil" elog elf ret end
+  stack zthen " [debug] stack is nil" elog elf ret end
 
   " [debug] stack           " elog stack                 debug_arg
   " [debug] Stack_bytelen @ " elog stack Stack_bytelen @ debug_arg
@@ -2203,7 +2227,7 @@ end
 
 fun: loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
-  frame ifn " missing loop frame" throw end
+  frame zthen " missing loop frame" throw end
   frame STACK stack_cell_at nil
 end
 
@@ -2414,7 +2438,7 @@ end
 \   123  23    3    +loop: ind ind . end
 \
 \ When the loop ends, the index local is still in scope,
-\ holding a value which is out of range. For example, if
+\ holding a value which is out of range. For example, then
 \ `ceil floor step` is `7 3 2`, the loop iterates twice,
 \ with indexes `3` and `5`, and the index outside is `8`.
 fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
@@ -2450,9 +2474,9 @@ end
 
 \ `strcmp` doesn't like null string pointers.
 fun: ccompare { cstr0 cstr1 -- cmp }
-  cstr0 cstr1 or ifn 0 ret end
-  cstr0 ifn -1 ret end
-  cstr1 ifn +1 ret end
+  cstr0 cstr1 or zthen 0 ret end
+  cstr0 zthen -1 ret end
+  cstr1 zthen +1 ret end
   cstr0 cstr1 strcmp
 end
 
@@ -2495,7 +2519,7 @@ end
 
 \ Short for "compile variadic arguments end".
 fun: comp_va_end { len -- err }
-  len if
+  len then
     len cells 16 align_up { off }
     ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
   end
@@ -2522,12 +2546,12 @@ end
 \ Prepends `pre_len` args to current args. Inputs are passed on the control
 \ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
 fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
-  pre_len ifn nil ret end
+  pre_len zthen nil ret end
 
   comp_args_get      { post_len }
   post_len pre_len + { arg_len }
 
-  arg_len ASM_PARAM_LEN_MAX > if
+  arg_len ASM_PARAM_LEN_MAX > then
     " in `comp_args_prepend`: too many total args" throw
   end
 
@@ -2587,7 +2611,7 @@ fun_comp: errf { -- err } ( E: fmt …vargs… -- err )
 end
 
 fun: wrapf_args { err fmt -- buf cap fmt }
-  err ERR_BUF_0 = if ERR_BUF_1 ERR_CAP fmt ret end
+  err ERR_BUF_0 = then ERR_BUF_1 ERR_CAP fmt ret end
   ERR_BUF_0 ERR_CAP fmt
 end
 
@@ -2624,7 +2648,7 @@ fun: fatal { err } " fatal: %s" err elogf elf abort end
 0 1 extern: __error
 1 1 extern: strerror
 
-\ We'd like to treat `errno` as a noun. It would have been convenient if
+\ We'd like to treat `errno` as a noun. It would have been convenient then
 \ `errno` was a regular global variable, like `__stdinp`. Unfortunately,
 \ on MacOS, it's implemented as a macro which calls an external function
 \ which returns `x0` while clobbering `x8` and `x9` on the tested system
@@ -2639,7 +2663,7 @@ fun: errno { -- code } __error @s32 end
 \ See `is_err_flag` earlier in this file for detecting -1 error codes.
 fun: os_err { code ctx -- err_str }
   code strerror { msg }
-  msg if
+  msg then
     " %s; code: %zd; msg: %s" ctx code msg errf ret
   end
   " %s; code: %zd" ctx code errf
@@ -2651,14 +2675,14 @@ end
 \   0 1 extern: some_fun
 \   some_fun " unable to do X" os_err? try
 fun: os_err? { int ctx -- err_str }
-  int is_err_flag if errno ctx os_err ret end
+  int is_err_flag then errno ctx os_err ret end
   nil
 end
 
 \ Like `os_err?`, but for Posix functions which directly
 \ return an `errno` code on failure, and zero on success.
 fun: posix_err? { code ctx -- err_str }
-  code if code ctx os_err ret end
+  code then code ctx os_err ret end
   nil
 end
 
@@ -2667,11 +2691,11 @@ end
 \ For functions like `snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
 fun: validate_format_len { len -- len err }
-  len >=0 if len nil ret end
+  len >=0 then len nil ret end
 
   errno { code }
   code strerror { msg }
-  msg if
+  msg then
     " unable to format string; code: %d; msg: %s" code msg errf throw
   else
     " unable to format string; code: %s" code errf throw
@@ -2724,7 +2748,7 @@ end
 \
 \ Should usually be followed with `0 comp_args_set`.
 fun: comp_args_to_stack { len stk_reg top_reg -- err } ( E: …args… -- )
-  len ifn nil ret end
+  len zthen nil ret end
 
   top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
@@ -2744,14 +2768,14 @@ end
 fun_comp: >>s { -- err } ( E: …args… stack -- )
   comp_args_get { len }
 
-  len ifn
+  len zthen
     " unable to use `>>s`: at least 1 argument is required (stack address)"
     throw
   end
 
   len dec { len }
   len comp_args_set
-  len ifn nil ret end
+  len zthen nil ret end
 
   len             { stk_reg }
   ASM_REG_SCRATCH { top_reg }
@@ -2767,7 +2791,7 @@ end
 fun_comp: stack{ { -- err } ( E: stack -- )
   comp_args_get { len }
 
-  len 1 <> if
+  len 1 <> then
     " unable to use `stack{`: exactly one argument is required (stack address)"
     throw
   end
@@ -2777,9 +2801,9 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   loop
     read_word { str len }
 
-    s" }"  str len str= if leave end
+    s" }"  str len str= then leave end
 
-    s" --" str len str= if
+    s" --" str len str= then
       " unsupported `--` in `stack{`" throw
     end
 
@@ -2788,7 +2812,7 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   end
 
   0 comp_args_set
-  locs ifn nil ret end
+  locs zthen nil ret end
 
   0 { stk_reg }
   1 { top_reg }
@@ -2819,12 +2843,12 @@ fun: .        { num } num log_cell lf end
 fun: stack_log_cells { stack }
   stack stack_len_cells { len }
 
-  len ifn
+  len zthen
     " stack is empty" log lf
     ret
   end
 
-  len <0 if
+  len <0 then
     " stack length is negative: %zd" len logf lf
     ret
   end
@@ -2977,7 +3001,7 @@ fun: interp { -- adr } [
 fun: wordlist_log { dict list_num list_name }
   dict Interp_dict_len @u32 { len }
 
-  len ifn
+  len zthen
     " %s: empty" list_name logf lf
     ret
   end
@@ -2999,7 +3023,7 @@ fun: wordlist_log { dict list_num list_name }
     1 bit_ind lsl           { bit_mask }
     bitset bit_mask and     { live }
 
-    live ifn cont end
+    live zthen cont end
 
     ind cells { off }
     keys off + @ { key }
@@ -3075,7 +3099,7 @@ fun: indirect_to { decl xt_to -- err }
   xt_to Sym_inp_len     @b { sym_inp }
   xt_to sym_name           { name }
 
-  decl_inp sym_inp <> if
+  decl_inp sym_inp <> then
     " unable to indirect to `%s`: input count: %zd <> %zd"
     name decl_inp sym_inp errf throw
   end
@@ -3083,7 +3107,7 @@ fun: indirect_to { decl xt_to -- err }
   decl Indir_decl_out @b { decl_out }
   xt_to Sym_out_len     @b { sym_out }
 
-  decl_out sym_out <> if
+  decl_out sym_out <> then
     " unable to indirect to `%s`: output count: %zd <> %zd"
     name decl_out sym_out errf throw
   end
@@ -3091,7 +3115,7 @@ fun: indirect_to { decl xt_to -- err }
   decl Indir_decl_has_err @b { decl_has_err }
   xt_to Sym_has_err       @b { sym_has_err }
 
-  decl_has_err sym_has_err <> if
+  decl_has_err sym_has_err <> then
     " unable to indirect to `%s`: has_err: %zd <> %zd"
     name decl_has_err sym_has_err errf throw
   end
@@ -3122,7 +3146,7 @@ fun: execute_raw { fun } [ 0 asm_branch_link_reg comp_instr ] end
 fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_args_get { len }
 
-  len ifn
+  len zthen
     " unable to compile `execute_raw`: at least 1 argument is required" throw
   end
 
@@ -3144,7 +3168,7 @@ end
 fun: comp_loc_mut { fun name -- err } ( C: "name" -- ) ( E: -- )
   read_word comp_local_named { loc }
 
-  comp_args_get if
+  comp_args_get then
     " arity mismatch in `%s`: expected no arguments" name errf throw
   end
 
@@ -3194,7 +3218,7 @@ fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
 
   comp_args_get { len }
 
-  len 3 < if
+  len 3 < then
     " `%s` requires at least 3 inputs: value to test, and predicates" name errf throw
   end
 
@@ -3250,7 +3274,7 @@ true try_all
 fun: is_whitespace { char -- bool } char LF CR TAB VTAB SPACE =any end
 
 fun: assert_cond { cond ctx -- err }
-  cond if nil ret end
+  cond then nil ret end
   " assertion failed: %s" ctx errf
 end
 
@@ -3263,7 +3287,7 @@ fun: assert_pop { beg -- err }
   ceil dec @b is_whitespace =0 { fail }
   s" end" ceil 3 str<> fail or { fail }
 
-  fail if
+  fail then
     " invalid use of `assert`: must be terminated with `end`" throw
   end
 

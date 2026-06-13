@@ -38,7 +38,7 @@ fun: list_verify { list len -- err }
   list
   CELL
   +loop: ptr
-    ptr @2 > if " [bubble] not sorted" throw end
+    ptr @2 > then " [bubble] not sorted" throw end
   end
   nil
 end
@@ -50,7 +50,7 @@ fun: bubble { list len }
   -loop: ceil_ptr
     ceil_ptr list CELL
     +loop: ptr
-      ptr @2 > if
+      ptr @2 > then
         ptr @2 { one two }
         two one ptr !2
       end
@@ -67,7 +67,7 @@ end
 
 fun: main { -- exit }
   LIST LEN bubble_sort { err }
-  err ifn 0 ret end
+  err zthen 0 ret end
   " error: %s" err elogf elf
   1
 end

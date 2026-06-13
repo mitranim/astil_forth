@@ -2,7 +2,7 @@
 import' ../lang_s.af
 
 fun: test_stack_recur_then_throw_fail ( val -- val )
-  dup ifn ret end
+  dup zthen ret end
   dec recur
   " late throw" throw
 end

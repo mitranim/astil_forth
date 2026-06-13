@@ -1,0 +1,1 @@
+Code samples in this directory are occasionally accidentally updated by mechanical refactorings. This also keeps them runnable. As a result, the samples are slightly different from what can be seen in the talk recordings.

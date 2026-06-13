@@ -20,7 +20,7 @@ fun: testing_stack_eq { len0 len1 len stk -- equal }
   len 0 +for: ind
     ind len0 + stk stack_cell_at @ { one }
     ind len1 + stk stack_cell_at @ { two }
-    one two <> if false ret end
+    one two <> then false ret end
   end
   true
 end
@@ -71,10 +71,10 @@ fun: }T { -- err }
 
   \ Does the stack length match?
   rel0 rel1 =
-  if
+  then
     \ Does the content match?
     len0 len1 rel1 stk testing_stack_eq
-    if stk testing_interp_reset nil ret end
+    then stk testing_interp_reset nil ret end
   else
     " [test] stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 elogf elf
   end
@@ -110,8 +110,8 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
 \
 \ TODO: general solution for similar cases.
 fun: testing_stack_init_aot { -- err }
-  has_interp if nil ret end
-  TEST_STACK_INITED_AOT @ if nil ret end
+  has_interp then nil ret end
+  TEST_STACK_INITED_AOT @ then nil ret end
   32 TEST_STACK stack_init
   TEST_STACK_INITED_AOT on!
   nil
@@ -123,7 +123,7 @@ fun: testing_compiled_reset
 end
 
 fun: testing_compile_push_args { len -- err }
-  len ifn nil ret end
+  len zthen nil ret end
 
   len     { stk_reg }
   len inc { top_reg }
@@ -140,7 +140,7 @@ end
 fun_comp: T{ { -- err }
   0 " when calling `T{`" comp_args_valid
 
-  TEST_ARG_LEN @ if
+  TEST_ARG_LEN @ then
     " internal error: non-empty `TEST_ARG_LEN` at `T{`"
     throw
   end
@@ -169,7 +169,7 @@ fun: testing_compiled_end { arg_len -- err } [ false try_all ]
   arg_len 2 * { len2 } \ }T
 
   len0 len1 arg_len stk testing_stack_eq
-  if testing_compiled_reset nil ret end
+  then testing_compiled_reset nil ret end
 
   " [test] mismatch: " elog
   len0 len1 len2 stk testing_stack_log
@@ -200,28 +200,28 @@ end
 \ ## Misc assertions
 
 fun: T_str_eq { act exp -- err }
-  exp ifn
-    act ifn nil ret end
+  exp zthen
+    act zthen nil ret end
     " expected string to be nil; got: %s" act errf throw
   end
 
-  act ifn
+  act zthen
     " unexpected nil string; expected: %s" exp errf throw
   end
 
-  act exp cstr= if nil ret end
+  act exp cstr= then nil ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
   " expected string: %s; actual string: %s" exp act errf
 end
 
 fun: T_err_contains { act exp -- err }
-  act ifn
+  act zthen
     " missing error message; expected error to contain: %s"
     exp errf throw
   end
 
-  act exp strstr if nil ret end
+  act exp strstr then nil ret end
 
   " expected error message to contain: %s; actual error message: %s"
   exp act errf throw

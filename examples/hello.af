@@ -22,7 +22,7 @@ STDOUT CRLF 2 sys_write
 
 fun: bool_str { val -- str }
   val
-  if " true" ret end
+  then " true" ret end
   " false"
 end
 

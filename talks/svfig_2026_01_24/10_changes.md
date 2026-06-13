@@ -26,12 +26,12 @@ Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
 - `elif` is supported.
-- Any amount of `else elif` is popped with a single `end`.
+- Any amount of `elif cond then` is popped with a single `end`.
 - Most loops are terminated with `end`. No need to remember other terminators.
 - Loop controls like `leave` and `while` are terminated by the same `end` as the loop.
 
 ```forth
-10 #if 20 #else 30 #elif 40 #else 50 #end
+10 #then 20 #elif 30 #then 40 #else 50 #end
 
 #loop true #while #leave #leave #leave #end
 
@@ -82,7 +82,7 @@ compile' some_word
 234 let: CONST
 345 var: VAR
 
-#if
+#then
   some new input
   #recur
 #end

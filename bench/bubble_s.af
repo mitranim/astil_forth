@@ -35,7 +35,7 @@ fun: list_verify { list len -- }
   list
   CELL
   +loop: ptr
-    ptr @2 > if " [bubble] not sorted" throw end
+    ptr @2 > then " [bubble] not sorted" throw end
   end
 end
 
@@ -46,7 +46,7 @@ fun: bubble { list len -- }
   -loop: ceil_ptr
     ceil_ptr list CELL
     +loop: ptr
-      ptr @2 > if ptr @2 swap ptr !2 end
+      ptr @2 > then ptr @2 swap ptr !2 end
     end
   end
 end
@@ -66,13 +66,13 @@ end
 \     ceil_ptr LIST CELL
 \     +loop: ptr
 \       ptr @2 >
-\       if
+\       then
 \         ptr @2 swap ptr !2
 \         false to: flag
 \       end
 \     end
 \
-\     flag if leave end
+\     flag then leave end
 \   end
 \ end
 

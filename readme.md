@@ -66,9 +66,9 @@ import' std:lang.af
 fun: main
   " hello world!" log lf
 
-  10 if
+  10 then
     " branch 0" log lf
-  else 20 elif
+  elif 20 then
     " branch 1" log lf
   else
     " branch 2" log lf
@@ -194,9 +194,9 @@ By convention, if the last output parameter is named _exactly_ `err`, the compil
 
 ```forth
 fun: word { -- err }
-  word0 { err }           err if err ret end
-  word1 { val0 err }      err if err ret end
-  word2 { val1 val2 err } err if err ret end
+  word0 { err }           err then err ret end
+  word1 { val0 err }      err then err ret end
+  word2 { val1 val2 err } err then err ret end
   nil
 end
 ```
@@ -386,8 +386,9 @@ Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
 - All conditionals and loops are terminated with `end`. No need to remember other terminators. (`until` is also available.)
-- `elif` / `elifn` is supported.
-- Any amount of `else elif` is terminated with a single `end`.
+- Conditionals begin with `then` or `zthen`, rather than with `if`. This reads better.
+- `elif` is supported.
+- Any amount of `elif cond then` / `elif cond zthen` is terminated with a single `end`.
 - Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
 Because the system uses native function calls, there is no return stack; see below.
@@ -415,7 +416,7 @@ Examples:
 - Parsing words: `import' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
 - Unusual control words: `T{ }T`.
-- Well-known control words don't use special characters: `if else end ret` and several more. Syntax highlighters should hardcode them.
+- Well-known control words don't use special characters: `then zthen else elif end ret` and several more. Syntax highlighters should hardcode them.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names. These are commonly used as delimiters, like `T{ }T`.
 

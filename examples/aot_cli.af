@@ -10,7 +10,7 @@ import' std:lang.af
 \ See `./aot.af` for compiling from INSIDE the program.
 
 fun: main { -- exit }
-  has_interp if
+  has_interp then
     " hello world (JIT mode)!" log lf
   else
     " hello world (AOT-compiled)!" log lf

@@ -4,17 +4,11 @@ import' std:lang_s.af
 
 : main { val }
   val 0 =
-  if
+  then
     " branch: 0" log lf
-  else
-
-  val 1 =
-  elif
+  elif val 1 = then
     " branch: 1" log lf
-  else
-
-  val 2 =
-  elif
+  elif val 2 = then
     " branch: 2" log lf
   else
     " branch: none" log lf

@@ -22,11 +22,11 @@ fun: read_req { conn buf cap -- len err }
 
   loop
     conn buf cap read { wrote }
-    wrote ifn len nil ret end
+    wrote zthen len nil ret end
 
-    wrote is_err_flag if
+    wrote is_err_flag then
       errno { code }
-      code EINTR = if cont end
+      code EINTR = then cont end
       code " unable to read request" os_err throw
     end
 
@@ -57,13 +57,13 @@ end
 fun: handle_conn { conn }
   conn respond_conn { err }
 
-  err if
+  err then
     " [srv] unable to respond; error: %s" err elogf elf
   end
 
   " [srv] closing connection" elog elf elf
 
-  conn close is_err_flag if
+  conn close is_err_flag then
     errno " [srv] unable to close connection" os_err elog elf
   end
 end

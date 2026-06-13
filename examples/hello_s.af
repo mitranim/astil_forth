@@ -21,7 +21,7 @@ flush
 STDOUT s" hello world! (using syscall)" sys_write
 STDOUT CRLF 2 sys_write
 
-fun: bool_str if " true" else " false" end end
+fun: bool_str then " true" else " false" end end
 
 " bool_str(false): " log false bool_str log lf
 " bool_str(true):  " log true  bool_str log lf
