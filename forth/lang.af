@@ -1787,9 +1787,8 @@ fun_comp: elifn { adr pop meta cond_pop -- adr pop meta pop err }
   adr pop meta cond_separator xt' ifn_pop nil
 end
 
-fun: switch_pop { -- err } ( C: next_pop val_loc meta -- )
-  STACK s> cond_close_branch COND_LEN_MASK and { len }
-  STACK stack_drop_cell
+fun: switch_pop { _val_loc_ meta -- err } ( C: next_pop -- )
+  meta cond_close_branch COND_LEN_MASK and { len }
   execute'' end
   len " when ending `switch`" comp_args_valid
   nil
@@ -1988,16 +1987,10 @@ end
 \ must be loaded and stored using dedicated typed operators.
 
 \ For internal use, invoked by `end`.
-fun: struct_pop { -- err } ( C: name name_len align off -- )
-  STACK s> { off }
-  STACK s> { align }
-  STACK s> { name_len }
-  STACK s> { name }
-
+fun: struct_pop { name name_len align off -- err } ( C: name name_len align off -- )
   off align align_up { size }
   name name_len size align define_type
   name free
-
   [ false comp_only ]
   nil
 end
@@ -2005,7 +1998,7 @@ end
 \ Begins a definition; terminate with `end`.
 fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
   read_word       { str len }
-  str len strndup { str }
+  str len strndup { str } \ Leak if comp error before `struct_pop` done.
   xt' struct_pop  { fun }
   str len 0 0 fun nil
 end
@@ -2576,15 +2569,9 @@ end
 \   end
 \
 \ Caution: vargs can only be used in direct calls to variadic functions.
-\ Indirect calls DO NOT WORK because stack pointer is changed by calls.
-fun_comp: vargs{ { -- err } ( C: -- len ) ( E: <systack_push> )
-  0 comp_va_beg STACK >s nil
-end
-
-\ Restores the SP after a variadic call. See `vargs{`.
-fun_comp: }vargs { -- err } ( C: len -- ) ( E: <systack_pop> )
-  STACK s> comp_va_end nil
-end
+\ Indirect calls DO NOT WORK, because stack pointer is changed by calls.
+fun_comp: vargs{ { -- len err } ( E: <systack_push> ) 0   comp_va_beg nil end
+fun_comp: }vargs { len -- err } ( E: <systack_pop> )  len comp_va_end nil end
 
 \ Prepends `pre_len` args to current args. Inputs are passed on the control
 \ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
