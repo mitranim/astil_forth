@@ -468,8 +468,8 @@ initializing their own locals or otherwise using the available arguments.
 This validates that there are no unused arguments, and clobbers each temp
 register-local association. Might eventually get a more general mechanism.
 */
-static Err intrin_comp_barrier(Interp *interp) {
-  try(comp_barrier(&interp->comp));
+static Err intrin_comp_barrier(Sint req, Interp *interp) {
+  try(comp_barrier(&interp->comp, req));
   return nullptr;
 }
 
@@ -764,6 +764,7 @@ static const USED auto INTRIN_COMP_BARRIER = (Sym){
   .name.buf  = "comp_barrier",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_barrier,
+  .inp_len   = 1,
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,

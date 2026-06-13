@@ -1,0 +1,5 @@
+import' ../lang.af
+
+fun: test_cond_arity_elif_mismatch_fail { -- out }
+  if false then 10 elif true then 20 30 else 40 end
+end

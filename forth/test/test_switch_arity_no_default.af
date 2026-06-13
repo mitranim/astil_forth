@@ -1,0 +1,7 @@
+\ Requires `std:lang.af`.
+
+fun: test_switch_arity_no_default_fail { val -- out }
+  val switch
+    10 case 100 end
+  end
+end

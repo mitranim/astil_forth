@@ -208,8 +208,9 @@ fun: dec { i0 -- i1 } [
   1 comp_args_set
 ] end
 
-fun: low_bits { len -- bits } 1 len lsl dec end
-fun: bit_trunc { imm len -- imm } len low_bits imm and end
+fun: low_bits   { len      -- bits } 1 len lsl dec end
+fun: bit_trunc  { imm len  -- imm  } len low_bits imm and end
+fun: bits_clear { imm mask -- out  } mask invert imm and end
 
 \ cmp Xn, <imm>
 fun: asm_cmp_imm { Xn imm -- instr }
@@ -692,6 +693,13 @@ fun: asm_mvn { Xd Xm -- instr }
   0b1_01_01010_00_1_00000_000000_11111_00000 or
 end
 
+\ clz Xd, Xn
+fun: asm_clz { Xd Xn -- instr }
+  Xn 5 lsl
+  Xd or
+  0b1_1_0_11010110_00000_00010_0_00000_00000 or
+end
+
 \ `ret x30`; requires caution with SP / FP.
 0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 let: asm_ret
 
@@ -775,6 +783,15 @@ fun: max { i0 i1 -- i0|i1 } [
   0 1          asm_cmp_reg comp_instr \ cmp x0, x1
   0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
   1                        comp_args_set
+] end
+
+fun: bit_len { val -- len } [
+  0     comp_clobber
+  1     comp_clobber
+  0 0   asm_clz     comp_instr \ clz x0, x0
+  1 64  asm_mov_imm comp_instr \ mov x1, 64
+  0 1 0 asm_sub_reg comp_instr \ sub x0, x1, x0
+  1     comp_args_set
 ] end
 
 fun: align_down { len wid -- len } wid negate len and end
@@ -1661,105 +1678,159 @@ fun: off_to_pc { adr -- off err } here_write adr - nil end
 \ For backward jumps.
 fun: off_from_pc { adr -- off err } here_write { out } adr out - nil end
 
- \ b <off>
+\ b <off>
 fun: patch_branch_forward { adr -- err } adr off_to_pc asm_branch adr !32 nil end
 
- \ b <off>
+\ b <off>
 fun: patch_branch_back { adr -- err } adr off_from_pc asm_branch adr !32 nil end
 
+\ Caller must also use `comp_barrier` with appropriate arity.
 fun: if_pop { prev adr -- err }
-  comp_barrier \ Clobber / relocate locals.
   adr off_to_pc { off }
   0 off asm_cmp_branch_zero adr !32 \ cbz x0, <else|end>
   prev catch' execute
 end
 
+\ Caller must also use `comp_barrier` with appropriate arity.
 fun: ifn_pop { prev adr -- err }
-  comp_barrier
   adr off_to_pc { off }
   0 off asm_cmp_branch_not_zero adr !32 \ cbnz x0, <else|end>
   prev catch' execute
 end
 
-fun_comp: if  { -- nop pop } xt' nop xt' if_pop  end
-fun_comp: ifn { -- nop pop } xt' nop xt' ifn_pop end
+fun: if_pop_void  { prev adr -- err } 0 comp_barrier prev adr catch' if_pop  end
+fun: ifn_pop_void { prev adr -- err } 0 comp_barrier prev adr catch' ifn_pop end
+
+fun_comp: if  { -- nop pop } xt' nop xt' if_pop_void  end
+fun_comp: ifn { -- nop pop } xt' nop xt' ifn_pop_void end
 
 fun_comp: then { pop -- adr pop err } ( E: pred -- )
   1 " when calling `then`" comp_args_valid 0 comp_args_set
-  comp_barrier
+  0 comp_barrier
   reserve_here pop nil
 end
 
+\ Now that we have conditionals, we can redefine them
+\ into arity-aware condition expressions with outputs.
+
+ASM_PARAM_LEN_MAX bit_len low_bits let: COND_LEN_MASK
+COND_LEN_MASK inc                  let: COND_HAS_LEN
+COND_HAS_LEN 1 lsl                 let: COND_HAS_ELSE
+
+fun: cond_close_branch { meta -- meta err }
+  meta COND_LEN_MASK and { len }
+
+  ifn meta COND_HAS_LEN and then
+    comp_args_get { len }
+    meta COND_LEN_MASK bits_clear len or COND_HAS_LEN or { meta }
+  end
+
+  len comp_barrier
+  meta nil
+end
+
+\ Caller must also use `comp_barrier` with appropriate arity.
 fun: else_pop { prev adr -- err }
-  comp_barrier
   adr patch_branch_forward
   prev catch' execute
 end
 
-fun: else_init { if_adr if_fun msg -- adr err }
-  0 msg comp_args_valid
+fun: cond_separator { adr pop meta -- adr pop meta err }
+  meta cond_close_branch { meta }
+  reserve_here { next_adr }
 
-  comp_barrier
-  reserve_here { adr }
+  xt' nop STACK >s
+  adr     STACK >s
+  pop execute
 
-  xt' nop STACK >s \ Terminate chaining from `if_fun`.
-  if_adr  STACK >s
-  if_fun  execute
-  adr nil
+  0 comp_args_set
+  next_adr xt' else_pop meta nil
 end
 
-fun_comp: else { if_adr if_fun -- else_adr else_fun err }
-  if_adr if_fun " when calling `else`" else_init
-  xt' else_pop nil
-end
+fun: cond_pop { adr pop meta -- err }
+  meta COND_LEN_MASK and { len }
+  len comp_barrier
 
-fun_comp: elif { if_adr if_fun -- else_adr else_fun pop err }
-  if_adr if_fun " when calling `elif`" else_init { adr }
-  adr xt' else_pop xt' if_pop nil
-end
+  if len then
+    ifn meta COND_HAS_ELSE and then
+      " conditional with outputs requires final `else`" throw
+    end
+  end
 
-fun_comp: elifn { if_adr if_fun -- else_adr else_fun pop err }
-  if_adr if_fun " when calling `elifn`" else_init { adr }
-  adr xt' else_pop xt' ifn_pop nil
-end
-
-fun: switch_pop { -- err } ( C: next_pop val_loc -- )
-  comp_barrier
-  STACK stack_drop_cell
-  execute'' end
+  adr STACK >s
+  pop execute
+  len " when ending conditional branch" comp_args_valid
   nil
 end
 
-fun_comp: switch { -- nop val_loc switch_pop err } ( E: val -- )
+fun_comp: if  { -- nop meta pop } [ redefine ] xt' nop 0 xt' if_pop  end
+fun_comp: ifn { -- nop meta pop } [ redefine ] xt' nop 0 xt' ifn_pop end
+
+fun_comp: then { meta pop -- adr pop meta cond_pop err } ( E: pred -- )
+  [ redefine ]
+  1 " when calling `then`" comp_args_valid 0 comp_args_set
+  0 comp_barrier
+  reserve_here pop meta xt' cond_pop nil
+end
+
+fun_comp: else { adr pop meta cond_pop -- adr pop meta cond_pop err }
+  adr pop meta cond_separator { adr pop meta }
+  meta COND_HAS_ELSE or { meta }
+  adr pop meta xt' cond_pop nil
+end
+
+fun_comp: elif { adr pop meta cond_pop -- adr pop meta pop err }
+  adr pop meta cond_separator xt' if_pop nil
+end
+
+fun_comp: elifn { adr pop meta cond_pop -- adr pop meta pop err }
+  adr pop meta cond_separator xt' ifn_pop nil
+end
+
+fun: switch_pop { -- err } ( C: next_pop val_loc meta -- )
+  STACK s> cond_close_branch COND_LEN_MASK and { len }
+  STACK stack_drop_cell
+  execute'' end
+  len " when ending `switch`" comp_args_valid
+  nil
+end
+
+fun_comp: switch { -- nop val_loc meta switch_pop err } ( E: val -- )
   1 " when calling `switch`" comp_args_valid 0 comp_args_set
   comp_local_anon { val_loc }
   0 val_loc comp_local_set \ mov <val>, x0 | str x0, [FP, <val>]
-  xt' nop val_loc xt' switch_pop nil
+  xt' nop val_loc 0 xt' switch_pop nil
+end
+
+fun: else_pop_void { prev adr -- err }
+  0 comp_barrier
+  prev adr catch' else_pop
 end
 
 fun: case_pop
-  { val_loc switch_pop case_adr -- adr_end else_pop val_loc switch_pop err }
+  { val_loc meta switch_pop case_adr -- adr_end else_pop val_loc meta switch_pop err }
 
-  comp_barrier
-  reserve_here       { adr_end }
-  case_adr off_to_pc { off     }
+  meta cond_close_branch { meta    }
+  reserve_here           { adr_end }
+  case_adr off_to_pc     { off     }
 
   off ASM_NE asm_branch_cond case_adr !32 \ b.ne <case_end>
-  adr_end xt' else_pop val_loc switch_pop nil
+  0 comp_args_set
+  adr_end xt' else_pop val_loc meta switch_pop nil
 end
 
 fun_comp: case
-  { val_loc switch_pop -- val_loc switch_pop case_adr case_pop err }
+  { val_loc meta switch_pop -- val_loc meta switch_pop case_adr case_pop err }
   ( E: pred -- )
 
   1 " when calling `case`" comp_args_valid 0 comp_args_set
 
   1 val_loc       comp_local_get \ mov x1, <val> | ldr x1, [FP, <val>]
   0 1 asm_cmp_reg comp_instr     \ cmp x0, x1
-  comp_barrier
+  0 comp_barrier
 
   reserve_here { adr } \ b.ne <case_end>
-  val_loc switch_pop adr xt' case_pop nil
+  val_loc meta switch_pop adr xt' case_pop nil
 end
 
 \ ## Types
@@ -2196,7 +2267,7 @@ fun: loop_frame_adr { -- adr err }
 end
 
 fun: loop_frame_pop { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
-  comp_barrier
+  0 comp_barrier
   LOOP_AUX s> execute \ Pop all auxiliaries until a terminating `nop`.
   prev_loop_ind LOOP_IND !
   nil
@@ -2213,7 +2284,7 @@ fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
 end
 
 fun: loop_back { adr -- err }
-  comp_barrier
+  0 comp_barrier
   adr off_from_pc asm_branch comp_instr \ b <beg>
   nil
 end
@@ -2222,13 +2293,13 @@ end
 \ Loops which push larger frames simply pop-off extra data first.
 fun: loop_base_pop { loop_beg -- err }
   ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
-  comp_barrier
+  0 comp_barrier
   loop_beg loop_back \ b <beg>
   catch'' end        \ Run `loop_frame_pop`.
 end
 
 fun_comp: loop { -- loop_beg loop_pop err } ( C: -- <loop_prev> )
-  comp_barrier
+  0 comp_barrier
   loop_frame_init
   here_write xt' loop_base_pop nil
 end
@@ -2236,12 +2307,12 @@ end
 fun: leave_pop { -- err }
   LOOP_AUX s> { adr }
   LOOP_AUX s> { prev }
-  prev adr catch' else_pop
+  prev adr catch' else_pop_void
 end
 
 \ Breaks out of any loop.
 fun_comp: leave { -- err } ( LOOP_AUX: -- leave_adr leave_pop )
-  comp_barrier
+  0 comp_barrier
   reserve_here  LOOP_AUX >s
   xt' leave_pop LOOP_AUX >s
   nil
@@ -2250,13 +2321,13 @@ end
 fun: while_pop { -- err }
   LOOP_AUX s> { adr }
   LOOP_AUX s> { prev }
-  prev adr catch' if_pop
+  prev adr catch' if_pop_void
 end
 
 \ Breaks out of any loop.
 fun_comp: while { -- err } ( LOOP_AUX: -- while_adr while_pop )
   1 " when calling `while`" comp_args_valid 0 comp_args_set
-  comp_barrier
+  0 comp_barrier
   reserve_here  LOOP_AUX >s
   xt' while_pop LOOP_AUX >s
   nil
@@ -2271,7 +2342,7 @@ fun_comp: cont { -- err } loop_frame_adr @ loop_back nil end \ b <beg>
 \   loop false until
 fun_comp: until { fun -- err }
   1 " when calling `until`" comp_args_valid 0 comp_args_set
-  comp_barrier
+  0 comp_barrier
   0 8 asm_cmp_branch_not_zero comp_instr \ cbnz x0, 8
   fun execute nil
 end
@@ -2295,12 +2366,12 @@ fun: for_loop_countdown_init { cur -- loop_beg cond_adr asm_cond loop_pop err }
 
   loop_frame_init
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
-  comp_barrier                     \ Clobber / relocate locals.
+  0 comp_barrier                   \ Clobber / relocate locals.
   here_write { loop_beg }          \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
   0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
-  comp_barrier                     \ Tell compiler to commit "local set".
+  0 comp_barrier                   \ Tell compiler to commit "local set".
   0 asm_cmp_zero    comp_instr     \ cmp x0, 0
   here_write { cond_adr } reserve_instr \ b.lt <end>
 
@@ -2359,14 +2430,14 @@ fun_comp: +for: { -- loop_beg cond_adr asm_cond loop_pop err }
 
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
-  comp_barrier                     \ Clobber / relocate locals.
+  0 comp_barrier                   \ Clobber / relocate locals.
   20 asm_branch     comp_instr     \ b <cmp>
   here_write { loop_beg }          \ `end` jumps here.
   0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
   1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
   1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
   1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
-  comp_barrier                     \ Tell compiler to commit "local set".
+  0 comp_barrier                   \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here_write { cond_adr } reserve_instr \ b.le <end>
 
@@ -2389,14 +2460,14 @@ fun_comp: -loop: { -- loop_beg cond_adr asm_cond loop_pop err }
   0 cur             comp_local_set \ mov <cur>,  x0 | str x0, [FP, <cur>]
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
-  comp_barrier                     \ Clobber / relocate locals.
+  0 comp_barrier                   \ Clobber / relocate locals.
   here_write { loop_beg }          \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
   1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
   0 0 2 asm_sub_reg comp_instr     \ sub x0, x0, x2
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
-  comp_barrier                     \ Tell compiler to commit "local set".
+  0 comp_barrier                   \ Tell compiler to commit "local set".
   0 1   asm_cmp_reg comp_instr     \ cmp <cur>, <lim>
   here_write { cond_adr } reserve_instr \ b.lt <end>
 
@@ -2427,7 +2498,7 @@ fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
-  comp_barrier                     \ Clobber / relocate locals.
+  0 comp_barrier                   \ Clobber / relocate locals.
   24 asm_branch     comp_instr     \ b <cmp>
   here_write { loop_beg }          \ `end` jumps here.
   0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
@@ -2435,7 +2506,7 @@ fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
   1 1 2 asm_add_reg comp_instr     \ add x1, x1, x2
   1 cur             comp_local_set \ mov <cur>, x1  | str x1, [FP, <cur>]
-  comp_barrier                     \ Tell compiler to commit "local set".
+  0 comp_barrier                   \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here_write { cond_adr } reserve_instr \ b.le <end>
 

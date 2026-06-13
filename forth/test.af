@@ -282,20 +282,47 @@ end
 test_local_ref_volatile_with_outputs
 
 fun: test_conditionals { -- err }
-  \ if false then 10      end \ Must compile to a skipped branch.
-  \ Bare `false then` is unsupported.
+  \ Must fail to compile: bare `if then end`
+  \ doesn't support outputs.
+  \ if false then 10 end
+
+  T{ if false then 10 else 20 end <T> 20 }T
+  T{ if true  then 10 else 20 end <T> 10 }T
+
+  T{ ifn false then 10 else 20 end <T> 10 }T
+  T{ ifn true  then 10 else 20 end <T> 20 }T
+
+  T{
+    if false then 10 elif true then 20 else 30 end
+  <T>
+    20
+  }T
+
+  T{
+    if false then 10 elifn false then 20 else 30 end
+  <T>
+    20
+  }T
+
+  T{
+    10 { loc }
+    if false then 20 else 30 end { out }
+    loc out
+  <T>
+    10 30
+  }T
 
   T{ -1 { val } if false then 10 { val } end val <T> -1 }T
   T{ -1 { val } if true  then 10 { val } end val <T> 10 }T
 
-  T{ if false then 10 { val } else 20 { val } end val <T> 20 }T
-  T{ if true  then 10 { val } else 20 { val } end val <T> 10 }T
+  T{ if false then 10 else 20 end <T> 20 }T
+  T{ if true  then 10 else 20 end <T> 10 }T
 
   T{ -1 { val } ifn false then 10 { val } end val <T> 10 }T
   T{ -1 { val } ifn true  then 10 { val } end val <T> -1 }T
 
-  T{ ifn false then 10 { val } else 20 { val } end val <T> 10 }T
-  T{ ifn true  then 10 { val } else 20 { val } end val <T> 20 }T
+  T{ ifn false then 10 else 20 end <T> 10 }T
+  T{ ifn true  then 10 else 20 end <T> 20 }T
 
   T{
     -1 { val }
@@ -305,9 +332,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val }
-    if false then 10 { val } elif false then 20 { val } else 30 { val } end
-    val
+    if false then 10 elif false then 20 else 30 end
   <T>
     30
   }T
@@ -320,9 +345,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val }
-    if false then 10 { val } elif true then 20 { val } else 30 { val } end
-    val
+    if false then 10 elif true then 20 else 30 end
   <T>
     20
   }T
@@ -335,9 +358,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val }
-    if true then 10 { val } elif false then 20 { val } else 30 { val } end
-    val
+    if true then 10 elif false then 20 else 30 end
   <T>
     10
   }T
@@ -350,9 +371,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val }
-    if false then 10 { val } elifn false then 20 { val } else 30 { val } end
-    val
+    if false then 10 elifn false then 20 else 30 end
   <T>
     20
   }T
@@ -365,9 +384,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val }
-    if false then 10 { val } elifn true then 20 { val } else 30 { val } end
-    val
+    if false then 10 elifn true then 20 else 30 end
   <T>
     30
   }T
@@ -380,9 +397,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val }
-    if true then 10 { val } elifn false then 20 { val } else 30 { val } end
-    val
+    if true then 10 elifn false then 20 else 30 end
   <T>
     10
   }T
@@ -503,8 +518,8 @@ test_switch_inner_statements
 fun: switch_nested_if { val flag -- out }
   -1 { out }
   val switch
-    10 case if flag then 100 { out } else 300 { out } end end
-    20 case if flag then 200 { out } else 400 { out } end end
+    10 case if flag then 100 else 300 end { out } end
+    20 case if flag then 200 else 400 end { out } end
     999 { out }
   end
   out
@@ -544,6 +559,66 @@ fun: test_switch_nested { -- err }
   nil
 end
 test_switch_nested
+
+fun: switch_output_one { val -- out }
+  val switch
+    10 case 100 end
+    20 case 200 end
+    val 2 *
+  end
+end
+
+fun: test_switch_output_one { -- err }
+  T{ 10  switch_output_one <T> 100 }T
+  T{ 20  switch_output_one <T> 200 }T
+  T{ 123 switch_output_one <T> 246 }T
+  nil
+end
+test_switch_output_one
+
+fun: switch_output_two { val -- out0 out1 }
+  val switch
+    10 case 100 101 end
+    20 case 200 201 end
+    val inc val
+  end
+end
+
+fun: test_switch_output_two { -- err }
+  T{ 10 switch_output_two <T> 100 101 }T
+  T{ 20 switch_output_two <T> 200 201 }T
+  T{ 30 switch_output_two <T> 31  30  }T
+  nil
+end
+test_switch_output_two
+
+fun: switch_output_nested_if { val flag -- out }
+  val switch
+    10 case if flag then 100 else 300 end end
+    20 case if flag then 200 else 400 end end
+    999
+  end
+end
+
+fun: test_switch_output_nested_if { -- err }
+  T{ 10 true  switch_output_nested_if <T> 100 }T
+  T{ 10 false switch_output_nested_if <T> 300 }T
+  T{ 20 true  switch_output_nested_if <T> 200 }T
+  T{ 20 false switch_output_nested_if <T> 400 }T
+  T{ 0  true  switch_output_nested_if <T> 999 }T
+  nil
+end
+test_switch_output_nested_if
+
+fun: switch_output_body_only { val -- out }
+  val switch val inc end
+end
+
+fun: test_switch_output_body_only { -- err }
+  T{ 10 switch_output_body_only <T> 11 }T
+  nil
+end
+test_switch_output_body_only
 
 fun: recursive_fun { val -- val }
   if val 13 <= then val ret end
@@ -1365,6 +1440,18 @@ fun: test_max { -- err }
   nil
 end
 test_max
+
+fun: test_bit_len { -- err }
+  T{ 0   bit_len <T> 0 }T
+  T{ 1   bit_len <T> 1 }T
+  T{ 2   bit_len <T> 2 }T
+  T{ 3   bit_len <T> 2 }T
+  T{ 8   bit_len <T> 4 }T
+  T{ 255 bit_len <T> 8 }T
+  T{ 256 bit_len <T> 9 }T
+  nil
+end
+test_bit_len
 
 fun: test_cstr_eq { -- err }
   T{ nil           nil    cstr= <T> true  }T
@@ -2236,6 +2323,48 @@ fun: test_partial_assign { -- err } [ false try_all ]
 end
 test_partial_assign
 
+fun: test_cond_arity_bare_if { -- err } [ false try_all ]
+  import' ./test/test_cond_arity_bare_if.af
+  " in `test_cond_arity_bare_if_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 0, provided: 1"
+  T_err_contains
+end
+test_cond_arity_bare_if
+
+fun: test_cond_arity_else_mismatch { -- err } [ false try_all ]
+  import' ./test/test_cond_arity_else_mismatch.af
+  " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 2, provided: 1"
+  T_err_contains
+end
+test_cond_arity_else_mismatch
+
+fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
+  import' ./test/test_cond_arity_elif_mismatch.af
+  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 1, provided: 2"
+  T_err_contains
+end
+test_cond_arity_elif_mismatch
+
+fun: test_cond_arity_no_else { -- err } [ false try_all ]
+  import' ./test/test_cond_arity_no_else.af
+  " conditional with outputs requires final `else`"
+  T_err_contains
+end
+test_cond_arity_no_else
+
+fun: test_switch_arity_case_mismatch { -- err } [ false try_all ]
+  import' ./test/test_switch_arity_case_mismatch.af
+  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 1, provided: 2"
+  T_err_contains
+end
+test_switch_arity_case_mismatch
+
+fun: test_switch_arity_no_default { -- err } [ false try_all ]
+  import' ./test/test_switch_arity_no_default.af
+  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 1, provided: 0"
+  T_err_contains
+end
+test_switch_arity_no_default
+
 fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN mem_unprot nil end
 
 fun: test_arena_alloc { -- err }
@@ -2371,6 +2500,10 @@ fun: main_run { -- err }
   test_switch_inner_statements
   test_switch_nested_if
   test_switch_nested
+  test_switch_output_one
+  test_switch_output_two
+  test_switch_output_nested_if
+  test_switch_output_body_only
   test_recursion
   test_recur_with_err
   \ test_sleep_loop
@@ -2407,6 +2540,7 @@ fun: main_run { -- err }
   test_abs
   test_min
   test_max
+  test_bit_len
   test_cstr_eq
   test_cstr_less
   test_int_to_cell

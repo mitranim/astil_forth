@@ -873,7 +873,7 @@ static Err comp_append_call_extern(Comp *comp, Sym *callee) {
 Used at every branch point to evict locals from parameter
 registers to their "stable" locations.
 */
-static Err comp_barrier(Comp *comp) {
+static Err comp_barrier(Comp *comp, Sint req) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
@@ -885,8 +885,8 @@ static Err comp_barrier(Comp *comp) {
   if (arg_low) {
     return err_args_partial(sym, "in control flow", arg_low, arg_len);
   }
-  if (arg_len) {
-    return err_args_arity(sym, "in control flow", 0, arg_len);
+  if (req != arg_len) {
+    return err_args_arity(sym, "in control flow", req, arg_len);
   }
   for (U8 reg = 0; reg < ceil; reg++) {
     comp_clear_param_reg(comp, reg);
