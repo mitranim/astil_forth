@@ -10,6 +10,7 @@ static const USED Sym INTRIN[] = {
   INTRIN_COMP_SIGNATURE_GET, // comp_signature_get
   INTRIN_COMP_SIGNATURE_SET, // comp_signature_set
   INTRIN_COMP_ARGS_VALID,    // comp_args_valid
+  INTRIN_COMP_ARGS_MIN,      // comp_args_min
   INTRIN_COMP_ARGS_GET,      // comp_args_get
   INTRIN_COMP_ARGS_SET,      // comp_args_set
   INTRIN_COMP_NEXT_ARG_REG,  // comp_next_arg_reg

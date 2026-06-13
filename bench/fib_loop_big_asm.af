@@ -51,15 +51,13 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
 
   hi { word }
   64 for
-    word 63 lsr { bit }
-    qhi bit rem bigint_divmod10_step { qhi rem }
+    qhi word 63 lsr rem bigint_divmod10_step { qhi rem }
     word 1 lsl { word }
   end
 
   lo { word }
   64 for
-    word 63 lsr { bit }
-    qlo bit rem bigint_divmod10_step { qlo rem }
+    qlo word 63 lsr rem bigint_divmod10_step { qlo rem }
     word 1 lsl { word }
   end
 

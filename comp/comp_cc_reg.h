@@ -130,7 +130,7 @@ typedef struct {
   // We track the `[floor,ceil)` instruction range for compile-time constants.
   // When consuming a constant at compile time via `alloca`, this allows us to
   // backtrack, deleting the previously-assembled instructions which move that
-  // constant to a parameter register.
+  // constant to an argument register.
   Ind instr_floor;
   Ind instr_ceil;
 } Reg_val;
@@ -149,12 +149,12 @@ SYNC[comp_ctx_trunc].
 SYNC[comp_ctx_rewind].
 */
 typedef struct {
-  Sym       *sym;        // What we're currently compiling.
-  Loc_stack  locals;     // Includes current word's input params.
-  Loc_dict   local_dict; // So we can find locals by name.
-  Ind        anon_locs;  // For auto-naming of anonymous locals.
-  Ind        fp_off;     // Stack space reserved for locals.
-  Reg_val    reg_vals[ASM_ALL_PARAM_REG_LEN]; // Values in registers.
+  Sym       *sym;                       // What we're currently compiling.
+  Loc_stack  locals;                    // Includes current word's input params.
+  Loc_dict   local_dict;                // So we can find locals by name.
+  Ind        anon_locs;                 // For auto-naming of anonymous locals.
+  Ind        fp_off;                    // Stack space reserved for locals.
+  Reg_val    reg_vals[ASM_ARG_LEN_MAX]; // Values in arg registers.
   Bits       vol_regs;   // Volatile registers available for locals.
   U8         saved_reg;  // Lowest callee-saved register used for locals.
   U8         arg_low;    // How many args got consumed by assignments.

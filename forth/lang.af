@@ -121,6 +121,7 @@ end
 
 4      let: ASM_INSTR_SIZE
 8      let: ASM_PARAM_LEN_MAX
+16     let: ASM_ARG_LEN_MAX
 8      let: ASM_REG_SCRATCH \ Dangerous; high chance of collision.
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
@@ -156,7 +157,9 @@ fun_comp: ASM_REG_INTERP { -- err }
   nil
 end
 
-\ Bitwise arithmetic needed for the early stages of the self-assembler.
+\ ## Early arithmetic
+\
+\ Bitwise ops needed for the early stages of the self-assembler.
 
 fun: or { i0 i1 -- i2 } [
   0 comp_clobber
@@ -212,6 +215,8 @@ fun: low_bits   { len      -- bits } 1 len lsl dec end
 fun: bit_trunc  { imm len  -- imm  } len low_bits imm and end
 fun: bits_clear { imm mask -- out  } mask invert imm and end
 
+\ ## Early assembler
+
 \ cmp Xn, <imm>
 fun: asm_cmp_imm { Xn imm -- instr }
   imm  10 lsl { imm }
@@ -241,6 +246,14 @@ fun: asm_ccmp_reg { Xn Xm nzcv cond -- instr }
   0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 or
 end
 
+\ brk <imm16>
+fun: asm_brk { imm16 -- instr }
+  imm16 5 lsl
+  0b110_101_00_001_0000000000000000_000_00 or
+end
+
+\ ## Early booleans
+
 fun: <>0 { int -- bool } [
   0                     comp_clobber
   0        asm_cmp_zero comp_instr \ cmp x0, 0
@@ -255,25 +268,7 @@ fun: =0 { int -- bool } [
   1                     comp_args_set
 ] end
 
-\ True if running in JIT mode (interpreter available).
-\ False if running in AOT-compiled mode.
-\
-\ In JIT mode, the outer interpreter (in C) always sets this register when
-\ calling into Forth. in AOT mode, the reg starts as zero when the OS runs
-\ the process, none of our compiled code modifies it, and locals are never
-\ assigned to this register.
-fun: has_interp { -- bool } [
-  0                           comp_clobber
-  ASM_REG_INTERP asm_cmp_zero comp_instr \ cmp x28, 0
-  0 ASM_NE       asm_cset     comp_instr \ cset x0, ne
-  1                           comp_args_set
-] end
-
-\ brk <imm16>
-fun: asm_brk { imm16 -- instr }
-  imm16 5 lsl
-  0b110_101_00_001_0000000000000000_000_00 or
-end
+\ ## Assembler: instruction patterns
 
 \ Shared by a lot of load and store instructions. 64-bit only.
 fun: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
@@ -284,6 +279,59 @@ fun: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
   Xt2  or
   Xn   or
 end
+
+\ Shared by a lot of load and store instructions.
+\ Patches the X bits:
+\   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
+fun: asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
+  Xn                5 lsl { Xn }
+  imm9 9 bit_trunc 12 lsl
+  Xt or Xn or
+end
+
+\ Shared by register-offset load and store instructions.
+\ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
+fun: asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
+  Xn        5  lsl { Xn }
+  Xm        16 lsl { Xm }
+  scale <>0 12 lsl \ lsl 3
+  Xt or Xn or Xm or
+end
+
+\ Shared by some integer arithmetic instructions.
+fun: asm_pattern_arith_reg { Xd Xn Xm -- instr_mask }
+  Xn 5  lsl { Xn }
+  Xm 16 lsl
+  Xd or Xn or
+end
+
+\ Shared by some integer arithmetic and load/store instructions.
+fun: asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
+  Xn                  5 lsl { Xn }
+  imm12 12 bit_trunc 10 lsl
+  Xd or Xn or
+end
+
+fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
+  cond 12 lsl { cond }
+  Xd Xm Xn asm_pattern_arith_reg
+  cond or
+end
+
+\ `off19` offset is implicitly times 4 and can be negative.
+fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
+  off19 2 lsr 19 bit_trunc 5 lsl
+  Xt or
+end
+
+\ `off9` offset is implicitly times 4 and can be negative.
+fun: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
+  off9 2 lsr 9 bit_trunc 5  lsl { off9 }
+  cond                   21 lsl
+  Xt or off9 or
+end
+
+\ ## Assembler: memory ops
 
 \ ldp Xt1, Xt2, [Xn, <imm>]!
 fun: asm_load_pair_pre { Xt1 Xt2 Xn imm7 -- instr }
@@ -319,15 +367,6 @@ end
 fun: asm_store_pair_off { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_010_0_0000000_00000_00000_00000 or
-end
-
-\ Shared by a lot of load and store instructions.
-\ Patches the X bits:
-\   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
-fun: asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
-  Xn                5 lsl { Xn }
-  imm9 9 bit_trunc 12 lsl
-  Xt or Xn or
 end
 
 \ ldr Xt, [Xn, <imm>]!
@@ -366,15 +405,6 @@ fun: asm_store_unscaled_off { Xt Xn imm9 -- instr }
   0b11_111_0_00_00_0_000000000_00_00000_00000 or
 end
 
-\ Shared by register-offset load and store instructions.
-\ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
-fun: asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
-  Xn        5  lsl { Xn }
-  Xm        16 lsl { Xm }
-  scale <>0 12 lsl \ lsl 3
-  Xt or Xn or Xm or
-end
-
 \ ldr Xt, [Xn, Xm, lsl <scale>]
 fun: asm_load_with_register_off { Xt Xn Xm scale -- instr }
   Xt Xn Xm scale asm_pattern_load_store_with_register_off
@@ -385,20 +415,6 @@ end
 fun: asm_store_with_register_off { Xt Xn Xm scale -- instr }
   Xt Xn Xm scale asm_pattern_load_store_with_register_off
   0b11_111_0_00_00_1_00000_011_0_10_00000_00000 or
-end
-
-\ Shared by some integer arithmetic instructions.
-fun: asm_pattern_arith_reg { Xd Xn Xm -- instr_mask }
-  Xn 5  lsl { Xn }
-  Xm 16 lsl
-  Xd or Xn or
-end
-
-\ Shared by some integer arithmetic and load/store instructions.
-fun: asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
-  Xn                  5 lsl { Xn }
-  imm12 12 bit_trunc 10 lsl
-  Xd or Xn or
 end
 
 \ size:
@@ -534,6 +550,18 @@ fun: asm_sub_reg_words { Xd Xn Xm -- instr }
   0b0_0_0_00000_00_0_00000_000011_00000_00000 or
 end
 
+\ orr Xd, Xn, Xm
+fun: asm_orr_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_01_01010_00_0_00000_000000_00000_00000 or
+end
+
+\ and Xd, Xn, Xm
+fun: asm_and_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_00_01010_00_0_00000_000000_00000_00000 or
+end
+
 \ mul Xd, Xn, Xm
 fun: asm_mul { Xd Xn Xm -- instr }
   Xd Xn Xm asm_pattern_arith_reg
@@ -559,12 +587,6 @@ fun: asm_msub { Xd Xn Xm Xa -- instr }
   Xa 10 lsl
   Xd or Xn or Xm or
   0b1_00_11011_000_00000_1_00000_00000_00000 or
-end
-
-fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
-  cond 12 lsl { cond }
-  Xd Xm Xn asm_pattern_arith_reg
-  cond or
 end
 
 \ csel Xd, Xn, Xm, <cond>
@@ -604,6 +626,18 @@ fun: asm_eor_reg { Xd Xn Xm -- instr }
   0b1_10_01010_00_0_00000_000000_00000_00000 or
 end
 
+\ lsl Xd, Xn, Xm
+fun: asm_lsl_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_0010_00_00000_00000 or
+end
+
+\ lsr Xd, Xn, Xm
+fun: asm_lsr_reg { Xd Xn Xm -- instr }
+  Xd Xn Xm asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_0010_01_00000_00000 or
+end
+
 \ cmp Xn, Xm
 fun: asm_cmp_reg { Xn Xm -- instr }
   Xn  5 lsl { Xn }
@@ -627,12 +661,6 @@ fun: asm_branch_cond { off19 cond -- instr }
   0b010_101_00_0000000000000000000_0_0000 or
 end
 
-\ `off19` offset is implicitly times 4 and can be negative.
-fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
-  off19 2 lsr 19 bit_trunc 5 lsl
-  Xt or
-end
-
 \ cbz x1, <off>
 fun: asm_cmp_branch_zero { Xt off19 -- instr }
   Xt off19 asm_pattern_cmp_branch
@@ -643,13 +671,6 @@ end
 fun: asm_cmp_branch_not_zero { Xt off19 -- instr }
   Xt off19 asm_pattern_cmp_branch
   0b1_011010_1_0000000000000000000_00000 or
-end
-
-\ `off9` offset is implicitly times 4 and can be negative.
-fun: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
-  off9 2 lsr 9 bit_trunc 5  lsl { off9 }
-  cond                   21 lsl
-  Xt or off9 or
 end
 
 \ Not supported on M3 Pro.
@@ -708,91 +729,242 @@ end
 \ svc 666
 0b110_101_00_000_0000001010011010_000_01 let: asm_svc
 
-\ ## Arithmetic
+\ ## Assembler: register selection
 
-fun: negate { i0 -- i1 } [
-  0         comp_clobber
-  0 asm_neg comp_instr \ neg x0, x0
-  1         comp_args_set
-] end
+fun: comp_args1_reg { -- dst err }
+  1 comp_args_min
+  comp_args_get dec { dst }
+  dst comp_clobber
+  dst nil
+end
 
-fun: + { i0 i1 -- i2 } [
-  0                 comp_clobber
-  0 0 1 asm_add_reg comp_instr \ add x0, x0, x1
-  1                 comp_args_set
-] end
+fun: comp_args2_regs { -- dst lhs rhs err }
+  2 comp_args_min
+  comp_args_get dec { rhs }
+  rhs dec { lhs }
+  lhs comp_clobber
+  lhs lhs rhs nil
+end
 
-fun: - { i0 i1 -- i2 } [
-  0                 comp_clobber
-  0 0 1 asm_sub_reg comp_instr \ sub x0, x0, x1
-  1                 comp_args_set
-] end
+fun: comp_args1_reg2 { -- out0 out1 src err }
+  1 comp_args_min
+  comp_args_get dec { src }
+  src inc { out1 }
+  src  comp_clobber
+  out1 comp_clobber
+  src out1 src nil
+end
 
-fun: * { i0 i1 -- i2 } [
-  0             comp_clobber
-  0 0 1 asm_mul comp_instr \ mul x0, x0, x1
-  1             comp_args_set
-] end
+fun: comp_args2_regs2 { -- out0 out1 lhs rhs err }
+  2 comp_args_min
+  comp_args_get dec { rhs }
+  rhs dec { lhs }
+  lhs comp_clobber
+  rhs comp_clobber
+  lhs rhs lhs rhs nil
+end
 
-fun: / { i0 i1 -- i2 } [
-  0              comp_clobber
-  0 0 1 asm_sdiv comp_instr \ sdiv x0, x0, x1
-  1              comp_args_set
-] end
+\ ## Arithmetic continued
 
-fun: u/ { i0 i1 -- i2 } [
-  0              comp_clobber
-  0 0 1 asm_udiv comp_instr \ udiv x0, x0, x1
-  1              comp_args_set
-] end
+fun_comp: or { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_orr_reg comp_instr \ orr Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
 
-fun: mod { i0 i1 -- i2 } [
-  0                comp_clobber
-  2                comp_clobber
-  2 0 1   asm_sdiv comp_instr \ sdiv x2, x0, x1
-  0 2 1 0 asm_msub comp_instr \ msub x0, x2, x1, x0
-  1                comp_args_set
-] end
+fun: or { i0 i1 -- i2 } [ redefine ] i0 i1 or end
 
-fun: /mod { dividend divisor -- rem quo } [
-  0                   comp_clobber
-  1                   comp_clobber
-  2                   comp_clobber
-  2 1     asm_mov_reg comp_instr \ mov x2, x1
-  1 0 2   asm_sdiv    comp_instr \ sdiv x1, x0, x2
-  0 1 2 0 asm_msub    comp_instr \ msub x0, x1, x2, x0
-  2                   comp_args_set
-] end
+fun_comp: and { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_and_reg comp_instr \ and Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
 
-fun: abs { int -- +int } [
-  0                         comp_clobber
-  0            asm_cmp_zero comp_instr \ cmp x0, 0
-  0 0 0 ASM_PL asm_csneg    comp_instr \ cneg x0, x0, pl
-  1                         comp_args_set
-] end
+fun: and { i0 i1 -- i2 } [ redefine ] i0 i1 and end
 
-fun: min { i0 i1 -- i0|i1 } [
-  0                        comp_clobber
-  0 1          asm_cmp_reg comp_instr \ cmp x0, x1
-  0 0 1 ASM_LT asm_csel    comp_instr \ csel x0, x0, x1, lt
-  1                        comp_args_set
-] end
+fun_comp: xor { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_eor_reg comp_instr \ eor Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
 
-fun: max { i0 i1 -- i0|i1 } [
-  0                        comp_clobber
-  0 1          asm_cmp_reg comp_instr \ cmp x0, x1
-  0 0 1 ASM_GT asm_csel    comp_instr \ csel x0, x0, x1, gt
-  1                        comp_args_set
-] end
+fun: xor { i0 i1 -- i2 } [ redefine ] i0 i1 xor end
 
-fun: bit_len { val -- len } [
-  0     comp_clobber
-  1     comp_clobber
-  0 0   asm_clz     comp_instr \ clz x0, x0
-  1 64  asm_mov_imm comp_instr \ mov x1, 64
-  0 1 0 asm_sub_reg comp_instr \ sub x0, x1, x0
-  1     comp_args_set
-] end
+fun_comp: lsl { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: lsl { i0 bits -- i1 } [ redefine ] i0 bits lsl end
+
+fun_comp: lsr { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: lsr { i0 bits -- i1 } [ redefine ] i0 bits lsr end
+
+fun_comp: invert { -- err }
+  comp_args1_reg { dst }
+  dst dst asm_mvn comp_instr \ mvn Xd, Xm
+  dst inc comp_args_set
+  nil
+end
+
+fun: invert { i0 -- i1 } [ redefine ] i0 invert end
+
+fun_comp: inc { -- err }
+  comp_args1_reg { dst }
+  dst dst 1 asm_add_imm comp_instr \ add Xd, Xn, #imm12
+  dst inc comp_args_set
+  nil
+end
+
+fun: inc { i0 -- i1 } [ redefine ] i0 inc end
+
+fun_comp: dec { -- err }
+  comp_args1_reg { dst }
+  dst dst 1 asm_sub_imm comp_instr \ sub Xd, Xn, #imm12
+  dst inc comp_args_set
+  nil
+end
+
+fun: dec { i0 -- i1 } [ redefine ] i0 dec end
+
+fun_comp: negate { -- err }
+  comp_args1_reg { dst }
+  dst asm_neg comp_instr \ neg Xd, Xn
+  dst inc comp_args_set
+  nil
+end
+
+fun: negate { i0 -- i1 } i0 negate end
+
+fun_comp: + { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_add_reg comp_instr \ add Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: + { i0 i1 -- i2 } i0 i1 + end
+
+fun_comp: - { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_sub_reg comp_instr \ sub Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: - { i0 i1 -- i2 } i0 i1 - end
+
+fun_comp: * { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_mul comp_instr \ mul Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: * { i0 i1 -- i2 } i0 i1 * end
+
+fun_comp: / { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: / { i0 i1 -- i2 } i0 i1 / end
+
+fun_comp: u/ { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_udiv comp_instr \ udiv Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: u/ { i0 i1 -- i2 } i0 i1 u/ end
+
+fun_comp: asr { -- err }
+  comp_args2_regs { dst lhs rhs }
+  dst lhs rhs asm_asr_reg comp_instr \ asr Xd, Xn, Xm
+  rhs comp_args_set
+  nil
+end
+
+fun: asr { i0 bits -- i1 } [ redefine ] i0 bits asr end
+
+fun_comp: mod { -- err }
+  comp_args2_regs { dst lhs rhs }
+  comp_scratch_reg { tmp }
+  tmp lhs rhs     asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
+  dst tmp rhs lhs asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  rhs comp_args_set
+  nil
+end
+
+fun: mod { i0 i1 -- i2 } i0 i1 mod end
+
+fun_comp: /mod { -- err }
+  comp_args2_regs2 { rem quo dividend divisor }
+  comp_scratch_reg { tmp }
+  tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
+  quo dividend tmp     asm_sdiv    comp_instr \ sdiv Xd, Xn, Xm
+  rem quo tmp dividend asm_msub    comp_instr \ msub Xd, Xn, Xm, Xa
+  quo inc comp_args_set
+  nil
+end
+
+fun: /mod { dividend divisor -- rem quo } dividend divisor /mod end
+
+fun_comp: abs { -- err }
+  comp_args1_reg { dst }
+  dst                asm_cmp_zero comp_instr \ cmp Xn, #0
+  dst dst dst ASM_PL asm_csneg    comp_instr \ cneg Xd, Xn, cond
+  dst inc comp_args_set
+  nil
+end
+
+fun: abs { int -- +int } int abs end
+
+fun_comp: min { -- err }
+  comp_args2_regs { dst lhs rhs }
+  lhs rhs            asm_cmp_reg comp_instr \ cmp Xn, Xm
+  dst lhs rhs ASM_LT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  rhs comp_args_set
+  nil
+end
+
+fun: min { i0 i1 -- i0|i1 } i0 i1 min end
+
+fun_comp: max { -- err }
+  comp_args2_regs { dst lhs rhs }
+  lhs rhs            asm_cmp_reg comp_instr \ cmp Xn, Xm
+  dst lhs rhs ASM_GT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  rhs comp_args_set
+  nil
+end
+
+fun: max { i0 i1 -- i0|i1 } i0 i1 max end
+
+fun_comp: bit_len { -- err }
+  comp_args1_reg { dst }
+  comp_scratch_reg { tmp }
+  dst dst     asm_clz     comp_instr \ clz Xd, Xn
+  tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
+  dst tmp dst asm_sub_reg comp_instr \ sub Xd, Xn, Xm
+  dst inc comp_args_set
+  nil
+end
+
+fun: bit_len { val -- len } val bit_len end
 
 fun: align_down { len wid -- len } wid negate len and end
 fun: align_up   { len wid -- len } wid dec len + wid align_down end
@@ -855,8 +1027,6 @@ fun: asm_branch_link_reg { Xn -- instr }
 end
 
 \ orr Xd, Xn, #(1 << bit)
-\
-\ TODO add general-purpose `orr`.
 fun: asm_orr_bit { Xd Xn bit -- instr }
   64 bit - 16 lsl { immr }
   Xn        5 lsl
@@ -865,18 +1035,18 @@ fun: asm_orr_bit { Xd Xn bit -- instr }
 end
 
 fun: asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
-  0                  comp_clobber
-  0 1    asm_cmp_reg comp_instr \ cmp x0, x1
-  0 cond asm_cset    comp_instr \ cset x0, <cond>
-  1                  comp_args_set
+  comp_args2_regs { dst lhs rhs }
+  lhs rhs  asm_cmp_reg comp_instr \ cmp Xn, Xm
+  dst cond asm_cset    comp_instr \ cset Xd, cond
+  rhs comp_args_set
   nil
 end
 
 fun: asm_comp_cset_zero { cond -- err } ( E: num -- bool )
-  0                   comp_clobber
-  0      asm_cmp_zero comp_instr \ cmp x0, 0
-  0 cond asm_cset     comp_instr \ cset x0, <cond>
-  1                   comp_args_set
+  comp_args1_reg { dst }
+  dst      asm_cmp_zero comp_instr \ cmp Xn, #0
+  dst cond asm_cset     comp_instr \ cset Xd, cond
+  dst inc comp_args_set
   nil
 end
 
@@ -901,32 +1071,48 @@ fun: asm_sign_extend_32 { Xd Xn -- instr } Xd Xn 0 31 asm_bitfield_move end
 \ when converting between types. Sometimes it has to be
 \ done manually, particularly when dealing with C words
 \ which return `(int)-1` which ends up being 0xffffffff.
-fun: int_to_cell { int32 -- cell } [
-  0                      comp_clobber
-  0 0 asm_sign_extend_32 comp_instr \ sxtw x0, x0
-  1                      comp_args_set
-] end
+fun_comp: int_to_cell { -- err }
+  comp_args1_reg { dst }
+  dst dst asm_sign_extend_32 comp_instr \ sxtw Xd, Wn
+  dst inc comp_args_set
+  nil
+end
+
+fun: int_to_cell { int32 -- cell } int32 int_to_cell end
 
 \ ## Numeric comparison
 
+false try_all
+
 \ https://gforth.org/manual/Numeric-comparison.html
-fun: =   { i0 i1 -- bool } [ ASM_EQ asm_comp_cset_reg  ] end
-fun: <>  { i0 i1 -- bool } [ ASM_NE asm_comp_cset_reg  ] end
-fun: >   { i0 i1 -- bool } [ ASM_GT asm_comp_cset_reg  ] end
-fun: <   { i0 i1 -- bool } [ ASM_LT asm_comp_cset_reg  ] end
-fun: <=  { i0 i1 -- bool } [ ASM_LE asm_comp_cset_reg  ] end
-fun: >=  { i0 i1 -- bool } [ ASM_GE asm_comp_cset_reg  ] end
-fun: <0  { num   -- bool } [ ASM_LT asm_comp_cset_zero ] end \ Or `MI`.
-fun: >0  { num   -- bool } [ ASM_GT asm_comp_cset_zero ] end
-fun: <=0 { num   -- bool } [ ASM_LE asm_comp_cset_zero ] end
-fun: >=0 { num   -- bool } [ ASM_GE asm_comp_cset_zero ] end \ Or `PL`.
+fun_comp: =0  {       -- err  } ASM_EQ asm_comp_cset_zero end
+fun:      =0  { int   -- bool } [ redefine ] int =0       end
+fun_comp: <>0 {       -- err  } ASM_NE asm_comp_cset_zero end
+fun:      <>0 { int   -- bool } [ redefine ] int <>0      end
+fun_comp: =   {       -- err  } ASM_EQ asm_comp_cset_reg  end
+fun:      =   { i0 i1 -- bool } i0 i1 =                   end
+fun_comp: <>  {       -- err  } ASM_NE asm_comp_cset_reg  end
+fun:      <>  { i0 i1 -- bool } i0 i1 <>                  end
+fun_comp: >   {       -- err  } ASM_GT asm_comp_cset_reg  end
+fun:      >   { i0 i1 -- bool } i0 i1 >                   end
+fun_comp: <   {       -- err  } ASM_LT asm_comp_cset_reg  end
+fun:      <   { i0 i1 -- bool } i0 i1 <                   end
+fun_comp: <=  {       -- err  } ASM_LE asm_comp_cset_reg  end
+fun:      <=  { i0 i1 -- bool } i0 i1 <=                  end
+fun_comp: >=  {       -- err  } ASM_GE asm_comp_cset_reg  end
+fun:      >=  { i0 i1 -- bool } i0 i1 >=                  end
+fun_comp: <0  {       -- err  } ASM_LT asm_comp_cset_zero end \ Or `MI`.
+fun:      <0  { num   -- bool } num <0                    end
+fun_comp: >0  {       -- err  } ASM_GT asm_comp_cset_zero end
+fun:      >0  { num   -- bool } num >0                    end
+fun_comp: <=0 {       -- err  } ASM_LE asm_comp_cset_zero end
+fun:      <=0 { num   -- bool } num <=0                   end
+fun_comp: >=0 {       -- err  } ASM_GE asm_comp_cset_zero end \ Or `PL`.
+fun:      >=0 { num   -- bool } num >=0                   end
 
-fun: within { num one two -- bool }
-  one num > { one }
-  num two >
-  one or =0
-end
+true try_all
 
+fun: within { num one two -- bool } one num > num two > or =0 end
 fun: odd { i0 -- bool } i0 1 and end
 
 \ ## Memory load / store
@@ -1021,30 +1207,46 @@ end
 0b11 0b01 load:  @culong
 0b11      store: !culong
 
-fun: @2 { adr -- val0 val1 } [
-  0                         comp_clobber
-  1                         comp_clobber
-  0 1 0 0 asm_load_pair_off comp_instr \ ldp x0, x1, [x0]
-  2                         comp_args_set
-] end
+fun_comp: @2 { -- err }
+  comp_args1_reg2 { val0 val1 adr }
+  val0 val1 adr 0 asm_load_pair_off comp_instr \ ldp Xt1, Xt2, [Xn]
+  val1 inc comp_args_set
+  nil
+end
 
-fun: @@2 { adr0 adr1 -- val0 val1 } [
-  0                  comp_clobber
-  1                  comp_clobber
-  0 0 0 asm_load_off comp_instr \ ldr x0, [x0]
-  1 1 0 asm_load_off comp_instr \ ldr x1, [x1]
-  2                  comp_args_set
-] end
+fun: @2 { adr -- val0 val1 } adr @2 end
 
-fun: !2 { val0 val1 adr } [
-  0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
-] end
+fun_comp: @@2 { -- err }
+  comp_args2_regs2 { val0 val1 adr0 adr1 }
+  val0 adr0 0 asm_load_off comp_instr \ ldr Xt, [Xn]
+  val1 adr1 0 asm_load_off comp_instr \ ldr Xt, [Xn]
+  val1 inc comp_args_set
+  nil
+end
 
-fun: !at { val adr off } [
-  \ str x0, [x1, x2]
-  0 1 2 0 asm_store_with_register_off comp_instr
-  0 comp_args_set
-] end
+fun: @@2 { adr0 adr1 -- val0 val1 } adr0 adr1 @@2 end
+
+fun_comp: !2 { -- err }
+  comp_args_get dec { adr }
+  adr dec { val1 }
+  val1 dec { val0 }
+  val0 val1 adr 0 asm_store_pair_off comp_instr \ stp Xt1, Xt2, [Xn]
+  val0 comp_args_set
+  nil
+end
+
+fun: !2 { val0 val1 adr } val0 val1 adr !2 end
+
+fun_comp: !at { -- err }
+  comp_args_get dec { off }
+  off dec { adr }
+  adr dec { val }
+  val adr off 0 asm_store_with_register_off comp_instr \ str Xt, [Xn, Xm]
+  val comp_args_set
+  nil
+end
+
+fun: !at { val adr off } val adr off !at end
 
 fun: off! { adr } false adr ! end
 fun: on!  { adr } true  adr ! end
@@ -1349,13 +1551,12 @@ fun: erase { buf len      } buf len 0 fill end
 
 \ See `ccompare` below for null-terminated strings.
 fun: compare { str0 len0 str1 len1 -- direction }
-  len0 len1 max { len }
-  str0 str1 len strncmp
+  str0 str1 len0 len1 max strncmp
 end
 
 \ See `cstr=` and more below for null-terminated strings.
-fun: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0 end
-fun: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 end
+fun: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0  end
+fun: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0  end
 fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
 
 \ ## Characters and strings
@@ -1422,8 +1623,7 @@ fun: read_interp_cstr { delim -- cstr err }
   ROOT_STR_BUF { buf cap }
   len cap min { len }
   buf src len memcpy
-  buf len + { ceil }
-  nil ceil !b
+  nil buf len + !b
   buf nil
 end
 
@@ -1713,7 +1913,7 @@ end
 \ Now that we have conditionals, we can redefine them
 \ into arity-aware condition expressions with outputs.
 
-ASM_PARAM_LEN_MAX bit_len low_bits let: COND_LEN_MASK
+ASM_ARG_LEN_MAX bit_len low_bits let: COND_LEN_MASK
 COND_LEN_MASK inc                  let: COND_HAS_LEN
 COND_HAS_LEN 1 lsl                 let: COND_HAS_ELSE
 
@@ -2581,7 +2781,7 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
   comp_args_get      { post_len }
   post_len pre_len + { arg_len }
 
-  if arg_len ASM_PARAM_LEN_MAX > then
+  if arg_len ASM_ARG_LEN_MAX > then
     " in `comp_args_prepend`: too many total args" throw
   end
 
@@ -2796,19 +2996,24 @@ end
 \
 \ TODO drop: too error-prone.
 fun_comp: >>s { -- err } ( E: …args… stack -- )
-  comp_args_get { len }
+  comp_args_get { arg_len }
 
-  ifn len then
+  ifn arg_len then
     " unable to use `>>s`: at least 1 argument is required (stack address)"
     throw
   end
 
-  len dec { len }
+  arg_len dec { len }
   len comp_args_set
   ifn len then nil ret end
 
-  len             { stk_reg }
-  ASM_REG_SCRATCH { top_reg }
+  if arg_len ASM_ARG_LEN_MAX >= then
+    " unable to use `>>s`: not enough scratch registers" throw
+  end
+
+  len     { stk_reg }
+  arg_len { top_reg }
+  top_reg comp_clobber
   len stk_reg top_reg comp_args_to_stack
   0 comp_args_set
   nil
@@ -3021,6 +3226,20 @@ struct: Interp_module_ctx
   U8            1 field: Interp_module_try_all
 end
 
+\ True if running in JIT mode (interpreter available).
+\ False if running in AOT-compiled mode.
+\
+\ In JIT mode, the outer interpreter (in C) always sets this register when
+\ calling into Forth. in AOT mode, the reg starts as zero when the OS runs
+\ the process, none of our compiled code modifies it, and locals are never
+\ assigned to this register.
+fun: has_interp { -- bool } [
+  0                           comp_clobber
+  ASM_REG_INTERP asm_cmp_zero comp_instr \ cmp x28, 0
+  0 ASM_NE       asm_cset     comp_instr \ cset x0, ne
+  1                           comp_args_set
+] end
+
 fun: interp { -- adr } [
   true interp_only
   0 ASM_REG_INTERP asm_mov_reg comp_instr
@@ -3178,6 +3397,11 @@ fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun --
 
   ifn len then
     " unable to compile `execute_raw`: at least 1 argument is required" throw
+  end
+
+  if len ASM_PARAM_LEN_MAX inc > then
+    " unable to compile `execute_raw`: %zd param registers available, %zd arguments provided"
+    ASM_PARAM_LEN_MAX len dec errf throw
   end
 
   comp_clobber_volatile

@@ -47,13 +47,17 @@ For example, `x31` and `q31` are `0b11111`.
 static constexpr Bits ASM_REGS_VOLATILE = 0b11111111'11111111;
 
 // x0 ... x7
-static constexpr Bits ASM_ALL_PARAM_REGS = 0b11111111;
+static constexpr Bits ASM_PARAM_REGS = 0b11111111;
+
+// x0 ... x15
+static constexpr Bits ASM_ARG_REGS = ASM_REGS_VOLATILE;
 
 static constexpr U8 ASM_REG_LEN           = 32;
 static constexpr U8 ASM_VOLATILE_REG_LEN  = 16;
 static constexpr U8 ASM_INP_PARAM_REG_LEN = 8;
 static constexpr U8 ASM_OUT_PARAM_REG_LEN = 8;
 static constexpr U8 ASM_ALL_PARAM_REG_LEN = 8;
+static constexpr U8 ASM_ARG_LEN_MAX       = ASM_VOLATILE_REG_LEN;
 
 static constexpr U8 ASM_PARAM_REG_0 = 0;
 static constexpr U8 ASM_PARAM_REG_1 = 1;

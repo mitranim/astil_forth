@@ -162,6 +162,16 @@ static Err asm_validate_output_param_reg(Sint reg) {
   );
 }
 
+static Err asm_validate_arg_reg(Sint reg) {
+  if (reg >= 0 && reg < ASM_ARG_LEN_MAX) return nullptr;
+  return errf(
+    "too many arguments: %d registers available, " FMT_SINT
+    " arguments provided",
+    ASM_ARG_LEN_MAX,
+    reg + 1
+  );
+}
+
 static Err err_imm_range_signed(Sint imm, Uint wid, Sint min, Sint max) {
   return errf(
     "value " FMT_SINT " out of signed " FMT_UINT "-bit range [" FMT_SINT

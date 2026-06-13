@@ -1547,11 +1547,7 @@ end
 fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
 fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
 
-fun: within { num one two -- bool }
-  one num >
-  num two >
-  or =0
-end
+fun: within { num one two -- bool } one num > num two > or =0 end
 
 \ ## Varargs and formatting
 

@@ -1379,6 +1379,27 @@ fun: test_arith { -- err }
 end
 test_arith
 
+fun: test_comptime_stack_arith { -- err }
+  T{ 234 123 -                            <T> 111    }T
+  T{ 234 123 +                            <T> 357    }T
+  T{ 234 123 *                            <T> 28782  }T
+  T{ 10 20 + 30 40 - *                    <T> -300   }T
+  T{ 10 20 + 100 30 - *                   <T> 2100   }T
+  T{ 24 4 / 64 8 u/ +                     <T> 14     }T
+  T{ 29 5 mod 20 6 mod +                  <T> 6      }T
+  T{ 29 5 /mod 20 6 /mod + + +            <T> 14     }T
+  T{ 1 4 lsl 128 3 lsr +                  <T> 32     }T
+  T{ -128 2 asr 0xff and                  <T> 224    }T
+  T{ 0b1010 0b1100 or 0b0110 xor          <T> 0b1000 }T
+  T{ 10 20 < 30 5 > +                     <T> 2      }T
+  T{ 10 20 30 + =0 +                      <T> 10     }T
+  T{ 10 20 30 + <>0 +                     <T> 11     }T
+  T{ -123 abs 10 20 min 30 40 max + +     <T> 173    }T
+  T{ 255 bit_len 256 bit_len +            <T> 17     }T
+  nil
+end
+test_comptime_stack_arith
+
 fun: test_mod { -- err }
   T{ 12 1 mod <T> 0 }T
   T{ 12 2 mod <T> 0 }T
@@ -1496,6 +1517,70 @@ fun: test_int_to_cell { -- err }
   nil
 end
 test_int_to_cell
+
+fun: test_comptime_arg_stack_sum16_fun { -- val }
+  0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+  + + + + + + + + + + + + + + +
+end
+
+fun: test_comptime_arg_stack_sum16 { -- err }
+  T{ test_comptime_arg_stack_sum16_fun <T> 120 }T
+  nil
+end
+test_comptime_arg_stack_sum16
+
+fun: test_comptime_arg_stack_mod_scratch_fun { -- val }
+  1000 1 2 3 4 5 6 7 8 20 6 mod
+  + + + + + + + + +
+end
+
+fun: test_comptime_arg_stack_mod_scratch { -- err }
+  T{ test_comptime_arg_stack_mod_scratch_fun <T> 1038 }T
+  nil
+end
+test_comptime_arg_stack_mod_scratch
+
+fun_comp: test_comptime_arg_stack_local_set_x8_compile { -- err } ( E: -- val err )
+  comp_local_anon { loc }
+  8 8 comp_load
+  8 loc comp_local_set
+  0 8 asm_mov_reg comp_instr
+  0 1 comp_load
+  2 comp_args_set
+  nil
+end
+
+fun: test_comptime_arg_stack_local_set_x8_fun { -- val err }
+  test_comptime_arg_stack_local_set_x8_compile
+end
+
+fun: test_comptime_arg_stack_local_set_x8 { -- err }
+  T{ test_comptime_arg_stack_local_set_x8_fun <T> 8 }T
+  nil
+end
+test_comptime_arg_stack_local_set_x8
+
+fun: test_comptime_arg_stack_to_stack_9 { -- err }
+  alloca' Stack { stk }
+  32 stk stack_init
+
+  0 1 2 3 4 5 6 7 8 stk >>s
+  T{ stk stack_len_cells <T> 9 }T
+  T{ stk s> <T> 8  }T
+  T{ stk s> <T> 7  }T
+  T{ stk s> <T> 6  }T
+  T{ stk s> <T> 5  }T
+  T{ stk s> <T> 4  }T
+  T{ stk s> <T> 3  }T
+  T{ stk s> <T> 2  }T
+  T{ stk s> <T> 1  }T
+  T{ stk s> <T> 0  }T
+  T{ stk stack_len_cells <T> 0 }T
+
+  stk stack_deinit
+  nil
+end
+test_comptime_arg_stack_to_stack_9
 
 fun: test_fallback { -- err }
   T{ 0  0  fallback <T> 0  }T
@@ -2316,6 +2401,27 @@ fun: test_too_many_output_regs_with_err { -- err } [ false try_all ]
 end
 test_too_many_output_regs_with_err
 
+fun: test_too_many_comptime_arg_regs { -- err } [ false try_all ]
+  import' ./test/test_too_many_comptime_arg_regs.af
+  " too many arguments: 16 registers available, 17 arguments provided"
+  T_err_contains
+end
+test_too_many_comptime_arg_regs
+
+fun: test_too_many_execute_raw_args { -- err } [ false try_all ]
+  import' ./test/test_too_many_execute_raw_args.af
+  " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided"
+  T_err_contains
+end
+test_too_many_execute_raw_args
+
+fun: test_comptime_stack_underflow { -- err } [ false try_all ]
+  import' ./test/test_comptime_stack_underflow.af
+  " in `some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
+  T_err_contains
+end
+test_comptime_stack_underflow
+
 fun: test_partial_assign { -- err } [ false try_all ]
   import' ./test/test_partial_assign.af
   " in `test_partial_assign_fail`: arity mismatch: assigned 1 of 2 prior values"
@@ -2535,6 +2641,7 @@ fun: main_run { -- err }
   test_compare_many
   test_assert
   test_arith
+  test_comptime_stack_arith
   test_mod
   test_slash_mod
   test_abs
@@ -2544,6 +2651,10 @@ fun: main_run { -- err }
   test_cstr_eq
   test_cstr_less
   test_int_to_cell
+  test_comptime_arg_stack_sum16
+  test_comptime_arg_stack_mod_scratch
+  test_comptime_arg_stack_local_set_x8
+  test_comptime_arg_stack_to_stack_9
   test_fallback
   test_fallback_decl
   \ test_vargs_printf
@@ -2596,6 +2707,9 @@ fun: main_run { -- err }
   \ test_too_many_input_regs              \ interp-only
   \ test_too_many_output_regs             \ interp-only
   \ test_too_many_output_regs_with_err    \ interp-only
+  \ test_too_many_comptime_arg_regs       \ interp-only
+  \ test_too_many_execute_raw_args        \ interp-only
+  \ test_comptime_stack_underflow         \ interp-only
   test_arena_alloc
   test_arena_trunc
   test_arena_deinit

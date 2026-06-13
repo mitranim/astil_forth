@@ -13,6 +13,7 @@
 - [Sublime Text](#sublime-text)
 - [Library](#library)
 - [Tricks and optimizations](#tricks-and-optimizations)
+- [Register allocation and greediness](#register-allocation-and-greediness)
 - [Performance](#performance)
 - [Limitations](#limitations)
 - [Non-standard](#non-standard)
@@ -344,6 +345,18 @@ In reg-CC:
 - Keep track of clobbers, preserve caller-saved registers when possible.
 - ...Other small tricks. Some are word-specific.
 
+## Register allocation and greediness
+
+The reg-CC version of Astil Forth takes an extremely simple yet effective approach to register allocation. It treats parameter registers as a stack, operating at the _bottom_ of that stack rather than top.
+
+Inside every word definition, the "register stack" starts "empty". This lets the compiler immediately assign values to registers without any outer context. When you write code like `10 20 30`, the values are immediately assigned to `x0 x1 x2`. This matches the Arm64 call ABI; a subsequent call to a verb with 3 inputs will "just work" whether it's an Astil Forth word or a C function.
+
+Register allocation for locals is trickier and smarter. They often have to be relocated, but the final destinations are unknown until the end of a word definition. The compiler reserves instructions, builds a list of pending relocations, and patches them in a fixup pass. This allows us to preserve the single-pass compilation strategy. The compiler employs several tricks to elide unnecessary relocations.
+
+Runtime-only verbs are greedy: they must consume the entire "register stack", replacing it with their outputs. This often requires "stashing" values out of the way into locals, which also makes the code clearer.
+
+Comptime words are allowed to operate at the _top_ of the register stack. For example, all arithmetic words like `+ - * /` come with two definitions. Their runtime definitions are `x0 x1 -> x0`, but their comptime definitions "pop" and "push" top argument registers, often allowing "normal" concatenative code without locals in compiled code. This works by asking and telling about argument registers at comptime: `comp_args_get comp_args_set`.
+
 ## Performance
 
 See [`./bench`](./bench). Summary: in these _very limited_ microbenchmarks, the reg-CC version of Astil Forth trounces VM interpreters, often outpaces other JITs, and vaguely approximates Clang C with `-O2`. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
@@ -394,8 +407,8 @@ More ergonomic control flow structures:
 Because the system uses native function calls, there is no return stack; see below.
 
 There is no `state` or `does>`. Instead, the system uses two wordlists:
-- "exec" — execution-time words; not immediate.
-- "comp" — compile-time words; immediate.
+- "exec" — runtime words; not immediate.
+- "comp" — comptime words; immediate.
 
 Each word can be defined _twice_: an "exec" variant and a "comp" variant. In compilation mode, the "comp" variant is used first. In interpretation mode, the "exec" variant is used first. When finding a word by name, the caller must choose the wordlist, and thus the variant.
 

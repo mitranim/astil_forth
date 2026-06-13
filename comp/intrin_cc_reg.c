@@ -431,13 +431,31 @@ static Err intrin_comp_args_valid(Sint args, Sint action, Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_comp_args_min(Sint args, Interp *interp) {
+  Sym *sym;
+  try(comp_require_current_sym(&interp->comp, &sym));
+
+  const auto ctx     = &interp->comp.ctx;
+  const auto arg_low = ctx->arg_low;
+  const auto arg_len = ctx->arg_len;
+  const auto msg     = "invalid argument count";
+
+  if (arg_low) {
+    return err_args_partial(sym, msg, arg_low, arg_len);
+  }
+  if (arg_len < args) {
+    return err_args_arity(sym, msg, args, arg_len);
+  }
+  return nullptr;
+}
+
 static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
   if (arg_len) *arg_len = (Sint)interp->comp.ctx.arg_len;
   return nullptr;
 }
 
 static Err intrin_comp_args_set(Sint len, Interp *interp) {
-  try(asm_validate_input_param_reg(len));
+  try(asm_validate_arg_reg(len));
   comp_args_set(&interp->comp, (U8)len);
   return nullptr;
 }
@@ -605,7 +623,7 @@ static void intrin_debug_ctx(Interp *interp) {
     }
 
     if (has_vals || args) {
-      eprintf("[debug]   values in param registers:\n");
+      eprintf("[debug]   values in argument registers:\n");
 
       const auto last_val_ind = (U8)(last_val + 1);
       U8         val_cap      = cap;
@@ -718,6 +736,16 @@ static const USED auto INTRIN_COMP_ARGS_VALID = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_valid,
   .inp_len   = 2,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_ARGS_MIN = (Sym){
+  .name.buf  = "comp_args_min",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_args_min,
+  .inp_len   = 1,
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
