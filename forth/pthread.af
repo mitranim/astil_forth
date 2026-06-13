@@ -205,12 +205,35 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 
 \ Wraps `pthread_create`, throwing a descriptive error on failure.
 \ The caller must either `thread_join` or `pthread_detach`.
+\ If error, caller owns `inp`. Otherwise, thread owns `inp`.
 fun: thread_spawn { fun inp -- thread err }
   nil { attr }
   nil { thread }
 
   ref' thread attr fun inp pthread_create
   " unable to spawn thread" posix_err? { err }
+  thread err
+end
+
+\ Wraps `pthread_create` with `PTHREAD_CREATE_DETACHED`.
+\ The caller must not `thread_join` or `pthread_detach`.
+\ If error, caller owns `inp`. Otherwise, thread owns `inp`.
+fun: thread_spawn_detached { fun inp -- thread err }
+  alloca' Pthread_attr { attr   }
+  nil                  { thread }
+
+  attr pthread_attr_init
+  " unable to init thread attributes" posix_err? try
+
+  attr PTHREAD_CREATE_DETACHED pthread_attr_setdetachstate
+  " unable to mark thread as detached" posix_err? { err }
+
+  ifn err then
+    ref' thread attr fun inp pthread_create
+    " unable to spawn detached thread" posix_err? { err }
+  end
+
+  attr pthread_attr_destroy { -- }
   thread err
 end
 

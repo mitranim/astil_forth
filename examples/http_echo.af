@@ -10,8 +10,7 @@ import' ./http_util.af
 \   astil examples/http_echo.af
 \   curl http://localhost:2345
 
-128  let: MAX_CONN
-4096 buf: READ_BUF
+4096 let: BUF_CAP
 
 fun: write_opt { fdes buf len } fdes buf len write { -- } end
 fun: write_eol { fdes }         fdes CRLF 2 write_opt     end \ \r\n
@@ -38,8 +37,8 @@ fun: read_req { conn buf cap -- len err }
 end
 
 fun: respond_conn { conn -- err }
-  READ_BUF                  { buf cap }
-  conn buf cap read_req try { len }
+  BUF_CAP alloca { buf }
+  conn buf BUF_CAP read_req try { len }
 
   " [srv] incoming request:" elog elf elf
   STDERR buf len write_opt elf
@@ -68,12 +67,21 @@ fun: handle_conn { conn }
   end
 end
 
-fun: main { -- err }
-  " 2345" { port }
-  instr' handle_conn { handler }
-  port MAX_CONN net_listen try { sock }
-  sock handler net_accept_loop
+fun: run { -- err }
+  " 2345"                     { port }
+  128                         { backlog }
+  instr' handle_conn          { handler }
+  port backlog net_listen try { sock }
+
+  " [srv] listening on http://localhost:%s" port elogf elf
+
+  sock handler net_accept_loop_threaded
   sock sock_close \ Unreachable.
-  nil
 end
+
+fun: main { -- exit }
+  run { err }
+  ifn err then 0 else " error: %s" err elogf elf 1 end
+end
+
 main

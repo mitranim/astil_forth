@@ -1,94 +1,11 @@
 import' std:lang.af
 import' std:net.af
 import' std:errno.af
+import' std:pthread.af
 
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
-fun: sock_close { sock }
-  if sock close is_err_flag then
-    errno " [srv] unable to close socket" os_err elog elf
-  end
-end
-
-fun: sock_bind_opt { info max_conn -- sock }
-  info Addrinfo_family   @ { fam }
-  info Addrinfo_socktype @ { type }
-  info Addrinfo_protocol @ { prot }
-  fam type prot socket     { sock }
-
-  if sock is_err_flag then -1 ret end
-
-  \ `setsockopt` requires non-nil option address.
-  alloca' Cint { opt }
-  nil opt !cint
-
-  sock SOL_SOCKET SO_REUSEADDR opt size' Cint setsockopt
-  if is_err_flag then
-    sock sock_close
-    errno " [srv] unable to `setsockopt`" os_err elog elf
-    -1 ret
-  end
-
-  sock info Addrinfo_addr @ info Addrinfo_addrlen @ bind
-  if is_err_flag then
-    sock sock_close
-    errno " [srv] unable to bind socket" os_err elog elf
-    -1 ret
-  end
-
-  sock max_conn listen
-  if is_err_flag then
-    sock sock_close
-    errno " [srv] unable to listen on socket" os_err elog elf
-    -1 ret
-  end
-
-  sock
-end
-
-\ Result is `Addrinfo *` and should be freed with `freeaddrinfo`.
-fun: net_addr_info { port -- ainf err }
-  alloca' Addrinfo { hint }
-  hint size' Addrinfo erase
-  AF_UNSPEC   hint Addrinfo_family   !
-  SOCK_STREAM hint Addrinfo_socktype !
-  AI_PASSIVE  hint Addrinfo_flags    !
-
-  nil { ainf }
-  nil port hint ref' ainf getaddrinfo { code }
-
-  if code then
-    code gai_strerror { msg }
-    " [srv] unable to listen on port %s; code: %zd; msg; %s" port code msg errf throw
-  end
-
-  ainf nil
-end
-
-fun: net_listen { port max_conn -- sock err }
-  port net_addr_info try { ainf }
-  -1   { sock }
-  ainf { next }
-
-  loop
-    next while
-    next max_conn sock_bind_opt { sock }
-    next Addrinfo_next @ { next }
-    ifn sock is_err_flag then leave end
-  end
-
-  ainf freeaddrinfo
-
-  if sock is_err_flag then
-    " [srv] unable to listen on :%s" port errf throw
-  end
-
-  " [srv] listening on http://localhost:%s" port elogf elf
-  sock nil
-end
-
-\ This is single-threaded. A real server should handle clients concurrently.
-\ See adjacent example files `thread*.f` for using Posix threads from Forth.
+\ Single-threaded accept loop. Convenient for examples/tests.
 fun: net_accept_loop { sock handler }
   alloca' Sockaddr_storage { addr }
   alloca' Cuint            { size }
@@ -108,5 +25,39 @@ fun: net_accept_loop { sock handler }
 
     " [srv] accepted connection" elog elf
     conn handler execute_raw
+  end
+end
+
+\ Multi-threaded accept loop. Spawns one detached worker per accepted conn.
+\ The handler receives one input: `conn`. On spawn failure, closes `conn`.
+\ No cancellation support. No thread limit.
+fun: net_accept_loop_threaded { sock handler }
+  alloca' Sockaddr_storage { addr }
+  alloca' Cuint            { size }
+
+  loop
+    addr size' Sockaddr_storage erase
+    size' Sockaddr_storage size !cuint
+    sock addr size accept { conn }
+
+    if conn is_err_flag then
+      errno { code }
+      if code EINTR = then cont end
+      code strerror { msg }
+      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg elogf elf
+      cont
+    end
+
+    " [srv] accepted connection" elog elf
+
+    handler conn thread_spawn_detached { _ err }
+
+    if err then
+      " [srv] unable to spawn worker: %s" err elogf elf
+      conn sock_close { err }
+      if err then
+        " [srv] unable to close connection %zd: %s" conn err elogf elf
+      end
+    end
   end
 end

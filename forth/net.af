@@ -11,6 +11,8 @@ import' ./io.af
 \
 \   some_word " unable to blah" os_err? { err }
 \   some_word " unable to blah" os_err? try
+\
+\ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
 1      let: AI_PASSIVE   \ Any host IP is fine.
 0      let: AF_UNSPEC    \ Both IPv4 and IPv6.
@@ -52,3 +54,84 @@ struct: Addrinfo
 end
 
 U8 128 arr: Sockaddr_storage
+
+\ Result is `Addrinfo *` and should be freed with `freeaddrinfo`.
+fun: net_addr_info { port -- ainf err }
+  alloca' Addrinfo { hint }
+  hint size' Addrinfo erase
+  AF_UNSPEC   hint Addrinfo_family   !
+  SOCK_STREAM hint Addrinfo_socktype !
+  AI_PASSIVE  hint Addrinfo_flags    !
+
+  nil { ainf }
+  nil port hint ref' ainf getaddrinfo { code }
+
+  if code then
+    code gai_strerror { msg }
+    " unable to listen on port %s; code: %zd; msg: %s" port code msg errf throw
+  end
+
+  ifn ainf then
+    \ This line should not be reached on Posix-conforming systems.
+    " unable to listen on port %s: no addrinfo available" port errf throw
+  end
+
+  ainf nil
+end
+
+fun: sock_close { sock -- err }
+  sock close is_err_flag " unable to close socket" os_err?
+end
+
+fun: sock_bind { info backlog -- sock err }
+  info Addrinfo_family   @ { fam  }
+  info Addrinfo_socktype @ { type }
+  info Addrinfo_protocol @ { prot }
+  fam type prot socket     { sock }
+
+  sock " unable to create network socket" os_err? try
+
+  alloca' Cint { opt } \ `setsockopt` requires non-nil option address.
+  true opt !cint       \ Enable options like `SO_REUSEADDR`.
+
+  sock SOL_SOCKET SO_REUSEADDR opt size' Cint setsockopt
+  " unable to `setsockopt`" os_err? { err }
+
+  ifn err then
+    sock info Addrinfo_addr @ info Addrinfo_addrlen @ bind
+    " unable to bind socket" os_err? { err }
+
+    ifn err then
+      sock backlog listen
+      " unable to listen on socket" os_err? { err }
+    end
+  end
+
+  if err then sock sock_close { -- } end
+  sock err
+end
+
+fun: net_listen { port backlog -- sock err }
+  port net_addr_info try { ainf }
+  -1   { sock }
+  ainf { next }
+  nil  { err  }
+
+  loop
+    next while
+    next backlog sock_bind { sock err }
+    next Addrinfo_next @ { next }
+    ifn err then leave end
+    -1 { sock }
+  end
+
+  ainf freeaddrinfo
+
+  if err then
+    " unable to listen on port %s: socket error: %s %s" port err wrapf { err }
+  elif sock <0 then
+    " unable to listen on port %s: no sockets available" port errf { err }
+  end
+
+  sock err
+end
