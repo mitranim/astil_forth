@@ -1011,6 +1011,14 @@ fun: @2 { adr -- val0 val1 } [
   2                         comp_args_set
 ] end
 
+fun: @@2 { adr0 adr1 -- val0 val1 } [
+  0                  comp_clobber
+  1                  comp_clobber
+  0 0 0 asm_load_off comp_instr \ ldr x0, [x0]
+  1 1 0 asm_load_off comp_instr \ ldr x1, [x1]
+  2                  comp_args_set
+] end
+
 fun: !2 { val0 val1 adr } [
   0 1 2 0 asm_store_pair_off comp_instr \ stp x0, x1, [x2]
 ] end
@@ -1552,6 +1560,9 @@ fun_comp: catch'' { -- err } WORDLIST_COMP catch nil end
 
 10 let: LF
 13 let: CR
+9  let: TAB
+11 let: VTAB
+32 let: SPACE
 
 3 mem: CRLF    \ \r\n\0
 CR CRLF     !8 \ \r
@@ -1606,8 +1617,8 @@ fun: flush                   stdout fflush           { -- } end
 fun: eflush                  stderr fflush           { -- } end
 fun: lf                      LF putchar              { -- } end \ Renamed from `cr`.
 fun: elf                     LF eputchar             { -- } end
-fun: space                   32 putchar              { -- } end
-fun: espace                  32 eputchar             { -- } end
+fun: space                   SPACE putchar           { -- } end
+fun: espace                  SPACE eputchar          { -- } end
 fun: fprint { str len file } str 1 len file fwrite   { -- } end
 
 \ ## Conditionals
@@ -1678,14 +1689,14 @@ fun: if_pop  { -- err } STACK if_pop_from  nil end
 fun: ifn_pop { -- err } STACK ifn_pop_from nil end
 
 fun_comp: if { -- nop adr fun err } ( E: pred -- )
-  " when calling `if`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `if`" comp_args_valid 0 comp_args_set
   comp_barrier
   reserve_here { adr }
   xt' nop adr xt' if_pop nil \ `nop` terminates the `end` pop-chain.
 end
 
 fun_comp: ifn { -- nop adr fun err } ( E: pred -- )
-  " when calling `ifn`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `ifn`" comp_args_valid 0 comp_args_set
   comp_barrier
   reserve_here { adr }
   xt' nop adr xt' ifn_pop nil
@@ -1701,19 +1712,19 @@ end
 fun: else_pop { -- err } STACK else_pop_from nil end
 
 fun_comp: elif { -- adr fun err } ( E: pred -- )
-  " when calling `elif`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `elif`" comp_args_valid 0 comp_args_set
   comp_barrier
   reserve_here xt' if_pop nil
 end
 
 fun_comp: elifn { -- adr fun err } ( E: pred -- )
-  " when calling `elifn`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `elifn`" comp_args_valid 0 comp_args_set
   comp_barrier
   reserve_here xt' ifn_pop nil
 end
 
 fun_comp: else { if_adr if_fun -- else_adr else_fun err }
-  " when calling `else`" 0 comp_args_valid
+  0 " when calling `else`" comp_args_valid
 
   comp_barrier \ Clobber / relocate locals.
   reserve_here { else_adr }
@@ -1732,7 +1743,7 @@ fun: switch_pop { -- err } ( C: next_pop val_loc -- )
 end
 
 fun_comp: switch { -- nop val_loc switch_pop err } ( E: val -- )
-  " when calling `switch`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `switch`" comp_args_valid 0 comp_args_set
   comp_local_anon { val_loc }
   0 val_loc comp_local_set \ mov <val>, x0 | str x0, [FP, <val>]
   xt' nop val_loc xt' switch_pop nil
@@ -1753,7 +1764,7 @@ fun_comp: case
   { val_loc switch_pop -- val_loc switch_pop case_adr case_pop err }
   ( E: pred -- )
 
-  " when calling `case`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `case`" comp_args_valid 0 comp_args_set
 
   1 val_loc       comp_local_get \ mov x1, <val> | ldr x1, [FP, <val>]
   0 1 asm_cmp_reg comp_instr     \ cmp x0, x1
@@ -2248,7 +2259,7 @@ fun: while_pop { -- err } LOOP_AUX if_pop_from nil end
 
 \ Breaks out of any loop.
 fun_comp: while { -- err } ( LOOP_AUX: -- while_adr while_pop )
-  " when calling `while`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `while`" comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   reserve_here  LOOP_AUX >s
   xt' while_pop LOOP_AUX >s
@@ -2263,7 +2274,7 @@ fun_comp: cont { -- err } loop_frame_adr @ loop_back nil end \ b <beg>
 \
 \   loop false until
 fun_comp: until { fun -- err }
-  " when calling `until`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `until`" comp_args_valid 0 comp_args_set
   comp_barrier \ Clobber / relocate locals.
   0 8 asm_cmp_branch_not_zero comp_instr \ cbnz x0, 8
   fun execute nil
@@ -2317,7 +2328,7 @@ fun_comp: for { -- loop_beg cond_adr asm_cond loop_pop err }
   ( C: -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
-  " when calling `for`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `for`" comp_args_valid 0 comp_args_set
   comp_local_anon for_loop_countdown_init nil
 end
 
@@ -2332,7 +2343,7 @@ fun_comp: -for: { -- loop_beg cond_adr asm_cond loop_pop err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
-  " when calling `-for:`" 1 comp_args_valid 0 comp_args_set
+  1 " when calling `-for:`" comp_args_valid 0 comp_args_set
   read_word comp_local_named for_loop_countdown_init nil
 end
 
@@ -2344,7 +2355,7 @@ fun_comp: +for: { -- loop_beg cond_adr asm_cond loop_pop err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor -- )
 
-  " when calling `+for:`" 2 comp_args_valid 0 comp_args_set
+  2 " when calling `+for:`" comp_args_valid 0 comp_args_set
 
   loop_frame_init
   comp_local_anon            { lim } \ ceil  = limit
@@ -2372,7 +2383,7 @@ fun_comp: -loop: { -- loop_beg cond_adr asm_cond loop_pop err }
   ( E: ceil floor step -- )
   ( LOOP_AUX: -- nop )
 
-  " when calling `-loop:`" 3 comp_args_valid 0 comp_args_set
+  3 " when calling `-loop:`" comp_args_valid 0 comp_args_set
 
   loop_frame_init
   read_word comp_local_named { cur } \ ceil  = cursor
@@ -2410,7 +2421,7 @@ fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor step -- )
 
-  " when calling `+loop:`" 3 comp_args_valid 0 comp_args_set
+  3 " when calling `+loop:`" comp_args_valid 0 comp_args_set
 
   loop_frame_init
   comp_local_anon            { lim } \ ceil  = limit
@@ -2639,11 +2650,17 @@ end
 \
 \   0 1 extern: some_fun
 \   some_fun " unable to do X" os_err? try
-fun: os_err? { int ctx -- err } int is_err_flag if errno ctx os_err ret end nil end
+fun: os_err? { int ctx -- err_str }
+  int is_err_flag if errno ctx os_err ret end
+  nil
+end
 
 \ Like `os_err?`, but for Posix functions which directly
 \ return an `errno` code on failure, and zero on success.
-fun: posix_err? { code ctx -- err } code if code ctx os_err ret end nil end
+fun: posix_err? { code ctx -- err_str }
+  code if code ctx os_err ret end
+  nil
+end
 
 \ ## Formatting continued
 
@@ -2922,14 +2939,32 @@ struct: Interp_dict
 end
 
 \ SYNC[interp_dict_offsets].
+\ SYNC[interp_module_offset].
 \
 \ Caution: this struct definition is incomplete.
 struct: Interp
   Stack       1 field: Interp_ints
   Interp_dict 1 field: Interp_dict_exec
   Interp_dict 1 field: Interp_dict_comp
+  Stack       1 field: Interp_sym
+  Adr         1 field: Interp_module \ Interp_module_ctx*
 
   \ ... Other fields elided until we need them.
+end
+
+\ SYNC[interp_reader_fields].
+struct: Interp_reader
+  Cstr 1 field: Interp_reader_src
+  U32  1 field: Interp_reader_len
+  U32  1 field: Interp_reader_pos
+  Cstr 1 field: Interp_reader_path
+  U8   1 field: Interp_reader_tty
+end
+
+\ SYNC[interp_module_fields].
+struct: Interp_module_ctx
+  Interp_reader 1 field: Interp_module_reader
+  U8            1 field: Interp_module_try_all
 end
 
 fun: interp { -- adr } [
@@ -3211,3 +3246,39 @@ fun_comp: >=none  { -- err } " >=none"  ASM_LT ASM_NZCV_GE_OK ASM_LT comp_cmp_ma
 fun_comp: >none   { -- err } " >none"   ASM_LE ASM_NZCV_GT_OK ASM_LE comp_cmp_many end
 fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT comp_cmp_many end
 true try_all
+
+fun: is_whitespace { char -- bool } char LF CR TAB VTAB SPACE =any end
+
+fun: assert_cond { cond ctx -- err }
+  cond if nil ret end
+  " assertion failed: %s" ctx errf
+end
+
+fun: assert_pop { beg -- err }
+  1 " when compiling `assert`" comp_args_valid
+  interp Interp_module @ Interp_module_reader { read }
+  read Interp_reader_src @ read Interp_reader_pos @u32 + { ceil }
+
+  ceil 3 - { ceil }
+  ceil dec @b is_whitespace =0 { fail }
+  s" end" ceil 3 str<> fail or { fail }
+
+  fail if
+    " invalid use of `assert`: must be terminated with `end`" throw
+  end
+
+  loop beg  @b is_whitespace while inc: beg end
+  loop ceil @b is_whitespace while dec: ceil end
+
+  ceil beg - { len }
+  beg len comp_cstr
+  compile' assert_cond
+  nil
+end
+
+fun_comp: assert { -- beg fun err } ( E: cond -- )
+  interp Interp_module @ Interp_module_reader { read }
+  read Interp_reader_src @ read Interp_reader_pos @u32 +
+  xt' assert_pop
+  nil
+end

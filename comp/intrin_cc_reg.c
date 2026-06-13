@@ -425,7 +425,7 @@ static Err intrin_comp_signature_set(
   return nullptr;
 }
 
-static Err intrin_comp_args_valid(Sint action, Sint args, Interp *interp) {
+static Err intrin_comp_args_valid(Sint args, Sint action, Interp *interp) {
   try(interp_validate_data_ptr(action));
   try(comp_validate_args(&interp->comp, (const char *)action, args));
   return nullptr;

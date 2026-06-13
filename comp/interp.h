@@ -11,7 +11,11 @@ typedef struct {
   Sym_stack  syms;
 } Interp_snap;
 
-// Per-module state, created for each import.
+/*
+Per-module state, created for each import.
+
+SYNC[interp_module_fields].
+*/
 typedef struct {
   Reader reader;
   bool   try_all;
@@ -30,6 +34,7 @@ must be kept in sync.
 SYNC[interp_stack_offset].
 SYNC[interp_dict_offsets].
 SYNC[stack_field_offsets].
+SYNC[interp_module_offset].
 */
 typedef struct {
   Sint_stack  ints;      // Forth integer stack.

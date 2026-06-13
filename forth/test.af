@@ -298,7 +298,8 @@ fun: test_conditionals { -- err }
   T{ true  ifn 10 { val } else 20 { val } end val <T> 20 }T
 
   T{
-    -1 { val } false if 10 { val } else false elif 20 { val } end val
+    -1 { val }
+    false if 10 { val } else false elif 20 { val } end val
   <T>
     -1
   }T
@@ -312,7 +313,8 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val } false if 10 { val } else true elif 20 { val } end val
+    -1 { val }
+    false if 10 { val } else true elif 20 { val } end val
   <T>
     20
   }T
@@ -326,7 +328,8 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val } true if 10 { val } else false elif 20 { val } end val
+    -1 { val }
+    true if 10 { val } else false elif 20 { val } end val
   <T>
     10
   }T
@@ -340,7 +343,8 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val } false if 10 { val } else false elifn 20 { val } end val
+    -1 { val }
+    false if 10 { val } else false elifn 20 { val } end val
   <T>
     20
   }T
@@ -354,7 +358,8 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val } false if 10 { val } else true elifn 20 { val } end val
+    -1 { val }
+    false if 10 { val } else true elifn 20 { val } end val
   <T>
     -1
   }T
@@ -368,7 +373,8 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    -1 { val } true if 10 { val } else false elifn 20 { val } end val
+    -1 { val }
+    true if 10 { val } else false elifn 20 { val } end val
   <T>
     10
   }T
@@ -380,6 +386,7 @@ fun: test_conditionals { -- err }
   <T>
     10
   }T
+
   nil
 end
 test_conditionals
@@ -1251,6 +1258,28 @@ fun: test_compare_many { -- err }
   nil
 end
 test_compare_many
+
+fun: assert_ok { val -- err }
+  assert
+    val 10 =
+  end
+  nil
+end
+
+fun: assert_fail { -- err }
+  assert
+    123 456 =
+  end
+  nil
+end
+
+fun: test_assert { -- err }
+  T{ 10 assert_ok <T> }T
+  T{ catch' assert_fail { err } <T> }T
+  err " assertion failed: 123 456 =" T_err_contains
+  nil
+end
+test_assert
 
 fun: test_arith { -- err }
   T{ 234 123 - <T> 111   }T
@@ -2357,6 +2386,7 @@ fun: main_run { -- err }
   test_lesser_equal
   test_greater_equal
   test_compare_many
+  test_assert
   test_arith
   test_mod
   test_slash_mod

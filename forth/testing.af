@@ -138,7 +138,7 @@ fun: testing_compile_push_args { len -- err }
 end
 
 fun_comp: T{ { -- err }
-  " when calling `T{`" 0 comp_args_valid
+  0 " when calling `T{`" comp_args_valid
 
   TEST_ARG_LEN @ if
     " internal error: non-empty `TEST_ARG_LEN` at `T{`"
@@ -184,8 +184,7 @@ fun_comp: }T { -- err }
   TEST_ARG_LEN @ { len }
   TEST_ARG_LEN off!
 
-  " when calling `}T`" len comp_args_valid
-
+  len " when calling `}T`" comp_args_valid
   len testing_compile_push_args
   len comp_push
 

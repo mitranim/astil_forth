@@ -140,7 +140,7 @@ fun: io_err { action path -- err_str }
   action " unable to %s `%s`; code: %s" action path code wrapf
 end
 
-fun: file_err { action file -- err }
+fun: file_err { action file -- err_str }
   nil nil { code msg }
 
   file ferror if

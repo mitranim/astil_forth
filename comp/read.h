@@ -11,6 +11,7 @@ typedef struct {
   Ind col;
 } Read_pos;
 
+// SYNC[interp_reader_fields].
 typedef struct {
   const char *src;
   Ind         len;
