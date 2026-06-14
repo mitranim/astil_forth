@@ -163,33 +163,31 @@ end
 
 fun: fd_stat { fdes path stat_adr -- err }
   if fdes stat_adr fstat then " stat" path io_err throw end
-  nil
 end
 
 fun: path_stat { path stat_adr -- err }
   if path stat_adr stat then " stat" path io_err throw end
-  nil
 end
 
 fun: fd_open { path mode -- fdes err }
   path mode open { out }
   if out is_err_flag then " open" path io_err throw end
-  out nil
+  out
 end
 
 fun: file_open { path mode -- file err }
   path mode fopen { file }
   ifn file then " open" path io_err throw end
-  file nil
+  file
 end
 
 fun: file_write_char { char file -- err }
-  ifn char file fputc is_err_flag then nil ret end
+  ifn char file fputc is_err_flag then ret end
   " failed to write char" file file_err
 end
 
 fun: file_write_bytes { buf len file -- err }
   buf 1 len file fwrite { out }
-  if out len = then nil ret end
+  if out len = then ret end
   " wrote %zd instead of %zd bytes" out len errf file file_err
 end

@@ -72,7 +72,7 @@ fun: }T { -- err }
   \ Does the stack length match?
   if rel0 rel1 = then
     \ Does the content match?
-    if len0 len1 rel1 stk testing_stack_eq then stk testing_interp_reset nil ret end
+    if len0 len1 rel1 stk testing_stack_eq then stk testing_interp_reset ret end
   else
     " [test] stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 elogf elf
   end
@@ -83,7 +83,6 @@ fun: }T { -- err }
   stk testing_interp_reset
   " test failure" throw
   unreachable
-  nil
 end
 
 \ ## Compilation-mode test routines (inside words)
@@ -108,11 +107,10 @@ false var: TEST_STACK_INITED_AOT \ Must remain `false` in JIT.
 \
 \ TODO: general solution for similar cases.
 fun: testing_stack_init_aot { -- err }
-  if has_interp then nil ret end
-  if TEST_STACK_INITED_AOT @ then nil ret end
+  if has_interp then ret end
+  if TEST_STACK_INITED_AOT @ then ret end
   32 TEST_STACK stack_init
   TEST_STACK_INITED_AOT on!
-  nil
 end
 
 fun: testing_compiled_reset
@@ -121,7 +119,7 @@ fun: testing_compiled_reset
 end
 
 fun: testing_compile_push_args { len -- err }
-  ifn len then nil ret end
+  ifn len then ret end
 
   len     { stk_reg }
   len inc { top_reg }
@@ -132,7 +130,6 @@ fun: testing_compile_push_args { len -- err }
   TEST_STACK stk_reg         comp_page_addr
   len        stk_reg top_reg comp_args_to_stack
   0                          comp_args_set
-  nil
 end
 
 fun_comp: T{ { -- err }
@@ -148,15 +145,12 @@ fun_comp: T{ { -- err }
   true try_all
   compile' testing_stack_init_aot
   prev try_all
-
-  nil
 end
 
 fun_comp: <T> { -- err }
   comp_args_get { len }
   len testing_compile_push_args
   len TEST_ARG_LEN !
-  nil
 end
 
 \ Modified from `}T` to be more suitable for compiled code in reg-CC.
@@ -166,7 +160,7 @@ fun: testing_compiled_end { arg_len -- err } [ false try_all ]
   arg_len     { len1 } \ <T>
   arg_len 2 * { len2 } \ }T
 
-  if len0 len1 arg_len stk testing_stack_eq then testing_compiled_reset nil ret end
+  if len0 len1 arg_len stk testing_stack_eq then testing_compiled_reset ret end
 
   " [test] mismatch: " elog
   len0 len1 len2 stk testing_stack_log
@@ -174,7 +168,6 @@ fun: testing_compiled_end { arg_len -- err } [ false try_all ]
   testing_compiled_reset
   " test failure" throw
   unreachable
-  nil
 end
 
 fun_comp: }T { -- err }
@@ -190,15 +183,13 @@ fun_comp: }T { -- err }
   true try_all
   compile' testing_compiled_end
   prev try_all
-
-  nil
 end
 
 \ ## Misc assertions
 
 fun: T_str_eq { act exp -- err }
   ifn exp then
-    ifn act then nil ret end
+    ifn act then ret end
     " expected string to be nil; got: %s" act errf throw
   end
 
@@ -206,7 +197,7 @@ fun: T_str_eq { act exp -- err }
     " unexpected nil string; expected: %s" exp errf throw
   end
 
-  if act exp cstr= then nil ret end
+  if act exp cstr= then ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
   " expected string: %s; actual string: %s" exp act errf
@@ -218,10 +209,8 @@ fun: T_err_contains { act exp -- err }
     exp errf throw
   end
 
-  if act exp strstr then nil ret end
+  if act exp strstr then ret end
 
   " expected error message to contain: %s; actual error message: %s"
   exp act errf throw
-
-  nil
 end

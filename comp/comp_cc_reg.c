@@ -313,19 +313,34 @@ static Err err_args_partial(
   );
 }
 
-static Err err_args_arity(const Sym *sym, const char *action, Sint req, Sint ava) {
+static Err err_args_arity(
+  const Sym *sym, const char *action, Sint min, Sint max, Sint ava
+) {
+  if (min == max) {
+    return errf(
+      "in " FMT_QUOTED " (%s): %s: arity mismatch: required: " FMT_SINT
+      ", provided: " FMT_SINT,
+      sym->name.buf,
+      wordlist_name(sym->wordlist),
+      action,
+      max,
+      ava
+    );
+  }
+
   return errf(
-    "in " FMT_QUOTED " (%s): %s: arity mismatch: required: " FMT_SINT
-    ", provided: " FMT_SINT,
+    "in " FMT_QUOTED " (%s): %s: arity mismatch: required: between " FMT_SINT
+    " and " FMT_SINT ", provided: " FMT_SINT,
     sym->name.buf,
     wordlist_name(sym->wordlist),
     action,
-    req,
+    min,
+    max,
     ava
   );
 }
 
-static Err comp_validate_args(Comp *comp, const char *action, Sint req) {
+static Err comp_validate_args(Comp *comp, const char *action, Sint min, Sint max) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
@@ -334,7 +349,10 @@ static Err comp_validate_args(Comp *comp, const char *action, Sint req) {
   const auto arg_len = ctx->arg_len;
 
   if (arg_low) return err_args_partial(sym, action, arg_low, arg_len);
-  if (req != arg_len) return err_args_arity(sym, action, req, arg_len);
+
+  if (!(arg_len >= min && arg_len <= max)) {
+    return err_args_arity(sym, action, min, max, arg_len);
+  }
   return nullptr;
 }
 
@@ -342,30 +360,17 @@ static Err comp_validate_call_args(Comp *comp, const Sym *callee) {
   const auto               name = &callee->name;
   static constexpr auto    cap  = 36 + arr_cap(name->buf);
   static thread_local char buf[cap];
+  const auto               len = callee->inp_len;
 
   snprintf(buf, cap, "unable to compile call to " FMT_QUOTED, name->buf);
-  return comp_validate_args(comp, buf, callee->inp_len);
-}
-
-static Err comp_validate_ret_args(Comp *comp) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to compile return", sym->out_len));
-
-  if (!sym->has_err) return nullptr;
-  if (sym->out_len) return nullptr;
-
-  return errf(
-    "unable to compile return: " FMT_QUOTED
-    " has error output but returns no outputs",
-    sym->name.buf
-  );
+  return comp_validate_args(comp, buf, len, len);
 }
 
 static Err comp_validate_recur_args(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to compile recursive call", sym->inp_len));
+  const auto len = sym->inp_len;
+  try(comp_validate_args(comp, "unable to compile recursive call", len, len));
   return nullptr;
 }
 
@@ -870,6 +875,36 @@ static Err comp_append_call_extern(Comp *comp, Sym *callee) {
   return nullptr;
 }
 
+static Err comp_before_append_ret(Comp *comp) {
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+
+  const U8 max = sym->out_len;
+  const U8 min = sym->has_err && max ? (U8)(max - 1) : max;
+
+  try(comp_validate_args(comp, "unable to compile return", min, max));
+
+  if (!sym->has_err) return nullptr;
+
+  const auto ctx     = &comp->ctx;
+  const auto len     = ctx->arg_len;
+  const U8   err_reg = min;
+
+  if (len != max) {
+    IF_DEBUG(assert(len == min));
+    asm_append_zero_reg(comp, min);
+    return nullptr;
+  }
+
+  const auto val = ctx->reg_vals[err_reg];
+  if (val.type != REG_VAL_IMM) return nullptr;
+  if (val.imm) return nullptr;
+
+  return errf(
+    "unable to compile return: redundant nil error; hint: the compiler implicitly inserts nil error values"
+  );
+}
+
 /*
 Used at every branch point to evict locals from parameter
 registers to their "stable" locations.
@@ -887,7 +922,7 @@ static Err comp_barrier(Comp *comp, Sint req) {
     return err_args_partial(sym, "in control flow", arg_low, arg_len);
   }
   if (req != arg_len) {
-    return err_args_arity(sym, "in control flow", req, arg_len);
+    return err_args_arity(sym, "in control flow", req, req, arg_len);
   }
   for (U8 reg = 0; reg < ceil; reg++) {
     comp_clear_tracked_arg_reg(comp, reg);
@@ -945,7 +980,7 @@ static Err comp_alloca_dynamic(Comp *comp) {
 static Err comp_alloca(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to `alloca`", 1));
+  try(comp_validate_args(comp, "unable to `alloca`", 1, 1));
 
   const auto ctx = &comp->ctx;
   const auto val = ctx->reg_vals[0];
@@ -1017,7 +1052,7 @@ static Err comp_append_throw(Comp *comp, const Sym *sym) {
       sym->name.buf
     );
   }
-  try(comp_validate_args(comp, "unable to `throw`", 1));
+  try(comp_validate_args(comp, "unable to `throw`", 1, 1));
   comp_clear_args(comp);
 
   const auto src_reg = ASM_PARAM_REG_0;

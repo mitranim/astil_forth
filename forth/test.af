@@ -15,7 +15,6 @@ fun: test_test { -- err }
   T{       <T>       }T
   T{ 10    <T> 10    }T
   T{ 10 20 <T> 10 20 }T
-  nil
 end
 test_test
 
@@ -25,7 +24,6 @@ fun: test_empty_comment { -- err }
   10 20 30
   { one two three }
   T{ one two three <T> 10 20 30 }T
-  nil
 end
 test_empty_comment
 
@@ -64,7 +62,6 @@ fun: test_locals { -- err }
   T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
   T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
   T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
-  nil
 end
 test_locals
 
@@ -104,7 +101,6 @@ fun: test_stack_primitives { -- err }
   T{ stk stack_len_cells <T> 0  }T
 
   stk stack_deinit
-  nil
 end
 test_stack_primitives
 
@@ -145,7 +141,6 @@ fun: test_to_stack_variadic { -- err }
   T{ stk stack_len_cells <T> 0  }T
 
   stk stack_deinit
-  nil
 end
 test_to_stack_variadic
 
@@ -173,7 +168,6 @@ fun: test_stack_braces { -- err }
   T{ stk stack_len_cells one two three <T> 0 10 20 30 }T
 
   stk stack_deinit
-  nil
 end
 test_stack_braces
 
@@ -197,7 +191,6 @@ fun: test_local_ref { -- err }
   21 adr0 ! 32 adr1 ! 43 adr2 !
   T{ val0   val1   val2   <T> 21 32 43 }T
   T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
-  nil
 end
 test_local_ref
 
@@ -206,7 +199,6 @@ fun: test_local_ref_volatile_immediate_read { -- err }
   { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
   ref' val { adr }    \ add x0, x29, 16
   T{ adr @ <T> 123 }T \ no junk data
-  nil
 end
 test_local_ref_volatile_immediate_read
 
@@ -217,7 +209,6 @@ fun: test_local_ref_volatile_delayed_read { -- err }
   { -- }
   ref' val { adr }    \ add x0, x29, 16
   T{ adr @ <T> 123 }T \ no junk data
-  nil
 end
 test_local_ref_volatile_delayed_read
 
@@ -244,7 +235,6 @@ fun: test_local_ref_volatile_with_inputs { -- err }
   \ Valid:   `ldr x0, [x29, 16]`.
   T{ val   <T> 234 }T
   T{ adr @ <T> 234 }T
-  nil
 end
 test_local_ref_volatile_with_inputs
 
@@ -277,7 +267,6 @@ fun: test_local_ref_volatile_with_outputs { -- err }
   \ Invalid: `mov x0, x2`.
   \ Valid:   `ldr x0, [x29, 16]`.
   T{ val <T> 567 }T
-  nil
 end
 test_local_ref_volatile_with_outputs
 
@@ -416,7 +405,6 @@ fun: test_conditionals { -- err }
     20
   }T
 
-  nil
 end
 test_conditionals
 
@@ -429,7 +417,6 @@ fun: test_switch_empty { -- err }
   T{ 0  switch_empty <T> 0  }T
   T{ 10 switch_empty <T> 20 }T
   T{ 20 switch_empty <T> 40 }T
-  nil
 end
 test_switch_empty
 
@@ -446,7 +433,6 @@ fun: test_switch_body_only { -- err }
   T{ -1 switch_body_only <T> 10 -1 25 }T
   T{ 30 switch_body_only <T> 10 30 25 }T
   T{ 40 switch_body_only <T> 10 40 25 }T
-  nil
 end
 test_switch_body_only
 
@@ -467,7 +453,6 @@ fun: test_switch_ret { -- err }
   T{ 20  switch_ret <T> 200 }T
   T{ 30  switch_ret <T> 300 }T
   T{ 123 switch_ret <T> 246 }T
-  nil
 end
 test_switch_ret
 
@@ -487,7 +472,6 @@ fun: test_switch_assign { -- err }
   T{ 20  switch_assign <T> 200 }T
   T{ 30  switch_assign <T> 300 }T
   T{ 123 switch_assign <T> 246 }T
-  nil
 end
 test_switch_assign
 
@@ -511,7 +495,6 @@ fun: test_switch_inner_statements { -- err }
   T{ 20  switch_inner_statements <T> 200 40 50 -1 -1 }T
   T{ 30  switch_inner_statements <T> 300 40 50 60 -1 }T
   T{ 123 switch_inner_statements <T> -1  40 50 60 70 }T
-  nil
 end
 test_switch_inner_statements
 
@@ -530,7 +513,6 @@ fun: test_switch_nested_if { -- err }
   T{ 10 false switch_nested_if <T> 300 }T
   T{ 20 true  switch_nested_if <T> 200 }T
   T{ 0  true  switch_nested_if <T> 999 }T
-  nil
 end
 test_switch_nested_if
 
@@ -556,7 +538,6 @@ fun: test_switch_nested { -- err }
   T{ 1 30 switch_nested <T> 199 }T
   T{ 2 10 switch_nested <T> 200 }T
   T{ 3 10 switch_nested <T> 999 }T
-  nil
 end
 test_switch_nested
 
@@ -572,7 +553,6 @@ fun: test_switch_output_one { -- err }
   T{ 10  switch_output_one <T> 100 }T
   T{ 20  switch_output_one <T> 200 }T
   T{ 123 switch_output_one <T> 246 }T
-  nil
 end
 test_switch_output_one
 
@@ -588,7 +568,6 @@ fun: test_switch_output_two { -- err }
   T{ 10 switch_output_two <T> 100 101 }T
   T{ 20 switch_output_two <T> 200 201 }T
   T{ 30 switch_output_two <T> 31  30  }T
-  nil
 end
 test_switch_output_two
 
@@ -606,7 +585,6 @@ fun: test_switch_output_nested_if { -- err }
   T{ 20 true  switch_output_nested_if <T> 200 }T
   T{ 20 false switch_output_nested_if <T> 400 }T
   T{ 0  true  switch_output_nested_if <T> 999 }T
-  nil
 end
 test_switch_output_nested_if
 
@@ -616,7 +594,6 @@ end
 
 fun: test_switch_output_body_only { -- err }
   T{ 10 switch_output_body_only <T> 11 }T
-  nil
 end
 test_switch_output_body_only
 
@@ -627,7 +604,6 @@ end
 
 fun: test_recursion { -- err }
   T{ 123 recursive_fun <T> 13 }T
-  nil
 end
 test_recursion
 
@@ -641,28 +617,27 @@ end
 
 fun: test_recur_reg_clobber { -- err }
   T{ 10 recur_reg_clobber_fun <T> 11 }T
-  nil
 end
 test_recur_reg_clobber
 
 fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
-  ifn val then 100 nil ret end
+  ifn val then 100 ret end
   if val 3 = then 0 " recur_err_non_try" ret end
   val dec recur
 end
 
 fun: recur_err_manual_try_fun { val -- out err } [ false try_all ]
-  ifn val then 100 nil ret end
+  ifn val then 100 ret end
   if val 3 = then 0 " recur_err_manual" ret end
   val dec recur try { out }
-  out nil
+  out
 end
 
 fun: recur_err_auto_try_fun { val -- out err } [ true try_all ]
-  ifn val then 100 nil ret end
+  ifn val then 100 ret end
   if val 3 = then 0 " recur_err_auto" ret end
   val dec recur { out }
-  out nil
+  out
 end
 
 fun: test_recur_with_err { -- err }
@@ -689,8 +664,6 @@ fun: test_recur_with_err { -- err }
 
   4 catch' recur_err_auto_try_fun { out4 err4 }
   err4 " recur_err_auto" T_str_eq
-
-  nil
 end
 test_recur_with_err
 
@@ -703,7 +676,6 @@ fun: test_loop_leave { -- err }
   T{ -1 { val } loop            leave abort             end val <T> -1 }T
   T{ -1 { val } loop 10 { val } leave abort             end val <T> 10 }T
   T{ -1 { val } loop 10 { val } leave abort leave abort end val <T> 10 }T
-  nil
 end
 test_loop_leave
 
@@ -725,7 +697,6 @@ fun: test_loop_nested { -- err }
   <T>
     10 20 30
   }T
-  nil
 end
 test_loop_nested
 
@@ -797,7 +768,6 @@ fun: test_loop_while { -- err }
   <T>
     0
   }T
-  nil
 end
 test_loop_while
 
@@ -808,7 +778,6 @@ fun: test_loop_while_leave { -- err }
   T{ -1 { val } loop 10 { val } true  while 20 { val } leave end val <T> 20 }T
   T{ -1 { val } loop 10 { val } true  while leave 20 { val } end val <T> 10 }T
   T{ -1 { val } loop leave 10 { val } true  while 20 { val } end val <T> -1 }T
-  nil
 end
 test_loop_while_leave
 
@@ -849,7 +818,6 @@ fun: test_loop_until { -- err }
   <T>
     9
   }T
-  nil
 end
 test_loop_until
 
@@ -908,7 +876,6 @@ fun: test_loop_for { -- err }
   <T>
     5
   }T
-  nil
 end
 test_loop_for
 
@@ -946,7 +913,6 @@ fun: test_loop_for_countdown { -- err }
   <T>
     7
   }T
-  nil
 end
 test_loop_for_countdown
 
@@ -1009,7 +975,6 @@ fun: test_loop_for_countup { -- err }
   <T>
     6
   }T
-  nil
 end
 test_loop_for_countup
 
@@ -1054,7 +1019,6 @@ fun: test_loop_countdown { -- err }
   \ Out of range from the start.
   0 { len }
   T{ 8 0 10 -loop: ind inc: len end len ind <T> 0 -2 }T
-  nil
 end
 test_loop_countdown
 
@@ -1104,7 +1068,6 @@ fun: test_loop_countup { -- err }
   \ Out of range from the start.
   0 { len }
   T{ 8 9 1 +loop: ind inc: len end len ind <T> 0 9 }T
-  nil
 end
 test_loop_countup
 
@@ -1117,7 +1080,6 @@ fun: test_loop_countup_nested { -- err }
   <T>
     4 7
   }T
-  nil
 end
 test_loop_countup_nested
 
@@ -1137,7 +1099,6 @@ fun: test_cont_loop { -- err }
     leave
   end
   T{ len <T> 7 }T
-  nil
 end
 test_cont_loop
 
@@ -1151,7 +1112,6 @@ fun: test_cont_for { -- err }
     leave
   end
   T{ len <T> 7 }T
-  nil
 end
 test_cont_for
 
@@ -1159,7 +1119,6 @@ test_cont_for
 fun: test_cont_for_countup { -- err }
   12 0 +for: ind cont end
   T{ ind <T> 12 }T
-  nil
 end
 test_cont_for_countup
 
@@ -1177,7 +1136,6 @@ fun: test_cont_loop_countdown { -- err }
   <T>
     3
   }T
-  nil
 end
 test_cont_loop_countdown
 
@@ -1195,7 +1153,6 @@ fun: test_cont_loop_countup { -- err }
   <T>
     5
   }T
-  nil
 end
 test_cont_loop_countup
 
@@ -1213,7 +1170,6 @@ fun: test_load_store { -- err }
   T{ VAR @     <T> 234 }T
   T{ 345 VAR ! <T>     }T
   T{ VAR @     <T> 345 }T
-  nil
 end
 test_load_store
 
@@ -1221,7 +1177,6 @@ fun: test_negate { -- err }
   T{ 0    negate <T> 0    }T
   T{ 123  negate <T> -123 }T
   T{ -123 negate <T> 123  }T
-  nil
 end
 test_negate
 
@@ -1235,7 +1190,6 @@ fun: test_equal { -- err }
   T{  123 -123 = <T> 0 }T
   T{ -123 -123 = <T> 1 }T
   T{  123  123 = <T> 1 }T
-  nil
 end
 test_equal
 
@@ -1248,7 +1202,6 @@ fun: test_not_equal { -- err }
   T{  123 -123 <> <T> 1 }T
   T{ -123 -123 <> <T> 0 }T
   T{  123  123 <> <T> 0 }T
-  nil
 end
 test_not_equal
 
@@ -1261,7 +1214,6 @@ fun: test_greater { -- err }
   T{  123 -123 > <T> 1 }T
   T{ -123 -123 > <T> 0 }T
   T{  123  123 > <T> 0 }T
-  nil
 end
 test_greater
 
@@ -1274,7 +1226,6 @@ fun: test_lesser { -- err }
   T{  123 -123 < <T> 0 }T
   T{ -123 -123 < <T> 0 }T
   T{  123  123 < <T> 0 }T
-  nil
 end
 test_lesser
 
@@ -1287,7 +1238,6 @@ fun: test_lesser_equal { -- err }
   T{  123 -123  <= <T> 0 }T
   T{ -123 -123  <= <T> 1 }T
   T{  123  123  <= <T> 1 }T
-  nil
 end
 test_lesser_equal
 
@@ -1300,7 +1250,6 @@ fun: test_greater_equal { -- err }
   T{  123 -123  >= <T> 1 }T
   T{ -123 -123  >= <T> 1 }T
   T{  123  123  >= <T> 1 }T
-  nil
 end
 test_greater_equal
 
@@ -1344,7 +1293,6 @@ fun: test_compare_many { -- err }
   T{ -1  0  1 u>none  <T> false }T
   T{ -1  0  1 u<=none <T> true  }T
   T{  0 -1  1 u<=none <T> false }T
-  nil
 end
 test_compare_many
 
@@ -1352,21 +1300,18 @@ fun: assert_ok { val -- err }
   assert
     val 10 =
   end
-  nil
 end
 
 fun: assert_fail { -- err }
   assert
     123 456 =
   end
-  nil
 end
 
 fun: test_assert { -- err }
   T{ 10 assert_ok <T> }T
   T{ catch' assert_fail { err } <T> }T
   err " assertion failed: 123 456 =" T_err_contains
-  nil
 end
 test_assert
 
@@ -1375,7 +1320,6 @@ fun: test_arith { -- err }
   T{ 234 123 + <T> 357   }T
   T{ 234 123 * <T> 28782 }T
   T{ 234 123 / <T> 1     }T
-  nil
 end
 test_arith
 
@@ -1396,7 +1340,6 @@ fun: test_comptime_stack_arith { -- err }
   T{ 10 20 30 + <>0 +                     <T> 11     }T
   T{ -123 abs 10 20 min 30 40 max + +     <T> 173    }T
   T{ 255 bit_len 256 bit_len +            <T> 17     }T
-  nil
 end
 test_comptime_stack_arith
 
@@ -1410,7 +1353,6 @@ fun: test_mod { -- err }
   T{ 12 7 mod <T> 5 }T
   T{ 12 8 mod <T> 4 }T
   T{ 12 9 mod <T> 3 }T
-  nil
 end
 test_mod
 
@@ -1424,7 +1366,6 @@ fun: test_slash_mod { -- err }
   T{ 12 7 /mod <T> 5 1  }T
   T{ 12 8 /mod <T> 4 1  }T
   T{ 12 9 /mod <T> 3 1  }T
-  nil
 end
 test_slash_mod
 
@@ -1432,7 +1373,6 @@ fun: test_abs { -- err }
   T{    0 abs <T>   0 }T
   T{ -123 abs <T> 123 }T
   T{  123 abs <T> 123 }T
-  nil
 end
 test_abs
 
@@ -1445,7 +1385,6 @@ fun: test_min { -- err }
   T{ -123  0   min <T> -123 }T
   T{ -123  234 min <T> -123 }T
   T{  234 -123 min <T> -123 }T
-  nil
 end
 test_min
 
@@ -1458,7 +1397,6 @@ fun: test_max { -- err }
   T{ -123  0   max <T>  0   }T
   T{ -123  234 max <T>  234 }T
   T{  234 -123 max <T>  234 }T
-  nil
 end
 test_max
 
@@ -1470,7 +1408,6 @@ fun: test_bit_len { -- err }
   T{ 8   bit_len <T> 4 }T
   T{ 255 bit_len <T> 8 }T
   T{ 256 bit_len <T> 9 }T
-  nil
 end
 test_bit_len
 
@@ -1481,13 +1418,11 @@ fun: test_cstr_eq { -- err }
   T{ " one" strdup " two" cstr= <T> false }T
   T{ " two" strdup " one" cstr= <T> false }T
   T{ " one" strdup " one" cstr= <T> true  }T
-  nil
 end
 test_cstr_eq
 
 fun: test_str_slice { -- err }
   T{ s" one" s" two" str= <T> false }T
-  nil
 end
 test_str_slice
 
@@ -1501,7 +1436,6 @@ fun: test_cstr_less { -- err }
   T{ " one" strdup " two" cstr< <T> true  }T
   T{ " two" strdup " one" cstr< <T> false }T
   T{ " one" strdup " one" cstr< <T> false }T
-  nil
 end
 test_cstr_less
 
@@ -1514,7 +1448,6 @@ fun: test_int_to_cell { -- err }
   T{ int32_negative             <T> 0xffff_ffff           }T
   T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
   T{ int32_negative int_to_cell <T> -1                    }T
-  nil
 end
 test_int_to_cell
 
@@ -1525,7 +1458,6 @@ end
 
 fun: test_comptime_arg_stack_sum16 { -- err }
   T{ test_comptime_arg_stack_sum16_fun <T> 120 }T
-  nil
 end
 test_comptime_arg_stack_sum16
 
@@ -1536,18 +1468,15 @@ end
 
 fun: test_comptime_arg_stack_mod_scratch { -- err }
   T{ test_comptime_arg_stack_mod_scratch_fun <T> 1038 }T
-  nil
 end
 test_comptime_arg_stack_mod_scratch
 
 fun_comp: test_comptime_arg_stack_local_set_x8_compile { -- err } ( E: -- val err )
   comp_local_anon { loc }
-  8 8 comp_load
-  8 loc comp_local_set
+  8 8             comp_load
+  8 loc           comp_local_set
   0 8 asm_mov_reg comp_instr
-  0 1 comp_load
-  2 comp_args_set
-  nil
+  1               comp_args_set
 end
 
 fun: test_comptime_arg_stack_local_set_x8_fun { -- val err }
@@ -1556,7 +1485,6 @@ end
 
 fun: test_comptime_arg_stack_local_set_x8 { -- err }
   T{ test_comptime_arg_stack_local_set_x8_fun <T> 8 }T
-  nil
 end
 test_comptime_arg_stack_local_set_x8
 
@@ -1578,7 +1506,6 @@ fun: test_comptime_arg_stack_to_stack_9 { -- err }
   T{ stk stack_len_cells <T> 0 }T
 
   stk stack_deinit
-  nil
 end
 test_comptime_arg_stack_to_stack_9
 
@@ -1592,7 +1519,6 @@ fun: test_fallback { -- err }
   T{ 10 0  fallback <T> 10 }T
   T{ 10 20 fallback <T> 20 }T
   T{ 20 10 fallback <T> 10 }T
-  nil
 end
 test_fallback
 
@@ -1606,7 +1532,6 @@ fun: test_fallback_decl { -- err }
   T{ 10 0  fallback: val val <T> 10 }T
   T{ 10 20 fallback: val val <T> 20 }T
   T{ 20 10 fallback: val val <T> 10 }T
-  nil
 end
 test_fallback_decl
 
@@ -1617,7 +1542,6 @@ fun: test_vargs_printf { -- err }
 
   s" numbers (should be 10 20 30): 10 20 30" { __ len }
   T{ printed <T> len }T
-  nil
 end
 \ test_vargs_printf
 
@@ -1638,7 +1562,6 @@ fun: test_strf { -- err }
   T{ buf cap " numbers: %zd %zd %zd" 10 20 30 strf <T> buf }T
   buf " numbers: 10 20 30" T_str_eq
 
-  nil
 end
 test_strf
 
@@ -1651,7 +1574,6 @@ fun: test_errf { -- err }
   T{ " codes: %zd %zd %zd" 40 50 60 errf <T> buf }T
   buf " codes: 40 50 60" T_str_eq
 
-  nil
 end
 test_errf
 
@@ -1674,7 +1596,6 @@ fun: test_try_multiple { -- err }
   T{ 10 20 nil nil try try <T> 10 20 }T
   T{ 10 20 nil try nil try <T> 10 20 }T
   T{ 10 20 nil try nil try nil <T> 10 20 nil }T
-  nil
 end
 test_try_multiple
 
@@ -1704,7 +1625,6 @@ fun: test_wrapf { -- err }
 
   err3 " four: 123: three: two: one" T_str_eq
 
-  nil
 end
 test_wrapf
 
@@ -1716,15 +1636,12 @@ fun: test_alloca { ptr -- err }
 
   234 ptr !
   T{ ptr @ <T> 234 }T
-
-  nil
 end
 
 fun: test_alloca_cell { -- err }
   CELL         alloca test_alloca
   size'   Cell alloca test_alloca
   alloca' Cell        test_alloca
-  nil
 end
 test_alloca_cell
 
@@ -1751,7 +1668,6 @@ fun: test_alloca_align { -- err }
   T{ adr3 <T> SP 64 - }T
   T{ adr4 <T> SP 80 - }T
   T{ adr5 <T> SP 112 - }T
-  nil
 end
 test_alloca_align
 
@@ -1768,7 +1684,6 @@ fun: test_alloca_big { -- err }
 
   T{ adr0 adr1 - <T> SIZE_BIG }T
   T{ adr1 adr2 - <T> SIZE_BIG }T
-  nil
 end
 test_alloca_big
 
@@ -1782,7 +1697,6 @@ fun: test_alloca_dynamic { size0 size1 -- err }
 
   adr0 @ { -- } \ Should not segfault.
   adr1 @ { -- } \ Should not segfault.
-  nil
 end
 32 64 test_alloca_dynamic
 
@@ -1825,7 +1739,6 @@ fun: test_array_sizes { -- err }
   T{ align' Arr4 <T> 1 }T
   T{ align' Arr5 <T> 2 }T
   T{ align' Arr6 <T> 1 }T
-  nil
 end
 test_array_sizes
 
@@ -1845,7 +1758,6 @@ fun: test_struct_fields_basic { -- err }
   T{ 234 Typ_field0 <T> 234 }T
   T{ 123 Typ_field1 <T> 131 }T
   T{ 234 Typ_field1 <T> 242 }T
-  nil
 end
 test_struct_fields_basic
 
@@ -1871,7 +1783,6 @@ fun: test_struct_fields_load_store { -- err }
   T{    ptr Typ_field1 @ <T> 20 }T
   T{ 40 ptr Typ_field1 ! <T>    }T
   T{    ptr Typ_field1 @ <T> 40 }T
-  nil
 end
 test_struct_fields_load_store
 
@@ -1880,7 +1791,6 @@ struct: Typ0 end
 fun: test_struct_0 { -- err }
   T{ size'  Typ0 <T> 0 }T
   T{ align' Typ0 <T> 0 }T
-  nil
 end
 test_struct_0
 
@@ -1892,7 +1802,6 @@ fun: test_struct_1 { -- err }
   T{ size'  Typ1    <T> 1   }T
   T{ align' Typ1    <T> 1   }T
   T{ 123 Typ1_field <T> 123 }T
-  nil
 end
 test_struct_1
 
@@ -1906,7 +1815,6 @@ fun: test_struct_2 { -- err }
   T{ align' Typ2     <T> 4   }T
   T{ 123 Typ2_field0 <T> 123 }T
   T{ 123 Typ2_field1 <T> 127 }T
-  nil
 end
 test_struct_2
 
@@ -1922,7 +1830,6 @@ fun: test_struct_3 { -- err }
   T{ nil Typ3_field1 <T> 4   }T
   T{ 123 Typ3_field0 <T> 123 }T
   T{ 123 Typ3_field1 <T> 127 }T
-  nil
 end
 test_struct_3
 
@@ -1938,7 +1845,6 @@ fun: test_struct_4 { -- err }
   T{ 123 Typ4_field0 <T> 123 }T
   T{ 123 Typ4_field1 <T> 127 }T
   T{ 123 Typ4_field2 <T> 131 }T
-  nil
 end
 test_struct_4
 
@@ -1954,7 +1860,6 @@ fun: test_struct_5 { -- err }
   T{ 123 Typ5_field0 <T> 123 }T
   T{ 123 Typ5_field1 <T> 127 }T
   T{ 123 Typ5_field2 <T> 131 }T
-  nil
 end
 test_struct_5
 
@@ -1970,7 +1875,6 @@ fun: test_struct_6 { -- err }
   T{ 123 Typ6_field0 <T> 123 }T
   T{ 123 Typ6_field1 <T> 131 }T
   T{ 123 Typ6_field2 <T> 139 }T
-  nil
 end
 test_struct_6
 
@@ -1988,7 +1892,6 @@ fun: test_struct_7 { -- err }
   T{ 123 Typ7_field1 <T> 131 }T
   T{ 123 Typ7_field2 <T> 135 }T
   T{ 123 Typ7_field3 <T> 139 }T
-  nil
 end
 test_struct_7
 
@@ -2006,7 +1909,6 @@ fun: test_struct_8 { -- err }
   T{ 123 Typ8_field1 <T> 124 }T
   T{ 123 Typ8_field2 <T> 125 }T
   T{ 123 Typ8_field3 <T> 127 }T
-  nil
 end
 test_struct_8
 
@@ -2020,7 +1922,6 @@ fun: test_struct_9 { -- err }
   T{ align' Typ9     <T> 1   }T
   T{ 123 Typ9_field0 <T> 123 }T
   T{ 123 Typ9_field1 <T> 124 }T
-  nil
 end
 test_struct_9
 
@@ -2038,7 +1939,6 @@ fun: test_struct_10 { -- err }
   T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
   T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
   T{ 123 Typ10_field3 <T> 139 }T
-  nil
 end
 test_struct_10
 
@@ -2052,7 +1952,6 @@ fun: test_struct_11 { -- err }
   T{ align' Typ11     <T> 8   }T
   T{ 123 Typ11_field0 <T> 123 }T
   T{ 123 Typ11_field1 <T> 139 }T
-  nil
 end
 test_struct_11
 
@@ -2069,18 +1968,17 @@ fun: test_catch_invalid { -- err } [ false try_all ]
   " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
   T_err_contains try
 
-  nil
 end
 test_catch_invalid
 
 \ Also equivalent to:
 \
 \   fun: test_throw { -- err } " test_err" end
-fun: test_throw { -- err } " test_err" throw nil end
+fun: test_throw { -- err } " test_err" throw end
 
 fun: test_catch_0_val { -- val err }
   if false then test_throw end
-  123 nil
+  123
 end
 
 fun: test_catch_0 { -- err }
@@ -2088,15 +1986,14 @@ fun: test_catch_0 { -- err }
   T{ catch' test_catch_0_val   <T> 123 nil }T
   T{ catch' test_throw { err } <T>         }T
   err " test_err" T_str_eq
-  nil
 end
 test_catch_0
 
 fun: test_catch_1_cond { one -- two err }
-  if one then one 2 * nil ret end
+  if one then one 2 * ret end
   test_throw
   unreachable
-  nil nil
+  nil
 end
 
 fun: test_catch_1 { -- err }
@@ -2108,7 +2005,6 @@ fun: test_catch_1 { -- err }
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ val <T> err }T
-  nil
 end
 test_catch_1
 
@@ -2119,12 +2015,12 @@ fun: test_catch_2_cond { one two -- three four err }
   if ok0 ok1 and then
     one two + { three }
     two one - { four  }
-    three four nil ret
+    three four ret
   end
 
   test_throw
   unreachable
-  nil nil nil
+  nil nil
 end
 
 fun: test_catch_2 { -- err }
@@ -2142,7 +2038,6 @@ fun: test_catch_2 { -- err }
 
   \ Accident of register allocation. We're not attached to this behavior.
   T{ one two <T> err 0 }T
-  nil
 end
 test_catch_2
 
@@ -2170,7 +2065,7 @@ test_explicit_err_0
 
 fun: test_explicit_err_1_fun { one -- two err }
   ifn one then test_throw end
-  one 2 * nil
+  one 2 *
 end
 
 \ Compare with `test_explicit_err_1` which is the actual test.
@@ -2180,7 +2075,6 @@ fun: test_explicit_err_1_fun_throwing { -- err }
   T{ 123 test_explicit_err_1_fun { val } <T>     }T
   T{ val                                 <T> 246 }T
   T{ 123 test_explicit_err_1_fun         <T> 246 }T
-  nil
 end
 test_explicit_err_1_fun_throwing
 
@@ -2195,13 +2089,12 @@ fun: test_explicit_err_1 { -- err } [ false try_all ]
   T{ 123 test_explicit_err_1_fun { val err } <T>         }T
   T{ val err                                 <T> 246 nil }T
   T{ 123 test_explicit_err_1_fun             <T> 246 nil }T
-  nil
 end
 test_explicit_err_1
 
 fun: test_explicit_err_2_fun { one two -- three err }
   ifn one then test_throw end
-  one two + nil
+  one two +
 end
 
 \ Compare with `test_explicit_err_2` which is the actual test.
@@ -2215,7 +2108,6 @@ fun: test_explicit_err_2_fun_throwing { -- err }
   T{ 11 0 test_explicit_err_2_fun { val } <T>    }T
   T{ val                                  <T> 11 }T
   T{ 11 0 test_explicit_err_2_fun         <T> 11 }T
-  nil
 end
 test_explicit_err_2_fun_throwing
 
@@ -2233,7 +2125,6 @@ fun: test_explicit_err_2 { -- err } [ false try_all ]
   T{ 11 0 test_explicit_err_2_fun { val err } <T>        }T
   T{ val err                                  <T> 11 nil }T
   T{ 11 0 test_explicit_err_2_fun             <T> 11 nil }T
-  nil
 end
 test_explicit_err_2
 
@@ -2241,7 +2132,7 @@ fun: test_explicit_err_3_fun { one -- two three err }
   ifn one then test_throw end
   one 2 *    { two }
   one negate { three }
-  two three nil
+  two three
 end
 
 \ Compare with `test_explicit_err_3` which is the actual test.
@@ -2253,7 +2144,6 @@ fun: test_explicit_err_3_fun_throwing { -- err }
   T{ 123 test_explicit_err_3_fun { one two } <T>          }T
   T{ one two                                 <T> 246 -123 }T
   T{ 123 test_explicit_err_3_fun             <T> 246 -123 }T
-  nil
 end
 test_explicit_err_3_fun_throwing
 
@@ -2273,7 +2163,6 @@ fun: test_explicit_err_3 { -- err } [ false try_all ]
   T{ 123 test_explicit_err_3_fun { one two err } <T>              }T
   T{ one two err                                 <T> 246 -123 nil }T
   T{ 123 test_explicit_err_3_fun                 <T> 246 -123 nil }T
-  nil
 end
 test_explicit_err_3
 
@@ -2281,7 +2170,7 @@ fun: test_explicit_err_4_fun { one two -- three four err }
   ifn one then test_throw end
   one two + { three }
   two one - { four }
-  three four nil
+  three four
 end
 
 \ Compare with `test_explicit_err_4` which is the actual test.
@@ -2295,7 +2184,6 @@ fun: test_explicit_err_4_fun_throwing { -- err }
   T{ 13 0 test_explicit_err_4_fun { one two } <T>        }T
   T{ one two                                  <T> 13 -13 }T
   T{ 13 0 test_explicit_err_4_fun             <T> 13 -13 }T
-  nil
 end
 test_explicit_err_4_fun_throwing
 
@@ -2314,7 +2202,6 @@ fun: test_explicit_err_4 { -- err } [ false try_all ]
   T{ 13 0 test_explicit_err_4_fun { one two err } <T>            }T
   T{ one two err                                  <T> 13 -13 nil }T
   T{ 13 0 test_explicit_err_4_fun                 <T> 13 -13 nil }T
-  nil
 end
 test_explicit_err_4
 
@@ -2324,17 +2211,15 @@ fun: test_max_input_regs { A B C D E F G H } end
 fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
 fun: test_max_output_regs { -- err } [ redefine ]
   T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
-  nil
 end
 test_max_output_regs
 
 fun: test_max_output_regs_with_err { -- A B C D E F G err }
   if false then test_throw end
-  0 1 2 3 4 5 6 nil
+  0 1 2 3 4 5 6
 end
 fun: test_max_output_regs_with_err { -- err } [ redefine ]
   T{ test_max_output_regs_with_err <T> 0 1 2 3 4 5 6 }T
-  nil
 end
 test_max_output_regs_with_err
 
@@ -2344,16 +2229,15 @@ fun: test_file_throw_import_catch { -- err } [ false try_all ]
 end
 test_file_throw_import_catch
 
-fun: test_signature_err_auto_callee { -- err } nil end
+fun: test_signature_err_auto_callee { -- err } end
 
 fun: test_signature_err_auto { -- err }
   T{ xt' test_signature_err_auto_callee Sym_has_err @b <T> true }T
   T{ xt' test_signature_err_auto_callee Sym_out_len @b <T> 1    }T
-  nil
 end
 test_signature_err_auto
 
-fun: test_has_err_not_auto_marked_callee { -- err } nil end
+fun: test_has_err_not_auto_marked_callee { -- err } end
 
 fun: test_has_err_not_auto_marked_caller { -- err_str } [ false try_all ]
   test_has_err_not_auto_marked_callee
@@ -2362,7 +2246,6 @@ end
 fun: test_has_err_not_auto_marked { -- err }
   T{ xt' test_has_err_not_auto_marked_callee Sym_has_err @b <T> true  }T
   T{ xt' test_has_err_not_auto_marked_caller Sym_has_err @b <T> false }T
-  nil
 end
 test_has_err_not_auto_marked
 
@@ -2471,7 +2354,7 @@ fun: test_switch_arity_no_default { -- err } [ false try_all ]
 end
 test_switch_arity_no_default
 
-fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN mem_unprot nil end
+fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN mem_unprot end
 
 fun: test_arena_alloc { -- err }
   alloca' Arena { arn }
@@ -2504,7 +2387,6 @@ fun: test_arena_alloc { -- err }
   T{ arn stack_len_bytes   <T> size' Stack 2 *     }T
 
   arn arena_deinit
-  nil
 end
 test_arena_alloc
 
@@ -2537,7 +2419,6 @@ fun: test_arena_trunc { -- err }
   T{ arn stack_len_bytes <T> size' Stack 2 * }T
 
   arn arena_deinit
-  nil
 end
 test_arena_trunc
 
@@ -2556,7 +2437,6 @@ fun: test_arena_deinit { -- err }
   adr1 catch' test_arena_unprot { err }
   T{ err <>0 <T> true }T
   err " unable to mprotect" T_err_contains
-  nil
 end
 test_arena_deinit
 
@@ -2571,14 +2451,12 @@ fun: test_arena_errors { -- err }
   nil arena_trunc
   nil arena_deinit
   arn arena_deinit
-  nil
 end
 test_arena_errors
 
 fun: test_word_len_over { -- err }
   s" ./test/test_word_len_over.af" catch' import { err }
   err " word length 128 exceeds max word length 127" T_err_contains
-  nil
 end
 test_word_len_over
 
@@ -2714,7 +2592,6 @@ fun: main_run { -- err }
   test_arena_trunc
   test_arena_deinit
   test_arena_errors
-  nil
 end
 
 fun: main { -- exit } [ false try_all ]

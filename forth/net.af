@@ -76,7 +76,7 @@ fun: net_addr_info { port -- ainf err }
     " unable to listen on port %s: no addrinfo available" port errf throw
   end
 
-  ainf nil
+  ainf
 end
 
 fun: sock_close { sock -- err }

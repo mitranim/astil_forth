@@ -77,7 +77,7 @@ static Err intrin_semicolon(Interp *interp) {
   const auto redef = interp->comp.ctx.redefining; // Snapshot before clearing.
 
 #ifndef CALL_CONV_STACK
-  try(comp_validate_ret_args(comp));
+  try(comp_before_append_ret(comp));
 #endif
 
   Sym *sym;

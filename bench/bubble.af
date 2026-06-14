@@ -40,7 +40,6 @@ fun: list_verify { list len -- err }
   +loop: ptr
     if ptr @2 > then " [bubble] not sorted" throw end
   end
-  nil
 end
 
 fun: bubble { list len }

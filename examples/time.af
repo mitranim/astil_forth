@@ -18,7 +18,5 @@ fun: main { -- err }
 
   " CPU  elapsed: " log clock log_int lf
   " Unix seconds: " log nil time log_int lf
-
-  nil
 end
 main

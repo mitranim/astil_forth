@@ -19,7 +19,5 @@ fun: main { -- err }
   thread thread_join try { err }
 
   " [main] received error: %s" err logf lf
-
-  nil
 end
 main

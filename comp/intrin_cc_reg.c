@@ -162,7 +162,7 @@ static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
 
 static Err intrin_ret(Interp *interp) {
   const auto comp = &interp->comp;
-  try(comp_validate_ret_args(comp));
+  try(comp_before_append_ret(comp));
   try(comp_append_ret(comp));
   comp_clear_args(comp);
   return nullptr;
@@ -427,7 +427,7 @@ static Err intrin_comp_signature_set(
 
 static Err intrin_comp_args_valid(Sint args, Sint action, Interp *interp) {
   try(interp_validate_data_ptr(action));
-  try(comp_validate_args(&interp->comp, (const char *)action, args));
+  try(comp_validate_args(&interp->comp, (const char *)action, args, args));
   return nullptr;
 }
 
@@ -444,7 +444,7 @@ static Err intrin_comp_args_min(Sint args, Interp *interp) {
     return err_args_partial(sym, msg, arg_low, arg_len);
   }
   if (arg_len < args) {
-    return err_args_arity(sym, msg, args, arg_len);
+    return err_args_arity(sym, msg, args, args, arg_len);
   }
   return nullptr;
 }

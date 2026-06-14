@@ -15,7 +15,7 @@ end
 fun: arena_init { arn } arn size' Arena erase end
 
 fun: arena_deinit { arn -- err }
-  ifn arn then nil ret end
+  ifn arn then ret end
 
   arn Stack_floor @ { floor }
   arn Stack_top   @ { ceil }
@@ -70,5 +70,5 @@ fun: arena_alloc { size arn -- adr err }
 
   adr size + page Stack_top !
   page arn Arena_low !
-  adr nil
+  adr
 end

@@ -191,14 +191,23 @@ In reg-CC, our error handling combines ergonomics and ABI compatibility:
 - Works across ABI boundaries between languages.
 - No unwinder; all control is local.
 
-By convention, if the last output parameter is named _exactly_ `err`, the compiler knows it's an error; this is similar to Swift's `throws` annotation. Either way, by default, errors are explicit values:
+By convention, if the last output parameter is named _exactly_ `err`, the compiler knows it's an error; this is similar to Swift's `throws` annotation. Either way, by default, errors are explicit values. They can be simply returned.
 
 ```forth
 fun: word { -- err }
   word0 { err }           if err then err ret end
   word1 { val0 err }      if err then err ret end
-  word2 { val1 val2 err } if err then err ret end
-  nil
+  word2 { val1 val2 err } err
+end
+```
+
+For ergonomics, the compiler automatically zeroes the error register if you don't explicitly return it:
+
+```forth
+fun: word { -- err }
+  word0 { val }           if val then     ret end
+  word1 { val0 err }      if err then err ret end
+  word2 { val1 val2 err } err
 end
 ```
 
@@ -209,7 +218,6 @@ fun: word { -- err }
   word0 try
   word1 try { val0 }
   word2 try { val1 val2 }
-  nil
 end
 ```
 
@@ -222,13 +230,12 @@ fun: word { -- err }
   word0
   word1 { val0 }
   word2 { val1 val2 }
-  nil
 end
 
 fun: word [ false try_all ] end \ Only inside this word.
 ```
 
-The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally). Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
+The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally), and make nil errors implicit. Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
 
 The above doesn't quite apply to stack-CC, which still treats errors as "exceptions".
 

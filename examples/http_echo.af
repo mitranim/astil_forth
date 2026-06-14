@@ -21,7 +21,7 @@ fun: read_req { conn buf cap -- len err }
 
   loop
     conn buf cap read { wrote }
-    ifn wrote then len nil ret end
+    ifn wrote then len ret end
 
     if wrote is_err_flag then
       errno { code }
@@ -33,7 +33,7 @@ fun: read_req { conn buf cap -- len err }
     leave
   end
 
-  len nil
+  len
 end
 
 fun: respond_conn { conn -- err }
@@ -50,7 +50,6 @@ fun: respond_conn { conn -- err }
   conn buf len               write_opt conn write_eol
 
   " [srv] echoed request back to client" elog elf
-  nil
 end
 
 fun: handle_conn { conn }
