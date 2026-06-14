@@ -12,6 +12,7 @@ convention. Intrinsics which do are located in dedicated files.
 #include "../clib/spawn.c"
 #include "./comp.c"
 #include "./interp_internal.c"
+#include "./sym.c"
 
 static Err err_nested_definition(const Interp *interp) {
   Sym *sym;
@@ -93,7 +94,10 @@ static Err intrin_semicolon(Interp *interp) {
 
   if (dict_has(dict, name) && !redef) {
     eprintf(
-      "[system] redefined word " FMT_QUOTED " in wordlist %d\n", name, wordlist
+      "[system] redefined word " FMT_QUOTED " in wordlist %d (%s)\n",
+      name,
+      wordlist,
+      wordlist_name(wordlist)
     );
   }
   dict_set(dict, name, sym);

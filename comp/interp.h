@@ -5,6 +5,7 @@
 #include "./read.h"
 #include "./sym.h"
 
+// SYNC[interp_snap_fields].
 typedef struct {
   Comp       comp;
   Sint_stack ints;
@@ -31,10 +32,7 @@ accesses the data stack via the interpreter object, rather than
 via a dedicated register, and hardcodes the field offsets which
 must be kept in sync.
 
-SYNC[interp_stack_offset].
-SYNC[interp_dict_offsets].
-SYNC[stack_field_offsets].
-SYNC[interp_module_offset].
+SYNC[interp_fields].
 */
 typedef struct {
   Sint_stack  ints;      // Forth integer stack.

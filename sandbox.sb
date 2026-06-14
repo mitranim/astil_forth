@@ -23,3 +23,9 @@
 (allow process-exec (literal (param "EXE0")))
 (allow process-exec (literal (param "EXE1")))
 (allow process-exec (literal (param "EXE2")))
+
+; Bots like to use `/tmp` for scratch.
+(allow file-read* (subpath "/tmp"))
+(allow file-write* (subpath "/tmp"))
+; (allow file-map-executable (subpath "/tmp"))
+; (allow process-exec (subpath "/tmp"))

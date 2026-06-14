@@ -19,8 +19,8 @@ typedef dict_of(Local *) Loc_dict;
 
 /*
 Transient context used in compilation of a single word.
-SYNC[comp_ctx_trunc].
-SYNC[comp_ctx_rewind].
+
+SYNC[comp_ctx_fields].
 */
 typedef struct {
   Sym       *sym;

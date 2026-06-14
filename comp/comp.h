@@ -88,12 +88,15 @@ typedef struct {
 } Comp_heap;
 
 // Invariants: `.addrs.len == stack_len(.names) == .inds.len`.
+//
+// SYNC[comp_syms_fields].
 typedef struct {
   U64_list           addrs; // References `Comp_heap.intrins` or `.externs`.
   stack_of(Word_str) names; // Backing storage for keys in `.inds`.
   Ind_dict           inds;  // Indexes in `.vals`; keys come from `.names`.
 } Comp_syms;
 
+// SYNC[comp_code_fields].
 typedef struct {
   Instr_heap *write;           // Writable non-executable instructions.
   Comp_heap  *heap;            // Executable code and data.
@@ -105,6 +108,7 @@ typedef struct {
   Ind         valid_instr_len; // Further instructions may be unpatched.
 } Comp_code;
 
+// SYNC[comp_fields].
 typedef struct {
   Comp_code code;
   Comp_ctx  ctx;

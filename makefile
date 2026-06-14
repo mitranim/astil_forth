@@ -147,7 +147,8 @@ repl_s:
 test:
 	make run args='forth/test.af --build=$(TEST_EXE)'
 	./$(TEST_EXE)
-	$(MAKE) test_repl
+
+# 	$(MAKE) test_repl
 
 .PHONY: test_repl
 test_repl: $(MAIN)

@@ -1621,6 +1621,8 @@ fun: test_comptime_arg_stack_to_stack_9 { -- err }
 end
 test_comptime_arg_stack_to_stack_9
 
+fun: fallback_high_regs_fun { keep one two -- keep out } keep one two fallback end
+
 fun: test_fallback { -- err }
   T{ 0  0  fallback <T> 0  }T
   T{ 0  1  fallback <T> 1  }T
@@ -1631,21 +1633,11 @@ fun: test_fallback { -- err }
   T{ 10 0  fallback <T> 10 }T
   T{ 10 20 fallback <T> 20 }T
   T{ 20 10 fallback <T> 10 }T
+
+  T{ 99 0 1 fallback_high_regs_fun <T> 99 1 }T
+  T{ 99 7 0 fallback_high_regs_fun <T> 99 7 }T
 end
 test_fallback
-
-fun: test_fallback_decl { -- err }
-  T{ 0  0  fallback: val val <T> 0  }T
-  T{ 0  1  fallback: val val <T> 1  }T
-  T{ 1  0  fallback: val val <T> 1  }T
-  T{ 0  -1 fallback: val val <T> -1 }T
-  T{ -1 0  fallback: val val <T> -1 }T
-  T{ 0  10 fallback: val val <T> 10 }T
-  T{ 10 0  fallback: val val <T> 10 }T
-  T{ 10 20 fallback: val val <T> 20 }T
-  T{ 20 10 fallback: val val <T> 10 }T
-end
-test_fallback_decl
 
 fun: test_vargs_printf { -- err }
   10 20 30 vargs{ " numbers (should be 10 20 30): %zd %zd %zd" printf }vargs
@@ -2609,6 +2601,8 @@ test_word_len_over
 
 s" ./test/test_import_empty.af" import
 
+import' ./test_const_fold.af
+
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
 \ interpreter-only features (currently none).
@@ -2681,7 +2675,6 @@ fun: main_run { -- err }
   test_comptime_arg_stack_local_set_x8
   test_comptime_arg_stack_to_stack_9
   test_fallback
-  test_fallback_decl
   \ test_vargs_printf
   \ test_logf
   \ test_elogf
@@ -2739,6 +2732,7 @@ fun: main_run { -- err }
   test_arena_trunc
   test_arena_deinit
   test_arena_errors
+  test_const_fold_all
 end
 
 fun: main { -- exit } [ false try_all ]

@@ -193,6 +193,12 @@ fun: invert { i0 -- i1 } [
   1 comp_args_set
 ] end
 
+fun: negate { i0 -- i1 } [
+  0 comp_clobber
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 comp_instr \ neg x0, x0
+  1 comp_args_set
+] end
+
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
 fun: inc { i0 -- i1 } [
   0 comp_clobber
@@ -207,17 +213,37 @@ fun: dec { i0 -- i1 } [
   1 comp_args_set
 ] end
 
+fun: + { i0 i1 -- i2 } [
+  0 comp_clobber
+  0b1_0_0_01011_00_0_00001_000000_00000_00000 comp_instr \ add x0, x0, x1
+  1 comp_args_set
+] end
+
+fun: - { i0 i1 -- i2 } [
+  0 comp_clobber
+  0b1_1_0_01011_00_0_00001_000000_00000_00000 comp_instr \ sub x0, x0, x1
+  1 comp_args_set
+] end
+
+fun: mod { i0 i1 -- i2 } [
+  0 comp_clobber
+  2 comp_clobber
+  0b1_0_0_11010110_00001_00001_1_00000_00010 comp_instr \ sdiv x2, x0, x1
+  0b1_00_11011_000_00001_1_00000_00010_00000 comp_instr \ msub x0, x2, x1, x0
+  1 comp_args_set
+] end
+
 fun: low_bits   { len      -- bits } 1 len lsl dec end
 fun: bit_trunc  { imm len  -- imm  } len low_bits imm and end
 fun: bits_clear { imm mask -- out  } mask invert imm and end
 
 \ ## Early assembler
 
-\ cmp Xn, <imm>
-fun: asm_cmp_imm { Xn imm -- instr }
-  imm  10 lsl { imm }
-  Xn   5  lsl
-  imm or
+\ cmp Xn, #imm12
+fun: asm_cmp_imm { Xn imm12 -- instr }
+  imm12  10 lsl { imm12 }
+  Xn     5  lsl
+  imm12 or
   0b1_1_1_100010_0_000000000000_00000_11111 or
 end
 
@@ -242,7 +268,7 @@ fun: asm_ccmp_reg { Xn Xm nzcv cond -- instr }
   0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 or
 end
 
-\ brk <imm16>
+\ brk #imm16
 fun: asm_brk { imm16 -- instr }
   imm16 5 lsl
   0b110_101_00_001_0000000000000000_000_00 or
@@ -329,73 +355,73 @@ end
 
 \ ## Assembler: memory ops
 
-\ ldp Xt1, Xt2, [Xn, <imm>]!
+\ ldp Xt1, Xt2, [Xn, #imm7]!
 fun: asm_load_pair_pre { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_011_1_0000000_00000_00000_00000 or
 end
 
-\ ldp Xt1, Xt2, [Xn], <imm>
+\ ldp Xt1, Xt2, [Xn], #imm7
 fun: asm_load_pair_post { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_001_1_0000000_00000_00000_00000 or
 end
 
-\ ldp Xt1, Xt2, [Xn, <imm>]
+\ ldp Xt1, Xt2, [Xn, #imm7]
 fun: asm_load_pair_off { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_010_1_0000000_00000_00000_00000 or
 end
 
-\ stp Xt1, Xt2, [Xn, <imm>]!
+\ stp Xt1, Xt2, [Xn, #imm7]!
 fun: asm_store_pair_pre { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_011_0_0000000_00000_00000_00000 or
 end
 
-\ stp Xt1, Xt2, [Xn], <imm>
+\ stp Xt1, Xt2, [Xn], #imm7
 fun: asm_store_pair_post { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_001_0_0000000_00000_00000_00000 or
 end
 
-\ stp Xt1, Xt2, [Xn, <imm>]
+\ stp Xt1, Xt2, [Xn, #imm7]
 fun: asm_store_pair_off { Xt1 Xt2 Xn imm7 -- instr }
   Xt1 Xt2 Xn imm7 asm_pattern_load_store_pair
   0b10_101_0_010_0_0000000_00000_00000_00000 or
 end
 
-\ ldr Xt, [Xn, <imm>]!
+\ ldr Xt, [Xn, #imm9]!
 fun: asm_load_pre { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_01_0_000000000_11_00000_00000 or
 end
 
-\ ldr Xt, [Xn], <imm>
+\ ldr Xt, [Xn], #imm9
 fun: asm_load_post { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_01_0_000000000_01_00000_00000 or
 end
 
-\ str Xt, [Xn, <imm>]!
+\ str Xt, [Xn, #imm9]!
 fun: asm_store_pre { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_00_0_000000000_11_00000_00000 or
 end
 
-\ str Xt, [Xn], <imm>
+\ str Xt, [Xn], #imm9
 fun: asm_store_post { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_00_0_000000000_01_00000_00000 or
 end
 
-\ ldur Xt, [Xn, <imm>]
+\ ldur Xt, [Xn, #imm9]
 fun: asm_load_unscaled_off { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_01_0_000000000_00_00000_00000 or
 end
 
-\ stur Xt, [Xn, <imm>]
+\ stur Xt, [Xn, #imm9]
 fun: asm_store_unscaled_off { Xt Xn imm9 -- instr }
   Xt Xn imm9 asm_pattern_load_store
   0b11_111_0_00_00_0_000000000_00_00000_00000 or
@@ -504,7 +530,7 @@ fun: asm_neg { Xd -- instr }
   0b1_1_0_01011_00_0_00000_000000_11111_00000 or
 end
 
-\ add Xd, Xn, <imm12>
+\ add Xd, Xn, #imm12
 fun: asm_add_imm { Xd Xn imm12 -- instr }
   Xd Xn imm12 asm_pattern_arith_imm
   0b1_0_0_100010_0_000000000000_00000_00000 or
@@ -522,7 +548,7 @@ fun: asm_adds_reg { Xd Xn Xm -- instr }
   0b0_0_1_00000000000000000000000000000 or
 end
 
-\ sub Xd, Xn, <imm12>
+\ sub Xd, Xn, #imm12
 fun: asm_sub_imm { Xd Xn imm12 -- instr }
   Xd Xn imm12 asm_pattern_arith_imm
   0b1_1_0_100010_0_000000000000_00000_00000 or
@@ -556,6 +582,19 @@ end
 fun: asm_and_reg { Xd Xn Xm -- instr }
   Xd Xn Xm asm_pattern_arith_reg
   0b1_00_01010_00_0_00000_000000_00000_00000 or
+end
+
+\ and Xd, Xn, #encoded_imm
+\
+\ Caller must pre-encode the immediate into the mask.
+\ Auto-encoding requires conditionals and maybe loops.
+\ TODO implement later.
+fun: asm_and_imm_enc { Xd Xn mask -- instr }
+  mask 10 lsl { mask }
+  Xn 5 lsl
+  Xd or
+  mask or
+  0b1_00_100100_0_000000_000000_00000_00000 or
 end
 
 \ mul Xd, Xn, Xm
@@ -628,6 +667,15 @@ fun: asm_lsl_reg { Xd Xn Xm -- instr }
   0b1_0_0_11010110_00000_0010_00_00000_00000 or
 end
 
+\ lsl Xd, Xn, #imm6
+fun: asm_lsl_imm { Xd Xn imm6 -- instr }
+  imm6 negate 64 mod 6 bit_trunc 16 lsl { immr }
+  63 imm6 -          6 bit_trunc 10 lsl { imms }
+  Xn 5 lsl
+  Xd or imms or immr or
+  0b1_10_100110_1_000000_000000_00000_00000 or
+end
+
 \ lsr Xd, Xn, Xm
 fun: asm_lsr_reg { Xd Xn Xm -- instr }
   Xd Xn Xm asm_pattern_arith_reg
@@ -670,7 +718,7 @@ fun: asm_cmp_branch_not_zero { Xt off19 -- instr }
 end
 
 \ Not supported on M3 Pro.
-\ cb.<cond> Xt, <imm>, <off>
+\ cb.<cond> Xt, #imm6, #off9
 fun: asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
   Xt off9 cond asm_pattern_cmp_branch_cond { mask }
   imm6 15 lsl
@@ -679,7 +727,7 @@ fun: asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
 end
 
 \ Not supported on M3 Pro.
-\ cb.<cond> Xt, Xm, <off>
+\ cb.<cond> Xt, Xm, #off9
 fun: asm_cmp_reg_branch { Xt Xm off9 cond -- instr }
   Xt off9 cond asm_pattern_cmp_branch_cond { mask }
   Xm 16 lsl
@@ -727,19 +775,19 @@ end
 
 \ ## Assembler: register selection
 
-fun: comp_args1_reg { -- dst err }
+fun: comp_args1_reg { -- reg err }
   1 nil comp_args_min
-  comp_args_get dec { dst }
-  dst comp_clobber
-  dst
+  comp_args_get dec { reg }
+  reg comp_clobber
+  reg
 end
 
-fun: comp_args2_regs { -- dst lhs rhs err }
+fun: comp_args2_regs { -- reg0 reg1 err }
   2 nil comp_args_min
-  comp_args_get dec { rhs }
-  rhs dec { lhs }
-  lhs comp_clobber
-  lhs lhs rhs
+  comp_args_get dec { reg1 }
+  reg1 dec { reg0 }
+  reg0 comp_clobber
+  reg0 reg1
 end
 
 fun: comp_args1_reg2 { -- out0 out1 src err }
@@ -763,134 +811,129 @@ end
 \ ## Arithmetic continued
 
 fun_comp: or { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_orr_reg comp_instr \ orr Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_orr_reg comp_instr \ orr Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: or { i0 i1 -- i2 } [ redefine ] i0 i1 or end
 
 fun_comp: and { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_and_reg comp_instr \ and Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: and { i0 i1 -- i2 } [ redefine ] i0 i1 and end
 
 fun_comp: xor { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_eor_reg comp_instr \ eor Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_eor_reg comp_instr \ eor Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: xor { i0 i1 -- i2 } [ redefine ] i0 i1 xor end
 
 fun_comp: lsl { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: lsl { i0 bits -- i1 } [ redefine ] i0 bits lsl end
 
 fun_comp: lsr { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: lsr { i0 bits -- i1 } [ redefine ] i0 bits lsr end
 
 fun_comp: invert { -- err }
-  comp_args1_reg { dst }
-  dst dst asm_mvn comp_instr \ mvn Xd, Xm
-  dst inc comp_args_set
+  comp_args1_reg { reg }
+  reg reg asm_mvn comp_instr \ mvn Xd, Xm
 end
 
 fun: invert { i0 -- i1 } [ redefine ] i0 invert end
 
+fun_comp: negate { -- err }
+  comp_args1_reg asm_neg comp_instr \ neg Xd, Xn
+end
+
+fun: negate { i0 -- i1 } [ redefine ] i0 negate end
+
 fun_comp: inc { -- err }
-  comp_args1_reg { dst }
-  dst dst 1 asm_add_imm comp_instr \ add Xd, Xn, #imm12
-  dst inc comp_args_set
+  comp_args1_reg { reg }
+  reg reg 1 asm_add_imm comp_instr \ add Xd, Xn, #imm12
 end
 
 fun: inc { i0 -- i1 } [ redefine ] i0 inc end
 
 fun_comp: dec { -- err }
-  comp_args1_reg { dst }
-  dst dst 1 asm_sub_imm comp_instr \ sub Xd, Xn, #imm12
-  dst inc comp_args_set
+  comp_args1_reg { reg }
+  reg reg 1 asm_sub_imm comp_instr \ sub Xd, Xn, #imm12
 end
 
 fun: dec { i0 -- i1 } [ redefine ] i0 dec end
 
-fun_comp: negate { -- err }
-  comp_args1_reg { dst }
-  dst asm_neg comp_instr \ neg Xd, Xn
-  dst inc comp_args_set
-end
-
-fun: negate { i0 -- i1 } i0 negate end
-
 fun_comp: + { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_add_reg comp_instr \ add Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_add_reg comp_instr \ add Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
-fun: + { i0 i1 -- i2 } i0 i1 + end
+fun: + { i0 i1 -- i2 } [ redefine ] i0 i1 + end
 
 fun_comp: - { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_sub_reg comp_instr \ sub Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_sub_reg comp_instr \ sub Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
-fun: - { i0 i1 -- i2 } i0 i1 - end
+fun: - { i0 i1 -- i2 } [ redefine ] i0 i1 - end
 
 fun_comp: * { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_mul comp_instr \ mul Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_mul comp_instr \ mul Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: * { i0 i1 -- i2 } i0 i1 * end
 
 fun_comp: / { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: / { i0 i1 -- i2 } i0 i1 / end
 
 fun_comp: u/ { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_udiv comp_instr \ udiv Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_udiv comp_instr \ udiv Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: u/ { i0 i1 -- i2 } i0 i1 u/ end
 
 fun_comp: asr { -- err }
-  comp_args2_regs { dst lhs rhs }
-  dst lhs rhs asm_asr_reg comp_instr \ asr Xd, Xn, Xm
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_asr_reg comp_instr \ asr Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: asr { i0 bits -- i1 } [ redefine ] i0 bits asr end
 
 fun_comp: mod { -- err }
-  comp_args2_regs { dst lhs rhs }
+  comp_args2_regs { reg0 reg1 }
   comp_scratch_reg { tmp }
-  tmp lhs rhs     asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
-  dst tmp rhs lhs asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
-  rhs comp_args_set
+  tmp reg0 reg1      asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
+  reg0 tmp reg1 reg0 asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  reg1 comp_args_set
 end
 
-fun: mod { i0 i1 -- i2 } i0 i1 mod end
+fun: mod { i0 i1 -- i2 } [ redefine ] i0 i1 mod end
 
 fun_comp: /mod { -- err }
   comp_args2_regs2 { rem quo dividend divisor }
@@ -898,71 +941,110 @@ fun_comp: /mod { -- err }
   tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
   quo dividend tmp     asm_sdiv    comp_instr \ sdiv Xd, Xn, Xm
   rem quo tmp dividend asm_msub    comp_instr \ msub Xd, Xn, Xm, Xa
-  quo inc comp_args_set
 end
 
 fun: /mod { dividend divisor -- rem quo } dividend divisor /mod end
 
 fun_comp: abs { -- err }
-  comp_args1_reg { dst }
-  dst                asm_cmp_zero comp_instr \ cmp Xn, #0
-  dst dst dst ASM_PL asm_csneg    comp_instr \ cneg Xd, Xn, cond
-  dst inc comp_args_set
+  comp_args1_reg { reg }
+  reg                asm_cmp_zero comp_instr \ cmp Xn, #0
+  reg reg reg ASM_PL asm_csneg    comp_instr \ cneg Xd, Xn, cond
 end
 
 fun: abs { int -- +int } int abs end
 
 fun_comp: min { -- err }
-  comp_args2_regs { dst lhs rhs }
-  lhs rhs            asm_cmp_reg comp_instr \ cmp Xn, Xm
-  dst lhs rhs ASM_LT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
+  reg0 reg0 reg1 ASM_LT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg1 comp_args_set
 end
 
 fun: min { i0 i1 -- i0|i1 } i0 i1 min end
 
 fun_comp: max { -- err }
-  comp_args2_regs { dst lhs rhs }
-  lhs rhs            asm_cmp_reg comp_instr \ cmp Xn, Xm
-  dst lhs rhs ASM_GT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
+  reg0 reg0 reg1 ASM_GT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg1 comp_args_set
 end
 
 fun: max { i0 i1 -- i0|i1 } i0 i1 max end
 
 fun_comp: bit_len { -- err }
-  comp_args1_reg { dst }
+  comp_args1_reg { reg }
   comp_scratch_reg { tmp }
-  dst dst     asm_clz     comp_instr \ clz Xd, Xn
+  reg reg     asm_clz     comp_instr \ clz Xd, Xn
   tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
-  dst tmp dst asm_sub_reg comp_instr \ sub Xd, Xn, Xm
-  dst inc comp_args_set
+  reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
 end
 
 fun: bit_len { val -- len } val bit_len end
 
-fun: align_down { len wid -- len } wid negate len and end
-fun: align_up   { len wid -- len } wid dec len + wid align_down end
+fun_comp: align_down { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg1           asm_neg     comp_instr \ neg Xd, Xd
+  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
+  reg1 comp_args_set
+end
+
+fun: align_down { len wid -- len } len wid align_down end
+
+\ Assumes power of two.
+fun_comp: align_up { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_add_reg comp_instr \ add Xd, Xn, Xm
+  reg0 reg0 1    asm_sub_imm comp_instr \ sub Xd, Xn, 1
+  reg1           asm_neg     comp_instr \ neg Xd, Xd
+  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
+  reg1 comp_args_set
+end
+
+fun: align_up { len wid -- len } len wid align_up end
+
+fun_comp: fallback { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg1 0                asm_cmp_imm comp_instr \ cmp x1, 0
+  reg0 reg1 reg0 ASM_NE asm_csel    comp_instr \ csel x0, x1, x0, ne
+  reg1 comp_args_set
+end
+
+\ Chooses a non-zero value, preferring the second input.
+fun: fallback { one two -- fallback } one two fallback end
 
 8 let: CELL
 
-fun: cells  { len  -- size } len 3 lsl  end
-fun: /cells { size -- len  } size 3 asr end
-fun: +cell  { adr  -- adr  } adr CELL + end
-fun: -cell  { adr  -- adr  } adr CELL - end
+fun_comp: cells { -- err }
+  comp_args1_reg { reg }
+  reg reg 3 asm_lsl_imm comp_instr \ lsl Xd, Xd, #shift
+end
+
+fun: cells { len -- size } len cells end
+
+fun_comp: /cells { -- err }
+  comp_args1_reg { reg }
+  reg reg 3 asm_asr_imm comp_instr \ asr Xd, Xd, #shift
+end
+
+fun: /cells { size -- len } size /cells end
+
+fun_comp: +cell { -- err }
+  comp_args1_reg { reg }
+  reg reg CELL asm_add_imm comp_instr \ add Xd, Xn, #imm12
+end
+
+fun: +cell { adr -- adr } adr +cell end
+
+fun_comp: -cell { -- err }
+  comp_args1_reg { reg }
+  reg reg CELL asm_sub_imm comp_instr \ sub Xd, Xn, #imm12
+end
+
+fun: -cell { adr -- adr } adr -cell end
 
 \ ## Assembler continued
 
-\ lsl Xd, Xn, <imm>
-fun: asm_lsl_imm { Xd Xn imm6 -- instr }
-  imm6 negate 64 mod 6 bit_trunc 16 lsl { immr }
-  63 imm6 -          6 bit_trunc 10 lsl { imms }
-  Xn 5 lsl
-  Xd or imms or immr or
-  0b1_10_100110_1_000000_000000_00000_00000 or
-end
-
-\ tbz Xt, <bit>, <imm>
+\ tbz Xt, #bit, #imm14
 fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
   imm14 2 lsr 14 bit_trunc 5 lsl { imm14 } \ Implicitly times 4.
   bit   5 lsr             31 lsl { b5 }
@@ -971,7 +1053,7 @@ fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
   0b0_01_101_1_0_00000_00000000000000_00000 or
 end
 
-\ adr Xd, <imm21>
+\ adr Xd, #imm21
 fun: asm_adr { Xd imm21 -- instr }
   imm21 0b11 and                 { low }
   imm21 2 lsr 19 bit_trunc 5 lsl { high }
@@ -1010,17 +1092,16 @@ fun: asm_orr_bit { Xd Xn bit -- instr }
 end
 
 fun: asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
-  comp_args2_regs { dst lhs rhs }
-  lhs rhs  asm_cmp_reg comp_instr \ cmp Xn, Xm
-  dst cond asm_cset    comp_instr \ cset Xd, cond
-  rhs comp_args_set
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg1 asm_cmp_reg comp_instr \ cmp Xn, Xm
+  reg0 cond asm_cset    comp_instr \ cset Xd, cond
+  reg1 comp_args_set
 end
 
 fun: asm_comp_cset_zero { cond -- err } ( E: num -- bool )
-  comp_args1_reg { dst }
-  dst      asm_cmp_zero comp_instr \ cmp Xn, #0
-  dst cond asm_cset     comp_instr \ cset Xd, cond
-  dst inc comp_args_set
+  comp_args1_reg { reg }
+  reg      asm_cmp_zero comp_instr \ cmp Xn, #0
+  reg cond asm_cset     comp_instr \ cset Xd, cond
 end
 
 \ sbfm Xd, Xn, immr, imms
@@ -1045,9 +1126,8 @@ fun: asm_sign_extend_32 { Xd Xn -- instr } Xd Xn 0 31 asm_bitfield_move end
 \ done manually, particularly when dealing with C words
 \ which return `(int)-1` which ends up being 0xffffffff.
 fun_comp: int_to_cell { -- err }
-  comp_args1_reg { dst }
-  dst dst asm_sign_extend_32 comp_instr \ sxtw Xd, Wn
-  dst inc comp_args_set
+  comp_args1_reg { reg }
+  reg reg asm_sign_extend_32 comp_instr \ sxtw Xd, Wn
 end
 
 fun: int_to_cell { int32 -- cell } int32 int_to_cell end
@@ -1085,7 +1165,13 @@ fun:      >=0 { num   -- bool } num >=0                   end
 true try_all
 
 fun: within { num one two -- bool } one num > num two > or =0 end
-fun: odd { i0 -- bool } i0 1 and end
+
+fun_comp: odd { -- err }
+  comp_args1_reg { reg }
+  reg reg 0b1_000000_000000 asm_and_imm_enc comp_instr \ and Xd, Xd, 1
+end
+
+fun: odd { val -- bool } val odd end
 
 \ ## Memory load / store
 
@@ -1188,7 +1274,6 @@ fun_comp: @@2 { -- err }
   comp_args2_regs2 { val0 val1 adr0 adr1 }
   val0 adr0 0 asm_load_off comp_instr \ ldr Xt, [Xn]
   val1 adr1 0 asm_load_off comp_instr \ ldr Xt, [Xn]
-  val1 inc comp_args_set
 end
 
 fun: @@2 { adr0 adr1 -- val0 val1 } adr0 adr1 @@2 end
@@ -1268,7 +1353,7 @@ fun: on!  { adr } true  adr ! end
 \ Default Forth stack provided by the interpreter.
 \ Not available when running in AOT-compiled mode.
 \
-\ SYNC[interp_stack_offset].
+\ SYNC[interp_fields].
 fun_comp: STACK { -- err } ( E: -- adr )
   \ mov <arg>, x28
   comp_next_arg_reg ASM_REG_INTERP asm_mov_reg comp_instr
@@ -1497,19 +1582,19 @@ end
 1 1 extern: malloc  ( size -- addr )
 1 0 extern: free    ( addr -- )
 3 0 extern: memset  ( buf char len -- )
-3 0 extern: memcpy  ( dst src len -- )
-3 0 extern: memmove ( dst src len -- )
+3 0 extern: memcpy  ( out src len -- )
+3 0 extern: memmove ( out src len -- )
 
 1 1 extern: strdup  ( cstr -- cstr )
 2 1 extern: strndup ( cstr len -- cstr )
 1 1 extern: strlen  ( cstr -- len )
 2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
 3 1 extern: strncmp ( str0 str1 len -- cmp )
-3 0 extern: strncpy ( dst src str_len -- )
-3 0 extern: strlcpy ( dst src buf_len -- )
+3 0 extern: strncpy ( out src str_len -- )
+3 0 extern: strlcpy ( out src buf_len -- )
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
 
-fun: move  { src dst len  } dst src len strncpy end
+fun: move  { src out len  } out src len strncpy end
 fun: fill  { buf len char } buf char len memset end
 fun: erase { buf len      } buf len 0 fill end
 
@@ -2304,6 +2389,524 @@ struct: Type
   U8   0 field: Type_name  \ Variable width; null-terminated.
 end
 
+\ ## Interpreter internals
+\
+\ Internal stuff not exposed via intrinsics.
+
+\ SYNC[set_fields].
+struct: Interp_set
+  U32 1 field: Interp_set_len
+  U32 1 field: Interp_set_cap
+  Adr 1 field: Interp_set_bits \ Cell*
+  Adr 1 field: Interp_set_vals \ Sym**
+end
+
+\ SYNC[word_str].
+struct: Sym_word
+  U32 1   field: Sym_word_len
+  U8  128 field: Sym_word_buf
+end
+
+\ SYNC[sym_fields].
+struct: Sym_instrs
+  U32 1 field: Sym_instrs_floor
+  U32 1 field: Sym_instrs_prologue
+  U32 1 field: Sym_instrs_inner
+  U32 1 field: Sym_instrs_epi_ok
+  U32 1 field: Sym_instrs_epi_err
+  U32 1 field: Sym_instrs_ret
+  U32 1 field: Sym_instrs_data
+  U32 1 field: Sym_instrs_ceil
+end
+
+\ SYNC[sym_fields].
+struct: Sym_norm
+  Adr        1 field: Sym_norm_exec
+  Sym_instrs 1 field: Sym_norm_spans
+  U8         1 field: Sym_norm_inlinable
+  U8         1 field: Sym_norm_has_loads
+  U8         1 field: Sym_norm_has_recur
+  U8         1 field: Sym_norm_has_alloca
+end
+
+\ Word metadata defined internally by the interpreter.
+\ Also execution token returned by `xt'` and `xt''`.
+\
+\ SYNC[sym_fields].
+struct: Sym
+  Cint       1 field: Sym_type
+  Sym_word   1 field: Sym_name
+  U8         1 field: Sym_wordlist
+  Sym_norm   1 field: Sym_union   \ Begins with executable instruction address.
+  Interp_set 1 field: Sym_callees \ set_of(Sym*)
+  Interp_set 1 field: Sym_callers \ set_of(Sym*)
+  Cell       1 field: Sym_clobber \ `Bits`
+  U8         1 field: Sym_inp_len
+  U8         1 field: Sym_out_len
+  U8         1 field: Sym_has_err
+  U8         1 field: Sym_comp_only
+  U8         1 field: Sym_interp_only
+end
+
+fun: sym_name { XT -- str } XT Sym_name Sym_word_buf end
+
+\ SYNC[sym_fields].
+fun: sym_instr { XT -- instr } XT Sym_union @ end
+
+\ For internal use below.
+fun: comp_word_instr { wordlist -- err } ( C: "name" -- ) ( E: -- instr )
+  wordlist next_word comp_push
+  compile' sym_instr
+end
+
+\ Similar to `xt'` and `xt''`, but instead of returning an execution token,
+\ which is `Sym *`, returns the address of the first executable instruction
+\ of the next word.
+\
+\ Intended for callbacks passed to foreign callers
+\ such as `pthread_create` or `qsort`.
+fun: instr' { -- instr err } execute' xt' sym_instr end
+
+fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
+  WORDLIST_EXEC comp_word_instr
+end
+
+fun_comp: instr'' { -- err } ( C: "name" -- ) ( E: -- instr )
+  WORDLIST_COMP comp_word_instr
+end
+
+\ This definition is assumed by stack operations defined earlier,
+\ and shared with the interpreter C code. See `## Stacks` above.
+\
+\ SYNC[stack_field_offsets].
+struct: Stack
+  Cell 1 field: Stack_bytelen
+  Adr  1 field: Stack_cellar
+  Adr  1 field: Stack_floor
+  Adr  1 field: Stack_top
+  Adr  1 field: Stack_ceil
+end
+
+\ SYNC[hash_table_structure].
+struct: Interp_dict
+  U32 1 field: Interp_dict_len
+  U32 1 field: Interp_dict_cap
+  Adr 1 field: Interp_dict_bits \ Cell*
+  Adr 1 field: Interp_dict_keys \ char**
+  Adr 1 field: Interp_dict_vals \ Sym**
+end
+
+\ SYNC[list_fields].
+struct: Interp_list
+  Adr 1 field: Interp_list_dat
+  U32 1 field: Interp_list_len
+  U32 1 field: Interp_list_cap
+end
+
+\ SYNC[interp_reader_fields].
+struct: Interp_reader
+  Cstr 1 field: Interp_reader_src
+  U32  1 field: Interp_reader_len
+  U32  1 field: Interp_reader_pos
+  Cstr 1 field: Interp_reader_path
+  U8   1 field: Interp_reader_tty
+end
+
+\ SYNC[interp_module_fields].
+struct: Interp_module_ctx
+  Interp_reader 1 field: Interp_module_reader
+  U8            1 field: Interp_module_try_all
+end
+
+\ SYNC[reg_val_types].
+1 let: REG_VAL_IMM
+2 let: REG_VAL_LOC
+
+\ SYNC[reg_val_fields].
+struct: Interp_reg_val
+  Cint 1 field: Interp_reg_val_type
+  U32  1 field: Interp_reg_val_pad
+  Cell 1 field: Interp_reg_val_imm
+  Adr  1 field: Interp_reg_val_loc
+  U32  1 field: Interp_reg_val_instr_floor
+  U32  1 field: Interp_reg_val_instr_ceil
+  U8   1 field: Interp_reg_val_can_backtrack
+end
+
+\ SYNC[comp_syms_fields].
+struct: Interp_comp_syms
+  Interp_list 1 field: Interp_comp_syms_addrs
+  Stack       1 field: Interp_comp_syms_names
+  Interp_dict 1 field: Interp_comp_syms_inds
+end
+
+\ SYNC[comp_code_fields].
+struct: Interp_comp_code
+  Adr              1 field: Interp_comp_code_write
+  Adr              1 field: Interp_comp_code_heap
+  Interp_list      1 field: Interp_comp_code_code_write
+  Interp_list      1 field: Interp_comp_code_code_exec
+  Interp_list      1 field: Interp_comp_code_data
+  Interp_comp_syms 1 field: Interp_comp_code_externs
+  Interp_comp_syms 1 field: Interp_comp_code_intrins
+  U32              1 field: Interp_comp_code_valid_instr_len
+end
+
+\ SYNC[comp_ctx_fields].
+struct: Interp_comp_ctx
+  Adr            1  field: Interp_comp_ctx_sym
+  Stack          1  field: Interp_comp_ctx_locals
+  Interp_dict    1  field: Interp_comp_ctx_local_dict
+  U32            1  field: Interp_comp_ctx_anon_locs
+  U32            1  field: Interp_comp_ctx_fp_off
+  Interp_reg_val 16 field: Interp_comp_ctx_reg_vals
+  Cell           1  field: Interp_comp_ctx_vol_regs
+  U8             1  field: Interp_comp_ctx_saved_reg
+  U8             1  field: Interp_comp_ctx_arg_low
+  U8             1  field: Interp_comp_ctx_arg_len
+end
+
+\ SYNC[comp_fields].
+struct: Interp_comp
+  Interp_comp_code 1 field: Interp_comp_code_field
+  Interp_comp_ctx  1 field: Interp_comp_ctx_field
+end
+
+\ SYNC[interp_snap_fields].
+struct: Interp_snap
+  Interp_comp 1 field: Interp_snap_comp
+  Stack       1 field: Interp_snap_ints
+  Stack       1 field: Interp_snap_syms
+end
+
+\ State of the outer C-based intepreter.
+\
+\ SYNC[interp_fields].
+struct: Interp
+  Stack       1 field: Interp_ints
+  Interp_dict 1 field: Interp_dict_exec
+  Interp_dict 1 field: Interp_dict_comp
+  Stack       1 field: Interp_sym
+  Adr         1 field: Interp_module \ Interp_module_ctx*
+  Interp_dict 1 field: Interp_imports
+  Interp_comp 1 field: Interp_comp_field
+  Interp_snap 1 field: Interp_snap_field
+  U8          1 field: Interp_welcomed
+end
+
+\ True if running in JIT mode (interpreter available).
+\ False if running in AOT-compiled mode.
+\
+\ In JIT mode, the outer interpreter (in C) always sets this register when
+\ calling into Forth. in AOT mode, the reg starts as zero when the OS runs
+\ the process, none of our compiled code modifies it, and locals are never
+\ assigned to this register.
+fun: has_interp { -- bool } [
+  0                           comp_clobber
+  ASM_REG_INTERP asm_cmp_zero comp_instr \ cmp x28, 0
+  0 ASM_NE       asm_cset     comp_instr \ cset x0, ne
+  1                           comp_args_set
+] end
+
+fun: interp { -- adr } [
+  true interp_only
+  0 ASM_REG_INTERP asm_mov_reg comp_instr
+  0 comp_clobber
+  1 comp_args_set
+] end
+
+\ ## Constant folding
+\
+\ When allocating values to registers, the outer compiler detects
+\ comptime immediates. We can access this by directly reading the
+\ compiler context, without the need for new intrinsics.
+\
+\ Then we can simply redefine our arithmetic words,
+\ wrapping them into new versions which detect such
+\ constants and fold them at comptime, falling back
+\ on the regular runtime arithmetic.
+
+fun: cf_comp_ctx { -- Interp_comp_ctx* }
+  interp Interp_comp_field Interp_comp_ctx_field
+end
+
+fun: cf_reg_val { reg -- Interp_reg_val* err }
+  cf_comp_ctx Interp_comp_ctx_reg_vals reg size' Interp_reg_val * +
+end
+
+fun: cf_writable_instrs { -- Interp_list* }
+  interp Interp_comp_field Interp_comp_code_field Interp_comp_code_code_write
+end
+
+fun: cf_code_len { -- len } cf_writable_instrs Interp_list_len @u32 end
+
+fun: cf_regs2 { -- reg0 reg1 err }
+  2 nil comp_args_min
+  comp_args_get dec { reg1 }
+  reg1 dec reg1
+end
+
+fun: cf_reg_val_foldable_imm { val -- imm ok }
+  if
+    val Interp_reg_val_type @cint REG_VAL_IMM =
+    val Interp_reg_val_can_backtrack @b and
+  then val Interp_reg_val_imm @ true
+  else 0 false
+  end
+end
+
+fun: cf_reg_val_current { val -- ok }
+  cf_code_len val Interp_reg_val_instr_ceil @u32 =
+end
+
+fun: cf_reg_vals_contiguous { val0 val1 -- ok }
+  cf_code_len                      { code_len }
+  val0 Interp_reg_val_instr_ceil  @u32 { cal0 }
+  val1 Interp_reg_val_instr_floor @u32 { floor1 }
+  val1 Interp_reg_val_instr_ceil  @u32 { ceil1 }
+  code_len ceil1 = cal0 floor1 = and
+end
+
+fun: cf_rewind_to_before_reg_val { val }
+  val Interp_reg_val_instr_floor @u32 { floor }
+  cf_writable_instrs { instrs }
+  floor instrs Interp_list_len !32
+end
+
+fun: cf_reg_val_clear { val } 0 val Interp_reg_val_type !cint end
+
+fun: cf_foldables2 { reg0 reg1 -- val0 val1 imm0 imm1 ok err }
+  reg0 cf_reg_val              { val0 }
+  reg1 cf_reg_val              { val1 }
+  val0 cf_reg_val_foldable_imm { imm0 ok0 }
+  val1 cf_reg_val_foldable_imm { imm1 ok1 }
+  ok0 ok1 and                  { both_const }
+
+  if ok0 ok1 and then
+    val0 val1 cf_reg_vals_contiguous { contiguous }
+    if contiguous then
+      val0 val1 imm0 imm1 true ret
+    end
+  end
+
+  0 0 0 0 false
+end
+
+fun: cf_fold_cleared1 { -- reg imm ok err }
+  1 nil comp_args_min
+  comp_args_get dec { reg }
+
+  reg cf_reg_val { val }
+  val cf_reg_val_foldable_imm { imm foldable }
+
+  ifn foldable then reg 0 false ret end
+  ifn val cf_reg_val_current then reg 0 false ret end
+
+  val cf_rewind_to_before_reg_val
+  val cf_reg_val_clear
+  reg imm true
+end
+
+fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
+  cf_regs2                { reg0 reg1 }
+  reg0 reg1 cf_foldables2 { val0 val1 imm0 imm1 ok }
+
+  ifn ok then 0 0 0 false ret end
+  val0 cf_rewind_to_before_reg_val
+  val1 cf_reg_val_clear
+  reg0 imm0 imm1 true
+end
+
+fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
+  cf_regs2                { reg0 reg1 }
+  reg0 reg1 cf_foldables2 { val0 val1 imm0 imm1 ok }
+
+  ifn ok then 0 0 0 0 false ret end
+  val0 cf_rewind_to_before_reg_val
+  val0 cf_reg_val_clear
+  val1 cf_reg_val_clear
+  reg0 reg1 imm0 imm1 true
+end
+
+fun: cf_fold_done { reg imm -- err }
+  imm reg comp_load
+  reg inc comp_args_set
+end
+
+fun: cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
+  imm0 reg0 comp_load
+  imm1 reg1 comp_load
+  reg1 inc comp_args_set
+end
+
+fun_comp: or { -- err } [ redefine ]
+  if cf_fold_cleared2 then or cf_fold_done else { -- } execute'' or end
+end
+
+fun_comp: and { -- err } [ redefine ]
+  if cf_fold_cleared2 then and cf_fold_done else { -- } execute'' and end
+end
+
+fun_comp: xor { -- err } [ redefine ]
+  if cf_fold_cleared2 then xor cf_fold_done else { -- } execute'' xor end
+end
+
+fun_comp: lsl { -- err } [ redefine ]
+  if cf_fold_cleared2 then lsl cf_fold_done else { -- } execute'' lsl end
+end
+
+fun_comp: lsr { -- err } [ redefine ]
+  if cf_fold_cleared2 then lsr cf_fold_done else { -- } execute'' lsr end
+end
+
+fun_comp: asr { -- err } [ redefine ]
+  if cf_fold_cleared2 then asr cf_fold_done else { -- } execute'' asr end
+end
+
+fun_comp: + { -- err } [ redefine ]
+  if cf_fold_cleared2 then + cf_fold_done else { -- } execute'' + end
+end
+
+fun_comp: - { -- err } [ redefine ]
+  if cf_fold_cleared2 then - cf_fold_done else { -- } execute'' - end
+end
+
+fun_comp: * { -- err } [ redefine ]
+  if cf_fold_cleared2 then * cf_fold_done else { -- } execute'' * end
+end
+
+fun_comp: / { -- err } [ redefine ]
+  if cf_fold_cleared2 then / cf_fold_done else { -- } execute'' / end
+end
+
+fun_comp: u/ { -- err } [ redefine ]
+  if cf_fold_cleared2 then u/ cf_fold_done else { -- } execute'' u/ end
+end
+
+fun_comp: mod { -- err } [ redefine ]
+  if cf_fold_cleared2 then mod cf_fold_done else { -- } execute'' mod end
+end
+
+fun_comp: /mod { -- err } [ redefine ]
+  if cf_fold_cleared2_keep2 then /mod cf_fold_done2 else { -- } execute'' /mod end
+end
+
+fun_comp: inc { -- err } [ redefine ]
+  if cf_fold_cleared1 then inc cf_fold_done else { -- } execute'' inc end
+end
+
+fun_comp: dec { -- err } [ redefine ]
+  if cf_fold_cleared1 then dec cf_fold_done else { -- } execute'' dec end
+end
+
+fun_comp: negate { -- err } [ redefine ]
+  if cf_fold_cleared1 then negate cf_fold_done else { -- } execute'' negate end
+end
+
+fun_comp: invert { -- err } [ redefine ]
+  if cf_fold_cleared1 then invert cf_fold_done else { -- } execute'' invert end
+end
+
+fun_comp: abs { -- err } [ redefine ]
+  if cf_fold_cleared1 then abs cf_fold_done else { -- } execute'' abs end
+end
+
+fun_comp: bit_len { -- err } [ redefine ]
+  if cf_fold_cleared1 then bit_len cf_fold_done else { -- } execute'' bit_len end
+end
+
+fun_comp: min { -- err } [ redefine ]
+  if cf_fold_cleared2 then min cf_fold_done else { -- } execute'' min end
+end
+
+fun_comp: max { -- err } [ redefine ]
+  if cf_fold_cleared2 then max cf_fold_done else { -- } execute'' max end
+end
+
+fun_comp: int_to_cell { -- err } [ redefine ]
+  if cf_fold_cleared1 then int_to_cell cf_fold_done else { -- } execute'' int_to_cell end
+end
+
+fun_comp: =0 { -- err } [ redefine ]
+  if cf_fold_cleared1 then =0 cf_fold_done else { -- } execute'' =0 end
+end
+
+fun_comp: <>0 { -- err } [ redefine ]
+  if cf_fold_cleared1 then <>0 cf_fold_done else { -- } execute'' <>0 end
+end
+
+fun_comp: <0 { -- err } [ redefine ]
+  if cf_fold_cleared1 then <0 cf_fold_done else { -- } execute'' <0 end
+end
+
+fun_comp: >0 { -- err } [ redefine ]
+  if cf_fold_cleared1 then >0 cf_fold_done else { -- } execute'' >0 end
+end
+
+fun_comp: <=0 { -- err } [ redefine ]
+  if cf_fold_cleared1 then <=0 cf_fold_done else { -- } execute'' <=0 end
+end
+
+fun_comp: >=0 { -- err } [ redefine ]
+  if cf_fold_cleared1 then >=0 cf_fold_done else { -- } execute'' >=0 end
+end
+
+fun_comp: = { -- err } [ redefine ]
+  if cf_fold_cleared2 then = cf_fold_done else { -- } execute'' = end
+end
+
+fun_comp: <> { -- err } [ redefine ]
+  if cf_fold_cleared2 then <> cf_fold_done else { -- } execute'' <> end
+end
+
+fun_comp: > { -- err } [ redefine ]
+  if cf_fold_cleared2 then > cf_fold_done else { -- } execute'' > end
+end
+
+fun_comp: < { -- err } [ redefine ]
+  if cf_fold_cleared2 then < cf_fold_done else { -- } execute'' < end
+end
+
+fun_comp: <= { -- err } [ redefine ]
+  if cf_fold_cleared2 then <= cf_fold_done else { -- } execute'' <= end
+end
+
+fun_comp: >= { -- err } [ redefine ]
+  if cf_fold_cleared2 then >= cf_fold_done else { -- } execute'' >= end
+end
+
+fun_comp: cells { -- err } [ redefine ]
+  if cf_fold_cleared1 then cells cf_fold_done else { -- } execute'' cells end
+end
+
+fun_comp: /cells { -- err } [ redefine ]
+  if cf_fold_cleared1 then /cells cf_fold_done else { -- } execute'' /cells end
+end
+
+fun_comp: +cell { -- err } [ redefine ]
+  if cf_fold_cleared1 then +cell cf_fold_done else { -- } execute'' +cell end
+end
+
+fun_comp: -cell { -- err } [ redefine ]
+  if cf_fold_cleared1 then -cell cf_fold_done else { -- } execute'' -cell end
+end
+
+fun_comp: odd { -- err } [ redefine ]
+  if cf_fold_cleared1 then odd cf_fold_done else { -- } execute'' odd end
+end
+
+fun_comp: align_down { -- err } [ redefine ]
+  if cf_fold_cleared2 then align_down cf_fold_done else { -- } execute'' align_down end
+end
+
+fun_comp: align_up { -- err } [ redefine ]
+  if cf_fold_cleared2 then align_up cf_fold_done else { -- } execute'' align_up end
+end
+
+fun_comp: fallback { -- err } [ redefine ]
+  if cf_fold_cleared2 then fallback cf_fold_done else { -- } execute'' fallback end
+end
+
 \ ## More memory stuff
 
 \ Some `libc` functions return -1 as 32-bit `0xffff_ffff`, while some others,
@@ -2352,18 +2955,6 @@ end
 fun: mem_unprot { addr size -- err } addr size PROT_RW mem_prot end
 
 \ ## Stacks continued
-
-\ This definition is assumed by stack operations defined earlier.
-\ See the section `## Stacks` above.
-\
-\ SYNC[stack_field_offsets].
-struct: Stack
-  Cell 1 field: Stack_bytelen
-  Adr  1 field: Stack_cellar
-  Adr  1 field: Stack_floor
-  Adr  1 field: Stack_top
-  Adr  1 field: Stack_ceil
-end
 
 \ Initializes a stack with guards. Note: the memory is acquired from the OS
 \ and is NOT managed by the compiler. When used for global variables, their
@@ -3094,150 +3685,7 @@ end
 fun: .s STACK stack_log_cells end
 fun: .sc .s STACK stack_trunc end
 
-\ ## Interpreter internals
-\
-\ Internal stuff not exposed via intrinsics.
-
-\ SYNC[set_fields].
-struct: Interp_set
-  U32 1 field: Interp_set_len
-  U32 1 field: Interp_set_cap
-  Adr 1 field: Interp_set_bits \ Cell*
-  Adr 1 field: Interp_set_vals \ Sym**
-end
-
-\ SYNC[word_str].
-struct: Sym_word
-  U32 1   field: Sym_word_len
-  U8  128 field: Sym_word_buf
-end
-
-\ SYNC[sym_fields].
-struct: Sym_instrs
-  U32 1 field: Sym_instrs_floor
-  U32 1 field: Sym_instrs_prologue
-  U32 1 field: Sym_instrs_inner
-  U32 1 field: Sym_instrs_epi_ok
-  U32 1 field: Sym_instrs_epi_err
-  U32 1 field: Sym_instrs_ret
-  U32 1 field: Sym_instrs_data
-  U32 1 field: Sym_instrs_ceil
-end
-
-\ SYNC[sym_fields].
-struct: Sym_norm
-  Adr        1 field: Sym_norm_exec
-  Sym_instrs 1 field: Sym_norm_spans
-  U8         1 field: Sym_norm_inlinable
-  U8         1 field: Sym_norm_has_loads
-  U8         1 field: Sym_norm_has_recur
-  U8         1 field: Sym_norm_has_alloca
-end
-
-\ Word metadata defined internally by the interpreter.
-\ Also execution token returned by `xt'` and `xt''`.
-\
-\ SYNC[sym_fields].
-struct: Sym
-  Cint       1 field: Sym_type
-  Sym_word   1 field: Sym_name
-  U8         1 field: Sym_wordlist
-  Sym_norm   1 field: Sym_union   \ Begins with executable instruction address.
-  Interp_set 1 field: Sym_callees \ set_of(Sym*)
-  Interp_set 1 field: Sym_callers \ set_of(Sym*)
-  Cell       1 field: Sym_clobber \ `Bits`
-  U8         1 field: Sym_inp_len
-  U8         1 field: Sym_out_len
-  U8         1 field: Sym_has_err
-  U8         1 field: Sym_comp_only
-  U8         1 field: Sym_interp_only
-end
-
-fun: sym_name { XT -- str } XT Sym_name Sym_word_buf end
-
-\ SYNC[sym_fields].
-fun: sym_instr { XT -- instr } XT Sym_union @ end
-
-\ For internal use below.
-fun: comp_word_instr { wordlist -- err } ( C: "name" -- ) ( E: -- instr )
-  wordlist next_word comp_push
-  compile' sym_instr
-end
-
-\ Similar to `xt'` and `xt''`, but instead of returning an execution token,
-\ which is `Sym *`, returns the address of the first executable instruction
-\ of the next word.
-\
-\ Intended for callbacks passed to foreign callers
-\ such as `pthread_create` or `qsort`.
-fun: instr' { -- instr err } execute' xt' sym_instr end
-
-fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
-  WORDLIST_EXEC comp_word_instr
-end
-
-fun_comp: instr'' { -- err } ( C: "name" -- ) ( E: -- instr )
-  WORDLIST_COMP comp_word_instr
-end
-
-\ SYNC[hash_table_structure].
-struct: Interp_dict
-  U32 1 field: Interp_dict_len
-  U32 1 field: Interp_dict_cap
-  Adr 1 field: Interp_dict_bits \ Cell*
-  Adr 1 field: Interp_dict_keys \ char**
-  Adr 1 field: Interp_dict_vals \ Sym**
-end
-
-\ SYNC[interp_dict_offsets].
-\ SYNC[interp_module_offset].
-\
-\ Caution: this struct definition is incomplete.
-struct: Interp
-  Stack       1 field: Interp_ints
-  Interp_dict 1 field: Interp_dict_exec
-  Interp_dict 1 field: Interp_dict_comp
-  Stack       1 field: Interp_sym
-  Adr         1 field: Interp_module \ Interp_module_ctx*
-
-  \ ... Other fields elided until we need them.
-end
-
-\ SYNC[interp_reader_fields].
-struct: Interp_reader
-  Cstr 1 field: Interp_reader_src
-  U32  1 field: Interp_reader_len
-  U32  1 field: Interp_reader_pos
-  Cstr 1 field: Interp_reader_path
-  U8   1 field: Interp_reader_tty
-end
-
-\ SYNC[interp_module_fields].
-struct: Interp_module_ctx
-  Interp_reader 1 field: Interp_module_reader
-  U8            1 field: Interp_module_try_all
-end
-
-\ True if running in JIT mode (interpreter available).
-\ False if running in AOT-compiled mode.
-\
-\ In JIT mode, the outer interpreter (in C) always sets this register when
-\ calling into Forth. in AOT mode, the reg starts as zero when the OS runs
-\ the process, none of our compiled code modifies it, and locals are never
-\ assigned to this register.
-fun: has_interp { -- bool } [
-  0                           comp_clobber
-  ASM_REG_INTERP asm_cmp_zero comp_instr \ cmp x28, 0
-  0 ASM_NE       asm_cset     comp_instr \ cset x0, ne
-  1                           comp_args_set
-] end
-
-fun: interp { -- adr } [
-  true interp_only
-  0 ASM_REG_INTERP asm_mov_reg comp_instr
-  0 comp_clobber
-  1 comp_args_set
-] end
+\ ## Dictionary introspection
 
 fun: wordlist_log { dict list_num list_name }
   dict Interp_dict_len @u32 { len }
@@ -3434,22 +3882,6 @@ end
 
 \ Comptime analogue of top-level `import'`.
 fun_comp: import' { -- err } read_word comp_str compile' import end
-
-\ Chooses a non-zero value, preferring the second input.
-fun: fallback { one two -- fallback } [
-  0                     comp_clobber
-  1 0 asm_cmp_imm       comp_instr \ cmp x1, 0
-  0 1 0 ASM_NE asm_csel comp_instr \ csel x0, x1, x0, ne
-  1                     comp_args_set
-] end
-
-\ TODO support any amount of inputs.
-fun_comp: fallback: { -- err } ( E: one two -- fallback )
-  compile' fallback
-  read_word comp_local_named { loc }
-  0 loc comp_local_set \ mov <loc>, x0 | str x0, [FP, <loc>]
-  0     comp_args_set
-end
 
 \ For internal use below. Each `ccmp` runs only if previous test didn't pass;
 \ otherwise it sets condition flags to our `nzcv` fallback. The final `cset`

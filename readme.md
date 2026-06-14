@@ -350,6 +350,7 @@ In reg-CC:
 - Elide relocations of parameter locals when possible.
 - Associate locals with param regs, reuse when possible.
 - Keep track of clobbers, preserve caller-saved registers when possible.
+- Fold comptime constants in most arithmetic words.
 - ...Other small tricks. Some are word-specific.
 
 ## Register allocation and greediness

@@ -45,7 +45,7 @@ static Err comp_ctx_init(Comp_ctx *ctx) {
   return nullptr;
 }
 
-// SYNC[comp_ctx_trunc].
+// SYNC[comp_ctx_fields].
 static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->asm_fix);
   stack_trunc(&ctx->locals);
@@ -58,7 +58,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->redefining);
 }
 
-// SYNC[comp_ctx_rewind].
+// SYNC[comp_ctx_fields].
 static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
   // Can't rewind dictionary state.
   const auto len = prev->local_dict.len;
@@ -74,7 +74,7 @@ static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
   return nullptr;
 }
 
-// SYNC[comp_ctx_rewind].
+// SYNC[comp_ctx_fields].
 static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->sym        = prev->sym;
   next->anon_locs  = prev->anon_locs;

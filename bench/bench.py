@@ -158,6 +158,12 @@ bench("fib_rec_cl_sbcl", "bench/fib_rec.lisp", "sbcl --script bench/fib_rec.lisp
 bench("fib_rec_pypy", "bench/fib_rec.py", "pypy3 bench/fib_rec.py", tools=("pypy3",))
 bench("fib_rec_python", "bench/fib_rec.py", "python3 bench/fib_rec.py", tools=("python3",))
 
+section("CONST FOLD")
+bench("const_fold_folded_astil_aot", "bench/const_fold_folded.af", "bench/const_fold_folded_astil.exe", setup=aot("bench/const_fold_folded.af", "bench/const_fold_folded_astil.exe"), tools=("clang",))
+bench("const_fold_runtime_astil_aot", "bench/const_fold_runtime.af", "bench/const_fold_runtime_astil.exe", setup=aot("bench/const_fold_runtime.af", "bench/const_fold_runtime_astil.exe"), tools=("clang",))
+bench("const_fold_folded_astil_reg", "bench/const_fold_folded.af", "./astil.exe bench/const_fold_folded.af", setup=(BUILD,), tools=("clang",))
+bench("const_fold_runtime_astil_reg", "bench/const_fold_runtime.af", "./astil.exe bench/const_fold_runtime.af", setup=(BUILD,), tools=("clang",))
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()

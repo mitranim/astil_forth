@@ -121,6 +121,9 @@ typedef struct {
 typedef stack_of(Loc_fixup) Loc_fixups;
 
 // Value associated with a register.
+//
+// SYNC[reg_val_fields].
+// SYNC[reg_val_types].
 typedef struct {
   enum { REG_VAL_IMM = 1, REG_VAL_LOC } type;
 
@@ -131,8 +134,9 @@ typedef struct {
   // When consuming a constant at compile time via `alloca`, this allows us to
   // backtrack, deleting the previously-assembled instructions which move that
   // constant to an argument register.
-  Ind instr_floor;
-  Ind instr_ceil;
+  Ind  instr_floor;
+  Ind  instr_ceil;
+  bool can_backtrack;
 } Reg_val;
 
 /*
@@ -145,8 +149,7 @@ and its outputs go back into the data stack. All of this happens without
 any effects on the compile-time context by default. Some immediate words
 choose to affect compilation by invoking various compiler intrinsics.
 
-SYNC[comp_ctx_trunc].
-SYNC[comp_ctx_rewind].
+SYNC[comp_ctx_fields].
 */
 typedef struct {
   Sym       *sym;                       // What we're currently compiling.

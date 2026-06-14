@@ -3,6 +3,7 @@
 #include "./num.h"
 #include <string.h>
 
+// SYNC[list_fields].
 typedef struct {
   void *dat;
   Ind   len;
@@ -16,6 +17,7 @@ typedef struct {
 } Span;
 */
 
+// SYNC[list_fields].
 #define list_of(Elem) \
   struct {            \
     Elem *dat;        \

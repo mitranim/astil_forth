@@ -5,6 +5,7 @@
 #include "../clib/path.c"
 #include "./comp.c"
 #include "./read.c"
+#include "./sym.c"
 #include <dlfcn.h>
 #include <stdio.h>
 
@@ -679,9 +680,10 @@ static Err interp_extern_fun(
 
   if (had && !interp->comp.ctx.redefining) {
     eprintf(
-      "[system] redefined word " FMT_QUOTED " in wordlist %d (as extern)\n",
+      "[system] redefined word " FMT_QUOTED " in wordlist %d (%s) (as extern)\n",
       sym->name.buf,
-      wordlist
+      wordlist,
+      wordlist_name(wordlist)
     );
   }
 

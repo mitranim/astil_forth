@@ -1,0 +1,26 @@
+import' std:lang.af
+
+\ BOT-GENERATED
+
+1 24 lsl let: RUNS
+214 RUNS * let: EXPECT
+
+fun: runtime_const { seed -- val }
+  seed seed - 11 + 22 + 333 + 44 - 5 * 6 / 7 mod 8 lsl 9 or 10 xor 3 and
+  40 max 50 min 4 cells + 24 /cells + 0 99 fallback + 37 8 align_up +
+end
+
+fun: runtime_step { acc -- out }
+  acc runtime_const acc +
+end
+
+fun: main { -- exit }
+  0 { acc }
+
+  RUNS for
+    acc runtime_step { acc }
+  end
+
+  if acc EXPECT <> then 1 else 0 end
+end
+main

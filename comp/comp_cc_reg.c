@@ -95,7 +95,7 @@ static Err comp_ctx_init(Comp_ctx *ctx) {
   return nullptr;
 }
 
-// SYNC[comp_ctx_trunc].
+// SYNC[comp_ctx_fields].
 static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->loc_fix);
   stack_trunc(&ctx->asm_fix);
@@ -116,7 +116,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->try_all);
 }
 
-// SYNC[comp_ctx_rewind].
+// SYNC[comp_ctx_fields].
 static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
   // Can't rewind dictionary state.
   const auto len = prev->local_dict.len;
@@ -132,7 +132,7 @@ static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
   return nullptr;
 }
 
-// SYNC[comp_ctx_rewind].
+// SYNC[comp_ctx_fields].
 static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->sym        = prev->sym;
   next->anon_locs  = prev->anon_locs;
@@ -757,6 +757,7 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) 
   const auto instrs = &comp->code.code_write;
   const auto floor  = instrs->len;
 
+  if (!has_load) has_load = &(bool){};
   asm_append_imm_to_reg(comp, reg, imm, has_load);
 
   const auto ceil = instrs->len;
@@ -764,10 +765,11 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) 
   aver(!ctx->reg_vals[reg].type);
 
   ctx->reg_vals[reg] = (Reg_val){
-    .type        = REG_VAL_IMM,
-    .imm         = imm,
-    .instr_floor = floor,
-    .instr_ceil  = ceil,
+    .type          = REG_VAL_IMM,
+    .imm           = imm,
+    .instr_floor   = floor,
+    .instr_ceil    = ceil,
+    .can_backtrack = !*has_load,
   };
 
   IF_DEBUG(eprintf(
@@ -986,7 +988,7 @@ static Err comp_alloca(Comp *comp) {
   const auto ctx = &comp->ctx;
   const auto val = ctx->reg_vals[0];
 
-  if (val.type == REG_VAL_IMM) {
+  if (val.type == REG_VAL_IMM && val.can_backtrack) {
     try(comp_alloca_const(comp, val));
   }
   else {
