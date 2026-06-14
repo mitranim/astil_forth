@@ -431,14 +431,15 @@ static Err intrin_comp_args_valid(Sint args, Sint action, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_comp_args_min(Sint args, Interp *interp) {
+static Err intrin_comp_args_min(Sint args, Sint action, Interp *interp) {
   Sym *sym;
   try(comp_require_current_sym(&interp->comp, &sym));
+  if (action) try(interp_validate_data_ptr(action));
 
   const auto ctx     = &interp->comp.ctx;
   const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
-  const auto msg     = "invalid argument count";
+  const auto msg     = action ? (const char *)action : "invalid argument count";
 
   if (arg_low) {
     return err_args_partial(sym, msg, arg_low, arg_len);
@@ -486,8 +487,9 @@ initializing their own locals or otherwise using the available arguments.
 This validates that there are no unused arguments, and clobbers each temp
 register-local association. Might eventually get a more general mechanism.
 */
-static Err intrin_comp_barrier(Sint req, Interp *interp) {
-  try(comp_barrier(&interp->comp, req));
+static Err intrin_comp_barrier(Sint req, Sint action, Interp *interp) {
+  if (action) try(interp_validate_data_ptr(action));
+  try(comp_barrier(&interp->comp, (const char *)action, req));
   return nullptr;
 }
 
@@ -745,7 +747,7 @@ static const USED auto INTRIN_COMP_ARGS_MIN = (Sym){
   .name.buf  = "comp_args_min",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_min,
-  .inp_len   = 1,
+  .inp_len   = 2,
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
@@ -792,7 +794,7 @@ static const USED auto INTRIN_COMP_BARRIER = (Sym){
   .name.buf  = "comp_barrier",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_barrier,
-  .inp_len   = 1,
+  .inp_len   = 2,
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,

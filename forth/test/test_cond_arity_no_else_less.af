@@ -1,0 +1,6 @@
+import' ../lang.af
+
+fun: test_cond_arity_no_else_less_fail { val flag -- out }
+  val flag if then { val } end
+end
+

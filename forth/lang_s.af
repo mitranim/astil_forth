@@ -1127,19 +1127,20 @@ end
 \ chains by prepending a `nop` XT.
 
 fun: reserve_instr ASM_PLACEHOLDER comp_instr end
-fun: reserve_cond ( -- adr )     asm_pop_x1 comp_instr here_write reserve_instr end
+fun: reserve_here ( -- adr ) here_write reserve_instr end
+fun: reserve_cond ( -- adr ) asm_pop_x1 comp_instr reserve_here end
 fun: off_to_pc    ( adr -- off ) here_write swap - end \ For forward jumps.
 fun: off_from_pc  ( adr -- off ) here_write      - end \ For backward jumps.
 fun: patch_branch_forward ( adr -- ) dup off_to_pc asm_branch swap !32 end \ b <off>
 fun: patch_branch_back    ( adr -- ) off_from_pc   asm_branch swap !32 end \ b <off>
 
-fun: if_pop ( prev_fun if_adr -- )
+fun: if_pop ( nop if_adr -- )
   \ cbz x1, <else|end>
   dup off_to_pc 1 swap asm_cmp_branch_zero swap !32
   execute
 end
 
-fun: ifn_pop ( prev_fun ifn_adr  -- )
+fun: ifn_pop ( nop ifn_adr -- )
   \ cbnz x1, <else|end>
   dup off_to_pc 1 swap asm_cmp_branch_not_zero swap !32
   execute
@@ -1151,12 +1152,10 @@ fun_comp: then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) reserve_cond swap e
 
 fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward execute end
 
-fun_comp: else
-  ( C: if_adr if_fun -- else_adr else_fun )
-  here_write to: adr
-  reserve_instr
-  xt' nop -rot \ Isolate the top frame to prevent chaining.
-  execute      \ Pop the top frame including the nop.
+fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
+  reserve_here to: adr
+  xt' nop -rot
+  execute
   adr xt' else_pop
 end
 
@@ -1241,7 +1240,7 @@ end
 fun_comp: leave
   ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
   stack_len to: len
-  here_write reserve_instr xt' else_pop len loop_aux
+  reserve_here xt' else_pop len loop_aux
 end
 
 \ Breaks out of any loop.
@@ -1290,11 +1289,11 @@ fun: for_countdown_loop_init
   cur comp_pop_local_set \ Grab the initial ceiling value.
 
   here_write to: loop_adr
-  1 cur asm_local_get     comp_instr    \ ldr x1, [FP, <cur>]
-  1     asm_cmp_zero      comp_instr    \ cmp x1, 0
-  here_write to: cond_adr reserve_instr \ b.<cond> <end>
-  1 1 1 asm_sub_imm       comp_instr    \ sub x1, x1, 1
-  1 cur asm_local_set     comp_instr    \ str x1, [FP, <cur>]
+  1 cur asm_local_get       comp_instr \ ldr x1, [FP, <cur>]
+  1     asm_cmp_zero        comp_instr \ cmp x1, 0
+  reserve_here to: cond_adr            \ b.<cond> <end>
+  1 1 1 asm_sub_imm         comp_instr \ sub x1, x1, 1
+  1 cur asm_local_set       comp_instr \ str x1, [FP, <cur>]
 
   loop_adr cond_adr xt' for_countdown_loop_pop
 end
@@ -1352,9 +1351,9 @@ fun: comp_count_loop_init ( loc_cur loc_lim -- loop_adr cond_adr loc_cur )
   2 lim asm_local_get comp_instr \ ldr x2, [FP, <loc>]
   1 2   asm_cmp_reg   comp_instr \ cmp x1, x2
 
-  here_write to: cond_adr
-  reserve_instr \ b.<cond> <end>
-  loop_adr cond_adr cur
+  loop_adr
+  reserve_here \ b.<cond> <end>
+  cur
 end
 
 \ A count-up-by-one loop. Analogue of the standard `?do … loop` idiom.

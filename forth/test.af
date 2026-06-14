@@ -408,6 +408,72 @@ fun: test_conditionals { -- err }
 end
 test_conditionals
 
+fun: cond_input_if { val flag -- out } val flag if then end end
+fun: cond_input_ifn { val flag -- out } val flag ifn then end end
+fun: cond_input_if_else { val flag -- out } val flag if then else end end
+
+fun: cond_input_elif { val flag0 flag1 -- out }
+  val flag0 if then
+  elif flag1 then
+  else
+  end
+end
+
+fun: cond_input_elifn { val flag0 flag1 -- out }
+  val flag0 if then
+  elifn flag1 then
+  else
+  end
+end
+
+fun: cond_input_elif_diff { flag0 flag1 -- out0 out1 }
+  flag0 if then 10 11
+  elif 20 flag1 then 30
+  else 40
+  end
+end
+
+fun: cond_input_elif_diff_no_else { flag0 flag1 -- out }
+  flag0 if then 10
+  elif 20 flag1 then
+  end
+end
+
+fun: cond_input_max { A B C D E F G flag -- A B C D E F G }
+  A B C D E F G flag if then end
+end
+
+fun: test_cond_input_arity { -- err }
+  T{ 123 false cond_input_if <T> 123 }T
+  T{ 123 true  cond_input_if <T> 123 }T
+
+  T{ 234 false cond_input_ifn <T> 234 }T
+  T{ 234 true  cond_input_ifn <T> 234 }T
+
+  T{ 345 false cond_input_if_else <T> 345 }T
+  T{ 345 true  cond_input_if_else <T> 345 }T
+
+  T{ 456 false false cond_input_elif <T> 456 }T
+  T{ 456 false true  cond_input_elif <T> 456 }T
+  T{ 456 true  false cond_input_elif <T> 456 }T
+
+  T{ 567 false false cond_input_elifn <T> 567 }T
+  T{ 567 false true  cond_input_elifn <T> 567 }T
+  T{ 567 true  false cond_input_elifn <T> 567 }T
+
+  T{ false false cond_input_elif_diff <T> 20 40 }T
+  T{ false true  cond_input_elif_diff <T> 20 30 }T
+  T{ true  false cond_input_elif_diff <T> 10 11 }T
+
+  T{ false false cond_input_elif_diff_no_else <T> 20 }T
+  T{ false true  cond_input_elif_diff_no_else <T> 20 }T
+  T{ true  false cond_input_elif_diff_no_else <T> 10 }T
+
+  T{ 0 1 2 3 4 5 6 false cond_input_max <T> 0 1 2 3 4 5 6 }T
+  T{ 0 1 2 3 4 5 6 true  cond_input_max <T> 0 1 2 3 4 5 6 }T
+end
+test_cond_input_arity
+
 fun: switch_empty { val -- out }
   val switch end
   val 2 *
@@ -596,6 +662,52 @@ fun: test_switch_output_body_only { -- err }
   T{ 10 switch_output_body_only <T> 11 }T
 end
 test_switch_output_body_only
+
+fun: switch_input_empty { val key -- out }
+  val key switch end
+end
+
+fun: switch_input_body { val key -- out0 out1 }
+  val key switch 30 end
+end
+
+fun: switch_input_case { val key -- out0 out1 }
+  val key switch
+    30 case 40 end
+    50
+  end
+end
+
+fun: switch_input_case_empty { val key -- out }
+  val key switch
+    30 case end
+  end
+end
+
+fun: switch_input_max_case { key -- out }
+  0 1 2 3 4 5 6 7 8 9 10 11 12 13 key switch
+    99 case 100 end
+    200
+  end
+  { A B C D E F G H I J K L M N out -- }
+  out
+end
+
+fun: test_switch_input_arity { -- err }
+  T{ 10 20 switch_input_empty <T> 10 }T
+
+  T{ 10 20 switch_input_body <T> 10 30 }T
+
+  T{ 10 20 switch_input_case <T> 10 50 }T
+  T{ 10 30 switch_input_case <T> 10 40 }T
+
+  T{ 10 20 switch_input_case_empty <T> 10 }T
+  T{ 10 30 switch_input_case_empty <T> 10 }T
+
+  T{ 0  switch_input_max_case <T> 200 }T
+  T{ 99 switch_input_max_case <T> 100 }T
+end
+test_switch_input_arity
 
 fun: recursive_fun { val -- val }
   if val 13 <= then val ret end
@@ -2314,21 +2426,21 @@ test_partial_assign
 
 fun: test_cond_arity_bare_if { -- err } [ false try_all ]
   import' ./test/test_cond_arity_bare_if.af
-  " in `test_cond_arity_bare_if_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 0, provided: 1"
+  " conditional with outputs requires final `else`"
   T_err_contains
 end
 test_cond_arity_bare_if
 
 fun: test_cond_arity_else_mismatch { -- err } [ false try_all ]
   import' ./test/test_cond_arity_else_mismatch.af
-  " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 2, provided: 1"
+  " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): when ending conditional branch: arity mismatch: required: 2, provided: 1"
   T_err_contains
 end
 test_cond_arity_else_mismatch
 
 fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
   import' ./test/test_cond_arity_elif_mismatch.af
-  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 1, provided: 2"
+  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): when calling `else`: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_cond_arity_elif_mismatch
@@ -2340,16 +2452,51 @@ fun: test_cond_arity_no_else { -- err } [ false try_all ]
 end
 test_cond_arity_no_else
 
+fun: test_cond_arity_no_else_less { -- err } [ false try_all ]
+  import' ./test/test_cond_arity_no_else_less.af
+  " in `test_cond_arity_no_else_less_fail` (WORDLIST_EXEC): when ending conditional branch: arity mismatch: required: 1, provided: 0"
+  T_err_contains
+end
+test_cond_arity_no_else_less
+
+fun: test_cond_arity_no_else_more { -- err } [ false try_all ]
+  import' ./test/test_cond_arity_no_else_more.af
+  " in `test_cond_arity_no_else_more_fail` (WORDLIST_EXEC): when ending conditional branch: arity mismatch: required: 1, provided: 2"
+  T_err_contains
+end
+test_cond_arity_no_else_more
+
 fun: test_switch_arity_case_mismatch { -- err } [ false try_all ]
   import' ./test/test_switch_arity_case_mismatch.af
-  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 1, provided: 2"
+  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): when ending `case`: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_switch_arity_case_mismatch
 
+fun: test_switch_arity_input_case_mismatch { -- err } [ false try_all ]
+  import' ./test/test_switch_arity_input_case_mismatch.af
+  " in `test_switch_arity_input_case_mismatch_fail` (WORDLIST_EXEC): when ending `switch`: arity mismatch: required: 2, provided: 1"
+  T_err_contains
+end
+test_switch_arity_input_case_mismatch
+
+fun: test_switch_arity_input_cases_mismatch { -- err } [ false try_all ]
+  import' ./test/test_switch_arity_input_cases_mismatch.af
+  " in `test_switch_arity_input_cases_mismatch_fail` (WORDLIST_EXEC): when ending `case`: arity mismatch: required: 2, provided: 3"
+  T_err_contains
+end
+test_switch_arity_input_cases_mismatch
+
+fun: test_switch_arity_input_case_too_many { -- err } [ false try_all ]
+  import' ./test/test_switch_arity_input_case_too_many.af
+  " unable to compile `case`: too many arguments: 15 registers available, 16 arguments provided"
+  T_err_contains
+end
+test_switch_arity_input_case_too_many
+
 fun: test_switch_arity_no_default { -- err } [ false try_all ]
   import' ./test/test_switch_arity_no_default.af
-  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): in control flow: arity mismatch: required: 1, provided: 0"
+  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): when ending `switch`: arity mismatch: required: 1, provided: 0"
   T_err_contains
 end
 test_switch_arity_no_default

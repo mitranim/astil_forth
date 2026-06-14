@@ -728,14 +728,14 @@ end
 \ ## Assembler: register selection
 
 fun: comp_args1_reg { -- dst err }
-  1 comp_args_min
+  1 nil comp_args_min
   comp_args_get dec { dst }
   dst comp_clobber
   dst
 end
 
 fun: comp_args2_regs { -- dst lhs rhs err }
-  2 comp_args_min
+  2 nil comp_args_min
   comp_args_get dec { rhs }
   rhs dec { lhs }
   lhs comp_clobber
@@ -743,7 +743,7 @@ fun: comp_args2_regs { -- dst lhs rhs err }
 end
 
 fun: comp_args1_reg2 { -- out0 out1 src err }
-  1 comp_args_min
+  1 nil comp_args_min
   comp_args_get dec { src }
   src inc { out1 }
   src  comp_clobber
@@ -752,7 +752,7 @@ fun: comp_args1_reg2 { -- out0 out1 src err }
 end
 
 fun: comp_args2_regs2 { -- out0 out1 lhs rhs err }
-  2 comp_args_min
+  2 nil comp_args_min
   comp_args_get dec { rhs }
   rhs dec { lhs }
   lhs comp_clobber
@@ -1202,6 +1202,15 @@ fun_comp: !2 { -- err }
 end
 
 fun: !2 { val0 val1 adr } val0 val1 adr !2 end
+
+fun_comp: @at { -- err }
+  comp_args_get dec { off }
+  off dec { adr }
+  adr adr off 0 asm_load_with_register_off comp_instr \ ldr Xt, [Xn, Xm]
+  off comp_args_set
+end
+
+fun: @at { adr off -- val } adr off @at end
 
 fun_comp: !at { -- err }
   comp_args_get dec { off }
@@ -1831,150 +1840,218 @@ fun: patch_branch_forward { adr -- err } adr off_to_pc asm_branch adr !32 end
 \ b <off>
 fun: patch_branch_back { adr -- err } adr off_from_pc asm_branch adr !32 end
 
+\ The bits "inp len" describe _extra_ inputs after consuming the predicate.
+\ Each branch gets its own input length, because expressions in each `elif`
+\ may have different arities. Each branch feeds extra inputs into its body.
+\ We validate that the result output length is consistent between branches.
+\
+\ The bits "out len" describe leftover arguments at branch exits.
+\ We infer them at the first branch exit. Every subsequent branch
+\ exit validates arity match.
+ASM_ARG_LEN_MAX bit_len            let: COND_LEN_OFF
+COND_LEN_OFF low_bits              let: COND_INP_LEN_MASK
+COND_INP_LEN_MASK COND_LEN_OFF lsl let: COND_OUT_LEN_MASK
+1 COND_LEN_OFF 1 lsl lsl           let: COND_HAS_INP_LEN
+COND_HAS_INP_LEN 1 lsl             let: COND_HAS_OUT_LEN
+COND_HAS_OUT_LEN 1 lsl             let: COND_HAS_ELSE
+
+fun: cond_meta_inp_len { meta -- len } meta COND_INP_LEN_MASK and end
+fun: cond_meta_out_len { meta -- len } meta COND_OUT_LEN_MASK and COND_LEN_OFF lsr end
+
 \ Caller must also use `comp_barrier` with appropriate arity.
-fun: if_pop { prev adr -- err }
+fun: if_pop { prev adr meta -- err }
   adr off_to_pc { off }
-  0 off asm_cmp_branch_zero adr !32 \ cbz x0, <else|end>
+  meta cond_meta_inp_len { reg }
+  reg off asm_cmp_branch_zero adr !32 \ cbz <reg>, <else|end>
   prev execute
 end
 
 \ Caller must also use `comp_barrier` with appropriate arity.
-fun: ifn_pop { prev adr -- err }
+fun: ifn_pop { prev adr meta -- err }
   adr off_to_pc { off }
-  0 off asm_cmp_branch_not_zero adr !32 \ cbnz x0, <else|end>
+  meta cond_meta_inp_len { reg }
+  reg off asm_cmp_branch_not_zero adr !32 \ cbnz <reg>, <else|end>
   prev execute
 end
 
-fun: if_pop_void  { prev adr -- err } 0 comp_barrier prev adr if_pop  end
-fun: ifn_pop_void { prev adr -- err } 0 comp_barrier prev adr ifn_pop end
+fun: if_pop_void  { prev adr -- err } 0 nil comp_barrier prev adr 0 if_pop  end
+fun: ifn_pop_void { prev adr -- err } 0 nil comp_barrier prev adr 0 ifn_pop end
 
 fun_comp: if  { -- nop pop } xt' nop xt' if_pop_void  end
 fun_comp: ifn { -- nop pop } xt' nop xt' ifn_pop_void end
 
 fun_comp: then { pop -- adr pop err } ( E: pred -- )
-  1 " when calling `then`" comp_args_valid 0 comp_args_set
-  0 comp_barrier
+  " when calling `then`" { ctx }
+  1 ctx comp_args_valid
+  0     comp_args_set
+  0 ctx comp_barrier
   reserve_here pop
 end
 
-\ Now that we have conditionals, we can redefine them
-\ into arity-aware condition expressions with outputs.
+\ Now that we have nullary conditionals, we can redefine
+\ them into full-blown arity-aware condition expressions.
 
-ASM_ARG_LEN_MAX bit_len low_bits let: COND_LEN_MASK
-COND_LEN_MASK inc                  let: COND_HAS_LEN
-COND_HAS_LEN 1 lsl                 let: COND_HAS_ELSE
+fun: cond_branch_open { meta ctx -- meta branch_meta err }
+  1 ctx comp_args_min
+  comp_args_get dec { len }
+  len comp_args_set
+  len ctx comp_barrier
+  meta len
+end
 
-fun: cond_close_branch { meta -- meta err }
-  meta COND_LEN_MASK and { len }
+fun: cond_branch_close { meta ctx -- meta err }
+  meta cond_meta_out_len { len }
 
-  ifn meta COND_HAS_LEN and then
+  ifn meta COND_HAS_OUT_LEN and then
     comp_args_get { len }
-    meta COND_LEN_MASK bits_clear len or COND_HAS_LEN or { meta }
+    len COND_LEN_OFF lsl meta or COND_HAS_OUT_LEN or { meta }
   end
 
-  len comp_barrier
+  len ctx comp_barrier
   meta
 end
 
 \ Caller must also use `comp_barrier` with appropriate arity.
-fun: else_pop { prev adr -- err }
+\ Takes "meta" because this shares the signature with `if_pop`
+\ and `ifn_pop`; all these words may be executed by `cond_pop`.
+fun: else_pop { prev adr _meta -- err }
   adr patch_branch_forward
   prev execute
 end
 
-fun: cond_separator { adr pop meta -- adr pop meta err }
-  meta cond_close_branch { meta }
+\ Used by `else elif elifn`. `pop` is one of: `if_pop ifn_pop`.
+fun: cond_separator { adr branch_meta pop meta ctx -- adr branch_meta else_pop meta err }
+  meta ctx cond_branch_close { meta }
   reserve_here { next_adr }
 
-  xt' nop STACK >s
-  adr     STACK >s
+  xt' nop STACK >s \ Prevent chaining.
+  adr         STACK >s
+  branch_meta STACK >s
   pop execute
 
-  0 comp_args_set
-  next_adr xt' else_pop meta
+  branch_meta cond_meta_inp_len comp_args_set
+  next_adr branch_meta xt' else_pop meta
 end
 
-fun: cond_pop { adr pop meta -- err }
-  meta COND_LEN_MASK and { len }
-  len comp_barrier
+\ Popped by `end` after `if elif elifn … then`.
+\ `pop` is one of: `if_pop ifn_pop else_pop`.
+fun: cond_pop { adr branch_meta pop meta -- err }
+  " when ending conditional branch" { ctx }
+  meta ctx cond_branch_close { meta }
+  meta cond_meta_out_len { len }
 
-  if len then
-    ifn meta COND_HAS_ELSE and then
-      " conditional with outputs requires final `else`" throw
+  ifn meta COND_HAS_ELSE and then
+    branch_meta cond_meta_inp_len { inp_len }
+    if len inp_len <> then
+      if inp_len =0 len and then
+        " conditional with outputs requires final `else`" throw
+      end
+      inp_len ctx comp_args_valid
     end
   end
 
-  adr STACK >s
-  pop execute
-  len " when ending conditional branch" comp_args_valid
+  adr         STACK >s
+  branch_meta STACK >s
+  pop         execute
+  len ctx comp_args_valid
 end
 
-fun_comp: if  { -- nop meta pop } [ redefine ] xt' nop 0 xt' if_pop  end
-fun_comp: ifn { -- nop meta pop } [ redefine ] xt' nop 0 xt' ifn_pop end
+fun_comp: if  { -- nop pop meta err } [ redefine ] xt' nop xt' if_pop  0 end
+fun_comp: ifn { -- nop pop meta err } [ redefine ] xt' nop xt' ifn_pop 0 end
 
-fun_comp: then { meta pop -- adr pop meta cond_pop err } ( E: pred -- )
+\ `pop` is one of: `if_pop ifn_pop`.
+fun_comp: then { pop meta -- adr branch_meta pop meta cond_pop err } ( E: pred -- )
   [ redefine ]
-  1 " when calling `then`" comp_args_valid 0 comp_args_set
-  0 comp_barrier
-  reserve_here pop meta xt' cond_pop
+  meta " when calling `then`" cond_branch_open { meta branch_meta }
+  reserve_here branch_meta pop meta xt' cond_pop
 end
 
-fun_comp: else { adr pop meta cond_pop -- adr pop meta cond_pop err }
-  adr pop meta cond_separator { adr pop meta }
-  meta COND_HAS_ELSE or { meta }
-  adr pop meta xt' cond_pop
+\ `pop` is one of: `if_pop ifn_pop`.
+fun_comp: elif
+  { adr branch_meta pop meta _cond_pop -- adr branch_meta else_pop if_pop meta err }
+  adr branch_meta pop meta
+  " when calling `elif`" cond_separator { adr branch_meta pop meta }
+  adr branch_meta pop xt' if_pop meta
 end
 
-fun_comp: elif { adr pop meta cond_pop -- adr pop meta pop err }
-  adr pop meta cond_separator xt' if_pop
+\ `pop` is one of: `if_pop ifn_pop`.
+fun_comp: elifn
+  { adr branch_meta pop meta _cond_pop -- adr branch_meta else_pop ifn_pop meta err }
+  adr branch_meta pop meta
+  " when calling `elifn`" cond_separator { adr branch_meta pop meta }
+  adr branch_meta pop xt' ifn_pop meta
 end
 
-fun_comp: elifn { adr pop meta cond_pop -- adr pop meta pop err }
-  adr pop meta cond_separator xt' ifn_pop
+\ `pop` is one of: `if_pop ifn_pop`.
+fun_comp: else { adr branch_meta pop meta cond_pop -- adr branch_meta else_pop meta cond_pop err }
+  adr branch_meta pop meta COND_HAS_ELSE or
+  " when calling `else`" cond_separator cond_pop
 end
 
-fun: switch_pop { _val_loc_ meta -- err } ( C: next_pop -- )
-  meta cond_close_branch COND_LEN_MASK and { len }
-  execute'' end
-  len " when ending `switch`" comp_args_valid
+fun: switch_pop { prev _val_loc_ _branch_meta meta -- err }
+  meta " when ending `switch`" cond_branch_close { -- }
+  prev execute
 end
 
-fun_comp: switch { -- nop val_loc meta switch_pop err } ( E: val -- )
-  1 " when calling `switch`" comp_args_valid 0 comp_args_set
-  comp_local_anon { val_loc }
-  0 val_loc comp_local_set \ mov <val>, x0 | str x0, [FP, <val>]
-  xt' nop val_loc 0 xt' switch_pop
+fun_comp: switch { -- nop val branch_meta meta switch_pop err } ( E: … val -- … )
+  " when calling `switch`" { ctx }
+  1 ctx comp_args_min
+  comp_args_get dec { branch_meta }
+  comp_local_anon { val }
+  branch_meta val comp_local_set \ mov <val>, xN | str xN, [FP, <val>]
+  branch_meta comp_args_set
+  branch_meta ctx comp_barrier
+  xt' nop val branch_meta 0 xt' switch_pop
 end
 
-fun: else_pop_void { prev adr -- err }
-  0 comp_barrier
-  prev adr else_pop
+fun: case_else_pop { prev adr -- err }
+  adr patch_branch_forward
+  prev execute
 end
 
 fun: case_pop
-  { val_loc meta switch_pop case_adr -- adr_end else_pop val_loc meta switch_pop err }
+  {
+    val_loc branch_meta meta switch_pop case_adr
+    --
+    adr_end case_else_pop val_loc branch_meta meta switch_pop err
+  }
 
-  meta cond_close_branch { meta    }
-  reserve_here           { adr_end }
-  case_adr off_to_pc     { off     }
+  meta " when ending `case`" cond_branch_close { meta }
+  reserve_here { adr_end }
+  case_adr off_to_pc { off }
 
   off ASM_NE asm_branch_cond case_adr !32 \ b.ne <case_end>
-  0 comp_args_set
-  adr_end xt' else_pop val_loc meta switch_pop
+  branch_meta cond_meta_inp_len comp_args_set
+  adr_end xt' case_else_pop val_loc branch_meta meta switch_pop
 end
 
 fun_comp: case
-  { val_loc meta switch_pop -- val_loc meta switch_pop case_adr case_pop err }
+  {
+    val_loc switch_branch_meta meta switch_pop
+    --
+    val_loc branch_meta meta switch_pop case_adr case_pop err
+  }
   ( E: pred -- )
 
-  1 " when calling `case`" comp_args_valid 0 comp_args_set
+  " when calling `case`" { ctx }
+  1 ctx comp_args_min
+  comp_args_get { len }
 
-  1 val_loc       comp_local_get \ mov x1, <val> | ldr x1, [FP, <val>]
-  0 1 asm_cmp_reg comp_instr     \ cmp x0, x1
-  0 comp_barrier
+  \ TODO: un-hardcode the numbers.
+  if len ASM_ARG_LEN_MAX >= then
+    " unable to compile `case`: too many arguments: 15 registers available, 16 arguments provided" throw
+  end
+
+  len dec          { branch_meta }
+  comp_scratch_reg { val_reg }
+
+  val_reg val_loc comp_local_get \ mov <val_reg>, <val> | ldr <val_reg>, [FP, <val>]
+  branch_meta val_reg asm_cmp_reg comp_instr \ cmp <pred>, <val>
+  branch_meta comp_args_set
+  branch_meta ctx comp_barrier
 
   reserve_here { adr } \ b.ne <case_end>
-  val_loc meta switch_pop adr xt' case_pop
+  val_loc branch_meta meta switch_pop adr xt' case_pop
 end
 
 \ ## Types
@@ -2395,7 +2472,7 @@ fun: loop_frame_adr { -- adr err }
 end
 
 fun: loop_frame_pop { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
-  0 comp_barrier
+  0 nil comp_barrier
   LOOP_AUX s> execute \ Pop all auxiliaries until a terminating `nop`.
   prev_loop_ind LOOP_IND !
 end
@@ -2411,7 +2488,7 @@ fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
 end
 
 fun: loop_back { adr -- err }
-  0 comp_barrier
+  0 nil comp_barrier
   adr off_from_pc asm_branch comp_instr \ b <beg>
 end
 
@@ -2419,26 +2496,26 @@ end
 \ Loops which push larger frames simply pop-off extra data first.
 fun: loop_base_pop { loop_beg -- err }
   ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
-  0 comp_barrier
+  0 nil comp_barrier
   loop_beg loop_back \ b <beg>
   execute'' end      \ Run `loop_frame_pop`.
 end
 
 fun_comp: loop { -- loop_beg loop_pop err } ( C: -- <loop_prev> )
-  0 comp_barrier
+  0 nil comp_barrier
   loop_frame_init
   here_write xt' loop_base_pop
 end
 
 fun: leave_pop { -- err }
-  LOOP_AUX s> { adr }
-  LOOP_AUX s> { prev }
-  prev adr else_pop_void
+  0 nil comp_barrier
+  LOOP_AUX s> patch_branch_forward
+  LOOP_AUX s> execute
 end
 
 \ Breaks out of any loop.
 fun_comp: leave { -- err } ( LOOP_AUX: -- leave_adr leave_pop )
-  0 comp_barrier
+  0 nil comp_barrier
   reserve_here  LOOP_AUX >s
   xt' leave_pop LOOP_AUX >s
 end
@@ -2452,7 +2529,7 @@ end
 \ Breaks out of any loop.
 fun_comp: while { -- err } ( LOOP_AUX: -- while_adr while_pop )
   1 " when calling `while`" comp_args_valid 0 comp_args_set
-  0 comp_barrier
+  0 nil comp_barrier
   reserve_here  LOOP_AUX >s
   xt' while_pop LOOP_AUX >s
 end
@@ -2466,7 +2543,7 @@ fun_comp: cont { -- err } loop_frame_adr @ loop_back end \ b <beg>
 \   loop false until
 fun_comp: until { fun -- err }
   1 " when calling `until`" comp_args_valid 0 comp_args_set
-  0 comp_barrier
+  0 nil comp_barrier
   0 8 asm_cmp_branch_not_zero comp_instr \ cbnz x0, 8
   fun execute
 end
@@ -2489,12 +2566,12 @@ fun: for_loop_countdown_init { cur -- loop_beg cond_adr asm_cond loop_pop err }
 
   loop_frame_init
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
-  0 comp_barrier                   \ Clobber / relocate locals.
+  0 nil comp_barrier               \ Clobber / relocate locals.
   here_write { loop_beg }          \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur> | ldr x0, [FP, <cur>]
   0 0 1 asm_sub_imm comp_instr     \ sub x0, x0, 1
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
-  0 comp_barrier                   \ Tell compiler to commit "local set".
+  0 nil comp_barrier               \ Tell compiler to commit "local set".
   0 asm_cmp_zero    comp_instr     \ cmp x0, 0
   here_write { cond_adr } reserve_instr \ b.lt <end>
 
@@ -2553,14 +2630,14 @@ fun_comp: +for: { -- loop_beg cond_adr asm_cond loop_pop err }
 
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
-  0 comp_barrier                   \ Clobber / relocate locals.
+  0 nil comp_barrier               \ Clobber / relocate locals.
   20 asm_branch     comp_instr     \ b <cmp>
   here_write { loop_beg }          \ `end` jumps here.
   0 lim             comp_local_get \ mov x0, <lim> | ldr x0, [FP, <lim>]
   1 cur             comp_local_get \ mov x1, <cur> | ldr x1, [FP, <cur>]
   1 1 1 asm_add_imm comp_instr     \ add x1, x1, 1
   1 cur             comp_local_set \ mov <cur>, x1 | str x1, [FP, <cur>]
-  0 comp_barrier                   \ Tell compiler to commit "local set".
+  0 nil comp_barrier               \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here_write { cond_adr } reserve_instr \ b.le <end>
 
@@ -2583,14 +2660,14 @@ fun_comp: -loop: { -- loop_beg cond_adr asm_cond loop_pop err }
   0 cur             comp_local_set \ mov <cur>,  x0 | str x0, [FP, <cur>]
   1 lim             comp_local_set \ mov <lim>,  x1 | str x1, [FP, <lim>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
-  0 comp_barrier                   \ Clobber / relocate locals.
+  0 nil comp_barrier               \ Clobber / relocate locals.
   here_write { loop_beg }          \ `end` jumps here.
   0 cur             comp_local_get \ mov x0, <cur>  | ldr x0, [FP, <cur>]
   1 lim             comp_local_get \ mov x1, <lim>  | ldr x1, [FP, <lim>]
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
   0 0 2 asm_sub_reg comp_instr     \ sub x0, x0, x2
   0 cur             comp_local_set \ mov <cur>, x0 | str x0, [FP, <cur>]
-  0 comp_barrier                   \ Tell compiler to commit "local set".
+  0 nil comp_barrier               \ Tell compiler to commit "local set".
   0 1   asm_cmp_reg comp_instr     \ cmp <cur>, <lim>
   here_write { cond_adr } reserve_instr \ b.lt <end>
 
@@ -2621,7 +2698,7 @@ fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
   0 lim             comp_local_set \ mov <lim>, x0, | str x0, [FP, <lim>]
   1 cur             comp_local_set \ mov <cur>, x1, | str x1, [FP, <cur>]
   2 step            comp_local_set \ mov <step>, x2 | str x2, [FP, <step>]
-  0 comp_barrier                   \ Clobber / relocate locals.
+  0 nil comp_barrier               \ Clobber / relocate locals.
   24 asm_branch     comp_instr     \ b <cmp>
   here_write { loop_beg }          \ `end` jumps here.
   0 lim             comp_local_get \ mov x0, <lim>  | ldr x0, [FP, <lim>]
@@ -2629,7 +2706,7 @@ fun_comp: +loop: { -- loop_beg cond_adr loc_step loop_pop err }
   2 step            comp_local_get \ mov x2, <step> | ldr x2, [FP, <step>]
   1 1 2 asm_add_reg comp_instr     \ add x1, x1, x2
   1 cur             comp_local_set \ mov <cur>, x1  | str x1, [FP, <cur>]
-  0 comp_barrier                   \ Tell compiler to commit "local set".
+  0 nil comp_barrier               \ Tell compiler to commit "local set".
   0 1 asm_cmp_reg   comp_instr     \ cmp x0, x1
   here_write { cond_adr } reserve_instr \ b.le <end>
 

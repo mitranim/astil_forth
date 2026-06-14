@@ -909,7 +909,7 @@ static Err comp_before_append_ret(Comp *comp) {
 Used at every branch point to evict locals from parameter
 registers to their "stable" locations.
 */
-static Err comp_barrier(Comp *comp, Sint req) {
+static Err comp_barrier(Comp *comp, const char *action, Sint req) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
@@ -917,12 +917,13 @@ static Err comp_barrier(Comp *comp, Sint req) {
   const auto   arg_low = ctx->arg_low;
   const auto   arg_len = ctx->arg_len;
   constexpr U8 ceil    = arr_cap(ctx->reg_vals);
+  if (!action) action = "in control flow";
 
   if (arg_low) {
-    return err_args_partial(sym, "in control flow", arg_low, arg_len);
+    return err_args_partial(sym, action, arg_low, arg_len);
   }
   if (req != arg_len) {
-    return err_args_arity(sym, "in control flow", req, req, arg_len);
+    return err_args_arity(sym, action, req, req, arg_len);
   }
   for (U8 reg = 0; reg < ceil; reg++) {
     comp_clear_tracked_arg_reg(comp, reg);
