@@ -23,7 +23,7 @@ static void list_deinit(void *src) {
 static void list_reserve_total_cap_impl(List *tar, Ind size, Ind cap) {
   if (cap <= tar->cap) return;
 
-  const auto next = mul(cap, size);
+  const auto next = MUL(cap, size);
   const auto dat  = realloc(tar->dat, next);
   aver(dat);
 
@@ -62,7 +62,7 @@ static void list_push_raw_impl(
     fatal("unable to push raw data: out of capacity", file, line);
   }
 
-  const auto off = mul(tar->len, size);
+  const auto off = MUL(tar->len, size);
   memcpy(((U8 *)tar->dat + off), src, len);
   tar->len += len / size;
 }
@@ -84,7 +84,7 @@ static bool list_valid(const List *list) {
 // clang-format on
 
 static void *list_ceil_impl(const List *list, Ind size) {
-  return (U8 *)list->dat + mul(list->cap, size);
+  return (U8 *)list->dat + MUL(list->cap, size);
 }
 
 static bool is_list_elem_impl(

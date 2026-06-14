@@ -138,7 +138,7 @@ Reserves at least this much extra capacity over the current capacity. Due to
 pow2 rounding, capacity may be increased by more than the requested amount.
 */
 static void buf_reserve(Buf *buf, Ind more) {
-  const auto goal = add(buf->len, more);
+  const auto goal = ADD(buf->len, more);
   if (buf->cap >= goal) return;
 
   const Ind cap = round_up_pow2_Ind(goal);

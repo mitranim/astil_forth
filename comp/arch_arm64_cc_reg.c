@@ -342,7 +342,7 @@ static Err asm_append_call_intrin(
   const U8  inps   = callee->inp_len;
   const U8  outs   = callee->has_err ? callee->out_len - 1 : callee->out_len;
   const Ind size   = sizeof(Sint);
-  const Ind sp_off = asm_align_sp_off(mul(size, outs));
+  const Ind sp_off = asm_align_sp_off(MUL(size, outs));
 
   asm_append_mov_reg(comp, callee->inp_len, ASM_REG_INTERP);
 
@@ -353,7 +353,7 @@ static Err asm_append_call_intrin(
     while (out < outs) {
       U8 reg = inps + 1 + out;
       aver(reg < ASM_INP_PARAM_REG_LEN);
-      asm_append_add_imm(comp, reg, ASM_REG_SP, mul(out, size));
+      asm_append_add_imm(comp, reg, ASM_REG_SP, MUL(out, size));
       out++;
     }
   }

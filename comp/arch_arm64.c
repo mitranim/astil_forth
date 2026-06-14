@@ -1253,7 +1253,7 @@ static Err asm_append_call_norm(
     caller->name.buf,
     callee->name.buf,
     fun,
-    (Sint)mul(pc_off, sizeof(Instr))
+    (Sint)MUL(pc_off, sizeof(Instr))
   ));
   return nullptr;
 }

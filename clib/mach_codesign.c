@@ -33,9 +33,9 @@ static U32 mach_codesign_total_size(U32 file_off, U8 id_len) {
   U32 out = sizeof(Mach_codesign_head) + sizeof(Mach_codesign_index) +
     sizeof(Mach_codesign_dir);
 
-  out = add(out, id_len);
-  out = add(out, 1);
-  out = add(out, mul((file_off / MCS_PAGE_SIZE), MCS_HASH_SIZE));
+  out = ADD(out, id_len);
+  out = ADD(out, 1);
+  out = ADD(out, MUL((file_off / MCS_PAGE_SIZE), MCS_HASH_SIZE));
   return out;
 }
 

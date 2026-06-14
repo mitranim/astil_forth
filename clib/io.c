@@ -133,7 +133,7 @@ static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
   aver(info.st_size >= 0);
 
   const auto file_len = (Uint)info.st_size;
-  const auto buf_len  = add(file_len, 1);
+  const auto buf_len  = ADD(file_len, 1);
   U8        *buf      = malloc(buf_len);
   const auto err      = fd_read_all(path, file, buf, file_len);
 

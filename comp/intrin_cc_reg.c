@@ -627,8 +627,8 @@ static void intrin_debug_ctx(Interp *interp) {
 
       const auto last_val_ind = (U8)(last_val + 1);
       U8         val_cap      = cap;
-      val_cap                 = min(val_cap, last_val_ind);
-      val_cap                 = max(val_cap, args);
+      val_cap                 = MIN(val_cap, last_val_ind);
+      val_cap                 = MAX(val_cap, args);
 
       for (U8 ind = 0; ind < val_cap; ind++) {
         const auto val = arr[ind];

@@ -52,7 +52,7 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Ind val_size) {
   if (!(page >= 0 && page < INT_MAX)) return err_no_page_size(page);
 
   const auto page_size  = (Ind)page;
-  const auto data_size  = __builtin_align_up(mul(val_size, len), page_size);
+  const auto data_size  = __builtin_align_up(MUL(val_size, len), page_size);
   const auto total_size = page_size + data_size + page_size;
 
   const auto cellar = mem_map(total_size, 0);
