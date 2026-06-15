@@ -518,12 +518,14 @@ static Err interp_import_inner(
 
   *read = (Reader){.src = src, .len = (Ind)len, .path = path};
 
+  // Registering the import before interpreting the file
+  // enables partial cyclic imports and reduces surprise.
+  dict_set(imports, path, EMPTY); // The dict owns the path now.
+  path = nullptr;                 // No `free` on success.
+
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
   try(interp_err(read, interp_loop(interp)));
   IF_DEBUG(eprintf("[system] done importing file: " FMT_QUOTED "\n", path));
-
-  dict_set(imports, path, EMPTY); // Owns the path now.
-  path = nullptr;                 // No `free` on success.
   return nullptr;
 }
 
