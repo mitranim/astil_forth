@@ -1160,7 +1160,7 @@ fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
 end
 
 fun_comp: elif  execute'' else xt' if_pop  end
-fun_comp: elifn execute'' else xt' ifn_pop end
+fun_comp: elifz execute'' else xt' ifn_pop end
 
 \ ## Loops
 \

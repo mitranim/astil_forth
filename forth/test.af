@@ -288,7 +288,7 @@ fun: test_conditionals { -- err }
   }T
 
   T{
-    if false then 10 elifn false then 20 else 30 end
+    if false then 10 elifz false then 20 else 30 end
   <T>
     20
   }T
@@ -354,39 +354,39 @@ fun: test_conditionals { -- err }
 
   T{
     -1 { val }
-    if false then 10 { val } elifn false then 20 { val } end val
+    if false then 10 { val } elifz false then 20 { val } end val
   <T>
     20
   }T
 
   T{
-    if false then 10 elifn false then 20 else 30 end
+    if false then 10 elifz false then 20 else 30 end
   <T>
     20
   }T
 
   T{
     -1 { val }
-    if false then 10 { val } elifn true then 20 { val } end val
+    if false then 10 { val } elifz true then 20 { val } end val
   <T>
     -1
   }T
 
   T{
-    if false then 10 elifn true then 20 else 30 end
+    if false then 10 elifz true then 20 else 30 end
   <T>
     30
   }T
 
   T{
     -1 { val }
-    if true then 10 { val } elifn false then 20 { val } end val
+    if true then 10 { val } elifz false then 20 { val } end val
   <T>
     10
   }T
 
   T{
-    if true then 10 elifn false then 20 else 30 end
+    if true then 10 elifz false then 20 else 30 end
   <T>
     10
   }T
@@ -421,7 +421,7 @@ end
 
 fun: cond_input_elifn { val flag0 flag1 -- out }
   val flag0 if then
-  elifn flag1 then
+  elifz flag1 then
   else
   end
 end

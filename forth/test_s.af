@@ -26,10 +26,10 @@ fun: test_conditionals
   T{ if  false then 10 elif  true  then 20 elif  false then 30 else 40 end <T> 20 }T
   T{ if  false then 10 elif  false then 20 elif  true  then 30 else 40 end <T> 30 }T
   T{ if  false then 10 elif  false then 20 elif  false then 30 else 40 end <T> 40 }T
-  T{ ifz false then 10 elifn false then 20 elifn false then 30 else 40 end <T> 10 }T
-  T{ ifz true  then 10 elifn false then 20 elifn false then 30 else 40 end <T> 20 }T
-  T{ ifz true  then 10 elifn true  then 20 elifn false then 30 else 40 end <T> 30 }T
-  T{ ifz true  then 10 elifn true  then 20 elifn true  then 30 else 40 end <T> 40 }T
+  T{ ifz false then 10 elifz false then 20 elifz false then 30 else 40 end <T> 10 }T
+  T{ ifz true  then 10 elifz false then 20 elifz false then 30 else 40 end <T> 20 }T
+  T{ ifz true  then 10 elifz true  then 20 elifz false then 30 else 40 end <T> 30 }T
+  T{ ifz true  then 10 elifz true  then 20 elifz true  then 30 else 40 end <T> 40 }T
 end
 test_conditionals
 

@@ -2051,7 +2051,7 @@ fun: else_pop { prev adr _meta -- err }
   prev execute
 end
 
-\ Used by `else elif elifn`. `pop` is one of: `if_pop ifn_pop`.
+\ Used by `else elif elifz`. `pop` is one of: `if_pop ifn_pop`.
 fun: cond_separator { adr branch_meta pop meta ctx -- adr branch_meta else_pop meta err }
   meta ctx cond_branch_close { meta }
   reserve_here { next_adr }
@@ -2065,7 +2065,7 @@ fun: cond_separator { adr branch_meta pop meta ctx -- adr branch_meta else_pop m
   next_adr branch_meta xt' else_pop meta
 end
 
-\ Popped by `end` after `if elif elifn … then`.
+\ Popped by `end` after `if elif elifz … then`.
 \ `pop` is one of: `if_pop ifn_pop else_pop`.
 fun: cond_pop { adr branch_meta pop meta -- err }
   " when ending conditional branch" { ctx }
@@ -2107,10 +2107,10 @@ fun_comp: elif
 end
 
 \ `pop` is one of: `if_pop ifn_pop`.
-fun_comp: elifn
+fun_comp: elifz
   { adr branch_meta pop meta _cond_pop -- adr branch_meta else_pop ifn_pop meta err }
   adr branch_meta pop meta
-  " when calling `elifn`" cond_separator { adr branch_meta pop meta }
+  " when calling `elifz`" cond_separator { adr branch_meta pop meta }
   adr branch_meta pop xt' ifn_pop meta
 end
 
