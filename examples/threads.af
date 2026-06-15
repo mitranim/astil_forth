@@ -11,7 +11,7 @@ fun: callback { inout -- err }
   alloca' Fstat       { stat }
   path stat path_stat { err }
 
-  ifn err then
+  ifz err then
     \ Store the output back.
     stat Fstat_size @ inout !
   end
@@ -47,7 +47,7 @@ fun: main
   \ Since this word handles thread creation errors explicitly,
   \ it won't terminate until done with both thread handles.
 
-  ifn err0 then
+  ifz err0 then
     " [main] waiting on thread 0..." log lf
     thread0 thread_join { err0 join_err }
 
@@ -60,7 +60,7 @@ fun: main
     end
   end
 
-  ifn err1 then
+  ifz err1 then
     " [main] waiting on thread 1..." log lf
     thread1 thread_join { err1 join_err }
 

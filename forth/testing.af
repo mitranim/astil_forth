@@ -119,7 +119,7 @@ fun: testing_compiled_reset
 end
 
 fun: testing_compile_push_args { len -- err }
-  ifn len then ret end
+  ifz len then ret end
 
   len     { stk_reg }
   len inc { top_reg }
@@ -188,12 +188,12 @@ end
 \ ## Misc assertions
 
 fun: T_str_eq { act exp -- err }
-  ifn exp then
-    ifn act then ret end
+  ifz exp then
+    ifz act then ret end
     " expected string to be nil; got: %s" act errf throw
   end
 
-  ifn act then
+  ifz act then
     " unexpected nil string; expected: %s" exp errf throw
   end
 
@@ -204,7 +204,7 @@ fun: T_str_eq { act exp -- err }
 end
 
 fun: T_err_contains { act exp -- err }
-  ifn act then
+  ifz act then
     " missing error message; expected error to contain: %s"
     exp errf throw
   end

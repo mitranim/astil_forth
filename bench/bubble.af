@@ -66,6 +66,6 @@ end
 
 fun: main { -- exit }
   LIST LEN bubble_sort { err }
-  ifn err then 0 else " error: %s" err elogf elf 1 end
+  ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 main

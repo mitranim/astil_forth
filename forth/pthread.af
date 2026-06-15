@@ -228,7 +228,7 @@ fun: thread_spawn_detached { fun inp -- thread err }
   attr PTHREAD_CREATE_DETACHED pthread_attr_setdetachstate
   " unable to mark thread as detached" posix_err? { err }
 
-  ifn err then
+  ifz err then
     ref' thread attr fun inp pthread_create
     " unable to spawn detached thread" posix_err? { err }
   end

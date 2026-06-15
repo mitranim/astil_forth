@@ -31,7 +31,7 @@ variables:
   keyword: |-
     (?x:
       ret|recur|
-      if|ifn|then|else|elif|elifn|switch|case|do|end|
+      if|ifz|then|else|elif|elifn|switch|case|do|end|
       loop|for|while|until|leave|cont|
       throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
       try|try[_]{{word}}|{{word}}[_]try|

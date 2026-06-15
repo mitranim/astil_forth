@@ -1963,7 +1963,7 @@ fun: if_pop_void  { prev adr -- err } 0 nil comp_barrier prev adr 0 if_pop  end
 fun: ifn_pop_void { prev adr -- err } 0 nil comp_barrier prev adr 0 ifn_pop end
 
 fun_comp: if  { -- nop pop } xt' nop xt' if_pop_void  end
-fun_comp: ifn { -- nop pop } xt' nop xt' ifn_pop_void end
+fun_comp: ifz { -- nop pop } xt' nop xt' ifn_pop_void end
 
 fun_comp: then { pop -- adr pop err } ( E: pred -- )
   " when calling `then`" { ctx }
@@ -1987,7 +1987,7 @@ end
 fun: cond_branch_close { meta ctx -- meta err }
   meta cond_meta_out_len { len }
 
-  ifn meta COND_HAS_OUT_LEN and then
+  ifz meta COND_HAS_OUT_LEN and then
     comp_args_get { len }
     len COND_LEN_OFF lsl meta or COND_HAS_OUT_LEN or { meta }
   end
@@ -2025,7 +2025,7 @@ fun: cond_pop { adr branch_meta pop meta -- err }
   meta ctx cond_branch_close { meta }
   meta cond_meta_out_len { len }
 
-  ifn meta COND_HAS_ELSE and then
+  ifz meta COND_HAS_ELSE and then
     branch_meta cond_meta_inp_len { inp_len }
     if len inp_len <> then
       if inp_len =0 len and then
@@ -2042,7 +2042,7 @@ fun: cond_pop { adr branch_meta pop meta -- err }
 end
 
 fun_comp: if  { -- nop pop meta err } [ redefine ] xt' nop xt' if_pop  0 end
-fun_comp: ifn { -- nop pop meta err } [ redefine ] xt' nop xt' ifn_pop 0 end
+fun_comp: ifz { -- nop pop meta err } [ redefine ] xt' nop xt' ifn_pop 0 end
 
 \ `pop` is one of: `if_pop ifn_pop`.
 fun_comp: then { pop meta -- adr branch_meta pop meta cond_pop err } ( E: pred -- )
@@ -2310,8 +2310,8 @@ end
 \ Compile field access, which computes address + offset.
 fun: struct_field_comp { off -- err }
   comp_args_get { len }
-  ifn len then " struct field must be preceded by struct pointer" throw end
-  ifn off then ret end
+  ifz len then " struct field must be preceded by struct pointer" throw end
+  ifz off then ret end
 
   \ Same reg: replace prior address with address + offset.
   len dec { adr_reg }
@@ -2699,8 +2699,8 @@ fun: cf_fold_cleared1 { -- reg imm ok err }
   reg cf_reg_val { val }
   val cf_reg_val_foldable_imm { imm foldable }
 
-  ifn foldable then reg 0 false ret end
-  ifn val cf_reg_val_current then reg 0 false ret end
+  ifz foldable then reg 0 false ret end
+  ifz val cf_reg_val_current then reg 0 false ret end
 
   val cf_rewind_to_before_reg_val
   val cf_reg_val_clear
@@ -2711,7 +2711,7 @@ fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
   cf_regs2                { reg0 reg1 }
   reg0 reg1 cf_foldables2 { val0 val1 imm0 imm1 ok }
 
-  ifn ok then 0 0 0 false ret end
+  ifz ok then 0 0 0 false ret end
   val0 cf_rewind_to_before_reg_val
   val1 cf_reg_val_clear
   reg0 imm0 imm1 true
@@ -2721,7 +2721,7 @@ fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
   cf_regs2                { reg0 reg1 }
   reg0 reg1 cf_foldables2 { val0 val1 imm0 imm1 ok }
 
-  ifn ok then 0 0 0 0 false ret end
+  ifz ok then 0 0 0 0 false ret end
   val0 cf_rewind_to_before_reg_val
   val0 cf_reg_val_clear
   val1 cf_reg_val_clear
@@ -2978,7 +2978,7 @@ fun: stack_init { size stack -- err }
 end
 
 fun: stack_deinit { stack -- err }
-  ifn stack then ret end
+  ifz stack then ret end
 
   stack Stack_bytelen @ { bytelen }
   stack Stack_cellar  @ { cellar }
@@ -2994,12 +2994,12 @@ end
 
 \ Redefine to skip nil stack.
 fun: stack_trunc { stack } [ redefine ]
-  ifn stack then ret end
+  ifz stack then ret end
   stack stack_trunc
 end
 
 fun: stack_repr { stack }
-  ifn stack then " [debug] stack is nil" elog elf ret end
+  ifz stack then " [debug] stack is nil" elog elf ret end
 
   " [debug] stack           " elog stack                 debug_arg
   " [debug] Stack_bytelen @ " elog stack Stack_bytelen @ debug_arg
@@ -3058,7 +3058,7 @@ end
 
 fun: loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
-  ifn frame then " missing loop frame" throw end
+  ifz frame then " missing loop frame" throw end
   frame STACK stack_cell_at
 end
 
@@ -3308,9 +3308,9 @@ end
 
 \ `strcmp` doesn't like null string pointers.
 fun: ccompare { cstr0 cstr1 -- cmp }
-  ifn cstr0 cstr1 or then 0 ret end
-  ifn cstr0 then -1 ret end
-  ifn cstr1 then +1 ret end
+  ifz cstr0 cstr1 or then 0 ret end
+  ifz cstr0 then -1 ret end
+  ifz cstr1 then +1 ret end
   cstr0 cstr1 strcmp
 end
 
@@ -3373,7 +3373,7 @@ fun_comp: }vargs { len -- err } ( E: <systack_pop> )  len comp_va_end end
 \ Prepends `pre_len` args to current args. Inputs are passed on the control
 \ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
 fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
-  ifn pre_len then ret end
+  ifz pre_len then ret end
 
   comp_args_get      { post_len }
   post_len pre_len + { arg_len }
@@ -3565,7 +3565,7 @@ end
 \
 \ Should usually be followed with `0 comp_args_set`.
 fun: comp_args_to_stack { len stk_reg top_reg -- err } ( E: …args… -- )
-  ifn len then ret end
+  ifz len then ret end
 
   top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
@@ -3584,14 +3584,14 @@ end
 fun_comp: >>s { -- err } ( E: …args… stack -- )
   comp_args_get { arg_len }
 
-  ifn arg_len then
+  ifz arg_len then
     " unable to use `>>s`: at least 1 argument is required (stack address)"
     throw
   end
 
   arg_len dec { len }
   len comp_args_set
-  ifn len then ret end
+  ifz len then ret end
 
   if arg_len ASM_ARG_LEN_MAX >= then
     " unable to use `>>s`: not enough scratch registers" throw
@@ -3632,7 +3632,7 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   end
 
   0 comp_args_set
-  ifn locs then ret end
+  ifz locs then ret end
 
   0 { stk_reg }
   1 { top_reg }
@@ -3662,7 +3662,7 @@ fun: .        { num } num log_cell lf end
 fun: stack_log_cells { stack }
   stack stack_len_cells { len }
 
-  ifn len then
+  ifz len then
     " stack is empty" log lf
     ret
   end
@@ -3690,7 +3690,7 @@ fun: .sc .s STACK stack_trunc end
 fun: wordlist_log { dict list_num list_name }
   dict Interp_dict_len @u32 { len }
 
-  ifn len then
+  ifz len then
     " %s: empty" list_name logf lf
     ret
   end
@@ -3712,7 +3712,7 @@ fun: wordlist_log { dict list_num list_name }
     1 bit_ind lsl           { bit_mask }
     bitset bit_mask and     { live }
 
-    ifn live then cont end
+    ifz live then cont end
 
     ind cells { off }
     keys off + @ { key }
@@ -3833,7 +3833,7 @@ fun: execute_raw { fun } [ 0 asm_branch_link_reg comp_instr ] end
 fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_args_get { len }
 
-  ifn len then
+  ifz len then
     " unable to compile `execute_raw`: at least 1 argument is required" throw
   end
 
@@ -3975,4 +3975,5 @@ fun_comp: assert { -- beg fun err } ( E: cond -- )
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 +
   xt' assert_pop
+  [ true comp_only ]
 end

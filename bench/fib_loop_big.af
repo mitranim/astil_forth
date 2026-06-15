@@ -60,7 +60,7 @@ fun: bigint_log_decimal { lo hi }
   40 alloca { buf }
   buf 40 +  { ptr }
 
-  ifn lo hi or then
+  ifz lo hi or then
     48 logc
     ret
   end
@@ -71,7 +71,7 @@ fun: bigint_log_decimal { lo hi }
     rem 48 + ptr !8
     qlo { lo }
     qhi { hi }
-    ifn lo hi or then leave end
+    ifz lo hi or then leave end
   end
 
   buf 40 + ptr

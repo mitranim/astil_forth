@@ -278,8 +278,8 @@ fun: test_conditionals { -- err }
   T{ if false then 10 else 20 end <T> 20 }T
   T{ if true  then 10 else 20 end <T> 10 }T
 
-  T{ ifn false then 10 else 20 end <T> 10 }T
-  T{ ifn true  then 10 else 20 end <T> 20 }T
+  T{ ifz false then 10 else 20 end <T> 10 }T
+  T{ ifz true  then 10 else 20 end <T> 20 }T
 
   T{
     if false then 10 elif true then 20 else 30 end
@@ -307,11 +307,11 @@ fun: test_conditionals { -- err }
   T{ if false then 10 else 20 end <T> 20 }T
   T{ if true  then 10 else 20 end <T> 10 }T
 
-  T{ -1 { val } ifn false then 10 { val } end val <T> 10 }T
-  T{ -1 { val } ifn true  then 10 { val } end val <T> -1 }T
+  T{ -1 { val } ifz false then 10 { val } end val <T> 10 }T
+  T{ -1 { val } ifz true  then 10 { val } end val <T> -1 }T
 
-  T{ ifn false then 10 else 20 end <T> 10 }T
-  T{ ifn true  then 10 else 20 end <T> 20 }T
+  T{ ifz false then 10 else 20 end <T> 10 }T
+  T{ ifz true  then 10 else 20 end <T> 20 }T
 
   T{
     -1 { val }
@@ -409,7 +409,7 @@ end
 test_conditionals
 
 fun: cond_input_if { val flag -- out } val flag if then end end
-fun: cond_input_ifn { val flag -- out } val flag ifn then end end
+fun: cond_input_ifn { val flag -- out } val flag ifz then end end
 fun: cond_input_if_else { val flag -- out } val flag if then else end end
 
 fun: cond_input_elif { val flag0 flag1 -- out }
@@ -721,7 +721,7 @@ test_recursion
 
 fun: recur_reg_clobber_fun { val -- out }
   -1 -2   { -- }            \ Unconditionally clobber x0 x1.
-  ifn val then 0 ret end
+  ifz val then 0 ret end
   val val { ignored saved } \ `ignored` = x0, `saved` = x1, `val` = none
   0 recur { -- }            \ Must relocate `saved`.
   saved inc
@@ -733,20 +733,20 @@ end
 test_recur_reg_clobber
 
 fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
-  ifn val then 100 ret end
+  ifz val then 100 ret end
   if val 3 = then 0 " recur_err_non_try" ret end
   val dec recur
 end
 
 fun: recur_err_manual_try_fun { val -- out err } [ false try_all ]
-  ifn val then 100 ret end
+  ifz val then 100 ret end
   if val 3 = then 0 " recur_err_manual" ret end
   val dec recur try { out }
   out
 end
 
 fun: recur_err_auto_try_fun { val -- out err } [ true try_all ]
-  ifn val then 100 ret end
+  ifz val then 100 ret end
   if val 3 = then 0 " recur_err_auto" ret end
   val dec recur { out }
   out
@@ -2168,7 +2168,7 @@ end
 test_explicit_err_0
 
 fun: test_explicit_err_1_fun { one -- two err }
-  ifn one then test_throw end
+  ifz one then test_throw end
   one 2 *
 end
 
@@ -2197,7 +2197,7 @@ end
 test_explicit_err_1
 
 fun: test_explicit_err_2_fun { one two -- three err }
-  ifn one then test_throw end
+  ifz one then test_throw end
   one two +
 end
 
@@ -2233,7 +2233,7 @@ end
 test_explicit_err_2
 
 fun: test_explicit_err_3_fun { one -- two three err }
-  ifn one then test_throw end
+  ifz one then test_throw end
   one 2 *    { two }
   one negate { three }
   two three
@@ -2271,7 +2271,7 @@ end
 test_explicit_err_3
 
 fun: test_explicit_err_4_fun { one two -- three four err }
-  ifn one then test_throw end
+  ifz one then test_throw end
   one two + { three }
   two one - { four }
   three four
@@ -2738,7 +2738,7 @@ end
 fun: main { -- exit } [ false try_all ]
   main_run { err }
 
-  ifn err then
+  ifz err then
     " [test] [aot] ok" elog elf
     0 ret
   end

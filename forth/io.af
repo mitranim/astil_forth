@@ -177,12 +177,12 @@ end
 
 fun: file_open { path mode -- file err }
   path mode fopen { file }
-  ifn file then " open" path io_err throw end
+  ifz file then " open" path io_err throw end
   file
 end
 
 fun: file_write_char { char file -- err }
-  ifn char file fputc is_err_flag then ret end
+  ifz char file fputc is_err_flag then ret end
   " failed to write char" file file_err
 end
 

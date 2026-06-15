@@ -21,7 +21,7 @@ fun: read_req { conn buf cap -- len err }
 
   loop
     conn buf cap read { wrote }
-    ifn wrote then len ret end
+    ifz wrote then len ret end
 
     if wrote is_err_flag then
       errno { code }
@@ -80,7 +80,7 @@ end
 
 fun: main { -- exit }
   run { err }
-  ifn err then 0 else " error: %s" err elogf elf 1 end
+  ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 
 main

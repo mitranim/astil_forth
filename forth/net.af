@@ -71,7 +71,7 @@ fun: net_addr_info { port -- ainf err }
     " unable to listen on port %s; code: %zd; msg: %s" port code msg errf throw
   end
 
-  ifn ainf then
+  ifz ainf then
     \ This line should not be reached on Posix-conforming systems.
     " unable to listen on port %s: no addrinfo available" port errf throw
   end
@@ -97,11 +97,11 @@ fun: sock_bind { info backlog -- sock err }
   sock SOL_SOCKET SO_REUSEADDR opt size' Cint setsockopt
   " unable to `setsockopt`" os_err? { err }
 
-  ifn err then
+  ifz err then
     sock info Addrinfo_addr @ info Addrinfo_addrlen @ bind
     " unable to bind socket" os_err? { err }
 
-    ifn err then
+    ifz err then
       sock backlog listen
       " unable to listen on socket" os_err? { err }
     end
@@ -121,7 +121,7 @@ fun: net_listen { port backlog -- sock err }
     next while
     next backlog sock_bind { sock err }
     next Addrinfo_next @ { next }
-    ifn err then leave end
+    ifz err then leave end
     -1 { sock }
   end
 

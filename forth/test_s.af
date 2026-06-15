@@ -10,10 +10,10 @@ fun: test_conditionals
   T{ if  true  then 10 end                                                 <T> 10 }T
   T{ if  false then 10 else 20 end                                         <T> 20 }T
   T{ if  true  then 10 else 20 end                                         <T> 10 }T
-  T{ ifn false then 10 end                                                 <T> 10 }T
-  T{ ifn true  then 10 end                                                 <T>    }T
-  T{ ifn false then 10 else 20 end                                         <T> 10 }T
-  T{ ifn true  then 10 else 20 end                                         <T> 20 }T
+  T{ ifz false then 10 end                                                 <T> 10 }T
+  T{ ifz true  then 10 end                                                 <T>    }T
+  T{ ifz false then 10 else 20 end                                         <T> 10 }T
+  T{ ifz true  then 10 else 20 end                                         <T> 20 }T
   T{ if  true  then 10 elif  true  then 20 end                             <T> 10 }T
   T{ if  false then 10 elif  true  then 20 end                             <T> 20 }T
   T{ if  false then 10 elif  true  then 20 else 30 end                     <T> 20 }T
@@ -26,10 +26,10 @@ fun: test_conditionals
   T{ if  false then 10 elif  true  then 20 elif  false then 30 else 40 end <T> 20 }T
   T{ if  false then 10 elif  false then 20 elif  true  then 30 else 40 end <T> 30 }T
   T{ if  false then 10 elif  false then 20 elif  false then 30 else 40 end <T> 40 }T
-  T{ ifn false then 10 elifn false then 20 elifn false then 30 else 40 end <T> 10 }T
-  T{ ifn true  then 10 elifn false then 20 elifn false then 30 else 40 end <T> 20 }T
-  T{ ifn true  then 10 elifn true  then 20 elifn false then 30 else 40 end <T> 30 }T
-  T{ ifn true  then 10 elifn true  then 20 elifn true  then 30 else 40 end <T> 40 }T
+  T{ ifz false then 10 elifn false then 20 elifn false then 30 else 40 end <T> 10 }T
+  T{ ifz true  then 10 elifn false then 20 elifn false then 30 else 40 end <T> 20 }T
+  T{ ifz true  then 10 elifn true  then 20 elifn false then 30 else 40 end <T> 30 }T
+  T{ ifz true  then 10 elifn true  then 20 elifn true  then 30 else 40 end <T> 40 }T
 end
 test_conditionals
 
@@ -41,7 +41,7 @@ T{ 123 test_recursion <T> 13 }T
 
 fun: recur_throw_callee ( val -- val )
   [ true throws ]
-  ifn dup then drop 100 ret end
+  ifz dup then drop 100 ret end
   if dup 3 = then drop " recur_err_stack" throw end
   dec recur
 end

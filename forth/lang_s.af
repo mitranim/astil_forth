@@ -1147,7 +1147,7 @@ fun: ifn_pop ( nop ifn_adr -- )
 end
 
 fun_comp: if  xt' nop xt' if_pop  end
-fun_comp: ifn xt' nop xt' ifn_pop end
+fun_comp: ifz xt' nop xt' ifn_pop end
 fun_comp: then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) reserve_cond swap end
 
 fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward execute end
@@ -1194,7 +1194,7 @@ fun: loop_aux
             to: stack_len_0
   stack_len to: stack_len_1
 
-  ifn LOOP_FRAME @ then
+  ifz LOOP_FRAME @ then
     " auxiliary loop constructs require an ancestor loop frame" throw
   end
 
@@ -1264,7 +1264,7 @@ end
 \ with `cont` because they update counters and check bounds at the end, rather
 \ than at the start. The issue was fixed for reg-CC, but not for stack-CC.
 fun_comp: cont
-  ifn LOOP_FRAME @ dup then " `cont` requires an ancestor loop frame" throw end
+  ifz LOOP_FRAME @ dup then " `cont` requires an ancestor loop frame" throw end
   sp_at @ loop_end \ b <beg>
 end
 
@@ -1449,9 +1449,9 @@ fun: ccompare ( cstr0 cstr1 -- cmp )
   to: cstr1
   to: cstr0
 
-  ifn cstr0 cstr1 or then 0 ret end
-  ifn cstr0 then -1 ret end
-  ifn cstr1 then +1 ret end
+  ifz cstr0 cstr1 or then 0 ret end
+  ifz cstr0 then -1 ret end
+  ifz cstr1 then +1 ret end
   cstr0 cstr1 strcmp
 end
 
@@ -1600,7 +1600,7 @@ fun: comp_va_beg ( C: len -- )
     dec
   end
 
-  ifn dup then drop ret end
+  ifz dup then drop ret end
 
   \ Not odd = automatically aligned to 16.
   loop
@@ -1709,7 +1709,7 @@ fun: .        ( num     -- ) stack_len dec log_cell lf end
 fun: .s
   stack_len to: len
 
-  ifn len then
+  ifz len then
     " stack is empty" log lf
     ret
   end
