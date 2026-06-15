@@ -10,72 +10,67 @@
 // #include "./comp.h"
 // #endif
 
-typedef struct Loc_write Loc_write;
+typedef struct Loc_reloc Loc_reloc;
 
 /*
 Book-keeping structure describing a local variable.
 
-Operations on locals, synopsis:
-- "get"   -- mov from a known temp register; fall back on a "read"
-- "set"   -- reset to given temp register
-- "read"  -- mov or load from the stable location; confirm a prior "write"
-- "write" -- mov or store from temp register to stable location
+Local lifecycle ALWAYS begins by associating with some argument register.
+Mentioning a local by name is a "push from local" operation, which copies
+its value into the next argument register, associating it with the local.
+When a local runs out of argument registers due to clobbers, the compiler
+emits a tentative relocation by reserving an instruction and adding a new
+`Loc_reloc` asm fixup entry; the assembler patches this when finalizing a
+function, when other clobbers are known.
 
-When locals are "set" or "got", they're associated with "temp" registers.
-The association is invalidated by clobbers, which occur for two reasons:
+Local relocations are initially tentative. Subsequently accessing a local
+confirms its prior relocs. When possible, unconfirmed relocs are elided,
+and when not, the instructions are replaced with nops.
 
-1. The register is about to be used for something else:
-- Input argument to a function about to be called.
-- Output value from a function about to be called.
-- Any other clobber in function about to be called.
+Relocations copy local values to their eventual stable locations,
+which are undecided until we finalize the current function. Those
+locations can be:
+- Argument registers; architecturally this is better-known as caller-saved
+  registers, or volatile scratch registers. We use them like a "stack".
+- Stable callee-saved registers.
+- Memory locations (offsets from the frame pointer).
 
-2. We're about to meet a "clobber barrier" which invalidates ALL
-temp register associations. These barriers occur at EVERY branch
-point in conditionals and loops. A dirty but ultra simple way of
-avoiding data flow analysis which requires an IR and obliterates
-the dream of simplicity.
+We have "clobber barriers" which invalidate all argument registers,
+evicting all locals to their eventual "stable" locations. Barriers
+are used at branch points and in recursion. This simple solution
+lets us avoid a complex IR and liveness analysis.
 
-Locals always begin in temp registers without a stable location.
-Locals used in "read" operations and thus in "write" operations,
-eventually get a stable location, which is either an unclobbered
-register or an FP offset on the system stack.
+When compiling a function, we track clobbers, and when finalizing,
+we allocate one location per local, for the duration of the entire
+function, in the priority order listed above: arg > stable > mem.
 
-"get" and "set" are abstract operations. An intrinsic for "set" is used by
-assignment via `to:`; this doesn't always produce a "write". "get" is used
-internally whenever a local is mentioned by name; sometimes it produces no
-instructions, sometimes a `mov` from a known temp register. Failing that,
-"get" falls back on a real "read", which requires a real prior "write",
-which we insert in advance.
+When "pushing" a local to the compile-time "register stack",
+the compiler looks for registers already associated with the
+local in the current position, and falls back on a tentative
+"read fixup" which will copy the local from its stable place
+which is only decided when finalizing a function. Similar to
+relocations, this reserves an instruction for later patching.
 
-"read" and "write" are data-copy operations. Depending on the eventual
-location of the local, they become either `mov` between registers, or
-`ldr` and `str` from/to stack memory. These operations always involve
-a known temp register, which is either a source or a destination.
-A "read" always associates the local with that temp reg in addition
-to the local's stable location and other temp regs.
+Internal invariant: a local EITHER has some argument registers,
+OR has been relocated. We do not support un-initialized locals
+with unknown locations.
 
-"write" is emitted lazily on clobbers, and is initially unconfirmed.
-We still reserve an instruction to be patched; an unconfirmed write
-is later replaced with a `nop`; obviously suboptimal but avoids the
-need for IR and multiple passes. The next "read" operation for this
-local confirms every preceding unconfirmed "write". Every confirmed
-"write" is later rewritten with a `mov` or `str` instruction.
+Locals have a special lifecycle phase between two events:
+- 0: run out of arg registers -> get relocated
+- 1: get reassigned
 
-Additionally, a "read" causes _subsequent_ "writes" to be confirmed.
-
-When a local runs out of temp registers and we emit a "write" operation,
-the local is considered "stable" until the next "set". Its location now
-holds an up-to-date value, and can be repeatedly "read" from. The local
-may now be repeatedly associated and disassociated with temp registers,
-without "running out" and creating new "write" operations. However, the
-next "set" operation invalidates this state.
+Between these two events, a local is marked as "stable".
+It can be repeatedly associated with arg regs via reads,
+and repeatedly disassociated due to clobbers without any
+new relocations. Reassignment clears this flag, possibly
+incurring new relocations.
 */
 typedef struct {
   Word_str   name;
-  Loc_write *write;  // Latest unconfirmed "write"; confirmed by "reads".
+  Loc_reloc *reloc;  // Latest unconfirmed "reloc"; confirmed by "reads".
   bool       stable; // Has up-to-date value in assigned stable location.
   bool       read;   // Has a read; auto-confirm all subsequent writes.
-  bool       vol;    // Volatile: address taken.
+  bool       used;   // Has ever been mentioned by name; superset of `read`.
 
   // Final stable location used for writes and reads.
   // Locals which are never "read" are not considered.
@@ -100,44 +95,51 @@ typedef struct {
   U8     reg;   // Reg is immediately known; location is unknown.
 } Loc_read;
 
-typedef struct Loc_write {
+typedef struct Loc_reloc {
   Local            *loc;
   Instr            *instr;     // Retropatched with mov or store.
-  struct Loc_write *prev;      // Prior "write" for chain-confirming.
+  struct Loc_reloc *prev;      // Prior "reloc" for chain-confirming.
   U8                reg;       // Reg is known; location is unknown.
   bool              confirmed; // If not, turn this into a nop.
-} Loc_write;
+} Loc_reloc;
 
 typedef struct {
   enum {
     LOC_FIX_READ = 1,
-    LOC_FIX_WRITE,
+    LOC_FIX_RELOC,
   } type;
 
   Loc_read  read;
-  Loc_write write;
+  Loc_reloc reloc;
 } Loc_fixup;
 
 typedef stack_of(Loc_fixup) Loc_fixups;
 
-// Value associated with a register.
-//
-// SYNC[reg_val_fields].
-// SYNC[reg_val_types].
+/*
+We track comptime constants, and the `[floor,ceil)` ranges
+for the instructions generated for placing them into regs.
+Some parts of the system, such as our constant folding and
+`alloca`, detect and "consume" constants, backtracking the
+instructions. Assembler always encodes immediates inline.
+
+An immediate can be held with or without an associated local.
+*/
 typedef struct {
-  enum { REG_VAL_IMM = 1, REG_VAL_LOC } type;
+  Sint num;
+  Ind  floor; // For backtracking: first instruction.
+  Ind  ceil;  // For backtracking: just above last instruction.
+  bool has_imm;
+} Reg_imm;
 
-  Sint   imm; // Compile-time constant.
-  Local *loc;
+/*
+Value associated with a register.
 
-  // We track the `[floor,ceil)` instruction range for compile-time constants.
-  // When consuming a constant at compile time via `alloca`, this allows us to
-  // backtrack, deleting the previously-assembled instructions which move that
-  // constant to an argument register.
-  Ind  instr_floor;
-  Ind  instr_ceil;
-  bool can_backtrack;
-} Reg_val;
+SYNC[comp_arg_fields].
+*/
+typedef struct {
+  Local  *loc;
+  Reg_imm imm;
+} Comp_arg;
 
 /*
 Transient context used in compilation of a single word.
@@ -152,15 +154,14 @@ choose to affect compilation by invoking various compiler intrinsics.
 SYNC[comp_ctx_fields].
 */
 typedef struct {
-  Sym       *sym;                       // What we're currently compiling.
-  Loc_stack  locals;                    // Includes current word's input params.
-  Loc_dict   local_dict;                // So we can find locals by name.
-  Ind        anon_locs;                 // For auto-naming of anonymous locals.
-  Ind        fp_off;                    // Stack space reserved for locals.
-  Reg_val    reg_vals[ASM_ARG_LEN_MAX]; // Values in arg registers.
-  Bits       vol_regs;   // Volatile registers available for locals.
+  Sym       *sym;                   // What we're currently compiling.
+  Loc_stack  locals;                // Includes current word's input params.
+  Loc_dict   local_dict;            // So we can find locals by name.
+  Ind        anon_locs;             // For auto-naming of anonymous locals.
+  Ind        fp_off;                // Stack space reserved for locals.
+  Comp_arg   args[ASM_ARG_LEN_MAX]; // Values in arg registers.
+  Bits       vol_regs;              // Volatile registers available for locals.
   U8         saved_reg;  // Lowest callee-saved register used for locals.
-  U8         arg_low;    // How many args got consumed by assignments.
   U8         arg_len;    // Available args for the next call or assign.
   Asm_fixups asm_fix;    // For patching instructions in a post-pass.
   Loc_fixups loc_fix;    // For resolving stable locations for locals.

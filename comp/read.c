@@ -57,31 +57,16 @@ static Err reader_err(Reader *read, Err err) {
 // 255 = EOF
 static U8 normalize_char(U8 val) { return val == 254 || val == 255 ? 0 : val; }
 
-/*
-For internal use by the reader. Other code should use
-`read_ascii_printable` or `read_char`.
-*/
-static U8 read_char(Reader *read) {
-  const U8 next = read->pos < read->len
-    ? normalize_char((U8)read->src[read->pos++])
-    : (U8)0;
-
-  // IF_DEBUG(eprintf("[system] read char code: %d\n", next));
-  // IF_DEBUG(eprintf("[system] read char: %c\n", next));
-
-  return next;
-}
-
-// Note: avoid backtracking on EOF.
-static void reader_backtrack(Reader *read) {
-  if (read->pos) read->pos--;
+static U8 read_char_at(const Reader *read, Ind pos) {
+  return pos < read->len ? normalize_char((U8)read->src[pos]) : 0u;
 }
 
 static Err err_unsupported_char(Sint code) {
   return errf("unsupported character code " FMT_SINT, code);
 }
 
-static Err validate_char_ascii_printable(Sint code) {
+// 0 is a special case; caller must check for it.
+static Err validate_ascii_printable(Sint code) {
   if (!(code >= 0 && code < 256)) return err_unsupported_char(code);
   switch (HEAD_CHAR_KIND[code]) {
     case CHAR_WHITESPACE:  [[fallthrough]];
@@ -92,14 +77,6 @@ static Err validate_char_ascii_printable(Sint code) {
     case CHAR_UNPRINTABLE: [[fallthrough]];
     default:               return err_unsupported_char(code);
   }
-}
-
-// Output is 0 on EOF.
-static Err read_ascii_printable(Reader *read, U8 *out) {
-  const auto next = read_char(read);
-  try(validate_char_ascii_printable(next));
-  *out = next;
-  return nullptr;
 }
 
 static Err err_not_digit(U8 val) {
@@ -129,37 +106,100 @@ static Err err_overflow(U8 radix, const char *mode) {
   );
 }
 
-static Err err_minus_unsigned(U8 radix) {
+static Err err_minus_unsigned(Sint radix) {
   return errf(
-    "unsupported minus sign before an unsigned numeric literal in radix %d; only decimals may be signed",
+    "unsupported minus sign before an unsigned numeric literal in radix " FMT_SINT
+    "; only decimals may be signed",
     radix
   );
 }
 
-static Err read_num_internal(
-  Reader *read, Sint num, S8 sign, U8 radix, bool is_signed, Sint *out
-) {
+/*
+Supported formats:
+
+- Binary:  0b10100101
+- Octal:   0o123467
+- Decimal: 123 +234 -345
+- Hex:     0x123456789abcdef
+
+Binary, octal, and hex are treated as unsigned during parsing,
+and the preceding minus is forbidden for them, as it's unclear
+what its semantics should be: either `~num + 1` as with signed
+multiplication by -1, or simply set the sign bit to 1.
+*/
+static Err read_num(Reader *read, Sint *out) {
+  auto head = read_char_at(read, read->pos);
+
+  S8 sign = 1;
+
+  if (head == '-' || head == '+') {
+    if (head == '-') sign = -1;
+    head = read_char_at(read, ++read->pos);
+    try(validate_ascii_printable(head));
+  }
+  else {
+    IF_DEBUG(assert_fatal(HEAD_CHAR_KIND[head] == CHAR_DECIMAL));
+  }
+
+  read->pos++;
+
+  if (HEAD_CHAR_KIND[head] != CHAR_DECIMAL) return err_not_digit(head);
+
+  Sint num       = CHAR_TO_DIGIT[head];
+  U8   radix     = 10;
+  bool is_signed = true;
+
+  if (!num) {
+    head = read_char_at(read, read->pos);
+    try(validate_ascii_printable(head));
+
+    switch (head) {
+      case 'b': {
+        if (sign < 0) return err_minus_unsigned(radix);
+        radix     = 2;
+        is_signed = false;
+        read->pos++;
+        break;
+      }
+      case 'o': {
+        if (sign < 0) return err_minus_unsigned(radix);
+        radix     = 8;
+        is_signed = false;
+        read->pos++;
+        break;
+      }
+      case 'x': {
+        if (sign < 0) return err_minus_unsigned(radix);
+        radix     = 16;
+        is_signed = false;
+        read->pos++;
+        break;
+      }
+      default: break;
+    }
+  }
+
+  num *= sign;
+
   for (;;) {
-    U8 head;
-    try(read_ascii_printable(read, &head));
+    const auto head = read_char_at(read, read->pos);
+    try(validate_ascii_printable(head));
 
     // Cosmetic group separator.
-    if (head == '_') continue;
+    if (head == '_') {
+      read->pos++;
+      continue;
+    }
 
     const auto dig = CHAR_TO_DIGIT[head];
 
     switch (dig) {
+      case DIGIT_BREAK: goto done;
+
       // Unlike other Forths, we don't allow numeric literals to be immediately
       // followed by non-digit printable characters. Anything that begins with
       // a digit or `+`/`-` and a digit must be a number, not a word.
-      case DIGIT_INVALID: {
-        return err_not_digit(head);
-      }
-
-      case DIGIT_BREAK: {
-        if (head) reader_backtrack(read);
-        goto done;
-      }
+      case DIGIT_INVALID: return err_not_digit(head);
 
       default: {
         if (dig >= radix) {
@@ -181,7 +221,7 @@ static Err read_num_internal(
           }
           num = (Sint)next + dig;
         }
-        continue;
+        read->pos++;
       }
     }
   }
@@ -191,73 +231,11 @@ done:
   return nullptr;
 }
 
-/*
-Supported formats:
-
-- Binary:  0b10100101
-- Octal:   0o123467
-- Decimal: 123 +234 -345
-- Hex:     0x123456789abcdef
-
-Binary, octal, and hex are treated as unsigned during parsing,
-and the preceding minus is forbidden for them, as it's unclear
-what its semantics should be: either `~num + 1` as with signed
-multiplication by -1, or simply set the sign bit to 1.
-*/
-static Err read_num(Reader *read, Sint *out) {
-  S8 sign = 1;
-  U8 head;
-
-  try(read_ascii_printable(read, &head));
-
-  if (head == '-') {
-    sign = -1;
-    try(read_ascii_printable(read, &head));
-  }
-  else if (head == '+') {
-    try(read_ascii_printable(read, &head));
-  }
-
-  if (HEAD_CHAR_KIND[head] != CHAR_DECIMAL) return err_not_digit(head);
-
-  const auto num = (Sint)CHAR_TO_DIGIT[head];
-
-  if (num == 0) {
-    try(read_ascii_printable(read, &head));
-
-    switch (head) {
-      case 'b': {
-        const auto radix = 2;
-        if (sign < 0) return err_minus_unsigned(radix);
-        return read_num_internal(read, num, 0, radix, false, out);
-      }
-      case 'o': {
-        const auto radix = 8;
-        if (sign < 0) return err_minus_unsigned(radix);
-        return read_num_internal(read, num, 0, radix, false, out);
-      }
-      case 'x': {
-        const auto radix = 16;
-        if (sign < 0) return err_minus_unsigned(radix);
-        return read_num_internal(read, num, 0, radix, false, out);
-      }
-      default: {
-        if (head) reader_backtrack(read);
-        break;
-      }
-    }
-  }
-
-  return read_num_internal(read, num * sign, sign, 10, true, out);
-}
-
 static void read_skip_whitespace(Reader *read) {
   for (;;) {
-    const auto next = read_char(read);
-    if (!next) break;
-    if (HEAD_CHAR_KIND[next] == CHAR_WHITESPACE) continue;
-    reader_backtrack(read);
-    break;
+    const auto next = read_char_at(read, read->pos);
+    if (HEAD_CHAR_KIND[next] != CHAR_WHITESPACE) break;
+    read->pos++;
   }
 }
 
@@ -279,19 +257,16 @@ static Err read_word(Reader *read, const char **out_buf, Ind *out_len) {
   read_skip_whitespace(read);
 
   const auto beg = read->pos;
-
   for (;;) {
-    U8 head;
-    try(read_ascii_printable(read, &head));
-
-    if (WORD_CHAR_KIND[head] != CHAR_WORD) {
-      if (head) reader_backtrack(read);
-      break;
-    }
+    const auto head = read_char_at(read, read->pos);
+    try(validate_ascii_printable(head));
+    if (WORD_CHAR_KIND[head] != CHAR_WORD) break;
+    read->pos++;
   }
 
   const auto len = read->pos - beg;
   if (!len) return err_str("failed to read a word");
+
   if (out_buf) *out_buf = read->src + beg;
   if (out_len) *out_len = len;
   return nullptr;
@@ -316,18 +291,15 @@ static Err read_until_char(
   const auto beg = read->pos;
 
   for (;;) {
-    auto next = read_char(read);
+    const auto next = read_char_at(read, read->pos);
     if (!next) return err_read_eof(delim);
-
-    IF_DEBUG(aver(beg < read->pos));
-
-    if (next != delim) continue;
-    if (out_buf) *out_buf = read->src + beg;
-    if (out_len) *out_len = read->pos - beg - 1;
-    return nullptr;
+    if (next == delim) break;
+    read->pos++;
   }
 
-  unreachable();
+  if (out_buf) *out_buf = read->src + beg;
+  if (out_len) *out_len = read->pos - beg;
+  return nullptr;
 }
 
 // TODO: expose an intrinsic with this.

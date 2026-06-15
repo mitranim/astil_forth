@@ -1,7 +1,7 @@
 import' std:lang.af
 
-fun: fib { src -- out } [
-  0 comp_clobber
+fun: fib { _src -- _out } [
+  0 comp_realloc_reg
   0 1        asm_cmp_imm     comp_instr \ cmp x0, 1
   12  ASM_GT asm_branch_cond comp_instr \ b.gt <init>
   0 1        asm_mov_imm     comp_instr \ mov x0, 1
@@ -18,9 +18,9 @@ fun: fib { src -- out } [
   1 comp_args_set
 ] end
 
-fun: run { count }
+fun: run { _count }
   [
-    9 comp_clobber
+    9 comp_realloc_reg
     9 0 asm_mov_reg comp_instr \ mov x9, x0
   ]
   91     \ mov x0, 91 -- <loop_beg>

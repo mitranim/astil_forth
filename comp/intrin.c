@@ -227,13 +227,13 @@ static Err err_char_eof() {
   return err_str("EOF where a character was expected");
 }
 
-static Err interp_char(Interp *interp, char *out) {
+static Err interp_read_char(Interp *interp, char *out) {
   const auto read = interp_reader(interp);
-  U8         byte;
-
-  try(read_ascii_printable(read, &byte));
-  if (!byte) return err_char_eof();
-  if (out) *out = byte;
+  const auto next = read_char_at(read, read->pos);
+  try(validate_ascii_printable(next));
+  if (!next) return err_char_eof();
+  read->pos++;
+  if (out) *out = next;
   return nullptr;
 }
 
@@ -785,11 +785,12 @@ static const USED auto INTRIN_READ_CHAR = (Sym){
   .name.buf = "read_char",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_read_char,
-  .out_len  = 1,
+  .out_len  = 2,
   .has_err  = true,
 };
 
-// Renamed from standard Forth `parse`.
+// Renamed from standard Forth `parse` and made slightly non-standard:
+// it really reads until char, without skipping over it.
 static const USED auto INTRIN_READ_UNTIL_CHAR = (Sym){
   .name.buf = "read_until_char",
   .wordlist = WORDLIST_EXEC,
@@ -871,20 +872,11 @@ static const USED auto INTRIN_EXECUTE = (Sym){
   .has_err  = true,
 };
 
-static const USED auto INTRIN_COMP_LOCAL_NAMED = (Sym){
-  .name.buf  = "comp_local_named",
+static const USED auto INTRIN_COMP_LOCAL = (Sym){
+  .name.buf  = "comp_local",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_local_named,
+  .intrin    = (void *)intrin_comp_local,
   .inp_len   = 2,
-  .out_len   = 2,
-  .has_err   = true,
-  .comp_only = true,
-};
-
-static const USED auto INTRIN_COMP_LOCAl_ANON = (Sym){
-  .name.buf  = "comp_local_anon",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_local_anon,
   .out_len   = 2,
   .has_err   = true,
   .comp_only = true,

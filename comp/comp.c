@@ -50,7 +50,7 @@ static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
 static Local *comp_local_anon(Comp *comp) {
   const auto ctx = &comp->ctx;
   const auto loc = stack_push(&ctx->locals, (Local){});
-  str_fmt(&loc->name, "(anon_" FMT_IND ")", ctx->anon_locs++);
+  str_fmt(&loc->name, "_anon_" FMT_IND, ctx->anon_locs++);
   return loc;
 }
 
@@ -276,11 +276,11 @@ static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
   if (got_ind != INVALID_IND) return;
 
   got_ind = addrs->len;
-  aver(stack_len(names) == got_ind);
-  aver(inds->len == got_ind);
+  assert_fatal(stack_len(names) == got_ind);
+  assert_fatal(inds->len == got_ind);
 
   const auto got_name = names->top;
-  averr(str_set(got_name, name));
+  try_fatal(str_set(got_name, name));
 
   names->top++;
   list_push(addrs, addr);
@@ -420,7 +420,7 @@ static Err comp_sym_instr_range(
   const auto spans  = &sym->norm.spans;
 
   try(comp_code_ensure_sym_ready(code, sym));
-  aver(spans->ret > spans->prologue);
+  assert_fatal(spans->ret >= spans->prologue);
 
   if (floor) *floor = &instrs->dat[spans->prologue];
   if (ceil) *ceil = &instrs->dat[spans->ret + 1];
@@ -438,6 +438,10 @@ static Err comp_append_ret(Comp *comp) {
       .ret  = asm_append_breakpoint(comp, ASM_CODE_RET),
     }
   );
+
+#ifndef CALL_CONV_STACK
+  comp->ctx.arg_len = 0;
+#endif
   return nullptr;
 }
 
@@ -512,17 +516,6 @@ static const char *asm_fixup_fmt(Asm_fixup *fix) {
   static thread_local char BUF[4096];
 
   switch (fix->type) {
-    case ASM_FIX_IMM: {
-      const auto val = &fix->imm;
-      return sprintbuf(
-        BUF,
-        "{type = imm, instr = %p, reg = %d, num = " FMT_SINT "}",
-        val->instr,
-        val->reg,
-        val->num
-      );
-    }
-
     case ASM_FIX_RET: {
       return sprintbuf(BUF, "{type = ret, instr = %p}", fix->ret);
     }

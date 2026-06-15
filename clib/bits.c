@@ -6,7 +6,7 @@
 
 // Is there a simpler way?
 ALLOW_OVERFLOW static Bits bits_span(U8 ceil) {
-  aver(ceil <= BITS_CEIL);
+  assert_fatal(ceil <= BITS_CEIL);
 
   /*
   Why all the casts: apparently, C "promotes" operands of bitwise operations
@@ -38,14 +38,14 @@ static bool bits_has(Bits set, U8 bit) {
 }
 
 static Bits bits_add(Bits set, U8 bit) {
-  aver(bit < BITS_CEIL);
+  assert_fatal(bit < BITS_CEIL);
   return set | ((Bits)1 << bit);
 }
 
 static void bits_add_to(Bits *set, U8 bit) { *set = bits_add(*set, bit); }
 
 static Bits bits_del(Bits set, U8 bit) {
-  aver(bit < BITS_CEIL);
+  assert_fatal(bit < BITS_CEIL);
   return set & ~((Bits)1 << bit);
 }
 

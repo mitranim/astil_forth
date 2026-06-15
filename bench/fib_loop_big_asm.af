@@ -10,14 +10,14 @@ fun: asm_adc_reg { Xd Xn Xm -- instr }
   0b1_0_0_11010000_00000_000000_00000_00000 or
 end
 
-fun: fib { depth -- lo hi } [
-  0 comp_clobber
-  1 comp_clobber
-  2 comp_clobber
-  3 comp_clobber
-  4 comp_clobber
-  5 comp_clobber
-  6 comp_clobber
+fun: fib { _depth -- lo hi } [
+  0 comp_realloc_reg
+  1 comp_realloc_reg
+  2 comp_realloc_reg
+  3 comp_realloc_reg
+  4 comp_realloc_reg
+  5 comp_realloc_reg
+  6 comp_realloc_reg
 
   4 0   asm_mov_reg             comp_instr \ mov  x4, x0
   0 1   asm_mov_imm             comp_instr \ mov  x0, 1

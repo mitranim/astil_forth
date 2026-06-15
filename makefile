@@ -113,7 +113,7 @@ run_s:
 
 # Usage example:
 #
-#   make run_w args='forth/test.af -'
+#   make run_w args='forth/test/test.af -'
 .PHONY: run_w
 run_w:
 	$(WATCH_ALL) -- $(MAKE) run
@@ -149,7 +149,7 @@ repl_s:
 
 .PHONY: test
 test:
-	make run args='forth/test.af --build=$(TEST_EXE)'
+	make run args='forth/test/test.af --build=$(TEST_EXE)'
 	./$(TEST_EXE)
 
 # 	$(MAKE) test_repl
@@ -164,7 +164,7 @@ test_w:
 
 .PHONY: test_s
 test_s:
-	make run_s args=forth/test_s.af
+	make run_s args=forth/test/test_s.af
 
 .PHONY: test_s_w
 test_s_w:

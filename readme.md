@@ -95,7 +95,7 @@ end
 \ add x0, x0, x1
 fun: + { i0 i1 -- i2 }
   [
-    0                 comp_clobber
+    0                 comp_realloc_reg
     0 0 1 asm_add_reg comp_instr
     1                 comp_args_set
   ]

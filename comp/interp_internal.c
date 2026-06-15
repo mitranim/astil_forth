@@ -145,7 +145,10 @@ static Err read_interp_num(Interp *interp) {
   IF_DEBUG(eprintf("[system] read number: " FMT_SINT "\n", num));
 
   const auto comp = &interp->comp;
-  if (comp->ctx.compiling) return comp_append_push_imm(comp, num);
+
+  if (comp->ctx.compiling) {
+    return comp_append_push_imm(comp, num);
+  }
 
   stack_push(&interp->ints, num);
 
@@ -273,7 +276,7 @@ static Err interp_word(Interp *interp, Word_str word) {
 
   if (ctx->compiling) {
     const auto loc = comp_local_get(comp, name);
-    if (loc) return comp_append_local_get_next(comp, loc);
+    if (loc) return comp_append_push_from_local(comp, loc);
 
     auto sym = dict_get(dict_comp, name);
     if (sym) return interp_call_sym(interp, sym);
@@ -319,38 +322,34 @@ static Err interp_loop(Interp *interp) {
   const auto read = interp_reader(interp);
 
   while (reader_has_more(read)) {
-    const auto beg = read->pos;
-    U8         next;
-    try(read_ascii_printable(read, &next));
+    const auto next = read_char_at(read, read->pos);
+    try(validate_ascii_printable(next));
 
     switch (HEAD_CHAR_KIND[next]) {
-      case CHAR_EOF:        return nullptr;
-      case CHAR_WHITESPACE: continue;
+      case CHAR_EOF: return nullptr;
+
+      case CHAR_WHITESPACE: {
+        read->pos++;
+        continue;
+      }
 
       case CHAR_DECIMAL: {
-        read->pos = beg;
         try(read_interp_num(interp));
         continue;
       }
 
       // `+` and `-` are ambiguous: may begin a number or a word.
       case CHAR_ARITH: {
-        U8 next_next;
-        try(read_ascii_printable(read, &next_next));
-
-        if (HEAD_CHAR_KIND[next_next] == CHAR_DECIMAL) {
-          read->pos = beg;
+        if (HEAD_CHAR_KIND[read_char_at(read, read->pos + 1)] == CHAR_DECIMAL) {
           try(read_interp_num(interp));
           continue;
         }
 
-        read->pos = beg;
         try(read_interp_word(interp));
         continue;
       }
 
       case CHAR_WORD: {
-        read->pos = beg;
         try(read_interp_word(interp));
         continue;
       }

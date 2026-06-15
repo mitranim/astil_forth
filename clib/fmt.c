@@ -160,21 +160,21 @@ static char *fmt_bytes_into(char *buf, Ind cap, const U8 *src, Ind src_len) {
     *buf_top++ = digits[byte & (U8)0b1111];
   }
 
-  aver(buf_top <= inner_ceil);
+  assert_fatal(buf_top <= inner_ceil);
 
   // Ran out of buffer for inner content.
   if (src_top < src_ceil) {
     buf_top -= 4;
-    aver(buf_top >= inner_beg);
+    assert_fatal(buf_top >= inner_beg);
     *buf_top++ = '.';
     *buf_top++ = '.';
     *buf_top++ = '.';
   }
 
-  aver(buf_top < buf_end);
+  assert_fatal(buf_top < buf_end);
   *buf_top++ = '}';
 
-  aver(buf_top <= buf_end);
+  assert_fatal(buf_top <= buf_end);
   *buf_top = '\0';
 
   return buf;

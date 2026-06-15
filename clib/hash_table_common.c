@@ -52,7 +52,7 @@ static void hash_table_init(Hash_table *out, Ind cap, Ind key_size, Ind val_size
   }
 
   // Power of 2, or 0. Assumed by `hash_table_loaded` and `hash_table_probe_ind`.
-  IF_DEBUG(aver(!(cap & (cap - 1))));
+  IF_DEBUG(assert_fatal(!(cap & (cap - 1))));
 
   auto bits_len = hash_table_bits_arr_len(cap);
 
@@ -171,7 +171,7 @@ static Ind hash_table_available_ind(
   Eq_fun            eq_fun,
   bool             *new
 ) {
-  aver(tab->cap > tab->len);
+  assert_fatal(tab->cap > tab->len);
   const auto hash = hash_fun(key, key_size);
 
   for (Ind iter = 0; iter < tab->cap; iter++) {
@@ -228,7 +228,7 @@ static void hash_table_rehash(
     );
     const auto key_next = ptr_at(next.keys, ind_next, key_size);
     const auto val_next = ptr_at(next.vals, ind_next, val_size);
-    aver(new);
+    assert_fatal(new);
 
     memcpy(key_next, key_prev, key_size);
     memcpy(val_next, val_prev, val_size);

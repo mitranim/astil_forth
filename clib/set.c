@@ -23,7 +23,7 @@ static void set_init_impl(Set *set, Ind cap, Ind size) {
   }
 
   // Power of 2, or 0. Assumed by `set_loaded` and `set_probe_ind`.
-  IF_DEBUG(aver(!(cap & (cap - 1))));
+  IF_DEBUG(assert_fatal(!(cap & (cap - 1))));
 
   const auto bits_len = hash_table_bits_arr_len(cap);
 
@@ -147,76 +147,76 @@ int main() {
   deferred(set_deinit) set_of(Sint) set = {};
   // set_eprint_repr((Set *)&set);
 
-  aver(set.len == 0);
-  aver(set.cap == 0);
-  aver(!set_has(&set, 0));
-  aver(!set_has(&set, 10));
-  aver(!set_has(&set, 20));
+  assert_fatal(set.len == 0);
+  assert_fatal(set.cap == 0);
+  assert_fatal(!set_has(&set, 0));
+  assert_fatal(!set_has(&set, 10));
+  assert_fatal(!set_has(&set, 20));
 
   for (span(3)) {
     set_add(&set, 10);
     // set_eprint_repr((Set *)&set);
-    aver(set.len == 1);
-    aver(set.cap == HASH_TABLE_INIT_CAP);
-    aver(!set_has(&set, 0));
-    aver(set_has(&set, 10));
-    aver(!set_has(&set, 20));
+    assert_fatal(set.len == 1);
+    assert_fatal(set.cap == HASH_TABLE_INIT_CAP);
+    assert_fatal(!set_has(&set, 0));
+    assert_fatal(set_has(&set, 10));
+    assert_fatal(!set_has(&set, 20));
   }
 
   for (span(3)) {
     set_add(&set, 20);
     // set_eprint_repr((Set *)&set);
-    aver(set.len == 2);
-    aver(set.cap == HASH_TABLE_INIT_CAP);
-    aver(!set_has(&set, 0));
-    aver(set_has(&set, 10));
-    aver(set_has(&set, 20));
-    aver(!set_has(&set, 30));
+    assert_fatal(set.len == 2);
+    assert_fatal(set.cap == HASH_TABLE_INIT_CAP);
+    assert_fatal(!set_has(&set, 0));
+    assert_fatal(set_has(&set, 10));
+    assert_fatal(set_has(&set, 20));
+    assert_fatal(!set_has(&set, 30));
   }
 
   for (span(3)) {
     set_add(&set, 30);
     // set_eprint_repr((Set *)&set);
-    aver(set.len == 3);
-    aver(!set_has(&set, 0));
-    aver(set_has(&set, 10));
-    aver(set_has(&set, 20));
-    aver(set_has(&set, 30));
-    aver(!set_has(&set, 40));
+    assert_fatal(set.len == 3);
+    assert_fatal(!set_has(&set, 0));
+    assert_fatal(set_has(&set, 10));
+    assert_fatal(set_has(&set, 20));
+    assert_fatal(set_has(&set, 30));
+    assert_fatal(!set_has(&set, 40));
   }
-  aver(set.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(set.cap == HASH_TABLE_INIT_CAP * 2);
 
   for (span(3)) {
     set_add(&set, 40);
     // set_eprint_repr((Set *)&set);
-    aver(set.len == 4);
-    aver(set.cap == HASH_TABLE_INIT_CAP * 2);
-    aver(!set_has(&set, 0));
-    aver(set_has(&set, 10));
-    aver(set_has(&set, 20));
-    aver(set_has(&set, 30));
-    aver(set_has(&set, 40));
-    aver(!set_has(&set, 50));
+    assert_fatal(set.len == 4);
+    assert_fatal(set.cap == HASH_TABLE_INIT_CAP * 2);
+    assert_fatal(!set_has(&set, 0));
+    assert_fatal(set_has(&set, 10));
+    assert_fatal(set_has(&set, 20));
+    assert_fatal(set_has(&set, 30));
+    assert_fatal(set_has(&set, 40));
+    assert_fatal(!set_has(&set, 50));
   }
 
   for (span(3)) {
     set_add(&set, 50);
     // set_eprint_repr((Set *)&set);
-    aver(set.len == 5);
-    aver(!set_has(&set, 0));
-    aver(set_has(&set, 10));
-    aver(set_has(&set, 20));
-    aver(set_has(&set, 30));
-    aver(set_has(&set, 40));
-    aver(set_has(&set, 50));
-    aver(!set_has(&set, 60));
+    assert_fatal(set.len == 5);
+    assert_fatal(!set_has(&set, 0));
+    assert_fatal(set_has(&set, 10));
+    assert_fatal(set_has(&set, 20));
+    assert_fatal(set_has(&set, 30));
+    assert_fatal(set_has(&set, 40));
+    assert_fatal(set_has(&set, 50));
+    assert_fatal(!set_has(&set, 60));
   }
-  aver(set.cap == HASH_TABLE_INIT_CAP * 4);
+  assert_fatal(set.cap == HASH_TABLE_INIT_CAP * 4);
 
   set_deinit(&set);
-  aver(!set.vals);
-  aver(!set.bits);
-  aver(!set.len);
-  aver(!set.cap);
+  assert_fatal(!set.vals);
+  assert_fatal(!set.bits);
+  assert_fatal(!set.len);
+  assert_fatal(!set.cap);
 }
 */

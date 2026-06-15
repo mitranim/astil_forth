@@ -89,101 +89,101 @@ int main() {
   deferred(dict_deinit) dict_of(Sint) dict = {};
   // dict_eprint_repr((Dict *)&dict);
 
-  aver(dict.len == 0);
-  aver(dict.cap == 0);
+  assert_fatal(dict.len == 0);
+  assert_fatal(dict.cap == 0);
 
-  aver(!dict_has(&dict, ""));
-  aver(!dict_has(&dict, "one"));
-  aver(!dict_has(&dict, "two"));
+  assert_fatal(!dict_has(&dict, ""));
+  assert_fatal(!dict_has(&dict, "one"));
+  assert_fatal(!dict_has(&dict, "two"));
 
-  aver(dict_get(&dict, "") == 0);
-  aver(dict_get(&dict, "one") == 0);
-  aver(dict_get(&dict, "two") == 0);
+  assert_fatal(dict_get(&dict, "") == 0);
+  assert_fatal(dict_get(&dict, "one") == 0);
+  assert_fatal(dict_get(&dict, "two") == 0);
 
   dict_set(&dict, "one", 10);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 1);
-  aver(dict.cap == HASH_TABLE_INIT_CAP);
-  aver(!dict_has(&dict, ""));
-  aver(dict_has(&dict, "one"));
-  aver(dict_get(&dict, "one") == 10);
-  aver(!dict_has(&dict, "two"));
+  assert_fatal(dict.len == 1);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!dict_has(&dict, ""));
+  assert_fatal(dict_has(&dict, "one"));
+  assert_fatal(dict_get(&dict, "one") == 10);
+  assert_fatal(!dict_has(&dict, "two"));
 
   dict_set(&dict, "one", 20);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 1);
-  aver(dict.cap == HASH_TABLE_INIT_CAP);
-  aver(!dict_has(&dict, ""));
-  aver(dict_get(&dict, "one") == 20);
-  aver(!dict_has(&dict, "two"));
+  assert_fatal(dict.len == 1);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!dict_has(&dict, ""));
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(!dict_has(&dict, "two"));
 
   dict_set(&dict, "two", 30);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 2);
-  aver(dict.cap == HASH_TABLE_INIT_CAP);
-  aver(!dict_has(&dict, ""));
-  aver(dict_get(&dict, "one") == 20);
-  aver(dict_get(&dict, "two") == 30);
-  aver(!dict_has(&dict, "three"));
+  assert_fatal(dict.len == 2);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!dict_has(&dict, ""));
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(dict_get(&dict, "two") == 30);
+  assert_fatal(!dict_has(&dict, "three"));
 
   dict_set(&dict, "two", 40);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 2);
-  aver(dict.cap == HASH_TABLE_INIT_CAP);
-  aver(!dict_has(&dict, ""));
-  aver(dict_get(&dict, "one") == 20);
-  aver(dict_get(&dict, "two") == 40);
-  aver(!dict_has(&dict, "three"));
+  assert_fatal(dict.len == 2);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!dict_has(&dict, ""));
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(dict_get(&dict, "two") == 40);
+  assert_fatal(!dict_has(&dict, "three"));
 
   dict_set(&dict, "three", 50);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 3);
-  aver(dict.cap == HASH_TABLE_INIT_CAP);
-  aver(!dict_has(&dict, ""));
-  aver(dict_get(&dict, "one") == 20);
-  aver(dict_get(&dict, "two") == 40);
-  aver(dict_get(&dict, "three") == 50);
-  aver(!dict_has(&dict, "four"));
+  assert_fatal(dict.len == 3);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!dict_has(&dict, ""));
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(dict_get(&dict, "two") == 40);
+  assert_fatal(dict_get(&dict, "three") == 50);
+  assert_fatal(!dict_has(&dict, "four"));
 
   dict_set(&dict, "three", 60);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 3);
-  aver(dict.cap == HASH_TABLE_INIT_CAP * 2);
-  aver(dict_get(&dict, "one") == 20);
-  aver(dict_get(&dict, "two") == 40);
-  aver(dict_get(&dict, "three") == 60);
+  assert_fatal(dict.len == 3);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(dict_get(&dict, "two") == 40);
+  assert_fatal(dict_get(&dict, "three") == 60);
 
   dict_set(&dict, "four", 70);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 4);
-  aver(dict.cap == HASH_TABLE_INIT_CAP * 2);
-  aver(dict_get(&dict, "one") == 20);
-  aver(dict_get(&dict, "two") == 40);
-  aver(dict_get(&dict, "three") == 60);
-  aver(dict_get(&dict, "four") == 70);
+  assert_fatal(dict.len == 4);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(dict_get(&dict, "two") == 40);
+  assert_fatal(dict_get(&dict, "three") == 60);
+  assert_fatal(dict_get(&dict, "four") == 70);
 
   dict_set(&dict, "four", 80);
   // dict_eprint_repr((Dict *)&dict);
-  aver(dict.len == 4);
-  aver(dict.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(dict.len == 4);
+  assert_fatal(dict.cap == HASH_TABLE_INIT_CAP * 2);
 
-  aver(dict_get(&dict, "one") == 20);
-  aver(dict_get(&dict, "two") == 40);
-  aver(dict_get(&dict, "three") == 60);
-  aver(dict_get(&dict, "four") == 80);
+  assert_fatal(dict_get(&dict, "one") == 20);
+  assert_fatal(dict_get(&dict, "two") == 40);
+  assert_fatal(dict_get(&dict, "three") == 60);
+  assert_fatal(dict_get(&dict, "four") == 80);
 
-  aver(dict_get(&dict, strdup("")) == 0);
-  aver(dict_get(&dict, strdup("one")) == 20);
-  aver(dict_get(&dict, strdup("two")) == 40);
-  aver(dict_get(&dict, strdup("three")) == 60);
-  aver(dict_get(&dict, strdup("four")) == 80);
+  assert_fatal(dict_get(&dict, strdup("")) == 0);
+  assert_fatal(dict_get(&dict, strdup("one")) == 20);
+  assert_fatal(dict_get(&dict, strdup("two")) == 40);
+  assert_fatal(dict_get(&dict, strdup("three")) == 60);
+  assert_fatal(dict_get(&dict, strdup("four")) == 80);
 
   dict_deinit(&dict);
 
-  aver(!dict.keys);
-  aver(!dict.vals);
-  aver(!dict.bits);
-  aver(!dict.len);
-  aver(!dict.cap);
+  assert_fatal(!dict.keys);
+  assert_fatal(!dict.vals);
+  assert_fatal(!dict.bits);
+  assert_fatal(!dict.len);
+  assert_fatal(!dict.cap);
 }
 */

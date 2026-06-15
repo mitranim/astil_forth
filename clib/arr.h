@@ -17,7 +17,7 @@
 #define arr_ptr_at_inner(tmp, arr, ind) \
   ({                                    \
     const Ind tmp = ind;                \
-    aver(tmp < arr_cap(arr));           \
+    assert_fatal(tmp < arr_cap(arr));   \
     &(arr)[tmp];                        \
   })
 

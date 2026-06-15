@@ -49,9 +49,6 @@ static constexpr Bits ASM_REGS_VOLATILE = 0b11111111'11111111;
 // x0 ... x7
 static constexpr Bits ASM_PARAM_REGS = 0b11111111;
 
-// x0 ... x15
-static constexpr Bits ASM_ARG_REGS = ASM_REGS_VOLATILE;
-
 static constexpr U8 ASM_REG_LEN           = 32;
 static constexpr U8 ASM_VOLATILE_REG_LEN  = 16;
 static constexpr U8 ASM_INP_PARAM_REG_LEN = 8;
@@ -137,8 +134,7 @@ static constexpr U8 ASM_STABLE_REG_LEN = ASM_STABLE_REG_LAST - ASM_STABLE_REG_FI
 
 // Magic numbers for `brk` instructions. Makes them more identifiable.
 typedef enum : Instr {
-  ASM_CODE_IMM = 1,
-  ASM_CODE_RET,
+  ASM_CODE_RET = 1,
   ASM_CODE_TRY,
   ASM_CODE_THROW,
   ASM_CODE_RECUR,

@@ -21,19 +21,17 @@ fun: callback { inout -- err }
 end
 
 fun: main
-  instr' callback  { instr  } \ Raw instruction address.
-  " missing/none"  { path0  } \ Input for `thread0`: missing file.
-  " forth/lang.af" { path1  } \ Input for `thread1`: existing file.
-  path0            { val0   } \ Input-output for `thread0`.
-  path1            { val1   } \ Input-output for `thread1`.
-  ref' val0        { inout0 }
-  ref' val1        { inout1 }
+  instr' callback  { instr } \ Raw instruction address.
+  " missing/none"  { path0 } \ Input for `thread0`: missing file.
+  " forth/lang.af" { path1 } \ Input for `thread1`: existing file.
+  path0 >slot      { val0  } \ Input-output for `thread0`.
+  path1 >slot      { val1  } \ Input-output for `thread1`.
 
   " [main] spawning thread 0..." log lf
-  instr inout0 thread_spawn { thread0 err0 }
+  instr val0 thread_spawn { thread0 err0 }
 
   " [main] spawning thread 1..." log lf
-  instr inout1 thread_spawn { thread1 err1 }
+  instr val1 thread_spawn { thread1 err1 }
 
   if err0 then
     " [main] unable to spawn thread 0: %s" err0 logf lf
@@ -56,7 +54,7 @@ fun: main
     elif err0 then
       " [main] error from thread 0: %s" err0 logf lf
     else
-      " [main] result from thread 0: length of `%s`: %zd" path0 val0 logf lf
+      " [main] result from thread 0: length of `%s`: %zd" path0 val0 @ logf lf
     end
   end
 
@@ -69,7 +67,7 @@ fun: main
     elif err1 then
       " [main] error from thread 1: %s" err1 logf lf
     else
-      " [main] result from thread 1: length of `%s`: %zd" path1 val1 logf lf
+      " [main] result from thread 1: length of `%s`: %zd" path1 val1 @ logf lf
     end
   end
 end

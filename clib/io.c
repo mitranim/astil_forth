@@ -130,7 +130,7 @@ static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
   try(fd_stat(path, file, &info));
 
   if (!S_ISREG(info.st_mode)) return err_file_not_regular(path);
-  aver(info.st_size >= 0);
+  assert_fatal(info.st_size >= 0);
 
   const auto file_len = (Uint)info.st_size;
   const auto buf_len  = ADD(file_len, 1);
@@ -271,7 +271,7 @@ static Err write_all(int file, const U8 *buf, Uint len, int *out_err) {
 
     if (wrote > 0) {
       const auto val = (Uint)wrote;
-      aver(val <= len);
+      assert_fatal(val <= len);
       buf += val;
       len -= val;
       continue;

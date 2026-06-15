@@ -101,9 +101,9 @@ Relevant stuff in compiler code:
 - `Comp_ctx`
 - `Loc_fixup`
 - `Loc_read`
-- `Loc_write`
+- `Loc_reloc`
 - `asm_fixup_locals`
-- `comp_append_local_set_next`
+- `comp_append_push_into_local`
 
 Here, the locals use no instructions, because every register matches and is not clobbered by anything else:
 
@@ -287,16 +287,16 @@ Callers can use remaining volatile registers:
 
 ```forth
 : example_callee_with_clobbers [
-  0 comp_clobber \ x0
-  1 comp_clobber \ x1
-  2 comp_clobber \ x2
-  3 comp_clobber \ x3
-  4 comp_clobber \ x4
-  5 comp_clobber \ x5
-  6 comp_clobber \ x6
-  7 comp_clobber \ x7
-  8 comp_clobber \ x8
-  9 comp_clobber \ x9
+  0 comp_realloc_reg \ x0
+  1 comp_realloc_reg \ x1
+  2 comp_realloc_reg \ x2
+  3 comp_realloc_reg \ x3
+  4 comp_realloc_reg \ x4
+  5 comp_realloc_reg \ x5
+  6 comp_realloc_reg \ x6
+  7 comp_realloc_reg \ x7
+  8 comp_realloc_reg \ x8
+  9 comp_realloc_reg \ x9
 ] ;
 
 : example_caller_with_locals

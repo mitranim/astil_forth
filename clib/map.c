@@ -51,95 +51,95 @@ int main() {
   deferred(map_deinit) map_of(Sint, Uint) map = {};
   // map_eprint_repr((const Map *)&map);
 
-  aver(map.len == 0);
-  aver(map.cap == 0);
+  assert_fatal(map.len == 0);
+  assert_fatal(map.cap == 0);
 
-  aver(!map_has(&map, 0));
-  aver(!map_has(&map, -11));
-  aver(!map_has(&map, -22));
+  assert_fatal(!map_has(&map, 0));
+  assert_fatal(!map_has(&map, -11));
+  assert_fatal(!map_has(&map, -22));
 
-  aver(map_get(&map, 0) == 0);
-  aver(map_get(&map, -11) == 0);
-  aver(map_get(&map, -22) == 0);
+  assert_fatal(map_get(&map, 0) == 0);
+  assert_fatal(map_get(&map, -11) == 0);
+  assert_fatal(map_get(&map, -22) == 0);
 
   map_set(&map, -11, 10);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 1);
-  aver(map.cap == HASH_TABLE_INIT_CAP);
-  aver(!map_has(&map, 0));
-  aver(map_has(&map, -11));
-  aver(map_get(&map, -11) == 10);
-  aver(!map_has(&map, -22));
+  assert_fatal(map.len == 1);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!map_has(&map, 0));
+  assert_fatal(map_has(&map, -11));
+  assert_fatal(map_get(&map, -11) == 10);
+  assert_fatal(!map_has(&map, -22));
 
   map_set(&map, -11, 20);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 1);
-  aver(map.cap == HASH_TABLE_INIT_CAP);
-  aver(!map_has(&map, 0));
-  aver(map_get(&map, -11) == 20);
-  aver(!map_has(&map, -22));
+  assert_fatal(map.len == 1);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!map_has(&map, 0));
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(!map_has(&map, -22));
 
   map_set(&map, -22, 30);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 2);
-  aver(map.cap == HASH_TABLE_INIT_CAP);
-  aver(!map_has(&map, 0));
-  aver(map_get(&map, -11) == 20);
-  aver(map_get(&map, -22) == 30);
-  aver(!map_has(&map, -33));
+  assert_fatal(map.len == 2);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!map_has(&map, 0));
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(map_get(&map, -22) == 30);
+  assert_fatal(!map_has(&map, -33));
 
   map_set(&map, -22, 40);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 2);
-  aver(map.cap == HASH_TABLE_INIT_CAP);
-  aver(!map_has(&map, 0));
-  aver(map_get(&map, -11) == 20);
-  aver(map_get(&map, -22) == 40);
-  aver(!map_has(&map, -33));
+  assert_fatal(map.len == 2);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!map_has(&map, 0));
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(map_get(&map, -22) == 40);
+  assert_fatal(!map_has(&map, -33));
 
   map_set(&map, -33, 50);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 3);
-  aver(map.cap == HASH_TABLE_INIT_CAP);
-  aver(!map_has(&map, 0));
-  aver(map_get(&map, -11) == 20);
-  aver(map_get(&map, -22) == 40);
-  aver(map_get(&map, -33) == 50);
-  aver(!map_has(&map, -44));
+  assert_fatal(map.len == 3);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP);
+  assert_fatal(!map_has(&map, 0));
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(map_get(&map, -22) == 40);
+  assert_fatal(map_get(&map, -33) == 50);
+  assert_fatal(!map_has(&map, -44));
 
   map_set(&map, -33, 60);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 3);
-  aver(map.cap == HASH_TABLE_INIT_CAP * 2);
-  aver(map_get(&map, -11) == 20);
-  aver(map_get(&map, -22) == 40);
-  aver(map_get(&map, -33) == 60);
+  assert_fatal(map.len == 3);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(map_get(&map, -22) == 40);
+  assert_fatal(map_get(&map, -33) == 60);
 
   map_set(&map, -44, 70);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 4);
-  aver(map.cap == HASH_TABLE_INIT_CAP * 2);
-  aver(map_get(&map, -11) == 20);
-  aver(map_get(&map, -22) == 40);
-  aver(map_get(&map, -33) == 60);
-  aver(map_get(&map, -44) == 70);
+  assert_fatal(map.len == 4);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(map_get(&map, -22) == 40);
+  assert_fatal(map_get(&map, -33) == 60);
+  assert_fatal(map_get(&map, -44) == 70);
 
   map_set(&map, -44, 80);
   // map_eprint_repr((const Map *)&map);
-  aver(map.len == 4);
-  aver(map.cap == HASH_TABLE_INIT_CAP * 2);
+  assert_fatal(map.len == 4);
+  assert_fatal(map.cap == HASH_TABLE_INIT_CAP * 2);
 
-  aver(map_get(&map, -11) == 20);
-  aver(map_get(&map, -22) == 40);
-  aver(map_get(&map, -33) == 60);
-  aver(map_get(&map, -44) == 80);
+  assert_fatal(map_get(&map, -11) == 20);
+  assert_fatal(map_get(&map, -22) == 40);
+  assert_fatal(map_get(&map, -33) == 60);
+  assert_fatal(map_get(&map, -44) == 80);
 
   map_deinit(&map);
 
-  aver(!map.keys);
-  aver(!map.vals);
-  aver(!map.bits);
-  aver(!map.len);
-  aver(!map.cap);
+  assert_fatal(!map.keys);
+  assert_fatal(!map.vals);
+  assert_fatal(!map.bits);
+  assert_fatal(!map.len);
+  assert_fatal(!map.cap);
 }
 */

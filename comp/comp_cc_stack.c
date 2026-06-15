@@ -88,17 +88,13 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   stack_rewind(&prev->asm_fix, &next->asm_fix);
 }
 
-// Returns a token representing a local which can be given to Forth code.
-// In the reg-based calling convention, this returns a different value.
-static Sint local_token(Local *loc) { return loc->fp_off; }
-
 static Err comp_append_push_imm(Comp *comp, Sint imm) {
   asm_append_stack_push_imm(comp, imm);
   IF_DEBUG(eprintf("[system] compiled push of number " FMT_SINT "\n", imm));
   return nullptr;
 }
 
-static Err comp_append_local_get_next(Comp *comp, Local *loc) {
+static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   const auto off = loc->fp_off;
   asm_append_local_read(comp, off);
   return nullptr;
@@ -107,7 +103,7 @@ static Err comp_append_local_get_next(Comp *comp, Local *loc) {
 /*
 The language bootstrap file implements this on its own.
 
-static Err comp_append_local_set_next(Comp *comp, Local *loc) {
+static Err comp_append_push_into_local(Comp *comp, Local *loc) {
   const auto off = loc->fp_off;
   asm_append_local_write(comp, off);
   return nullptr;
@@ -115,7 +111,7 @@ static Err comp_append_local_set_next(Comp *comp, Local *loc) {
 */
 
 static Err comp_call_intrin(Interp *interp, const Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_INTRIN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
   typedef Err(Fun)(Interp *);
   const auto fun = (Fun *)callee->intrin;
   const auto err = fun(interp);
@@ -129,13 +125,13 @@ in stack-CC, we don't actually track all register clobbers. We do however
 track the one we care about: the error reg.
 */
 static void comp_add_clobbers(Sym *caller, const Sym *callee) {
-  IF_DEBUG(aver(caller->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(caller->type == SYM_NORM));
   const auto reg = ASM_REG_ERR;
   if (bits_has(callee->clobber, reg)) bits_add_to(&caller->clobber, reg);
 }
 
 static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
-  IF_DEBUG(aver(callee->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(callee->type == SYM_NORM));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -153,7 +149,7 @@ static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
 }
 
 static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
-  IF_DEBUG(aver(callee->type == SYM_INTRIN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(asm_append_call_intrin(comp, caller, callee, err_mode));
@@ -163,7 +159,7 @@ static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
 }
 
 static Err comp_append_call_extern(Comp *comp, Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_EXTERN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   asm_append_call_extern(comp, caller, callee);

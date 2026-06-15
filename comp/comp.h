@@ -18,20 +18,13 @@ Procedure prologue also implicitly undergoes fixup.
 */
 typedef struct {
   enum {
-    ASM_FIX_IMM = 1,
-    ASM_FIX_RET,
+    ASM_FIX_RET = 1,
     ASM_FIX_TRY,
     ASM_FIX_THROW,
     ASM_FIX_RECUR,
   } type;
 
   union {
-    struct {
-      Instr *instr; // Instruction to patch.
-      Sint   num;   // Immediate value to load.
-      U8     reg;   // Register to load into.
-    } imm;
-
     Instr *ret; // b <epi_ok>
 
     struct {
@@ -53,6 +46,7 @@ typedef stack_of(Asm_fixup) Asm_fixups;
 #endif
 
 // 0x100000 * sizeof(Instr) = 4 MiB
+// SYNC[instr_heap_len].
 static constexpr Uint INSTR_HEAP_LEN = (1u << 22u) / sizeof(Instr);
 
 /*
@@ -64,6 +58,8 @@ flow words such as conditionals and loops.
 
 TODO: consider writing interp-only words to a separate sector,
 allowing us to elide them from the executable.
+
+SYNC[instr_heap_fields].
 */
 typedef struct {
   U8    guard_0[MEM_PAGE];      // PROT_NONE

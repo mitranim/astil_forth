@@ -35,8 +35,8 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
-  aver(out_len <= ASM_OUT_PARAM_REG_LEN);
+  assert_fatal(inp_len <= ASM_INP_PARAM_REG_LEN);
+  assert_fatal(out_len <= ASM_OUT_PARAM_REG_LEN);
 
   const auto ints     = &interp->ints;
   const auto ints_len = stack_len(ints);
@@ -159,15 +159,15 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
 
 // See `asm_append_call_intrin` for the explanation of the calling convention.
 TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
-  aver(sym->type == SYM_INTRIN);
+  assert_fatal(sym->type == SYM_INTRIN);
 
   const auto ints = &interp->ints;
 
   Sint inps[ASM_INP_PARAM_REG_LEN] = {};
   Sint outs[ASM_OUT_PARAM_REG_LEN] = {};
 
-  aver(sym->inp_len < ASM_INP_PARAM_REG_LEN);
-  aver(sym->out_len < ASM_OUT_PARAM_REG_LEN);
+  assert_fatal(sym->inp_len < ASM_INP_PARAM_REG_LEN);
+  assert_fatal(sym->out_len < ASM_OUT_PARAM_REG_LEN);
 
   Ind inp = 0;
   while (inp < sym->inp_len) {
@@ -177,14 +177,14 @@ TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
     inp++;
   }
 
-  aver(inp < ASM_INP_PARAM_REG_LEN);
+  assert_fatal(inp < ASM_INP_PARAM_REG_LEN);
   inps[inp++] = (Sint)interp;
 
   const U8 reg_out_len = sym->has_err ? sym->out_len - 1 : sym->out_len;
 
   Ind out = 0;
   while (out < reg_out_len) {
-    aver((inp + out) < ASM_INP_PARAM_REG_LEN);
+    assert_fatal((inp + out) < ASM_INP_PARAM_REG_LEN);
     inps[inp + out] = (Sint)&outs[out];
     out++;
   }
@@ -295,7 +295,7 @@ static Err asm_append_try_catch(
   const U8   caller_reg = caller->out_len - 1;
   const auto callee_reg = asm_sym_err_reg(callee);
 
-  IF_DEBUG(aver(callee_reg >= 0));
+  IF_DEBUG(assert_fatal(callee_reg >= 0));
 
   asm_append_try(comp, caller_reg, (U8)callee_reg);
   return nullptr;
@@ -337,7 +337,7 @@ pointers appropriately.
 static Err asm_append_call_intrin(
   Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
-  aver(callee->type == SYM_INTRIN);
+  assert_fatal(callee->type == SYM_INTRIN);
 
   const U8  inps   = callee->inp_len;
   const U8  outs   = callee->has_err ? callee->out_len - 1 : callee->out_len;
@@ -352,7 +352,7 @@ static Err asm_append_call_intrin(
     U8 out = 0;
     while (out < outs) {
       U8 reg = inps + 1 + out;
-      aver(reg < ASM_INP_PARAM_REG_LEN);
+      assert_fatal(reg < ASM_INP_PARAM_REG_LEN);
       asm_append_add_imm(comp, reg, ASM_REG_SP, MUL(out, size));
       out++;
     }
@@ -366,7 +366,7 @@ static Err asm_append_call_intrin(
   if (sp_off) asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);
 
   if (callee->has_err && outs) {
-    aver(outs < ASM_OUT_PARAM_REG_LEN);
+    assert_fatal(outs < ASM_OUT_PARAM_REG_LEN);
     asm_append_mov_reg(comp, outs, ASM_PARAM_REG_0);
   }
 
@@ -374,8 +374,8 @@ static Err asm_append_call_intrin(
     U8 reg = 0;
     while (reg < outs) {
       const auto out_off = (Sint)(reg * size) - (Sint)sp_off;
-      aver(reg < ASM_OUT_PARAM_REG_LEN);
-      aver(out_off < 0);
+      assert_fatal(reg < ASM_OUT_PARAM_REG_LEN);
+      assert_fatal(out_off < 0);
       asm_append_load_unscaled_offset(comp, reg, ASM_REG_SP, out_off);
       reg++;
     }
@@ -388,7 +388,7 @@ static Err asm_append_call_intrin(
 }
 
 static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
-  aver(callee->type == SYM_EXTERN);
+  assert_fatal(callee->type == SYM_EXTERN);
 
   // Free to use because extern calls clobber everything anyway.
   constexpr auto reg = ASM_SCRATCH_REG_8;
@@ -405,11 +405,13 @@ TODO: for both callventions: support larger offsets.
 Arm64 `ldr` and `str` are limited to 32760, which is
 insufficient when abusing `alloca`.
 */
-static void asm_validate_local_off(Ind off) { aver(off > 0 && off <= 32'760); }
+static void asm_validate_local_off(Ind off) {
+  assert_fatal(off > 0 && off <= 32'760);
+}
 
 // SYNC[asm_local_addressing].
 static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
-  IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
+  IF_DEBUG(assert_fatal(loc->location != LOC_UNKNOWN));
 
   switch (loc->location) {
     case LOC_REG: {
@@ -427,7 +429,7 @@ static Instr asm_instr_local_read(Local *loc, U8 tar_reg) {
 
 // SYNC[asm_local_addressing].
 static Instr asm_instr_local_write(Local *loc, U8 src_reg) {
-  IF_DEBUG(aver(loc->location != LOC_UNKNOWN));
+  IF_DEBUG(assert_fatal(loc->location != LOC_UNKNOWN));
 
   switch (loc->location) {
     case LOC_REG: {
@@ -482,7 +484,7 @@ static void asm_resolve_local_location(Comp *comp, Local *loc, Sym *sym) {
 }
 
 static void asm_fixup_loc_read(Comp *comp, Loc_fixup *fix, Sym *sym) {
-  IF_DEBUG(aver(fix->type == LOC_FIX_READ));
+  IF_DEBUG(assert_fatal(fix->type == LOC_FIX_READ));
 
   const auto read = &fix->read;
   const auto loc  = read->loc;
@@ -491,25 +493,25 @@ static void asm_fixup_loc_read(Comp *comp, Loc_fixup *fix, Sym *sym) {
   *read->instr = asm_instr_local_read(loc, read->reg);
 }
 
-static void asm_fixup_loc_write(Comp *comp, Loc_fixup *fix, Sym *sym) {
-  IF_DEBUG(aver(fix->type == LOC_FIX_WRITE));
+static void asm_fixup_loc_reloc(Comp *comp, Loc_fixup *fix, Sym *sym) {
+  IF_DEBUG(assert_fatal(fix->type == LOC_FIX_RELOC));
 
-  const auto write = &fix->write;
+  const auto reloc = &fix->reloc;
+  const auto instr = reloc->instr;
 
   // This VERY dirty hack allows us to preserve the simplicity of forward-only
   // single-pass assembly, without having to invent an IR and have the library
   // and program code deal with an extra API. Nops are cheap and significantly
   // better than memory ops anyway.
-  if (!write->confirmed) {
-    const auto instr = write->instr;
+  if (!reloc->confirmed) {
     if (asm_skipped_prologue_instr(comp, sym, instr)) return;
     *instr = ASM_INSTR_NOP;
     return;
   }
 
-  const auto loc = write->loc;
+  const auto loc = reloc->loc;
   asm_resolve_local_location(comp, loc, sym);
-  *write->instr = asm_instr_local_write(loc, write->reg);
+  *instr = asm_instr_local_write(loc, reloc->reg);
 }
 
 /*
@@ -533,10 +535,10 @@ static void asm_fixup_locals(Comp *comp, Sym *sym) {
   const auto ctx = &comp->ctx;
 
   // Figure out which volatile registers are available for locals.
-  aver(ctx->vol_regs == BITS_ALL);
+  assert_fatal(ctx->vol_regs == BITS_ALL);
   ctx->vol_regs = asm_remaining_vol_regs(sym);
 
-  aver(!ctx->saved_reg);
+  assert_fatal(!ctx->saved_reg);
 
   for (stack_range(auto, fix, &ctx->loc_fix)) {
     switch (fix->type) {
@@ -544,11 +546,16 @@ static void asm_fixup_locals(Comp *comp, Sym *sym) {
         asm_fixup_loc_read(comp, fix, sym);
         continue;
       }
-      case LOC_FIX_WRITE: {
-        asm_fixup_loc_write(comp, fix, sym);
+      case LOC_FIX_RELOC: {
+        asm_fixup_loc_reloc(comp, fix, sym);
         continue;
       }
       default: unreachable();
     }
   }
+}
+
+static void asm_backtrack_instrs_opt(Comp *comp, Ind floor, Ind ceil) {
+  const auto instrs = &comp->code.code_write;
+  if (instrs->len == ceil) instrs->len = floor;
 }

@@ -60,7 +60,7 @@ static Err interp_init_syms(Interp *interp) {
     try(interp_wordlist(interp, sym->wordlist, &dict));
 
     sym_init_intrin(sym);
-    IF_DEBUG(aver(!dict_has(dict, sym->name.buf)));
+    IF_DEBUG(assert_fatal(!dict_has(dict, sym->name.buf)));
     dict_set(dict, sym->name.buf, sym);
 
     const auto syms = &comp->code.intrins;
@@ -68,15 +68,15 @@ static Err interp_init_syms(Interp *interp) {
   }
 
   IF_DEBUG({
-    aver(dict_has(&interp->dict_exec, ":"));
-    aver(dict_has(&interp->dict_comp, ";"));
+    assert_fatal(dict_has(&interp->dict_exec, ":"));
+    assert_fatal(dict_has(&interp->dict_comp, ";"));
 
     const auto            syms = &comp->code.intrins;
     static constexpr auto len  = arr_cap(INTRIN);
 
-    aver(syms->addrs.len == len);
-    aver(stack_len(&syms->names) == len);
-    aver(syms->inds.len == len);
+    assert_fatal(syms->addrs.len == len);
+    assert_fatal(stack_len(&syms->names) == len);
+    assert_fatal(syms->inds.len == len);
   });
   return nullptr;
 }

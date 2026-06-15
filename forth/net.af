@@ -63,20 +63,20 @@ fun: net_addr_info { port -- ainf err }
   SOCK_STREAM hint Addrinfo_socktype !
   AI_PASSIVE  hint Addrinfo_flags    !
 
-  nil { ainf }
-  nil port hint ref' ainf getaddrinfo { code }
+  slot { ainf }
+  nil port hint ainf getaddrinfo { code }
 
   if code then
     code gai_strerror { msg }
     " unable to listen on port %s; code: %zd; msg: %s" port code msg errf throw
   end
 
-  ifz ainf then
+  ifz ainf @ then
     \ This line should not be reached on Posix-conforming systems.
     " unable to listen on port %s: no addrinfo available" port errf throw
   end
 
-  ainf
+  ainf @
 end
 
 fun: sock_close { sock -- err }

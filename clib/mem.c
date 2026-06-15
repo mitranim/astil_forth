@@ -142,11 +142,11 @@ static void buf_reserve(Buf *buf, Ind more) {
   if (buf->cap >= goal) return;
 
   const Ind cap = round_up_pow2_Ind(goal);
-  aver(cap);
-  aver(cap >= goal);
+  assert_fatal(cap);
+  assert_fatal(cap >= goal);
 
   const auto dat = realloc(buf->dat, cap);
-  aver(dat);
+  assert_fatal(dat);
 
   buf->dat = dat;
   buf->cap = cap;

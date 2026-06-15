@@ -256,9 +256,17 @@ contexts:
   parens-params-inner-pop:
     - meta_scope: markup.raw.astil_forth meta.parens.astil_forth
     - include: parens-end-pop
-    - include: special-param-match
+    - include: parens-special-match
     - include: parens-param-match
     - include: nonblank-pop
+
+  parens-special-match:
+    - match: '{{word_begin}}{{word}}(:){{word_end}}'
+      scope: storage.modifier.astil_forth
+      captures:
+        1: punctuation.separator.astil_forth
+    - match: '{{word_begin}}--{{word_end}}'
+      scope: punctuation.separator.astil_forth
 
   parens-param-match:
     - match: '{{parens_param}}'
@@ -277,23 +285,18 @@ contexts:
 
   braces-params-inner-pop:
     - include: braces-end-pop
-    - include: braces-dash-match
-    - include: special-param-match
-    - include: braces-param-match
-    - include: nonblank-pop
-
-  braces-dash-match:
     - match: '{{word_begin}}--{{word_end}}'
       scope: punctuation.separator.astil_forth
       set: braces-params-output-pop
+    - include: braces-param-match
+    - include: nonblank-pop
 
   braces-params-output-pop:
-    - meta_scope: markup.raw.astil_forth meta.parens.astil_forth
-    # This trick gets rid of the "raw" scope for the closing brace.
-    - match: (?=\s*\})
-      set: braces-end-pop
-    - include: special-param-match
-    - include: braces-other-match
+    - match: '{{word_begin}}--{{word_end}}'
+      scope: punctuation.separator.astil_forth
+    - match: '{{word_begin}}err{{word_end}}(?=\s+})'
+      scope: variable.parameter.astil_forth storage.modifier.astil_forth
+    - include: braces-param-match
     - include: nonblank-pop
 
   # Used only for input parameters.
@@ -310,14 +313,6 @@ contexts:
     - match: \}
       scope: punctuation.section.braces.end.astil_forth
       pop: 1
-
-  special-param-match:
-    - match: '{{word_begin}}{{word}}(:){{word_end}}'
-      scope: storage.modifier.astil_forth
-      captures:
-        1: punctuation.separator.astil_forth
-    - match: '{{word_begin}}--{{word_end}}'
-      scope: punctuation.separator.astil_forth
 
   # Convention for word-declaring words.
   declaring-word-match:

@@ -104,7 +104,7 @@ static Err validate_sym_inlinable(const Sym *sym) {
 
   // Same as `err_inline_pc_rel`. Redundant check for safety.
   const auto spans = &sym->norm.spans;
-  IF_DEBUG(aver(sym->norm.has_loads == (spans->data < spans->ceil)));
+  IF_DEBUG(assert_fatal(sym->norm.has_loads == (spans->data < spans->ceil)));
   if (spans->data < spans->ceil) return err_inline_has_data(sym);
 
   return nullptr;

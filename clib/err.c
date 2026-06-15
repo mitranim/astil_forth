@@ -32,9 +32,13 @@ static void abort_traced() {
 }
 
 [[noreturn]]
-static void aver_fatal(const char *expr, const char *file, int line) {
+static void fatal_assert(const char *expr, const char *file, int line) {
   fprintf(stderr, "assertion failed: (%s); %s:%d\n", expr, file, line);
   abort_traced();
+}
+
+static Err err_assert_fail(const char *expr, const char *file, int line) {
+  return errf("assertion failed: (%s); %s:%d", expr, file, line);
 }
 
 [[noreturn]]

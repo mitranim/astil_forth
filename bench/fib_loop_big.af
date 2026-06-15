@@ -4,13 +4,6 @@ import' std:lang.af
 \
 \ Emulates 128-bit integers in 64-bit GPRs.
 
-fun: u< { left right -- bool } [
-  0                    comp_clobber
-  0 1      asm_cmp_reg comp_instr \ cmp x0, x1
-  0 ASM_CC asm_cset    comp_instr \ cset x0, cc
-  1                    comp_args_set
-] end
-
 fun: int128_add { lo0 hi0 lo1 hi1 -- lo hi }
   lo0 lo1 + { lo }
   lo lo0 u< { carry }

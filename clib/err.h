@@ -13,16 +13,31 @@ MUST_USE typedef const char *Err;
 
 typedef Err Err_fun(void);
 
-// Assert with backtrace. Name yoinked from SBCL.
-#define aver(expr)                                                           \
+/*
+Assert with backtrace. Name yoinked from SBCL.
+
+TODO: convert all assertions from "this is fatal"
+to recoverable "try"-style statements; see below.
+*/
+#define assert_fatal(expr)                                                   \
   ({                                                                         \
     static_assert(                                                           \
       !__builtin_types_compatible_p(typeof_unqual(expr), typeof_unqual(Err)) \
     );                                                                       \
-    if (!(expr)) aver_fatal(#expr, __FILE__, __LINE__);                      \
+    if (!(expr)) fatal_assert(#expr, __FILE__, __LINE__);                    \
   })
 
-#define averr_inner(tmp, expr)                    \
+#define err_assert(expr)                                                     \
+  ({                                                                         \
+    static_assert(                                                           \
+      !__builtin_types_compatible_p(typeof_unqual(expr), typeof_unqual(Err)) \
+    );                                                                       \
+    (expr) ? nullptr : err_assert_fail(#expr, __FILE__, __LINE__);           \
+  })
+
+#define try_assert(expr) try(err_assert(expr))
+
+#define try_fatal_inner(tmp, expr)                \
   {                                               \
     Err tmp = expr;                               \
     if (tmp) {                                    \
@@ -30,10 +45,10 @@ typedef Err Err_fun(void);
     }                                             \
   }
 
-#define averr(...) averr_inner(UNIQ_IDENT, __VA_ARGS__)
+#define try_fatal(...) try_fatal_inner(UNIQ_IDENT, __VA_ARGS__)
 
 #ifdef FAST_CRASH
-#define try averr
+#define try try_fatal
 #else
 #define try_inner(tmp, expr) \
   {                          \

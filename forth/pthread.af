@@ -15,9 +15,8 @@ import' ./lang.af
 \ ## Types
 
 \ `pthread_t`. Used by value except in "create".
-\ Can be used as a local addressed via `ref'`.
 \ See usage in `examples/threads_*.f`.
-size' Adr int: Pthread
+CELL int: Pthread
 
 \ `pthread_attr_t`; used by reference.
 64 8 opaque: Pthread_attr
@@ -208,11 +207,11 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 \ If error, caller owns `inp`. Otherwise, thread owns `inp`.
 fun: thread_spawn { fun inp -- thread err }
   nil { attr }
-  nil { thread }
+  slot { thread }
 
-  ref' thread attr fun inp pthread_create
+  thread attr fun inp pthread_create
   " unable to spawn thread" posix_err? { err }
-  thread err
+  thread @ err
 end
 
 \ Wraps `pthread_create` with `PTHREAD_CREATE_DETACHED`.
@@ -220,7 +219,7 @@ end
 \ If error, caller owns `inp`. Otherwise, thread owns `inp`.
 fun: thread_spawn_detached { fun inp -- thread err }
   alloca' Pthread_attr { attr   }
-  nil                  { thread }
+  slot                 { thread }
 
   attr pthread_attr_init
   " unable to init thread attributes" posix_err? try
@@ -229,18 +228,18 @@ fun: thread_spawn_detached { fun inp -- thread err }
   " unable to mark thread as detached" posix_err? { err }
 
   ifz err then
-    ref' thread attr fun inp pthread_create
+    thread attr fun inp pthread_create
     " unable to spawn detached thread" posix_err? { err }
   end
 
   attr pthread_attr_destroy { -- }
-  thread err
+  thread @ err
 end
 
 \ Wraps `pthread_join`, throwing a descriptive error on failure.
 fun: thread_join { thread -- out err }
-  nil { out }
-  thread ref' out pthread_join
+  slot { out }
+  thread out pthread_join
   " unable to join with thread" posix_err? { err }
-  out err
+  out @ err
 end

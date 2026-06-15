@@ -95,7 +95,7 @@ typedef span_of(F64)  F64_span;
 #define stack_push_inner(tmp, stack, ...) \
   ({                                      \
     const auto tmp = (stack)->top;        \
-    aver(tmp < (stack)->ceil);            \
+    assert_fatal(tmp < (stack)->ceil);    \
     *tmp         = __VA_ARGS__;           \
     (stack)->top = tmp + 1;               \
     tmp;                                  \

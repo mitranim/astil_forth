@@ -95,7 +95,7 @@ static bool stack_valid(Stack const *stack) {
 // clang-format on
 
 static void stack_rewind_impl(const Stack *prev, Stack *next) {
-  aver(next->floor == prev->floor);
+  assert_fatal(next->floor == prev->floor);
   next->top = prev->top;
 }
 

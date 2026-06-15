@@ -54,7 +54,7 @@ static void asm_append_stack_push_imm(Comp *comp, Sint imm) {
   mov <reg>, <imm>
   str <reg>, [x27], 8
   */
-  asm_append_imm_to_reg(comp, ASM_SCRATCH_REG_8, imm, nullptr);
+  asm_append_imm_to_reg(comp, ASM_SCRATCH_REG_8, imm);
   asm_append_stack_push_from(comp, ASM_SCRATCH_REG_8);
 }
 
@@ -162,7 +162,7 @@ We detect these calls and set `Sym.interp_only` for later use.
 static Err asm_append_call_intrin(
   Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
-  IF_DEBUG(aver(callee->type == SYM_INTRIN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
 
   constexpr auto reg = ASM_SCRATCH_REG_8;
 
@@ -177,13 +177,13 @@ static Err asm_append_call_intrin(
 }
 
 static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_EXTERN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
 
   const auto inp_len = callee->inp_len;
   const auto out_len = callee->out_len;
 
-  IF_DEBUG(aver(inp_len <= ASM_INP_PARAM_REG_LEN));
-  IF_DEBUG(aver(out_len <= 1));
+  IF_DEBUG(assert_fatal(inp_len <= ASM_INP_PARAM_REG_LEN));
+  IF_DEBUG(assert_fatal(out_len <= 1));
 
   // TODO use `ldp` for even pairs.
   if (inp_len > 7) asm_append_stack_pop_into(comp, ASM_PARAM_REG_7);

@@ -206,17 +206,14 @@ static Err intrin_comp_instr(Interp *interp) {
 }
 
 static Err intrin_comp_load(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
+  try(interp_require_current_sym(interp, nullptr));
 
   Sint imm;
   U8   reg;
   try(interp_pop_reg(interp, &reg));
   try(int_stack_pop(&interp->ints, &imm));
 
-  bool has_load = true;
-  asm_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load);
-  if (has_load) sym->norm.has_loads = true;
+  asm_append_imm_to_reg(&interp->comp, (U8)reg, imm);
   return nullptr;
 }
 
@@ -260,7 +257,7 @@ static Err intrin_comp_call(Interp *interp) {
 
 static Err intrin_read_char(Interp *interp) {
   char out;
-  try(interp_char(interp, &out));
+  try(interp_read_char(interp, &out));
   try(int_stack_push(&interp->ints, out));
   return nullptr;
 }
@@ -279,7 +276,7 @@ static Err intrin_read_until_char(Interp *interp) {
 
   Sint delim;
   try(int_stack_pop(ints, &delim));
-  try(validate_char_ascii_printable(delim));
+  try(validate_ascii_printable(delim));
 
   const char *buf;
   Ind         len;
@@ -369,32 +366,35 @@ static Err intrin_inline_word(Interp *interp) {
 
 static Err intrin_execute(Interp *interp) { return intrin_end(interp); }
 
-static Err intrin_comp_local_named(Interp *interp) {
-  const char *name;
-  Ind         len;
-  try(interp_pop_str(interp, &name, &len));
+static Err intrin_comp_local(Interp *interp) {
+  const auto ints = &interp->ints;
 
-  Local *loc;
-  try(interp_get_local(interp, name, len, &loc));
+  Sint len;
+  Sint name;
+  try(int_stack_pop(ints, &len));
+  try(int_stack_pop(ints, &name));
 
-  if (!loc->inited) {
-    comp_local_alloc_mem(&interp->comp, loc);
-    loc->inited = true;
+  const auto comp = &interp->comp;
+
+  if (name) {
+    try(interp_validate_data_ptr(name));
+    try(interp_validate_data_len(len));
+
+    Local *loc;
+    try(interp_get_local(interp, (const char *)name, (Ind)len, &loc));
+
+    if (!loc->inited) {
+      comp_local_alloc_mem(comp, loc);
+      loc->inited = true;
+    }
+
+    try(int_stack_push(&interp->ints, loc->fp_off));
+    return nullptr;
   }
 
-  const auto tok = local_token(loc);
-  try(int_stack_push(&interp->ints, tok));
-  return nullptr;
-}
-
-static Err intrin_comp_local_anon(Interp *interp) {
-  const auto comp = &interp->comp;
-  const auto loc  = comp_local_anon(comp);
-
+  const auto loc = comp_local_anon(comp);
   comp_local_alloc_mem(comp, loc);
-
-  const auto tok = local_token(loc);
-  try(int_stack_push(&interp->ints, (Sint)tok));
+  try(int_stack_push(&interp->ints, loc->fp_off));
   return nullptr;
 }
 

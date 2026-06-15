@@ -94,7 +94,7 @@ Crashes the program if length is <= 0.
 #define list_pop_inner(tmp, list) \
   ({                              \
     const auto tmp = list;        \
-    aver(tmp->len > 0);           \
+    assert_fatal(tmp->len > 0);   \
     tmp->dat[--tmp->len];         \
   })
 
@@ -103,7 +103,7 @@ Crashes the program if length is <= 0.
 #define list_ptr_below_inner(tmp, list, ind, max) \
   ({                                              \
     const auto tmp = ind;                         \
-    aver(tmp >= 0 && tmp < (max));                \
+    assert_fatal(tmp >= 0 && tmp < (max));        \
     &((list)->dat[tmp]);                          \
   })
 
@@ -147,12 +147,12 @@ Does not initialize memory at location.
 #define list_elem_ptr(...) \
   list_elem_ptr_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
-#define list_elem_inner(tmp_list, tmp_ind, list, ind) \
-  ({                                                  \
-    const auto tmp_list = list;                       \
-    const auto tmp_ind  = ind;                        \
-    aver(tmp_ind >= 0 && tmp_ind < tmp_list->len);    \
-    tmp_list->dat[tmp_ind];                           \
+#define list_elem_inner(tmp_list, tmp_ind, list, ind)      \
+  ({                                                       \
+    const auto tmp_list = list;                            \
+    const auto tmp_ind  = ind;                             \
+    assert_fatal(tmp_ind >= 0 && tmp_ind < tmp_list->len); \
+    tmp_list->dat[tmp_ind];                                \
   })
 
 // Returns element at index. Crashes if out of bounds.
@@ -171,11 +171,11 @@ Does not initialize memory at location.
 #define list_head_ptr(...) list_head_ptr_inner(UNIQ_IDENT, __VA_ARGS__)
 
 // Returns first element. Crashes if out of bounds.
-#define list_head_inner(tmp, list) \
-  ({                               \
-    const auto tmp = list;         \
-    aver(tmp->dat && tmp->len);    \
-    tmp->dat[0];                   \
+#define list_head_inner(tmp, list)      \
+  ({                                    \
+    const auto tmp = list;              \
+    assert_fatal(tmp->dat && tmp->len); \
+    tmp->dat[0];                        \
   })
 
 #define list_head(...) list_head_inner(UNIQ_IDENT, __VA_ARGS__)
@@ -189,11 +189,11 @@ Does not initialize memory at location.
 // Returns pointer to last element, or nil if empty.
 #define list_last_ptr(...) list_last_ptr_inner(UNIQ_IDENT, __VA_ARGS__)
 
-#define list_last_inner(tmp, list) \
-  ({                               \
-    const auto tmp = list;         \
-    aver(tmp->dat && tmp->len);    \
-    tmp->dat[tmp->len - 1];        \
+#define list_last_inner(tmp, list)      \
+  ({                                    \
+    const auto tmp = list;              \
+    assert_fatal(tmp->dat && tmp->len); \
+    tmp->dat[tmp->len - 1];             \
   })
 
 // Returns last element. Crashes if out of bounds.
@@ -203,7 +203,7 @@ Does not initialize memory at location.
 #define list_push_inner(tmp_list, tmp_ptr, list, ...)     \
   ({                                                      \
     const auto tmp_list = list;                           \
-    aver(tmp_list->len < tmp_list->cap);                  \
+    assert_fatal(tmp_list->len < tmp_list->cap);          \
     const auto tmp_ptr = &tmp_list->dat[tmp_list->len++]; \
     *tmp_ptr           = __VA_ARGS__;                     \
     tmp_ptr;                                              \
@@ -215,7 +215,7 @@ Does not initialize memory at location.
 #define list_push_ind_inner(tmp_list, tmp_ind, list, ...) \
   ({                                                      \
     const auto tmp_list = list;                           \
-    aver(tmp_list->len < tmp_list->cap);                  \
+    assert_fatal(tmp_list->len < tmp_list->cap);          \
     const auto tmp_ind     = tmp_list->len++;             \
     tmp_list->dat[tmp_ind] = __VA_ARGS__;                 \
     tmp_ind;                                              \

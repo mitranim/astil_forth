@@ -28,7 +28,7 @@ SYNC[mach_codesign_total_size].
 static U32 mach_codesign_total_size(U32 file_off, U8 id_len) {
   // NOLINTEND(bugprone-easily-swappable-parameters)
 
-  aver(is_aligned_to(file_off, MCS_PAGE_SIZE));
+  assert_fatal(is_aligned_to(file_off, MCS_PAGE_SIZE));
 
   U32 out = sizeof(Mach_codesign_head) + sizeof(Mach_codesign_index) +
     sizeof(Mach_codesign_dir);
@@ -64,7 +64,7 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
     buf_append_bigend_U32(buf, src.magic);
     buf_append_bigend_U32(buf, src.length);
     buf_append_bigend_U32(buf, src.count);
-    aver(buf->len - beg == sizeof(src));
+    assert_fatal(buf->len - beg == sizeof(src));
   }
 
   {
@@ -76,7 +76,7 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
     const auto beg = buf->len;
     buf_append_bigend_U32(buf, src.type);
     buf_append_bigend_U32(buf, src.offset);
-    aver(buf->len - beg == sizeof(src));
+    assert_fatal(buf->len - beg == sizeof(src));
   }
 
   {
@@ -119,7 +119,7 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
     buf_append_bigend_U64(buf, src.exec_seg_base);
     buf_append_bigend_U64(buf, src.exec_seg_limit);
     buf_append_bigend_U64(buf, src.exec_seg_flags);
-    aver(buf->len - beg == sizeof(src));
+    assert_fatal(buf->len - beg == sizeof(src));
   }
 
   buf_append_bytes(buf, (const U8 *)cfg.id, cfg.id_len);
@@ -127,7 +127,7 @@ static void mach_codesign(Mach_codesign_cfg cfg) {
 
   {
     // An internal restriction for peace of mind.
-    aver(divisible_by(cfg.src_len, MCS_PAGE_SIZE));
+    assert_fatal(divisible_by(cfg.src_len, MCS_PAGE_SIZE));
     static_assert(MCS_HASH_SIZE == SHA256_SIZE);
 
     const U8 *page = cfg.src;

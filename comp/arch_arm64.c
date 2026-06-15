@@ -77,7 +77,7 @@ static Instr *comp_code_next_writable_instr(const Comp_code *code) {
 }
 
 static const Instr *comp_sym_exec_instr(const Comp *comp, const Sym *sym) {
-  IF_DEBUG(aver(sym->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
   return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.prologue);
 }
 
@@ -93,20 +93,20 @@ static Err comp_code_sync(Comp_code *code) {
   const auto beg = &exec->dat[exec_len];
   const auto end = beg + diff;
   const auto len = (U8 *)end - (U8 *)beg;
-  aver(len > 0 && len < IND_MAX);
+  assert_fatal(len > 0 && len < IND_MAX);
 
   // This alignment is only needed when `../clib/jit.c` uses `mprotect`.
   const auto page_beg = __builtin_align_down(beg, MEM_PAGE);
   const auto page_end = __builtin_align_up(end, MEM_PAGE);
   const auto page_len = (U8 *)page_end - (U8 *)page_beg;
-  aver(page_len > 0 && page_len < IND_MAX);
+  assert_fatal(page_len > 0 && page_len < IND_MAX);
 
   IF_DEBUG({
-    aver(page_beg >= exec->dat);
-    aver(page_end <= exec->dat + exec->cap);
-    aver(page_len > 0);
-    aver(page_beg <= beg);
-    aver(end <= page_end);
+    assert_fatal(page_beg >= exec->dat);
+    assert_fatal(page_end <= exec->dat + exec->cap);
+    assert_fatal(page_len > 0);
+    assert_fatal(page_beg <= beg);
+    assert_fatal(end <= page_end);
   });
 
   try(jit_before_write(page_beg, (Ind)page_len));
@@ -118,7 +118,7 @@ static Err comp_code_sync(Comp_code *code) {
 }
 
 static bool comp_code_is_sym_ready(const Comp_code *code, const Sym *sym) {
-  IF_DEBUG(aver(sym->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
   return code->code_exec.len >= sym->norm.spans.ceil;
 }
 
@@ -142,26 +142,54 @@ static Err asm_validate_reg(Sint reg) {
   return errf("invalid register value " FMT_SINT, reg);
 }
 
-static Err asm_validate_input_param_reg(Sint reg) {
-  if (reg >= 0 && reg < ASM_INP_PARAM_REG_LEN) return nullptr;
+static Err err_too_many_input_params(Sint req) {
   return errf(
     "too many input parameters: %d registers available, " FMT_SINT
     " parameters requested",
     ASM_INP_PARAM_REG_LEN,
-    reg + 1
+    req
+  );
+}
+
+static Err asm_validate_input_param_reg(Sint reg) {
+  if (reg >= 0 && reg < ASM_INP_PARAM_REG_LEN) return nullptr;
+  return err_too_many_input_params(reg + 1);
+}
+
+static Err asm_validate_input_param_count(Sint count) {
+  if (count >= 0 && count <= ASM_INP_PARAM_REG_LEN) return nullptr;
+  return err_too_many_input_params(count);
+}
+
+static Err err_too_many_output_params(Sint req) {
+  return errf(
+    "too many output parameters: %d registers available, " FMT_SINT
+    " parameters requested",
+    ASM_OUT_PARAM_REG_LEN,
+    req
   );
 }
 
 static Err asm_validate_output_param_reg(Sint reg) {
   if (reg >= 0 && reg < ASM_OUT_PARAM_REG_LEN) return nullptr;
-  return errf(
-    "too many output parameters: %d registers available, " FMT_SINT
-    " parameters requested",
-    ASM_OUT_PARAM_REG_LEN,
-    reg + 1
-  );
+  return err_too_many_output_params(reg + 1);
 }
 
+static Err asm_validate_output_param_count(Sint count) {
+  if (count >= 0 && count <= ASM_OUT_PARAM_REG_LEN) return nullptr;
+  return err_too_many_output_params(count);
+}
+
+/*
+We use all available volatile registers as our "comptime stack"
+for arguments. Note that we still follow the standard calling
+convention, which restricts function _parameters_ to fewer.
+
+TODO: this shouldn't always say "provided".
+See `comp_cc_reg.c` which uses this internally
+all over the place for different purposes.
+Sometimes it would be "requested" or something.
+*/
 static Err asm_validate_arg_reg(Sint reg) {
   if (reg >= 0 && reg < ASM_ARG_LEN_MAX) return nullptr;
   return errf(
@@ -225,7 +253,7 @@ where a signed `imm6` is expected, the CPU will interpret it as -32:
 Assumptions: `width < 32`, `sizeof(Sint) >= 32/8`.
 */
 static Err imm_signed(Sint src, U8 wid, Instr *out) {
-  IF_DEBUG(aver(wid));
+  IF_DEBUG(assert_fatal(wid));
 
   // Comments show example bit patterns with `wid = 6` within `U8`.
   // Some redundant casts were a concession to `clang-tidy` checks.
@@ -251,14 +279,14 @@ any functions with multiple outputs.
 Note: this works identically for both of our callventions.
 */
 static Err asm_call_extern(Sint_stack *stack, const Sym *sym) {
-  aver(sym->type == SYM_EXTERN);
+  assert_fatal(sym->type == SYM_EXTERN);
 
   const auto fun     = (Extern_fun *)sym->exter;
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  aver(inp_len <= ASM_INP_PARAM_REG_LEN);
-  aver(out_len <= 1);
+  assert_fatal(inp_len <= ASM_INP_PARAM_REG_LEN);
+  assert_fatal(out_len <= 1);
 
   Sint x0 = 0;
   Sint x1 = 0;
@@ -317,9 +345,9 @@ static Instr asm_instr_load_store_pre_post(
   Instr order = mod < 0 ? 0b11 : 0b01;
   Instr mod_val;
 
-  averr(imm_signed(mod, 9, &mod_val));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
+  try_fatal(imm_signed(mod, 9, &mod_val));
+  try_fatal(asm_validate_reg(val_reg));
+  try_fatal(asm_validate_reg(addr_reg));
 
   return ASM_BASE_LOAD_STORE | ((Instr)is_load << 22u) | (mod_val << 12u) |
     (order << 10u) | ((Instr)addr_reg << 5u) | val_reg;
@@ -373,12 +401,12 @@ Scaled offset can only be unsigned.
 static Instr asm_instr_load_store_scaled_offset(
   bool is_load, U8 val_reg, U8 addr_reg, Uint off
 ) {
-  aver(divisible_by(off, 8));
+  assert_fatal(divisible_by(off, 8));
   off /= 8;
 
-  averr(imm_unsigned(off, 12));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
+  try_fatal(imm_unsigned(off, 12));
+  try_fatal(asm_validate_reg(val_reg));
+  try_fatal(asm_validate_reg(addr_reg));
 
   return (Instr)0b11'111'0'01'00'000000000000'00000'00000 |
     ((Instr)is_load << 22u) | ((Instr)off << 10u) | ((Instr)addr_reg << 5u) |
@@ -418,9 +446,9 @@ static Instr asm_instr_load_store_unscaled_offset(
   bool is_load, U8 val_reg, U8 addr_reg, Sint off
 ) {
   Instr imm;
-  averr(imm_signed(off, 9, &imm));
-  averr(asm_validate_reg(val_reg));
-  averr(asm_validate_reg(addr_reg));
+  try_fatal(imm_signed(off, 9, &imm));
+  try_fatal(asm_validate_reg(val_reg));
+  try_fatal(asm_validate_reg(addr_reg));
 
   return ASM_BASE_LOAD_STORE | ((Instr)is_load << 22u) | (imm << 12u) |
     ((Instr)addr_reg << 5u) | val_reg;
@@ -449,10 +477,10 @@ static void asm_append_store_unscaled_offset(
 }
 
 static void asm_append_load_literal_offset(Comp *comp, U8 reg, Sint off) {
-  averr(asm_validate_reg(reg));
+  try_fatal(asm_validate_reg(reg));
 
   Instr imm;
-  averr(imm_signed(off, 19, &imm));
+  try_fatal(imm_signed(off, 19, &imm));
 
   asm_append_instr(
     comp,
@@ -481,14 +509,14 @@ static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
   const auto     page_diff = (addr_page >> bits) - (pc_page >> bits);
   const auto     pageoff   = addr - addr_page;
 
-  aver(addr > prog);
-  aver(addr_page > pc_page);
-  aver(page_diff > 0);
-  aver(addr >= addr_page);
-  aver(pageoff < (1u << bits));
+  assert_fatal(addr > prog);
+  assert_fatal(addr_page > pc_page);
+  assert_fatal(page_diff > 0);
+  assert_fatal(addr >= addr_page);
+  assert_fatal(pageoff < (1u << bits));
 
   // The immediate can be 21-bit signed, but ours is always positive.
-  averr(imm_unsigned(page_diff, 20));
+  try_fatal(imm_unsigned(page_diff, 20));
 
   const Instr high = (Instr)page_diff >> 2u;
   const Instr low  = (Instr)page_diff & 0b11u;
@@ -536,15 +564,15 @@ is implicitly a multiple of the register width in bytes.
 static Instr asm_instr_load_store_pair(
   Instr opc, U8 reg0, U8 reg1, U8 addr_reg, Sint off
 ) {
-  aver(off >= -512 && off <= 504); // See Arm64 docs.
-  aver(divisible_by(off, 8));
+  assert_fatal(off >= -512 && off <= 504); // See Arm64 docs.
+  assert_fatal(divisible_by(off, 8));
   off /= 8;
 
   Instr off_val;
-  averr(imm_signed(off, 7, &off_val));
-  averr(asm_validate_reg(reg0));
-  averr(asm_validate_reg(reg1));
-  averr(asm_validate_reg(addr_reg));
+  try_fatal(imm_signed(off, 7, &off_val));
+  try_fatal(asm_validate_reg(reg0));
+  try_fatal(asm_validate_reg(reg1));
+  try_fatal(asm_validate_reg(addr_reg));
 
   return (Instr)0b10'101'0'001'0'0000000'00000'00000'00000 | (opc << 22u) |
     (off_val << 15u) | ((Instr)reg1 << 10u) | ((Instr)addr_reg << 5u) | reg0;
@@ -561,7 +589,7 @@ static void asm_append_load_store_pair(
 // The offset is PC-relative and implicitly times 4.
 static Instr asm_instr_branch_to_offset(Sint off) {
   Instr imm;
-  averr(imm_signed(off, 26, &imm));
+  try_fatal(imm_signed(off, 26, &imm));
   return (Instr)0b0'00'101'00000000000000000000000000 | imm;
 }
 
@@ -583,7 +611,7 @@ The offset is implicitly times 4 at the CPU level.
 */
 static Instr asm_instr_branch_link_to_offset(Sint pc_off) {
   Instr imm26;
-  averr(imm_signed(pc_off, 26, &imm26));
+  try_fatal(imm_signed(pc_off, 26, &imm26));
   return (Instr)0b1'00'101'00000000000000000000000000 | imm26;
 }
 
@@ -592,16 +620,16 @@ static void asm_append_branch_link_to_offset(Comp *comp, Sint pc_off) {
 }
 
 static void asm_append_branch_link_to_reg(Comp *comp, U8 reg) {
-  averr(asm_validate_reg(reg));
+  try_fatal(asm_validate_reg(reg));
   const auto base = (Instr)0b110'101'1'0'0'01'11111'0000'0'0'00000'00000;
   asm_append_instr(comp, base | ((Instr)reg << 5u));
 }
 
 static Instr asm_instr_compare_branch(U8 reg, Sint off, bool non_zero) {
-  averr(asm_validate_reg(reg));
+  try_fatal(asm_validate_reg(reg));
 
   Instr imm;
-  averr(imm_signed(off, 19, &imm));
+  try_fatal(imm_signed(off, 19, &imm));
 
   // 0 = zero
   // 1 = zero not
@@ -634,24 +662,24 @@ static void asm_append_compare_branch_non_zero(Comp *comp, U8 reg, Sint off) {
 }
 
 // static const Instr *asm_sym_epilogue_writable(const Comp *comp, const Sym *sym) {
-//   aver(sym->type == SYM_NORM);
+//   assert_fatal(sym->type == SYM_NORM);
 //   return list_elem_ptr(&comp->code.code_write, sym->norm.spans.epilogue);
 // }
 
 // static const Instr *asm_sym_epilogue_executable(const Comp *comp, const Sym *sym) {
-//   aver(sym->type == SYM_NORM);
+//   assert_fatal(sym->type == SYM_NORM);
 //   return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.epilogue);
 // }
 
 static Instr *asm_sym_prologue_writable(const Comp *comp, const Sym *sym) {
-  aver(sym->type == SYM_NORM);
+  assert_fatal(sym->type == SYM_NORM);
   return list_elem_ptr(&comp->code.code_write, sym->norm.spans.prologue);
 }
 
 static Instr *asm_sym_prologue_executable(const Comp *comp, const Sym *sym) {
-  aver(sym->type == SYM_NORM);
+  assert_fatal(sym->type == SYM_NORM);
   const auto list = &comp->code.code_exec;
-  aver(sym->norm.spans.prologue < list->cap);
+  assert_fatal(sym->norm.spans.prologue < list->cap);
   return &list->dat[sym->norm.spans.prologue];
 }
 
@@ -660,7 +688,7 @@ We use breakpoint instructions with various magic codes
 when reserving space for later fixups.
 */
 static Instr asm_instr_breakpoint(Instr imm) {
-  averr(imm_unsigned(imm, 16));
+  try_fatal(imm_unsigned(imm, 16));
   // brk <imm>
   return (Instr)0b110'101'00'001'0000000000000000'000'00 | (imm << 5u);
 }
@@ -669,76 +697,46 @@ static Instr *asm_append_breakpoint(Comp *comp, Instr imm) {
   return asm_append_instr(comp, asm_instr_breakpoint(imm));
 }
 
-static void asm_fixup_load(Comp *comp, const Asm_fixup *fix, Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_IMM));
-
-  const auto write = &comp->code.code_write;
-  const auto imm   = &fix->imm;
-  const auto pci   = imm->instr;
-  const auto num   = imm->num;
-  const auto imm32 = (U32)num;
-  const auto top   = list_next_ptr(write);
-
-  IF_DEBUG(aver(*pci == asm_instr_breakpoint(ASM_CODE_IMM)));
-
-  Instr opc;
-  if ((Uint)imm32 == (Uint)num) {
-    opc = 0b00; // ldr <Wt>, <off>
-    asm_append_instr(comp, imm32);
-  }
-  else {
-    opc = 0b01; // ldr <Xt>, <off>
-    list_push_raw_val(write, num);
-  }
-
-  Instr imm19;
-  averr(imm_signed((top - pci), 19, &imm19));
-
-  *pci = (Instr)0b00'011'0'00'0000000000000000000'00000 | (opc << 30u) |
-    (imm19 << 5u) | imm->reg;
-  sym->norm.has_loads = true;
-}
-
 static void asm_fixup_ret(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_RET));
-  IF_DEBUG(aver(sym->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(fix->type == ASM_FIX_RET));
+  IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
 
   const auto code = &comp->code.code_write;
   const auto epi  = list_elem_ptr(code, sym->norm.spans.epi_ok);
   const auto tar  = fix->ret;
   const auto off  = epi - tar;
 
-  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RET)));
+  IF_DEBUG(assert_fatal(*tar == asm_instr_breakpoint(ASM_CODE_RET)));
   *tar = asm_instr_branch_to_offset(off);
 }
 
 static void asm_fixup_recur(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_RECUR));
+  IF_DEBUG(assert_fatal(fix->type == ASM_FIX_RECUR));
 
   const auto tar = fix->recur;
   const auto off = asm_sym_prologue_writable(comp, sym) - tar;
 
-  IF_DEBUG(aver(*tar == asm_instr_breakpoint(ASM_CODE_RECUR)));
+  IF_DEBUG(assert_fatal(*tar == asm_instr_breakpoint(ASM_CODE_RECUR)));
   *tar = asm_instr_branch_link_to_offset(off);
 }
 
 static void asm_fixup_try(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_TRY));
-  IF_DEBUG(aver(sym->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(fix->type == ASM_FIX_TRY));
+  IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
 
   const auto code  = &comp->code.code_write;
   const auto epi   = list_elem_ptr(code, sym->norm.spans.epi_err);
   const auto instr = fix->try.instr;
   const auto off   = epi - instr;
 
-  IF_DEBUG(aver(*instr == asm_instr_breakpoint(ASM_CODE_TRY)));
+  IF_DEBUG(assert_fatal(*instr == asm_instr_breakpoint(ASM_CODE_TRY)));
   *instr = asm_instr_compare_branch_non_zero(fix->try.err_reg, off);
 }
 
 static Instr asm_pattern_arith_imm(U8 tar_reg, U8 src_reg, Uint imm12) {
-  averr(imm_unsigned(imm12, 12));
-  averr(asm_validate_reg(src_reg));
-  averr(asm_validate_reg(tar_reg));
+  try_fatal(imm_unsigned(imm12, 12));
+  try_fatal(asm_validate_reg(src_reg));
+  try_fatal(asm_validate_reg(tar_reg));
   return (Instr)tar_reg | ((Instr)src_reg << 5u) | ((Instr)imm12 << 10u);
 }
 
@@ -779,9 +777,9 @@ static void asm_append_sub_imm(Comp *comp, U8 tar_reg, U8 src_reg, Uint imm) {
 
 // Shared by some integer arithmetic instructions.
 static Instr asm_pattern_arith_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
-  averr(asm_validate_reg(src_reg));
-  averr(asm_validate_reg(tar_reg));
-  averr(asm_validate_reg(mod_reg));
+  try_fatal(asm_validate_reg(src_reg));
+  try_fatal(asm_validate_reg(tar_reg));
+  try_fatal(asm_validate_reg(mod_reg));
   return (Instr)tar_reg | ((Instr)src_reg << 5u) | ((Instr)mod_reg << 16u);
 }
 
@@ -824,7 +822,7 @@ static Ind asm_align_sp_off(Ind off) { return __builtin_align_up(off, 16); }
 
 // and <reg>, <reg>, 0xfffffffffffffff0
 static void asm_append_sp_align(Comp *comp, U8 reg) {
-  averr(asm_validate_reg(reg));
+  try_fatal(asm_validate_reg(reg));
   asm_append_instr(comp, (Instr)0b1'00'100100'1'111100'111011'00000'00000 | reg);
 }
 
@@ -843,7 +841,7 @@ static Ind asm_sp_off(Ind off) {
 
 // SYNC[asm_sp_off].
 static void comp_local_alloc_mem(Comp *comp, Local *loc) {
-  aver(!loc->fp_off);
+  assert_fatal(!loc->fp_off);
 
   const auto ctx = &comp->ctx;
   auto       off = ctx->fp_off;
@@ -904,8 +902,8 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
     const auto brk = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
     const auto pro = &instrs->dat[spans->prologue];
 
-    aver((inner - pro) == len);
-    for (U8 ind = 0; ind < len; ind++) aver(pro[ind] == brk);
+    assert_fatal((inner - pro) == len);
+    for (U8 ind = 0; ind < len; ind++) assert_fatal(pro[ind] == brk);
   });
 
   /*
@@ -1063,8 +1061,8 @@ metadata for every return address and create backtraces when unwinding.
 static void asm_register_call(Comp *, const Sym *) {}
 
 static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
-  averr(asm_validate_reg(tar_reg));
-  averr(asm_validate_reg(src_reg));
+  try_fatal(asm_validate_reg(tar_reg));
+  try_fatal(asm_validate_reg(src_reg));
 
   return (Instr)0b1'01'01010'00'0'00000'000000'11111'00000 |
     ((Instr)src_reg << 16u) | (Instr)tar_reg;
@@ -1076,84 +1074,51 @@ static void asm_append_mov_reg(Comp *comp, U8 tar_reg, U8 src_reg) {
 }
 
 /*
-The instruction "mov wide immediate" supports an optional left shift
-which sometimes allows to encode larger immediates inline.
-*/
-static Instr asm_maybe_mov_imm_to_reg(
-  Instr base, Instr hw, Uint imm, Uint imm_max, U8 reg
-) {
-  aver(hw && hw <= 0b11);
-  averr(imm_unsigned(reg, 5));
-
-  const auto shift = (Uint)hw << 4u;
-  const auto low   = ((Uint)1 << shift) - 1;
-  if (imm & low) return 0;
-
-  const auto scaled = imm >> shift;
-  if (scaled > imm_max) return 0;
-
-  return base | (hw << 21u) | (Instr)(scaled << 5u) | reg;
-}
-
-/*
-Many immediates can be encoded inline inside a `mov`, sometimes with a shift.
-For immediates which do not fit, we reserve space for an instruction and emit
-a fixup record; when finalizing a function, we place the immediate after the
-body and rewrite the instruction with `ldr <off>`. There are other approaches.
-Many compilers place constants into a dedicated section in the executable and
-fold / dedup them, which should be better for the CPU cache. Some immediates
-can be split into `mov & add`. Some can become multiple `movk`. Maybe later.
+ARM64 move-wide instructions encode one 16-bit lane. `movz` and `movn`
+initialize all lanes to zero or ones; `movk` replaces one lane. This emits
+any 64-bit immediate inline in at most four instructions.
 
 SYNC[asm_imm_to_reg].
 */
-static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src, bool *has_load) {
-  averr(imm_unsigned(reg, 5));
-  if (has_load) *has_load = true;
+static Instr asm_instr_mov_wide(U8 reg, Instr opc, Uint hw, Uint imm16) {
+  try_fatal(imm_unsigned(reg, 5));
+  try_fatal(imm_unsigned(opc, 2));
+  assert_fatal(hw <= 0b11);
+  try_fatal(imm_unsigned(imm16, 16));
 
-  const auto imm = src < 0 ? ~(Uint)src : (Uint)src;
+  return (Instr)0b1'00'100101'00'0000000000000000'00000 | (opc << 29u) |
+    ((Instr)hw << 21u) | ((Instr)imm16 << 5u) | reg;
+}
 
-  // movn = 0b00
-  // movz = 0b10
-  const auto opc = (Instr)(src < 0 ? 0b00 : 0b10);
+static void asm_append_mov_wide(
+  Comp *comp, U8 reg, Instr opc, Uint hw, Uint imm16
+) {
+  asm_append_instr(comp, asm_instr_mov_wide(reg, opc, hw, imm16));
+}
 
-  // imm16 unsigned
-  constexpr auto imm_max = ((Uint)1 << 16u) - 1u;
+static Uint asm_imm16_lane(Uint val, Uint hw) {
+  assert_fatal(hw <= 0b11);
+  return (val >> (hw << 4u)) & 0xFFFFu;
+}
 
-  const auto base = (Instr)0b1'00'100101'00'0000000000000000'00000 |
-    (opc << 29u) | reg;
+static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src) {
+  const bool neg  = src < 0;
+  const auto bits = neg ? ~(Uint)src : (Uint)src;
+  const auto opc  = (Instr)(neg ? 0b00 : 0b10); // movn / movz
 
-  if (imm <= imm_max) {
-    asm_append_instr(comp, base | (Instr)((imm) << 5u));
-    if (has_load) *has_load = false;
-    return;
+  Uint base_hw = 0;
+  while (base_hw < 4 && !asm_imm16_lane(bits, base_hw)) base_hw++;
+  if (base_hw >= 4) base_hw = 0;
+
+  asm_append_mov_wide(comp, reg, opc, base_hw, asm_imm16_lane(bits, base_hw));
+
+  for (Uint hw = 0; hw < 4; hw++) {
+    const auto lane = asm_imm16_lane(bits, hw);
+    if (hw == base_hw || !lane) continue;
+
+    const auto imm16 = neg ? (~lane & 0xFFFFu) : lane;
+    asm_append_mov_wide(comp, reg, 0b11, hw, imm16); // movk
   }
-
-  Instr out = 0;
-  if ((out = asm_maybe_mov_imm_to_reg(base, 0b01u, imm, imm_max, reg))) {
-    asm_append_instr(comp, out);
-    if (has_load) *has_load = false;
-    return;
-  }
-  if ((out = asm_maybe_mov_imm_to_reg(base, 0b10u, imm, imm_max, reg))) {
-    asm_append_instr(comp, out);
-    if (has_load) *has_load = false;
-    return;
-  }
-  if ((out = asm_maybe_mov_imm_to_reg(base, 0b11u, imm, imm_max, reg))) {
-    asm_append_instr(comp, out);
-    if (has_load) *has_load = false;
-    return;
-  }
-
-  stack_push(
-    &comp->ctx.asm_fix,
-    (Asm_fixup){
-      .type      = ASM_FIX_IMM,
-      .imm.instr = asm_append_breakpoint(comp, ASM_CODE_IMM),
-      .imm.num   = src,
-      .imm.reg   = reg,
-    }
-  );
 }
 
 static void asm_append_add(Comp *comp, U8 tar_reg, U8 src_reg, Sint imm) {
@@ -1161,13 +1126,13 @@ static void asm_append_add(Comp *comp, U8 tar_reg, U8 src_reg, Sint imm) {
     asm_append_add_imm(comp, tar_reg, src_reg, (Uint)imm);
   }
   else {
-    asm_append_imm_to_reg(comp, tar_reg, imm, nullptr);
+    asm_append_imm_to_reg(comp, tar_reg, imm);
     asm_append_add_reg(comp, tar_reg, src_reg, tar_reg);
   }
 }
 
 static void asm_append_zero_reg(Comp *comp, U8 reg) {
-  averr(asm_validate_reg(reg));
+  try_fatal(asm_validate_reg(reg));
 
   // eor <reg>, <reg>, <reg>
   const auto ireg  = (Instr)reg;
@@ -1213,7 +1178,7 @@ static void asm_append_dysym_load(
 ) {
   const auto inds    = &syms->inds;
   const auto got_ind = dict_get_or(inds, name, INVALID_IND);
-  aver(got_ind != INVALID_IND);
+  assert_fatal(got_ind != INVALID_IND);
 
   const auto got_addr = syms->addrs.dat + got_ind;
   asm_append_page_load(comp, reg, (Uint)got_addr);
@@ -1242,7 +1207,7 @@ static Err asm_append_call_norm(
   const auto fun    = comp_sym_exec_instr(comp, callee);
   const auto pc_off = fun - comp_code_next_prog_counter(code);
 
-  aver(comp_code_is_instr_ours(code, fun));
+  assert_fatal(comp_code_is_instr_ours(code, fun));
   asm_append_branch_link_to_offset(comp, pc_off);
   asm_register_call(comp, caller);
   try(asm_append_try_catch(comp, caller, callee, err_mode));
@@ -1296,25 +1261,21 @@ static Err asm_inline_sym(
 }
 
 static void asm_fixup_throw(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
-  IF_DEBUG(aver(fix->type == ASM_FIX_THROW));
-  IF_DEBUG(aver(sym->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(fix->type == ASM_FIX_THROW));
+  IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
 
   const auto code  = &comp->code.code_write;
   const auto epi   = list_elem_ptr(code, sym->norm.spans.epi_err);
   const auto instr = fix->throw;
   const auto off   = epi - instr;
 
-  IF_DEBUG(aver(*instr == asm_instr_breakpoint(ASM_CODE_THROW)));
+  IF_DEBUG(assert_fatal(*instr == asm_instr_breakpoint(ASM_CODE_THROW)));
   *instr = asm_instr_branch_to_offset(off);
 }
 
 static void asm_fixup(Comp *comp, Sym *sym) {
   for (stack_range(auto, fix, &comp->ctx.asm_fix)) {
     switch (fix->type) {
-      case ASM_FIX_IMM: {
-        asm_fixup_load(comp, fix, sym);
-        continue;
-      }
       case ASM_FIX_RET: {
         asm_fixup_ret(comp, fix, sym);
         continue;

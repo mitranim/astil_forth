@@ -77,29 +77,29 @@ static constexpr auto INVALID_IND = (Ind)-1;
     val != INVALID_IND;                                                   \
   })
 
-#define add_inner(tmp, one, two)                   \
-  ({                                               \
-    typeof_unqual(one) tmp;                        \
-    aver(!__builtin_add_overflow(one, two, &tmp)); \
-    tmp;                                           \
+#define add_inner(tmp, one, two)                           \
+  ({                                                       \
+    typeof_unqual(one) tmp;                                \
+    assert_fatal(!__builtin_add_overflow(one, two, &tmp)); \
+    tmp;                                                   \
   })
 
 #define ADD(...) add_inner(UNIQ_IDENT, __VA_ARGS__)
 
-#define sub_inner(tmp, one, two)                   \
-  ({                                               \
-    typeof_unqual(one) tmp;                        \
-    aver(!__builtin_sub_overflow(one, two, &tmp)); \
-    tmp;                                           \
+#define sub_inner(tmp, one, two)                           \
+  ({                                                       \
+    typeof_unqual(one) tmp;                                \
+    assert_fatal(!__builtin_sub_overflow(one, two, &tmp)); \
+    tmp;                                                   \
   })
 
 #define SUB(...) sub_inner(UNIQ_IDENT, __VA_ARGS__)
 
-#define mul_inner(tmp, one, two)                   \
-  ({                                               \
-    typeof_unqual(one) tmp;                        \
-    aver(!__builtin_mul_overflow(one, two, &tmp)); \
-    tmp;                                           \
+#define mul_inner(tmp, one, two)                           \
+  ({                                                       \
+    typeof_unqual(one) tmp;                                \
+    assert_fatal(!__builtin_mul_overflow(one, two, &tmp)); \
+    tmp;                                                   \
   })
 
 #define MUL(...) mul_inner(UNIQ_IDENT, __VA_ARGS__)

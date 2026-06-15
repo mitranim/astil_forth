@@ -150,7 +150,7 @@ static void encode_linkedit_section(
     }
   }
 
-  aver(buf->len - base_len == sym_off);
+  assert_fatal(buf->len - base_len == sym_off);
 
   /*
   Symbol names. Each `Mach_fixup_import` appended above contains an offset of
@@ -269,9 +269,9 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     text_code_file_off + text_code_real_size
   );
 
-  aver(is_aligned_to(text_seg_size, MEM_PAGE));
-  aver(is_aligned_to(text_seg_vm_off, MEM_PAGE));
-  aver(is_aligned_to(text_seg_size, MEM_PAGE));
+  assert_fatal(is_aligned_to(text_seg_size, MEM_PAGE));
+  assert_fatal(is_aligned_to(text_seg_vm_off, MEM_PAGE));
+  assert_fatal(is_aligned_to(text_seg_size, MEM_PAGE));
 
   buf_append(
     buf,
@@ -318,12 +318,12 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   constexpr auto data_vm_off = text_code_vm_off + offsetof(Comp_heap, data) -
     offsetof(Comp_heap, exec.instrs);
 
-  aver(text_code_vm_off + text_seg_size <= data_vm_off);
+  assert_fatal(text_code_vm_off + text_seg_size <= data_vm_off);
 
-  aver(is_aligned_to(data_file_off, MEM_PAGE));
-  aver(is_aligned_to(data_file_size, MEM_PAGE));
-  aver(is_aligned_to(data_vm_off, MEM_PAGE));
-  aver(is_aligned_to(data_vm_size, MEM_PAGE));
+  assert_fatal(is_aligned_to(data_file_off, MEM_PAGE));
+  assert_fatal(is_aligned_to(data_file_size, MEM_PAGE));
+  assert_fatal(is_aligned_to(data_vm_off, MEM_PAGE));
+  assert_fatal(is_aligned_to(data_vm_size, MEM_PAGE));
 
   file_off += data_file_size;
 
@@ -364,11 +364,11 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   constexpr auto got_vm_off = text_code_vm_off + offsetof(Comp_heap, externs) -
     offsetof(Comp_heap, exec.instrs);
 
-  aver(data_vm_off + data_vm_size <= got_vm_off);
-  aver(is_aligned_to(got_file_off, MEM_PAGE));
-  aver(is_aligned_to(got_file_size, MEM_PAGE));
-  aver(is_aligned_to(got_vm_off, MEM_PAGE));
-  aver(is_aligned_to(got_vm_size, MEM_PAGE));
+  assert_fatal(data_vm_off + data_vm_size <= got_vm_off);
+  assert_fatal(is_aligned_to(got_file_off, MEM_PAGE));
+  assert_fatal(is_aligned_to(got_file_size, MEM_PAGE));
+  assert_fatal(is_aligned_to(got_vm_off, MEM_PAGE));
+  assert_fatal(is_aligned_to(got_vm_size, MEM_PAGE));
 
   file_off += got_file_size;
 
@@ -503,40 +503,40 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
 
   // Done writing headers; pad up to `__text` and write various sections.
 
-  aver(buf->len == sizeof(Mach_head) + cmd_size);
-  aver(sizeof(Mach_head) + cmd_size <= text_code_file_off);
+  assert_fatal(buf->len == sizeof(Mach_head) + cmd_size);
+  assert_fatal(sizeof(Mach_head) + cmd_size <= text_code_file_off);
 
   buf_zeropad_to(buf, text_code_file_off);
-  aver(buf->len == text_code_file_off);
+  assert_fatal(buf->len == text_code_file_off);
 
-  aver(text_code_real_size == instrs->len * sizeof(Instr));
+  assert_fatal(text_code_real_size == instrs->len * sizeof(Instr));
   buf_append_bytes(buf, (const U8 *)instrs->dat, text_code_real_size);
-  aver(buf->len == text_code_file_off + text_code_real_size);
+  assert_fatal(buf->len == text_code_file_off + text_code_real_size);
 
-  aver(buf->len <= data_file_off);
+  assert_fatal(buf->len <= data_file_off);
   buf_zeropad_to(buf, data_file_off);
-  aver(buf->len == data_file_off);
+  assert_fatal(buf->len == data_file_off);
 
-  aver(data_real_size == code->data.len);
+  assert_fatal(data_real_size == code->data.len);
   buf_append_bytes(buf, code->data.dat, data_real_size);
-  aver(buf->len == data_file_off + data_real_size);
+  assert_fatal(buf->len == data_file_off + data_real_size);
 
-  aver(buf->len <= got_file_off);
+  assert_fatal(buf->len <= got_file_off);
   buf_zeropad_to(buf, got_file_off);
-  aver(buf->len == got_file_off);
+  assert_fatal(buf->len == got_file_off);
 
   encode_got_section(comp, buf);
 
-  aver(buf->len <= linkedit_file_off);
-  aver(linkedit_file_off == got_file_off + got_file_size);
+  assert_fatal(buf->len <= linkedit_file_off);
+  assert_fatal(linkedit_file_off == got_file_off + got_file_size);
   buf_zeropad_to(buf, linkedit_file_off);
-  aver(buf->len == linkedit_file_off);
+  assert_fatal(buf->len == linkedit_file_off);
 
   buf_append_bytes(buf, linkedit.dat, linkedit.len);
-  aver(buf->len == linkedit_file_off + linkedit.len);
+  assert_fatal(buf->len == linkedit_file_off + linkedit.len);
 
   buf_zeropad_to(buf, sig_file_off);
-  aver(buf->len == sig_file_off);
+  assert_fatal(buf->len == sig_file_off);
 
   // Ad-hoc signature.
   mach_codesign((Mach_codesign_cfg){

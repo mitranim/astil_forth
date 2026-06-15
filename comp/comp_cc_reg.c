@@ -1,39 +1,13 @@
 /*
-This file contains compilation logic for the register-based callvention
-which is mutually exclusive with the stack-based callvention.
+Compilation logic for the register-based version of our system.
 
-Ideally, this logic should be arch-independent, while arch-specific logic
-should be placed in `arch_*.c` files. However, currently it hardcodes the
-assumption that input and output registers match 1-to-1, which holds when
-targeting Arm64 and Risc-V, and maybe some other arches, but not for x64.
-
-TODO: to support x64, we'd probably need to:
-
-- Treat "args" as speculative: they could be inputs or outputs.
-- Treat every register in "args" as speculative.
-- Emit a fixup for every "arg".
-- When encountering a "call" or "recur", commit to "args" being "inps".
-  Modify the latest "args" to reflect that. Commit each to the corresponding
-  input register number, according to the ABI.
-- When encountering a "ret", commit to "args" being "outs".
-  Do the same as above, but using output registers according to the ABI.
-- After a "call", remember that we have "outs" rather than "args".
-  "Outs" have specific known registers.
-- Assignments of locals after a call use the "out" regs as sources.
-- A "ret" in the "out" state uses the prior output regs as-is, unless
-  there's a mismatch between register types (we only use GPRs though).
-- The next "arg" or "call" in the "out" state requires converting
-  prior "outs" into "inps", moving between registers if needed.
-
-Instead of this hacky-sounding FSM logic, the usual "proper" solution
-is to build an AST during the first pass, then run semantic analysis,
-often involving extra intermediary representations, before eventually
-assembling. It would boil down to similar decisions anyway.
-
-Our system is built with the express goal of avoiding exactly that,
-and exploring the design space of AST-free single-pass forward-only
-assembly, which is only possible in a language like Forth. However,
-we still had to resort to an IR of sorts: the "fixups".
+Currently hardcodes the assumption "reg number = argument index",
+and assumes that inputs and outputs are in the same registers.
+This works beautifully on Arm64. If we ever support more arches,
+we'd need adapter logic for converting register numbers, which
+should be sufficient for RISC-V. x64 is a little trickier; we'd
+also need to convert output registers back into input registers,
+and do it lazily rather than immediately.
 */
 #pragma once
 #include "../clib/bits.c"
@@ -64,7 +38,7 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     is_aligned(&ctx->local_dict) &&
     is_aligned(&ctx->anon_locs) &&
     is_aligned(&ctx->fp_off) &&
-    is_aligned(&ctx->reg_vals) &&
+    is_aligned(&ctx->args) &&
     is_aligned(&ctx->vol_regs) &&
     is_aligned(ctx->sym) &&
     (!ctx->sym || sym_valid(ctx->sym)) &&
@@ -101,7 +75,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->asm_fix);
   stack_trunc(&ctx->locals);
   dict_trunc((Dict *)&ctx->local_dict);
-  arr_clear(ctx->reg_vals);
+  arr_clear(ctx->args);
 
   ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
@@ -109,7 +83,6 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->anon_locs);
   ptr_clear(&ctx->fp_off);
   ptr_clear(&ctx->saved_reg);
-  ptr_clear(&ctx->arg_low);
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
@@ -139,7 +112,6 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->fp_off     = prev->fp_off;
   next->vol_regs   = prev->vol_regs;
   next->saved_reg  = prev->saved_reg;
-  next->arg_low    = prev->arg_low;
   next->arg_len    = prev->arg_len;
   next->redefining = prev->redefining;
   next->compiling  = prev->compiling;
@@ -151,24 +123,11 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   stack_rewind(&prev->asm_fix, &next->asm_fix);
   stack_rewind(&prev->loc_fix, &next->loc_fix);
 
-  for (Ind ind = 0; ind < arr_cap(next->reg_vals); ind++) {
-    next->reg_vals[ind] = prev->reg_vals[ind];
+  static constexpr U8 ceil = arr_cap(next->args);
+  for (U8 ind = 0; ind < ceil; ind++) {
+    next->args[ind] = prev->args[ind];
   }
 }
-
-// Returns a token representing a local which can be given to Forth code.
-// In the stack-based calling convention, this returns a different value.
-static Local *local_token(Local *loc) { return loc; }
-
-static void validate_volatile_reg(U8 reg) {
-  aver(bits_has(ASM_REGS_VOLATILE, reg));
-}
-
-static void validate_tracked_arg_reg(U8 reg) {
-  aver(bits_has(ASM_ARG_REGS, reg));
-}
-
-static bool is_tracked_arg_reg(U8 reg) { return bits_has(ASM_ARG_REGS, reg); }
 
 static const char *comp_local_name(Local *loc) {
   if (!loc) return "(nil)";
@@ -176,141 +135,31 @@ static const char *comp_local_name(Local *loc) {
   return "(anonymous)";
 }
 
-static Local *comp_local_get_for_reg(Comp *comp, U8 reg) {
-  validate_tracked_arg_reg(reg);
-  const auto val = comp->ctx.reg_vals[reg];
-  return val.type == REG_VAL_LOC ? val.loc : nullptr;
-}
+static void comp_local_confirm_relocs(Local *loc) {
+  auto reloc = loc->reloc;
+  loc->reloc = nullptr;
 
-static bool comp_local_has_reg(Comp *comp, Local *loc, U8 reg) {
-  validate_tracked_arg_reg(reg);
-  return comp_local_get_for_reg(comp, reg) == loc;
-}
-
-static S8 comp_local_reg_any(Comp *comp, Local *loc) {
-  constexpr U8 ceil = arr_cap(comp->ctx.reg_vals);
-
-  /*
-  Could be "optimized" by creating two-way associations with extra
-  book-keeping. There's no point and it would make things fragile.
-  */
-  for (U8 reg = 0; reg < ceil; reg++) {
-    if (comp_local_get_for_reg(comp, reg) == loc) return (S8)reg;
-  }
-  return -1;
-}
-
-static bool comp_local_has_regs(Comp *comp, Local *loc) {
-  return comp_local_reg_any(comp, loc) >= 0;
-}
-
-static void comp_local_reg_add(Comp *comp, Local *loc, U8 reg) {
-  const auto vals = comp->ctx.reg_vals;
-
-  validate_tracked_arg_reg(reg);
-  aver(!vals[reg].type);
-
-  vals[reg] = (Reg_val){.type = REG_VAL_LOC, .loc = loc};
-}
-
-static void comp_local_regs_clear(Comp *comp, Local *loc) {
-  const auto   ctx  = &comp->ctx;
-  constexpr U8 ceil = arr_cap(comp->ctx.reg_vals);
-
-  for (U8 reg = 0; reg < ceil; reg++) {
-    if (comp_local_get_for_reg(comp, reg) != loc) continue;
-    ptr_clear(&ctx->reg_vals[reg]);
-  }
-}
-
-// For debug logging.
-static Bits comp_local_reg_bits(Comp *comp, const Local *loc) {
-  constexpr U8 ceil = arr_cap(comp->ctx.reg_vals);
-  Bits         out  = 0;
-
-  for (U8 reg = 0; reg < ceil; reg++) {
-    if (comp_local_get_for_reg(comp, reg) != loc) continue;
-    bits_add_to(&out, reg);
-  }
-  return out;
-}
-
-static void comp_local_confirm_writes(Local *loc) {
-  auto write = loc->write;
-  loc->write = nullptr;
-
-  while (write) {
-    write->confirmed = true;
-    write            = write->prev;
+  while (reloc) {
+    reloc->confirmed = true;
+    reloc            = reloc->prev;
   }
 
-  loc->read = true; // Also confirm all subsequent writes.
-}
-
-/*
-Used for code which takes a local's address. Evicts the local to memory and
-makes it "volatile": the compiler can no longer form temporary associations
-between such a local and argument registers, because the value may be read
-"out of band" through the address.
-*/
-static void comp_local_evict(Comp *comp, Local *loc) {
-  const auto type = loc->location;
-  if (type == LOC_MEM) return;
-
-  // Locations are undecided until finalizing the function at the semicolon.
-  aver(type == LOC_UNKNOWN);
-
-  comp_local_alloc_mem(comp, loc);
-  loc->location = LOC_MEM;
-
-  /*
-  The caller may now load data from the address in ways invisible to the
-  compiler. So the compiler must assume the value is read at some point.
-
-  Incorrect behavior if we don't do this:
-
-    123      \ mov x0, 123
-    { val }  \ nop
-    ref' val \ add x0, x29, 16
-    @        \ (junk data)
-
-  If we only confirm subsequent writes, but not prior writes:
-
-    123      \ mov x0, 123
-    { val }  \ nop
-    234      \ Clobber x0; write is never confirmed.
-    ref' val \ add x0, x29, 16
-    @        \ (junk data)
-
-  Correct behavior if we confirm prior and future writes:
-
-    123     \ mov x0, 123
-    { val } \ str x0, [x29, #16]
-  */
-  comp_local_confirm_writes(loc);
-
-  // Invalidates all register associations for this local.
-  loc->vol = true;
+  loc->read = true; // Also confirm all _subsequent_ relocs.
 }
 
 static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
-  return uint32_to_bit_str((U32)comp_local_reg_bits(comp, loc));
-}
+  const auto ctx = &comp->ctx;
 
-static Err err_args_partial(
-  const Sym *sym, const char *action, Sint low, Sint len
-) {
-  return errf(
-    "in " FMT_QUOTED
-    " (%s): %s: prior values were partially consumed by assignments: " FMT_SINT
-    " of " FMT_SINT
-    "; hint: either assign to more locals, or use `--` inside braces to discard unused values",
-    sym->name.buf,
-    wordlist_name(sym->wordlist),
-    action,
-    low,
-    len
-  );
+  Bits bits = 0;
+
+  static constexpr U8 ceil = arr_cap(ctx->args);
+
+  for (U8 reg = 0; reg < ceil; reg++) {
+    if (ctx->args[reg].loc != loc) continue;
+    bits_add_to(&bits, reg);
+  }
+
+  return uint32_to_bit_str((U32)bits);
 }
 
 static Err err_args_arity(
@@ -345,10 +194,7 @@ static Err comp_validate_args(Comp *comp, const char *action, Sint min, Sint max
   try(comp_require_current_sym(comp, &sym));
 
   const auto ctx     = &comp->ctx;
-  const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
-
-  if (arg_low) return err_args_partial(sym, action, arg_low, arg_len);
 
   if (!(arg_len >= min && arg_len <= max)) {
     return err_args_arity(sym, action, min, max, arg_len);
@@ -374,22 +220,18 @@ static Err comp_validate_recur_args(Comp *comp) {
   return nullptr;
 }
 
-static Err err_assign_no_args(const char *name) {
-  return errf(
-    "unable to assign to " FMT_QUOTED ": there are no available arguments", name
-  );
-}
-
-static Loc_write *comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
-  const auto confirm = loc->read || loc->vol;
+static Loc_reloc *comp_append_local_reloc_from_reg(
+  Comp *comp, Local *loc, U8 reg
+) {
+  const auto confirm = loc->read;
 
   const auto fix = stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
-      .type  = LOC_FIX_WRITE,
-      .write = (Loc_write){
+      .type  = LOC_FIX_RELOC,
+      .reloc = (Loc_reloc){
         .instr     = asm_append_breakpoint(comp, ASM_CODE_LOC_WRITE),
-        .prev      = loc->write,
+        .prev      = loc->reloc,
         .loc       = loc,
         .reg       = reg,
         .confirmed = confirm,
@@ -397,107 +239,127 @@ static Loc_write *comp_append_local_write(Comp *comp, Local *loc, U8 reg) {
     }
   );
 
-  return loc->write = &fix->write;
-}
-
-static void comp_clear_tracked_arg_reg(Comp *comp, U8 reg) {
-  validate_tracked_arg_reg(reg);
-
-  const auto loc          = comp_local_get_for_reg(comp, reg);
-  comp->ctx.reg_vals[reg] = (Reg_val){};
-
-  if (!loc || loc->stable || comp_local_has_regs(comp, loc)) return;
-  comp_append_local_write(comp, loc, reg);
   loc->stable = true;
+  loc->reloc  = &fix->reloc;
+  return loc->reloc;
 }
 
-/*
-Must be invoked whenever a register is used for ANYTHING
-other than the current word's input or output parameters.
-Examples:
-
-- An input argument for the next call.
-- Side-effect clobbers in some call.
-- Output results from some call.
-*/
-static Err comp_clobber_reg(Comp *comp, U8 reg) {
-  validate_volatile_reg(reg);
-
+static Err comp_register_clobber(Comp *comp, U8 reg) {
+  try(asm_validate_arg_reg(reg));
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
   bits_add_to(&sym->clobber, reg);
-
-  if (is_tracked_arg_reg(reg)) comp_clear_tracked_arg_reg(comp, reg);
   return nullptr;
 }
 
-static Err comp_clobber_regs(Comp *comp, Bits clob) {
-  while (clob) try(comp_clobber_reg(comp, bits_pop_low(&clob)));
-  return nullptr;
-}
+static Err comp_forget_reg(Comp *comp, U8 reg) {
+  try(asm_validate_arg_reg(reg));
 
-static Err comp_clobber_from_call(Comp *comp, const Sym *callee) {
-  /*
-  The callee's clobber list must include all of its auxiliary side-effectful
-  clobbers. But its inputs and outputs may or may not be considered clobbers.
-  For example an unary "identity" function which takes one value and returns
-  it as-is doesn't really clobber anything. Placing its input in `x0` before
-  the call may have clobbered a local which was previously in `x0`, but when
-  the input comes from another local, which is now associated with `x0`, the
-  second local should not be clobbered by such a call.
+  const auto ctx = &comp->ctx;
+  const auto arg = &ctx->args[reg];
+  const auto loc = arg->loc;
+  *arg           = (Comp_arg){};
 
-  In contrast, "intrin" and "extern" functions are assumed to always
-  clobber all volatile registers, including input and output params,
-  because they're opaque to us.
-  */
-  try(comp_clobber_regs(comp, callee->clobber));
+  if (!loc || loc->stable) return nullptr;
 
-  if (callee->has_err) {
-    try(comp_clobber_reg(comp, callee->out_len - 1));
+  static constexpr U8 ceil = arr_cap(ctx->args);
+  for (U8 any = 0; any < ceil; any++) {
+    if (any != reg && ctx->args[any].loc == loc) return nullptr;
   }
 
-  /*
-  Volatile locals may be modified by calls; our compiler is unable to detect
-  out-of-band loads and stores of locals by their address, because store and
-  load operations are implemented in program code via self-assembly.
+  comp_append_local_reloc_from_reg(comp, loc, reg);
+  IF_DEBUG(assert_fatal(loc->stable));
+  return nullptr;
+}
 
-  So, we use a simple solution: every call evicts all volatile locals
-  from argument registers, forcing subsequent access to use memory.
-  */
-  const auto   ctx  = &comp->ctx;
-  constexpr U8 ceil = arr_cap(ctx->reg_vals);
+/*
+Used at callsites and branch points to relocate locals from argument
+registers to their stable locations and to forget comptime constants
+located in arg registers. The caller is responsible for registering
+or not registering this bitset as clobbers.
+*/
+static Err comp_forget_regs(Comp *comp, Bits regs) {
+  const auto          ctx  = &comp->ctx;
+  static constexpr U8 ceil = arr_cap(ctx->args);
 
   for (U8 reg = 0; reg < ceil; reg++) {
-    const auto loc = comp_local_get_for_reg(comp, reg);
-
-    if (!loc) continue;
-    if (!loc->vol) continue;
-
-    ptr_clear(&ctx->reg_vals[reg]);
-
-    IF_DEBUG(eprintf(
-      "[debug] in " FMT_QUOTED ": evicted volatile local " FMT_QUOTED
-      " from argument register %d before calling " FMT_QUOTED "\n",
-      ctx->sym->name.buf,
-      loc->name.buf,
-      reg,
-      callee->name.buf
-    ));
+    if (!bits_has(regs, reg)) continue;
+    try(comp_forget_reg(comp, reg));
   }
-
   return nullptr;
 }
 
-static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
-  validate_tracked_arg_reg(reg);
-  comp_local_regs_clear(comp, loc);
+/*
+Lower-level tool for internal use only. The vast majority of callers
+should use `comp_append_push_from_local` instead of this. The caller
+is also responsible for updating `ctx->arg_len`.
 
-  const auto ctx  = &comp->ctx;
-  const auto prev = comp_local_get_for_reg(comp, reg);
-  if (prev && prev != loc) try(comp_clobber_reg(comp, reg));
+Used internally for both parameter declarations and regular assignments.
 
-  ctx->reg_vals[reg] = (Reg_val){.type = REG_VAL_LOC, .loc = loc};
-  loc->stable        = false;
+For regular locals, this does not immediately create a "reloc" as those are
+added lazily on clobbers. Does not check, confirm, or invalidate the latest
+pending "reloc" if any; relocs are confirmed by "reads", and link with each
+other for a chain confirmation.
+
+For volatile locals whose address is available to the code we're compiling,
+this has to immediately store the value because it may be read out-of-band
+through the local's address.
+*/
+static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
+  try(asm_validate_arg_reg(reg));
+
+  const auto ctx = &comp->ctx;
+
+  if (!ctx->arg_len) {
+    return errf(
+      "unable to assign argument %d to " FMT_QUOTED ": no arguments available",
+      reg,
+      loc->name.buf
+    );
+  }
+
+  if (reg >= ctx->arg_len) {
+    return errf(
+      "unable to assign argument %d to " FMT_QUOTED
+      ": only %d arguments available",
+      reg,
+      loc->name.buf,
+      ctx->arg_len
+    );
+  }
+
+  const auto arg  = &ctx->args[reg];
+  const auto prev = arg->loc;
+
+  const bool same_loc      = prev == loc;
+  bool       reloc         = !!prev && !same_loc && !prev->stable;
+  loc->stable              = false;
+  static constexpr U8 ceil = arr_cap(ctx->args);
+
+  /*
+  Evict the new local from all other registers,
+  while also searching for whether the previous
+  local is still assigned to other registers,
+  and thus doesn't need relocation.
+  */
+  for (U8 reg0 = 0; reg0 < ceil; reg0++) {
+    if (reg == reg0) {
+      /*
+      Caution: we reassign only the local while keeping the
+      comptime immediate if the register already holds one.
+      */
+      arg->loc = loc;
+    }
+    else {
+      const auto arg = &ctx->args[reg0];
+      if (arg->loc == prev) reloc = false;
+      if (arg->loc == loc) arg->loc = nullptr;
+    }
+  }
+
+  if (reloc) {
+    comp_append_local_reloc_from_reg(comp, prev, reg);
+  }
 
   IF_DEBUG({
     if (prev) {
@@ -518,53 +380,18 @@ static Err comp_local_reg_reset(Comp *comp, Local *loc, U8 reg) {
   return nullptr;
 }
 
-// Lower-level, unsafe analogue of `comp_append_local_set_next`.
-static Err comp_append_local_set(Comp *comp, Local *loc, U8 reg) {
-  try(asm_validate_arg_reg(reg));
-  try(comp_local_reg_reset(comp, loc, reg));
-
-  IF_DEBUG(eprintf(
-    "[system] appended \"set\" of local " FMT_QUOTED " from register %d",
-    loc->name.buf,
-    reg
-  ));
-
-  return nullptr;
-}
-
-/*
-Abstract "set" operation invoked via `{ }` braces. Used both for parameter
-declarations and regular assignments.
-
-For regular locals, this does not immediately create a "write", as those are
-added lazily on clobbers. Does not check, confirm, or invalidate the latest
-pending "write" if any; writes are confirmed by "reads", and link with each
-other for a chain confirmation.
-
-For volatile locals whose address is available to the code we're compiling,
-this has to immediately store the value because it may be read out-of-band
-through the local's address.
-*/
-static Err comp_append_local_set_next(Comp *comp, Local *loc) {
+static Err comp_pop_into_local(Comp *comp, Local *loc) {
   const auto ctx = &comp->ctx;
-  const auto rem = (Sint)ctx->arg_len - (Sint)ctx->arg_low;
 
-  if (!(rem > 0)) return err_assign_no_args(loc->name.buf);
-
-  const auto reg = ctx->arg_low++;
-  if (loc->vol) {
-    const auto write = comp_append_local_write(comp, loc, reg);
-    write->confirmed = true;
-    loc->stable      = true;
-  }
-  else {
-    try(comp_local_reg_reset(comp, loc, reg));
+  if (!ctx->arg_len) {
+    return errf(
+      "unable to assign to " FMT_QUOTED ": no arguments available", loc->name.buf
+    );
   }
 
-  if (ctx->arg_len == ctx->arg_low) {
-    ctx->arg_len = 0;
-    ctx->arg_low = 0;
-  }
+  const U8 reg = (U8)(ctx->arg_len - 1);
+  try(comp_assign_local_from_reg(comp, loc, reg));
+  ctx->arg_len = reg;
   return nullptr;
 }
 
@@ -590,40 +417,20 @@ static Err comp_next_out_param_reg(Comp *comp, U8 *out) {
   return nullptr;
 }
 
-static Err comp_next_arg_reg(Comp *comp, U8 *out) {
+static Err comp_alloc_next_reg(Comp *comp, U8 *out) {
+  try(asm_validate_arg_reg(comp->ctx.arg_len));
   const auto reg = comp->ctx.arg_len++;
-  try(asm_validate_arg_reg(reg));
-  try(comp_clobber_reg(comp, reg));
+  try(comp_forget_reg(comp, reg));
+  try(comp_register_clobber(comp, reg));
   if (out) *out = reg;
   return nullptr;
-}
-
-/*
-Caution: only one scratch reg may be requested at a time.
-TODO: support asking for multiple scratch regs.
-Requires adding the ability to "free" them.
-*/
-static Err comp_scratch_reg(Comp *comp, U8 *out) {
-  const auto reg = comp->ctx.arg_len;
-  try(asm_validate_arg_reg(reg));
-  validate_volatile_reg(reg);
-  try(comp_clobber_reg(comp, reg));
-  if (out) *out = reg;
-  return nullptr;
-}
-
-// Used by `intrin_comp_args_set`.
-static void comp_args_set(Comp *comp, U8 next) {
-  const auto ctx = &comp->ctx;
-  ctx->arg_len   = next;
-  ctx->arg_low   = 0;
 }
 
 // Concrete "read" operation used as a fallback by "get".
 static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   (void)comp;
 
-  comp_local_confirm_writes(loc);
+  comp_local_confirm_relocs(loc);
 
   stack_push(
     &comp->ctx.loc_fix,
@@ -645,70 +452,127 @@ static Err err_local_get_not_inited(const char *name) {
   );
 }
 
-// Lower-level, unsafe analogue of `comp_append_local_get_next`.
-static Err comp_append_local_get(Comp *comp, Local *loc, U8 reg) {
+static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm) {
   try(asm_validate_arg_reg(reg));
-  if (comp_local_has_reg(comp, loc, reg)) return nullptr;
 
-  if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
+  const auto prev = &comp->ctx.args[reg].imm;
+  if (prev->has_imm && prev->num == imm) {
+    return nullptr;
+  }
 
-  try(comp_clobber_reg(comp, reg));
-  comp_append_local_read(comp, loc, reg);
-  comp_local_reg_add(comp, loc, reg);
+  try(comp_forget_reg(comp, reg));
+  try(comp_register_clobber(comp, reg));
+
+  const auto instrs = &comp->code.code_write;
+  const auto floor  = instrs->len;
+
+  asm_append_imm_to_reg(comp, reg, imm);
+
+  comp->ctx.args[reg] = (Comp_arg){
+    .imm = (Reg_imm){
+      .num     = imm,
+      .floor   = floor,
+      .ceil    = instrs->len,
+      .has_imm = true,
+    },
+  };
+
+  IF_DEBUG(eprintf(
+    "[system] compiled constant " FMT_SINT " as argument in register %d\n", imm, reg
+  ));
   return nullptr;
 }
 
+static Err comp_append_push_imm(Comp *comp, Sint imm) {
+  const auto ctx = &comp->ctx;
+  return comp_append_imm_to_reg(comp, ctx->arg_len++, imm);
+}
+
 /*
-Abstract "get" operation invoked by simply mentioning
-a local inside a word. May fall back on a "read".
-
-Note that "get" happens as part of building an argument list,
-which clobbers argument registers, which may be associated
-with other locals. The clobbers are handled in that logic.
+Invoked by simply mentioning a local inside a word.
+Also available as a compiler intrinsic, and is used
+by control flow structures in self-compilation.
 */
-static Err comp_append_local_get_next(Comp *comp, Local *loc) {
-  auto reg = comp->ctx.arg_len;
-  try(asm_validate_arg_reg(reg));
+static Err comp_append_push_from_local(Comp *comp, Local *loc) {
+  IF_DEBUG(assert_fatal(!!loc));
 
-  if (comp_local_has_reg(comp, loc, reg)) {
+  const auto ctx = &comp->ctx;
+  try(asm_validate_arg_reg(ctx->arg_len));
+
+  auto       tar_reg = ctx->arg_len++;
+  const auto tar_arg = &ctx->args[tar_reg];
+
+  loc->used = true;
+
+  if (tar_arg->loc == loc) {
     IF_DEBUG(eprintf(
       "[debug] local " FMT_QUOTED
-      " already associated with register %d; skipping a \"get next\" operation\n",
+      " already associated with register %d; skipping instructions for \"push to local\"\n",
       loc->name.buf,
-      reg
+      tar_reg
     ));
-
-    comp->ctx.arg_len++;
     return nullptr;
   }
 
-  /*
-  Like `comp_next_arg_reg`, with a modification: when the register already has
-  the same local, this doesn't clobber the register. So for example, if a word
-  simply forwards its inputs to another word, the forwarding doesn't cause its
-  parameters to be added to its clobber list.
-  */
-  comp->ctx.arg_len++;
-  if (comp_local_get_for_reg(comp, reg) != loc) {
-    try(comp_clobber_reg(comp, reg));
-  }
+  const auto prev_loc = tar_arg->loc;
+  bool       reloc    = !!prev_loc && !prev_loc->stable;
+
+  S8 imm_reg = -1;
+  S8 loc_reg = -1;
 
   /*
-  When a local is already associated with an argument register,
-  we can immediately copy its value from that register into our
-  new argument register, and associate them.
+  Search for other registers already associated with this local,
+  prioritizing comptime constants / immediates, while also looking
+  for other registers associated with the previous local, to decide
+  whether it needs relocation.
+
+  If we find an existing register with the new local, this lets us immediately
+  compile a mov instruction and avoid emitting a fixup. If we find a comptime
+  constant, we can even make this backtrackable.
   */
-  const auto any = comp_local_reg_any(comp, loc);
-  if (any >= 0) {
-    asm_append_mov_reg(comp, reg, (U8)any);
-    comp_local_reg_add(comp, loc, reg);
+  for (S8 src_reg = (int)arr_cap(ctx->args) - 1; src_reg >= 0; src_reg--) {
+    if (src_reg == (S8)tar_reg) continue;
+
+    const auto src_arg = &ctx->args[src_reg];
+
+    if (src_arg->loc != loc) {
+      if (src_arg->loc == prev_loc) reloc = false;
+      continue;
+    }
+
+    if (src_arg->imm.has_imm) {
+      imm_reg = src_reg;
+      if (!reloc) break;
+      continue;
+    }
+
+    loc_reg = src_reg;
+  }
+
+  if (reloc) {
+    comp_append_local_reloc_from_reg(comp, prev_loc, tar_reg);
+  }
+
+  if (imm_reg >= 0) {
+    const auto arg = &ctx->args[imm_reg];
+    IF_DEBUG(assert_fatal(arg->imm.has_imm));
+    try(comp_append_imm_to_reg(comp, tar_reg, arg->imm.num));
+    tar_arg->loc = loc;
+    return nullptr;
+  }
+
+  if (loc_reg >= 0) {
+    asm_append_mov_reg(comp, tar_reg, (U8)loc_reg);
+    try(comp_register_clobber(comp, tar_reg));
+    *tar_arg = (Comp_arg){.loc = loc};
     return nullptr;
   }
 
   if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
 
-  comp_append_local_read(comp, loc, reg);
-  comp_local_reg_add(comp, loc, reg);
+  comp_append_local_read(comp, loc, tar_reg);
+  try(comp_register_clobber(comp, tar_reg));
+  *tar_arg = (Comp_arg){.loc = loc};
   return nullptr;
 }
 
@@ -725,7 +589,12 @@ static Err comp_add_input_param(Comp *comp, Word_str name) {
   U8 reg;
   try(comp_next_inp_param_reg(comp, &reg));
 
-  comp_local_reg_add(comp, loc, reg);
+  const auto ctx = &comp->ctx;
+  const auto arg = &ctx->args[reg];
+
+  IF_DEBUG(assert_fatal(!arg->loc));
+
+  arg->loc = loc;
   return nullptr;
 }
 
@@ -740,69 +609,33 @@ static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
   return nullptr;
 }
 
-static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm, bool *has_load) {
-  const auto ctx = &comp->ctx;
-
-  if (ctx->arg_low) {
-    Sym *sym;
-    try(comp_require_current_sym(comp, &sym));
-    return err_args_partial(
-      sym, "unable to push immediate value", ctx->arg_low, ctx->arg_len
-    );
-  }
-
-  try(asm_validate_arg_reg(reg));
-  try(comp_clobber_reg(comp, reg));
-
-  const auto instrs = &comp->code.code_write;
-  const auto floor  = instrs->len;
-
-  if (!has_load) has_load = &(bool){};
-  asm_append_imm_to_reg(comp, reg, imm, has_load);
-
-  const auto ceil = instrs->len;
-
-  aver(!ctx->reg_vals[reg].type);
-
-  ctx->reg_vals[reg] = (Reg_val){
-    .type          = REG_VAL_IMM,
-    .imm           = imm,
-    .instr_floor   = floor,
-    .instr_ceil    = ceil,
-    .can_backtrack = !*has_load,
-  };
-
-  IF_DEBUG(eprintf(
-    "[system] compiled constant " FMT_SINT " as argument in register %d\n", imm, reg
-  ));
-  return nullptr;
-}
-
-static Err comp_append_push_imm(Comp *comp, Sint imm) {
-  const auto reg = comp->ctx.arg_len++;
-  return comp_append_imm_to_reg(comp, reg, imm, nullptr);
-}
-
 static Err comp_call_intrin(Interp *interp, const Sym *sym) {
   try(asm_call_intrin(interp, sym));
   return nullptr;
 }
 
+/*
+The callee's clobber list must include all of its auxiliary side-effectful
+clobbers. But its inputs and outputs may or may not be considered clobbers.
+For example an unary "identity" function which takes one value and returns
+it as-is doesn't really clobber anything. Placing its input in `x0` before
+the call may have clobbered a local which was previously in `x0`, but when
+the input comes from another local, which is now associated with `x0`, the
+second local should not be clobbered by such a call.
+
+In contrast, "intrin" and "extern" functions are assumed to always
+clobber all volatile registers, including input and output params,
+because they're opaque to us.
+*/
 static Err comp_before_append_call(Comp *comp, const Sym *callee) {
   try(comp_validate_call_args(comp, callee));
-  try(comp_clobber_from_call(comp, callee));
+  try(comp_forget_regs(comp, callee->clobber));
+  Sym *caller;
+  try(comp_require_current_sym(comp, &caller));
+  bits_add_all_to(&caller->clobber, callee->clobber);
   return nullptr;
 }
 
-/*
-The code below assumes that the SAME registers are used for inps and outs,
-which allows to treat outputs as inputs. This is very nice, but works ONLY
-on some architectures, including Arm64 which is what we currently support,
-and ONLY when not mixing GPRs and FPRs.
-
-TODO: for x64, we'll need a more general approach.
-See the comment at the top of this file.
-*/
 static Err comp_after_append_call(
   Comp *comp, const Sym *caller, const Sym *callee, bool auto_try
 ) {
@@ -816,25 +649,15 @@ static Err comp_after_append_call(
   `asm_append_call_norm` and `asm_append_call_intrin` auto-insert the "try".
   Here we just hide the error since it's been checked already.
   */
-  if (auto_try && callee->has_err) {
-    ctx->arg_len = callee->out_len - 1;
+  ctx->arg_len = callee->out_len - !!(auto_try && callee->has_err);
+  for (U8 ind = 0; ind < ctx->arg_len; ind++) {
+    ctx->args[ind] = (Comp_arg){};
   }
-  else {
-    ctx->arg_len = callee->out_len;
-  }
-
-  ctx->arg_low = 0;
   return nullptr;
 }
 
-static void comp_clear_args(Comp *comp) {
-  const auto ctx = &comp->ctx;
-  ctx->arg_len   = 0;
-  ctx->arg_low   = 0;
-}
-
 static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
-  IF_DEBUG(aver(callee->type == SYM_NORM));
+  IF_DEBUG(assert_fatal(callee->type == SYM_NORM));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -853,7 +676,7 @@ static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
 }
 
 static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
-  IF_DEBUG(aver(callee->type == SYM_INTRIN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
@@ -864,7 +687,7 @@ static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
 }
 
 static Err comp_append_call_extern(Comp *comp, Sym *callee) {
-  IF_DEBUG(aver(callee->type == SYM_EXTERN));
+  IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -898,38 +721,21 @@ static Err comp_before_append_ret(Comp *comp) {
     return nullptr;
   }
 
-  const auto val = ctx->reg_vals[err_reg];
-  if (val.type != REG_VAL_IMM) return nullptr;
-  if (val.imm) return nullptr;
+  const auto arg = &ctx->args[err_reg];
+  if (!arg->imm.has_imm) return nullptr;
+  if (arg->imm.num) return nullptr;
 
   return errf(
-    "unable to compile return: redundant nil error; hint: the compiler implicitly inserts nil error values"
+    "in " FMT_QUOTED
+    ": unable to compile return: redundant nil error; hint: the compiler implicitly inserts nil error values",
+    sym->name.buf
   );
 }
 
-/*
-Used at every branch point to evict locals from parameter
-registers to their "stable" locations.
-*/
-static Err comp_barrier(Comp *comp, const char *action, Sint req) {
-  Sym *sym;
-  try(comp_require_current_sym(comp, &sym));
-
-  const auto   ctx     = &comp->ctx;
-  const auto   arg_low = ctx->arg_low;
-  const auto   arg_len = ctx->arg_len;
-  constexpr U8 ceil    = arr_cap(ctx->reg_vals);
-  if (!action) action = "in control flow";
-
-  if (arg_low) {
-    return err_args_partial(sym, action, arg_low, arg_len);
-  }
-  if (req != arg_len) {
-    return err_args_arity(sym, action, req, req, arg_len);
-  }
-  for (U8 reg = 0; reg < ceil; reg++) {
-    comp_clear_tracked_arg_reg(comp, reg);
-  }
+// See comment on `Local` for explanation.
+static Err comp_barrier(Comp *comp) {
+  try(comp_require_current_sym(comp, nullptr));
+  try(comp_forget_regs(comp, ASM_REGS_VOLATILE));
   return nullptr;
 }
 
@@ -949,31 +755,27 @@ static Err err_alloca_size_exceeds(Sint size, Uint limit) {
   );
 }
 
-static Err comp_alloca_const(Comp *comp, Reg_val val) {
-  const auto size = val.imm;
+static Err comp_alloca_const(Comp *comp, Sint size, U8 reg) {
+  try(asm_validate_arg_reg(reg));
+
   if (!size) return err_alloca_size_zero();
   if (size < 0) return err_alloca_size_negative(size);
   if (size > (Sint)IND_MAX) return err_alloca_size_exceeds(size, IND_MAX);
 
-  // If possible, delete prior "imm to reg" instructions.
-  const auto instrs = &comp->code.code_write;
-  if (instrs->len == val.instr_ceil) instrs->len = val.instr_floor;
-
-  const auto off = asm_align_sp_off((Ind)size);
-
-  // sub x0, sp, <off>
-  // mov sp, x0
-  asm_append_sub_imm(comp, ASM_PARAM_REG_0, ASM_REG_SP, off);
-  asm_append_add_imm(comp, ASM_REG_SP, ASM_PARAM_REG_0, 0);
+  // sub Xd, SP, <off>
+  // mov SP, Xd
+  asm_append_sub_imm(comp, reg, ASM_REG_SP, asm_align_sp_off((Ind)size));
+  asm_append_add_imm(comp, ASM_REG_SP, reg, 0);
   return nullptr;
 }
 
-// sub x0, sp, x0
-// and x0, x0, 0xfffffffffffffff0
-// mov sp, x0
-static Err comp_alloca_dynamic(Comp *comp) {
-  const auto reg = ASM_PARAM_REG_0;
-  try(comp_clobber_reg(comp, reg));
+// sub Xd, SP, Xd
+// and Xd, Xd, 0xfffffffffffffff0
+// mov SP, Xd
+static Err comp_alloca_dynamic(Comp *comp, U8 reg) {
+  try(asm_validate_arg_reg(reg));
+  try(comp_forget_reg(comp, reg));
+  try(comp_register_clobber(comp, reg));
   asm_append_sub_reg_ext(comp, reg, ASM_REG_SP, reg);
   asm_append_sp_align(comp, reg);
   asm_append_add_imm(comp, ASM_REG_SP, reg, 0);
@@ -983,16 +785,18 @@ static Err comp_alloca_dynamic(Comp *comp) {
 static Err comp_alloca(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to `alloca`", 1, 1));
+  try(comp_validate_args(comp, "unable to `alloca`", 1, ASM_REGS_VOLATILE));
 
   const auto ctx = &comp->ctx;
-  const auto val = ctx->reg_vals[0];
+  const U8   reg = (U8)(ctx->arg_len - 1);
+  const auto arg = ctx->args[reg];
 
-  if (val.type == REG_VAL_IMM && val.can_backtrack) {
-    try(comp_alloca_const(comp, val));
+  if (arg.imm.has_imm) {
+    asm_backtrack_instrs_opt(comp, arg.imm.floor, arg.imm.ceil);
+    try(comp_alloca_const(comp, arg.imm.num, reg));
   }
   else {
-    try(comp_alloca_dynamic(comp));
+    try(comp_alloca_dynamic(comp, reg));
   }
 
   sym->norm.has_alloca = true;
@@ -1025,12 +829,7 @@ static Err comp_append_try(Comp *comp, const Sym *sym) {
 
   const auto ctx     = &comp->ctx;
   const auto name    = sym->name.buf;
-  const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
-
-  if (arg_low) {
-    return err_args_partial(sym, "unable to `try`", arg_low, arg_len);
-  }
 
   if (!arg_len) {
     return errf(
@@ -1040,8 +839,8 @@ static Err comp_append_try(Comp *comp, const Sym *sym) {
 
   const auto src_reg = (U8)(arg_len - 1);
   const auto tar_reg = (U8)asm_sym_err_reg(sym);
-  validate_tracked_arg_reg(src_reg);
-  validate_tracked_arg_reg(tar_reg);
+  try(asm_validate_arg_reg(src_reg));
+  try(asm_validate_arg_reg(tar_reg));
   asm_append_try(comp, tar_reg, src_reg);
 
   ctx->arg_len--;
@@ -1055,15 +854,16 @@ static Err comp_append_throw(Comp *comp, const Sym *sym) {
       sym->name.buf
     );
   }
+
   try(comp_validate_args(comp, "unable to `throw`", 1, 1));
-  comp_clear_args(comp);
+  comp->ctx.arg_len = 0;
 
   const auto src_reg = ASM_PARAM_REG_0;
   const auto tar_reg = asm_sym_err_reg(sym);
-  aver(tar_reg >= 0);
+  assert_fatal(tar_reg >= 0);
 
   if (tar_reg != src_reg) {
-    try(comp_clobber_reg(comp, (U8)tar_reg));
+    try(comp_register_clobber(comp, (U8)tar_reg));
     asm_append_mov_reg(comp, (U8)tar_reg, (U8)src_reg);
   }
 
@@ -1076,21 +876,21 @@ TODO needs additional heuristics. Has way too many false positives.
 In addition, the user doesn't always want this. Some of our tests
 and examples use named locals which are intentionally ignored.
 */
-static void comp_warn_unused_locals(Comp_ctx *) {
-  /*
+static void comp_warn_unused_locals(Comp_ctx *ctx) {
   const auto sym = ctx->sym;
-  aver(!!sym);
+  assert_fatal(!!sym);
 
   for (stack_range(auto, loc, &ctx->locals)) {
-    if (loc->location == LOC_UNKNOWN) {
-      eprintf(
-        "[warning] in " FMT_QUOTED ": unused local " FMT_QUOTED "\n",
-        sym->name.buf,
-        comp_local_name(loc)
-      );
-    }
+    if (loc->used) continue;
+    if (loc->location != LOC_UNKNOWN) continue;
+    if (loc->name.buf[0] == '_') continue;
+
+    eprintf(
+      "[warning] in " FMT_QUOTED ": unused local " FMT_QUOTED "\n",
+      sym->name.buf,
+      comp_local_name(loc)
+    );
   }
-  */
 }
 
 static const char *loc_fixup_fmt(Loc_fixup *fix) {
@@ -1108,11 +908,11 @@ static const char *loc_fixup_fmt(Loc_fixup *fix) {
         val->reg
       );
     }
-    case LOC_FIX_WRITE: {
-      const auto val = &fix->write;
+    case LOC_FIX_RELOC: {
+      const auto val = &fix->reloc;
       return sprintbuf(
         BUF,
-        "{type = write, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %s}",
+        "{type = reloc, loc = %s (%p), instr = %p, reg = %d, prev = %p, confirmed = %s}",
         val->loc->name.buf,
         val->loc,
         val->instr,

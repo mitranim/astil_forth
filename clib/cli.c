@@ -62,7 +62,7 @@ static Err cli_key_val(const char *src, const char **key, const char **val) {
   }
 
   const auto key_len = sep - src;
-  aver(key_len > 0 && key_len < IND_MAX);
+  assert_fatal(key_len > 0 && key_len < IND_MAX);
 
   static char buf[256] = {};
   const auto  buf_cap  = sizeof(buf);
@@ -72,7 +72,7 @@ static Err cli_key_val(const char *src, const char **key, const char **val) {
   }
 
   const auto end = stpncpy(buf, src, (Ind)key_len);
-  aver(end > buf && end < (buf + buf_cap));
+  assert_fatal(end > buf && end < (buf + buf_cap));
 
   *key = buf;
   *val = sep + 1;

@@ -27,11 +27,11 @@ State contract: `len < buf_len && buf[len] == 0`.
 
 #define str_trunc(...) str_trunc_inner(UNIQ_IDENT, __VA_ARGS__)
 
-#define str_terminate_inner(tmp, str) \
-  ({                                  \
-    const auto tmp = str;             \
-    aver(tmp->len < str_cap(tmp));    \
-    tmp->buf[tmp->len] = '\0';        \
+#define str_terminate_inner(tmp, str)      \
+  ({                                       \
+    const auto tmp = str;                  \
+    assert_fatal(tmp->len < str_cap(tmp)); \
+    tmp->buf[tmp->len] = '\0';             \
   })
 
 #define str_terminate(...) str_terminate_inner(UNIQ_IDENT, __VA_ARGS__)
@@ -49,7 +49,7 @@ State contract: `len < buf_len && buf[len] == 0`.
   ({                                                 \
     const auto     tmp_str  = str;                   \
     constexpr auto tmp_ceil = str_cap(str) - 1;      \
-    aver(tmp_str->len < tmp_ceil);                   \
+    assert_fatal(tmp_str->len < tmp_ceil);           \
     tmp_str->buf[tmp_str->len++] = byte;             \
     tmp_str->buf[tmp_str->len]   = '\0';             \
     tmp_str->len >= tmp_ceil;                        \
@@ -77,8 +77,8 @@ State contract: `len < buf_len && buf[len] == 0`.
     const auto tmp_len = snprintf(                                       \
       tmp_str->buf, sizeof(tmp_str->buf), fmt __VA_OPT__(, ) __VA_ARGS__ \
     );                                                                   \
-    aver(tmp_len >= 0);                                                  \
-    aver((Uint)tmp_len < sizeof(tmp_str->buf));                          \
+    assert_fatal(tmp_len >= 0);                                          \
+    assert_fatal((Uint)tmp_len < sizeof(tmp_str->buf));                  \
     tmp_str->len = (Ind)tmp_len;                                         \
   })
 

@@ -124,8 +124,8 @@ fun: testing_compile_push_args { len -- err }
   len     { stk_reg }
   len inc { top_reg }
 
-  stk_reg comp_clobber
-  top_reg comp_clobber
+  stk_reg comp_realloc_reg
+  top_reg comp_realloc_reg
 
   TEST_STACK stk_reg         comp_page_addr
   len        stk_reg top_reg comp_args_to_stack

@@ -25,7 +25,7 @@ static void list_reserve_total_cap_impl(List *tar, Ind size, Ind cap) {
 
   const auto next = MUL(cap, size);
   const auto dat  = realloc(tar->dat, next);
-  aver(dat);
+  assert_fatal(dat);
 
   tar->dat = dat;
   tar->cap = cap;
@@ -55,7 +55,7 @@ static void list_push_raw_impl(
   List *tar, Ind size, const void *src, Uint len, const char *file, int line
 ) {
   if (!len) return;
-  aver(divisible_by(len, size));
+  assert_fatal(divisible_by(len, size));
 
   const auto rem = (tar->cap - tar->len) * size;
   if (!(rem >= len)) {

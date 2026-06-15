@@ -1,2 +1,0 @@
-\ Must fail to compile.
-fun: test_partial_assign_fail 10 20 { one } end

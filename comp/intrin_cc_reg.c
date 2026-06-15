@@ -2,9 +2,9 @@
 #include "./interp_internal.c"
 #include "./mach_o.c"
 
-// #ifdef CLANGD
-// #include "./intrin.c"
-// #endif
+#ifdef CLANGD
+#include "./intrin.c"
+#endif
 
 static Err err_redundant_param_skip(const char *name) {
   return errf("in " FMT_QUOTED ": redundant `--` without output params", name);
@@ -65,49 +65,72 @@ static Err intrin_brace(Interp *interp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
+  const auto arg_max = ctx->arg_len;
+
+  IF_DEBUG(assert_fatal(arg_max < ASM_VOLATILE_REG_LEN));
+
+  const char *names[ASM_VOLATILE_REG_LEN];
+  Ind         lens[ASM_VOLATILE_REG_LEN];
+
+  U8  loc_len = 0;
+  int discard = 0; // -1 = below, 1 = above
+
   for (;;) {
-    Word_str word;
-    try(read_valid_word(read, &word));
+    const char *buf;
+    Ind         len;
+    try(read_word(read, &buf, &len));
 
-    if (str_eq(&word, "--")) goto discard;
-    if (str_eq(&word, "}")) goto validate;
-
-    Local *loc;
-    try(comp_local_get_or_make(comp, word, &loc));
-    try(comp_append_local_set_next(comp, loc));
-  }
-
-discard:
-  Word_str word;
-  try(read_valid_word(read, &word));
-
-  if (str_eq(&word, "}")) {
-    if (comp->ctx.arg_low <= comp->ctx.arg_len) {
-      comp->ctx.arg_low = comp->ctx.arg_len = 0;
-      return nullptr;
+    if (!strncmp(buf, "--", MAX(2u, len))) {
+      if (discard) return err_str("redundant double discard via `--`");
+      discard = loc_len ? -1 : 1;
+      continue;
     }
 
-    return err_str(
-      "redundant `--` in assignment without any remaining arguments to skip"
-    );
+    if (!strncmp(buf, "}", len)) break;
+
+    if (loc_len >= arg_max) {
+      return errf(
+        "unable to assign to `%.*s`: requires %d arguments, but only %d are available",
+        len,
+        buf,
+        loc_len + 1,
+        arg_max
+      );
+    }
+
+    names[loc_len] = buf;
+    lens[loc_len]  = len;
+    loc_len++;
   }
 
-  return err_str("`--` in assignment should be followed by `}`");
+  if (!arg_max && loc_len) {
+    return err_str("redundant assignment: there are no available arguments");
+  }
 
-validate:
-  const auto low = ctx->arg_low;
-  if (!low) return nullptr;
+  if (discard >= 0) {
+    while (loc_len) {
+      loc_len--; // Doing this in condition check triggers UB traps.
+      Word_str name;
+      Local   *loc;
+      try(valid_word(names[loc_len], lens[loc_len], &name));
+      try(comp_local_get_or_make(comp, name, &loc));
+      try(comp_assign_local_from_reg(comp, loc, ctx->arg_len - 1));
+      ctx->arg_len--;
+    }
+    if (discard) ctx->arg_len = 0;
+    return nullptr;
+  }
 
-  const auto len = ctx->arg_len;
-  assert(low < len);
+  for (U8 ind = 0; ind < loc_len; ind++) {
+    Word_str name;
+    Local   *loc;
+    try(valid_word(names[ind], lens[ind], &name));
+    try(comp_local_get_or_make(comp, name, &loc));
+    try(comp_assign_local_from_reg(comp, loc, ind));
+  }
 
-  return errf(
-    "in " FMT_QUOTED
-    ": arity mismatch: assigned %d of %d prior values; hint: either assign to more locals, or use `--` inside braces to discard unused values",
-    sym->name.buf,
-    low,
-    len
-  );
+  ctx->arg_len = 0;
+  return nullptr;
 }
 
 static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
@@ -164,7 +187,6 @@ static Err intrin_ret(Interp *interp) {
   const auto comp = &interp->comp;
   try(comp_before_append_ret(comp));
   try(comp_append_ret(comp));
-  comp_clear_args(comp);
   return nullptr;
 }
 
@@ -175,9 +197,16 @@ static Err intrin_recur(Interp *interp) {
   const auto comp = &interp->comp;
 
   try(comp_validate_recur_args(comp));
-  try(comp_clobber_regs(comp, ASM_REGS_VOLATILE));
+
+  /*
+  Because the full clobber set of the current word is still unknown,
+  we have to assume it MIGHT eventually clobber everything, relocating
+  all locals at this callsite.
+  */
+  try(comp_forget_regs(comp, ASM_REGS_VOLATILE));
   try(comp_append_recur(comp));
-  comp_args_set(comp, sym->out_len);
+
+  comp->ctx.arg_len = sym->out_len;
   if (comp->ctx.try_all && sym->has_err) try(comp_append_try(comp, sym));
 
   sym->norm.has_recur = true;
@@ -261,13 +290,10 @@ static Err intrin_comp_instr(Instr instr, Interp *interp) {
 
 // SYNC[comp_constant].
 static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
+  try(interp_require_current_sym(interp, nullptr));
   try(asm_validate_reg(reg));
 
-  bool has_load = true;
-  try(comp_append_imm_to_reg(&interp->comp, (U8)reg, imm, &has_load));
-  if (has_load) sym->norm.has_loads = true;
+  try(comp_append_imm_to_reg(&interp->comp, (U8)reg, imm));
   return nullptr;
 }
 
@@ -305,7 +331,7 @@ static Err intrin_comp_call(Sint ptr, Interp *interp) {
 
 static Err intrin_read_char(Interp *interp, Sint *out) {
   char byte;
-  try(interp_char(interp, &byte));
+  try(interp_read_char(interp, &byte));
   if (out) *out = byte;
   return nullptr;
 }
@@ -314,7 +340,7 @@ static Err intrin_read_until_char(
   Sint delim, Interp *interp, const char **buf, Sint *len
 ) {
   Ind len_tmp;
-  try(validate_char_ascii_printable(delim));
+  try(validate_ascii_printable(delim));
   try(interp_parse_until(interp, (U8)delim, buf, &len_tmp));
   if (len) *len = len_tmp;
   return nullptr;
@@ -347,7 +373,8 @@ static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
 
   const auto comp = &interp->comp;
   U8         reg;
-  try(comp_next_arg_reg(comp, &reg));
+
+  try(comp_alloc_next_reg(comp, &reg));
   asm_append_dysym_load(comp, name.buf, reg, &comp->code.externs);
   return nullptr;
 }
@@ -410,8 +437,9 @@ static Err intrin_comp_signature_set(
 ) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  try(asm_validate_input_param_reg(inp_len));
-  try(asm_validate_output_param_reg(out_len));
+  try(asm_validate_input_param_count(inp_len));
+  try(asm_validate_output_param_count(out_len));
+
   if (has_err && !out_len) {
     return errf(
       "unable to set signature of " FMT_QUOTED
@@ -419,6 +447,7 @@ static Err intrin_comp_signature_set(
       sym->name.buf
     );
   }
+
   sym->inp_len = (U8)inp_len;
   sym->out_len = (U8)out_len;
   sym->has_err = !!has_err;
@@ -437,13 +466,9 @@ static Err intrin_comp_args_min(Sint args, Sint action, Interp *interp) {
   if (action) try(interp_validate_data_ptr(action));
 
   const auto ctx     = &interp->comp.ctx;
-  const auto arg_low = ctx->arg_low;
   const auto arg_len = ctx->arg_len;
   const auto msg     = action ? (const char *)action : "invalid argument count";
 
-  if (arg_low) {
-    return err_args_partial(sym, msg, arg_low, arg_len);
-  }
   if (arg_len < args) {
     return err_args_arity(sym, msg, args, args, arg_len);
   }
@@ -457,89 +482,62 @@ static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
 
 static Err intrin_comp_args_set(Sint len, Interp *interp) {
   try(asm_validate_arg_reg(len));
-  comp_args_set(&interp->comp, (U8)len);
+
+  const auto ctx   = &interp->comp.ctx;
+  const U8   prev  = ctx->arg_len;
+  const U8   next  = (U8)len;
+  const U8   floor = MIN(prev, next);
+  const U8   ceil  = MAX(prev, next);
+
+  for (U8 reg = floor; reg < ceil; reg++) {
+    try(comp_forget_reg(&interp->comp, reg));
+  }
+
+  ctx->arg_len = next;
   return nullptr;
 }
 
-/*
-Used by words which compile other words. For example, "var" uses this to load
-its data address into the next argument register, playing nicely with our
-on-the-fly register allocation.
-*/
-static Err intrin_comp_next_arg_reg(Interp *interp, Sint *out) {
+static Err intrin_comp_barrier(Interp *interp) {
+  return comp_barrier(&interp->comp);
+}
+
+static Err intrin_comp_alloc_next_reg(Interp *interp, Sint *out) {
   U8 reg;
-  try(comp_next_arg_reg(&interp->comp, &reg));
-  if (out) *out = (Sint)reg;
+  try(comp_alloc_next_reg(&interp->comp, &reg));
+  if (out) *out = reg;
   return nullptr;
 }
 
-// Caution: only ONE scratch reg is available at a time.
-static Err intrin_comp_scratch_reg(Interp *interp, Sint *out) {
-  U8 reg;
-  try(comp_scratch_reg(&interp->comp, &reg));
-  if (out) *out = (Sint)reg;
-  return nullptr;
-}
-
-/*
-Control constructs such as counted loops use this to emit a barrier AFTER
-initializing their own locals or otherwise using the available arguments.
-This validates that there are no unused arguments, and clobbers each temp
-register-local association. Might eventually get a more general mechanism.
-*/
-static Err intrin_comp_barrier(Sint req, Sint action, Interp *interp) {
-  if (action) try(interp_validate_data_ptr(action));
-  try(comp_barrier(&interp->comp, (const char *)action, req));
-  return nullptr;
-}
-
-static Err intrin_comp_clobber(Sint reg, Interp *interp) {
+static Err intrin_comp_realloc_reg(Sint reg, Interp *interp) {
   try(asm_validate_reg(reg));
-  try(comp_clobber_reg(&interp->comp, (U8)reg));
+  try(comp_forget_reg(&interp->comp, (U8)reg));
+  try(comp_register_clobber(&interp->comp, (U8)reg));
   return nullptr;
 }
 
-static Err intrin_comp_local_named(
-  Sint buf, Sint len, Interp *interp, const Local **out
-) {
-  try(interp_validate_buf_len(buf, len));
-  Local *loc;
-  try(interp_get_local(interp, (const char *)buf, (Ind)len, &loc));
-  if (out) *out = local_token(loc);
+static Err intrin_comp_local(Sint buf, Sint len, Interp *interp, Local **out) {
+  if (buf) {
+    try(interp_validate_buf_len(buf, len));
+    try(interp_get_local(interp, (const char *)buf, (Ind)len, out));
+    return nullptr;
+  }
+  *out = comp_local_anon(&interp->comp);
   return nullptr;
 }
 
-static Err intrin_comp_local_anon(Interp *interp, const Local **out) {
-  const auto comp = &interp->comp;
-  const auto loc  = comp_local_anon(comp);
-  if (out) *out = local_token(loc);
-  return nullptr;
-}
-
-static Err intrin_comp_local_get(Sint reg, Sint loc_ptr, Interp *interp) {
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(asm_validate_reg(reg));
-  try(comp_validate_local(comp, loc_ptr, &loc));
-  try(comp_append_local_get(comp, loc, (U8)reg));
-  return nullptr;
-}
-
-static Err intrin_comp_local_set(Sint reg, Sint loc_ptr, Interp *interp) {
-  const auto comp = &interp->comp;
-  Local     *loc;
-  try(asm_validate_reg(reg));
-  try(comp_validate_local(comp, loc_ptr, &loc));
-  try(comp_append_local_set(comp, loc, (U8)reg));
-  return nullptr;
-}
-
-static Err intrin_comp_local_off(Sint ptr, Interp *interp, Sint *out) {
+static Err intrin_comp_push_from_local(Sint ptr, Interp *interp) {
   const auto comp = &interp->comp;
   Local     *loc;
   try(comp_validate_local(comp, ptr, &loc));
-  comp_local_evict(comp, loc);
-  *out = loc->fp_off;
+  try(comp_append_push_from_local(comp, loc));
+  return nullptr;
+}
+
+static Err intrin_comp_pop_into_local(Sint ptr, Interp *interp) {
+  const auto comp = &interp->comp;
+  Local     *loc;
+  try(comp_validate_local(comp, ptr, &loc));
+  try(comp_pop_into_local(comp, loc));
   return nullptr;
 }
 
@@ -581,7 +579,6 @@ static void intrin_debug_ctx(Interp *interp) {
     "[debug]   input param count:  %d\n"
     "[debug]   output param count: %d\n"
     "[debug]   arguments:          %d\n"
-    "[debug]   arguments consumed: %d\n"
     "[debug]   data stack len:     " FMT_SINT
     "\n"
     "[debug]   clobber:            %s\n"
@@ -594,7 +591,6 @@ static void intrin_debug_ctx(Interp *interp) {
     inp_len,
     out_len,
     ctx->arg_len,
-    ctx->arg_low,
     stack_len(&interp->ints),
     uint32_to_bit_str((U32)sym->clobber),
     bool_str(ctx->redefining),
@@ -612,45 +608,52 @@ static void intrin_debug_ctx(Interp *interp) {
   }
 
   {
-    constexpr auto cap      = arr_cap(ctx->reg_vals);
-    const auto     arr      = ctx->reg_vals;
-    const auto     args     = ctx->arg_len;
-    bool           has_vals = false;
-    U8             last_val = 0;
+    S8 last_arg = -1;
 
-    for (U8 ind = 0; ind < cap; ind++) {
-      if (!arr[ind].type) continue;
-      has_vals = true;
-      last_val = ind;
+    for (S8 ind = arr_cap(ctx->args) - 1; ind >= 0; ind--) {
+      const auto arg = &ctx->args[ind];
+      if (arg->loc || arg->imm.has_imm) {
+        last_arg = ind;
+        break;
+      }
     }
 
-    if (has_vals || args) {
-      eprintf("[debug]   values in argument registers:\n");
+    if (last_arg >= 0) {
+      eprintf("[debug]   known values in argument registers:\n");
 
-      const auto last_val_ind = (U8)(last_val + 1);
-      U8         val_cap      = cap;
-      val_cap                 = MIN(val_cap, last_val_ind);
-      val_cap                 = MAX(val_cap, args);
+      for (S8 ind = 0; ind <= last_arg; ind++) {
+        const auto arg = &ctx->args[ind];
 
-      for (U8 ind = 0; ind < val_cap; ind++) {
-        const auto val = arr[ind];
+        if (arg->loc) {
+          const auto name = comp_local_name(arg->loc);
 
-        switch (val.type) {
-          case REG_VAL_IMM: {
-            eprintf("[debug]     %d -- constant: " FMT_SINT "\n", ind, val.imm);
-            break;
+          if (arg->imm.has_imm) {
+            eprintf(
+              "[debug]     %d -- local: %s; constant: " FMT_SINT
+              " " FMT_UINT_HEX "\n",
+              ind,
+              name,
+              arg->imm.num,
+              (Uint)arg->imm.num
+            );
+            continue;
           }
-          case REG_VAL_LOC: {
-            const auto loc  = val.loc;
-            const auto name = comp_local_name(loc);
-            eprintf("[debug]     %d -- local: %s\n", ind, name);
-            break;
-          }
-          default: {
-            eprintf("[debug]     %d -- unknown\n", ind);
-            break;
-          }
+
+          eprintf("[debug]     %d -- local: %s\n", ind, name);
+          continue;
         }
+
+        if (arg->imm.has_imm) {
+          eprintf(
+            "[debug]     %d -- constant: " FMT_SINT " " FMT_UINT_HEX "\n",
+            ind,
+            arg->imm.num,
+            (Uint)arg->imm.num
+          );
+          continue;
+        }
+
+        eprintf("[debug]     %d -- unknown\n", ind);
       }
     }
   }
@@ -674,6 +677,14 @@ static void intrin_debug_ctx(Interp *interp) {
       for (stack_range(auto, val, coll)) {
         eprintf("[debug]     %s\n", loc_fixup_fmt(val));
       }
+    }
+  }
+
+  if (stack_len(&ctx->locals)) {
+    eprintf("[debug]   locals (" FMT_SINT "):\n", stack_len(&ctx->locals));
+    for (stack_range(auto, loc, &ctx->locals)) {
+      eprintf("[debug]     %s: ", loc->name.buf);
+      repr_struct(loc);
     }
   }
 
@@ -772,70 +783,51 @@ static const USED auto INTRIN_COMP_ARGS_SET = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_COMP_NEXT_ARG_REG = (Sym){
-  .name.buf  = "comp_next_arg_reg",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_next_arg_reg,
-  .out_len   = 2,
-  .has_err   = true,
-  .comp_only = true,
-};
-
-static const USED auto INTRIN_COMP_SCRATCH_REG = (Sym){
-  .name.buf  = "comp_scratch_reg",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_scratch_reg,
-  .out_len   = 2,
-  .has_err   = true,
-  .comp_only = true,
-};
-
 static const USED auto INTRIN_COMP_BARRIER = (Sym){
   .name.buf  = "comp_barrier",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_barrier,
-  .inp_len   = 2,
+  .inp_len   = 0,
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
 };
 
-static const USED auto INTRIN_COMP_CLOBBER = (Sym){
-  .name.buf  = "comp_clobber",
+static const USED auto INTRIN_COMP_ALLOC_NEXT_REG = (Sym){
+  .name.buf  = "comp_alloc_next_reg",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_clobber,
-  .inp_len   = 1,
-  .out_len   = 1,
-  .has_err   = true,
-  .comp_only = true,
-};
-
-static const USED auto INTRIN_COMP_LOCAL_GET = (Sym){
-  .name.buf  = "comp_local_get",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_local_get,
-  .inp_len   = 2,
-  .out_len   = 1,
-  .has_err   = true,
-  .comp_only = true,
-};
-
-static const USED auto INTRIN_COMP_LOCAL_SET = (Sym){
-  .name.buf  = "comp_local_set",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_local_set,
-  .inp_len   = 2,
-  .out_len   = 1,
-  .has_err   = true,
-  .comp_only = true,
-};
-
-static const USED auto INTRIN_COMP_LOCAL_OFF = (Sym){
-  .name.buf  = "comp_local_off",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_local_off,
-  .inp_len   = 1,
+  .intrin    = (void *)intrin_comp_alloc_next_reg,
   .out_len   = 2,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_REALLOC_REG = (Sym){
+  .name.buf  = "comp_realloc_reg",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_realloc_reg,
+  .inp_len   = 1,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_PUSH_FROM_LOCAL = (Sym){
+  .name.buf  = "comp_push_from_local",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_push_from_local,
+  .inp_len   = 1,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_POP_INTO_LOCAL = (Sym){
+  .name.buf  = "comp_pop_into_local",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_pop_into_local,
+  .inp_len   = 1,
+  .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
 };

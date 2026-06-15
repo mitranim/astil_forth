@@ -1,6 +1,6 @@
-import' ./lang.af
-import' ./testing.af
-import' ./arena.af
+import' ../lang.af
+import' ../testing.af
+import' ../arena.af
 
 \ We test both JIT-compiled and AOT-compiled modes.
 \ For AOT, every test must be called in `main_run`.
@@ -171,104 +171,9 @@ fun: test_stack_braces { -- err }
 end
 test_stack_braces
 
-fun: test_local_ref { -- err }
-  ref' val0 ref' val1 ref' val2 { adr0 adr1 adr2 }
-  sysstack_frame_ptr { FP }
-
-  T{ FP   <T> sysstack_frame_ptr }T
-  T{ adr0 <T> FP 16 +            }T
-  T{ adr1 <T> FP 24 +            }T
-  T{ adr2 <T> FP 32 +            }T
-
-  12 23 34 { val0 val1 val2 }
-  T{ val0   val1   val2   <T> 12 23 34 }T
-  T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
-
-  -34 -23 -12 { val0 val1 val2 }
-  T{ val0   val1   val2   <T> -34 -23 -12 }T
-  T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
-
-  21 adr0 ! 32 adr1 ! 43 adr2 !
-  T{ val0   val1   val2   <T> 21 32 43 }T
-  T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
-end
-test_local_ref
-
-fun: test_local_ref_volatile_immediate_read { -- err }
-  123                 \ mov x0, 123
-  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
-  ref' val { adr }    \ add x0, x29, 16
-  T{ adr @ <T> 123 }T \ no junk data
-end
-test_local_ref_volatile_immediate_read
-
-fun: test_local_ref_volatile_delayed_read { -- err }
-  123                 \ mov x0, 123
-  { val }             \ str x0, [x29, #16] -- must be confirmed by `ref'`.
-  234                 \ Clobber x0; compiler emits a fixup.
-  { -- }
-  ref' val { adr }    \ add x0, x29, 16
-  T{ adr @ <T> 123 }T \ no junk data
-end
-test_local_ref_volatile_delayed_read
-
-fun: bang_with_more_inputs { val adr x2 x3 x4 } val adr ! end
-
-\ Taking a local's address makes it volatile. Temporary register associations
-\ may be silently invalidated by `!`, with the compiler none the wiser.
-fun: test_local_ref_volatile_with_inputs { -- err }
-  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
-  ref' val { adr } \ add x0, x29, 16
-
-  T{ adr @ <T> 123 }T
-
-  \ mov  x5, x0        -- relocate `adr`
-  \ mov  x0, 234
-  \ mov  x1, x5
-  \ ldr  x2, [x29, 16]
-  \ mov  x3, x2        -- temp register assoc for `val`
-  \ mov  x4, x2        -- temp register assoc for `val`
-  \ stur x0, [x1]
-  234 adr val val val bang_with_more_inputs
-
-  \ Invalid: `mov x0, x4`.
-  \ Valid:   `ldr x0, [x29, 16]`.
-  T{ val   <T> 234 }T
-  T{ adr @ <T> 234 }T
-end
-test_local_ref_volatile_with_inputs
+fun: bang_with_more_inputs { val adr _x2 _x3 _x4 } val adr ! end
 
 fun: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next end
-
-fun: test_local_ref_volatile_with_outputs { -- err }
-  123      { val } \ mov x0, 123 ; str x0, [x29, #16]
-  ref' val { adr } \ add x0, x29, 16
-
-  T{ adr @ <T> 123 }T
-
-  \ mov  x5, x0 -- relocate `adr`
-  \ mov  x0, 234
-  \ mov  x1, x5
-  \ stur x0, [x1]
-  \ mov  x0, 12
-  \ mov  x1, 23
-  \ mov  x2, 34
-  234 adr 345 bang_with_outputs
-
-  \ Without `ref'`, `val` would be temp-associated with `x0 x1 x2`
-  \ without immediately storing to memory. With `ref'`, this should
-  \ repeatedly store to memory.
-  { val val val }
-
-  T{ adr @ <T> 345 }T
-
-  456 adr 567 bang_with_outputs { val val val }
-
-  \ Invalid: `mov x0, x2`.
-  \ Valid:   `ldr x0, [x29, 16]`.
-  T{ val <T> 567 }T
-end
-test_local_ref_volatile_with_outputs
 
 fun: test_conditionals { -- err }
   \ Must fail to compile: bare `if then end`
@@ -689,7 +594,7 @@ fun: switch_input_max_case { key -- out }
     99 case 100 end
     200
   end
-  { A B C D E F G H I J K L M N out -- }
+  { _A _B _C _D _E _F _G _H _I _J _K _L _M _N out -- }
   out
 end
 
@@ -709,6 +614,12 @@ fun: test_switch_input_arity { -- err }
 end
 test_switch_input_arity
 
+fun: test_switch_missing_case_pred { -- err } [ false try_all ]
+  import' ./fail/test_cont_meta_switch_case_missing_pred.af
+  " inputs for `case`" T_err_contains
+end
+test_switch_missing_case_pred
+
 fun: recursive_fun { val -- val }
   if val 13 <= then val ret end
   val dec recur
@@ -722,7 +633,7 @@ test_recursion
 fun: recur_reg_clobber_fun { val -- out }
   -1 -2   { -- }            \ Unconditionally clobber x0 x1.
   ifz val then 0 ret end
-  val val { ignored saved } \ `ignored` = x0, `saved` = x1, `val` = none
+  val val { _ignored saved } \ `_ignored` = x0, `saved` = x1, `val` = none
   0 recur { -- }            \ Must relocate `saved`.
   saved inc
 end
@@ -731,6 +642,116 @@ fun: test_recur_reg_clobber { -- err }
   T{ 10 recur_reg_clobber_fun <T> 11 }T
 end
 test_recur_reg_clobber
+
+1 2 true indirect: TEST_INDIRECT_FORWARD test_indirect_forward_target
+
+fun: test_indirect_forward_caller { src -- char err } [ false try_all ]
+  src test_indirect_forward_target try
+end
+
+fun: test_indirect_forward_target { src -- char err } [ redefine ]
+  src @b
+end
+
+TEST_INDIRECT_FORWARD indirect_to' test_indirect_forward_target
+
+0 2 true indirect: TEST_INDIRECT_FORWARD_0 test_indirect_forward_target_0
+fun: test_indirect_forward_caller_0 { -- out err } test_indirect_forward_target_0 end
+fun: test_indirect_forward_target_0 { -- out err } [ redefine ] 100 end
+TEST_INDIRECT_FORWARD_0 indirect_to' test_indirect_forward_target_0
+
+2 2 true indirect: TEST_INDIRECT_FORWARD_2 test_indirect_forward_target_2
+fun: test_indirect_forward_caller_2 { a b -- out err } [ false try_all ] a b test_indirect_forward_target_2 try end
+fun: test_indirect_forward_target_2 { a b -- out err } [ redefine ] a b + end
+TEST_INDIRECT_FORWARD_2 indirect_to' test_indirect_forward_target_2
+
+3 2 true indirect: TEST_INDIRECT_FORWARD_3 test_indirect_forward_target_3
+fun: test_indirect_forward_caller_3 { a b c -- out err } [ false try_all ] a b c test_indirect_forward_target_3 try end
+fun: test_indirect_forward_target_3 { a b c -- out err } [ redefine ] a b + c + end
+TEST_INDIRECT_FORWARD_3 indirect_to' test_indirect_forward_target_3
+
+4 2 true indirect: TEST_INDIRECT_FORWARD_4 test_indirect_forward_target_4
+fun: test_indirect_forward_caller_4 { a b c d -- out err } [ false try_all ] a b c d test_indirect_forward_target_4 try end
+fun: test_indirect_forward_target_4 { a b c d -- out err } [ redefine ] a b + c + d + end
+TEST_INDIRECT_FORWARD_4 indirect_to' test_indirect_forward_target_4
+
+5 2 true indirect: TEST_INDIRECT_FORWARD_5 test_indirect_forward_target_5
+fun: test_indirect_forward_caller_5 { a b c d e -- out err } [ false try_all ] a b c d e test_indirect_forward_target_5 try end
+fun: test_indirect_forward_target_5 { a b c d e -- out err } [ redefine ] a b + c + d + e + end
+TEST_INDIRECT_FORWARD_5 indirect_to' test_indirect_forward_target_5
+
+6 2 true indirect: TEST_INDIRECT_FORWARD_6 test_indirect_forward_target_6
+fun: test_indirect_forward_caller_6 { a b c d e f -- out err } [ false try_all ] a b c d e f test_indirect_forward_target_6 try end
+fun: test_indirect_forward_target_6 { a b c d e f -- out err } [ redefine ] a b + c + d + e + f + end
+TEST_INDIRECT_FORWARD_6 indirect_to' test_indirect_forward_target_6
+
+7 2 true indirect: TEST_INDIRECT_FORWARD_7 test_indirect_forward_target_7
+fun: test_indirect_forward_caller_7 { a b c d e f g -- out err } [ false try_all ] a b c d e f g test_indirect_forward_target_7 try end
+fun: test_indirect_forward_target_7 { a b c d e f g -- out err } [ redefine ] a b + c + d + e + f + g + end
+TEST_INDIRECT_FORWARD_7 indirect_to' test_indirect_forward_target_7
+
+8 2 true indirect: TEST_INDIRECT_FORWARD_8 test_indirect_forward_target_8
+fun: test_indirect_forward_caller_8 { a b c d e f g h -- out err } [ false try_all ] a b c d e f g h test_indirect_forward_target_8 try end
+fun: test_indirect_forward_target_8 { a b c d e f g h -- out err } [ redefine ] a b + c + d + e + f + g + h + end
+TEST_INDIRECT_FORWARD_8 indirect_to' test_indirect_forward_target_8
+
+0 3 true indirect: TEST_INDIRECT_FORWARD_OUT2 test_indirect_forward_out2
+fun: test_indirect_forward_caller_out2 { -- a b err } test_indirect_forward_out2 end
+fun: test_indirect_forward_out2 { -- a b err } [ redefine ] 11 22 end
+TEST_INDIRECT_FORWARD_OUT2 indirect_to' test_indirect_forward_out2
+
+0 7 false indirect: TEST_INDIRECT_FORWARD_OUT7 test_indirect_forward_out7
+fun: test_indirect_forward_caller_out7 { -- a b c d e f g } test_indirect_forward_out7 end
+fun: test_indirect_forward_out7 { -- a b c d e f g } [ redefine ] 0 1 2 3 4 5 6 end
+TEST_INDIRECT_FORWARD_OUT7 indirect_to' test_indirect_forward_out7
+
+0 8 false indirect: TEST_INDIRECT_FORWARD_OUT8 test_indirect_forward_out8
+fun: test_indirect_forward_caller_out8 { -- a b c d e f g h } test_indirect_forward_out8 end
+fun: test_indirect_forward_out8 { -- a b c d e f g h } [ redefine ] 0 1 2 3 4 5 6 7 end
+TEST_INDIRECT_FORWARD_OUT8 indirect_to' test_indirect_forward_out8
+
+fun: test_indirect_forward_eq { act exp -- err }
+  if act exp = then ret end
+  " indirect forward call mismatch: actual=%zd expected=%zd" act exp errf throw
+end
+
+fun: test_indirect_forward { -- err } [ false try_all ]
+  " abc" test_indirect_forward_caller try { char }
+  char char' a test_indirect_forward_eq try
+
+  test_indirect_forward_caller_0 try 100 test_indirect_forward_eq try
+  10 20 test_indirect_forward_caller_2 try 30 test_indirect_forward_eq try
+  1 2 3 test_indirect_forward_caller_3 try 6 test_indirect_forward_eq try
+  1 2 3 4 test_indirect_forward_caller_4 try 10 test_indirect_forward_eq try
+  1 2 3 4 5 test_indirect_forward_caller_5 try 15 test_indirect_forward_eq try
+  1 2 3 4 5 6 test_indirect_forward_caller_6 try 21 test_indirect_forward_eq try
+  1 2 3 4 5 6 7 test_indirect_forward_caller_7 try 28 test_indirect_forward_eq try
+  1 2 3 4 5 6 7 8 test_indirect_forward_caller_8 try 36 test_indirect_forward_eq try
+
+  test_indirect_forward_caller_out2 try { a b }
+  a 11 test_indirect_forward_eq try
+  b 22 test_indirect_forward_eq try
+
+  test_indirect_forward_caller_out7 { a b c d e f g }
+  a 0 test_indirect_forward_eq try
+  b 1 test_indirect_forward_eq try
+  c 2 test_indirect_forward_eq try
+  d 3 test_indirect_forward_eq try
+  e 4 test_indirect_forward_eq try
+  f 5 test_indirect_forward_eq try
+  g 6 test_indirect_forward_eq try
+
+  test_indirect_forward_caller_out8 { a0 b0 c0 d0 e0 f0 g0 h0 }
+  a0 0 test_indirect_forward_eq try
+  b0 1 test_indirect_forward_eq try
+  c0 2 test_indirect_forward_eq try
+  d0 3 test_indirect_forward_eq try
+  e0 4 test_indirect_forward_eq try
+  f0 5 test_indirect_forward_eq try
+  g0 6 test_indirect_forward_eq try
+  h0 7 test_indirect_forward_eq try
+end
+test_indirect_forward
 
 fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
   ifz val then 100 ret end
@@ -757,24 +778,24 @@ fun: test_recur_with_err { -- err }
 
   T{ 2 recur_err_non_try_fun { out0 err0 } <T>         }T
   T{ out0 err0                             <T> 100 nil }T
-  T{ 4 recur_err_non_try_fun { out1 err1 } <T>         }T
+  T{ 4 recur_err_non_try_fun { _out1 err1 } <T>         }T
   err1 " recur_err_non_try" T_str_eq try
 
   [ true try_all ]
 
   T{ 2 catch' recur_err_manual_try_fun               <T> 100 nil }T
-  T{ 4 catch' recur_err_manual_try_fun { out2 err2 } <T>         }T
+  T{ 4 catch' recur_err_manual_try_fun { _out2 err2 } <T>         }T
   err2 " recur_err_manual" T_str_eq
 
   T{ 2 catch' recur_err_auto_try_fun <T> 100 nil }T
 
   [ false try_all ]
 
-  T{ 4 recur_err_auto_try_fun { out3 err3 } err3 <>0 <T> true }T
+  T{ 4 recur_err_auto_try_fun { _out3 err3 } err3 <>0 <T> true }T
 
   [ true try_all ]
 
-  4 catch' recur_err_auto_try_fun { out4 err4 }
+  4 catch' recur_err_auto_try_fun { _out4 err4 }
   err4 " recur_err_auto" T_str_eq
 end
 test_recur_with_err
@@ -1268,6 +1289,84 @@ fun: test_cont_loop_countup { -- err }
 end
 test_cont_loop_countup
 
+fun: cont_meta_loop_leave_top { val -- out }
+  val
+  loop
+    inc
+    leave
+  end
+end
+
+fun: cont_meta_loop_while_top { val -- out }
+  val
+  loop
+    inc
+    false while
+    999 +
+  end
+end
+
+fun: cont_meta_loop_until_top { val -- out }
+  val
+  loop
+    inc
+    true until
+end
+
+fun: cont_meta_for_top { val count -- out }
+  val count
+  for
+    inc
+  end
+end
+
+fun: cont_meta_minus_for_top { val count -- out }
+  val count
+  -for: ind
+    ind +
+  end
+end
+
+fun: cont_meta_plus_for_top { val ceil floor -- out }
+  val ceil floor
+  +for: ind
+    ind +
+  end
+end
+
+fun: cont_meta_minus_loop_top { val ceil floor step -- out }
+  val ceil floor step
+  -loop: ind
+    ind +
+  end
+end
+
+fun: cont_meta_plus_loop_top { val ceil floor step -- out }
+  val ceil floor step
+  +loop: ind
+    ind +
+  end
+end
+
+fun: test_cont_meta_loop_inputs { -- err }
+  T{ 10 cont_meta_loop_leave_top <T> 11 }T
+  T{ 10 cont_meta_loop_while_top <T> 11 }T
+  T{ 10 cont_meta_loop_until_top <T> 11 }T
+
+  T{ 10 3 cont_meta_for_top <T> 13 }T
+  T{ 10 3 cont_meta_minus_for_top <T> 13 }T
+  T{ 10 4 1 cont_meta_plus_for_top <T> 16 }T
+  T{ 10 4 1 1 cont_meta_plus_loop_top <T> 16 }T
+  T{ 10 4 1 1 cont_meta_minus_loop_top <T> 16 }T
+end
+test_cont_meta_loop_inputs
+
+fun: test_cont_meta_loop_arity_bad { -- err } [ false try_all ]
+  import' ./fail/test_cont_meta_loop_arity_bad.af
+  " loop" T_err_contains
+end
+test_cont_meta_loop_arity_bad
+
 123 var: VAR
 
 \ Load/store is used internally by testing utils. The test is kinda cyclic.
@@ -1584,7 +1683,7 @@ fun: test_str_slice { -- err }
 end
 test_str_slice
 
-fun: first_str_head { str0 len0 str1 len1 -- char } str0 @u8 end
+fun: first_str_head { str0 _len0 _str1 _len1 -- char } str0 @u8 end
 T{ s" one" s" two" first_str_head <T> char' o }T
 
 fun: test_cstr_less { -- err }
@@ -1609,6 +1708,15 @@ fun: test_int_to_cell { -- err }
 end
 test_int_to_cell
 
+fun: test_is_err_flag_regression { -- err }
+  T{ -1 invert =0 <T> true }T
+  T{ +1           <T> 1    }T
+  T{ 1024 cells   <T> 8192 }T
+  T{ -1 is_err_flag <T> true  }T
+  T{ 0  is_err_flag <T> false }T
+end
+test_is_err_flag_regression
+
 fun: test_comptime_arg_stack_sum16_fun { -- val }
   0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   + + + + + + + + + + + + + + +
@@ -1628,23 +1736,6 @@ fun: test_comptime_arg_stack_mod_scratch { -- err }
   T{ test_comptime_arg_stack_mod_scratch_fun <T> 1038 }T
 end
 test_comptime_arg_stack_mod_scratch
-
-fun_comp: test_comptime_arg_stack_local_set_x8_compile { -- err } ( E: -- val err )
-  comp_local_anon { loc }
-  8 8             comp_load
-  8 loc           comp_local_set
-  0 8 asm_mov_reg comp_instr
-  1               comp_args_set
-end
-
-fun: test_comptime_arg_stack_local_set_x8_fun { -- val err }
-  test_comptime_arg_stack_local_set_x8_compile
-end
-
-fun: test_comptime_arg_stack_local_set_x8 { -- err }
-  T{ test_comptime_arg_stack_local_set_x8_fun <T> 8 }T
-end
-test_comptime_arg_stack_local_set_x8
 
 fun: test_comptime_arg_stack_to_stack_9 { -- err }
   alloca' Stack { stk }
@@ -1897,6 +1988,11 @@ struct: Typ
   U32 1 field: Typ_field1
 end
 
+struct: Typ_arity
+  Adr 1 field: Typ_arity_head
+  U8 PAGE_SIZE PAGE_SIZE field_aligned: Typ_arity_guard
+end
+
 \ Field alignment and padding needs to match C.
 \ We test alignment for a lot more cases below.
 fun: test_struct_fields_basic { -- err }
@@ -1910,6 +2006,11 @@ fun: test_struct_fields_basic { -- err }
   T{ 234 Typ_field1 <T> 242 }T
 end
 test_struct_fields_basic
+
+fun: test_struct_field_comp_arity { val }
+  val Typ_arity_guard
+  { _val }
+end
 
 fun: test_struct_fields_load_store { -- err }
   alloca' Typ { ptr }
@@ -2106,15 +2207,15 @@ end
 test_struct_11
 
 fun: test_catch_invalid { -- err } [ false try_all ]
-  import' ./test/test_catch_invalid_exec.af
+  import' ./fail/test_catch_invalid_exec.af
   " useless attempt to catch an error when calling word `nop` which does not throw"
   T_err_contains try
 
-  import' ./test/test_catch_invalid_comp.af
+  import' ./fail/test_catch_invalid_comp.af
   " word `nop` not found in wordlist 2 (WORDLIST_COMP)"
   T_err_contains try
 
-  import' ./test/test_catch_requires_try_all.af
+  import' ./fail/test_catch_requires_try_all.af
   " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
   T_err_contains try
 
@@ -2194,7 +2295,7 @@ test_catch_2
 \ Words can disable file-scoped `try_all` and return their error output
 \ explicitly. Callers then handle the error value as an ordinary output.
 fun: test_disabling_try_all_fun { -- err } [ false try_all ]
-  test_throw { err_ignore }
+  test_throw { _err_ignore }
   " different_test_err"
 end
 
@@ -2356,7 +2457,7 @@ end
 test_explicit_err_4
 
 \ Must compile.
-fun: test_max_input_regs { A B C D E F G H } end
+fun: test_max_input_regs { _A _B _C _D _E _F _G _H } end
 
 fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
 fun: test_max_output_regs { -- err } [ redefine ]
@@ -2374,7 +2475,7 @@ end
 test_max_output_regs_with_err
 
 fun: test_file_throw_import_catch { -- err } [ false try_all ]
-  import' ./test/test_root_throw.af
+  import' ./fail/test_root_throw.af
   " test_err" T_err_contains
 end
 test_file_throw_import_catch
@@ -2400,141 +2501,134 @@ end
 test_has_err_not_auto_marked
 
 fun: test_has_err_not_contagious { -- err } [ false try_all ]
-  import' ./test/test_has_err_not_contagious.af
+  import' ./fail/test_has_err_not_contagious.af
   " caller has no error output for implicit `try_all`"
   T_err_contains
 end
 test_has_err_not_contagious
 
 fun: test_throw_requires_err { -- err } [ false try_all ]
-  import' ./test/test_throw_requires_err.af
+  import' ./fail/test_throw_requires_err.af
   " unable to `throw`: current word has no error output"
   T_err_contains
 end
 test_throw_requires_err
 
 fun: test_too_many_input_regs { -- err } [ false try_all ]
-  import' ./test/test_too_many_input_regs.af
+  import' ./fail/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
   T_err_contains
 end
 test_too_many_input_regs
 
 fun: test_too_many_output_regs { -- err } [ false try_all ]
-  import' ./test/test_too_many_output_regs.af
+  import' ./fail/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   T_err_contains
 end
 test_too_many_output_regs
 
 fun: test_too_many_output_regs_with_err { -- err } [ false try_all ]
-  import' ./test/test_too_many_output_regs_with_err.af
+  import' ./fail/test_too_many_output_regs_with_err.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   T_err_contains
 end
 test_too_many_output_regs_with_err
 
 fun: test_too_many_comptime_arg_regs { -- err } [ false try_all ]
-  import' ./test/test_too_many_comptime_arg_regs.af
+  import' ./fail/test_too_many_comptime_arg_regs.af
   " too many arguments: 16 registers available, 17 arguments provided"
   T_err_contains
 end
 test_too_many_comptime_arg_regs
 
 fun: test_too_many_execute_raw_args { -- err } [ false try_all ]
-  import' ./test/test_too_many_execute_raw_args.af
+  import' ./fail/test_too_many_execute_raw_args.af
   " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided"
   T_err_contains
 end
 test_too_many_execute_raw_args
 
 fun: test_comptime_stack_underflow { -- err } [ false try_all ]
-  import' ./test/test_comptime_stack_underflow.af
+  import' ./fail/test_comptime_stack_underflow.af
   " in `some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
   T_err_contains
 end
 test_comptime_stack_underflow
 
-fun: test_partial_assign { -- err } [ false try_all ]
-  import' ./test/test_partial_assign.af
-  " in `test_partial_assign_fail`: arity mismatch: assigned 1 of 2 prior values"
-  T_err_contains
-end
-test_partial_assign
-
 fun: test_cond_arity_bare_if { -- err } [ false try_all ]
-  import' ./test/test_cond_arity_bare_if.af
-  " conditional with outputs requires final `else`"
+  import' ./fail/test_cond_arity_bare_if.af
+  " conditional which consumes and produces different amounts of arguments requires final `else`"
   T_err_contains
 end
 test_cond_arity_bare_if
 
 fun: test_cond_arity_else_mismatch { -- err } [ false try_all ]
-  import' ./test/test_cond_arity_else_mismatch.af
-  " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): when ending conditional branch: arity mismatch: required: 2, provided: 1"
+  import' ./fail/test_cond_arity_else_mismatch.af
+  " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
   T_err_contains
 end
 test_cond_arity_else_mismatch
 
 fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
-  import' ./test/test_cond_arity_elif_mismatch.af
-  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): when calling `else`: arity mismatch: required: 1, provided: 2"
+  import' ./fail/test_cond_arity_elif_mismatch.af
+  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): outputs before `else`: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_cond_arity_elif_mismatch
 
 fun: test_cond_arity_no_else { -- err } [ false try_all ]
-  import' ./test/test_cond_arity_no_else.af
-  " conditional with outputs requires final `else`"
+  import' ./fail/test_cond_arity_no_else.af
+  " conditional which consumes and produces different amounts of arguments requires final `else`"
   T_err_contains
 end
 test_cond_arity_no_else
 
 fun: test_cond_arity_no_else_less { -- err } [ false try_all ]
-  import' ./test/test_cond_arity_no_else_less.af
-  " in `test_cond_arity_no_else_less_fail` (WORDLIST_EXEC): when ending conditional branch: arity mismatch: required: 1, provided: 0"
+  import' ./fail/test_cond_arity_no_else_less.af
+  " conditional which consumes and produces different amounts of arguments requires final `else`"
   T_err_contains
 end
 test_cond_arity_no_else_less
 
 fun: test_cond_arity_no_else_more { -- err } [ false try_all ]
-  import' ./test/test_cond_arity_no_else_more.af
-  " in `test_cond_arity_no_else_more_fail` (WORDLIST_EXEC): when ending conditional branch: arity mismatch: required: 1, provided: 2"
+  import' ./fail/test_cond_arity_no_else_more.af
+  " conditional which consumes and produces different amounts of arguments requires final `else`"
   T_err_contains
 end
 test_cond_arity_no_else_more
 
 fun: test_switch_arity_case_mismatch { -- err } [ false try_all ]
-  import' ./test/test_switch_arity_case_mismatch.af
-  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): when ending `case`: arity mismatch: required: 1, provided: 2"
+  import' ./fail/test_switch_arity_case_mismatch.af
+  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): outputs before ending `case`: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_switch_arity_case_mismatch
 
 fun: test_switch_arity_input_case_mismatch { -- err } [ false try_all ]
-  import' ./test/test_switch_arity_input_case_mismatch.af
-  " in `test_switch_arity_input_case_mismatch_fail` (WORDLIST_EXEC): when ending `switch`: arity mismatch: required: 2, provided: 1"
+  import' ./fail/test_switch_arity_input_case_mismatch.af
+  " in `test_switch_arity_input_case_mismatch_fail` (WORDLIST_EXEC): outputs before ending `switch`: arity mismatch: required: 2, provided: 1"
   T_err_contains
 end
 test_switch_arity_input_case_mismatch
 
 fun: test_switch_arity_input_cases_mismatch { -- err } [ false try_all ]
-  import' ./test/test_switch_arity_input_cases_mismatch.af
-  " in `test_switch_arity_input_cases_mismatch_fail` (WORDLIST_EXEC): when ending `case`: arity mismatch: required: 2, provided: 3"
+  import' ./fail/test_switch_arity_input_cases_mismatch.af
+  " in `test_switch_arity_input_cases_mismatch_fail` (WORDLIST_EXEC): outputs before ending `case`: arity mismatch: required: 2, provided: 3"
   T_err_contains
 end
 test_switch_arity_input_cases_mismatch
 
 fun: test_switch_arity_input_case_too_many { -- err } [ false try_all ]
-  import' ./test/test_switch_arity_input_case_too_many.af
+  import' ./fail/test_switch_arity_input_case_too_many.af
   " unable to compile `case`: too many arguments: 15 registers available, 16 arguments provided"
   T_err_contains
 end
 test_switch_arity_input_case_too_many
 
 fun: test_switch_arity_no_default { -- err } [ false try_all ]
-  import' ./test/test_switch_arity_no_default.af
-  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): when ending `switch`: arity mismatch: required: 1, provided: 0"
+  import' ./fail/test_switch_arity_no_default.af
+  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): outputs before ending `switch`: arity mismatch: required: 1, provided: 0"
   T_err_contains
 end
 test_switch_arity_no_default
@@ -2579,11 +2673,11 @@ fun: test_arena_trunc { -- err }
   alloca' Arena { arn }
   arn arena_init
 
-  7 arn arena_alloc { adr0 }
+  7 arn arena_alloc { _adr0 }
   arn Arena_low @ { page0 }
   page0 Stack_floor @ { floor0 }
 
-  ARENA_PAGE_MIN arn arena_alloc { adr1 }
+  ARENA_PAGE_MIN arn arena_alloc { _adr1 }
   arn Arena_low @ { page1 }
 
   T{ arn stack_len_bytes   <T> size' Stack 2 * }T
@@ -2611,7 +2705,7 @@ fun: test_arena_deinit { -- err }
   alloca' Arena { arn }
   arn arena_init
 
-  128 arn arena_alloc { adr0 }
+  128 arn arena_alloc { _adr0 }
   ARENA_PAGE_MIN arn arena_alloc { adr1 }
 
   arn arena_deinit
@@ -2629,7 +2723,7 @@ fun: test_arena_errors { -- err }
   alloca' Arena { arn }
   arn arena_init
 
-  0 arn catch' arena_alloc { adr err }
+  0 arn catch' arena_alloc { _adr err }
   T{ err <>0 <T> true }T
   err " unable to allocate: size is zero" T_err_contains
 
@@ -2640,14 +2734,14 @@ end
 test_arena_errors
 
 fun: test_word_len_over { -- err }
-  s" ./test/test_word_len_over.af" catch' import { err }
+  s" ./fail/test_word_len_over.af" catch' import { err }
   err " word length 128 exceeds max word length 127" T_err_contains
 end
 test_word_len_over
 
-s" ./test/test_import_empty.af" import
+s" ./test_import_empty.af" import
 
-T{ s" ./test/test_interp_ret.af" import <T> 123 }T
+T{ s" ./test_interp_ret.af" import <T> 123 }T
 
 import' ./test_const_fold.af
 
@@ -2660,11 +2754,6 @@ fun: main_run { -- err }
   test_stack_primitives
   test_to_stack_variadic
   test_stack_braces
-  test_local_ref
-  test_local_ref_volatile_immediate_read
-  test_local_ref_volatile_delayed_read
-  test_local_ref_volatile_with_inputs
-  test_local_ref_volatile_with_outputs
   test_conditionals
   test_switch_empty
   test_switch_body_only
@@ -2679,6 +2768,7 @@ fun: main_run { -- err }
   test_switch_output_body_only
   test_recursion
   test_recur_with_err
+  test_indirect_forward
   \ test_sleep_loop
   test_loop_leave
   test_loop_nested
@@ -2697,6 +2787,7 @@ fun: main_run { -- err }
   test_cont_for_countup
   test_cont_loop_countdown
   test_cont_loop_countup
+  test_cont_meta_loop_inputs
   test_load_store
   test_negate
   test_equal
@@ -2722,9 +2813,9 @@ fun: main_run { -- err }
   test_cstr_eq
   test_cstr_less
   test_int_to_cell
+  test_is_err_flag_regression
   test_comptime_arg_stack_sum16
   test_comptime_arg_stack_mod_scratch
-  test_comptime_arg_stack_local_set_x8
   test_comptime_arg_stack_to_stack_9
   test_fallback
   \ test_vargs_printf
