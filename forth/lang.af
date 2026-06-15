@@ -765,6 +765,14 @@ fun: asm_clz { Xd Xn -- instr }
   0b1_1_0_11010110_00000_00010_0_00000_00000 or
 end
 
+\ TODO: support shift.
+fun: asm_tst { Xn Xm -- instr }
+  Xm 16 lsl { Xm }
+  Xn 5 lsl
+  Xm or
+  0b1_11_01010_00_0_00000_000000_00000_00000 or
+end
+
 \ `ret x30`; requires caution with SP / FP.
 0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 let: asm_ret
 
@@ -1018,6 +1026,16 @@ fun_comp: bit_len { -- err }
 end
 
 fun: bit_len { val -- len } val bit_len end
+
+fun_comp: is_aligned_to { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg1 reg1 1    asm_sub_imm comp_instr \ sub Xd, Xn, 1
+  reg1 reg0      asm_tst     comp_instr
+  reg0 ASM_EQ    asm_cset    comp_instr \ cset Xd, eq
+  reg1 comp_args_set
+end
+
+fun: is_aligned_to { adr size -- bool } adr size is_aligned_to end
 
 fun_comp: align_down { -- err }
   comp_args2_regs { reg0 reg1 }
@@ -1645,16 +1663,6 @@ fun: move  { src out len  } out src len strncpy end
 fun: fill  { buf len char } buf char len memset end
 fun: erase { buf len      } buf len 0 fill end
 
-\ See `ccompare` below for null-terminated strings.
-fun: compare { str0 len0 str1 len1 -- direction }
-  str0 str1 len0 len1 max strncmp
-end
-
-\ See `cstr=` and more below for null-terminated strings.
-fun: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0  end
-fun: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0  end
-fun: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
-
 \ ## Characters and strings
 
 fun: read_word_char { -- char err } read_word { buf -- } buf @u8 end
@@ -2252,6 +2260,15 @@ end
 
 fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
   execute'' size' execute'' alloca
+end
+
+fun_comp: is_aligned_to' { -- err } ( C: "type" -- ) ( E: adr -- bool )
+  execute'' align' execute'' is_aligned_to
+end
+
+fun: is_aligned_to' { adr -- bool err }
+  execute' align' { size }
+  adr size is_aligned_to
 end
 
 \ ### Integer types
@@ -3385,16 +3402,29 @@ end
 
 \ ## String comparison continued
 
-\ `strcmp` doesn't like null string pointers.
-fun: ccompare { cstr0 cstr1 -- cmp }
-  ifz cstr0 cstr1 or then 0 ret end
-  ifz cstr0 then -1 ret end
-  ifz cstr1 then +1 ret end
-  cstr0 cstr1 strcmp
+\ `strncmp` doesn't like null string pointers.
+fun: compare { str0 len0 str1 len1 -- direction }
+  ifz   str0 str1 or then 0
+  elifz str0         then -1
+  elifz str1         then +1
+  else  str0 str1 len0 len1 max strncmp
+  end
 end
 
-fun: cstr=  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare =0 end
-fun: cstr<  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <0 end
+\ `strcmp` doesn't like null string pointers.
+fun: ccompare { cstr0 cstr1 -- cmp }
+  ifz   cstr0 cstr1 or then 0
+  elifz cstr0          then -1
+  elifz cstr1          then +1
+  else  cstr0 cstr1 strcmp
+  end
+end
+
+fun: str=   { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0  end
+fun: str<   { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0  end
+fun: str<>  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
+fun: cstr=  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare =0  end
+fun: cstr<  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <0  end
 fun: cstr<> { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <>0 end
 
 \ ## Vargs and formatting
