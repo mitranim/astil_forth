@@ -935,6 +935,16 @@ end
 
 fun: mod { i0 i1 -- i2 } [ redefine ] i0 i1 mod end
 
+fun_comp: umod { -- err }
+  comp_args2_regs { reg0 reg1 }
+  comp_scratch_reg { tmp }
+  tmp reg0 reg1      asm_udiv comp_instr \ udiv Xd, Xn, Xm
+  reg0 tmp reg1 reg0 asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  reg1 comp_args_set
+end
+
+fun: umod { i0 i1 -- i2 } i0 i1 umod end
+
 fun_comp: /mod { -- err }
   comp_args2_regs2 { rem quo dividend divisor }
   comp_scratch_reg { tmp }
@@ -944,6 +954,16 @@ fun_comp: /mod { -- err }
 end
 
 fun: /mod { dividend divisor -- rem quo } dividend divisor /mod end
+
+fun_comp: u/mod { -- err }
+  comp_args2_regs2 { rem quo dividend divisor }
+  comp_scratch_reg { tmp }
+  tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
+  quo dividend tmp     asm_udiv    comp_instr \ udiv Xd, Xn, Xm
+  rem quo tmp dividend asm_msub    comp_instr \ msub Xd, Xn, Xm, Xa
+end
+
+fun: u/mod { dividend divisor -- rem quo } dividend divisor u/mod end
 
 fun_comp: abs { -- err }
   comp_args1_reg { reg }
@@ -962,6 +982,15 @@ end
 
 fun: min { i0 i1 -- i0|i1 } i0 i1 min end
 
+fun_comp: umin { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
+  reg0 reg0 reg1 ASM_LO asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg1 comp_args_set
+end
+
+fun: umin { i0 i1 -- i0|i1 } i0 i1 umin end
+
 fun_comp: max { -- err }
   comp_args2_regs { reg0 reg1 }
   reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
@@ -970,6 +999,15 @@ fun_comp: max { -- err }
 end
 
 fun: max { i0 i1 -- i0|i1 } i0 i1 max end
+
+fun_comp: umax { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
+  reg0 reg0 reg1 ASM_HI asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg1 comp_args_set
+end
+
+fun: umax { i0 i1 -- i0|i1 } i0 i1 umax end
 
 fun_comp: bit_len { -- err }
   comp_args1_reg { reg }
@@ -1153,6 +1191,14 @@ fun_comp: <=  {       -- err  } ASM_LE asm_comp_cset_reg  end
 fun:      <=  { i0 i1 -- bool } i0 i1 <=                  end
 fun_comp: >=  {       -- err  } ASM_GE asm_comp_cset_reg  end
 fun:      >=  { i0 i1 -- bool } i0 i1 >=                  end
+fun_comp: u>  {       -- err  } ASM_HI asm_comp_cset_reg  end
+fun:      u>  { i0 i1 -- bool } i0 i1 u>                  end
+fun_comp: u<  {       -- err  } ASM_LO asm_comp_cset_reg  end
+fun:      u<  { i0 i1 -- bool } i0 i1 u<                  end
+fun_comp: u<= {       -- err  } ASM_LS asm_comp_cset_reg  end
+fun:      u<= { i0 i1 -- bool } i0 i1 u<=                 end
+fun_comp: u>= {       -- err  } ASM_HS asm_comp_cset_reg  end
+fun:      u>= { i0 i1 -- bool } i0 i1 u>=                 end
 fun_comp: <0  {       -- err  } ASM_LT asm_comp_cset_zero end \ Or `MI`.
 fun:      <0  { num   -- bool } num <0                    end
 fun_comp: >0  {       -- err  } ASM_GT asm_comp_cset_zero end
@@ -1165,6 +1211,7 @@ fun:      >=0 { num   -- bool } num >=0                   end
 true try_all
 
 fun: within { num one two -- bool } one num > num two > or =0 end
+fun: uwithin { num one two -- bool } one num u> num two u> or =0 end
 
 fun_comp: odd { -- err }
   comp_args1_reg { reg }
@@ -2787,8 +2834,16 @@ fun_comp: mod { -- err } [ redefine ]
   if cf_fold_cleared2 then mod cf_fold_done else { -- } execute'' mod end
 end
 
+fun_comp: umod { -- err } [ redefine ]
+  if cf_fold_cleared2 then umod cf_fold_done else { -- } execute'' umod end
+end
+
 fun_comp: /mod { -- err } [ redefine ]
   if cf_fold_cleared2_keep2 then /mod cf_fold_done2 else { -- } execute'' /mod end
+end
+
+fun_comp: u/mod { -- err } [ redefine ]
+  if cf_fold_cleared2_keep2 then u/mod cf_fold_done2 else { -- } execute'' u/mod end
 end
 
 fun_comp: inc { -- err } [ redefine ]
@@ -2819,8 +2874,16 @@ fun_comp: min { -- err } [ redefine ]
   if cf_fold_cleared2 then min cf_fold_done else { -- } execute'' min end
 end
 
+fun_comp: umin { -- err } [ redefine ]
+  if cf_fold_cleared2 then umin cf_fold_done else { -- } execute'' umin end
+end
+
 fun_comp: max { -- err } [ redefine ]
   if cf_fold_cleared2 then max cf_fold_done else { -- } execute'' max end
+end
+
+fun_comp: umax { -- err } [ redefine ]
+  if cf_fold_cleared2 then umax cf_fold_done else { -- } execute'' umax end
 end
 
 fun_comp: int_to_cell { -- err } [ redefine ]
@@ -2873,6 +2936,22 @@ end
 
 fun_comp: >= { -- err } [ redefine ]
   if cf_fold_cleared2 then >= cf_fold_done else { -- } execute'' >= end
+end
+
+fun_comp: u> { -- err } [ redefine ]
+  if cf_fold_cleared2 then u> cf_fold_done else { -- } execute'' u> end
+end
+
+fun_comp: u< { -- err } [ redefine ]
+  if cf_fold_cleared2 then u< cf_fold_done else { -- } execute'' u< end
+end
+
+fun_comp: u<= { -- err } [ redefine ]
+  if cf_fold_cleared2 then u<= cf_fold_done else { -- } execute'' u<= end
+end
+
+fun_comp: u>= { -- err } [ redefine ]
+  if cf_fold_cleared2 then u>= cf_fold_done else { -- } execute'' u>= end
 end
 
 fun_comp: cells { -- err } [ redefine ]

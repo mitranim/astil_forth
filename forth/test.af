@@ -1365,6 +1365,25 @@ fun: test_greater_equal { -- err }
 end
 test_greater_equal
 
+fun: test_unsigned_compare { -- err }
+  T{  0  0 u<  <T> 0 }T
+  T{  0  1 u<  <T> 1 }T
+  T{ -1  0 u<  <T> 0 }T
+  T{  0 -1 u<  <T> 1 }T
+  T{ -1  0 u>  <T> 1 }T
+  T{  0 -1 u>  <T> 0 }T
+  T{  0 -1 u<= <T> 1 }T
+  T{ -1  0 u<= <T> 0 }T
+  T{ -1  0 u>= <T> 1 }T
+  T{  0 -1 u>= <T> 0 }T
+
+  T{ -1 0 10 within  <T> 0 }T
+  T{ -1 0 10 uwithin <T> 0 }T
+  T{  5 0 10 uwithin <T> 1 }T
+  T{ 10 0 10 uwithin <T> 1 }T
+end
+test_unsigned_compare
+
 fun: test_compare_many { -- err }
   T{ 10 10 20 =any  <T> true  }T
   T{ 10 20 10 =any  <T> true  }T
@@ -1481,6 +1500,13 @@ fun: test_slash_mod { -- err }
 end
 test_slash_mod
 
+fun: test_unsigned_div_mod { -- err }
+  T{ -1 2 u/    <T> 9223372036854775807 }T
+  T{ -1 2 umod  <T> 1                   }T
+  T{ -1 2 u/mod <T> 1 9223372036854775807 }T
+end
+test_unsigned_div_mod
+
 fun: test_abs { -- err }
   T{    0 abs <T>   0 }T
   T{ -123 abs <T> 123 }T
@@ -1500,6 +1526,16 @@ fun: test_min { -- err }
 end
 test_min
 
+fun: test_umin { -- err }
+  T{  123  234 umin <T>  123 }T
+  T{  234  123 umin <T>  123 }T
+  T{  0   -123 umin <T>  0   }T
+  T{ -123  0   umin <T>  0   }T
+  T{ -123  234 umin <T>  234 }T
+  T{  234 -123 umin <T>  234 }T
+end
+test_umin
+
 fun: test_max { -- err }
   T{  123  234 max <T>  234 }T
   T{  234  123 max <T>  234 }T
@@ -1511,6 +1547,16 @@ fun: test_max { -- err }
   T{  234 -123 max <T>  234 }T
 end
 test_max
+
+fun: test_umax { -- err }
+  T{  123  234 umax <T>  234 }T
+  T{  234  123 umax <T>  234 }T
+  T{  0   -123 umax <T> -123 }T
+  T{ -123  0   umax <T> -123 }T
+  T{ -123  234 umax <T> -123 }T
+  T{  234 -123 umax <T> -123 }T
+end
+test_umax
 
 fun: test_bit_len { -- err }
   T{ 0   bit_len <T> 0 }T
@@ -2657,15 +2703,19 @@ fun: main_run { -- err }
   test_lesser
   test_lesser_equal
   test_greater_equal
+  test_unsigned_compare
   test_compare_many
   test_assert
   test_arith
   test_comptime_stack_arith
   test_mod
   test_slash_mod
+  test_unsigned_div_mod
   test_abs
   test_min
+  test_umin
   test_max
+  test_umax
   test_bit_len
   test_cstr_eq
   test_cstr_less
