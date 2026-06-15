@@ -63,11 +63,11 @@ contexts:
 
   comment-line-match:
     - match: '{{word_begin}}{{comment_line_begin}}{{word_end}}'
-      scope: punctuation.definition.comment.forth
+      scope: punctuation.definition.comment.astil_forth
       push: [comment-line-pop, comment-heading-pop]
 
   comment-line-pop:
-    - meta_scope: comment.line.forth
+    - meta_scope: comment.line.astil_forth
     - meta_include_prototype: false
     - match: '{{eol}}'
       pop: 1
@@ -75,30 +75,30 @@ contexts:
   # Also see `parens-params-match`.
   comment-block-match:
     - match: '{{word_begin}}{{comment_block_begin}}{{word_end}}(?={{eol}})'
-      scope: punctuation.definition.comment.begin.forth
+      scope: punctuation.definition.comment.begin.astil_forth
       push: [comment-block-pop, comment-heading-pop]
 
   comment-block-pop:
-    - meta_scope: comment.block.forth
+    - meta_scope: comment.block.astil_forth
     - meta_include_prototype: false
     - match: '{{comment_block_end}}'
-      scope: punctuation.definition.comment.end.forth
+      scope: punctuation.definition.comment.end.astil_forth
       pop: 1
     - include: comment-heading
 
   comment-heading-pop:
     - match: '{{md_heading}}'
       captures:
-        1: entity.name.section.forth markup.heading.forth
-        2: punctuation.definition.heading.begin.forth
+        1: entity.name.section.astil_forth markup.heading.astil_forth
+        2: punctuation.definition.heading.begin.astil_forth
       pop: 1
     - include: now-pop
 
   comment-heading:
     - match: '{{md_heading}}'
       captures:
-        1: entity.name.section.forth markup.heading.forth
-        2: punctuation.definition.heading.begin.forth
+        1: entity.name.section.astil_forth markup.heading.astil_forth
+        2: punctuation.definition.heading.begin.astil_forth
 
   number-match:
     - include: number-bin
@@ -108,37 +108,37 @@ contexts:
 
   number-bin:
     - match: '{{num_begin}}(?i)([+-])?(0b){{int_bin}}(?:(\.){{int_bin}})?(?:({{exponent}}){{int_bin}})?{{num_end}}'
-      scope: constant.numeric.binary.forth
+      scope: constant.numeric.binary.astil_forth
       captures:
-        1: keyword.operator.arithmetic.forth
-        2: punctuation.definition.numeric.binary.forth
-        3: punctuation.separator.numeric.binary.forth
-        4: punctuation.separator.exponent.forth
+        1: keyword.operator.arithmetic.astil_forth
+        2: punctuation.definition.numeric.binary.astil_forth
+        3: punctuation.separator.numeric.binary.astil_forth
+        4: punctuation.separator.exponent.astil_forth
 
   number-oct:
     - match: '{{num_begin}}(?i)([+-])?(0o)(?:{{int_oct}}(?:(\.){{int_oct}})?)?(?:({{exponent}}){{int_oct}})?{{num_end}}'
-      scope: constant.numeric.octal.forth
+      scope: constant.numeric.octal.astil_forth
       captures:
-        1: keyword.operator.arithmetic.forth
-        2: punctuation.definition.numeric.octal.forth
-        3: punctuation.separator.numeric.octal.forth
-        4: punctuation.separator.exponent.forth
+        1: keyword.operator.arithmetic.astil_forth
+        2: punctuation.definition.numeric.octal.astil_forth
+        3: punctuation.separator.numeric.octal.astil_forth
+        4: punctuation.separator.exponent.astil_forth
 
   number-dec:
     - match: '{{num_begin}}(?i)([+-])?{{int_dec}}(?:(\.){{int_dec}})?(?:({{exponent}}){{int_dec}})?{{num_end}}'
-      scope: constant.numeric.forth
+      scope: constant.numeric.astil_forth
       captures:
-        1: keyword.operator.arithmetic.forth
-        2: punctuation.separator.numeric.forth
-        3: punctuation.separator.exponent.forth
+        1: keyword.operator.arithmetic.astil_forth
+        2: punctuation.separator.numeric.astil_forth
+        3: punctuation.separator.exponent.astil_forth
 
   number-hex:
     - match: '{{num_begin}}(?i)([+-])?(0x)(?:{{int_hex}}(?:(\.){{int_hex}})?)?{{num_end}}'
-      scope: constant.numeric.hexadecimal.forth
+      scope: constant.numeric.hexadecimal.astil_forth
       captures:
-        1: keyword.operator.arithmetic.forth
-        2: punctuation.definition.numeric.hexadecimal.forth
-        3: punctuation.separator.numeric.hexadecimal.forth
+        1: keyword.operator.arithmetic.astil_forth
+        2: punctuation.definition.numeric.hexadecimal.astil_forth
+        3: punctuation.separator.numeric.hexadecimal.astil_forth
 
   string-match:
     - include: string-double-match
@@ -156,23 +156,23 @@ contexts:
   string-double-keyword-match:
     - match: '{{word_begin}}({{mod}})([^\s"]*)("+){{word_end}}(?:\s)'
       captures:
-        1: storage.modifier.forth
-        2: variable.function.forth
-        3: punctuation.definition.string.begin.forth
+        1: storage.modifier.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.definition.string.begin.astil_forth
       push: string-pop
     - match: '{{word_begin}}({{mod}})?({{keyword}})("+){{word_end}}(?:\s)'
       captures:
-        1: storage.modifier.forth
-        2: variable.function.forth
-        3: punctuation.definition.string.begin.forth
+        1: storage.modifier.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.definition.string.begin.astil_forth
       push: string-pop
 
   string-double-other-match:
     - match: '{{word_begin}}({{mod}})?([^\s"]*)("+){{word_end}}(?:\s)'
       captures:
-        1: storage.modifier.forth
-        2: variable.other.forth
-        3: punctuation.definition.string.begin.forth
+        1: storage.modifier.astil_forth
+        2: variable.other.astil_forth
+        3: punctuation.definition.string.begin.astil_forth
       push: string-pop
 
   # Scopes any construct like:
@@ -183,18 +183,18 @@ contexts:
   string-backtick-match:
     - match: '{{word_begin}}({{mod}})?([^\s`]*)(`+){{word_end}}(?:\s)'
       captures:
-        1: storage.modifier.forth
-        2: variable.other.forth
-        3: punctuation.definition.string.begin.forth
+        1: storage.modifier.astil_forth
+        2: variable.other.astil_forth
+        3: punctuation.definition.string.begin.astil_forth
       push: string-pop
 
   string-pop:
-    - meta_content_scope: string.quoted.forth
+    - meta_content_scope: string.quoted.astil_forth
     - meta_include_prototype: false
     - match: (\3)(\S*)
       captures:
-        1: punctuation.definition.string.end.forth
-        2: variable.other.forth
+        1: punctuation.definition.string.end.astil_forth
+        2: variable.other.astil_forth
       pop: 1
     # - include: str-escape-match
 
@@ -204,19 +204,19 @@ contexts:
 
   semi-match:
     - match: '{{word_begin}};{{word_end}}'
-      scope: punctuation.terminator.forth
+      scope: punctuation.terminator.astil_forth
 
   # Somewhat deprecated. TODO consider removing all "colon" stuff.
   colon-match:
     - match: '{{word_begin}}:+{{word_end}}'
-      scope: keyword.declaration.function.forth
+      scope: keyword.declaration.function.astil_forth
       push: [colon-meta-pop, colon-body-pop, colon-params-pop, colon-name-pop]
 
   colon-name-pop:
     - meta_include_prototype: false
-    - meta_scope: meta.declaration.forth
+    - meta_scope: meta.declaration.astil_forth
     - match: '{{word_begin}}{{word}}{{word_end}}'
-      scope: entity.name.function.forth
+      scope: entity.name.function.astil_forth
       pop: 1
     # When typing new definitions, this prevents an opening colon
     # from "declaring" an unrelated word on a subsequent line.
@@ -231,7 +231,7 @@ contexts:
 
   colon-body-pop:
     - match: '{{word_begin}};{{word_end}}'
-      scope: punctuation.terminator.forth
+      scope: punctuation.terminator.astil_forth
       pop: 1
     - include: main
 
@@ -240,7 +240,7 @@ contexts:
   # to use this trick for `fun: name end` definitions because we can't
   # special-case all openers which are terminated by `end`.
   colon-meta-pop:
-    - meta_scope: meta.colon.forth
+    - meta_scope: meta.colon.astil_forth
     - match: ''
       pop: 1
 
@@ -250,11 +250,11 @@ contexts:
 
   parens-params-match:
     - match: '{{word_begin}}\({{word_end}}'
-      scope: punctuation.section.parens.begin.forth
+      scope: punctuation.section.parens.begin.astil_forth
       push: parens-params-inner-pop
 
   parens-params-inner-pop:
-    - meta_scope: markup.raw.forth
+    - meta_scope: markup.raw.astil_forth meta.parens.astil_forth
     - include: parens-end-pop
     - include: special-param-match
     - include: parens-param-match
@@ -262,17 +262,17 @@ contexts:
 
   parens-param-match:
     - match: '{{parens_param}}'
-      scope: variable.other.forth
+      scope: variable.other.astil_forth
 
   parens-end-pop:
     - match: \)
-      scope: punctuation.section.parens.end.forth
+      scope: punctuation.section.parens.end.astil_forth
       pop: 1
 
   braces-params-match:
     - match: '{{word_begin}}(?:{{brace_params_pre}})?(\{){{word_end}}'
       captures:
-        1: punctuation.section.braces.begin.forth
+        1: punctuation.section.braces.begin.astil_forth
       push: braces-params-inner-pop
 
   braces-params-inner-pop:
@@ -284,11 +284,11 @@ contexts:
 
   braces-dash-match:
     - match: '{{word_begin}}--{{word_end}}'
-      scope: punctuation.separator.forth
+      scope: punctuation.separator.astil_forth
       set: braces-params-output-pop
 
   braces-params-output-pop:
-    - meta_scope: markup.raw.forth
+    - meta_scope: markup.raw.astil_forth meta.parens.astil_forth
     # This trick gets rid of the "raw" scope for the closing brace.
     - match: (?=\s*\})
       set: braces-end-pop
@@ -299,35 +299,35 @@ contexts:
   # Used only for input parameters.
   braces-param-match:
     - match: '{{word_begin}}{{braces_param}}{{word_end}}'
-      scope: variable.parameter.forth
+      scope: variable.parameter.astil_forth
 
   # Used for output parameters, which are not actually declared in scope.
   braces-other-match:
     - match: '{{word_begin}}{{braces_param}}{{word_end}}'
-      scope: variable.other.forth
+      scope: variable.other.astil_forth
 
   braces-end-pop:
     - match: \}
-      scope: punctuation.section.braces.end.forth
+      scope: punctuation.section.braces.end.astil_forth
       pop: 1
 
   special-param-match:
     - match: '{{word_begin}}{{word}}(:){{word_end}}'
-      scope: storage.modifier.forth
+      scope: storage.modifier.astil_forth
       captures:
-        1: punctuation.separator.forth
+        1: punctuation.separator.astil_forth
     - match: '{{word_begin}}--{{word_end}}'
-      scope: punctuation.separator.forth
+      scope: punctuation.separator.astil_forth
 
   # Convention for word-declaring words.
   declaring-word-match:
     - match: '{{word_begin}}({{mod}})?({{declarator}})(:){{word_end}}\s+({{word}}){{word_end}}'
-      scope: meta.declaration.forth
+      scope: meta.declaration.astil_forth
       captures:
-        1: storage.modifier.forth
-        2: keyword.declaration.forth
-        3: storage.modifier.forth
-        4: variable.declaration.forth
+        1: storage.modifier.astil_forth
+        2: keyword.declaration.astil_forth
+        3: storage.modifier.astil_forth
+        4: variable.declaration.astil_forth
 
   # Support the convention where immediate words with a trailing apostrophe are
   # expected to read the very next word in the source text, and do something
@@ -338,19 +338,19 @@ contexts:
 
   parsing-word-bracketed-ticked-match:
     - match: '{{word_begin}}(\[+)[^\s"]*?({{tick}}+)(\]+){{word_end}}'
-      scope: variable.function.forth
+      scope: variable.function.astil_forth
       captures:
-        1: storage.modifier.forth
-        2: storage.modifier.forth
-        3: storage.modifier.forth
+        1: storage.modifier.astil_forth
+        2: storage.modifier.astil_forth
+        3: storage.modifier.astil_forth
       push: parse-word-pop
 
   parsing-word-ticked-match:
     - match: '{{word_begin}}({{mod}})?[^\s{{tick}}"]*?({{tick}}+){{word_end}}'
-      scope: variable.function.forth
+      scope: variable.function.astil_forth
       captures:
-        1: storage.modifier.forth
-        2: storage.modifier.forth
+        1: storage.modifier.astil_forth
+        2: storage.modifier.astil_forth
       push: parse-word-pop
 
   parse-word-pop:
@@ -358,46 +358,46 @@ contexts:
     - match: '{{eol}}'
       pop: 1
     - match: '{{word_begin}}{{word}}{{word_end}}'
-      scope: string.other.forth
+      scope: string.other.astil_forth
       pop: 1
 
   delimited-word-match:
     - include: bracketed-word-match
     - match: '{{word_begin}}([{{delim}}]+)([^\s{{delim}}]*){{word_end}}'
       captures:
-        1: punctuation.section.forth
-        2: variable.other.forth
+        1: punctuation.section.astil_forth
+        2: variable.other.astil_forth
     - match: '{{word_begin}}([{{delim}}]*)([^\s{{delim}}]*?)([{{delim}}]+){{word_end}}'
       captures:
-        1: punctuation.section.forth
-        2: variable.other.forth
-        3: punctuation.section.forth
+        1: punctuation.section.astil_forth
+        2: variable.other.astil_forth
+        3: punctuation.section.astil_forth
 
   # Support the common convention of `[bracketed]` words.
   bracketed-word-match:
     - match: '{{word_begin}}(\[+)\S*(\]+){{word_end}}'
-      scope: variable.function.forth
+      scope: variable.function.astil_forth
       captures:
-        1: storage.modifier.forth
-        2: storage.modifier.forth
+        1: storage.modifier.astil_forth
+        2: storage.modifier.astil_forth
 
   modified-word-match:
     - match: '{{word_begin}}({{mod}})\S+{{word_end}}'
-      scope: variable.function.forth
+      scope: variable.function.astil_forth
       captures:
-        1: storage.modifier.forth
+        1: storage.modifier.astil_forth
 
   constant-match:
     - match: '{{word_begin}}(?:nil|true|false){{word_end}}'
-      scope: constant.language.boolean.forth
+      scope: constant.language.boolean.astil_forth
 
   keyword-match:
     - match: '{{word_begin}}{{keyword}}{{word_end}}'
-      scope: variable.function.forth
+      scope: variable.function.astil_forth
 
   any-word-match:
     - match: '{{word_begin}}{{word}}{{word_end}}'
-      scope: variable.other.forth
+      scope: variable.other.astil_forth
 
   now-pop:
     - match: ''
