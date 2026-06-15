@@ -15,6 +15,7 @@ static const USED Sym INTRIN[] = {
   INTRIN_DEFINE_FUN_COMP,  // define_fun_comp
   INTRIN_BRACKET_BEG,      // [
   INTRIN_BRACKET_END,      // ]
+  INTRIN_RET_EXEC,         // ret
   INTRIN_RET,              // #ret
   INTRIN_RECUR,            // #recur
   INTRIN_TRY,              // try

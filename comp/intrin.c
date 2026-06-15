@@ -221,6 +221,8 @@ static Err intrin_quit(Interp *interp) {
   return ERR_QUIT;
 }
 
+static Err intrin_ret_exec(Interp *) { return ERR_RET; }
+
 static Err err_char_eof() {
   return err_str("EOF where a character was expected");
 }
@@ -609,6 +611,14 @@ static const USED auto INTRIN_RET = (Sym){
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
+};
+
+static const USED auto INTRIN_RET_EXEC = (Sym){
+  .name.buf = "ret",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_ret_exec,
+  .out_len  = 1,
+  .has_err  = true,
 };
 
 static const USED auto INTRIN_RECUR = (Sym){

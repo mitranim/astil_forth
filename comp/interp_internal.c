@@ -307,9 +307,11 @@ static Err read_interp_word(Interp *interp) {
 }
 
 static const Err ERR_QUIT = "quit";
+static const Err ERR_RET  = "ret";
 
 static Err interp_err(Reader *read, const Err err) {
   if (err == ERR_QUIT) return err;
+  if (err == ERR_RET) return nullptr;
   return reader_err(read, err);
 }
 

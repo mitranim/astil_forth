@@ -723,4 +723,6 @@ test_word_len_over
 
 s" ./test/test_import_empty.af" import
 
+T{ s" ./test/test_interp_ret.af" import <T> 123 }T
+
 " [test] ok" log lf
