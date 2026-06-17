@@ -521,6 +521,15 @@ static Err intrin_comp_pop_into_local(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_comp_assign_local_from_reg(Sint reg, Sint ptr, Interp *interp) {
+  const auto comp = &interp->comp;
+  Local     *loc;
+  try(comp_validate_local(comp, ptr, &loc));
+  try(asm_validate_arg_reg(reg));
+  try(comp_assign_local_from_reg(comp, loc, (U8)reg));
+  return nullptr;
+}
+
 static Err intrin_alloca(Interp *interp) { return comp_alloca(&interp->comp); }
 
 static Err intrin_compile_executable(Sint main, Sint path, Interp *interp) {
@@ -807,6 +816,16 @@ static const USED auto INTRIN_COMP_POP_INTO_LOCAL = (Sym){
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_pop_into_local,
   .inp_len   = 1,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_ASSIGN_LOCAL_FROM_REG = (Sym){
+  .name.buf  = "comp_assign_local_from_reg",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_assign_local_from_reg,
+  .inp_len   = 2,
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,

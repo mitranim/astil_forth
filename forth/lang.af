@@ -3793,17 +3793,10 @@ end
 \ error with `errf` and wrap it repeatedly.
 fun_comp: wrapf { -- err } ( C: err fmt …vargs… -- str )
   nil 0 comp_local { buf }
-  nil 0 comp_local { cap }
-  nil 0 comp_local { fmt }
   2 comp_va_beg    { len }
 
   compile' wrapf_args
-  fmt comp_pop_into_local  \ mov <fmt>, xN | str xN, [FP, <fmt>]
-  cap comp_pop_into_local  \ mov <cap>, xN | str xN, [FP, <cap>]
-  buf comp_pop_into_local  \ mov <buf>, xN | str xN, [FP, <buf>]
-  buf comp_push_from_local \ mov xN, <buf> | ldr xN, [FP, <buf>]
-  cap comp_push_from_local \ mov xN, <cap> | ldr xN, [FP, <cap>]
-  fmt comp_push_from_local \ mov xN, <fmt> | ldr xN, [FP, <fmt>]
+  0 buf comp_assign_local_from_reg \ Stash x0 so we can return the buffer.
   compile' snprintf
 
   len comp_va_end
@@ -3889,16 +3882,9 @@ end
 \ instead of formatted length or error sentinel.
 fun_comp: strf { -- err } ( E: buf cap fmt …vargs… -- buf )
   nil 0 comp_local { buf }
-  nil 0 comp_local { cap }
-  nil 0 comp_local { fmt }
   3 comp_va_beg    { len }
 
-  fmt comp_pop_into_local  \ mov <fmt>, xN | str xN, [FP, <fmt>]
-  cap comp_pop_into_local  \ mov <cap>, xN | str xN, [FP, <cap>]
-  buf comp_pop_into_local  \ mov <buf>, xN | str xN, [FP, <buf>]
-  buf comp_push_from_local \ mov xN, <buf> | ldr xN, [FP, <buf>]
-  cap comp_push_from_local \ mov xN, <cap> | ldr xN, [FP, <cap>]
-  fmt comp_push_from_local \ mov xN, <fmt> | ldr xN, [FP, <fmt>]
+  0 buf comp_assign_local_from_reg \ Stash x0 so we can return the buffer.
   compile' snprintf
 
   len comp_va_end

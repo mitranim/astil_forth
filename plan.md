@@ -78,9 +78,10 @@ Sources used:
   - Candidate: one shared compile helper for counted loop init/update/compare. Review before touching correctness.
   - Verdict: simplify lightly. Factored repeated counted-loop condition metadata/pop construction; left loop init/update/compare bodies explicit because their stack/local choreography differs.
 
-- [ ] `forth/lang.af:3826-3843` and `3922-3940`: `wrapf` and `strf`.
+- [x] `forth/lang.af:3826-3843` and `3922-3940`: `wrapf` and `strf`.
   - Suspect chunk: same save three args to locals, reload three args, call `snprintf`, return buffer.
   - Candidate: shared helper for "preserve first N args across varargs call" or restore prior shorter implementation if safe.
+  - Verdict: simplify. Restored a specific-register local assignment intrinsic so `wrapf`/`strf` stash only `buf` from x0 before compiling `snprintf`; kept their different tails explicit.
 
 - [ ] `forth/lang.af:3963-4046`: `comp_args_to_stack`, `>>s`, `stack{`.
   - Suspect chunk: stack transfer logic now mixes locals, manual temp regs, and argument resetting.
