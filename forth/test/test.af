@@ -153,6 +153,16 @@ fun: test_to_stack_variadic { -- err }
 end
 test_to_stack_variadic
 
+fun: test_reg_cc_stack_words { -- err }
+  T{ 10 20 drop        <T> 10       }T
+  T{ 10 20 swap        <T> 20 10    }T
+  T{ 10 20 30 drop     <T> 10 20    }T
+  T{ 10 20 30 swap     <T> 10 30 20 }T
+  T{ 10 20 + 30 drop   <T> 30       }T
+  T{ 10 20 - 30 swap - <T> 40       }T
+end
+test_reg_cc_stack_words
+
 fun: test_stack_braces { -- err }
   alloca' Stack { stk }
   32 stk stack_init
@@ -1711,6 +1721,16 @@ fun: test_comptime_arg_stack_sum16 { -- err }
 end
 test_comptime_arg_stack_sum16
 
+fun: test_comptime_arg_stack_swap16_fun { -- val }
+  0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+  swap - + + + + + + + + + + + + + +
+end
+
+fun: test_comptime_arg_stack_swap16 { -- err }
+  T{ test_comptime_arg_stack_swap16_fun <T> 92 }T
+end
+test_comptime_arg_stack_swap16
+
 fun: test_assign_all_arg_regs_fun { -- val }
   0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   { A B C D E F G H I J K L M N O P }
@@ -2821,6 +2841,7 @@ fun: main_run { -- err }
   test_locals
   test_stack_primitives
   test_to_stack_variadic
+  test_reg_cc_stack_words
   test_stack_braces
   test_conditionals
   test_switch_ret
@@ -2880,6 +2901,7 @@ fun: main_run { -- err }
   test_int_to_cell
   test_is_err_flag_regression
   test_comptime_arg_stack_sum16
+  test_comptime_arg_stack_swap16
   test_comptime_arg_stack_mod_scratch
   test_comptime_arg_stack_to_stack_9
   test_fallback

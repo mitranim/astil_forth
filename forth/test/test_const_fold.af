@@ -82,15 +82,15 @@ fun: cf_expect_ret asm_ret cf_expect_instr end
 fun_comp: cf_expect_top_not_foldable { -- err }
   1 nil comp_args_min
   comp_args_get dec { reg }
-  reg cf_reg_val { val }
-  val cf_reg_val_foldable_imm { imm ok }
+  reg comp_arg { val }
+  val cf_arg_foldable_imm { imm ok }
   if ok then
     " [test] expected non-foldable top reg; got immediate %zd" imm errf throw
   end
 end
 
 fun_comp: cf_expect_reg_no_local { reg -- err }
-  reg cf_reg_val { val }
+  reg comp_arg { val }
   val Interp_comp_arg_loc @ { loc }
   if loc then
     " [test] expected no local in reg %zd" reg errf throw
@@ -108,8 +108,8 @@ end
 fun_comp: cf_expect_top_foldable { exp -- err }
   1 nil comp_args_min
   comp_args_get dec { reg }
-  reg cf_reg_val { val }
-  val cf_reg_val_foldable_imm { imm ok }
+  reg comp_arg { val }
+  val cf_arg_foldable_imm { imm ok }
   ifz ok then " [test] expected foldable top reg" throw end
   if imm exp <> then
     " [test] expected top immediate %zd; got %zd" exp imm errf throw

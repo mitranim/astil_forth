@@ -2747,6 +2747,41 @@ struct: Interp
   U8          1 field: Interp_slop
 end
 
+\ ## Compiler context
+\
+\ We use C-mirror structs to access the state of the running compiler.
+\ This requires keeping definitions in sync, but gives us an automatic
+\ ABI without the need for an API.
+
+fun: comp_ctx { -- Interp_comp_ctx* }
+  interp Interp_comp_field Interp_comp_ctx_field
+end
+
+fun: comp_arg { reg -- Interp_comp_arg* err }
+  comp_ctx Interp_comp_ctx_args { args }
+  Interp_comp_arg sizeof reg * args +
+end
+
+fun: comp_writable_instrs { -- Interp_list* }
+  interp Interp_comp_field Interp_comp_code_field Interp_comp_code_code_write
+end
+
+fun: comp_code_len { -- len } comp_writable_instrs Interp_list_len @u32 end
+
+fun: comp_top_arg_regs2 { -- reg0 reg1 err }
+  2 nil comp_args_min
+  comp_args_get dec { reg1 }
+  reg1 dec reg1
+end
+
+fun: comp_arg_imm_floor { val -- floor }
+  val Interp_comp_arg_imm_field Interp_reg_imm_floor @u32
+end
+
+fun: comp_arg_imm_ceil { val -- ceil }
+  val Interp_comp_arg_imm_field Interp_reg_imm_ceil @u32
+end
+
 \ ## Constant folding
 \
 \ When allocating values to registers, the outer compiler detects
@@ -2758,75 +2793,41 @@ end
 \ constants and fold them at comptime, falling back
 \ on the regular runtime arithmetic.
 
-fun: cf_comp_ctx { -- Interp_comp_ctx* }
-  interp Interp_comp_field Interp_comp_ctx_field
-end
-
-fun: cf_reg_val { reg -- Interp_comp_arg* err }
-  cf_comp_ctx Interp_comp_ctx_args { args }
-  Interp_comp_arg sizeof reg * args +
-end
-
-fun: cf_writable_instrs { -- Interp_list* }
-  interp Interp_comp_field Interp_comp_code_field Interp_comp_code_code_write
-end
-
-fun: cf_code_len { -- len } cf_writable_instrs Interp_list_len @u32 end
-
-fun: cf_regs2 { -- reg0 reg1 err }
-  2 nil comp_args_min
-  comp_args_get dec { reg1 }
-  reg1 dec reg1
-end
-
-fun: cf_reg_val_imm { val -- imm ok }
+fun: cf_arg_foldable_imm { val -- imm ok }
   val Interp_comp_arg_imm_field Interp_reg_imm_num @
   val Interp_comp_arg_imm_field Interp_reg_imm_has_imm @b
 end
 
-fun: cf_reg_val_foldable_imm { val -- imm ok }
-  val Interp_comp_arg_imm_field Interp_reg_imm_num @
-  val Interp_comp_arg_imm_field Interp_reg_imm_has_imm @b
+fun: cf_arg_current { val -- ok }
+  comp_code_len { len }
+  val comp_arg_imm_ceil len =
 end
 
-fun: cf_reg_val_floor { val -- floor }
-  val Interp_comp_arg_imm_field Interp_reg_imm_floor @u32
-end
-
-fun: cf_reg_val_ceil { val -- ceil }
-  val Interp_comp_arg_imm_field Interp_reg_imm_ceil @u32
-end
-
-fun: cf_reg_val_current { val -- ok }
-  cf_code_len { len }
-  val cf_reg_val_ceil len =
-end
-
-fun: cf_reg_vals_contiguous { val0 val1 -- ok }
-  cf_code_len           { code_len }
-  val0 cf_reg_val_ceil  { ceil0 }
-  val1 cf_reg_val_floor { floor1 }
-  val1 cf_reg_val_ceil  { ceil1 }
+fun: cf_args_contiguous { val0 val1 -- ok }
+  comp_code_len           { code_len }
+  val0 comp_arg_imm_ceil  { ceil0 }
+  val1 comp_arg_imm_floor { floor1 }
+  val1 comp_arg_imm_ceil  { ceil1 }
   code_len ceil1 = ceil0 floor1 = and
 end
 
-fun: cf_rewind_to_before_reg_val { val }
-  cf_writable_instrs { instrs }
-  val cf_reg_val_floor instrs Interp_list_len !32
+fun: cf_rewind_to_before_arg { val }
+  comp_writable_instrs { instrs }
+  val comp_arg_imm_floor instrs Interp_list_len !32
 end
 
-fun: cf_reg_val_clear { val }
+fun: cf_arg_clear { val }
   0 val Interp_comp_arg_imm_field Interp_reg_imm_has_imm !b
 end
 
 fun: cf_foldables2 { reg0 reg1 -- val0 val1 imm0 imm1 ok err }
-  reg0 cf_reg_val              { val0 }
-  reg1 cf_reg_val              { val1 }
-  val0 cf_reg_val_foldable_imm { imm0 ok0 }
-  val1 cf_reg_val_foldable_imm { imm1 ok1 }
+  reg0 comp_arg              { val0 }
+  reg1 comp_arg              { val1 }
+  val0 cf_arg_foldable_imm { imm0 ok0 }
+  val1 cf_arg_foldable_imm { imm1 ok1 }
 
   if ok0 ok1 and then
-    val0 val1 cf_reg_vals_contiguous { contiguous }
+    val0 val1 cf_args_contiguous { contiguous }
     if contiguous then
       val0 val1 imm0 imm1 true ret
     end
@@ -2839,36 +2840,36 @@ fun: cf_fold_cleared1 { -- reg imm ok err }
   1 nil comp_args_min
   comp_args_get dec { reg }
 
-  reg cf_reg_val { val }
-  val cf_reg_val_foldable_imm { imm foldable }
+  reg comp_arg { val }
+  val cf_arg_foldable_imm { imm foldable }
 
   ifz foldable then reg 0 false ret end
-  ifz val cf_reg_val_current then reg 0 false ret end
+  ifz val cf_arg_current then reg 0 false ret end
 
-  val cf_rewind_to_before_reg_val
-  val cf_reg_val_clear
+  val cf_rewind_to_before_arg
+  val cf_arg_clear
   reg imm true
 end
 
 fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
-  cf_regs2                { reg0 reg1 }
+  comp_top_arg_regs2                { reg0 reg1 }
   reg0 reg1 cf_foldables2 { val0 val1 imm0 imm1 ok }
 
   ifz ok then 0 0 0 false ret end
-  val0 cf_rewind_to_before_reg_val
-  val0 cf_reg_val_clear
-  val1 cf_reg_val_clear
+  val0 cf_rewind_to_before_arg
+  val0 cf_arg_clear
+  val1 cf_arg_clear
   reg0 imm0 imm1 true
 end
 
 fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
-  cf_regs2                { reg0 reg1 }
+  comp_top_arg_regs2                { reg0 reg1 }
   reg0 reg1 cf_foldables2 { val0 val1 imm0 imm1 ok }
 
   ifz ok then 0 0 0 0 false ret end
-  val0 cf_rewind_to_before_reg_val
-  val0 cf_reg_val_clear
-  val1 cf_reg_val_clear
+  val0 cf_rewind_to_before_arg
+  val0 cf_arg_clear
+  val1 cf_arg_clear
   reg0 reg1 imm0 imm1 true
 end
 
@@ -3082,6 +3083,48 @@ end
 fun_comp: fallback { -- err } [ redefine ]
   if cf_fold_cleared2 then fallback cf_fold_done else { -- } execute'' fallback end
 end
+
+\ ## Stack manipulation continued
+\
+\ Some really simple stack acrobatics.
+\
+\ Our reg-CC system endeavors to use volatile registers as a stack at comptime.
+\ Runtime-only words defined with `fun:` or `extern:` consume the entire stack.
+\ Comptime words defined with `fun_comp:`, or words with both variants, should
+\ generally endeavor to respect the comptime register stack.
+\
+\ Currently we don't provide more stack-acrobatics words because the default
+\ way of manipulating value order is via local names, which is intrinsically
+\ supported by the compiler, and considered clearer for readers of the code.
+
+fun_comp: drop { -- err }
+  1 " for `drop`" comp_args_min
+  comp_args_get dec comp_args_set
+end
+
+fun: drop { -- err } STACK stack_drop_cell end
+
+fun_comp: swap { -- err }
+  2 " for `swap`" comp_args_min
+
+  comp_args_get          { arg_len }
+  arg_len dec            { reg1 }
+  reg1 dec               { reg0 }
+  reg0 comp_arg          { arg0 }
+  reg1 comp_arg          { arg1 }
+  Interp_comp_arg sizeof { size }
+  STACK stack_top        { top }
+
+  top  arg0 size memcpy
+  arg0 arg1 size memcpy
+  arg1 top  size memcpy
+  reg0 reg0 reg1 asm_eor_reg comp_instr
+  reg1 reg1 reg0 asm_eor_reg comp_instr
+  reg0 reg0 reg1 asm_eor_reg comp_instr
+  arg_len comp_args_set
+end
+
+fun: swap { -- err } STACK stack_top -cell -cell { top } top @2 swap top !2 end
 
 \ ## More memory stuff
 
