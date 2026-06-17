@@ -190,14 +190,18 @@ See `comp_cc_reg.c` which uses this internally
 all over the place for different purposes.
 Sometimes it would be "requested" or something.
 */
-static Err asm_validate_arg_reg(Sint reg) {
-  if (reg >= 0 && reg < ASM_ARG_LEN_MAX) return nullptr;
+static Err err_too_many_args(Sint req) {
   return errf(
     "too many arguments: %d registers available, " FMT_SINT
     " arguments provided",
     ASM_ARG_LEN_MAX,
-    reg + 1
+    req
   );
+}
+
+static Err asm_validate_arg_reg(Sint reg) {
+  if (reg >= 0 && reg < ASM_ARG_LEN_MAX) return nullptr;
+  return err_too_many_args(reg + 1);
 }
 
 static Err err_imm_range_signed(Sint imm, Uint wid, Sint min, Sint max) {

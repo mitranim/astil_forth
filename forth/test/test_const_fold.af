@@ -252,6 +252,18 @@ fun: test_comp_args_set_clears_truncated_local { -- err }
 end
 test_comp_args_set_clears_truncated_local
 
+fun: comp_args_set_max_len_fun
+  [
+    ASM_ARG_LEN_MAX comp_args_set
+    0 comp_args_set
+  ]
+end
+
+fun: test_comp_args_set_max_len { -- err }
+  comp_args_set_max_len_fun
+end
+test_comp_args_set_max_len
+
 fun: const_fold_fallback_0_1_fun { val -- out } val 20 + end
 
 fun: test_const_fold_fallback_0_1 { -- err }

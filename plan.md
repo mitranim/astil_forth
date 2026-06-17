@@ -37,14 +37,16 @@ Sources used:
   - Candidate simplification: split pure lookup from mutation, or remove constant-local association if marginal.
   - Verdict: simplify. Kept immediate path; simplified local push by clearing the target arg first, then using shared local-arg lookup for prior-local relocation.
 
-- [ ] `comp/comp_cc_reg.c:420-428`, `652-654`, `715-726`, `785-797`: `arg_len` mutation policy.
+- [x] `comp/comp_cc_reg.c:420-428`, `652-654`, `715-726`, `785-797`: `arg_len` mutation policy.
   - Suspect chunk: scattered direct `ctx->arg_len++`, `ctx->arg_len = ...`, and clearing `ctx->args`.
   - Review for single primitive that owns arg stack resize and forgetting. Current direct mutation risks hidden stale `args[]`.
+  - Verdict: partial simplify. Extracted `comp_args_set` for explicit resize-and-forget behavior and fixed max-length validation; kept direct stack-height mutations where they intentionally preserve local-register associations above `arg_len`.
 
-- [ ] `comp/intrin_cc_reg.c:60-112`: brace assignment parser.
+- [x] `comp/intrin_cc_reg.c:60-112`: brace assignment parser.
   - Suspect chunk: manual arrays `names/lens`, discard state `-1/1`, reverse assignment.
   - Review if this can use existing `read_valid_word`/`Word_str` path or be split into parse + apply.
   - Confirm whether `strncmp(buf, "}", len)` should be exact compare helper, not ad hoc.
+  - Verdict: already simplified. Uses `read_valid_word`, `Word_str`, and exact `str_eq`; debug max-register assertion fixed with regression coverage.
 
 - [ ] `comp/intrin_cc_reg.c:482-540`, `797-828`: intrinsic surface API.
   - Suspect chunk: old `comp_next_arg_reg`, `comp_scratch_reg`, `comp_clobber`, `comp_local_get/set/off` replaced by `comp_alloc_next_reg`, `comp_realloc_reg`, `comp_push_from_local`, `comp_pop_into_local`.

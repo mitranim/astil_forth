@@ -107,7 +107,7 @@ static Err intrin_brace(Interp *interp) {
   if (discard >= 0) {
     while (loc_len) {
       loc_len--; // Doing this in condition check triggers UB traps.
-      Local   *loc;
+      Local *loc;
       try(comp_local_get_or_make(comp, names[loc_len], &loc));
       try(comp_assign_local_from_reg(comp, loc, ctx->arg_len - 1));
       ctx->arg_len--;
@@ -117,7 +117,7 @@ static Err intrin_brace(Interp *interp) {
   }
 
   for (U8 ind = 0; ind < loc_len; ind++) {
-    Local   *loc;
+    Local *loc;
     try(comp_local_get_or_make(comp, names[ind], &loc));
     try(comp_assign_local_from_reg(comp, loc, ind));
   }
@@ -474,20 +474,7 @@ static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
 }
 
 static Err intrin_comp_args_set(Sint len, Interp *interp) {
-  try(asm_validate_arg_reg(len));
-
-  const auto ctx   = &interp->comp.ctx;
-  const U8   prev  = ctx->arg_len;
-  const U8   next  = (U8)len;
-  const U8   floor = MIN(prev, next);
-  const U8   ceil  = MAX(prev, next);
-
-  for (U8 reg = floor; reg < ceil; reg++) {
-    try(comp_forget_reg(&interp->comp, reg));
-  }
-
-  ctx->arg_len = next;
-  return nullptr;
+  return comp_args_set(&interp->comp, len);
 }
 
 static Err intrin_comp_barrier(Interp *interp) {

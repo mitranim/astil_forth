@@ -294,6 +294,23 @@ static Err comp_forget_regs(Comp *comp, Bits regs) {
   return nullptr;
 }
 
+static Err comp_args_set(Comp *comp, Sint next) {
+  if (!(next >= 0 && next <= ASM_ARG_LEN_MAX)) return err_too_many_args(next);
+
+  const auto ctx   = &comp->ctx;
+  const U8   prev  = ctx->arg_len;
+  const U8   len   = (U8)next;
+  const U8   floor = MIN(prev, len);
+  const U8   ceil  = MAX(prev, len);
+
+  for (U8 reg = floor; reg < ceil; reg++) {
+    try(comp_forget_reg(comp, reg));
+  }
+
+  ctx->arg_len = len;
+  return nullptr;
+}
+
 /*
 Lower-level tool for internal use only. The vast majority of callers
 should use `comp_append_push_from_local` instead of this. The caller
