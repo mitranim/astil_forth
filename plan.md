@@ -62,9 +62,10 @@ Sources used:
   - Source: `rg -n "comp_realloc_reg|comp_args_set" forth/lang.af`.
   - Verdict: simplify. Added small Forth helpers for one-output instruction emission and replaced obvious arithmetic/boolean/asr boilerplate; left scratch-register `mod` explicit and kept existing register-selection helpers.
 
-- [ ] `forth/lang.af:1794-1810`: `comp_realloc_regs`.
+- [x] `forth/lang.af:1794-1810`: `comp_realloc_regs`.
   - Suspect chunk: explicit 16-line list of volatile regs.
   - Candidate simplification: Forth loop over `ASM_ARG_LEN_MAX` if available and clear.
+  - Verdict: simplify. Moved helper after counted loop support and rewrote the explicit x0..x15 list as `ASM_ARG_LEN_MAX -for:`.
 
 - [ ] `forth/lang.af:2024-2162`, `3274-3446`: continuation metadata.
   - Suspect chunk: packed bitfield helpers and repeated loop-gap handling.

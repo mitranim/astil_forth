@@ -1773,26 +1773,6 @@ fun_comp: comp_extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
   read_word comp_str compile' comp_extern_adr
 end
 
-\ Used when calling words with unknown clobbers.
-fun: comp_realloc_regs { -- err }
-  0  comp_realloc_reg \ x0
-  1  comp_realloc_reg \ x1
-  2  comp_realloc_reg \ x2
-  3  comp_realloc_reg \ x3
-  4  comp_realloc_reg \ x4
-  5  comp_realloc_reg \ x5
-  6  comp_realloc_reg \ x6
-  7  comp_realloc_reg \ x7
-  8  comp_realloc_reg \ x8
-  9  comp_realloc_reg \ x9
-  10 comp_realloc_reg \ x10
-  11 comp_realloc_reg \ x11
-  12 comp_realloc_reg \ x12
-  13 comp_realloc_reg \ x13
-  14 comp_realloc_reg \ x14
-  15 comp_realloc_reg \ x15
-end
-
 \ ## Errors
 \
 \ The compiler provides the following error-related intrinsics:
@@ -3752,6 +3732,13 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
   end
 
   arg_len comp_args_set
+end
+
+\ Used when calling words with unknown clobbers.
+fun: comp_realloc_regs { -- err }
+  ASM_ARG_LEN_MAX -for: reg
+    reg comp_realloc_reg
+  end
 end
 
 fun_comp: logf { -- err } ( E: fmt …vargs… -- )
