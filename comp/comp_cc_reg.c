@@ -162,6 +162,17 @@ static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
   return uint32_to_bit_str((U32)bits);
 }
 
+static bool comp_local_has_arg(const Comp_ctx *ctx, const Local *loc) {
+  if (!loc) return false;
+
+  static constexpr U8 ceil = arr_cap(ctx->args);
+  for (U8 reg = 0; reg < ceil; reg++) {
+    if (ctx->args[reg].loc == loc) return true;
+  }
+
+  return false;
+}
+
 static Err err_args_arity(
   const Sym *sym, const char *action, Sint min, Sint max, Sint ava
 ) {
@@ -260,13 +271,7 @@ static Err comp_forget_reg(Comp *comp, U8 reg) {
   const auto loc = arg->loc;
   *arg           = (Comp_arg){};
 
-  if (!loc || loc->stable) return nullptr;
-
-  static constexpr U8 ceil = arr_cap(ctx->args);
-  for (U8 any = 0; any < ceil; any++) {
-    if (any != reg && ctx->args[any].loc == loc) return nullptr;
-  }
-
+  if (!loc || loc->stable || comp_local_has_arg(ctx, loc)) return nullptr;
   comp_append_local_reloc_from_reg(comp, loc, reg);
   IF_DEBUG(assert_fatal(loc->stable));
   return nullptr;
@@ -331,16 +336,12 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
   const auto arg  = &ctx->args[reg];
   const auto prev = arg->loc;
 
-  const bool same_loc      = prev == loc;
-  bool       reloc         = !!prev && !same_loc && !prev->stable;
-  loc->stable              = false;
+  loc->stable = false;
+
   static constexpr U8 ceil = arr_cap(ctx->args);
 
   /*
-  Evict the new local from all other registers,
-  while also searching for whether the previous
-  local is still assigned to other registers,
-  and thus doesn't need relocation.
+  Evict the new local from all other registers.
   */
   for (U8 reg0 = 0; reg0 < ceil; reg0++) {
     if (reg == reg0) {
@@ -352,12 +353,11 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
     }
     else {
       const auto arg = &ctx->args[reg0];
-      if (arg->loc == prev) reloc = false;
       if (arg->loc == loc) arg->loc = nullptr;
     }
   }
 
-  if (reloc) {
+  if (prev && prev != loc && !prev->stable && !comp_local_has_arg(ctx, prev)) {
     comp_append_local_reloc_from_reg(comp, prev, reg);
   }
 

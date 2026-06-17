@@ -25,10 +25,11 @@ Sources used:
   - Source: `rg -n "Comp_arg|Loc_reloc|stable|used|imm|args\\[" comp/comp_cc_reg.h comp/comp_cc_reg.c`.
   - Verdict: keep. `reloc`, `stable`, `read`, `used`, and `Comp_arg { loc, imm }` encode separate lifecycle facts; implementation scan duplication belongs to the next chunk.
 
-- [ ] `comp/comp_cc_reg.c:138-147`, `223-271`, `295-361`: relocation writeback path.
+- [x] `comp/comp_cc_reg.c:138-147`, `223-271`, `295-361`: relocation writeback path.
   - Suspect chunk: `comp_local_confirm_relocs`, `comp_append_local_reloc_from_reg`, `comp_forget_reg`, `comp_assign_local_from_reg`.
   - Review for duplicated "does previous local still exist in another arg reg?" scans. Candidate helper: `comp_arg_loc_count/has_other_loc`.
   - Ignore rename itself. Check whether relocation lifecycle has avoidable extra machinery.
+  - Verdict: simplify. Added one helper for the shared "arg reg still owns this local" check; kept relocation lifecycle intact.
 
 - [ ] `comp/comp_cc_reg.c:455-488`, `493-575`: immediate and local push path.
   - Suspect chunk: `comp_append_imm_to_reg`, `comp_append_push_imm`, `comp_append_push_from_local`.
