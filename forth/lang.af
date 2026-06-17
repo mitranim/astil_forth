@@ -3418,6 +3418,12 @@ fun: loop_pop_with_cond { meta -- err }
   off cond asm_branch_cond cond_adr !32
 end
 
+fun: loop_meta_with_cond_pop { meta loop_off cond_off cond -- meta loop_pop err }
+  cond meta cont_meta_with_cond { meta }
+  cond_off loop_off - meta cont_meta_with_loop_cond_delta
+  xt' loop_pop_with_cond
+end
+
 fun: for_loop_countdown_init { cur -- meta loop_pop err }
   ( C: -- <loop_prev> )
   ( E: ceil -- )
@@ -3440,9 +3446,7 @@ fun: for_loop_countdown_init { cur -- meta loop_pop err }
   \ It is not split into never-entered fallback vs normal completion.
   reserve_instr { cond_off }         \ b.lt <end>
 
-  ASM_LT meta cont_meta_with_cond { meta }
-  cond_off loop_off - meta cont_meta_with_loop_cond_delta { meta }
-  meta xt' loop_pop_with_cond \ stop on <
+  meta loop_off cond_off ASM_LT loop_meta_with_cond_pop \ stop on <
 end
 
 \ A count-down-by-one loop with the range `[0,ceil)`.
@@ -3521,9 +3525,7 @@ fun_comp: +for: { -- meta loop_pop err }
   \ never-entered branch exists for loop `else`.
   reserve_instr { cond_off }          \ b.le <end>
 
-  ASM_LE meta cont_meta_with_cond { meta }
-  cond_off loop_off - meta cont_meta_with_loop_cond_delta { meta }
-  meta xt' loop_pop_with_cond \ stop on <=
+  meta loop_off cond_off ASM_LE loop_meta_with_cond_pop \ stop on <=
 end
 
 \ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
@@ -3564,9 +3566,7 @@ fun_comp: -loop: { -- meta loop_pop err }
   \ never-entered branch exists for loop `else`.
   reserve_instr { cond_off }          \ b.lt <end>
 
-  ASM_LT meta cont_meta_with_cond { meta }
-  cond_off loop_off - meta cont_meta_with_loop_cond_delta { meta }
-  meta xt' loop_pop_with_cond \ stop on <
+  meta loop_off cond_off ASM_LT loop_meta_with_cond_pop \ stop on <
 end
 
 \ Similar to the standard `?do ... +loop`, but terminated with an `end`
@@ -3623,9 +3623,7 @@ fun_comp: +loop: { -- meta loop_pop err }
   \ never-entered branch exists for loop `else`.
   reserve_instr { cond_off }          \ b.le <end>
 
-  ASM_LE meta cont_meta_with_cond { meta }
-  cond_off loop_off - meta cont_meta_with_loop_cond_delta { meta }
-  meta xt' loop_pop_with_cond \ stop on <=
+  meta loop_off cond_off ASM_LE loop_meta_with_cond_pop \ stop on <=
 end
 
 \ ## String comparison continued

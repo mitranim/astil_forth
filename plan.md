@@ -73,9 +73,10 @@ Sources used:
   - Keep comments that document current invariants or intended feature limits. Only trim stale repetition.
   - Verdict: simplify lightly. Kept packed metadata and explanatory loop-gap comments; extracted the duplicated input/output arity equality check shared by conditionals and loops.
 
-- [ ] `forth/lang.af:3463-3664`: counted loops `for`, `+for:`, `-loop:`, `+loop:`.
+- [x] `forth/lang.af:3463-3664`: counted loops `for`, `+for:`, `-loop:`, `+loop:`.
   - Suspect chunk: repeated `comp_pop_into_local`, `comp_push_from_local`, `comp_barrier`, compare, `comp_args_set`, `cont_meta_with_*`.
   - Candidate: one shared compile helper for counted loop init/update/compare. Review before touching correctness.
+  - Verdict: simplify lightly. Factored repeated counted-loop condition metadata/pop construction; left loop init/update/compare bodies explicit because their stack/local choreography differs.
 
 - [ ] `forth/lang.af:3826-3843` and `3922-3940`: `wrapf` and `strf`.
   - Suspect chunk: same save three args to locals, reload three args, call `snprintf`, return buffer.
