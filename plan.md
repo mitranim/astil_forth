@@ -123,10 +123,11 @@ Sources used:
 
 ## Phase 4: Reader / Parsing
 
-- [ ] `comp/read.c:56-94`, `128-239`, `256-304`: no-backtrack reader rewrite.
+- [x] `comp/read.c:56-94`, `128-239`, `256-304`: no-backtrack reader rewrite.
   - Suspect chunk: `read_char_at` plus manual `read->pos++` throughout number/word/string readers.
   - Review if backtracking removal simplified enough. Risk: repeated peeking logic and EOF validation.
   - Candidate: small `reader_peek_valid` / `reader_take_valid` pair.
+  - Verdict: keep. A helper does not reduce most callsites, and direct `read->pos` peeking is the reader's intended no-backtrack style. Delimiter scanning also must remain raw because comments and string contents may contain non-ASCII bytes.
 
 - [ ] `comp/intrin.c:227-239`, `783-804`: `read_char` and `read_until_char` semantics.
   - Suspect chunk: `read_char` changed to return char+err; `read_until_char` now leaves delimiter unread.
