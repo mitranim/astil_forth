@@ -129,9 +129,10 @@ Sources used:
   - Candidate: small `reader_peek_valid` / `reader_take_valid` pair.
   - Verdict: keep. A helper does not reduce most callsites, and direct `read->pos` peeking is the reader's intended no-backtrack style. Delimiter scanning also must remain raw because comments and string contents may contain non-ASCII bytes.
 
-- [ ] `comp/intrin.c:227-239`, `783-804`: `read_char` and `read_until_char` semantics.
+- [x] `comp/intrin.c:227-239`, `783-804`: `read_char` and `read_until_char` semantics.
   - Suspect chunk: `read_char` changed to return char+err; `read_until_char` now leaves delimiter unread.
   - Review for call-site burden in `forth/lang.af`. If many callers now do paired reads, helper belongs lower.
+  - Verdict: keep. `read_char` returning value+err matches other error-returning intrinsics, and `read_until_char` leaving the delimiter unread is required by bootstrap comment/string helpers. The post-bootstrap callsite burden was already handled in Forth with `read_delimited`.
 
 ## Phase 5: Tests / Low-Value Review Scope
 
