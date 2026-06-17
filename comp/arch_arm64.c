@@ -142,42 +142,34 @@ static Err asm_validate_reg(Sint reg) {
   return errf("invalid register value " FMT_SINT, reg);
 }
 
-static Err err_too_many_input_params(Sint req) {
+static Err err_too_many_params(const char *kind, Sint cap, Sint req) {
   return errf(
-    "too many input parameters: %d registers available, " FMT_SINT
+    "too many %s parameters: " FMT_SINT " registers available, " FMT_SINT
     " parameters requested",
-    ASM_INP_PARAM_REG_LEN,
+    kind,
+    cap,
     req
   );
 }
 
 static Err asm_validate_input_param_reg(Sint reg) {
   if (reg >= 0 && reg < ASM_INP_PARAM_REG_LEN) return nullptr;
-  return err_too_many_input_params(reg + 1);
+  return err_too_many_params("input", ASM_INP_PARAM_REG_LEN, reg + 1);
 }
 
 static Err asm_validate_input_param_count(Sint count) {
   if (count >= 0 && count <= ASM_INP_PARAM_REG_LEN) return nullptr;
-  return err_too_many_input_params(count);
-}
-
-static Err err_too_many_output_params(Sint req) {
-  return errf(
-    "too many output parameters: %d registers available, " FMT_SINT
-    " parameters requested",
-    ASM_OUT_PARAM_REG_LEN,
-    req
-  );
+  return err_too_many_params("input", ASM_INP_PARAM_REG_LEN, count);
 }
 
 static Err asm_validate_output_param_reg(Sint reg) {
   if (reg >= 0 && reg < ASM_OUT_PARAM_REG_LEN) return nullptr;
-  return err_too_many_output_params(reg + 1);
+  return err_too_many_params("output", ASM_OUT_PARAM_REG_LEN, reg + 1);
 }
 
 static Err asm_validate_output_param_count(Sint count) {
   if (count >= 0 && count <= ASM_OUT_PARAM_REG_LEN) return nullptr;
-  return err_too_many_output_params(count);
+  return err_too_many_params("output", ASM_OUT_PARAM_REG_LEN, count);
 }
 
 /*

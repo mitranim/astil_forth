@@ -111,9 +111,10 @@ Sources used:
   - Keep documentation if it explains invariant. Review NOP elision and reloc patching for simpler control flow.
   - Verdict: keep. The reloc NOP path documents and implements the single-pass fixup invariant. Keep `asm_backtrack_instrs_opt` in the assembler layer so compiler code does not mutate instruction buffers directly.
 
-- [ ] `comp/arch_arm64.c:142-183`: param count/register validators.
+- [x] `comp/arch_arm64.c:142-183`: param count/register validators.
   - Suspect chunk: split `*_reg`, `*_count`, `err_too_many_*`.
   - Review whether helpers reduce duplication enough. Maybe one validator with `requested_count` flag.
+  - Verdict: simplify lightly. Kept separate reg/count validators because they encode different bounds and callsite intent, but merged duplicate input/output parameter error formatting.
 
 - [ ] `comp/comp.c:430-444`, `comp/intrin_cc_reg.c:186-200`: return now clears args in `comp_append_ret`.
   - Suspect chunk: behavior moved from intrinsic into shared compiler function under `#ifndef CALL_CONV_STACK`.
