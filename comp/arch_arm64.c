@@ -1105,23 +1105,38 @@ static Uint asm_imm16_lane(Uint val, Uint hw) {
   return (val >> (hw << 4u)) & 0xFFFFu;
 }
 
+static bool asm_mov_wide_lane_is_default(bool neg, Uint lane) {
+  return lane == (neg ? 0xFFFFu : 0);
+}
+
+static Uint asm_mov_wide_base_imm16(bool neg, Uint lane) {
+  return neg ? (~lane & 0xFFFFu) : lane;
+}
+
 static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src) {
-  const bool neg  = src < 0;
-  const auto bits = neg ? ~(Uint)src : (Uint)src;
-  const auto opc  = (Instr)(neg ? 0b00 : 0b10); // movn / movz
+  const bool neg = src < 0;
+  const auto val = (Uint)src;
+  const auto opc = (Instr)(neg ? 0b00 : 0b10); // movn / movz
 
   Uint base_hw = 0;
-  while (base_hw < 4 && !asm_imm16_lane(bits, base_hw)) base_hw++;
+  while (
+    base_hw < 4 &&
+    asm_mov_wide_lane_is_default(neg, asm_imm16_lane(val, base_hw))
+  ) {
+    base_hw++;
+  }
   if (base_hw >= 4) base_hw = 0;
 
-  asm_append_mov_wide(comp, reg, opc, base_hw, asm_imm16_lane(bits, base_hw));
+  asm_append_mov_wide(
+    comp, reg, opc, base_hw,
+    asm_mov_wide_base_imm16(neg, asm_imm16_lane(val, base_hw))
+  );
 
   for (Uint hw = 0; hw < 4; hw++) {
-    const auto lane = asm_imm16_lane(bits, hw);
-    if (hw == base_hw || !lane) continue;
+    const auto lane = asm_imm16_lane(val, hw);
+    if (hw == base_hw || asm_mov_wide_lane_is_default(neg, lane)) continue;
 
-    const auto imm16 = neg ? (~lane & 0xFFFFu) : lane;
-    asm_append_mov_wide(comp, reg, 0b11, hw, imm16); // movk
+    asm_append_mov_wide(comp, reg, 0b11, hw, lane); // movk
   }
 }
 

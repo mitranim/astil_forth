@@ -100,10 +100,11 @@ Sources used:
 
 ## Phase 3: Arm64 / Assembler
 
-- [ ] `comp/arch_arm64.c:1044-1129`: immediate encoding rewrite.
+- [x] `comp/arch_arm64.c:1044-1129`: immediate encoding rewrite.
   - Suspect chunk: deleted literal-pool fixups, added move-wide sequence.
   - Review for simpler lane selection and negative immediate handling. This is correctness-sensitive; simplify only with tests.
   - Source: `rg -n "asm_append_imm_to_reg|asm_backtrack_instrs_opt" comp/arch_arm64.c comp/arch_arm64_cc_reg.c comp/comp_cc_reg.c`.
+  - Verdict: simplify. Reworked negative immediate handling to reason over actual target lanes and movz/movn default lanes instead of `~src`; added an exact-instruction regression for a negative mixed-lane immediate.
 
 - [ ] `comp/arch_arm64_cc_reg.c:496-558`: local reloc fixups and backtracking helper.
   - Suspect chunk: `asm_fixup_loc_reloc` still carries old "dirty hack" comment and NOP elision.
