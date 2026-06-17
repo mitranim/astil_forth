@@ -764,9 +764,3 @@ static Err interp_validate_buf_len(Sint buf, Sint len) {
   try(interp_validate_data_len(len));
   return nullptr;
 }
-
-static Err interp_push_semicolon(Interp *interp) {
-  const auto sym = dict_get(&interp->dict_comp, ";");
-  if (sym) return int_stack_push(&interp->ints, (Sint)sym);
-  return err_str("missing word `;`");
-}

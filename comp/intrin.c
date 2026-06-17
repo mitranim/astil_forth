@@ -561,7 +561,7 @@ static const USED auto INTRIN_FUN = (Sym){
   .name.buf = "fun:",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_fun,
-  .out_len  = 1,
+  .out_len  = 2,
   .has_err  = true,
 };
 
@@ -569,7 +569,7 @@ static const USED auto INTRIN_FUN_COMP = (Sym){
   .name.buf = "fun_comp:",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_fun_comp,
-  .out_len  = 1,
+  .out_len  = 2,
   .has_err  = true,
 };
 

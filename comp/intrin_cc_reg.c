@@ -170,15 +170,15 @@ static Err intrin_colon_colon(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_fun(Interp *interp) {
+static Err intrin_fun(Interp *interp, Sint *out) {
   try(intrin_colon(interp));
-  try(interp_push_semicolon(interp));
+  *out = (Sint)dict_get(&interp->dict_comp, ";");
   return nullptr;
 }
 
-static Err intrin_fun_comp(Interp *interp) {
+static Err intrin_fun_comp(Interp *interp, Sint *out) {
   try(intrin_colon_colon(interp));
-  try(interp_push_semicolon(interp));
+  *out = (Sint)dict_get(&interp->dict_comp, ";");
   return nullptr;
 }
 

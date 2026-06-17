@@ -75,22 +75,21 @@ static Err intrin_colon_colon(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_fun(Interp *interp) {
+static Err interp_fun(Interp *interp, Wordlist list) {
   try(interp_begin_definition(interp));
   Word_str name;
   try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_EXEC, name));
-  try(interp_push_semicolon(interp));
+  try(interp_word_begin(interp, list, name));
+  try(int_stack_push(&interp->ints, (Sint)dict_get(&interp->dict_comp, ";")));
   return nullptr;
 }
 
+static Err intrin_fun(Interp *interp) {
+  return interp_fun(interp, WORDLIST_EXEC);
+}
+
 static Err intrin_fun_comp(Interp *interp) {
-  try(interp_begin_definition(interp));
-  Word_str name;
-  try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_COMP, name));
-  try(interp_push_semicolon(interp));
-  return nullptr;
+  return interp_fun(interp, WORDLIST_COMP);
 }
 
 static Err intrin_define_fun(Interp *interp) {
