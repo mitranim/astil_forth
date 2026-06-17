@@ -145,8 +145,9 @@ Sources used:
   - Rename-only churn is not suspect. Drop from de-bloat review unless commented mains are already planned for real tests.
   - Verdict: drop from review scope. These are commented-out manual tests with rename-only churn, not active bloat.
 
-- [ ] `comp/intrin_list_cc_reg.c:6-86`.
+- [x] `comp/intrin_list_cc_reg.c:6-86`.
   - Mostly rename/list update. Review only grouping if it obscures feature ownership.
+  - Verdict: keep. The list still separates register-CC-specific intrinsics from shared intrinsics; `comp_local` remains shared while push/pop/direct register assignment stay register-CC-specific.
 
 - [ ] `forth/test/test_const_fold.af` (+648) replacing `forth/test_const_fold.af` (-340).
   - Suspect chunk: test file nearly doubled.
