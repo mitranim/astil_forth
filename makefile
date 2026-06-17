@@ -78,6 +78,11 @@ vet:
 vet_w:
 	$(WATCH_COMP) -- $(MAKE) vet
 
+RLWRAP := $(shell test -t 0 && printf 1)
+RLWRAP := $(and $(RLWRAP),$(if $(filter -j% --jobs% --jobserver-auth=%,$(MAKEFLAGS)),,1))
+RLWRAP := $(and $(RLWRAP),$(shell command -v rlwrap >/dev/null 2>&1 && printf 1))
+RLWRAP := $(and $(RLWRAP),rlwrap --no-warnings)
+
 # We use sandboxing to prevent buggy JIT-ted code from accidentally
 # deleting the entire filesystem, launching nuclear missiles, etc..
 # However, we whitelist a few child executables used for debugging.
@@ -87,8 +92,7 @@ EXE2 = $(shell realpath $$(xcrun --find atos))
 
 .PHONY: run_boxed
 run_boxed:
-	rlwrap --no-warnings \
-		sandbox-exec \
+	$(RLWRAP) sandbox-exec \
 		-f sandbox.sb \
 		-D MAIN="$(PWD)/$(file)" \
 		-D OUT="$(PWD)/$(TEST_EXE)" \
