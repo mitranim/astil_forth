@@ -1974,7 +1974,8 @@ fun: cont_meta_inp_len   { meta -- len } meta CONT_INP_LEN_MASK and end
 fun: cont_meta_out_len   { meta -- len } meta CONT_OUT_LEN_MASK and CONT_LEN_OFF lsr end
 fun: cont_meta_instr_off { meta -- off } meta 32 lsr end
 fun: cont_meta_cond      { meta -- cond } meta CONT_META_COND_MASK and CONT_META_COND_OFF lsr end
-fun: cont_meta_loop_cond_delta { meta -- delta }
+
+fun: cont_meta_loop_end_off { meta -- off }
   meta CONT_LOOP_COND_DELTA_MASK and CONT_LOOP_COND_DELTA_OFF lsr
 end
 
@@ -1987,9 +1988,9 @@ fun: cont_meta_with_cond { cond meta -- meta }
   cond 4 bit_trunc CONT_META_COND_OFF lsl meta or
 end
 
-fun: cont_meta_with_loop_cond_delta { delta meta -- meta err }
+fun: cont_meta_with_loop_end_off { off meta -- meta err }
   meta CONT_LOOP_COND_DELTA_MASK invert and { meta }
-  delta CONT_LOOP_COND_DELTA_OFF lsl meta or
+  off CONT_LOOP_COND_DELTA_OFF lsl meta or
 end
 
 fun: reserve_instr { -- off err }
@@ -3310,8 +3311,7 @@ fun_comp: loop { -- meta loop_pop err } ( C: -- <loop_prev> )
 end
 
 fun: leave_pop { -- err }
-  LOOP_AUX s> { meta }
-  meta cont_meta_instr_off instr_adr { adr }
+  LOOP_AUX s> cont_meta_instr_off instr_adr { adr }
   \ LOOP-ELSE-GAP: patches `leave` to the current after-loop point. With loop
   \ `else`, `leave` must skip fallback outputs and branch to the final merge.
   here_write adr - asm_branch adr !32
@@ -3389,8 +3389,8 @@ end
 fun: loop_pop_with_cond { meta -- err }
   ( LOOP_AUX: …aux… -- )
   ( C: <loop_prev> -- )
-  meta cont_meta_instr_off { loop_off }
-  meta cont_meta_loop_cond_delta loop_off + instr_adr { cond_adr }
+  meta cont_meta_instr_off { beg_off }
+  meta cont_meta_loop_end_off beg_off + instr_adr { cond_adr }
 
   \ LOOP-ELSE-GAP: counted loops patch one condition branch to after-loop.
   \ That conflates never-entered and normally-finished exits, so it cannot
@@ -3404,9 +3404,9 @@ fun: loop_pop_with_cond { meta -- err }
   off cond asm_branch_cond cond_adr !32
 end
 
-fun: loop_meta_with_cond_pop { meta loop_off cond_off cond -- meta loop_pop err }
+fun: loop_meta_with_cond_pop { meta beg_off end_off cond -- meta loop_pop err }
   cond meta cont_meta_with_cond { meta }
-  cond_off loop_off - meta cont_meta_with_loop_cond_delta
+  end_off beg_off - meta cont_meta_with_loop_end_off
   xt' loop_pop_with_cond
 end
 
@@ -3420,19 +3420,20 @@ fun: for_loop_countdown_init { cur -- meta loop_pop err }
   cur comp_pop_into_local            \ mov <cur>, xN | str xN, [FP, <cur>]
   loop_frame_init
   comp_barrier                       \ Clobber / relocate locals.
-  here_write instr_off { loop_off }     \ `end` jumps here.
-  loop_off loop_meta_from_off { meta }
+  here_write instr_off { beg_off }   \ `end` jumps here.
   cur comp_push_from_local           \ mov xN, <cur> | ldr xN, [FP, <cur>]
-  comp_args_get dec { count_reg }
-  count_reg count_reg 1 asm_sub_imm comp_instr \ sub xN, xN, 1
+  comp_args_get dec { reg }
+  reg reg 1 asm_sub_imm comp_instr   \ sub xN, xN, 1
   cur comp_pop_into_local            \ mov <cur>, xN | str xN, [FP, <cur>]
   comp_barrier                       \ Tell compiler to commit "local set".
-  count_reg asm_cmp_zero comp_instr  \ cmp xN, 0
+  reg asm_cmp_zero comp_instr        \ cmp xN, 0
   \ LOOP-ELSE-GAP: this single branch becomes the normal after-loop target.
   \ It is not split into never-entered fallback vs normal completion.
-  reserve_instr { cond_off }         \ b.lt <end>
+  reserve_instr { end_off }          \ b.lt <end>
 
-  meta loop_off cond_off ASM_LT loop_meta_with_cond_pop \ stop on <
+  beg_off loop_meta_from_off
+  beg_off end_off ASM_LT
+  loop_meta_with_cond_pop \ stop on <
 end
 
 \ A count-down-by-one loop with the range `[0,ceil)`.
@@ -3490,16 +3491,15 @@ fun_comp: +for: { -- meta loop_pop err }
   comp_barrier                        \ Clobber / relocate locals.
   \ LOOP-ELSE-GAP: entry jumps to the same compare that normal iterations use;
   \ this gives one after-loop target, not a distinct else fallback target.
-  reserve_instr { cmp_enter_off }     \ b <cmp>
-  here_write instr_off { loop_off }     \ `end` jumps here.
-  loop_off loop_meta_from_off { meta }
+  reserve_instr { cmp }               \ b <cmp>
+  here_write instr_off { beg_off }    \ `end` jumps here.
   cur comp_push_from_local            \ mov xN, <cur> | ldr xN, [FP, <cur>]
   comp_args_get dec { cur_reg }
   cur_reg cur_reg 1 asm_add_imm comp_instr \ add xN, xN, 1
   cur comp_pop_into_local             \ mov <cur>, xN | str xN, [FP, <cur>]
   comp_barrier                        \ Tell compiler to commit "local set".
-  cmp_enter_off instr_adr { cmp_enter_adr }
-  here_write cmp_enter_adr - asm_branch cmp_enter_adr !32 \ b <cmp>
+  cmp instr_adr { cmp }
+  here_write cmp - asm_branch cmp !32 \ b <cmp>
   lim comp_push_from_local            \ mov xN, <lim> | ldr xN, [FP, <lim>]
   cur comp_push_from_local            \ mov xN, <cur> | ldr xN, [FP, <cur>]
   comp_args2_regs { lim_reg cur_reg }
@@ -3509,9 +3509,11 @@ fun_comp: +for: { -- meta loop_pop err }
   lim_reg comp_args_set
   \ LOOP-ELSE-GAP: single compare exit is patched after the loop; no separate
   \ never-entered branch exists for loop `else`.
-  reserve_instr { cond_off }          \ b.le <end>
+  reserve_instr { end_off }          \ b.le <end>
 
-  meta loop_off cond_off ASM_LE loop_meta_with_cond_pop \ stop on <=
+  beg_off loop_meta_from_off
+  beg_off end_off ASM_LE
+  loop_meta_with_cond_pop \ stop on <=
 end
 
 \ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
@@ -3530,8 +3532,8 @@ fun_comp: -loop: { -- meta loop_pop err }
   cur  comp_pop_into_local            \ mov <cur>,  xN | str xN, [FP, <cur>]
   loop_frame_init
   comp_barrier                        \ Clobber / relocate locals.
-  here_write instr_off { loop_off }   \ `end` jumps here.
-  loop_off loop_meta_from_off { meta }
+  here_write instr_off { beg_off }    \ `end` jumps here.
+  beg_off loop_meta_from_off { meta }
   cur  comp_push_from_local           \ mov xN, <cur>  | ldr xN, [FP, <cur>]
   step comp_push_from_local           \ mov xN, <step> | ldr xN, [FP, <step>]
   comp_args2_regs { cur_reg step_reg }
@@ -3550,9 +3552,9 @@ fun_comp: -loop: { -- meta loop_pop err }
   cur_reg comp_args_set
   \ LOOP-ELSE-GAP: single compare exit is patched after the loop; no separate
   \ never-entered branch exists for loop `else`.
-  reserve_instr { cond_off }          \ b.lt <end>
+  reserve_instr { end_off }              \ b.lt <end>
 
-  meta loop_off cond_off ASM_LT loop_meta_with_cond_pop \ stop on <
+  meta beg_off end_off ASM_LT loop_meta_with_cond_pop \ stop on <
 end
 
 \ Similar to the standard `?do ... +loop`, but terminated with an `end`
@@ -3583,8 +3585,7 @@ fun_comp: +loop: { -- meta loop_pop err }
   \ LOOP-ELSE-GAP: entry jumps to the same compare that normal iterations use;
   \ this gives one after-loop target, not a distinct else fallback target.
   reserve_instr { cmp_enter_off }     \ b <cmp>
-  here_write instr_off { loop_off }   \ `end` jumps here.
-  loop_off loop_meta_from_off { meta }
+  here_write instr_off { beg_off }    \ `end` jumps here.
   cur  comp_push_from_local           \ mov xN, <cur>  | ldr xN, [FP, <cur>]
   step comp_push_from_local           \ mov xN, <step> | ldr xN, [FP, <step>]
   comp_args2_regs { cur_reg step_reg }
@@ -3607,9 +3608,11 @@ fun_comp: +loop: { -- meta loop_pop err }
   lim_reg comp_args_set
   \ LOOP-ELSE-GAP: single compare exit is patched after the loop; no separate
   \ never-entered branch exists for loop `else`.
-  reserve_instr { cond_off }          \ b.le <end>
+  reserve_instr { end_off }              \ b.le <end>
 
-  meta loop_off cond_off ASM_LE loop_meta_with_cond_pop \ stop on <=
+  beg_off loop_meta_from_off
+  beg_off end_off ASM_LE
+  loop_meta_with_cond_pop \ stop on <=
 end
 
 \ ## String comparison continued
