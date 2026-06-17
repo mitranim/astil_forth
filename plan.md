@@ -154,9 +154,10 @@ Sources used:
   - Review for duplicated fixtures and broad cases that can be table-driven or split. Preserve coverage, reduce repetition.
   - Verdict: keep. The growth is mostly exact emitted-instruction and compiler-metadata coverage; table-driving the expectation blocks would hide register order and instruction sequence details these tests are meant to expose.
 
-- [ ] `forth/test/fail/*` renames.
+- [x] `forth/test/fail/*` renames.
   - Suspect chunk: many failure tests moved, few one-line changes.
   - Review only harness impact; ignore for de-bloat unless names/paths duplicate meaning.
+  - Verdict: keep. The harness now groups negative import fixtures under `forth/test/fail`, and the filenames map to distinct failure modes; no duplicate path meanings found.
 
 ## Suggested Review Order
 
