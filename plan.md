@@ -48,17 +48,19 @@ Sources used:
   - Confirm whether `strncmp(buf, "}", len)` should be exact compare helper, not ad hoc.
   - Verdict: already simplified. Uses `read_valid_word`, `Word_str`, and exact `str_eq`; debug max-register assertion fixed with regression coverage.
 
-- [ ] `comp/intrin_cc_reg.c:482-540`, `797-828`: intrinsic surface API.
+- [x] `comp/intrin_cc_reg.c:482-540`, `797-828`: intrinsic surface API.
   - Suspect chunk: old `comp_next_arg_reg`, `comp_scratch_reg`, `comp_clobber`, `comp_local_get/set/off` replaced by `comp_alloc_next_reg`, `comp_realloc_reg`, `comp_push_from_local`, `comp_pop_into_local`.
   - New names are preferred. Review whether API level is right: enough Forth control, but not repeated call-site choreography.
   - Candidate: fewer higher-level Forth helpers wrapping these intrinsics, not moving feature logic into C.
+  - Verdict: keep API. C surface is thin and appropriately primitive; repeated choreography lives in Forth call sites and is covered by the next phase.
 
 ## Phase 2: Forth Bootstrap Bloat
 
-- [ ] `forth/lang.af:163-235`, `282-292`, `655-657`, `789-817`: widespread `comp_realloc_reg`.
+- [x] `forth/lang.af:163-235`, `282-292`, `655-657`, `789-817`: widespread `comp_realloc_reg`.
   - Suspect chunk: many one-off register realloc calls around primitive arithmetic.
   - Review for helper words/macros that encode "clobber output reg and set arity" once.
   - Source: `rg -n "comp_realloc_reg|comp_args_set" forth/lang.af`.
+  - Verdict: simplify. Added small Forth helpers for one-output instruction emission and replaced obvious arithmetic/boolean/asr boilerplate; left scratch-register `mod` explicit and kept existing register-selection helpers.
 
 - [ ] `forth/lang.af:1794-1810`: `comp_realloc_regs`.
   - Suspect chunk: explicit 16-line list of volatile regs.

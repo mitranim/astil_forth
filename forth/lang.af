@@ -159,72 +159,63 @@ end
 \
 \ Bitwise ops needed for the early stages of the self-assembler.
 
-fun: or { _i0 _i1 -- i2 } [
+fun: comp_out0 { instr -- err }
   0 comp_realloc_reg
-  0b1_01_01010_00_0_00001_000000_00000_00000 comp_instr \ orr x0, x0, x1
+  instr comp_instr
   1 comp_args_set
+end
+
+fun: comp_out0_2 { instr0 instr1 -- err }
+  0 comp_realloc_reg
+  instr0 comp_instr
+  instr1 comp_instr
+  1 comp_args_set
+end
+
+fun: or { _i0 _i1 -- i2 } [
+  0b1_01_01010_00_0_00001_000000_00000_00000 comp_out0 \ orr x0, x0, x1
 ] end
 
 fun: and { _i0 _i1 -- i2 } [
-  0 comp_realloc_reg
-  0b1_00_01010_00_0_00001_000000_00000_00000 comp_instr \ and x0, x0, x1
-  1 comp_args_set
+  0b1_00_01010_00_0_00001_000000_00000_00000 comp_out0 \ and x0, x0, x1
 ] end
 
 fun: xor { _i0 _i1 -- i2 } [
-  0 comp_realloc_reg
-  0b1_10_01010_00_0_00001_000000_00000_00000 comp_instr \ eor x0, x0, x1
-  1 comp_args_set
+  0b1_10_01010_00_0_00001_000000_00000_00000 comp_out0 \ eor x0, x0, x1
 ] end
 
 fun: lsl { _i0 _bits -- i1 } [
-  0 comp_realloc_reg
-  0b1_0_0_11010110_00001_0010_00_00000_00000 comp_instr \ lsl x0, x0, x1
-  1 comp_args_set
+  0b1_0_0_11010110_00001_0010_00_00000_00000 comp_out0 \ lsl x0, x0, x1
 ] end
 
 fun: lsr { _i0 _bits -- i1 } [
-  0 comp_realloc_reg
-  0b1_0_0_11010110_00001_0010_01_00000_00000 comp_instr \ lsr x0, x0, x1
-  1 comp_args_set
+  0b1_0_0_11010110_00001_0010_01_00000_00000 comp_out0 \ lsr x0, x0, x1
 ] end
 
 fun: invert { _i0 -- _i1 } [
-  0 comp_realloc_reg
-  0b1_01_01010_00_1_00000_000000_11111_00000 comp_instr \ mvn x0, x0
-  1 comp_args_set
+  0b1_01_01010_00_1_00000_000000_11111_00000 comp_out0 \ mvn x0, x0
 ] end
 
 fun: negate { _i0 -- i1 } [
-  0 comp_realloc_reg
-  0b1_1_0_01011_00_0_00000_000000_11111_00000 comp_instr \ neg x0, x0
-  1 comp_args_set
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 comp_out0 \ neg x0, x0
 ] end
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
 fun: inc { _i0 -- i1 } [
-  0 comp_realloc_reg
-  0b1_0_0_100010_0_000000000001_00000_00000 comp_instr \ add x0, x0, 1
-  1 comp_args_set
+  0b1_0_0_100010_0_000000000001_00000_00000 comp_out0 \ add x0, x0, 1
 ] end
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
 fun: dec { _i0 -- i1 } [
-  0 comp_realloc_reg
-  0b1_1_0_100010_0_000000000001_00000_00000 comp_instr \ sub x0, x0, 1
-  1 comp_args_set
+  0b1_1_0_100010_0_000000000001_00000_00000 comp_out0 \ sub x0, x0, 1
 ] end
 
 fun: + { _i0 _i1 -- i2 } [
-  0 comp_realloc_reg
-  0b1_0_0_01011_00_0_00001_000000_00000_00000 comp_instr \ add x0, x0, x1
-  1 comp_args_set
+  0b1_0_0_01011_00_0_00001_000000_00000_00000 comp_out0 \ add x0, x0, x1
 ] end
 
 fun: - { _i0 _i1 -- i2 } [
-  0 comp_realloc_reg
-  0b1_1_0_01011_00_0_00001_000000_00000_00000 comp_instr \ sub x0, x0, x1
-  1 comp_args_set
+  0b1_1_0_01011_00_0_00001_000000_00000_00000 comp_out0 \ sub x0, x0, x1
 ] end
 
 fun: mod { _i0 _i1 -- i2 } [
@@ -279,17 +270,11 @@ end
 \ ## Early booleans
 
 fun: <>0 { _int -- bool } [
-  0                     comp_realloc_reg
-  0        asm_cmp_zero comp_instr \ cmp x0, 0
-  0 ASM_NE asm_cset     comp_instr \ cset x0, ne
-  1                     comp_args_set
+  0 asm_cmp_zero 0 ASM_NE asm_cset comp_out0_2 \ cmp x0, 0; cset x0, ne
 ] end
 
 fun: =0 { _int -- bool } [
-  0                     comp_realloc_reg
-  0        asm_cmp_zero comp_instr \ cmp x0, 0
-  0 ASM_EQ asm_cset     comp_instr \ cset x0, eq
-  1                     comp_args_set
+  0 asm_cmp_zero 0 ASM_EQ asm_cset comp_out0_2 \ cmp x0, 0; cset x0, eq
 ] end
 
 \ ## Assembler: instruction patterns
@@ -652,9 +637,7 @@ end
 
 \ Arithmetic (sign-preserving) right shift.
 fun: asr { _i0 _bits -- i1 } [
-  0                 comp_realloc_reg
-  0 0 1 asm_asr_reg comp_instr \ asr x0, x0, x1
-  1                 comp_args_set
+  0 0 1 asm_asr_reg comp_out0 \ asr x0, x0, x1
 ] end
 
 \ eor Xd, Xn, Xm
