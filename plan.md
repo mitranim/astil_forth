@@ -136,8 +136,9 @@ Sources used:
 
 ## Phase 5: Tests / Low-Value Review Scope
 
-- [ ] `clib/err.h:13-51` and broad `assert_fatal` rename.
+- [x] `clib/err.h:13-51` and broad `assert_fatal` rename.
   - Rename is cosmetic and new names are preferred. Review only semantic additions: `err_assert`, `try_assert`, `try_fatal`, and `FAST_CRASH` behavior.
+  - Verdict: keep. `err_assert`/`try_assert` are intended for converting deprecated fatal assertions to recoverable errors over time. Keep `try_fatal` and `FAST_CRASH` for explicitly crash-fast paths.
 
 - [ ] `clib/dict.c:88-190`, `clib/map.c:50-146`, `clib/set.c:19-224`.
   - Suspect chunk: commented test code only changed by assert rename.

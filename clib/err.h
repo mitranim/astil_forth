@@ -16,8 +16,7 @@ typedef Err Err_fun(void);
 /*
 Assert with backtrace. Name yoinked from SBCL.
 
-TODO: convert all assertions from "this is fatal"
-to recoverable "try"-style statements; see below.
+TODO: convert fatal assertions to recoverable `try_assert` where feasible.
 */
 #define assert_fatal(expr)                                                   \
   ({                                                                         \
