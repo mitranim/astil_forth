@@ -31,10 +31,11 @@ Sources used:
   - Ignore rename itself. Check whether relocation lifecycle has avoidable extra machinery.
   - Verdict: simplify. Added one helper for the shared "arg reg still owns this local" check; kept relocation lifecycle intact.
 
-- [ ] `comp/comp_cc_reg.c:455-488`, `493-575`: immediate and local push path.
+- [x] `comp/comp_cc_reg.c:455-488`, `493-575`: immediate and local push path.
   - Suspect chunk: `comp_append_imm_to_reg`, `comp_append_push_imm`, `comp_append_push_from_local`.
   - Review for mixed responsibilities: register allocation, relocation, constant reuse, clobber registration, and `arg_len` mutation in one path.
   - Candidate simplification: split pure lookup from mutation, or remove constant-local association if marginal.
+  - Verdict: simplify. Kept immediate path; simplified local push by clearing the target arg first, then using shared local-arg lookup for prior-local relocation.
 
 - [ ] `comp/comp_cc_reg.c:420-428`, `652-654`, `715-726`, `785-797`: `arg_len` mutation policy.
   - Suspect chunk: scattered direct `ctx->arg_len++`, `ctx->arg_len = ...`, and clearing `ctx->args`.

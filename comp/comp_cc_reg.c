@@ -515,41 +515,33 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   }
 
   const auto prev_loc = tar_arg->loc;
-  bool       reloc    = !!prev_loc && !prev_loc->stable;
+  *tar_arg = (Comp_arg){};
 
   S8 imm_reg = -1;
   S8 loc_reg = -1;
 
   /*
   Search for other registers already associated with this local,
-  prioritizing comptime constants / immediates, while also looking
-  for other registers associated with the previous local, to decide
-  whether it needs relocation.
+  prioritizing comptime constants / immediates.
 
   If we find an existing register with the new local, this lets us immediately
   compile a mov instruction and avoid emitting a fixup. If we find a comptime
   constant, we can even make this backtrackable.
   */
   for (S8 src_reg = (int)arr_cap(ctx->args) - 1; src_reg >= 0; src_reg--) {
-    if (src_reg == (S8)tar_reg) continue;
-
     const auto src_arg = &ctx->args[src_reg];
 
-    if (src_arg->loc != loc) {
-      if (src_arg->loc == prev_loc) reloc = false;
-      continue;
-    }
+    if (src_arg->loc != loc) continue;
 
     if (src_arg->imm.has_imm) {
       imm_reg = src_reg;
-      if (!reloc) break;
       continue;
     }
 
     loc_reg = src_reg;
   }
 
-  if (reloc) {
+  if (prev_loc && !prev_loc->stable && !comp_local_has_arg(ctx, prev_loc)) {
     comp_append_local_reloc_from_reg(comp, prev_loc, tar_reg);
   }
 
