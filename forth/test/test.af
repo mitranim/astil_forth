@@ -65,6 +65,15 @@ fun: test_locals { -- err }
 end
 test_locals
 
+fun: test_params_push_sum { left right -> sum } + end
+fun: test_params_push_sum3 { one two three -> sum } + + end
+
+fun: test_params_push { -- err }
+  T{ 10 20    test_params_push_sum  <T> 30 }T
+  T{ 10 20 30 test_params_push_sum3 <T> 60 }T
+end
+test_params_push
+
 \ In top-level interpretation, `./testing.af` inspects the default Forth stack
 \ to compare expected with provided values. All of below should be equivalent.
 T{ 10          <T> 10 }T

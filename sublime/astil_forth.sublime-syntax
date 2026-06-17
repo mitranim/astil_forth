@@ -265,7 +265,7 @@ contexts:
       scope: storage.modifier.astil_forth
       captures:
         1: punctuation.separator.astil_forth
-    - match: '{{word_begin}}--{{word_end}}'
+    - match: '{{word_begin}}(?:--|->){{word_end}}'
       scope: punctuation.separator.astil_forth
 
   parens-param-match:
@@ -285,14 +285,14 @@ contexts:
 
   braces-params-inner-pop:
     - include: braces-end-pop
-    - match: '{{word_begin}}--{{word_end}}'
+    - match: '{{word_begin}}(?:--|->){{word_end}}'
       scope: punctuation.separator.astil_forth
       set: braces-params-output-pop
     - include: braces-param-match
     - include: nonblank-pop
 
   braces-params-output-pop:
-    - match: '{{word_begin}}--{{word_end}}'
+    - match: '{{word_begin}}(?:--|->){{word_end}}'
       scope: punctuation.separator.astil_forth
     - match: '{{word_begin}}err{{word_end}}(?=\s+})'
       scope: variable.parameter.astil_forth storage.modifier.astil_forth

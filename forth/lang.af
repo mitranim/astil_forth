@@ -3635,12 +3635,12 @@ fun: ccompare { cstr0 cstr1 -- cmp }
   end
 end
 
-fun: str=   { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0  end
-fun: str<   { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0  end
-fun: str<>  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 end
-fun: cstr=  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare =0  end
-fun: cstr<  { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <0  end
-fun: cstr<> { cstr0 cstr1 -- bool } cstr0 cstr1 ccompare <>0 end
+fun: str=   { str0 len0 str1 len1 -> bool } compare =0  end
+fun: str<   { str0 len0 str1 len1 -> bool } compare <0  end
+fun: str<>  { str0 len0 str1 len1 -> bool } compare <>0 end
+fun: cstr=  { cstr0 cstr1 -> bool } ccompare =0  end
+fun: cstr<  { cstr0 cstr1 -> bool } ccompare <0  end
+fun: cstr<> { cstr0 cstr1 -> bool } ccompare <>0 end
 
 \ ## Vargs and formatting
 

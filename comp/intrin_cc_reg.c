@@ -6,8 +6,10 @@
 #include "./intrin.c"
 #endif
 
-static Err err_redundant_param_skip(const char *name) {
-  return errf("in " FMT_QUOTED ": redundant `--` without output params", name);
+static Err err_redundant_param(const char *name, const char *infix) {
+  return errf(
+    "in " FMT_QUOTED ": redundant `%s` without output params", name, infix
+  );
 }
 
 /*
@@ -28,10 +30,19 @@ static Err interp_parse_params(Interp *interp) {
 
   const auto comp = &interp->comp;
 
+  bool push_inps = false;
+
   for (;;) {
     try(read_valid_word(read, &word));
+
     if (str_eq(&word, "}")) return nullptr;
     if (str_eq(&word, "--")) break;
+
+    if (str_eq(&word, "->")) {
+      push_inps = true;
+      break;
+    }
+
     try(comp_add_input_param(comp, word));
   }
 
@@ -53,7 +64,16 @@ static Err interp_parse_params(Interp *interp) {
     sym->has_err = true;
   }
 
-  if (!sym->out_len) return err_redundant_param_skip(sym->name.buf);
+  if (!sym->out_len) {
+    return err_redundant_param(sym->name.buf, push_inps ? "->" : "--");
+  }
+
+  if (push_inps) {
+    comp->ctx.arg_len = sym->inp_len;
+    for (U8 ind = 0; ind < sym->inp_len; ind++) {
+      comp->ctx.args[ind].loc->used = true;
+    }
+  }
   return nullptr;
 }
 
