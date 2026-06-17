@@ -140,9 +140,10 @@ Sources used:
   - Rename is cosmetic and new names are preferred. Review only semantic additions: `err_assert`, `try_assert`, `try_fatal`, and `FAST_CRASH` behavior.
   - Verdict: keep. `err_assert`/`try_assert` are intended for converting deprecated fatal assertions to recoverable errors over time. Keep `try_fatal` and `FAST_CRASH` for explicitly crash-fast paths.
 
-- [ ] `clib/dict.c:88-190`, `clib/map.c:50-146`, `clib/set.c:19-224`.
+- [x] `clib/dict.c:88-190`, `clib/map.c:50-146`, `clib/set.c:19-224`.
   - Suspect chunk: commented test code only changed by assert rename.
   - Rename-only churn is not suspect. Drop from de-bloat review unless commented mains are already planned for real tests.
+  - Verdict: drop from review scope. These are commented-out manual tests with rename-only churn, not active bloat.
 
 - [ ] `comp/intrin_list_cc_reg.c:6-86`.
   - Mostly rename/list update. Review only grouping if it obscures feature ownership.
