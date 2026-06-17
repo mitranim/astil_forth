@@ -83,9 +83,10 @@ Sources used:
   - Candidate: shared helper for "preserve first N args across varargs call" or restore prior shorter implementation if safe.
   - Verdict: simplify. Restored a specific-register local assignment intrinsic so `wrapf`/`strf` stash only `buf` from x0 before compiling `snprintf`; kept their different tails explicit.
 
-- [ ] `forth/lang.af:3963-4046`: `comp_args_to_stack`, `>>s`, `stack{`.
+- [x] `forth/lang.af:3963-4046`: `comp_args_to_stack`, `>>s`, `stack{`.
   - Suspect chunk: stack transfer logic now mixes locals, manual temp regs, and argument resetting.
   - Review whether higher-level stack words `>s`/`s>` are enough after their simplification at `1518-1539`.
+  - Verdict: keep. `>s`/`s>` are runtime stack words, while these words compile register-to-memory moves and local assignments. Removing the `>>s` local save/reload loses needed compiler metadata and breaks `test_to_stack_variadic`.
 
 - [ ] `forth/lang.af:4146-4173`, `4218-4249`: `indirect:` and `execute_raw`.
   - Suspect chunk: manual `comp_realloc_regs`, synthetic input modeling via `inp comp_args_set`, frame-record workaround.
