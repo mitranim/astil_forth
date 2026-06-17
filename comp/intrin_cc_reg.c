@@ -67,39 +67,36 @@ static Err intrin_brace(Interp *interp) {
 
   const auto arg_max = ctx->arg_len;
 
-  IF_DEBUG(assert_fatal(arg_max < ASM_VOLATILE_REG_LEN));
+  IF_DEBUG(assert_fatal(arg_max <= ASM_VOLATILE_REG_LEN));
 
-  const char *names[ASM_VOLATILE_REG_LEN];
-  Ind         lens[ASM_VOLATILE_REG_LEN];
+  Word_str names[ASM_VOLATILE_REG_LEN];
 
   U8  loc_len = 0;
   int discard = 0; // -1 = below, 1 = above
 
   for (;;) {
-    const char *buf;
-    Ind         len;
-    try(read_word(read, &buf, &len));
+    Word_str word;
+    try(read_valid_word(read, &word));
 
-    if (!strncmp(buf, "--", MAX(2u, len))) {
+    if (str_eq(&word, "--")) {
       if (discard) return err_str("redundant double discard via `--`");
       discard = loc_len ? -1 : 1;
       continue;
     }
 
-    if (!strncmp(buf, "}", len)) break;
+    if (str_eq(&word, "}")) break;
 
     if (loc_len >= arg_max) {
       return errf(
         "unable to assign to `%.*s`: requires %d arguments, but only %d are available",
-        len,
-        buf,
+        word.len,
+        word.buf,
         loc_len + 1,
         arg_max
       );
     }
 
-    names[loc_len] = buf;
-    lens[loc_len]  = len;
+    names[loc_len] = word;
     loc_len++;
   }
 
@@ -110,10 +107,8 @@ static Err intrin_brace(Interp *interp) {
   if (discard >= 0) {
     while (loc_len) {
       loc_len--; // Doing this in condition check triggers UB traps.
-      Word_str name;
       Local   *loc;
-      try(valid_word(names[loc_len], lens[loc_len], &name));
-      try(comp_local_get_or_make(comp, name, &loc));
+      try(comp_local_get_or_make(comp, names[loc_len], &loc));
       try(comp_assign_local_from_reg(comp, loc, ctx->arg_len - 1));
       ctx->arg_len--;
     }
@@ -122,10 +117,8 @@ static Err intrin_brace(Interp *interp) {
   }
 
   for (U8 ind = 0; ind < loc_len; ind++) {
-    Word_str name;
     Local   *loc;
-    try(valid_word(names[ind], lens[ind], &name));
-    try(comp_local_get_or_make(comp, name, &loc));
+    try(comp_local_get_or_make(comp, names[ind], &loc));
     try(comp_assign_local_from_reg(comp, loc, ind));
   }
 
