@@ -19,10 +19,11 @@ Sources used:
 
 ## Phase 1: Register-CC Core
 
-- [ ] `comp/comp_cc_reg.h:13-167`: new local relocation model.
+- [x] `comp/comp_cc_reg.h:13-167`: new local relocation model.
   - Suspect chunk: state surface around `Loc_reloc`, `Reg_imm`, `Comp_arg`, `Local.stable`, `Local.used`.
   - Keep documentation comments unless stale. Review whether state fields overlap or encode same lifecycle twice.
   - Source: `rg -n "Comp_arg|Loc_reloc|stable|used|imm|args\\[" comp/comp_cc_reg.h comp/comp_cc_reg.c`.
+  - Verdict: keep. `reloc`, `stable`, `read`, `used`, and `Comp_arg { loc, imm }` encode separate lifecycle facts; implementation scan duplication belongs to the next chunk.
 
 - [ ] `comp/comp_cc_reg.c:138-147`, `223-271`, `295-361`: relocation writeback path.
   - Suspect chunk: `comp_local_confirm_relocs`, `comp_append_local_reloc_from_reg`, `comp_forget_reg`, `comp_assign_local_from_reg`.
