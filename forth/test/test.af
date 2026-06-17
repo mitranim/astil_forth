@@ -645,8 +645,8 @@ test_recur_reg_clobber
 
 1 2 true indirect: TEST_INDIRECT_FORWARD test_indirect_forward_target
 
-fun: test_indirect_forward_caller { src -- char err } [ false try_all ]
-  src test_indirect_forward_target try
+fun: test_indirect_forward_caller { src -- char err }
+  src test_indirect_forward_target
 end
 
 fun: test_indirect_forward_target { src -- char err } [ redefine ]
@@ -679,37 +679,37 @@ fun: test_indirect_forward_target_0 { -- out err } [ redefine ] 100 end
 TEST_INDIRECT_FORWARD_0 indirect_to' test_indirect_forward_target_0
 
 2 2 true indirect: TEST_INDIRECT_FORWARD_2 test_indirect_forward_target_2
-fun: test_indirect_forward_caller_2 { a b -- out err } [ false try_all ] a b test_indirect_forward_target_2 try end
+fun: test_indirect_forward_caller_2 { a b -- out err } a b test_indirect_forward_target_2 end
 fun: test_indirect_forward_target_2 { a b -- out err } [ redefine ] a b + end
 TEST_INDIRECT_FORWARD_2 indirect_to' test_indirect_forward_target_2
 
 3 2 true indirect: TEST_INDIRECT_FORWARD_3 test_indirect_forward_target_3
-fun: test_indirect_forward_caller_3 { a b c -- out err } [ false try_all ] a b c test_indirect_forward_target_3 try end
+fun: test_indirect_forward_caller_3 { a b c -- out err } a b c test_indirect_forward_target_3 end
 fun: test_indirect_forward_target_3 { a b c -- out err } [ redefine ] a b + c + end
 TEST_INDIRECT_FORWARD_3 indirect_to' test_indirect_forward_target_3
 
 4 2 true indirect: TEST_INDIRECT_FORWARD_4 test_indirect_forward_target_4
-fun: test_indirect_forward_caller_4 { a b c d -- out err } [ false try_all ] a b c d test_indirect_forward_target_4 try end
+fun: test_indirect_forward_caller_4 { a b c d -- out err } a b c d test_indirect_forward_target_4 end
 fun: test_indirect_forward_target_4 { a b c d -- out err } [ redefine ] a b + c + d + end
 TEST_INDIRECT_FORWARD_4 indirect_to' test_indirect_forward_target_4
 
 5 2 true indirect: TEST_INDIRECT_FORWARD_5 test_indirect_forward_target_5
-fun: test_indirect_forward_caller_5 { a b c d e -- out err } [ false try_all ] a b c d e test_indirect_forward_target_5 try end
+fun: test_indirect_forward_caller_5 { a b c d e -- out err } a b c d e test_indirect_forward_target_5 end
 fun: test_indirect_forward_target_5 { a b c d e -- out err } [ redefine ] a b + c + d + e + end
 TEST_INDIRECT_FORWARD_5 indirect_to' test_indirect_forward_target_5
 
 6 2 true indirect: TEST_INDIRECT_FORWARD_6 test_indirect_forward_target_6
-fun: test_indirect_forward_caller_6 { a b c d e f -- out err } [ false try_all ] a b c d e f test_indirect_forward_target_6 try end
+fun: test_indirect_forward_caller_6 { a b c d e f -- out err } a b c d e f test_indirect_forward_target_6 end
 fun: test_indirect_forward_target_6 { a b c d e f -- out err } [ redefine ] a b + c + d + e + f + end
 TEST_INDIRECT_FORWARD_6 indirect_to' test_indirect_forward_target_6
 
 7 2 true indirect: TEST_INDIRECT_FORWARD_7 test_indirect_forward_target_7
-fun: test_indirect_forward_caller_7 { a b c d e f g -- out err } [ false try_all ] a b c d e f g test_indirect_forward_target_7 try end
+fun: test_indirect_forward_caller_7 { a b c d e f g -- out err } a b c d e f g test_indirect_forward_target_7 end
 fun: test_indirect_forward_target_7 { a b c d e f g -- out err } [ redefine ] a b + c + d + e + f + g + end
 TEST_INDIRECT_FORWARD_7 indirect_to' test_indirect_forward_target_7
 
 8 2 true indirect: TEST_INDIRECT_FORWARD_8 test_indirect_forward_target_8
-fun: test_indirect_forward_caller_8 { a b c d e f g h -- out err } [ false try_all ] a b c d e f g h test_indirect_forward_target_8 try end
+fun: test_indirect_forward_caller_8 { a b c d e f g h -- out err } a b c d e f g h test_indirect_forward_target_8 end
 fun: test_indirect_forward_target_8 { a b c d e f g h -- out err } [ redefine ] a b + c + d + e + f + g + h + end
 TEST_INDIRECT_FORWARD_8 indirect_to' test_indirect_forward_target_8
 
@@ -739,41 +739,41 @@ fun: test_indirect_clobber { -- err }
 end
 test_indirect_clobber
 
-fun: test_indirect_forward { -- err } [ false try_all ]
-  " abc" test_indirect_forward_caller try { char }
-  char char' a test_indirect_forward_eq try
+fun: test_indirect_forward { -- err }
+  " abc" test_indirect_forward_caller { char }
+  char char' a test_indirect_forward_eq
 
-  test_indirect_forward_caller_0 try 100 test_indirect_forward_eq try
-  10 20 test_indirect_forward_caller_2 try 30 test_indirect_forward_eq try
-  1 2 3 test_indirect_forward_caller_3 try 6 test_indirect_forward_eq try
-  1 2 3 4 test_indirect_forward_caller_4 try 10 test_indirect_forward_eq try
-  1 2 3 4 5 test_indirect_forward_caller_5 try 15 test_indirect_forward_eq try
-  1 2 3 4 5 6 test_indirect_forward_caller_6 try 21 test_indirect_forward_eq try
-  1 2 3 4 5 6 7 test_indirect_forward_caller_7 try 28 test_indirect_forward_eq try
-  1 2 3 4 5 6 7 8 test_indirect_forward_caller_8 try 36 test_indirect_forward_eq try
+  test_indirect_forward_caller_0 100 test_indirect_forward_eq
+  10 20 test_indirect_forward_caller_2 30 test_indirect_forward_eq
+  1 2 3 test_indirect_forward_caller_3 6 test_indirect_forward_eq
+  1 2 3 4 test_indirect_forward_caller_4 10 test_indirect_forward_eq
+  1 2 3 4 5 test_indirect_forward_caller_5 15 test_indirect_forward_eq
+  1 2 3 4 5 6 test_indirect_forward_caller_6 21 test_indirect_forward_eq
+  1 2 3 4 5 6 7 test_indirect_forward_caller_7 28 test_indirect_forward_eq
+  1 2 3 4 5 6 7 8 test_indirect_forward_caller_8 36 test_indirect_forward_eq
 
-  test_indirect_forward_caller_out2 try { a b }
-  a 11 test_indirect_forward_eq try
-  b 22 test_indirect_forward_eq try
+  test_indirect_forward_caller_out2 { a b }
+  a 11 test_indirect_forward_eq
+  b 22 test_indirect_forward_eq
 
   test_indirect_forward_caller_out7 { a b c d e f g }
-  a 0 test_indirect_forward_eq try
-  b 1 test_indirect_forward_eq try
-  c 2 test_indirect_forward_eq try
-  d 3 test_indirect_forward_eq try
-  e 4 test_indirect_forward_eq try
-  f 5 test_indirect_forward_eq try
-  g 6 test_indirect_forward_eq try
+  a 0 test_indirect_forward_eq
+  b 1 test_indirect_forward_eq
+  c 2 test_indirect_forward_eq
+  d 3 test_indirect_forward_eq
+  e 4 test_indirect_forward_eq
+  f 5 test_indirect_forward_eq
+  g 6 test_indirect_forward_eq
 
   test_indirect_forward_caller_out8 { a0 b0 c0 d0 e0 f0 g0 h0 }
-  a0 0 test_indirect_forward_eq try
-  b0 1 test_indirect_forward_eq try
-  c0 2 test_indirect_forward_eq try
-  d0 3 test_indirect_forward_eq try
-  e0 4 test_indirect_forward_eq try
-  f0 5 test_indirect_forward_eq try
-  g0 6 test_indirect_forward_eq try
-  h0 7 test_indirect_forward_eq try
+  a0 0 test_indirect_forward_eq
+  b0 1 test_indirect_forward_eq
+  c0 2 test_indirect_forward_eq
+  d0 3 test_indirect_forward_eq
+  e0 4 test_indirect_forward_eq
+  f0 5 test_indirect_forward_eq
+  g0 6 test_indirect_forward_eq
+  h0 7 test_indirect_forward_eq
 end
 test_indirect_forward
 
