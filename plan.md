@@ -88,9 +88,10 @@ Sources used:
   - Review whether higher-level stack words `>s`/`s>` are enough after their simplification at `1518-1539`.
   - Verdict: keep. `>s`/`s>` are runtime stack words, while these words compile register-to-memory moves and local assignments. Removing the `>>s` local save/reload loses needed compiler metadata and breaks `test_to_stack_variadic`.
 
-- [ ] `forth/lang.af:4146-4173`, `4218-4249`: `indirect:` and `execute_raw`.
+- [x] `forth/lang.af:4146-4173`, `4218-4249`: `indirect:` and `execute_raw`.
   - Suspect chunk: manual `comp_realloc_regs`, synthetic input modeling via `inp comp_args_set`, frame-record workaround.
   - Prefer keeping this in Forth. Review if a shared Forth trampoline/helper can remove duplication.
+  - Verdict: keep. `comp_realloc_regs` declares the generated indirect word's unknown target clobbers to callers; without it, locals live across an indirect call can remain assigned to registers clobbered by the eventual target. Added a regression test for this.
 
 - [ ] `forth/lang.af:1701-1744`: string/comment parsing after `read_until_char` semantic change.
   - Suspect chunk: repeated `read_char { -- }` before/after parse in `s"`, `s\``, `read_interp_cstr`.

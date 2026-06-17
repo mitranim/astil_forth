@@ -532,7 +532,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   }
 
   const auto prev_loc = tar_arg->loc;
-  *tar_arg = (Comp_arg){};
+  *tar_arg            = (Comp_arg){};
 
   S8 imm_reg = -1;
   S8 loc_reg = -1;

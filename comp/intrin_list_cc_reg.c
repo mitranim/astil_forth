@@ -6,26 +6,26 @@
 
 static const USED Sym INTRIN[] = {
   // Specific to this CC.
-  INTRIN_BRACE,                // {
-  INTRIN_COMP_SIGNATURE_GET,   // comp_signature_get
-  INTRIN_COMP_SIGNATURE_SET,   // comp_signature_set
-  INTRIN_COMP_ARGS_VALID,      // comp_args_valid
-  INTRIN_COMP_ARGS_MIN,        // comp_args_min
-  INTRIN_COMP_ARGS_GET,        // comp_args_get
-  INTRIN_COMP_ARGS_SET,        // comp_args_set
-  INTRIN_COMP_ALLOC_NEXT_REG,  // comp_alloc_next_reg
-  INTRIN_COMP_REALLOC_REG,     // comp_realloc_reg
-  INTRIN_COMP_BARRIER,         // comp_barrier
-  INTRIN_COMP_PUSH_FROM_LOCAL, // comp_push_from_local
-  INTRIN_COMP_POP_INTO_LOCAL,  // comp_pop_into_local
+  INTRIN_BRACE,                      // {
+  INTRIN_COMP_SIGNATURE_GET,         // comp_signature_get
+  INTRIN_COMP_SIGNATURE_SET,         // comp_signature_set
+  INTRIN_COMP_ARGS_VALID,            // comp_args_valid
+  INTRIN_COMP_ARGS_MIN,              // comp_args_min
+  INTRIN_COMP_ARGS_GET,              // comp_args_get
+  INTRIN_COMP_ARGS_SET,              // comp_args_set
+  INTRIN_COMP_ALLOC_NEXT_REG,        // comp_alloc_next_reg
+  INTRIN_COMP_REALLOC_REG,           // comp_realloc_reg
+  INTRIN_COMP_BARRIER,               // comp_barrier
+  INTRIN_COMP_PUSH_FROM_LOCAL,       // comp_push_from_local
+  INTRIN_COMP_POP_INTO_LOCAL,        // comp_pop_into_local
   INTRIN_COMP_ASSIGN_LOCAL_FROM_REG, // comp_assign_local_from_reg
-  INTRIN_TRY_ALL,              // try_all
-  INTRIN_GET_TRY_ALL,          // get_try_all
-  INTRIN_ALLOCA,               // alloca
-  INTRIN_COMPILE_EXECUTABLE,   // compile_executable
-  INTRIN_DEBUG_CTX,            // debug_ctx
-  INTRIN_DEBUG_CTX_COMP,       // #debug_ctx
-  INTRIN_DEBUG_ARG,            // debug_arg
+  INTRIN_TRY_ALL,                    // try_all
+  INTRIN_GET_TRY_ALL,                // get_try_all
+  INTRIN_ALLOCA,                     // alloca
+  INTRIN_COMPILE_EXECUTABLE,         // compile_executable
+  INTRIN_DEBUG_CTX,                  // debug_ctx
+  INTRIN_DEBUG_CTX_COMP,             // #debug_ctx
+  INTRIN_DEBUG_ARG,                  // debug_arg
 
   // Shared.
   INTRIN_COLON,           // :

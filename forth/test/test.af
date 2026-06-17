@@ -655,6 +655,24 @@ end
 
 TEST_INDIRECT_FORWARD indirect_to' test_indirect_forward_target
 
+1 1 false indirect: TEST_INDIRECT_CLOBBER test_indirect_clobber_target
+
+\ This tests the clobber contract of the generated indirect trampoline.
+\ Padding locals put `saved` in x4; the indirect target will clobber x4.
+\ The caller must relocate `saved` before calling the trampoline.
+fun: test_indirect_clobber_caller { _a _b _c _d saved arg -- out }
+  arg test_indirect_clobber_target { called }
+  saved called +
+end
+
+fun: test_indirect_clobber_target { arg -- out } [ redefine ]
+  \ Simulate an unknown target implementation clobbering a non-ABI arg reg.
+  [ 444 4 comp_load ]
+  arg
+end
+
+TEST_INDIRECT_CLOBBER indirect_to' test_indirect_clobber_target
+
 0 2 true indirect: TEST_INDIRECT_FORWARD_0 test_indirect_forward_target_0
 fun: test_indirect_forward_caller_0 { -- out err } test_indirect_forward_target_0 end
 fun: test_indirect_forward_target_0 { -- out err } [ redefine ] 100 end
@@ -714,6 +732,12 @@ fun: test_indirect_forward_eq { act exp -- err }
   if act exp = then ret end
   " indirect forward call mismatch: actual=%zd expected=%zd" act exp errf throw
 end
+
+fun: test_indirect_clobber { -- err }
+  \ Fails as 467 if indirect trampoline clobbers are not reported to callers.
+  0 0 0 0 100 23 test_indirect_clobber_caller 123 test_indirect_forward_eq
+end
+test_indirect_clobber
 
 fun: test_indirect_forward { -- err } [ false try_all ]
   " abc" test_indirect_forward_caller try { char }
