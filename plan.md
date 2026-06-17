@@ -149,9 +149,10 @@ Sources used:
   - Mostly rename/list update. Review only grouping if it obscures feature ownership.
   - Verdict: keep. The list still separates register-CC-specific intrinsics from shared intrinsics; `comp_local` remains shared while push/pop/direct register assignment stay register-CC-specific.
 
-- [ ] `forth/test/test_const_fold.af` (+648) replacing `forth/test_const_fold.af` (-340).
+- [x] `forth/test/test_const_fold.af` (+648) replacing `forth/test_const_fold.af` (-340).
   - Suspect chunk: test file nearly doubled.
   - Review for duplicated fixtures and broad cases that can be table-driven or split. Preserve coverage, reduce repetition.
+  - Verdict: keep. The growth is mostly exact emitted-instruction and compiler-metadata coverage; table-driving the expectation blocks would hide register order and instruction sequence details these tests are meant to expose.
 
 - [ ] `forth/test/fail/*` renames.
   - Suspect chunk: many failure tests moved, few one-line changes.
