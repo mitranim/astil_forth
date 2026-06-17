@@ -1665,9 +1665,16 @@ fun: read_word_char { -- char err } read_word { buf -- } buf @u8 end
 fun: char' { -- char err } ( E: "str" -- char ) read_word_char end
 
 fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
-  read_word_char     { char }
+  read_word_char      { char }
   comp_alloc_next_reg { reg }
   char reg comp_load
+end
+
+fun: read_delimited { delim -- str len err }
+  read_char { -- }
+  delim read_until_char { str len }
+  read_char { -- }
+  str len
 end
 
 fun: comp_alloc_cstr { buf len -- cstr err }
@@ -1681,8 +1688,8 @@ end
 \ Copies a string and appends a terminating null byte.
 fun: comp_str { buf len -- err } ( E: -- cstr len )
   buf len comp_alloc_cstr { adr }
-  comp_alloc_next_reg      { RS }
-  comp_alloc_next_reg      { RL }
+  comp_alloc_next_reg     { RS }
+  comp_alloc_next_reg     { RL }
   adr RS comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
   len RL comp_load      \ ldr RL, <len>
 end
@@ -1697,34 +1704,15 @@ end
 \ length of the resulting string. In interpretation mode, the string points
 \ into the transient reader input and is not null-terminated. In compilation
 \ mode, the string is statically allocated, unique, and null-terminated.
-fun: s" { -- str len err } ( E: "str" -- str len )
-  read_char { -- }
-  char' " read_until_char { str len }
-  read_char { -- }
-  str len
-end
-
-fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len )
-  execute' s"  comp_str
-end
-
-fun: s` { -- str len err } ( E: `str` -- str len )
-  read_char { -- }
-  char' ` read_until_char { str len }
-  read_char { -- }
-  str len
-end
-
-fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len )
-  execute' s` comp_str
-end
+fun: s" { -- str len err } ( E: "str" -- str len ) char' " read_delimited end
+fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len ) execute' s"  comp_str end
+fun: s` { -- str len err } ( E: `str` -- str len ) char' ` read_delimited end
+fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) execute' s` comp_str end
 
 4096 buf: ROOT_STR_BUF
 
 fun: read_interp_cstr { delim -- cstr err }
-  read_char { -- }
-  delim read_until_char { src len }
-  read_char { -- }
+  delim read_delimited { src len }
   ROOT_STR_BUF { buf cap }
   len cap min { len }
   buf src len memcpy
@@ -1740,9 +1728,7 @@ fun: ` { -- cstr err } ( E: `str` -- cstr ) char' ` read_interp_cstr end
 \ Reads a string, copies it to compiler-managed data,
 \ and compiles a PC-relative reference to it.
 fun: read_comp_cstr { delim -- err }
-  read_char { -- }
-  delim read_until_char comp_cstr
-  read_char { -- }
+  delim read_delimited comp_cstr
 end
 
 fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr ) char' " read_comp_cstr end

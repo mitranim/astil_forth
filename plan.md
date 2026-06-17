@@ -93,9 +93,10 @@ Sources used:
   - Prefer keeping this in Forth. Review if a shared Forth trampoline/helper can remove duplication.
   - Verdict: keep. `comp_realloc_regs` declares the generated indirect word's unknown target clobbers to callers; without it, locals live across an indirect call can remain assigned to registers clobbered by the eventual target. Added a regression test for this.
 
-- [ ] `forth/lang.af:1701-1744`: string/comment parsing after `read_until_char` semantic change.
+- [x] `forth/lang.af:1701-1744`: string/comment parsing after `read_until_char` semantic change.
   - Suspect chunk: repeated `read_char { -- }` before/after parse in `s"`, `s\``, `read_interp_cstr`.
   - Candidate: add `read_delimited` helper to avoid every caller knowing delimiter consumption contract.
+  - Verdict: simplify. Added `read_delimited` for post-bootstrap string literals and C-string readers; left top-of-file comment words explicit because the helper is not defined yet during bootstrap.
 
 ## Phase 3: Arm64 / Assembler
 
