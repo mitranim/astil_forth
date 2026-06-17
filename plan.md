@@ -106,9 +106,10 @@ Sources used:
   - Source: `rg -n "asm_append_imm_to_reg|asm_backtrack_instrs_opt" comp/arch_arm64.c comp/arch_arm64_cc_reg.c comp/comp_cc_reg.c`.
   - Verdict: simplify. Reworked negative immediate handling to reason over actual target lanes and movz/movn default lanes instead of `~src`; added an exact-instruction regression for a negative mixed-lane immediate.
 
-- [ ] `comp/arch_arm64_cc_reg.c:496-558`: local reloc fixups and backtracking helper.
+- [x] `comp/arch_arm64_cc_reg.c:496-558`: local reloc fixups and backtracking helper.
   - Suspect chunk: `asm_fixup_loc_reloc` still carries old "dirty hack" comment and NOP elision.
   - Keep documentation if it explains invariant. Review NOP elision and reloc patching for simpler control flow.
+  - Verdict: keep. The reloc NOP path documents and implements the single-pass fixup invariant. Keep `asm_backtrack_instrs_opt` in the assembler layer so compiler code does not mutate instruction buffers directly.
 
 - [ ] `comp/arch_arm64.c:142-183`: param count/register validators.
   - Suspect chunk: split `*_reg`, `*_count`, `err_too_many_*`.
