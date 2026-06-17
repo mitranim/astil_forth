@@ -2103,6 +2103,12 @@ fun: cond_branch_close { meta ctx -- meta err }
   meta
 end
 
+fun: cont_meta_validate_len_match { meta ctx -- err }
+  meta cont_meta_out_len { out_len }
+  meta cont_meta_inp_len { inp_len }
+  if out_len inp_len <> then ctx throw end
+end
+
 \ Caller must also use `comp_args_valid` and `comp_barrier`.
 \ Takes "meta" because this shares the signature with `if_pop`
 \ and `ifz_pop`; all these words may be executed by `cond_pop`.
@@ -2159,11 +2165,9 @@ fun: cond_pop { pop_meta pop meta -- err }
     ret
   end
 
-  meta cont_meta_out_len { out_len }
-  meta cont_meta_inp_len { inp_len }
-  if out_len inp_len <> then
-    " conditional which consumes and produces different amounts of arguments requires final `else`" throw
-  end
+  meta
+  " conditional which consumes and produces different amounts of arguments requires final `else`"
+  cont_meta_validate_len_match
 
   pop_meta STACK >s
   pop      execute
@@ -2208,8 +2212,7 @@ fun: switch_pop { prev _val_loc_ meta -- err }
 end
 
 fun_comp: switch { -- nop val meta switch_pop err } ( E: … val -- … )
-  " inputs for `switch`" { ctx }
-  1 ctx comp_args_min
+  1 " inputs for `switch`" comp_args_min
   comp_args_get dec { len }
   nil 0 comp_local { val }
   val comp_pop_into_local
@@ -2249,8 +2252,7 @@ fun_comp: case
   }
   ( E: pred -- )
 
-  " inputs for `case`" { ctx }
-  meta cont_meta_inp_len inc ctx comp_args_min
+  meta cont_meta_inp_len inc " inputs for `case`" comp_args_min
   comp_args_get { len }
 
   \ TODO: un-hardcode the numbers.
@@ -3282,11 +3284,9 @@ fun: loop_exit_close { meta ctx -- meta err }
   meta ctx cond_branch_close { meta }
 
   ifz meta CONT_HAS_ELSE and then
-    meta cont_meta_out_len { out_len }
-    meta cont_meta_inp_len { inp_len }
-    if out_len inp_len <> then
-      " loop which consumes and produces different amounts of arguments requires final `else`" throw
-    end
+    meta
+    " loop which consumes and produces different amounts of arguments requires final `else`"
+    cont_meta_validate_len_match
   end
 
   meta

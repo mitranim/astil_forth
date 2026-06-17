@@ -67,10 +67,11 @@ Sources used:
   - Candidate simplification: Forth loop over `ASM_ARG_LEN_MAX` if available and clear.
   - Verdict: simplify. Moved helper after counted loop support and rewrote the explicit x0..x15 list as `ASM_ARG_LEN_MAX -for:`.
 
-- [ ] `forth/lang.af:2024-2162`, `3274-3446`: continuation metadata.
+- [x] `forth/lang.af:2024-2162`, `3274-3446`: continuation metadata.
   - Suspect chunk: packed bitfield helpers and repeated loop-gap handling.
   - Review if metadata format is too clever. Candidate: store loop frame fields on `LOOP_AUX` separately, or factor patching helpers.
   - Keep comments that document current invariants or intended feature limits. Only trim stale repetition.
+  - Verdict: simplify lightly. Kept packed metadata and explanatory loop-gap comments; extracted the duplicated input/output arity equality check shared by conditionals and loops.
 
 - [ ] `forth/lang.af:3463-3664`: counted loops `for`, `+for:`, `-loop:`, `+loop:`.
   - Suspect chunk: repeated `comp_pop_into_local`, `comp_push_from_local`, `comp_barrier`, compare, `comp_args_set`, `cont_meta_with_*`.
