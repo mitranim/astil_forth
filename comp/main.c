@@ -27,6 +27,7 @@ static void print_help() {
     "Flags:\n"
     "\n"
 #ifndef CALL_CONV_STACK
+    "  --slop   -- disable checks of unused locals\n"
     "  --build  -- AOT-compile a Mach-O executable\n"
 #endif // CALL_CONV_STACK
     "  --debug  -- extremely verbose debug logging\n"
@@ -36,6 +37,9 @@ static void print_help() {
     "Env vars:\n"
     "\n"
     "  DEBUG  -- same as `--debug`\n"
+#ifndef CALL_CONV_STACK
+    "  SLOP   -- same as `--slop`\n"
+#endif // CALL_CONV_STACK
     "  TRACE  -- same as `--trace`\n"
     "  TIMING -- same as `--timing`\n"
     "\n"
@@ -82,6 +86,7 @@ static Err main_run(int argc, const char *argv[]) {
 
   Interp interp = {};
   try(interp_init(&interp));
+  try(env_bool("SLOP", &interp.slop));
   try(init_exception_handling());
 
   const auto ceil = argv + argc;
@@ -118,6 +123,9 @@ static Err main_run(int argc, const char *argv[]) {
     bool ok;
 
     try(cli_bool_for("--debug", key, val, &DEBUG, &ok));
+    if (ok) continue;
+
+    try(cli_bool_for("--slop", key, val, &interp.slop, &ok));
     if (ok) continue;
 
     try(cli_bool_for("--trace", key, val, &TRACE, &ok));

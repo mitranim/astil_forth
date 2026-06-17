@@ -20,6 +20,7 @@ SYNC[interp_module_fields].
 typedef struct {
   Reader reader;
   bool   try_all;
+  bool   slop;
 } Module_ctx;
 
 /*
@@ -44,6 +45,7 @@ typedef struct {
   Comp        comp;      // Code and compilation context.
   Interp_snap snap;      // Stable snapshot for rewinding.
   bool        welcomed;  // Already printed REPL help.
+  bool        slop;      // Disable validation of used/unused locals in reg-CC.
 } Interp;
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);

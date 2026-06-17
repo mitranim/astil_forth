@@ -59,7 +59,9 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
   );
 
   comp_sym_beg(&interp->comp, sym);
+
 #ifndef CALL_CONV_STACK
+  interp->comp.ctx.slop = interp->module ? interp->module->slop : interp->slop;
   interp->comp.ctx.try_all = interp->module ? interp->module->try_all : false;
 #endif
   return nullptr;
@@ -83,7 +85,7 @@ static Err intrin_semicolon(Interp *interp) {
 
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
-  comp_sym_end(comp, sym);
+  try(comp_sym_end(comp, sym));
   try(interp_snapshot(interp));
 
   const auto name     = sym->name.buf;

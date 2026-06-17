@@ -87,6 +87,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
   ptr_clear(&ctx->try_all);
+  ptr_clear(&ctx->slop);
 }
 
 // SYNC[comp_ctx_fields].
@@ -117,6 +118,7 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->compiling  = prev->compiling;
   next->has_alloca = prev->has_alloca;
   next->try_all    = prev->try_all;
+  next->slop       = prev->slop;
 
   stack_rewind(&prev->locals, &next->locals);
   dict_trunc((Dict *)&next->local_dict);
@@ -592,11 +594,12 @@ static Err err_dup_param(const char *name) {
 static Err comp_add_input_param(Comp *comp, Word_str name) {
   if (comp_local_get(comp, name.buf)) return err_dup_param(name.buf);
 
-  Local *loc;
-  try(comp_local_add(comp, name, &loc));
-
   U8 reg;
   try(comp_next_inp_param_reg(comp, &reg));
+  if (comp_name_discards(name)) return nullptr;
+
+  Local *loc;
+  try(comp_local_add(comp, name, &loc));
 
   const auto ctx = &comp->ctx;
   const auto arg = &ctx->args[reg];
@@ -885,21 +888,24 @@ TODO needs additional heuristics. Has way too many false positives.
 In addition, the user doesn't always want this. Some of our tests
 and examples use named locals which are intentionally ignored.
 */
-static void comp_warn_unused_locals(Comp_ctx *ctx) {
+static Err comp_check_unused_locals(Comp_ctx *ctx) {
+  if (ctx->slop) return nullptr;
+
   const auto sym = ctx->sym;
   assert_fatal(!!sym);
 
   for (stack_range(auto, loc, &ctx->locals)) {
     if (loc->used) continue;
     if (loc->location != LOC_UNKNOWN) continue;
-    if (loc->name.buf[0] == '_') continue;
 
-    eprintf(
-      "[warning] in " FMT_QUOTED ": unused local " FMT_QUOTED "\n",
+    return errf(
+      "in " FMT_QUOTED ": unused local " FMT_QUOTED,
       sym->name.buf,
       comp_local_name(loc)
     );
   }
+
+  return nullptr;
 }
 
 static const char *loc_fixup_fmt(Loc_fixup *fix) {

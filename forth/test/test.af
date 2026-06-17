@@ -388,34 +388,6 @@ fun: test_cond_input_arity { -- err }
 end
 test_cond_input_arity
 
-fun: switch_empty { val -- out }
-  val switch end
-  val 2 *
-end
-
-fun: test_switch_empty { -- err }
-  T{ 0  switch_empty <T> 0  }T
-  T{ 10 switch_empty <T> 20 }T
-  T{ 20 switch_empty <T> 40 }T
-end
-test_switch_empty
-
-fun: switch_body_only { val -- one two three }
-  -1 -1 { one two }
-  val switch
-    10 { one }
-    20 5 + { two }
-  end
-  one val two
-end
-
-fun: test_switch_body_only { -- err }
-  T{ -1 switch_body_only <T> 10 -1 25 }T
-  T{ 30 switch_body_only <T> 10 30 25 }T
-  T{ 40 switch_body_only <T> 10 40 25 }T
-end
-test_switch_body_only
-
 fun: switch_ret { val -- out }
   val switch
     10 case 100 ret end
@@ -568,23 +540,6 @@ fun: test_switch_output_nested_if { -- err }
 end
 test_switch_output_nested_if
 
-fun: switch_output_body_only { val -- out }
-  val switch val inc end
-end
-
-fun: test_switch_output_body_only { -- err }
-  T{ 10 switch_output_body_only <T> 11 }T
-end
-test_switch_output_body_only
-
-fun: switch_input_empty { val key -- out }
-  val key switch end
-end
-
-fun: switch_input_body { val key -- out0 out1 }
-  val key switch 30 end
-end
-
 fun: switch_input_case { val key -- out0 out1 }
   val key switch
     30 case 40 end
@@ -608,10 +563,6 @@ fun: switch_input_max_case { key -- out }
 end
 
 fun: test_switch_input_arity { -- err }
-  T{ 10 20 switch_input_empty <T> 10 }T
-
-  T{ 10 20 switch_input_body <T> 10 30 }T
-
   T{ 10 20 switch_input_case <T> 10 50 }T
   T{ 10 30 switch_input_case <T> 10 40 }T
 
@@ -2349,6 +2300,44 @@ fun: test_disabling_try_all { -- err } [ false try_all ]
 end
 test_disabling_try_all
 
+fun: test_unused_local_error { -- err } [ false try_all ]
+  import' ./fail/test_unused_local.af
+  " unused local"
+  T_err_contains
+end
+test_unused_local_error
+
+fun: test_discard_param_read { -- err } [ false try_all ]
+  import' ./fail/test_discard_param_read.af
+  " undefined word"
+  T_err_contains
+end
+test_discard_param_read
+
+fun: test_discard_param_push { -- err } [ false try_all ]
+  import' ./fail/test_discard_param_push.af
+  " unable to use discard parameter with `->`"
+  T_err_contains
+end
+test_discard_param_push
+
+fun: test_discard_assign_read { -- err } [ false try_all ]
+  import' ./fail/test_discard_assign_read.af
+  " undefined word"
+  T_err_contains
+end
+test_discard_assign_read
+
+fun: test_named_local_anon_style { (anon_0) -- out } (anon_0) end
+T{ 123 test_named_local_anon_style <T> 123 }T
+
+fun: test_unpopped_anon_local { -- err } [ false try_all ]
+  import' ./fail/test_unpopped_anon_local.af
+  " unused local"
+  T_err_contains
+end
+test_unpopped_anon_local
+
 fun: test_explicit_err_0 { -- err } [ false try_all ]
   test_throw  { err0 }
   " test_err" { err1 }
@@ -2677,6 +2666,41 @@ fun: test_switch_arity_no_default { -- err } [ false try_all ]
 end
 test_switch_arity_no_default
 
+fun: test_switch_no_case_empty { -- err } [ false try_all ]
+  import' ./fail/test_switch_no_case_empty.af
+  " unused local"
+  T_err_contains
+end
+test_switch_no_case_empty
+
+fun: test_switch_no_case_body_only { -- err } [ false try_all ]
+  import' ./fail/test_switch_no_case_body_only.af
+  " unused local"
+  T_err_contains
+end
+test_switch_no_case_body_only
+
+fun: test_switch_no_case_output_body_only { -- err } [ false try_all ]
+  import' ./fail/test_switch_no_case_output_body_only.af
+  " unused local"
+  T_err_contains
+end
+test_switch_no_case_output_body_only
+
+fun: test_switch_no_case_input_empty { -- err } [ false try_all ]
+  import' ./fail/test_switch_no_case_input_empty.af
+  " unused local"
+  T_err_contains
+end
+test_switch_no_case_input_empty
+
+fun: test_switch_no_case_input_body { -- err } [ false try_all ]
+  import' ./fail/test_switch_no_case_input_body.af
+  " unused local"
+  T_err_contains
+end
+test_switch_no_case_input_body
+
 fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN mem_unprot end
 
 fun: test_arena_alloc { -- err }
@@ -2799,8 +2823,6 @@ fun: main_run { -- err }
   test_to_stack_variadic
   test_stack_braces
   test_conditionals
-  test_switch_empty
-  test_switch_body_only
   test_switch_ret
   test_switch_assign
   test_switch_inner_statements
@@ -2809,7 +2831,6 @@ fun: main_run { -- err }
   test_switch_output_one
   test_switch_output_two
   test_switch_output_nested_if
-  test_switch_output_body_only
   test_recursion
   test_recur_with_err
   test_indirect_forward
@@ -2908,6 +2929,7 @@ fun: main_run { -- err }
   \ test_has_err_not_auto_marked          \ interp-only
   \ test_has_err_not_contagious           \ interp-only
   \ test_file_throw_import_catch          \ interp-only
+  \ test_discard_param_push               \ interp-only
   \ test_throw_requires_err               \ interp-only
   \ test_too_many_input_regs              \ interp-only
   \ test_too_many_output_regs             \ interp-only
@@ -2915,6 +2937,11 @@ fun: main_run { -- err }
   \ test_too_many_comptime_arg_regs       \ interp-only
   \ test_too_many_execute_raw_args        \ interp-only
   \ test_comptime_stack_underflow         \ interp-only
+  \ test_switch_no_case_empty             \ interp-only
+  \ test_switch_no_case_body_only         \ interp-only
+  \ test_switch_no_case_output_body_only  \ interp-only
+  \ test_switch_no_case_input_empty       \ interp-only
+  \ test_switch_no_case_input_body        \ interp-only
   test_arena_alloc
   test_arena_trunc
   test_arena_deinit

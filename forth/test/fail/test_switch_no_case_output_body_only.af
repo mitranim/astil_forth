@@ -1,0 +1,7 @@
+\ Must fail to compile.
+\ This currently fails via no-unused-locals validation, not a switch-specific
+\ contract. Switch with no case is useless, but language needn't promise this
+\ exact diagnostic forever.
+fun: test_switch_no_case_output_body_only_fail { val -- out }
+  val switch val inc end
+end

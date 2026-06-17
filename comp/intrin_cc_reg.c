@@ -12,6 +12,12 @@ static Err err_redundant_param(const char *name, const char *infix) {
   );
 }
 
+static Err err_discard_param_push(const char *name) {
+  return errf(
+    "in " FMT_QUOTED ": unable to use discard parameter with `->`", name
+  );
+}
+
 /*
 The braces immediately following `: <name>` are used for parameters,
 while the braces anywhere else are used for assignments.
@@ -31,6 +37,7 @@ static Err interp_parse_params(Interp *interp) {
   const auto comp = &interp->comp;
 
   bool push_inps = false;
+  bool discard   = false;
 
   for (;;) {
     try(read_valid_word(read, &word));
@@ -43,6 +50,7 @@ static Err interp_parse_params(Interp *interp) {
       break;
     }
 
+    if (comp_name_discards(word)) discard = true;
     try(comp_add_input_param(comp, word));
   }
 
@@ -69,9 +77,13 @@ static Err interp_parse_params(Interp *interp) {
   }
 
   if (push_inps) {
+    if (discard) return err_discard_param_push(sym->name.buf);
+
     comp->ctx.arg_len = sym->inp_len;
+
     for (U8 ind = 0; ind < sym->inp_len; ind++) {
-      comp->ctx.args[ind].loc->used = true;
+      const auto loc = comp->ctx.args[ind].loc;
+      if (loc) loc->used = true;
     }
   }
   return nullptr;
@@ -127,6 +139,12 @@ static Err intrin_brace(Interp *interp) {
   if (discard >= 0) {
     while (loc_len) {
       loc_len--; // Doing this in condition check triggers UB traps.
+
+      if (comp_name_discards(names[loc_len])) {
+        ctx->arg_len--;
+        continue;
+      }
+
       Local *loc;
       try(comp_local_get_or_make(comp, names[loc_len], &loc));
       try(comp_assign_local_from_reg(comp, loc, ctx->arg_len - 1));
@@ -137,6 +155,7 @@ static Err intrin_brace(Interp *interp) {
   }
 
   for (U8 ind = 0; ind < loc_len; ind++) {
+    if (comp_name_discards(names[ind])) continue;
     Local *loc;
     try(comp_local_get_or_make(comp, names[ind], &loc));
     try(comp_assign_local_from_reg(comp, loc, ind));

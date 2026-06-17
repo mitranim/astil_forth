@@ -23,9 +23,18 @@ static Err err_internal_dup_local(const char *name) {
   return errf("internal error: duplicate local name " FMT_QUOTED, name);
 }
 
+static bool comp_name_discards(Word_str name) {
+  return name.len > 0 && name.buf[0] == '_';
+}
+
+static Err err_discard_local(const char *name) {
+  return errf("unable to create discard local " FMT_QUOTED, name);
+}
+
 static Err comp_local_add(Comp *comp, Word_str word, Local **out) {
   const auto dict = &comp->ctx.local_dict;
   const auto name = word.buf;
+  if (comp_name_discards(word)) return err_discard_local(name);
   if (dict_has(dict, name)) return err_internal_dup_local(name);
 
   const auto loc = stack_push(&comp->ctx.locals, (Local){.name = word});
@@ -39,6 +48,8 @@ static Local *comp_local_get(Comp *comp, const char *name) {
 }
 
 static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
+  if (comp_name_discards(name)) return err_discard_local(name.buf);
+
   auto loc = comp_local_get(comp, name.buf);
   if (loc) {
     if (out) *out = loc;
@@ -50,7 +61,7 @@ static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
 static Local *comp_local_anon(Comp *comp) {
   const auto ctx = &comp->ctx;
   const auto loc = stack_push(&ctx->locals, (Local){});
-  str_fmt(&loc->name, "_anon_" FMT_IND, ctx->anon_locs++);
+  str_fmt(&loc->name, "(anon_" FMT_IND ")", ctx->anon_locs++);
   return loc;
 }
 
@@ -350,15 +361,16 @@ static void comp_sym_beg(Comp *comp, Sym *sym) {
   asm_sym_beg(comp, sym);
 }
 
-static void comp_sym_end(Comp *comp, Sym *sym) {
+static Err comp_sym_end(Comp *comp, Sym *sym) {
   asm_sym_end(comp, sym);
   sym_auto_inlinable(sym);
 
 #ifndef CALL_CONV_STACK
-  comp_warn_unused_locals(&comp->ctx);
+  try(comp_check_unused_locals(&comp->ctx));
 #endif
 
   comp_ctx_trunc(&comp->ctx);
+  return nullptr;
 }
 
 /*

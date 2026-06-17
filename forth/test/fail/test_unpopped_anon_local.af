@@ -1,0 +1,3 @@
+\ Must fail to compile.
+fun_comp: make_unpopped_anon { } nil 0 comp_local { -- } end
+fun: test_unpopped_anon_local_fail { } make_unpopped_anon end

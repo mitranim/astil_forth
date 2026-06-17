@@ -1,0 +1,2 @@
+\ Must fail to compile.
+fun: test_discard_param_read_fail { _val -- out } _val end

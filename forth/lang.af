@@ -2645,6 +2645,7 @@ end
 struct: Interp_module_ctx
   Interp_reader 1 field: Interp_module_reader
   U8            1 field: Interp_module_try_all
+  U8            1 field: Interp_module_slop
 end
 
 \ SYNC[reg_imm_fields].
@@ -2707,6 +2708,7 @@ struct: Interp_comp_ctx
   U8          1 field: Interp_comp_ctx_compiling
   U8          1 field: Interp_comp_ctx_has_alloca
   U8          1 field: Interp_comp_ctx_try_all
+  U8          1 field: Interp_comp_ctx_slop
 end
 
 \ SYNC[comp_fields].
@@ -2735,6 +2737,7 @@ struct: Interp
   Interp_comp 1 field: Interp_comp_field
   Interp_snap 1 field: Interp_snap_field
   U8          1 field: Interp_welcomed
+  U8          1 field: Interp_slop
 end
 
 \ ## Constant folding
@@ -3929,9 +3932,10 @@ fun_comp: >>s { -- err } ( E: …args… stack -- )
   end
 
   arg_len dec { len }
+  ifz len then 0 comp_args_set ret end
+
   nil 0 comp_local { stk }
   stk comp_pop_into_local
-  ifz len then ret end
 
   if arg_len ASM_ARG_LEN_MAX >= then
     " unable to use `>>s`: not enough scratch registers" throw

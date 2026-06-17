@@ -402,6 +402,7 @@ static Err interp_eval(Interp *interp, const char *src) {
   next.reader     = (Reader){.src = src, .len = len, .path = "<eval>"};
 
   Module_ctx *prev     = interp->module;
+  next.slop            = prev ? prev->slop : interp->slop;
   interp->module       = &next;
   defer interp->module = prev;
 
@@ -538,6 +539,7 @@ static Err interp_import(Interp *interp, const char *path) {
   const auto prev_path = prev ? prev->reader.path : nullptr;
   const auto prev_tty  = prev && prev->reader.tty;
   Module_ctx next      = {};
+  next.slop            = prev ? prev->slop : interp->slop;
   interp->module       = &next;
   defer interp->module = prev;
 
