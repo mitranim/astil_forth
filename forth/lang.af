@@ -729,12 +729,19 @@ fun: asm_mov_reg { Xd Xm -- instr }
   0b1_01_01010_00_0_00000_000000_11111_00000 or
 end
 
-\ Immediate must be unsigned and within range.
-fun: asm_mov_imm { Xd imm -- instr }
-  imm 5 lsl
-  Xd or
-  0b1_10_100101_00_0000000000000000_00000 or
+\ movn/movz/movk Xd, #imm16, lsl #hw*16
+fun: asm_mov_wide { Xd opc hw imm16 -- instr }
+  opc   29 lsl { opc }
+  hw    21 lsl { hw }
+  imm16 5  lsl
+  opc      or
+  hw       or
+  Xd       or
+  0b1_00_100101_00_0000000000000000_00000 or
 end
+
+\ Immediate must be unsigned and within range.
+fun: asm_mov_imm { Xd imm -- instr } Xd 0b10 0 imm asm_mov_wide end
 
 \ mvn Xd, Xm
 fun: asm_mvn { Xd Xm -- instr }

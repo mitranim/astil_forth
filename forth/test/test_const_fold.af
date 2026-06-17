@@ -40,14 +40,6 @@ fun: cf_expect_word { XT -- err }
   end
 end
 
-fun: cf_asm_mov_wide { reg opc hw imm16 -- instr }
-  0b1_00_100101_00_0000000000000000_00000
-  opc 29 lsl or
-  hw 21 lsl or
-  imm16 5 lsl or
-  reg or
-end
-
 fun: cf_imm_lane { imm hw -- lane }
   imm hw 16 * lsr 0xffff and
 end
@@ -65,7 +57,7 @@ fun: cf_expect_movk_if { reg neg base_hw hw bits }
   if hw base_hw <> then
     if lane then
       if neg then lane invert 0xffff and else lane end { imm16 }
-      reg 0b11 hw imm16 cf_asm_mov_wide cf_expect_instr
+      reg 0b11 hw imm16 asm_mov_wide cf_expect_instr
     end
   end
 end
@@ -77,7 +69,7 @@ fun: cf_expect_load { reg imm }
 
   bits cf_base_hw { hw }
   bits hw cf_imm_lane { imm16 }
-  reg opc hw imm16 cf_asm_mov_wide cf_expect_instr
+  reg opc hw imm16 asm_mov_wide cf_expect_instr
 
   reg neg hw 0 bits cf_expect_movk_if
   reg neg hw 1 bits cf_expect_movk_if
