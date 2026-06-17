@@ -180,6 +180,7 @@ static Err intrin_ret(Interp *interp) {
   const auto comp = &interp->comp;
   try(comp_before_append_ret(comp));
   try(comp_append_ret(comp));
+  comp->ctx.arg_len = 0;
   return nullptr;
 }
 

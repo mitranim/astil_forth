@@ -116,9 +116,10 @@ Sources used:
   - Review whether helpers reduce duplication enough. Maybe one validator with `requested_count` flag.
   - Verdict: simplify lightly. Kept separate reg/count validators because they encode different bounds and callsite intent, but merged duplicate input/output parameter error formatting.
 
-- [ ] `comp/comp.c:430-444`, `comp/intrin_cc_reg.c:186-200`: return now clears args in `comp_append_ret`.
+- [x] `comp/comp.c:430-444`, `comp/intrin_cc_reg.c:186-200`: return now clears args in `comp_append_ret`.
   - Suspect chunk: behavior moved from intrinsic into shared compiler function under `#ifndef CALL_CONV_STACK`.
   - Review if this conditional belongs in CC-specific layer, not shared `comp.c`.
+  - Verdict: simplify boundary. Moved register-CC arg clearing back into `intrin_ret`; shared `comp_append_ret` now only appends the return fixup again.
 
 ## Phase 4: Reader / Parsing
 

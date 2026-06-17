@@ -438,10 +438,6 @@ static Err comp_append_ret(Comp *comp) {
       .ret  = asm_append_breakpoint(comp, ASM_CODE_RET),
     }
   );
-
-#ifndef CALL_CONV_STACK
-  comp->ctx.arg_len = 0;
-#endif
   return nullptr;
 }
 
