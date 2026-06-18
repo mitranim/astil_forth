@@ -3107,21 +3107,21 @@ fun: drop { -- err } STACK stack_drop_cell end
 fun_comp: swap { -- err }
   2 " for `swap`" comp_args_min
 
-  comp_args_get          { arg_len }
-  arg_len dec            { reg1 }
-  reg1 dec               { reg0 }
+  \ In-place swap without scratch regs.
+  comp_args_get dec { reg1 }
+  reg1 dec          { reg0 }
+  reg0 reg0 reg1 asm_eor_reg comp_instr
+  reg1 reg1 reg0 asm_eor_reg comp_instr
+  reg0 reg0 reg1 asm_eor_reg comp_instr
+
+  \ Update compiler's knowledge about what we did.
   reg0 comp_arg          { arg0 }
   reg1 comp_arg          { arg1 }
   Interp_comp_arg sizeof { size }
   STACK stack_top        { top }
-
   top  arg0 size memcpy
   arg0 arg1 size memcpy
   arg1 top  size memcpy
-  reg0 reg0 reg1 asm_eor_reg comp_instr
-  reg1 reg1 reg0 asm_eor_reg comp_instr
-  reg0 reg0 reg1 asm_eor_reg comp_instr
-  arg_len comp_args_set
 end
 
 fun: swap { -- err } STACK stack_top -cell -cell { top } top @2 swap top !2 end
