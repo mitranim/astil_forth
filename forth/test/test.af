@@ -2344,9 +2344,13 @@ fun: test_discard_param_read { -- err } [ false try_all ]
 end
 test_discard_param_read
 
+fun: discard_param_push_suffix { val _ignored -> out } end
+
 fun: test_discard_param_push { -- err } [ false try_all ]
+  T{ 10 20 discard_param_push_suffix <T> 10 }T
+
   import' ./fail/test_discard_param_push.af
-  " unable to use discard parameter with `->`"
+  " unable to use non-trailing discard parameter with `->`"
   T_err_contains
 end
 test_discard_param_push

@@ -12,9 +12,11 @@ static Err err_redundant_param(const char *name, const char *infix) {
   );
 }
 
-static Err err_discard_param_push(const char *name) {
+static Err err_non_trailing_discard_param_push(const char *name) {
   return errf(
-    "in " FMT_QUOTED ": unable to use discard parameter with `->`", name
+    "in " FMT_QUOTED
+    ": unable to use non-trailing discard parameter with `->`",
+    name
   );
 }
 
@@ -36,8 +38,8 @@ static Err interp_parse_params(Interp *interp) {
 
   const auto comp = &interp->comp;
 
-  bool push_inps = false;
-  bool discard   = false;
+  bool push_inps            = false;
+  S8   trailing_discard_len = 0;
 
   for (;;) {
     try(read_valid_word(read, &word));
@@ -50,7 +52,12 @@ static Err interp_parse_params(Interp *interp) {
       break;
     }
 
-    if (comp_name_discards(word)) discard = true;
+    if (comp_name_discards(word) && trailing_discard_len >= 0) {
+      trailing_discard_len++;
+    }
+    else {
+      trailing_discard_len = trailing_discard_len ? -1 : 0;
+    }
     try(comp_add_input_param(comp, word));
   }
 
@@ -73,11 +80,14 @@ static Err interp_parse_params(Interp *interp) {
   }
 
   if (push_inps) {
-    if (discard) return err_discard_param_push(sym->name.buf);
+    if (trailing_discard_len < 0) {
+      return err_non_trailing_discard_param_push(sym->name.buf);
+    }
 
-    comp->ctx.arg_len = sym->inp_len;
+    const U8 arg_len = sym->inp_len - (U8)trailing_discard_len;
+    comp->ctx.arg_len = arg_len;
 
-    for (U8 ind = 0; ind < sym->inp_len; ind++) {
+    for (U8 ind = 0; ind < arg_len; ind++) {
       const auto loc = comp->ctx.args[ind].loc;
       if (loc) loc->used = true;
     }

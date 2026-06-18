@@ -1,2 +1,2 @@
 \ Must fail to compile.
-fun: test_discard_param_push_fail { _val -> out } inc end
+fun: test_discard_param_push_fail { _val val -> out } val end
