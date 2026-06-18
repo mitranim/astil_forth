@@ -8,12 +8,12 @@ import' std:lang.af
 \ x16 = 4 -> XNU write syscall.
 \
 \ Inspired by Cosmopolitan Libc: https://justine.lol/cosmopolitan.
-fun: sys_write { fdes str len } [
+fun: sys_write { _fdes _str _len } [
   0                comp_realloc_reg \ x0 clobber = kernel return value.
   8                comp_realloc_reg \ x8 clobber = Linux sysno.
-  8 64 asm_mov_imm comp_instr           \ mov x8, 64
-  16 4 asm_mov_imm comp_instr           \ mov x16, 4
-       asm_svc     comp_instr           \ svc 666
+  8 64 asm_mov_imm comp_instr       \ mov x8, 64
+  16 4 asm_mov_imm comp_instr       \ mov x16, 4
+       asm_svc     comp_instr       \ svc 666
 ] end
 
 flush

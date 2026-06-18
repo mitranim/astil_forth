@@ -4,7 +4,7 @@ import' std:pthread.af
 
 \ Passed to `pthread_spawn` by raw instruction address.
 \ We have no hidden adapters between Forth and libc.
-fun: callback { ignored -- err }
+fun: callback { _ignored -- err }
   " [child] running; returning error" log lf
   " mock_error"
 end

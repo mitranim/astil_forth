@@ -1281,7 +1281,9 @@ fun_comp: slot { -- err } ( E: -- adr ) execute'' CELL execute'' alloca end
 fun_comp: >slot { -- err } ( E: val -- adr )
   execute'' slot
   compile'  !
-  comp_args_get inc comp_args_set
+  0 comp_realloc_reg
+  0 1 asm_mov_reg comp_instr \ mov x0, x1
+  1 comp_args_set
 end
 
 \ ## Stacks
