@@ -107,11 +107,13 @@ fun: test_stack_primitives { -- err }
 
   20 stk >s
   30 stk >s
-  T{ stk stack_len_cells <T> 2  }T
-  T{ stk s>              <T> 30 }T
-  T{ stk stack_len_cells <T> 1  }T
-  T{ stk s>              <T> 20 }T
-  T{ stk stack_len_cells <T> 0  }T
+  T{ stk stack_len_cells            <T> 2  }T
+  T{ 0 CELL -        stk stack_rel@ <T> 30 }T
+  T{ 0 CELL - CELL - stk stack_rel@ <T> 20 }T
+  T{ stk s>                         <T> 30 }T
+  T{ stk stack_len_cells            <T> 1  }T
+  T{ stk s>                         <T> 20 }T
+  T{ stk stack_len_cells            <T> 0  }T
 
   stk stack_deinit
 end
@@ -1672,6 +1674,43 @@ fun: test_bit_len { -- err }
 end
 test_bit_len
 
+fun: test_bit_counts { -- err }
+  T{ 0 bit_clz <T> 64 }T
+  T{ 1 bit_clz <T> 63 }T
+  T{ 0b1000000000000000000000000000000000000000000000000000000000000000 bit_clz <T> 0 }T
+
+  T{ 0 bit_ctz <T> 64 }T
+  T{ 1 bit_ctz <T> 0  }T
+  T{ 8 bit_ctz <T> 3  }T
+  T{ 0b1000000000000000000000000000000000000000000000000000000000000000 bit_ctz <T> 63 }T
+end
+test_bit_counts
+
+fun: test_bit_masks { -- err }
+  T{ 0b1001000110100 0b111111110000 bit_mask_get <T> 0b100011 }T
+  T{ 0b1001000110100 0b11110000 bit_mask_unset <T> 0b1001000000100 }T
+  T{ 0b10101011 0b1001000110100 0b111111110000 bit_mask_set <T> 0b1101010110100 }T
+  T{ 0b0 0b1001000110100 0b111111110000 bit_mask_set <T> 0b1000000000100 }T
+  T{ 99 0b10101011 0b1001000110100 0b111111110000 bit_mask_set <T> 99 0b1101010110100 }T
+end
+test_bit_masks
+
+fun: test_asm_new_bits { -- err }
+  T{ 2 3 4 asm_bic  <T> 0b10001010001001000000000001100010 }T
+  T{ 2 3 asm_rbit <T> 0b11011010110000000000000001100010 }T
+  T{ 2 3 asm_clz  <T> 0b11011010110000000001000001100010 }T
+  T{ 2 3 asm_ctz  <T> 0b11011010110000000001100001100010 }T
+end
+test_asm_new_bits
+
+fun: test_asm_cmp_branch { -- err }
+  T{ 1 8 0 asm_cmp_branch <T> 0b10110100000000000000000001000001 }T
+  T{ 1 8 1 asm_cmp_branch <T> 0b10110101000000000000000001000001 }T
+  T{ 1 8 asm_cmp_branch_zero     <T> 0b10110100000000000000000001000001 }T
+  T{ 1 8 asm_cmp_branch_not_zero <T> 0b10110101000000000000000001000001 }T
+end
+test_asm_cmp_branch
+
 fun: test_cstr_eq { -- err }
   T{ nil           nil    cstr= <T> true  }T
   T{ nil           " one" cstr= <T> false }T
@@ -2911,6 +2950,10 @@ fun: main_run { -- err }
   test_max
   test_umax
   test_bit_len
+  test_bit_counts
+  test_bit_masks
+  test_asm_new_bits
+  test_asm_cmp_branch
   test_cstr_eq
   test_cstr_less
   test_int_to_cell

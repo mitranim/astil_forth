@@ -509,6 +509,11 @@ fun: asm_and_reg { Xd Xn Xm -> instr }
   asm_pattern_arith_reg 0b1_00_01010_00_0_00000_000000_00000_00000 or
 end
 
+\ bic Xd, Xn, Xm
+fun: asm_bic { Xd Xn Xm -> instr }
+  asm_pattern_arith_reg 0b1_00_01010_00_1_00000_000000_00000_00000 or
+end
+
 \ and Xd, Xn, #encoded_imm
 \
 \ Caller must pre-encode the immediate into the mask.
@@ -607,15 +612,17 @@ fun: asm_branch_cond { off19 cond -- instr }
   cond or 0b010_101_00_0000000000000000000_0_0000 or
 end
 
-\ cbz x1, <off>
-fun: asm_cmp_branch_zero { Xt off19 -> instr }
-  asm_pattern_cmp_branch 0b1_011010_0_0000000000000000000_00000 or
+fun: asm_cmp_branch { Xt off19 not_zero -- instr }
+  not_zero <>0 24 lsl { op_mask }
+  Xt off19 asm_pattern_cmp_branch op_mask or
+  0b1_011010_0_0000000000000000000_00000 or
 end
 
+\ cbz x1, <off>
+fun: asm_cmp_branch_zero { Xt off19 -> instr } 0 asm_cmp_branch end
+
 \ cbnz x1, <off>
-fun: asm_cmp_branch_not_zero { Xt off19 -> instr }
-  asm_pattern_cmp_branch 0b1_011010_1_0000000000000000000_00000 or
-end
+fun: asm_cmp_branch_not_zero { Xt off19 -> instr } 1 asm_cmp_branch end
 
 \ Not supported on M3 Pro.
 \ cb.<cond> Xt, #imm6, #off9
@@ -660,6 +667,17 @@ end
 \ clz Xd, Xn
 fun: asm_clz { Xd Xn -- instr }
   Xn 5 lsl Xd or 0b1_1_0_11010110_00000_00010_0_00000_00000 or
+end
+
+\ Requires Arm64 `FEAT_CSSC`; not supported on M3 Pro.
+\ ctz Xd, Xn
+fun: asm_ctz { Xd Xn -- instr }
+  Xn 5 lsl Xd or 0b1_1_0_11010110_00000_000110_00000_00000 or
+end
+
+\ rbit Xd, Xn
+fun: asm_rbit { Xd Xn -- instr }
+  Xn 5 lsl Xd or 0b1_1_0_11010110_00000_00000_0_00000_00000 or
 end
 
 \ TODO: support shift.
@@ -914,13 +932,33 @@ end
 
 fun: umax { i0 i1 -> i0|i1 } umax end
 
+\ "count leading zeros" (in high bits)
+fun_comp: bit_clz { -- err }
+  comp_args1_reg { reg }
+  reg reg asm_clz comp_instr \ neg Xd, Xn
+end
+
+fun: bit_clz { num -> bool } bit_clz end
+
+\ "count trailing zeros" (in low bits)
+\
+\ Fallback version of `ctz Xd, Xn` for chips without `ctz`.
+fun_comp: bit_ctz { -- err }
+  comp_args1_reg { reg }
+  reg reg asm_rbit comp_instr \ rbit Xd, Xn
+  reg reg asm_clz  comp_instr \ clz Xd, Xd
+end
+
+fun: bit_ctz { num -> bool } bit_ctz end
+
+\ 1-based index of the highest bit.
 fun_comp: bit_len { -- err }
-  comp_args1_reg     { reg }
+  comp_args1_reg      { reg }
   comp_alloc_next_reg { tmp }
   reg reg     asm_clz     comp_instr \ clz Xd, Xn
   tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
   reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
-  reg inc comp_args_set
+  tmp comp_args_set
 end
 
 fun: bit_len { val -> len } bit_len end
@@ -965,6 +1003,52 @@ end
 
 \ Chooses a non-zero value, preferring the second input.
 fun: fallback { one two -> fallback } fallback end
+
+fun_comp: bit_mask_unset { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_bic comp_instr \ bic Xd, Xn, Xm
+  reg1 comp_args_set
+end
+
+fun: bit_mask_unset { src mask -> out } bit_mask_unset end
+
+\ Gets bits according to mask and returns them in low bits.
+\ The mask must be nonzero and contiguous.
+fun_comp: bit_mask_get { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
+  reg1 reg1      asm_rbit    comp_instr \ rbit Xd, Xn
+  reg1 reg1      asm_clz     comp_instr \ clz Xd, Xn
+  reg0 reg0 reg1 asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
+  reg1 comp_args_set
+end
+
+fun: bit_mask_get { src mask -> out } bit_mask_get end
+
+\ Sets bits according to the mask.
+\ The input value must be in low bits.
+\ The mask must be nonzero and contiguous.
+fun_comp: bit_mask_set { -- err }
+  3 nil comp_args_min
+  comp_args_get dec { mask }
+  mask dec          { src  }
+  src  dec          { inp  }
+
+  inp  comp_realloc_reg
+  src  comp_realloc_reg
+  mask comp_realloc_reg
+  comp_alloc_next_reg { shift }
+
+  src   src   mask  asm_bic     comp_instr \ bic Xd, Xn, Xm
+  shift mask        asm_rbit    comp_instr \ rbit Xd, Xn
+  shift shift       asm_clz     comp_instr \ clz Xd, Xn
+  inp   inp   shift asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
+  inp   inp   mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
+  inp   inp   src   asm_orr_reg comp_instr \ orr Xd, Xn, Xm
+  inp inc comp_args_set
+end
+
+fun: bit_mask_set { inp src mask -> out } bit_mask_set end
 
 8 let: CELL
 
@@ -1015,10 +1099,8 @@ fun: asm_adr { Xd imm21 -- instr }
   0b0_00_100_00_0000000000000000000_00000 or
 end
 
-\ br Xn
 fun: asm_branch_to_reg { Xn -> instr }
-  5 lsl
-  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 or
+  5 lsl 0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 or \ br Xn
 end
 
 \ bl imm26
@@ -1029,12 +1111,9 @@ fun: asm_branch_link_off { imm26 -> instr }
   0b100_101_00000000000000000000000000 or
 end
 
-\ blr Xn
-\
 \ Requires caution to avoid messing up the link register.
 fun: asm_branch_link_reg { Xn -> instr }
-  5 lsl
-  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or
+  5 lsl 0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or \ blr Xn
 end
 
 \ orr Xd, Xn, #(1 << bit)
@@ -1362,6 +1441,8 @@ fun: asm_stack_top_store { out stack -> instr }
 end
 
 fun: stack@ { stack -> val } stack_top -cell @ end
+
+fun: stack_rel@ { ind stack -- val } stack stack_top ind + @ end
 
 fun: stack_top! { _top _stack } [
   0 comp_realloc_reg
@@ -2669,6 +2750,13 @@ fun: comp_top_arg_regs2 { -- reg0 reg1 err }
   reg1 dec reg1
 end
 
+fun: comp_top_arg_regs3 { -- reg0 reg1 reg2 err }
+  3 nil comp_args_min
+  comp_args_get dec { reg2 }
+  reg2 dec { reg1 }
+  reg1 dec reg1 reg2
+end
+
 fun: comp_arg_imm_floor { val -> floor }
   Interp_comp_arg_imm_field Interp_reg_imm_floor @u32
 end
@@ -2706,6 +2794,16 @@ fun: cf_args_contiguous { arg0 arg1 -- ok }
   code_len ceil1 = ceil0 floor1 = and
 end
 
+fun: cf_args_contiguous3 { arg0 arg1 arg2 -- ok }
+  comp_code_len           { code_len }
+  arg0 comp_arg_imm_ceil  { ceil0 }
+  arg1 comp_arg_imm_floor { floor1 }
+  arg1 comp_arg_imm_ceil  { ceil1 }
+  arg2 comp_arg_imm_floor { floor2 }
+  arg2 comp_arg_imm_ceil  { ceil2 }
+  code_len ceil2 = ceil1 floor2 = and ceil0 floor1 = and
+end
+
 fun: cf_rewind_to_before_arg { arg }
   comp_writable_instrs { instrs }
   arg comp_arg_imm_floor instrs Interp_list_len !32
@@ -2722,13 +2820,27 @@ fun: cf_foldables2 { reg0 reg1 -- arg0 arg1 imm0 imm1 ok err }
   arg1 cf_arg_foldable_imm { imm1 ok1 }
 
   if ok0 ok1 and then
-    arg0 arg1 cf_args_contiguous { contiguous }
-    if contiguous then
-      arg0 arg1 imm0 imm1 true ret
-    end
+    if arg0 arg1 cf_args_contiguous then arg0 arg1 imm0 imm1 true ret end
   end
 
   0 0 0 0 false
+end
+
+fun: cf_foldables3 { reg0 reg1 reg2 -- arg0 arg1 arg2 imm0 imm1 imm2 ok err }
+  reg0 comp_arg            { arg0 }
+  reg1 comp_arg            { arg1 }
+  reg2 comp_arg            { arg2 }
+  arg0 cf_arg_foldable_imm { imm0 ok0 }
+  arg1 cf_arg_foldable_imm { imm1 ok1 }
+  arg2 cf_arg_foldable_imm { imm2 ok2 }
+
+  if ok0 ok1 ok2 and and then
+    if arg0 arg1 arg2 cf_args_contiguous3 then
+      arg0 arg1 arg2 imm0 imm1 imm2 true ret
+    end
+  end
+
+  0 0 0 0 0 0 false
 end
 
 fun: cf_fold_cleared1 { -- reg imm ok err }
@@ -2736,9 +2848,9 @@ fun: cf_fold_cleared1 { -- reg imm ok err }
   comp_args_get dec { reg }
 
   reg comp_arg { arg }
-  arg cf_arg_foldable_imm { imm foldable }
+  arg cf_arg_foldable_imm { imm ok }
 
-  ifz foldable then reg 0 false ret end
+  ifz ok then reg 0 false ret end
   ifz arg cf_arg_current then reg 0 false ret end
 
   arg cf_rewind_to_before_arg
@@ -2766,6 +2878,18 @@ fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
   arg0 cf_arg_clear
   arg1 cf_arg_clear
   reg0 reg1 imm0 imm1 true
+end
+
+fun: cf_fold_cleared3 { -- reg imm0 imm1 imm2 ok err }
+  comp_top_arg_regs3           { reg0 reg1 reg2 }
+  reg0 reg1 reg2 cf_foldables3 { arg0 arg1 arg2 imm0 imm1 imm2 ok }
+
+  ifz ok then 0 0 0 0 false ret end
+  arg0 cf_rewind_to_before_arg
+  arg0 cf_arg_clear
+  arg1 cf_arg_clear
+  arg2 cf_arg_clear
+  reg0 imm0 imm1 imm2 true
 end
 
 fun: cf_fold_done { reg imm -- err }
@@ -2832,11 +2956,13 @@ fun_comp: umod { -- err } [ redefine ]
 end
 
 fun_comp: /mod { -- err } [ redefine ]
-  if cf_fold_cleared2_keep2 then /mod cf_fold_done2 else { -- } execute'' /mod end
+  if cf_fold_cleared2_keep2 then /mod cf_fold_done2
+  else { -- } execute'' /mod end
 end
 
 fun_comp: u/mod { -- err } [ redefine ]
-  if cf_fold_cleared2_keep2 then u/mod cf_fold_done2 else { -- } execute'' u/mod end
+  if cf_fold_cleared2_keep2 then u/mod cf_fold_done2
+  else { -- } execute'' u/mod end
 end
 
 fun_comp: inc { -- err } [ redefine ]
@@ -2857,6 +2983,14 @@ end
 
 fun_comp: abs { -- err } [ redefine ]
   if cf_fold_cleared1 then abs cf_fold_done else { -- } execute'' abs end
+end
+
+fun_comp: bit_clz { -- err } [ redefine ]
+  if cf_fold_cleared1 then bit_clz cf_fold_done else { -- } execute'' bit_clz end
+end
+
+fun_comp: bit_ctz { -- err } [ redefine ]
+  if cf_fold_cleared1 then bit_ctz cf_fold_done else { -- } execute'' bit_ctz end
 end
 
 fun_comp: bit_len { -- err } [ redefine ]
@@ -2880,7 +3014,8 @@ fun_comp: umax { -- err } [ redefine ]
 end
 
 fun_comp: int_to_cell { -- err } [ redefine ]
-  if cf_fold_cleared1 then int_to_cell cf_fold_done else { -- } execute'' int_to_cell end
+  if cf_fold_cleared1 then int_to_cell cf_fold_done
+  else { -- } execute'' int_to_cell end
 end
 
 fun_comp: =0 { -- err } [ redefine ]
@@ -2968,15 +3103,33 @@ fun_comp: odd { -- err } [ redefine ]
 end
 
 fun_comp: align_down { -- err } [ redefine ]
-  if cf_fold_cleared2 then align_down cf_fold_done else { -- } execute'' align_down end
+  if cf_fold_cleared2 then align_down cf_fold_done
+  else { -- } execute'' align_down end
 end
 
 fun_comp: align_up { -- err } [ redefine ]
-  if cf_fold_cleared2 then align_up cf_fold_done else { -- } execute'' align_up end
+  if cf_fold_cleared2 then align_up cf_fold_done
+  else { -- } execute'' align_up end
 end
 
 fun_comp: fallback { -- err } [ redefine ]
-  if cf_fold_cleared2 then fallback cf_fold_done else { -- } execute'' fallback end
+  if cf_fold_cleared2 then fallback cf_fold_done
+  else { -- } execute'' fallback end
+end
+
+fun_comp: bit_mask_unset { -- err } [ redefine ]
+  if cf_fold_cleared2 then bit_mask_unset cf_fold_done
+  else { -- } execute'' bit_mask_unset end
+end
+
+fun_comp: bit_mask_get { -- err } [ redefine ]
+  if cf_fold_cleared2 then bit_mask_get cf_fold_done
+  else { -- } execute'' bit_mask_get end
+end
+
+fun_comp: bit_mask_set { -- err } [ redefine ]
+  if cf_fold_cleared3 then bit_mask_set cf_fold_done
+  else { -- } execute'' bit_mask_set end
 end
 
 \ ## Stack manipulation continued
