@@ -288,7 +288,8 @@ contexts:
     - match: '{{word_begin}}(?:--|->){{word_end}}'
       scope: punctuation.separator.astil_forth
       set: braces-params-output-pop
-    - include: braces-param-match
+    - match: '{{word_begin}}{{braces_param}}{{word_end}}'
+      scope: variable.parameter.astil_forth
     - include: nonblank-pop
 
   braces-params-output-pop:
@@ -296,18 +297,9 @@ contexts:
       scope: punctuation.separator.astil_forth
     - match: '{{word_begin}}err{{word_end}}(?=\s+})'
       scope: variable.parameter.astil_forth storage.modifier.astil_forth
-    - include: braces-param-match
-    - include: nonblank-pop
-
-  # Used only for input parameters.
-  braces-param-match:
     - match: '{{word_begin}}{{braces_param}}{{word_end}}'
       scope: variable.parameter.astil_forth
-
-  # Used for output parameters, which are not actually declared in scope.
-  braces-other-match:
-    - match: '{{word_begin}}{{braces_param}}{{word_end}}'
-      scope: variable.other.astil_forth
+    - include: nonblank-pop
 
   braces-end-pop:
     - match: \}
