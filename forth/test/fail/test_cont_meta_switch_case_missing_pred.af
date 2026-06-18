@@ -1,5 +1,5 @@
-fun: cont_meta_switch_case_missing_pred_fail { val key -- out }
-  val key switch
+fun: cont_meta_switch_case_missing_pred_fail { key -- out }
+  key switch
     case 100 end
     200
   end

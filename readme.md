@@ -406,7 +406,7 @@ Words are preferred over punctuation (except delimiters):
 Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
-- All conditionals and loops are terminated with `end`. No need to remember other terminators. (`until` is also available.)
+- All conditionals and loops are terminated with `end`. No need to remember other terminators.
 - Conditionals take the form `if then else end`, which reads much nicer.
 - `elif` is supported.
 - Any amount of conditional branches is terminated with a single `end`.

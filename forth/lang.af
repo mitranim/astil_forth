@@ -313,14 +313,17 @@ fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
   Xd Xn Xm asm_pattern_arith_reg cond or
 end
 
+fun: instr_off_pack { off -- packed } off 2 lsl end
+fun: instr_off_unpack { packed -- off } packed 2 lsr end
+
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
-  off19 2 lsr 19 bit_trunc 5 lsl Xt or
+  off19 instr_off_unpack 19 bit_trunc 5 lsl Xt or
 end
 
 \ `off9` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
-  off9 2 lsr 9 bit_trunc 5 lsl { off9 }
+  off9 instr_off_unpack 9 bit_trunc 5 lsl { off9 }
   cond 21 lsl Xt or off9 or
 end
 
@@ -601,14 +604,14 @@ end
 
 \ b <off>
 fun: asm_branch { off26 -> instr }
-  2  lsr       \ Offset is implicitly times 4.
-  26 bit_trunc \ Offset may be negative.
+  instr_off_unpack \ Offset is implicitly times 4.
+  26 bit_trunc     \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 or
 end
 
 \ b.<cond> <off>
 fun: asm_branch_cond { off19 cond -- instr }
-  off19 2 asr 19 bit_trunc 5 lsl \ Implicitly times 4.
+  off19 instr_off_unpack 19 bit_trunc 5 lsl \ Implicitly times 4.
   cond or 0b010_101_00_0000000000000000000_0_0000 or
 end
 
@@ -847,7 +850,7 @@ end
 fun: asr { i0 bits -> i1 } [ redefine ] asr end
 
 fun_comp: mod { -- err }
-  comp_args2_regs         { reg0 reg1 }
+  comp_args2_regs     { reg0 reg1 }
   comp_alloc_next_reg { tmp }
   tmp reg0 reg1      asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
   reg0 tmp reg1 reg0 asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
@@ -857,7 +860,7 @@ end
 fun: mod { i0 i1 -> i2 } [ redefine ] mod end
 
 fun_comp: umod { -- err }
-  comp_args2_regs         { reg0 reg1 }
+  comp_args2_regs     { reg0 reg1 }
   comp_alloc_next_reg { tmp }
   tmp  reg0 reg1     asm_udiv comp_instr \ udiv Xd, Xn, Xm
   reg0 tmp reg1 reg0 asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
@@ -867,7 +870,7 @@ end
 fun: umod { i0 i1 -> i2 } umod end
 
 fun_comp: /mod { -- err }
-  comp_args2_regs2        { rem quo dividend divisor }
+  comp_args2_regs2    { rem quo dividend divisor }
   comp_alloc_next_reg { tmp }
   tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
   quo dividend tmp     asm_sdiv    comp_instr \ sdiv Xd, Xn, Xm
@@ -878,7 +881,7 @@ end
 fun: /mod { dividend divisor -> rem quo } /mod end
 
 fun_comp: u/mod { -- err }
-  comp_args2_regs2        { rem quo dividend divisor }
+  comp_args2_regs2    { rem quo dividend divisor }
   comp_alloc_next_reg { tmp }
   tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
   quo dividend tmp     asm_udiv    comp_instr \ udiv Xd, Xn, Xm
@@ -1084,17 +1087,17 @@ fun: -cell { adr -> adr } -cell end
 
 \ tbz Xt, #bit, #imm14
 fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
-  imm14 2 lsr 14 bit_trunc 5 lsl { imm14 } \ Implicitly times 4.
-  bit   5 lsr             31 lsl { b5 }
-  bit         5 bit_trunc 19 lsl \ b40
+  imm14 instr_off_unpack 14 bit_trunc 5 lsl { imm14 } \ Implicitly times 4.
+  bit 5 lsr 31 lsl { b5 }
+  bit 5 bit_trunc 19 lsl \ b40
   Xt or imm14 or b5 or
   0b0_01_101_1_0_00000_00000000000000_00000 or
 end
 
 \ adr Xd, #imm21
 fun: asm_adr { Xd imm21 -- instr }
-  imm21 0b11 and                 { low }
-  imm21 2 lsr 19 bit_trunc 5 lsl { high }
+  imm21 0b11 and { low }
+  imm21 instr_off_unpack 19 bit_trunc 5 lsl { high }
   high low or Xd or
   0b0_00_100_00_0000000000000000000_00000 or
 end
@@ -1107,7 +1110,7 @@ end
 \
 \ Requires caution to avoid messing up the link register.
 fun: asm_branch_link_off { imm26 -> instr }
-  2 lsr 26 bit_trunc \ Implicitly times 4.
+  instr_off_unpack 26 bit_trunc \ Implicitly times 4.
   0b100_101_00000000000000000000000000 or
 end
 
@@ -1119,7 +1122,7 @@ end
 \ orr Xd, Xn, #(1 << bit)
 fun: asm_orr_bit { Xd Xn bit -- instr }
   64 bit - 16 lsl { immr }
-  Xn        5 lsl
+  Xn 5 lsl
   Xd or immr or
   0b1_01_100100_1_000000_000000_00000_00000 or
 end
@@ -1914,17 +1917,19 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 \ ## Control flow metadata
 \
 \ All control structures pass around a "meta" cell.
-\ SYNC[control-meta-layout]
-\ Bit layout:
 \
-\ - 63..32: instruction offset.
-\ -  0.. 4: input length.
-\ -  5.. 9: output length.
-\ -     10: has input length.
-\ -     11: has output length.
-\ -     12: has else.
-\ - 13..16: pop-specific ARM condition code.
-\ - 17..31: pop-specific small data; counted loops use condition delta.
+\ SYNC[control_meta_layout]:
+\
+\ - 63..32: instruction offset
+\ - 19..31: frame-specific small data; counted loops -> offset of `b.<cond>`
+\ - 15..18: frame-specific Arm64 condition code
+\ -     14: exec_prev
+\ -     13: 0 / 1 = `cbz` / `cbnz`
+\ -     12: has_else_or_case
+\ -     11: has_out_len
+\ -     10: has_inp_len
+\ -   5..9: out_len
+\ -   0..4: inp_len
 \
 \ Instruction offset describes the start of some conditional branch or loop.
 \ It's used to compile PC-relative branch instructions at the branch points.
@@ -1937,44 +1942,38 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 \ in conditionals, every `then` takes the same `inp_len`,
 \ and `out_len` must match between every `elif else end`.
 \
-\ Conditionals may have multiple branch points via `elif`.
-\ Each leaves its own instance of the metadata on the stack.
-\ In other cases, there is just one instance passed around
-\ and occasionally updated.
-ASM_ARG_LEN_MAX bit_len            let: CONT_LEN_OFF
-CONT_LEN_OFF low_bits              let: CONT_INP_LEN_MASK
-CONT_INP_LEN_MASK CONT_LEN_OFF lsl let: CONT_OUT_LEN_MASK
-1 CONT_LEN_OFF 1 lsl lsl           let: CONT_HAS_INP_LEN
-CONT_HAS_INP_LEN 1 lsl             let: CONT_HAS_OUT_LEN
-CONT_HAS_OUT_LEN 1 lsl             let: CONT_HAS_ELSE
-CONT_LEN_OFF 2 * 3 +               let: CONT_META_COND_OFF
-4 low_bits CONT_META_COND_OFF lsl  let: CONT_META_COND_MASK
-CONT_META_COND_OFF 4 +             let: CONT_LOOP_COND_DELTA_OFF
-32 CONT_LOOP_COND_DELTA_OFF -      let: CONT_LOOP_COND_DELTA_LEN
-CONT_LOOP_COND_DELTA_LEN low_bits
-CONT_LOOP_COND_DELTA_OFF lsl       let: CONT_LOOP_COND_DELTA_MASK
+\ Single-bit masks are used with `or and`.
+\ Multi-bit masks must be used with `bit_mask_get bit_mask_set`.
 
-fun: cont_meta_inp_len   { meta -> len  } CONT_INP_LEN_MASK and end
-fun: cont_meta_out_len   { meta -> len  } CONT_OUT_LEN_MASK and CONT_LEN_OFF lsr end
-fun: cont_meta_instr_off { meta -> off  } 32 lsr end
-fun: cont_meta_cond      { meta -> cond } CONT_META_COND_MASK and CONT_META_COND_OFF lsr end
+ASM_ARG_LEN_MAX bit_len low_bits let: CONT_MASK_INP_LEN
+CONT_MASK_INP_LEN CONT_MASK_INP_LEN bit_len lsl let: CONT_MASK_OUT_LEN
 
-fun: cont_meta_loop_end_off { meta -> off }
-  CONT_LOOP_COND_DELTA_MASK and CONT_LOOP_COND_DELTA_OFF lsr
+1 CONT_MASK_OUT_LEN bit_len lsl  let: CONT_MASK_HAS_INP
+CONT_MASK_HAS_INP  1 lsl         let: CONT_MASK_HAS_OUT
+CONT_MASK_HAS_OUT  1 lsl         let: CONT_MASK_HAS_ELSE_OR_CASE
+CONT_MASK_HAS_ELSE_OR_CASE 1 lsl let: CONT_MASK_CBNZ
+CONT_MASK_CBNZ     1 lsl         let: CONT_MASK_EXEC_PREV
+
+CONT_MASK_EXEC_PREV bit_len       let: CONT_META_COND_OFF
+4 low_bits CONT_META_COND_OFF lsl let: CONT_MASK_META_COND
+
+CONT_MASK_META_COND bit_len      let: CONT_LOOP_COND_OFF
+32 low_bits invert               let: CONT_MASK_INSTR_OFF
+
+32 CONT_LOOP_COND_OFF -
+low_bits CONT_LOOP_COND_OFF lsl
+let: CONT_MASK_LOOP_COND_OFF
+
+fun: cont_meta_instr_off_set { off meta -- meta }
+  off instr_off_pack meta CONT_MASK_INSTR_OFF bit_mask_set
 end
 
-fun: cont_meta_with_instr_off { off meta -- meta }
-  32 low_bits meta and off 32 lsl or
+fun: cont_meta_instr_off_get { meta -> off }
+  CONT_MASK_INSTR_OFF bit_mask_get instr_off_unpack
 end
 
-fun: cont_meta_with_cond { cond meta -- meta }
-  meta CONT_META_COND_MASK invert and { meta }
-  cond 4 bit_trunc CONT_META_COND_OFF lsl meta or
-end
-
-fun: cont_meta_with_loop_end_off { off meta -- meta err }
-  meta CONT_LOOP_COND_DELTA_MASK invert and { meta }
-  off CONT_LOOP_COND_DELTA_OFF lsl meta or
+fun: cont_meta_instr_adr { meta -> adr }
+  cont_meta_instr_off_get instr_adr
 end
 
 fun: reserve_instr { -- off err }
@@ -2006,241 +2005,199 @@ end
 \ Unlike other Forth systems, we also support chains of "elif",
 \ terminated with a single "end", which is generic: it pops one
 \ XT from the stack and executes it. The XT can pop another one,
-\ popping multiple control frames in a chain. We terminate such
-\ chains by prepending a `nop` XT.
+\ popping multiple control frames in a chain.
 \
-\ Control flow arity checkpoints:
-\
-\ - `if`         = no barrier, no validation
-\ - `then`       = barrier + input inference or validation
-\ - `elif`       = barrier + output inference or validation
-\ - `else`       = same as `elif`
-\ - `cond_pop`   = (wrapper for `if_pop else_pop`) barrier + output validation
-\ - `switch`     = input snapshot, validation is just "min 1"
-\ - `case`       = barrier + "min 1" validation + output inference or validation
-\ - `case_pop`   = barrier + output inference or validation
-\ - `switch_pop` = barrier + output validation
+\ Conditional chains involving `elif` have two passes.
+\ In the forward pass, every `else elif elifz` executes
+\ one previous frame, with special flags passed through
+\ the "meta" input. `else` pushes one replacement frame,
+\ `elif elifz` push two replacement frames; the second
+\ frame is configured to also execute the first one.
+\ When `end` executes the last frame, the entire prior
+\ chain executes as a backwards pass, retropatching
+\ instructions reserved by each `else elif elifz`.
 
-fun: if_pop { prev meta -- err }
-  meta cont_meta_instr_off instr_adr { adr }
+fun: if_patch { reg meta -- err }
+  meta cont_meta_instr_adr { adr }
   here_write adr - { off }
-  meta cont_meta_inp_len { reg }
-  reg off asm_cmp_branch_zero adr !32 \ cbz <reg>, <else|end>
-  prev execute
+  meta CONT_MASK_CBNZ and { cbnz }
+  reg off cbnz asm_cmp_branch adr !32
 end
 
-fun: ifz_pop { prev meta -- err }
-  meta cont_meta_instr_off instr_adr { adr }
-  here_write adr - { off }
-  meta cont_meta_inp_len { reg }
-  reg off asm_cmp_branch_not_zero adr !32 \ cbnz <reg>, <else|end>
-  prev execute
-end
-
-fun: if_pop_void { prev meta -> err } if_pop end
-
-fun_comp: if { -- nop pop } xt' nop xt' if_pop_void  end
-
-fun_comp: then { pop -- meta pop err } ( E: pred -- )
-  " inputs for `then`" { ctx }
-  1 ctx comp_args_valid
-  0     comp_args_set
+fun: if_end_xt { meta -- err }
   comp_barrier
-  reserve_instr 0 cont_meta_with_instr_off pop
+  0 " branch outputs" comp_args_valid
+  meta CONT_MASK_INP_LEN bit_mask_get meta if_patch
+end
+
+fun_comp: then { -- meta end_xt err } ( E: pred -- )
+  comp_barrier
+  1 " arguments before `then`" comp_args_valid
+  0 comp_args_set
+  reserve_instr 0 cont_meta_instr_off_set xt' if_end_xt
 end
 
 \ Now that we have nullary conditionals, we can redefine
 \ them into full-blown arity-aware condition expressions.
 
-fun: cond_branch_open { meta ctx -- meta err }
-  1 ctx comp_args_min
-  comp_args_get dec { len }
+\ Executed either during the forward pass by `else elif elifz`,
+\ or during the backward pass by `end`.
+fun: if_end_xt { meta -- err } [ redefine ]
+  comp_barrier
+  meta CONT_MASK_INP_LEN bit_mask_get meta if_patch
+
+  meta CONT_MASK_HAS_ELSE_OR_CASE and =0 then
+    meta CONT_MASK_INP_LEN bit_mask_get
+    " arguments before ending conditional without `else`"
+    comp_args_valid
+  end
+
+  \ Only in the backward pass.
+  meta CONT_MASK_EXEC_PREV and then execute'' end end
+end
+
+fun_comp: if  { -- meta end_xt } nil            xt' if_end_xt end
+fun_comp: ifz { -- meta end_xt } CONT_MASK_CBNZ xt' if_end_xt end
+
+\ Caution: after this definition, `if ifz` are required
+\ and bare `then` is invalid.
+fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ redefine ]
+  comp_barrier
+  " arguments before `then`" { ctx }
+  meta CONT_MASK_HAS_INP and { has }
+
+  has then
+    meta CONT_MASK_INP_LEN bit_mask_get { len }
+    len inc ctx comp_args_valid
+  end
+
+  has =0 then
+    1 ctx comp_args_min
+    comp_args_get dec { len }
+    len meta CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
+  end
+
   len comp_args_set
-  comp_barrier
-  meta len or CONT_HAS_INP_LEN or
+  reserve_instr meta cont_meta_instr_off_set end_xt
 end
 
-fun: cond_branch_close { meta ctx -- meta err }
-  if meta CONT_HAS_OUT_LEN and then
-    meta cont_meta_out_len ctx comp_args_valid
-    comp_barrier
-    meta ret
-  end
-
-  comp_args_get CONT_LEN_OFF lsl
-  meta or
-  CONT_HAS_OUT_LEN or { meta }
-  comp_barrier
-  meta
-end
-
-fun: cont_meta_validate_len_match { meta ctx -- err }
-  meta cont_meta_out_len { out_len }
-  meta cont_meta_inp_len { inp_len }
-  if out_len inp_len <> then ctx throw end
-end
-
-\ Caller must also use `comp_args_valid` and `comp_barrier`.
-\ Takes "meta" because this shares the signature with `if_pop`
-\ and `ifz_pop`; all these words may be executed by `cond_pop`.
-fun: else_pop { prev meta -- err }
-  meta cont_meta_instr_off instr_adr { adr }
+fun: else_patch { meta -- err }
+  meta cont_meta_instr_adr { adr }
   here_write adr - asm_branch adr !32
-  prev execute
 end
 
-\ Used by `else elif elifz`. `pop` is one of: `if_pop ifz_pop`.
-fun: cond_branch_separator { pop_meta pop meta ctx -- exit_meta else_pop meta err }
-  meta ctx cond_branch_close { meta }
-  reserve_instr { exit_off }
-
-  xt' nop STACK >s \ Prevent chaining.
-  pop_meta STACK >s
-  pop      execute
-
-  meta cont_meta_inp_len comp_args_set
-  exit_off meta cont_meta_with_instr_off { exit_meta }
-  exit_meta xt' else_pop meta
+fun: else_end_xt { meta -- err }
+  comp_barrier
+  meta else_patch
+  meta CONT_MASK_OUT_LEN bit_mask_get " branch outputs" comp_args_valid
+  if meta CONT_MASK_EXEC_PREV and then execute'' end end
 end
 
-\ Final branch / final exit branch point.
-\
-\ Popped by `end` after `if elif elifz … then`.
-\ `pop` is one of: `if_pop ifz_pop else_pop`.
-\
-\ This part is tricky. We need to validate one of:
-\
-\ - If there's no `else`: length of register stack must match
-\   between first entry point and every exit point; `cond_pop`
-\   validates the final exit point at `end`; `elif else`
-\   validate their own.
-\
-\ - If there's `else`: input and output length are allowed to be
-\   different, but output length must still match between all
-\   exit branch points `elif else end`.
-\
-\ Input length is inferred by the first `then` and carried in the meta value;
-\ copies of meta on the control stack preserve it. In the general case, input
-\ validation can only reliably be done here, because `elif else` are optional.
-\
-\ This has been modified and not tested yet.
-fun: cond_pop { pop_meta pop meta -- err }
-  \ Either infers or validates output length.
-  \ When `else` is present, length was already
-  \ inferred, this validates it, we're good.
-  meta " branch outputs" cond_branch_close { meta }
-
-  if meta CONT_HAS_ELSE and then
-    pop_meta STACK >s
-    pop      execute
-    ret
-  end
+fun_comp: else { meta end_xt -- meta end_xt err }
+  comp_barrier
+  reserve_instr { off }
 
   meta
-  " conditional which consumes and produces different amounts of arguments requires final `else`"
-  cont_meta_validate_len_match
+    CONT_MASK_HAS_ELSE_OR_CASE or
+    CONT_MASK_EXEC_PREV bit_mask_unset
+  STACK >s
+  end_xt execute
 
-  pop_meta STACK >s
-  pop      execute
+  off meta cont_meta_instr_off_set { meta }
+  meta CONT_MASK_HAS_OUT and { has }
+
+  if has then
+    meta CONT_MASK_OUT_LEN bit_mask_get " branch outputs" comp_args_valid
+  end
+
+  ifz has then
+    comp_args_get meta CONT_MASK_OUT_LEN bit_mask_set CONT_MASK_HAS_OUT or { meta }
+  end
+
+  meta CONT_MASK_INP_LEN bit_mask_get comp_args_set
+  meta xt' else_end_xt
 end
 
-fun_comp: if  { -- nop pop meta err } [ redefine ] xt' nop xt' if_pop  0 end
-fun_comp: ifz { -- nop pop meta err } [ redefine ] xt' nop xt' ifz_pop 0 end
-
-\ `pop` is one of: `if_pop ifz_pop`.
-fun_comp: then { pop meta -- pop_meta pop meta cond_pop err } ( E: pred -- )
-  [ redefine ]
-  meta " inputs for `then`" cond_branch_open { meta }
-  reserve_instr meta cont_meta_with_instr_off { pop_meta }
-  pop_meta pop meta xt' cond_pop
+fun_comp: elif { meta end_xt -> else_meta else_xt meta end_xt err }
+  execute'' else { meta else_xt }
+  meta else_xt
+  meta CONT_MASK_EXEC_PREV or xt' if_end_xt
 end
 
-\ `pop` is one of: `if_pop ifz_pop`.
-fun_comp: elif
-  { pop_meta pop meta _cond_pop -- exit_meta else_pop if_pop meta err }
-  pop_meta pop meta
-  " outputs before `elif`" cond_branch_separator { exit_meta pop meta }
-  exit_meta pop xt' if_pop meta
+fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
+  execute'' else
+  meta CONT_MASK_EXEC_PREV or CONT_MASK_CBNZ or xt' if_end_xt
 end
 
-\ `pop` is one of: `if_pop ifz_pop`.
-fun_comp: elifz
-  { pop_meta pop meta _cond_pop -- exit_meta else_pop ifz_pop meta err }
-  pop_meta pop meta
-  " outputs before `elifz`" cond_branch_separator { exit_meta pop meta }
-  exit_meta pop xt' ifz_pop meta
+\ ## Switch
+
+fun: switch_end_xt { _val meta -- err }
+  comp_barrier
+
+  ifz meta CONT_MASK_HAS_ELSE_OR_CASE and then
+    " pointless empty `switch`" throw
+  end
+
+  ifz meta CONT_MASK_HAS_OUT and then
+    " internal error: non-empty `switch` without inferred output length" throw
+  end
+
+  meta CONT_MASK_OUT_LEN bit_mask_get " arguments before ending `switch`" comp_args_valid
 end
 
-\ `pop` is one of: `if_pop ifz_pop`.
-fun_comp: else { pop_meta pop meta cond_pop -- exit_meta else_pop meta cond_pop err }
-  pop_meta pop meta CONT_HAS_ELSE or
-  " outputs before `else`" cond_branch_separator cond_pop
-end
-
-fun: switch_pop { prev _val_loc_ meta -- err }
-  meta " outputs before ending `switch`" cond_branch_close { -- }
-  prev execute
-end
-
-fun_comp: switch { -- nop val meta switch_pop err } ( E: … val -- … )
-  1 " inputs for `switch`" comp_args_min
-  comp_args_get dec { len }
+fun_comp: switch { -- val meta end_xt err } ( E: … val -- … )
+  1 " arguments before `switch`" comp_args_min
   nil 0 comp_local { val }
   val comp_pop_into_local
+  val CONT_MASK_EXEC_PREV xt' switch_end_xt
+end
+
+fun: case_else_xt { _val meta -- err } meta else_end_xt end
+
+fun: case_end_xt
+  { pmeta pxt val meta -- pmeta pxt val meta else_xt err }
   comp_barrier
-  len CONT_HAS_INP_LEN or { meta }
-  xt' nop val meta xt' switch_pop
-end
 
-fun: case_else_pop { prev meta -- err }
-  meta cont_meta_instr_off instr_adr { adr }
-  here_write adr - asm_branch adr !32
-  prev execute
-end
+  if meta CONT_MASK_HAS_OUT and then
+    meta CONT_MASK_OUT_LEN bit_mask_get " arguments before ending `case`" comp_args_valid
+  else
+    comp_args_get meta CONT_MASK_OUT_LEN bit_mask_set CONT_MASK_HAS_OUT or { meta }
+  end
 
-fun: case_pop
-  {
-    val_loc meta switch_pop case_meta
-    --
-    meta case_else_pop val_loc meta switch_pop err
-  }
+  meta CONT_MASK_INP_LEN bit_mask_get comp_args_set
+  meta cont_meta_instr_adr { adr }
+  reserve_instr meta cont_meta_instr_off_set { meta }
+  here_write adr - ASM_NE asm_branch_cond adr !32 \ b.ne <case_end>
 
-  meta " outputs before ending `case`" cond_branch_close { meta }
-  reserve_instr { off_end }
-  case_meta cont_meta_instr_off instr_adr { adr }
-  here_write adr - { off }
+  meta CONT_MASK_OUT_LEN bit_mask_get      { len   }
+  len pmeta CONT_MASK_OUT_LEN bit_mask_set { pmeta }
+  pmeta CONT_MASK_HAS_OUT          or      { pmeta }
+  pmeta CONT_MASK_HAS_ELSE_OR_CASE or      { pmeta }
 
-  off ASM_NE asm_branch_cond adr !32 \ b.ne <case_end>
-  meta cont_meta_inp_len comp_args_set
-  off_end 0 cont_meta_with_instr_off xt' case_else_pop val_loc meta switch_pop
+  pmeta pxt val meta xt' case_else_xt
 end
 
 fun_comp: case
-  {
-    val_loc meta switch_pop
-    --
-    val_loc meta switch_pop case_meta case_pop err
-  }
+  { val pmeta pxt -- val pmeta pxt val meta case_xt err }
   ( E: pred -- )
 
-  meta cont_meta_inp_len inc " inputs for `case`" comp_args_min
-  comp_args_get { len }
-
-  \ TODO: un-hardcode the numbers.
-  if len ASM_ARG_LEN_MAX >= then
-    " unable to compile `case`: too many arguments: 15 registers available, 16 arguments provided" throw
-  end
-
-  len dec { pred_reg }
-
-  val_loc comp_push_from_local
-  pred_reg len asm_cmp_reg comp_instr \ cmp <pred>, <val>
-  pred_reg comp_args_set
+  1 " arguments before `case`" comp_args_min
+  comp_args_get dec { len }
+  val comp_push_from_local
   comp_barrier
+  len len inc asm_cmp_reg comp_instr \ cmp <pred>, <val>
+  len comp_args_set
 
-  reserve_instr 0 cont_meta_with_instr_off { case_meta } \ b.ne <case_end>
-  val_loc meta switch_pop case_meta xt' case_pop
+  \ Remaining argument length just before this case
+  \ remains valid if this case is not entered. This
+  \ value is used by `case_end_xt` to reset args.
+  len pmeta CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
+  reserve_instr meta cont_meta_instr_off_set { meta } \ b.ne <case_end>
+
+  val pmeta pxt val meta xt' case_end_xt
 end
+
+
 
 \ ## Types
 \
@@ -2404,7 +2361,7 @@ end
 \ must be loaded and stored using dedicated typed operators.
 
 \ For internal use, invoked by `end`.
-fun: struct_pop { name name_len align off -- err } ( C: name name_len align off -- )
+fun: struct_end_xt { name name_len align off -- err } ( C: name name_len align off -- )
   off align align_up { size }
   name name_len size align define_type
   name free
@@ -2414,8 +2371,8 @@ end
 \ Begins a definition; terminate with `end`.
 fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
   read_word       { str len }
-  str len strndup { str } \ Leak if comp error before `struct_pop` done.
-  xt' struct_pop  { fun }
+  str len strndup { str } \ Leak if comp error before `struct_end_xt` done.
+  xt' struct_end_xt  { fun }
   str len 0 0 fun
 end
 
@@ -3292,7 +3249,7 @@ end
 \ the index local is still in scope, with an out-of-range value.
 
 \ Control stack for auxiliary loop constructs like `leave` and `while`.
-\ Each auxiliary construct pushes `aux_meta aux_pop`, and `loop_frame_pop`
+\ Each auxiliary construct pushes `aux_meta aux_pop`, and `loop_frame_end_xt`
 \ repeatedly executes aux pops until it reaches the `nop` terminator installed
 \ by `loop_frame_init`.
 \
@@ -3305,16 +3262,16 @@ end
 \ Position of the topmost loop metadata cell on the main control stack.
 \ Each loop pushes the following frame:
 \
-\   prev_loop_ind loop_frame_pop meta loop_pop
-\                                ^
-\                                LOOP_IND points here
+\   prev_loop_ind loop_frame_end_xt meta loop_pop
+\                                   ^
+\                                   LOOP_IND points here
 \
 \ `meta` holds the loop start instruction offset, entry arity,
-\ and pop-specific metadata described by SYNC[control-meta-layout].
+\ and pop-specific metadata described by SYNC[control_meta_layout].
 \ Counted loops keep their counters in compiler locals; current loop frames
 \ do not carry loop-specific extra cells on the main control stack.
 \
-\ In stack signatures below, `prev_loop_ind loop_frame_pop` is often
+\ In stack signatures below, `prev_loop_ind loop_frame_end_xt` is often
 \ shortened to `<loop_prev>`, and `meta loop_pop` is the part returned by
 \ each loop word for `end` to consume.
 \
@@ -3332,7 +3289,7 @@ fun: loop_frame_adr { -- adr err }
   frame STACK stack_cell_at
 end
 
-fun: loop_frame_pop { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
+fun: loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
   comp_barrier
   LOOP_AUX s> execute \ Pop all auxiliaries until a terminating `nop`.
   prev_loop_ind LOOP_IND !
@@ -3341,171 +3298,144 @@ end
 fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
   \ Stash prev loop info; record where caller's `meta` will land.
   LOOP_IND @            STACK >s
-  xt' loop_frame_pop    STACK >s
+  xt' loop_frame_end_xt STACK >s
   STACK stack_len_cells LOOP_IND !
 
-  \ Terminator for `loop_frame_pop`.
+  \ Terminator for `loop_frame_end_xt`.
   xt' nop LOOP_AUX >s
 end
 
-fun: loop_meta_from_off { off -- meta err }
-  \ LOOP-ELSE-GAP: records only absolute entry arg length, not a base+delta
-  \ model that could describe alternate loop outputs with register offsets.
-  comp_args_get CONT_HAS_INP_LEN or { meta }
-  off meta cont_meta_with_instr_off
-end
-
-fun: loop_meta_here { -- meta err }
-  here_write instr_off loop_meta_from_off
-end
-
-fun: loop_exit_close { meta ctx -> meta err }
-  \ LOOP-ELSE-GAP: this updates one shared loop `meta` for every exit path.
-  \ That is enough for same-arity `leave`/`while`/`until`, but not for a
-  \ separate loop `else` path with arbitrary fallback outputs.
-  cond_branch_close { meta }
-
-  ifz meta CONT_HAS_ELSE and then
-    meta
-    " loop which consumes and produces different amounts of arguments requires final `else`"
-    cont_meta_validate_len_match
-  end
-
-  meta
-end
-
-fun: loop_back_close { meta ctx -- meta err }
-  \ LOOP-ELSE-GAP: loop-back is validated against absolute entry arity.
-  \ This is correct for continuation paths, but future loop `else` support
-  \ must keep fallback output arity separate from this loop-back arity.
-  meta cont_meta_inp_len ctx comp_args_valid
-  comp_barrier
-  meta
+fun: loop_meta_init { off -- meta err }
+  comp_args_get 0 CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
+  off meta cont_meta_instr_off_set
 end
 
 fun: loop_back { meta -> err }
-  cont_meta_instr_off instr_adr { adr }
+  cont_meta_instr_adr { adr }
   here_write { out }
   adr out - asm_branch comp_instr \ b <beg>
 end
 
-\ Pops the `meta loop_pop` part of a loop frame, then runs `end` again to
-\ consume `<loop_prev>` via `loop_frame_pop`.
-\
-fun: loop_base_pop { meta -> err }
-  ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
-  " outputs before ending loop" loop_back_close { meta }
-  meta loop_back     \ b <beg>
-  execute'' end      \ Run `loop_frame_pop`.
+fun: loop_back_close { meta ctx -- err }
+  meta CONT_MASK_INP_LEN bit_mask_get ctx comp_args_valid
+  meta loop_back
 end
 
-fun_comp: loop { -- meta loop_pop err } ( C: -- <loop_prev> )
+fun: loop_branch_exit { meta ctx -- meta err }
+  if meta CONT_MASK_HAS_OUT and then
+    meta CONT_MASK_OUT_LEN bit_mask_get ctx comp_args_valid
+    meta ret
+  end
+  comp_args_get meta CONT_MASK_OUT_LEN bit_mask_set CONT_MASK_HAS_OUT or
+end
+
+\ TODO: this is a semi-placeholder which enforces `inp_len out_len =`.
+\ Works when loops are incompatible with `else`. If we ever manage to
+\ make `else` work with loops, this may need an update.
+fun: loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
+  comp_barrier
+  " arguments before ending `loop`" { ctx }
+  meta ctx loop_back_close
+  meta ctx loop_branch_exit { -- } \ Semi-placeholder; `else` may change this.
+  execute'' end \ Run `loop_frame_end_xt`.
+end
+
+fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
   comp_barrier
   loop_frame_init
-  loop_meta_here xt' loop_base_pop
+  here_write instr_off loop_meta_init xt' loop_end_xt
 end
 
-fun: leave_pop { -- err }
-  LOOP_AUX s> cont_meta_instr_off instr_adr { adr }
-  \ LOOP-ELSE-GAP: patches `leave` to the current after-loop point. With loop
-  \ `else`, `leave` must skip fallback outputs and branch to the final merge.
+fun: leave_end_xt { -- err }
+  LOOP_AUX s> cont_meta_instr_adr { adr }
   here_write adr - asm_branch adr !32
   LOOP_AUX s> execute
 end
 
 \ Breaks out of any loop.
-fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_pop )
-  loop_frame_adr { frame }
-  \ LOOP-ELSE-GAP: `leave` is treated as a same-arity loop exit today.
-  \ It cannot target or cooperate with a loop `else` fallback frame yet.
-  frame @ " outputs before `leave`" loop_exit_close { meta }
-  meta frame !
-
-  comp_barrier
-  reserve_instr 0 cont_meta_with_instr_off LOOP_AUX >s
-  xt' leave_pop LOOP_AUX >s
-end
-
-fun: while_pop { -- err }
-  LOOP_AUX s> { meta }
-  LOOP_AUX s> { prev }
-  prev meta if_pop
-end
-
-\ Breaks out of any loop.
-fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_pop )
+fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_end_xt )
   loop_frame_adr { frame }
   frame @ { meta }
-  meta cont_meta_inp_len { inp_len }
+  meta CONT_MASK_INP_LEN bit_mask_get { len }
 
-  \ LOOP-ELSE-GAP: predicate must sit exactly at entry arity. There is no
-  \ register-offset model for loops whose body temporarily shifts outputs.
-  inp_len inc " when calling `while`" comp_args_valid
-  inp_len comp_args_set
-  \ LOOP-ELSE-GAP: `while` exit currently shares ordinary loop exit arity.
-  \ It cannot distinguish first-entry failure from later termination for else.
-  meta " outputs before `while`" loop_exit_close { meta }
+  if comp_args_get len < then
+    " invalid attempt to `leave` with fewer arguments than at loop entry" throw
+  end
+
+  meta " arguments before `leave`" loop_branch_exit { meta }
+  meta frame !
+
+  len comp_args_set
+  comp_barrier
+  reserve_instr 0 cont_meta_instr_off_set LOOP_AUX >s
+  xt' leave_end_xt LOOP_AUX >s
+end
+
+fun: while_end_xt { -- err }
+  LOOP_AUX s> { meta }
+  meta CONT_MASK_OUT_LEN bit_mask_get { reg }
+  reg meta if_patch
+
+  LOOP_AUX s> execute
+end
+
+\ Tests a predicate; if predicate is 0, leaves the loop.
+fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
+  loop_frame_adr { frame }
+  frame @ { meta }
+  meta CONT_MASK_INP_LEN bit_mask_get { inp_len }
+
+  " arguments before `while`" { ctx }
+  1 ctx comp_args_min
+  comp_args_get dec { out_len }
+  out_len comp_args_set
+
+  if out_len inp_len < then
+    " invalid attempt to `while` with fewer arguments than at loop entry" throw
+  end
+
+  meta ctx loop_branch_exit { meta }
   meta frame !
   comp_barrier
+  inp_len comp_args_set
 
-  reserve_instr inp_len CONT_HAS_INP_LEN or cont_meta_with_instr_off LOOP_AUX >s
-  xt' while_pop LOOP_AUX >s
+  reserve_instr meta cont_meta_instr_off_set LOOP_AUX >s
+  xt' while_end_xt                           LOOP_AUX >s
 end
 
 \ Goes back to loop start.
 fun_comp: cont { -- err }
-  \ LOOP-ELSE-GAP: `cont` is only a loop-back path; it assumes current args
-  \ exactly match loop entry arity and ignores any future fallback outputs.
-  loop_frame_adr @ " when calling `cont`" loop_back_close loop_back
-end
-
-\ Like regular Forth `until`, but usable with any loop.
-\ Alternative loop terminator; replaces `end`. Example:
-\
-\   loop false until
-fun_comp: until { fun -- err }
-  loop_frame_adr { frame }
-  frame @ { meta }
-  meta cont_meta_inp_len { inp_len }
-  \ LOOP-ELSE-GAP: predicate must sit exactly at entry arity. There is no
-  \ register-offset model for arbitrary loop output arity.
-  inp_len inc " when calling `until`" comp_args_valid
-  inp_len comp_args_set
-  \ LOOP-ELSE-GAP: `until` currently closes the shared same-arity exit path.
-  \ It has no separate loop-else fallback output path.
-  meta " outputs before `until`" loop_exit_close { meta }
-  meta frame !
   comp_barrier
-
-  inp_len 8 asm_cmp_branch_not_zero comp_instr \ cbnz <pred>, 8
-  fun execute
+  loop_frame_adr @ { meta }
+  meta CONT_MASK_INP_LEN bit_mask_get { len }
+  len " arguments before `cont`" comp_args_valid
+  meta loop_back
 end
 
-fun: loop_pop_with_cond { meta -> err }
+fun: loop_counted_end_xt { meta -- err }
   ( LOOP_AUX: …aux… -- )
   ( C: <loop_prev> -- )
-  cont_meta_instr_off { beg_off }
-  meta cont_meta_loop_end_off beg_off + instr_adr { cond_adr }
+  comp_barrier
+  meta cont_meta_instr_off_get { beg_off }
+  meta CONT_MASK_LOOP_COND_OFF bit_mask_get instr_off_unpack
+  beg_off + instr_adr { cond_adr }
 
-  \ LOOP-ELSE-GAP: counted loops patch one condition branch to after-loop.
-  \ That conflates never-entered and normally-finished exits, so it cannot
-  \ implement `else` fallback values yet.
-  \ `b <beg>` and other effects.
-  meta loop_base_pop
+  meta " arguments before ending counted loop" loop_back_close
+  execute'' end  \ Run `loop_frame_end_xt`.
 
   \ Retropatch `b.<cond> <end>`.
   here_write cond_adr - { off }
-  meta cont_meta_cond { cond }
+  meta CONT_MASK_META_COND bit_mask_get { cond }
   off cond asm_branch_cond cond_adr !32
 end
 
-fun: loop_meta_with_cond_pop { meta beg_off end_off cond -- meta loop_pop err }
-  cond meta cont_meta_with_cond { meta }
-  end_off beg_off - meta cont_meta_with_loop_end_off
-  xt' loop_pop_with_cond
+fun: loop_counted_init { meta beg_off end_off cond -- meta loop_pop err }
+  cond meta CONT_MASK_META_COND bit_mask_set { meta }
+  end_off beg_off - instr_off_pack meta CONT_MASK_LOOP_COND_OFF bit_mask_set
+  xt' loop_counted_end_xt
 end
 
-fun: for_loop_countdown_init { cur -- meta loop_pop err }
+fun: for_loop_countdown_init { cur ctx -- meta loop_pop err }
   ( C: -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
@@ -3522,13 +3452,16 @@ fun: for_loop_countdown_init { cur -- meta loop_pop err }
   cur comp_pop_into_local            \ mov <cur>, xN | str xN, [FP, <cur>]
   comp_barrier                       \ Tell compiler to commit "local set".
   reg asm_cmp_zero comp_instr        \ cmp xN, 0
+
   \ LOOP-ELSE-GAP: this single branch becomes the normal after-loop target.
   \ It is not split into never-entered fallback vs normal completion.
   reserve_instr { end_off }          \ b.lt <end>
 
-  beg_off loop_meta_from_off
-  beg_off end_off ASM_LT
-  loop_meta_with_cond_pop \ stop on <
+  beg_off loop_meta_init ctx loop_branch_exit
+  beg_off
+  end_off
+  ASM_LT \ stop on <
+  loop_counted_init
 end
 
 \ A count-down-by-one loop with the range `[0,ceil)`.
@@ -3548,8 +3481,8 @@ fun_comp: for { -- meta loop_pop err }
   ( C: -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
-  1 " when calling `for`" comp_args_min
-  nil 0 comp_local for_loop_countdown_init
+  1 " arguments before `for`" comp_args_min
+  nil 0 comp_local " arguments before exiting `for`" for_loop_countdown_init
 end
 
 \ Like `for` but requires a local name to make the index
@@ -3563,8 +3496,8 @@ fun_comp: -for: { -- meta loop_pop err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
-  1 " when calling `-for:`" comp_args_min
-  read_word comp_local for_loop_countdown_init
+  1 " arguments before `-for:`" comp_args_min
+  read_word comp_local " arguments before exiting `-for:`" for_loop_countdown_init
 end
 
 \ Count-up loop with the range `[floor,ceil)`. Usage:
@@ -3575,7 +3508,7 @@ fun_comp: +for: { -- meta loop_pop err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor -- )
 
-  2 " when calling `+for:`" comp_args_min
+  2 " arguments before `+for:`" comp_args_min
   nil 0     comp_local { lim } \ ceil  = limit
   read_word comp_local { cur } \ floor = cursor
 
@@ -3606,9 +3539,9 @@ fun_comp: +for: { -- meta loop_pop err }
   \ never-entered branch exists for loop `else`.
   reserve_instr { end_off }          \ b.le <end>
 
-  beg_off loop_meta_from_off
+  beg_off loop_meta_init " arguments before exiting `+for:`" loop_branch_exit
   beg_off end_off ASM_LE
-  loop_meta_with_cond_pop \ stop on <=
+  loop_counted_init \ stop on <=
 end
 
 \ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
@@ -3617,7 +3550,7 @@ fun_comp: -loop: { -- meta loop_pop err }
   ( E: ceil floor step -- )
   ( LOOP_AUX: -- nop )
 
-  3 " when calling `-loop:`" comp_args_min
+  3 " arguments before `-loop:`" comp_args_min
   read_word comp_local { cur }  \ ceil  = cursor
   nil 0 comp_local     { lim }  \ floor = limit
   nil 0 comp_local     { step }
@@ -3628,7 +3561,7 @@ fun_comp: -loop: { -- meta loop_pop err }
   loop_frame_init
   comp_barrier                        \ Clobber / relocate locals.
   here_write instr_off { beg_off }    \ `end` jumps here.
-  beg_off loop_meta_from_off { meta }
+  beg_off loop_meta_init { meta }
   cur  comp_push_from_local           \ mov xN, <cur>  | ldr xN, [FP, <cur>]
   step comp_push_from_local           \ mov xN, <step> | ldr xN, [FP, <step>]
   comp_args2_regs { cur_reg step_reg }
@@ -3649,7 +3582,8 @@ fun_comp: -loop: { -- meta loop_pop err }
   \ never-entered branch exists for loop `else`.
   reserve_instr { end_off }              \ b.lt <end>
 
-  meta beg_off end_off ASM_LT loop_meta_with_cond_pop \ stop on <
+  meta " arguments before exiting `-loop:`" loop_branch_exit { meta }
+  meta beg_off end_off ASM_LT loop_counted_init \ stop on <
 end
 
 \ Similar to the standard `?do ... +loop`, but terminated with an `end`
@@ -3666,7 +3600,7 @@ fun_comp: +loop: { -- meta loop_pop err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor step -- )
 
-  3 " when calling `+loop:`" comp_args_min
+  3 " arguments before `+loop:`" comp_args_min
   nil 0 comp_local     { lim } \ ceil  = limit
   read_word comp_local { cur } \ floor = cursor
   nil 0 comp_local     { step }
@@ -3705,9 +3639,9 @@ fun_comp: +loop: { -- meta loop_pop err }
   \ never-entered branch exists for loop `else`.
   reserve_instr { end_off }              \ b.le <end>
 
-  beg_off loop_meta_from_off
+  beg_off loop_meta_init " arguments before exiting `+loop:`" loop_branch_exit
   beg_off end_off ASM_LE
-  loop_meta_with_cond_pop \ stop on <=
+  loop_counted_init \ stop on <=
 end
 
 \ ## String comparison continued
@@ -4380,7 +4314,7 @@ fun: assert_cond { cond ctx -- err }
   " assertion failed: %s" ctx errf
 end
 
-fun: assert_pop { beg -- err }
+fun: assert_end_xt { beg -- err }
   1 " when compiling `assert`" comp_args_valid
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 + { ceil }
@@ -4404,6 +4338,6 @@ end
 fun_comp: assert { -- beg fun err } ( E: cond -- )
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 +
-  xt' assert_pop
+  xt' assert_end_xt
   [ true comp_only ]
 end

@@ -357,15 +357,15 @@ fun: cond_input_elifn { val flag0 flag1 -- out }
 end
 
 fun: cond_input_elif_diff { flag0 flag1 -- out0 out1 }
-  flag0 if then 10 11
-  elif 20 flag1 then 30
+  20 flag0 if then drop 10 11
+  elif flag1 then 30
   else 40
   end
 end
 
 fun: cond_input_elif_diff_no_else { flag0 flag1 -- out }
-  flag0 if then 10
-  elif 20 flag1 then
+  20 flag0 if then drop 10
+  elif flag1 then
   end
 end
 
@@ -592,7 +592,7 @@ test_switch_input_arity
 
 fun: test_switch_missing_case_pred { -- err } [ false try_all ]
   import' ./fail/test_cont_meta_switch_case_missing_pred.af
-  " inputs for `case`" T_err_contains
+  " arguments before `case`" T_err_contains
 end
 test_switch_missing_case_pred
 
@@ -913,46 +913,6 @@ fun: test_loop_while_leave { -- err }
   T{ -1 { val } loop leave 10 { val } true  while 20 { val } end val <T> -1 }T
 end
 test_loop_while_leave
-
-fun: test_loop_until { -- err }
-  \ Loops indefinitely. How to test?
-  \ loop false until
-
-  T{ loop             true  until <T> }T
-  T{ loop leave       true  until <T> }T
-  T{ loop leave       false until <T> }T
-  T{ loop leave leave false until <T> }T
-
-  T{ -1 { val } loop      10 { val } val     until val <T> 10 }T
-  T{ 0  { val } loop val inc { val } val     until val <T> 1  }T
-  T{ 0  { val } loop val dec { val } val     until val <T> -1 }T
-  T{ 12 { val } loop val dec { val } val 6 < until val <T> 5  }T
-
-  T{
-    12 { val }
-    loop
-      val dec { val }
-      val 5 > while
-      val 9 <
-    until
-    val
-  <T>
-    8
-  }T
-
-  T{
-    12 { val }
-    loop
-      val dec { val }
-      val 9 > while
-      val 5 <
-    until
-    val
-  <T>
-    9
-  }T
-end
-test_loop_until
 
 fun: test_loop_for { -- err }
   \ Should terminate right away.
@@ -1306,13 +1266,6 @@ fun: cont_meta_loop_while_top { val -- out }
   end
 end
 
-fun: cont_meta_loop_until_top { val -- out }
-  val
-  loop
-    inc
-    true until
-end
-
 fun: cont_meta_for_top { val count -- out }
   val count
   for
@@ -1351,7 +1304,6 @@ end
 fun: test_cont_meta_loop_inputs { -- err }
   T{ 10 cont_meta_loop_leave_top <T> 11 }T
   T{ 10 cont_meta_loop_while_top <T> 11 }T
-  T{ 10 cont_meta_loop_until_top <T> 11 }T
 
   T{ 10 3 cont_meta_for_top <T> 13 }T
   T{ 10 3 cont_meta_minus_for_top <T> 13 }T
@@ -2664,7 +2616,7 @@ test_comptime_stack_underflow
 
 fun: test_cond_arity_bare_if { -- err } [ false try_all ]
   import' ./fail/test_cond_arity_bare_if.af
-  " conditional which consumes and produces different amounts of arguments requires final `else`"
+  " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
   T_err_contains
 end
 test_cond_arity_bare_if
@@ -2678,98 +2630,98 @@ test_cond_arity_else_mismatch
 
 fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
   import' ./fail/test_cond_arity_elif_mismatch.af
-  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): outputs before `else`: arity mismatch: required: 1, provided: 2"
+  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_cond_arity_elif_mismatch
 
 fun: test_cond_arity_no_else { -- err } [ false try_all ]
   import' ./fail/test_cond_arity_no_else.af
-  " conditional which consumes and produces different amounts of arguments requires final `else`"
+  " arguments before ending conditional without `else`: arity mismatch"
   T_err_contains
 end
 test_cond_arity_no_else
 
 fun: test_cond_arity_no_else_less { -- err } [ false try_all ]
   import' ./fail/test_cond_arity_no_else_less.af
-  " conditional which consumes and produces different amounts of arguments requires final `else`"
+  " arguments before ending conditional without `else`: arity mismatch"
   T_err_contains
 end
 test_cond_arity_no_else_less
 
 fun: test_cond_arity_no_else_more { -- err } [ false try_all ]
   import' ./fail/test_cond_arity_no_else_more.af
-  " conditional which consumes and produces different amounts of arguments requires final `else`"
+  " arguments before ending conditional without `else`: arity mismatch"
   T_err_contains
 end
 test_cond_arity_no_else_more
 
 fun: test_switch_arity_case_mismatch { -- err } [ false try_all ]
   import' ./fail/test_switch_arity_case_mismatch.af
-  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): outputs before ending `case`: arity mismatch: required: 1, provided: 2"
+  " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): arguments before ending `case`: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_switch_arity_case_mismatch
 
 fun: test_switch_arity_input_case_mismatch { -- err } [ false try_all ]
   import' ./fail/test_switch_arity_input_case_mismatch.af
-  " in `test_switch_arity_input_case_mismatch_fail` (WORDLIST_EXEC): outputs before ending `switch`: arity mismatch: required: 2, provided: 1"
+  " in `test_switch_arity_input_case_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
   T_err_contains
 end
 test_switch_arity_input_case_mismatch
 
 fun: test_switch_arity_input_cases_mismatch { -- err } [ false try_all ]
   import' ./fail/test_switch_arity_input_cases_mismatch.af
-  " in `test_switch_arity_input_cases_mismatch_fail` (WORDLIST_EXEC): outputs before ending `case`: arity mismatch: required: 2, provided: 3"
+  " in `test_switch_arity_input_cases_mismatch_fail` (WORDLIST_EXEC): arguments before ending `case`: arity mismatch: required: 2, provided: 3"
   T_err_contains
 end
 test_switch_arity_input_cases_mismatch
 
 fun: test_switch_arity_input_case_too_many { -- err } [ false try_all ]
   import' ./fail/test_switch_arity_input_case_too_many.af
-  " unable to compile `case`: too many arguments: 15 registers available, 16 arguments provided"
+  " too many arguments: 16 registers available, 17 arguments provided"
   T_err_contains
 end
 test_switch_arity_input_case_too_many
 
 fun: test_switch_arity_no_default { -- err } [ false try_all ]
   import' ./fail/test_switch_arity_no_default.af
-  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): outputs before ending `switch`: arity mismatch: required: 1, provided: 0"
+  " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 0"
   T_err_contains
 end
 test_switch_arity_no_default
 
 fun: test_switch_no_case_empty { -- err } [ false try_all ]
   import' ./fail/test_switch_no_case_empty.af
-  " unused local"
+  " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_empty
 
 fun: test_switch_no_case_body_only { -- err } [ false try_all ]
   import' ./fail/test_switch_no_case_body_only.af
-  " unused local"
+  " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_body_only
 
 fun: test_switch_no_case_output_body_only { -- err } [ false try_all ]
   import' ./fail/test_switch_no_case_output_body_only.af
-  " unused local"
+  " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_output_body_only
 
 fun: test_switch_no_case_input_empty { -- err } [ false try_all ]
   import' ./fail/test_switch_no_case_input_empty.af
-  " unused local"
+  " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_input_empty
 
 fun: test_switch_no_case_input_body { -- err } [ false try_all ]
   import' ./fail/test_switch_no_case_input_body.af
-  " unused local"
+  " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_input_body
@@ -2914,7 +2866,6 @@ fun: main_run { -- err }
   test_loop_nested
   test_loop_while
   test_loop_while_leave
-  test_loop_until
   test_loop_for
   test_loop_for_countdown
   test_loop_for_countup

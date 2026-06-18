@@ -1247,13 +1247,6 @@ fun_comp: while
   reserve_cond xt' if_pop len loop_aux
 end
 
-\ Assumes that the top control frame is from `loop`.
-fun_comp: until ( C: prev… <loop> -- )
-      asm_pop_x1              comp_instr \ ldr x1, [x27, -8]!
-  1 8 asm_cmp_branch_not_zero comp_instr \ cbnz x1, 8
-  execute
-end
-
 \ Goes back to loop start. Requires loop frames to begin with `loop_adr`:
 \ the address of the first instruction inside the loop.
 \
@@ -1526,7 +1519,7 @@ fun_comp: {
   end
 
   \ After `--`: skip all words which aren't `}`.
-  loop read_word s" }" str= until
+  loop read_word s" }" str= =0 while end
 
   loc_len }
 end

@@ -32,7 +32,7 @@ variables:
     (?x:
       ret|recur|
       if|ifz|then|else|elif|elifz|switch|case|do|end|
-      loop|for|while|until|leave|cont|
+      loop|for|while|leave|cont|
       throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
       try|try[_]{{word}}|{{word}}[_]try|
       assert|abort|unreachable|fatal|quit|exit
