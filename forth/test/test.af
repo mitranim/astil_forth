@@ -2832,6 +2832,7 @@ s" ./test_import_empty.af" import
 T{ s" ./test_interp_ret.af" import <T> 123 }T
 
 import' ./test_const_fold.af
+import' ./test_simd.af
 
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
@@ -2969,6 +2970,7 @@ fun: main_run { -- err }
   test_arena_deinit
   test_arena_errors
   test_const_fold_all
+  test_simd_asm
 end
 
 fun: main { -- exit } [ false try_all ]

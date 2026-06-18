@@ -1,0 +1,44 @@
+import' std:lang.af
+
+\ BOT-GENERATED
+
+65536 let: CAP
+4096  let: REPS
+150994944 let: WANT
+CAP mem: BUF
+1 1 extern: getenv
+
+fun: init_chunk { ptr }
+  123 ptr      !8  97 ptr 1  + !8  44 ptr 2  + !8  98 ptr 3  + !8
+  58  ptr 4  + !8  99 ptr 5  + !8  91 ptr 6  + !8 100 ptr 7  + !8
+  93  ptr 8  + !8 101 ptr 9  + !8 125 ptr 10 + !8  32 ptr 11 + !8
+  10  ptr 12 + !8   9 ptr 13 + !8 102 ptr 14 + !8 103 ptr 15 + !8
+end
+
+fun: init
+  BUF CAP + BUF 16 +loop: ptr
+    ptr init_chunk
+  end
+end
+
+fun: delim? { c -- yes }
+  c 123 = c 125 = or c 91 = or c 93 = or c 58 = or c 44 = or
+  c 32 = or c 10 = or c 9 = or
+end
+
+fun: scan { rounds -- out }
+  0 { out }
+  rounds for
+    BUF CAP + BUF +for: ptr
+      ptr @u8 delim? out + { out }
+    end
+  end
+  out
+end
+
+fun: main { -- exit }
+  init REPS scan { out }
+  " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
+  if out WANT <> then 1 else 0 end
+end
+main

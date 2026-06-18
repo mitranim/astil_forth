@@ -1,0 +1,69 @@
+import' std:lang.af
+import' std:simd.af
+
+\ BOT-GENERATED
+
+true try_all
+
+65536 let: CAP
+4096  let: REPS
+150994944 let: WANT
+CAP mem: BUF
+1 1 extern: getenv
+
+fun: init_chunk { ptr }
+  123 ptr      !8  97 ptr 1  + !8  44 ptr 2  + !8  98 ptr 3  + !8
+  58  ptr 4  + !8  99 ptr 5  + !8  91 ptr 6  + !8 100 ptr 7  + !8
+  93  ptr 8  + !8 101 ptr 9  + !8 125 ptr 10 + !8  32 ptr 11 + !8
+  10  ptr 12 + !8   9 ptr 13 + !8 102 ptr 14 + !8 103 ptr 15 + !8
+end
+
+fun: init
+  BUF CAP + BUF 16 +loop: ptr
+    ptr init_chunk
+  end
+end
+
+fun: scan_init { chr -- err }
+  1 chr asm_movi_16b comp_instr \ movi v1.16b, #chr
+  2 0 1 asm_cmeq_16b comp_instr \ cmeq v2.16b, v0.16b, v1.16b
+end
+
+fun: scan_next { chr -- err }
+  1 chr asm_movi_16b comp_instr \ movi v1.16b, #chr
+  3 0 1 asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v1.16b
+  2 2 3 asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
+end
+
+fun: scan { pat rounds -- count }
+  [ 4 asm_movi_2d_zero comp_instr ] \ movi v4.2d, #0
+  rounds for
+    pat CAP + pat 16 +loop: ptr
+      ptr [
+        0 comp_realloc_reg
+        0 0   asm_ld1_16b   comp_instr \ ld1  {v0.16b}, [x0]
+        123 scan_init 125 scan_next 91 scan_next 93 scan_next
+         58 scan_next  44 scan_next 32 scan_next 10 scan_next 9 scan_next
+        1 1   asm_movi_16b  comp_instr \ movi v1.16b, #1
+        2 2 1 asm_and_16b   comp_instr \ and  v2.16b, v2.16b, v1.16b
+        2 2   asm_uaddlp_8h comp_instr \ uaddlp v2.8h, v2.16b
+        2 2   asm_uaddlp_4s comp_instr \ uaddlp v2.4s, v2.8h
+        2 2   asm_uaddlp_2d comp_instr \ uaddlp v2.2d, v2.4s
+        4 4 2 asm_add_2d    comp_instr \ add    v4.2d, v4.2d, v2.2d
+        0 comp_args_set
+      ]
+    end
+  end
+  [
+    4 4 4 asm_addp_2d comp_instr \ addp v4.2d, v4.2d, v4.2d
+    0 4   asm_umov_d0 comp_instr \ umov x0, v4.d[0]
+    1 comp_args_set
+  ]
+end
+
+fun: main { -- exit }
+  init BUF REPS scan { out }
+  " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
+  if out WANT <> then 1 else 0 end
+end
+main

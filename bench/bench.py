@@ -164,6 +164,18 @@ bench("const_fold_runtime_astil_aot", "bench/const_fold_runtime.af", "bench/cons
 bench("const_fold_folded_astil_reg", "bench/const_fold_folded.af", "./astil.exe bench/const_fold_folded.af", setup=(BUILD,), tools=("clang",))
 bench("const_fold_runtime_astil_reg", "bench/const_fold_runtime.af", "./astil.exe bench/const_fold_runtime.af", setup=(BUILD,), tools=("clang",))
 
+section("SCAN DELIMS")
+bench("scan_delims_c_simd", "bench/scan_delims_simd.c", "bench/scan_delims_simd.exe", setup=c_exe("bench/scan_delims_simd.c", "bench/scan_delims_simd.exe"), tools=("clang",))
+bench("scan_delims_c_naive", "bench/scan_delims_naive.c", "bench/scan_delims_naive.exe", setup=c_exe("bench/scan_delims_naive.c", "bench/scan_delims_naive.exe"), tools=("clang",))
+bench("scan_delims_astil_simd_aot", "bench/scan_delims_simd.af", "bench/scan_delims_simd_astil.exe", setup=aot("bench/scan_delims_simd.af", "bench/scan_delims_simd_astil.exe"), tools=("clang",))
+bench("scan_delims_astil_simd_reg", "bench/scan_delims_simd.af", "./astil.exe bench/scan_delims_simd.af", setup=(BUILD,), tools=("clang",))
+bench("scan_delims_astil_naive_reg", "bench/scan_delims_naive.af", "./astil.exe bench/scan_delims_naive.af", setup=(BUILD,), tools=("clang",))
+bench("scan_delims_luajit", "bench/scan_delims.lua", "luajit bench/scan_delims.lua", tools=("luajit",))
+bench("scan_delims_js_bun", "bench/scan_delims.mjs", "bun run bench/scan_delims.mjs", tools=("bun",))
+bench("scan_delims_cl_sbcl", "bench/scan_delims.lisp", "sbcl --script bench/scan_delims.lisp", tools=("sbcl",))
+bench("scan_delims_pypy", "bench/scan_delims.py", "pypy3 bench/scan_delims.py", tools=("pypy3",))
+bench("scan_delims_python", "bench/scan_delims.py", "python3 bench/scan_delims.py", tools=("python3",))
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
