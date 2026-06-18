@@ -20,8 +20,6 @@ fun: example_file_stat { -- err }
   " [example0] path:        %s"  path logf lf
   " [example0] file size:   %zd" size logf lf
   " [example0] last change: %zd" secs logf lf
-
-  nil
 end
 example_file_stat
 
@@ -64,7 +62,6 @@ fun: example_seek_and_thou_shall_find { -- err }
   " [example1] partial content of `%s`:" path logf lf lf
 
   BUF log lf
-  nil
 end
 example_seek_and_thou_shall_find
 

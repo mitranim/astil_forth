@@ -12,10 +12,10 @@ struct: Arena
   Adr   1 field: Arena_low   \ `Stack*` of active page
 end
 
-fun: arena_init { arn } arn size' Arena erase end
+fun: arena_init { arn -> } size' Arena erase end
 
-fun: arena_deinit { arn -- err }
-  ifz arn then ret end
+fun: arena_deinit { arn -> err }
+  ifz then ret end
 
   arn Stack_floor @ { floor }
   arn Stack_top   @ { ceil }
@@ -30,8 +30,8 @@ fun: arena_deinit { arn -- err }
 end
 
 \ Truncate every page and reset to first page if any, while keeping capacity.
-fun: arena_trunc { arn }
-  ifz arn then ret end
+fun: arena_trunc { arn -> }
+  ifz then ret end
 
   arn Stack_floor @ { floor }
   arn Stack_top   @ { ceil }

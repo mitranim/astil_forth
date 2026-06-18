@@ -79,8 +79,8 @@ fun: net_addr_info { port -- ainf err }
   ainf @
 end
 
-fun: sock_close { sock -- err }
-  sock close is_err_flag " unable to close socket" os_err?
+fun: sock_close { sock -> err }
+  close is_err_flag " unable to close socket" os_err?
 end
 
 fun: sock_bind { info backlog -- sock err }

@@ -65,12 +65,16 @@ fun: test_locals { -- err }
 end
 test_locals
 
+0 var: TEST_PARAMS_PUSH_VOID_VAL
 fun: test_params_push_sum { left right -> sum } + end
 fun: test_params_push_sum3 { one two three -> sum } + + end
+fun: test_params_push_void { val -> } TEST_PARAMS_PUSH_VOID_VAL ! end
 
 fun: test_params_push { -- err }
   T{ 10 20    test_params_push_sum  <T> 30 }T
   T{ 10 20 30 test_params_push_sum3 <T> 60 }T
+  T{ 10       test_params_push_void <T>    }T
+  T{ TEST_PARAMS_PUSH_VOID_VAL @    <T> 10 }T
 end
 test_params_push
 
@@ -1377,6 +1381,12 @@ fun: test_load_store { -- err }
   T{ VAR @     <T> 345 }T
 end
 test_load_store
+
+fun: test_asm_csel_order { -- err }
+  T{ 0 1 2 ASM_PL asm_csel  <T> 0b10011010100000100101000000100000 }T \ csel  x0, x1, x2, pl
+  T{ 0 1 2 ASM_PL asm_csneg <T> 0b11011010100000100101010000100000 }T \ csneg x0, x1, x2, pl
+end
+test_asm_csel_order
 
 fun: test_negate { -- err }
   T{ 0    negate <T> 0    }T

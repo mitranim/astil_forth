@@ -11,8 +11,7 @@ end
 fun: asm_movi_16b { Vd imm8 -- instr }
   imm8 31  and 5  lsl { low }
   imm8 224 and 11 lsl { high }
-  Vd low or high or
-  0b01001111000_00000_111001_00000_00000 or
+  Vd low or high or 0b01001111000_00000_111001_00000_00000 or
 end
 
 \ movi Vd.2d, #0

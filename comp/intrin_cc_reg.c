@@ -72,10 +72,6 @@ static Err interp_parse_params(Interp *interp) {
     sym->has_err = true;
   }
 
-  if (!sym->out_len) {
-    return err_redundant_param(sym->name.buf, push_inps ? "->" : "--");
-  }
-
   if (push_inps) {
     if (discard) return err_discard_param_push(sym->name.buf);
 
@@ -85,6 +81,12 @@ static Err interp_parse_params(Interp *interp) {
       const auto loc = comp->ctx.args[ind].loc;
       if (loc) loc->used = true;
     }
+
+    return nullptr;
+  }
+
+  if (!sym->out_len) {
+    return err_redundant_param(sym->name.buf, push_inps ? "->" : "--");
   }
   return nullptr;
 }

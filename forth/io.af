@@ -135,9 +135,10 @@ fun: io_err { action path -- err_str }
   code strerror { msg }
   if msg then
     action " unable to %s `%s`; code: %d; msg: %s"
-    action path code msg wrapf ret
+    action path code msg wrapf
+  else
+    action " unable to %s `%s`; code: %s" action path code wrapf
   end
-  action " unable to %s `%s`; code: %s" action path code wrapf
 end
 
 fun: file_err { action file -- err_str }
@@ -162,28 +163,27 @@ fun: file_err { action file -- err_str }
 end
 
 fun: fd_stat { fdes path stat_adr -- err }
-  if fdes stat_adr fstat then " stat" path io_err throw end
+  if fdes stat_adr fstat is_err_flag then " stat" path io_err throw end
 end
 
-fun: path_stat { path stat_adr -- err }
-  if path stat_adr stat then " stat" path io_err throw end
+fun: path_stat { path stat_adr -> err }
+  if stat is_err_flag then " stat" path io_err throw end
 end
 
-fun: fd_open { path mode -- fdes err }
-  path mode open { out }
+fun: fd_open { path mode -> fdes err }
+  open { out }
   if out is_err_flag then " open" path io_err throw end
   out
 end
 
-fun: file_open { path mode -- file err }
-  path mode fopen { file }
+fun: file_open { path mode -> file err }
+  fopen { file }
   ifz file then " open" path io_err throw end
   file
 end
 
-fun: file_write_char { char file -- err }
-  ifz char file fputc is_err_flag then ret end
-  " failed to write char" file file_err
+fun: file_write_char { char file -> err }
+  if fputc is_err_flag then " failed to write char" file file_err throw end
 end
 
 fun: file_write_bytes { buf len file -- err }

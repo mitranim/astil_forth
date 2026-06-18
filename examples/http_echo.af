@@ -12,8 +12,8 @@ import' ./http_util.af
 
 4096 let: BUF_CAP
 
-fun: write_opt { fdes buf len } fdes buf len write { -- } end
-fun: write_eol { fdes }         fdes CRLF 2 write_opt     end \ \r\n
+fun: write_opt { fdes buf len -> } write { -- } end
+fun: write_eol { fdes -> } CRLF 2 write_opt end \ \r\n
 
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
 fun: read_req { conn buf cap -- len err }
@@ -52,8 +52,8 @@ fun: respond_conn { conn -- err }
   " [srv] echoed request back to client" elog elf
 end
 
-fun: handle_conn { conn }
-  conn respond_conn { err }
+fun: handle_conn { conn -> }
+  respond_conn { err }
 
   if err then
     " [srv] unable to respond; error: %s" err elogf elf
