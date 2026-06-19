@@ -17,10 +17,13 @@ import' ./lang.af
 true try_all
 
 fun: testing_stack_eq { len0 len1 len stk -- equal }
-  len 0 +for: ind
+  0 { ind }
+  loop
+    ind len < while
     ind len0 + stk stack_cell_at @ { one }
     ind len1 + stk stack_cell_at @ { two }
     if one two <> then false ret end
+    inc: ind
   end
   true
 end
@@ -28,16 +31,21 @@ end
 fun: testing_stack_log { len0 len1 len2 stk }
   " T{ " elog
 
-  len1 len0 +for: ind
+  len0 { ind }
+  loop
+    ind len1 < while
     ind stk stack_cell_at @ { val }
     " %zd " val elogf
+    inc: ind
   end
 
   " <T> " elog
 
-  len2 ind +for: ind
+  loop
+    ind len2 < while
     ind stk stack_cell_at @ { val }
     " %zd " val elogf
+    inc: ind
   end
 
   " }T" elog elf

@@ -19,8 +19,11 @@ fun: init_chunk { ptr }
 end
 
 fun: init
-  BUF CAP + BUF 16 +loop: ptr
+  BUF { ptr }
+  loop
+    ptr BUF CAP + < while
     ptr init_chunk
+    ptr 16 + { ptr }
   end
 end
 
@@ -37,8 +40,13 @@ end
 
 fun: scan { pat rounds -- count }
   [ 4 asm_movi_2d_zero comp_instr ] \ movi v4.2d, #0
-  rounds for
-    pat CAP + pat 16 +loop: ptr
+  rounds { ind }
+  loop
+    dec: ind
+    ind >=0 while
+    pat { ptr }
+    loop
+      ptr pat CAP + < while
       ptr [
         0 comp_realloc_reg
         0 0   asm_ld1_16b   comp_instr \ ld1  {v0.16b}, [x0]
@@ -52,6 +60,7 @@ fun: scan { pat rounds -- count }
         4 4 2 asm_add_2d    comp_instr \ add    v4.2d, v4.2d, v2.2d
         0 comp_args_set
       ]
+      ptr 16 + { ptr }
     end
   end
   [

@@ -914,19 +914,35 @@ fun: test_loop_while_leave { -- err }
 end
 test_loop_while_leave
 
-fun: test_loop_for { -- err }
+fun: test_loop_manual_countdown { -- err }
   \ Should terminate right away.
-  T{ -12 for end <T> }T
-  T{ -1  for end <T> }T
-  T{ 0   for end <T> }T
-
-  T{ 0 { val } 12 for       val inc { val }       end val <T> 12 }T
-  T{ 0 { val } 12 for       val inc { val } leave end val <T> 1  }T
-  T{ 0 { val } 12 for leave val inc { val }       end val <T> 0  }T
+  T{ -12 { ind } loop dec: ind ind >=0 while end <T> }T
+  T{ -1  { ind } loop dec: ind ind >=0 while end <T> }T
+  T{ 0   { ind } loop dec: ind ind >=0 while end <T> }T
 
   T{
-    0 { val }
-    12 for
+    0 12 { val ind }
+    loop dec: ind ind >=0 while       val inc { val }       end
+    val
+  <T> 12 }T
+
+  T{
+    0 12 { val ind }
+    loop dec: ind ind >=0 while       val inc { val } leave end
+    val
+  <T> 1 }T
+
+  T{
+    0 12 { val ind }
+    loop dec: ind ind >=0 while leave val inc { val }       end
+    val
+  <T> 0 }T
+
+  T{
+    0 12 { val ind }
+    loop
+      dec: ind
+      ind >=0 while
       if val 5 > then leave end
       val inc { val }
     end
@@ -936,8 +952,10 @@ fun: test_loop_for { -- err }
   }T
 
   T{
-    0 { val }
-    12 for
+    0 12 { val ind }
+    loop
+      dec: ind
+      ind >=0 while
       val 6 < while
       val inc { val }
     end
@@ -947,8 +965,10 @@ fun: test_loop_for { -- err }
   }T
 
   T{
-    0 { val }
-    12 for
+    0 12 { val ind }
+    loop
+      dec: ind
+      ind >=0 while
       val 5 < while
       val 8 < while
       val inc { val }
@@ -959,8 +979,10 @@ fun: test_loop_for { -- err }
   }T
 
   T{
-    0 { val }
-    12 for
+    0 12 { val ind }
+    loop
+      dec: ind
+      ind >=0 while
       val 8 < while
       val 5 < while
       val inc { val }
@@ -970,211 +992,35 @@ fun: test_loop_for { -- err }
     5
   }T
 end
-test_loop_for
+test_loop_manual_countdown
 
-\ A countdown loop walks the range [floor,ceil), in the backwards direction.
-\ We retain the index local after the loop with an out-of-range value, which
-\ is always -1 in this case.
-fun: test_loop_for_countdown { -- err }
-  T{ -12 -for: ind end <T> }T
-  T{ -1  -for: ind end <T> }T
-  T{ 0   -for: ind end <T> }T
-
-  T{ 666 { ind } 12 -for: ind                            end ind <T> -1 }T
-  T{ 666 { ind } 12 -for: ind                  leave     end ind <T> 11 }T
-  T{ 666 { ind } 12 -for: ind if ind 5 <= then leave end end ind <T> 5  }T
-  T{ 666 { ind } 12 -for: ind    ind 5 >       while     end ind <T> 5  }T
-
+fun: test_loop_manual_counting { -- err }
   T{
-    666 { ind }
-    12 -for: ind
-      ind 7 > while
-      ind 5 > while
+    0 0 { acc ind }
+    loop
+      ind 12 < while
+      acc ind + { acc }
+      inc: ind
     end
-    ind
+    acc ind
   <T>
-    7
+    66 12
   }T
 
   T{
-    666 { ind }
-    12 -for: ind
-      ind 5 > while
-      ind 7 > while
+    0 { acc }
+    8 { ind }
+    loop
+      ind 2 - { ind }
+      0 ind <= while
+      acc ind + { acc }
     end
-    ind
+    acc ind
   <T>
-    7
+    12 -2
   }T
 end
-test_loop_for_countdown
-
-fun: test_loop_for_countup { -- err }
-  T{ -1 -1 +for: ind end ind <T> -1 }T
-  T{ -1 -2 +for: ind end ind <T> -1 }T
-  T{  0 -2 +for: ind end ind <T>  0 }T
-  T{  0  0 +for: ind end ind <T>  0 }T
-  T{  1  0 +for: ind end ind <T>  1 }T
-  T{  2  0 +for: ind end ind <T>  2 }T
-  T{ 12  0 +for: ind end ind <T> 12 }T
-
-  T{ -1 -2 +for: ind       leave end ind <T> -2 }T
-  T{ -1 -1 +for: ind       leave end ind <T> -1 }T
-  T{  0  0 +for: ind       leave end ind <T>  0 }T
-  T{  1  0 +for: ind       leave end ind <T>  0 }T
-  T{  1  1 +for: ind       leave end ind <T>  1 }T
-  T{  2  1 +for: ind       leave end ind <T>  1 }T
-  T{  2  1 +for: ind false while end ind <T>  1 }T
-  T{  2  1 +for: ind true  while end ind <T>  2 }T
-
-  T{
-    -123 { ind }
-    12 0 +for: ind
-      if ind 5 > then leave end
-    end
-    ind
-  <T>
-    6
-  }T
-
-  T{
-    -123 { ind }
-    12 0 +for: ind
-      ind 6 < while
-    end
-    ind
-  <T>
-    6
-  }T
-
-  T{
-    -123 { ind }
-    12 0 +for: ind
-      ind 8 < while
-      ind 6 < while
-    end
-    ind
-  <T>
-    6
-  }T
-
-  T{
-    -123 { ind }
-    12 0 +for: ind
-      ind 6 < while
-      ind 8 < while
-    end
-    ind
-  <T>
-    6
-  }T
-end
-test_loop_for_countup
-
-fun: test_loop_countdown { -- err }
-  0 { len }
-
-  T{
-    8 0 1
-    -loop: ind
-      inc: len
-    end
-    len ind
-  <T>
-    8 -1
-  }T
-
-  0 { len }
-  T{ 8 0 2 -loop: ind inc: len end len ind <T> 4 -2 }T
-
-  0 { len }
-  T{ 8 0 3 -loop: ind inc: len end len ind <T> 2 -1 }T
-
-  0 { len }
-  T{ 8 0 4 -loop: ind inc: len end len ind <T> 2 -4 }T
-
-  0 { len }
-  T{ 8 0 5 -loop: ind inc: len end len ind <T> 1 -2 }T
-
-  0 { len }
-  T{ 8 0 6 -loop: ind inc: len end len ind <T> 1 -4 }T
-
-  0 { len }
-  T{ 8 0 7 -loop: ind inc: len end len ind <T> 1 -6 }T
-
-  0 { len }
-  T{ 8 0 8 -loop: ind inc: len end len ind <T> 1 -8 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 0 9 -loop: ind inc: len end len ind <T> 0 -1 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 0 10 -loop: ind inc: len end len ind <T> 0 -2 }T
-end
-test_loop_countdown
-
-\ When the loop terminates, the "ind" local holds an out-of-range value.
-\ If the value is out of range at the start, it should remain unchanged.
-fun: test_loop_countup { -- err }
-  0 { len }
-
-  T{
-    8 0 1
-    +loop: ind
-      inc: len
-    end
-    len ind
-  <T>
-    8 8
-  }T
-
-  0 { len }
-  T{ 8 0 2 +loop: ind inc: len end len ind <T> 4 8 }T
-
-  0 { len }
-  T{ 8 0 3 +loop: ind inc: len end len ind <T> 3 9 }T
-
-  0 { len }
-  T{ 8 0 4 +loop: ind inc: len end len ind <T> 2 8 }T
-
-  0 { len }
-  T{ 8 0 5 +loop: ind inc: len end len ind <T> 2 10 }T
-
-  0 { len }
-  T{ 8 0 6 +loop: ind inc: len end len ind <T> 2 12 }T
-
-  0 { len }
-  T{ 8 0 7 +loop: ind inc: len end len ind <T> 2 14 }T
-
-  0 { len }
-  T{ 8 0 8 +loop: ind inc: len end len ind <T> 1 8 }T
-
-  0 { len }
-  T{ 8 0 9 +loop: ind inc: len end len ind <T> 1 9 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 8 1 +loop: ind inc: len end len ind <T> 0 8 }T
-
-  \ Out of range from the start.
-  0 { len }
-  T{ 8 9 1 +loop: ind inc: len end len ind <T> 0 9 }T
-end
-test_loop_countup
-
-fun: test_loop_countup_nested { -- err }
-  T{
-    4 0 1 +loop: one
-      7 one 1 +loop: two end
-    end
-    one two
-  <T>
-    4 7
-  }T
-end
-test_loop_countup_nested
+test_loop_manual_counting
 
 fun: test_cont_loop_basic
   loop
@@ -1195,59 +1041,25 @@ fun: test_cont_loop { -- err }
 end
 test_cont_loop
 
-fun: test_cont_for { -- err }
-  7 for cont end \ Should terminate.
+fun: test_cont_countdown_manual { -- err }
+  7 { ind }
+  loop
+    dec: ind
+    ind >=0 while
+    cont
+  end \ Should terminate.
 
-  0 { len }
-  7 for
+  0 7 { len ind }
+  loop
+    dec: ind
+    ind >=0 while
     len inc { len }
     cont
     leave
   end
   T{ len <T> 7 }T
 end
-test_cont_for
-
-\ Should terminate.
-fun: test_cont_for_countup { -- err }
-  12 0 +for: ind cont end
-  T{ ind <T> 12 }T
-end
-test_cont_for_countup
-
-fun: test_cont_loop_countdown { -- err }
-  8 0 1 -loop: ind cont end \ Should terminate.
-  T{ ind <T> -1 }T
-
-  T{
-    8 0 1
-    -loop: ind
-      if ind 3 > then cont end
-      leave
-    end
-    ind
-  <T>
-    3
-  }T
-end
-test_cont_loop_countdown
-
-fun: test_cont_loop_countup { -- err }
-  8 0 1 +loop: ind cont end \ Should terminate.
-  T{ ind <T> 8 }T
-
-  T{
-    8 0 1
-    +loop: ind
-      if ind 5 < then cont end
-      leave
-    end
-    ind
-  <T>
-    5
-  }T
-end
-test_cont_loop_countup
+test_cont_countdown_manual
 
 fun: cont_meta_loop_leave_top { val -- out }
   val
@@ -1266,50 +1078,20 @@ fun: cont_meta_loop_while_top { val -- out }
   end
 end
 
-fun: cont_meta_for_top { val count -- out }
-  val count
-  for
-    inc
+fun: cont_meta_countdown_manual_top { val len -- out }
+  loop
+    dec: len
+    len >=0 while
+    val inc { val }
   end
-end
-
-fun: cont_meta_minus_for_top { val count -- out }
-  val count
-  -for: ind
-    ind +
-  end
-end
-
-fun: cont_meta_plus_for_top { val ceil floor -- out }
-  val ceil floor
-  +for: ind
-    ind +
-  end
-end
-
-fun: cont_meta_minus_loop_top { val ceil floor step -- out }
-  val ceil floor step
-  -loop: ind
-    ind +
-  end
-end
-
-fun: cont_meta_plus_loop_top { val ceil floor step -- out }
-  val ceil floor step
-  +loop: ind
-    ind +
-  end
+  val
 end
 
 fun: test_cont_meta_loop_inputs { -- err }
   T{ 10 cont_meta_loop_leave_top <T> 11 }T
   T{ 10 cont_meta_loop_while_top <T> 11 }T
 
-  T{ 10 3 cont_meta_for_top <T> 13 }T
-  T{ 10 3 cont_meta_minus_for_top <T> 13 }T
-  T{ 10 4 1 cont_meta_plus_for_top <T> 16 }T
-  T{ 10 4 1 1 cont_meta_plus_loop_top <T> 16 }T
-  T{ 10 4 1 1 cont_meta_minus_loop_top <T> 16 }T
+  T{ 10 3 cont_meta_countdown_manual_top <T> 13 }T
 end
 test_cont_meta_loop_inputs
 
@@ -2873,18 +2655,11 @@ fun: main_run { -- err }
   test_loop_nested
   test_loop_while
   test_loop_while_leave
-  test_loop_for
-  test_loop_for_countdown
-  test_loop_for_countup
-  test_loop_countdown
-  test_loop_countup
-  test_loop_countup_nested
+  test_loop_manual_countdown
+  test_loop_manual_counting
   test_cont_loop_basic
   test_cont_loop
-  test_cont_for
-  test_cont_for_countup
-  test_cont_loop_countdown
-  test_cont_loop_countup
+  test_cont_countdown_manual
   test_cont_meta_loop_inputs
   test_load_store
   test_negate

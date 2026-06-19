@@ -1945,10 +1945,7 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 \
 \ SYNC[control_meta_layout]:
 \
-\ - 63..32: instruction offset
-\ - 23..31: frame-specific small data; currently unused
-\ - 19..22: counted-loop `b.<cond>` offset relative to `<loop_beg>`, packed
-\ - 15..18: frame-specific Arm64 condition code
+\ - 15..63: instruction offset
 \ -     14: exec_prev
 \ -     13: 0 / 1 = `cbz` / `cbnz`
 \ -     12: has_else_or_case
@@ -1978,13 +1975,9 @@ CONT_MASK_INP_LEN CONT_MASK_INP_LEN bit_len lsl let: CONT_MASK_OUT_LEN
 CONT_MASK_HAS_INP          1 lsl let: CONT_MASK_HAS_OUT
 CONT_MASK_HAS_OUT          1 lsl let: CONT_MASK_HAS_ELSE_OR_CASE
 CONT_MASK_HAS_ELSE_OR_CASE 1 lsl let: CONT_MASK_CBNZ
-CONT_MASK_CBNZ             1 lsl let: CONT_MASK_EXEC_PREV
+CONT_MASK_CBNZ 1 lsl let: CONT_MASK_EXEC_PREV
 
-CONT_MASK_EXEC_PREV bit_len       let: CONT_META_COND_OFF
-4 low_bits CONT_META_COND_OFF lsl let: CONT_MASK_META_COND
-
-4 low_bits CONT_MASK_META_COND bit_len lsl let: CONT_MASK_LOOP_COND_REL
-32 low_bits invert let: CONT_MASK_INSTR_OFF
+CONT_MASK_EXEC_PREV bit_len low_bits invert let: CONT_MASK_INSTR_OFF
 
 fun: cont_meta_instr_off_set { off meta -- meta }
   off instr_off_pack meta CONT_MASK_INSTR_OFF bit_mask_set
@@ -1996,12 +1989,6 @@ end
 
 fun: cont_meta_instr_adr { meta -> adr }
   cont_meta_instr_off_get instr_adr
-end
-
-fun: cont_meta_loop_exit_branch_off_get { meta -- off }
-  meta cont_meta_instr_off_get { off }
-  meta CONT_MASK_LOOP_COND_REL bit_mask_get instr_off_pack
-  off +
 end
 
 fun: reserve_instr { -- off err }
@@ -3287,10 +3274,6 @@ end
 \ then pops the next function in the chain. The cascade terminates
 \ when encountering a function which doesn't pop a preceding one.
 \
-\ In every counting loop with a named index, such as `+for: ind`,
-\ when the loop terminates normally, not with `leave` or `while`,
-\ the index local is still in scope, with an out-of-range value.
-
 \ Control stack for auxiliary loop constructs like `leave` and `while`.
 \ Each auxiliary construct pushes `aux_meta aux_pop`, and `loop_frame_end_xt`
 \ repeatedly executes aux pops until it reaches the `nop` terminator installed
@@ -3309,21 +3292,14 @@ end
 \                                   ^
 \                                   LOOP_IND points here
 \
-\ `meta` holds the loop start instruction offset, entry arity,
-\ and pop-specific metadata described by SYNC[control_meta_layout].
-\ Counted loops keep their counters in compiler locals; current loop frames
-\ do not carry loop-specific extra cells on the main control stack.
+\ `meta` holds the loop start instruction offset and entry arity,
+\ as described by SYNC[control_meta_layout]. Every loop exit point
+\ must have exactly this entry arity. Loops have no fallback/else
+\ branch and do not infer a separate output arity.
 \
 \ In stack signatures below, `prev_loop_ind loop_frame_end_xt` is often
 \ shortened to `<loop_prev>`, and `meta end_xt` is the part returned by
 \ each loop word for `end` to consume.
-\
-\ LOOP-ELSE-GAP: loops currently support only same-arity exits. Future
-\ `leave ... else ... end` support needs a distinct fallback path where
-\ `else` supplies outputs for never-entered / left loops, while loop-back
-\ paths still validate the original entry arity. Any line tagged with
-\ LOOP-ELSE-GAP below depends on the current same-arity / absolute-register
-\ model and must be revisited for arbitrary output arity.
 0 var: LOOP_IND
 
 fun: loop_frame_adr { -- adr err }
@@ -3348,45 +3324,24 @@ fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
   xt' nop LOOP_AUX >s
 end
 
-fun: loop_meta_init { off -- meta err }
-  comp_args_get 0 CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
-  off meta cont_meta_instr_off_set
-end
-
 fun: loop_back { meta -> err }
   cont_meta_instr_adr { adr }
   here_write { out }
   adr out - asm_branch comp_instr \ b <beg>
 end
 
-fun: loop_back_close { meta ctx -- err }
-  meta CONT_MASK_INP_LEN bit_mask_get ctx comp_args_valid
-  meta loop_back \ b <beg>
-end
-
-fun: loop_branch_exit { meta ctx -- meta err }
-  if meta CONT_MASK_HAS_OUT and then
-    meta CONT_MASK_OUT_LEN bit_mask_get ctx comp_args_valid
-    meta ret
-  end
-  comp_args_get meta CONT_MASK_OUT_LEN bit_mask_set CONT_MASK_HAS_OUT or
-end
-
-\ TODO: this is a semi-placeholder which enforces `inp_len out_len =`.
-\ Works when loops are incompatible with `else`. If we ever manage to
-\ make `else` work with loops, this may need an update.
 fun: loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
   comp_barrier
-  " arguments before ending `loop`" { ctx }
-  meta ctx loop_back_close
-  meta ctx loop_branch_exit { -- } \ Semi-placeholder; `else` may change this.
+  meta CONT_MASK_INP_LEN bit_mask_get " arguments before ending `loop`" comp_args_valid
+  meta loop_back \ b <beg>
   execute'' end \ Run `loop_frame_end_xt`.
 end
 
 fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
   comp_barrier
   loop_frame_init
-  here_write instr_off loop_meta_init xt' loop_end_xt
+  comp_args_get 0 CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
+  here_write instr_off meta cont_meta_instr_off_set xt' loop_end_xt
 end
 
 fun: leave_end_xt { -- err }
@@ -3397,16 +3352,10 @@ end
 
 \ Breaks out of any loop.
 fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_end_xt )
-  loop_frame_adr { frame }
-  frame @ { meta }
+  loop_frame_adr @ { meta }
   meta CONT_MASK_INP_LEN bit_mask_get { len }
 
-  if comp_args_get len < then
-    " invalid attempt to `leave` with fewer arguments than at loop entry" throw
-  end
-
-  meta " arguments before `leave`" loop_branch_exit { meta }
-  meta frame !
+  len " arguments before `leave`" comp_args_valid
 
   len comp_args_set
   comp_barrier
@@ -3416,15 +3365,14 @@ end
 
 fun: while_end_xt { -- err }
   LOOP_AUX s> { meta }
-  meta CONT_MASK_OUT_LEN bit_mask_get { reg }
+  meta CONT_MASK_INP_LEN bit_mask_get { reg }
   reg meta if_patch
   LOOP_AUX s> execute
 end
 
 \ Tests a predicate; if predicate is 0, leaves the loop.
 fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
-  loop_frame_adr { frame }
-  frame @ { meta }
+  loop_frame_adr @ { meta }
   meta CONT_MASK_INP_LEN bit_mask_get { inp_len }
 
   " arguments before `while`" { ctx }
@@ -3432,12 +3380,7 @@ fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
   comp_args_get dec { out_len }
   out_len comp_args_set
 
-  if out_len inp_len < then
-    " invalid attempt to `while` with fewer arguments than at loop entry" throw
-  end
-
-  meta ctx loop_branch_exit { meta }
-  meta frame !
+  out_len ctx comp_args_valid
   comp_barrier
   inp_len comp_args_set
 
@@ -3452,240 +3395,6 @@ fun_comp: cont { -- err }
   meta CONT_MASK_INP_LEN bit_mask_get { len }
   len " arguments before `cont`" comp_args_valid
   meta loop_back
-end
-
-fun: loop_counted_end_xt { meta -- err }
-  ( LOOP_AUX: …aux… -- )
-  ( C: <loop_prev> -- )
-  comp_barrier
-  meta cont_meta_loop_exit_branch_off_get instr_adr { cond_adr }
-
-  meta " arguments before ending counted loop" loop_back_close \ b <beg>
-  execute'' end  \ Run `loop_frame_end_xt`.
-
-  \ Retropatch `b.<cond> <end>`.
-  here_write cond_adr - { off }
-  meta CONT_MASK_META_COND bit_mask_get { cond }
-  off cond asm_branch_cond cond_adr !32
-end
-
-fun: loop_counted_init { meta beg_off end_off cond -- meta end_xt err }
-  cond meta CONT_MASK_META_COND bit_mask_set { meta }
-  end_off beg_off - instr_off_unpack { cond_rel }
-  if cond_rel 4 low_bits u> then
-    " internal error: counted-loop branch offset overflow" throw
-  end
-  cond_rel meta CONT_MASK_LOOP_COND_REL bit_mask_set
-  xt' loop_counted_end_xt
-end
-
-fun: for_loop_countdown_init { cur ctx -- meta end_xt err }
-  ( C: -- <loop_prev> )
-  ( E: ceil -- )
-  ( LOOP_AUX: -- nop )
-
-  \ LOOP-ELSE-GAP: countdown loops consume the limit into a local and record
-  \ post-pop arg length as loop entry arity.
-  cur comp_pop_into_local            \ mov <cur>, xN | str xN, [FP, <cur>]
-  loop_frame_init
-  comp_barrier                       \ Clobber / relocate locals.
-  here_write instr_off { beg_off }   \ `end` jumps here.
-  cur comp_push_from_local           \ mov xN, <cur> | ldr xN, [FP, <cur>]
-  comp_args_get dec { reg }
-  reg reg 1 asm_sub_imm comp_instr   \ sub xN, xN, 1
-  cur comp_pop_into_local            \ mov <cur>, xN | str xN, [FP, <cur>]
-  comp_barrier                       \ Tell compiler to commit "local set".
-  reg asm_cmp_zero comp_instr        \ cmp xN, 0
-
-  \ LOOP-ELSE-GAP: this single branch becomes the normal after-loop target.
-  \ It is not split into never-entered fallback vs normal completion.
-  reserve_instr { end_off }          \ b.lt <end>
-
-  beg_off loop_meta_init ctx loop_branch_exit
-  beg_off
-  end_off
-  ASM_LT \ stop on <
-  loop_counted_init
-end
-
-\ A count-down-by-one loop with the range `[0,ceil)`.
-\ Analogue of the non-standard `for … next` loop.
-\ Usage; ceiling must be positive:
-\
-\   123
-\   for
-\     " looping" log lf
-\   end
-\
-\ Anton Ertl circa 1994:
-\
-\ > This is the preferred loop of native code compiler writers
-\   who are too lazy to optimize `?do` loops properly.
-fun_comp: for { -- meta end_xt err }
-  ( C: -- <loop_prev> )
-  ( E: ceil -- )
-  ( LOOP_AUX: -- nop )
-  1 " arguments before `for`" comp_args_min
-  nil 0 comp_local " arguments before exiting `for`" for_loop_countdown_init
-end
-
-\ Like `for` but requires a local name to make the index
-\ accessible. Usage; ceiling must be positive:
-\
-\   123
-\   -for: ind
-\     ind .
-\   end
-fun_comp: -for: { -- meta end_xt err }
-  ( C: "name" -- <loop_prev> )
-  ( E: ceil -- )
-  ( LOOP_AUX: -- nop )
-  1 " arguments before `-for:`" comp_args_min
-  read_word comp_local " arguments before exiting `-for:`" for_loop_countdown_init
-end
-
-\ Count-up loop with the range `[floor,ceil)`. Usage:
-\
-\   ceil floor +for: ind       end
-\   123  45    +for: ind ind . end
-fun_comp: +for: { -- meta end_xt err }
-  ( C: "name" -- <loop_prev> )
-  ( E: ceil floor -- )
-
-  2 " arguments before `+for:`" comp_args_min
-  nil 0     comp_local { lim } \ ceil  = limit
-  read_word comp_local { cur } \ floor = cursor
-
-  cur comp_pop_into_local             \ mov <cur>, xN | str xN, [FP, <cur>]
-  lim comp_pop_into_local             \ mov <lim>, xN | str xN, [FP, <lim>]
-
-  loop_frame_init
-  comp_barrier                        \ Clobber / relocate locals.
-  \ LOOP-ELSE-GAP: entry jumps to the same compare that normal iterations use;
-  \ this gives one after-loop target, not a distinct else fallback target.
-  reserve_instr { cmp }               \ b <cmp>
-  here_write instr_off { beg_off }    \ `end` jumps here.
-  cur comp_push_from_local            \ mov xN, <cur> | ldr xN, [FP, <cur>]
-  comp_args_get dec { cur_reg }
-  cur_reg cur_reg 1 asm_add_imm comp_instr \ add xN, xN, 1
-  cur comp_pop_into_local             \ mov <cur>, xN | str xN, [FP, <cur>]
-  comp_barrier                        \ Tell compiler to commit "local set".
-  cmp instr_adr { cmp }
-  here_write cmp - asm_branch cmp !32 \ b <cmp>
-  lim comp_push_from_local            \ mov xN, <lim> | ldr xN, [FP, <lim>]
-  cur comp_push_from_local            \ mov xN, <cur> | ldr xN, [FP, <cur>]
-  comp_args2_regs { lim_reg cur_reg }
-  lim_reg cur_reg asm_cmp_reg comp_instr \ cmp <lim>, <cur>
-  \ LOOP-ELSE-GAP: drop compare operands back to the absolute entry arity.
-  \ Future arbitrary output arity must not be represented by this register cut.
-  lim_reg comp_args_set
-  \ LOOP-ELSE-GAP: single compare exit is patched after the loop; no separate
-  \ never-entered branch exists for loop `else`.
-  reserve_instr { end_off }          \ b.le <end>
-
-  beg_off loop_meta_init " arguments before exiting `+for:`" loop_branch_exit
-  beg_off end_off ASM_LE
-  loop_counted_init \ stop on <=
-end
-
-\ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
-fun_comp: -loop: { -- meta end_xt err }
-  ( C: "name" -- <loop_prev> )
-  ( E: ceil floor step -- )
-  ( LOOP_AUX: -- nop )
-
-  3 " arguments before `-loop:`" comp_args_min
-  read_word comp_local { cur }  \ ceil  = cursor
-  nil 0 comp_local     { lim }  \ floor = limit
-  nil 0 comp_local     { step }
-
-  step comp_pop_into_local            \ mov <step>, xN | str xN, [FP, <step>]
-  lim  comp_pop_into_local            \ mov <lim>,  xN | str xN, [FP, <lim>]
-  cur  comp_pop_into_local            \ mov <cur>,  xN | str xN, [FP, <cur>]
-  loop_frame_init
-  comp_barrier                        \ Clobber / relocate locals.
-  here_write instr_off { beg_off }    \ `end` jumps here.
-  beg_off loop_meta_init { meta }
-  cur  comp_push_from_local           \ mov xN, <cur>  | ldr xN, [FP, <cur>]
-  step comp_push_from_local           \ mov xN, <step> | ldr xN, [FP, <step>]
-  comp_args2_regs { cur_reg step_reg }
-  cur_reg cur_reg step_reg asm_sub_reg comp_instr \ sub <cur>, <cur>, <step>
-  \ LOOP-ELSE-GAP: drop step operand back to the absolute entry arity.
-  \ Future arbitrary output arity must not be represented by this register cut.
-  step_reg comp_args_set
-  cur comp_pop_into_local             \ mov <cur>, xN | str xN, [FP, <cur>]
-  comp_barrier                        \ Tell compiler to commit "local set".
-  cur comp_push_from_local            \ mov xN, <cur> | ldr xN, [FP, <cur>]
-  lim comp_push_from_local            \ mov xN, <lim> | ldr xN, [FP, <lim>]
-  comp_args2_regs { cur_reg lim_reg }
-  cur_reg lim_reg asm_cmp_reg comp_instr \ cmp <cur>, <lim>
-  \ LOOP-ELSE-GAP: drop compare operands back to the absolute entry arity.
-  \ Future arbitrary output arity must not be represented by this register cut.
-  cur_reg comp_args_set
-  \ LOOP-ELSE-GAP: single compare exit is patched after the loop; no separate
-  \ never-entered branch exists for loop `else`.
-  reserve_instr { end_off }              \ b.lt <end>
-
-  meta " arguments before exiting `-loop:`" loop_branch_exit { meta }
-  meta beg_off end_off ASM_LT loop_counted_init \ stop on <
-end
-
-\ Similar to the standard `?do ... +loop`, but terminated with an `end`
-\ like all our loops. Takes a name to make the index accessible. Usage:
-\
-\   ceil floor step +loop: ind       end
-\   123  23    3    +loop: ind ind . end
-\
-\ When the loop ends, the index local is still in scope,
-\ holding a value which is out of range. For example, then
-\ `ceil floor step` is `7 3 2`, the loop iterates twice,
-\ with indexes `3` and `5`, and the index outside is `8`.
-fun_comp: +loop: { -- meta end_xt err }
-  ( C: "name" -- <loop_prev> )
-  ( E: ceil floor step -- )
-
-  3 " arguments before `+loop:`" comp_args_min
-  nil 0 comp_local     { lim } \ ceil  = limit
-  read_word comp_local { cur } \ floor = cursor
-  nil 0 comp_local     { step }
-
-  step comp_pop_into_local            \ mov <step>, xN | str xN, [FP, <step>]
-  cur  comp_pop_into_local            \ mov <cur>,  xN | str xN, [FP, <cur>]
-  lim  comp_pop_into_local            \ mov <lim>,  xN | str xN, [FP, <lim>]
-
-  loop_frame_init
-  comp_barrier                        \ Clobber / relocate locals.
-  \ LOOP-ELSE-GAP: entry jumps to the same compare that normal iterations use;
-  \ this gives one after-loop target, not a distinct else fallback target.
-  reserve_instr { cmp_enter_off }     \ b <cmp>
-  here_write instr_off { beg_off }    \ `end` jumps here.
-  cur  comp_push_from_local           \ mov xN, <cur>  | ldr xN, [FP, <cur>]
-  step comp_push_from_local           \ mov xN, <step> | ldr xN, [FP, <step>]
-  comp_args2_regs { cur_reg step_reg }
-  cur_reg cur_reg step_reg asm_add_reg comp_instr \ add <cur>, <cur>, <step>
-  \ LOOP-ELSE-GAP: drop step operand back to the absolute entry arity.
-  \ Future arbitrary output arity must not be represented by this register cut.
-  step_reg comp_args_set
-  cur comp_pop_into_local             \ mov <cur>, xN | str xN, [FP, <cur>]
-  comp_barrier                        \ Tell compiler to commit "local set".
-  \ LOOP-ELSE-GAP: entry jumps to the same compare that normal iterations use;
-  \ this gives one after-loop target, not a distinct else fallback target.
-  cmp_enter_off instr_adr { cmp_enter_adr }
-  here_write cmp_enter_adr - asm_branch cmp_enter_adr !32 \ b <cmp>
-  lim comp_push_from_local            \ mov xN, <lim> | ldr xN, [FP, <lim>]
-  cur comp_push_from_local            \ mov xN, <cur> | ldr xN, [FP, <cur>]
-  comp_args2_regs { lim_reg cur_reg }
-  lim_reg cur_reg asm_cmp_reg comp_instr \ cmp <lim>, <cur>
-  \ LOOP-ELSE-GAP: drop compare operands back to the absolute entry arity.
-  \ Future arbitrary output arity must not be represented by this register cut.
-  lim_reg comp_args_set
-  \ LOOP-ELSE-GAP: single compare exit is patched after the loop; no separate
-  \ never-entered branch exists for loop `else`.
-  reserve_instr { end_off }              \ b.le <end>
-
-  beg_off loop_meta_init " arguments before exiting `+loop:`" loop_branch_exit
-  beg_off end_off ASM_LE
-  loop_counted_init \ stop on <=
 end
 
 \ ## String comparison continued
@@ -3715,6 +3424,22 @@ fun: cstr=  { cstr0 cstr1 -> bool } ccompare =0  end
 fun: cstr<  { cstr0 cstr1 -> bool } ccompare <0  end
 fun: cstr<> { cstr0 cstr1 -> bool } ccompare <>0 end
 
+\ ## Locals mutation
+
+\ For compiling words which modify a local by applying the given function.
+fun: comp_loc_mut { fun -- err } ( C: "name" -- ) ( E: -- )
+  read_word comp_local { loc }
+  loc comp_push_from_local \ mov x0, <loc> | ldr x0, [FP, <loc>]
+  fun comp_call            \ blr <fun>
+  loc comp_pop_into_local  \ mov <loc>, x0 | str x0, [FP, <loc>]
+end
+
+\ Increment a local: `inc: some_val`.
+fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
+
+\ Decrement a local: `dec: some_val`.
+fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
+
 \ ## Vargs and formatting
 
 4096    let: ERR_CAP
@@ -3737,8 +3462,10 @@ fun: comp_va_beg { floor -- diff err }
   ceil floor - 2 align_up { diff }
   diff floor +            { ceil }
 
-  ceil floor 2
-  -loop: ind
+  ceil { ind }
+  loop
+    ind 2 - { ind }
+    floor ind <= while
     ind     { Xd }
     ind inc { Xt }
     Xd Xt ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp Xd, Xt, [sp, -16]!
@@ -3779,14 +3506,24 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
     " in `comp_args_prepend`: too many total args" throw
   end
 
-  arg_len pre_len +for: reg reg comp_realloc_reg end
-
-  post_len -for: reg_src
-    reg_src pre_len + { reg_out }
-    reg_out reg_src asm_mov_reg comp_instr \ mov <out>, <src>
+  pre_len { reg }
+  loop
+    reg arg_len < while
+    reg comp_realloc_reg
+    inc: reg
   end
 
-  pre_len -for: reg
+  post_len { reg }
+  loop
+    dec: reg
+    reg 0 >= while
+    reg pre_len + reg asm_mov_reg comp_instr \ mov <out>, <src>
+  end
+
+  pre_len { reg }
+  loop
+    dec: reg
+    reg 0 >= while
     reg comp_args_set
     STACK s> execute
   end
@@ -3796,7 +3533,12 @@ end
 
 \ Used when calling words with unknown clobbers.
 fun: comp_realloc_regs { -- err }
-  ASM_ARG_LEN_MAX -for: reg reg comp_realloc_reg end
+  ASM_ARG_LEN_MAX { reg }
+  loop
+    dec: reg
+    reg 0 >= while
+    reg comp_realloc_reg
+  end
 end
 
 fun_comp: logf { -- err } ( E: fmt …vargs… -- )
@@ -3979,8 +3721,11 @@ fun: comp_args_to_stack { len stk_reg top_reg -- err } ( E: …args… -- )
 
   top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
-  len 0 +for: arg_reg
+  0 { arg_reg }
+  loop
+    arg_reg len < while
     arg_reg top_reg 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
+    inc: arg_reg
   end
 
   top_reg stk_reg asm_stack_top_store comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
@@ -4033,7 +3778,7 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   loop
     read_word { str len }
 
-    if s" }"  str len str= then leave end
+    if s" }" str len str= then leave end
 
     if s" --" str len str= then
       " unsupported `--` in `stack{`" throw
@@ -4050,7 +3795,10 @@ fun_comp: stack{ { -- err } ( E: stack -- )
 
   top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
 
-  locs for
+  locs { ind }
+  loop
+    dec: ind
+    ind >=0 while
     STACK s> { loc }
     comp_alloc_next_reg { val_reg }
     val_reg top_reg -8 asm_load_pre comp_instr     \ ldr <val>, [<top>, -8]!
@@ -4082,11 +3830,14 @@ fun: stack_log_cells { stack -> }
 
   " stack <%zd>:" len logf lf
 
-  len 0 +for: ind
+  0 { ind }
+  loop
+    ind len < while
     space space
     ind stack stack_cell_at @ log_cell
     "  <%zd>" ind logf
     lf
+    inc: ind
   end
 end
 
@@ -4113,18 +3864,21 @@ fun: wordlist_log { dict list_name }
   \ See C `dict_has` (with some indirections):
   \
   \   bits[ind / HASH_TABLE_BITS_CAP] & ((Uint)1 << (ind % HASH_TABLE_BITS_CAP))
-  cap 0 +for: ind
+  0 { ind }
+  loop
+    ind cap < while
     ind bitset_size / cells { bitset_off }
     bitsets bitset_off + @  { bitset }
     ind bitset_size mod     { bit_ind }
     1 bit_ind lsl           { bit_mask }
     bitset bit_mask and     { live }
 
-    ifz live then cont end
+    ifz live then inc: ind cont end
 
     ind cells { off }
     keys off + @ { key }
     space key log
+    inc: ind
   end
 
   lf
@@ -4265,29 +4019,6 @@ fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun --
   ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
 end
 
-\ For compiling words which modify a local by applying the given function.
-fun: comp_loc_mut { fun name -- err } ( C: "name" -- ) ( E: -- )
-  read_word comp_local { loc }
-
-  if comp_args_get then
-    " arity mismatch in `%s`: expected no arguments" name errf throw
-  end
-
-  loc comp_push_from_local \ mov x0, <loc> | ldr x0, [FP, <loc>]
-  fun comp_call            \ blr <fun>
-  loc comp_pop_into_local  \ mov <loc>, x0 | str x0, [FP, <loc>]
-end
-
-\ Increment a local: `inc: some_val`.
-fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
-  xt' inc " inc:" comp_loc_mut
-end
-
-\ Decrement a local: `inc: some_val`.
-fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
-  xt' dec " dec:" comp_loc_mut
-end
-
 \ Comptime analogue of top-level `import'`.
 fun_comp: import' { -- err } read_word comp_str compile' import end
 
@@ -4305,9 +4036,12 @@ fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
 
   0 1 asm_cmp_reg comp_instr \ cmp x0, x1
 
-  len 2 +for: pred
+  2 { pred }
+  loop
+    pred len < while
     \ ccmp x0, xN, <nzcv>, <cond>
     0 pred nzcv cond_each asm_ccmp_reg comp_instr
+    inc: pred
   end
 
   0 comp_realloc_reg

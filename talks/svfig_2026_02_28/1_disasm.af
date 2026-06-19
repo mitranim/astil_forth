@@ -46,24 +46,28 @@ dis' example_alloca_dynamic
 \ ret
 
 : example_loop
-  12 0 +for: ind
+  0 { ind }
+  loop
+    ind 12 < while
     123 ind * { -- } \ Just something to do.
+    inc: ind
   end
 ;
 dis' example_loop
-\ mov  x0, #12    -- loop ceiling
-\ mov  x1, #0     -- loop floor (index)
-\ mov  x8, x0     -- store ceiling
-\ mov  x9, x1     -- store index (loop begins here)
-\ cmp  x0, x1     -- ceiling vs index
-\ b.le #32        -- leave if done
-\ mov  x0, #123   -- `123`
-\ mov  x1, x9     -- `ind`
-\ mul  x0, x0, x1 -- `*`; `{ -- }` ignores the result
-\ mov  x0, x8     -- read ceiling
-\ mov  x1, x9     -- read index
-\ add  x1, x1, #1 -- increment index
-\ b    #-36
+\ mov  x0, #0
+\ mov  x8, x0
+\ mov  x0, x8
+\ mov  x1, #12
+\ cmp  x0, x1
+\ cset x0, lt
+\ cbz  x0, #28
+\ mov  x0, #123
+\ mov  x1, x8
+\ mul  x0, x0, x1
+\ mov  x0, x8
+\ add  x0, x0, #1
+\ mov  x8, x0
+\ b    #-48
 \ ret
 
 

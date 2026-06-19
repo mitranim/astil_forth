@@ -50,13 +50,19 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   0 0 0 { qlo qhi rem }
 
   hi { word }
-  64 for
+  64 { ind }
+  loop
+    dec: ind
+    ind >=0 while
     qhi word 63 lsr rem bigint_divmod10_step { qhi rem }
     word 1 lsl { word }
   end
 
   lo { word }
-  64 for
+  64 { ind }
+  loop
+    dec: ind
+    ind >=0 while
     qlo word 63 lsr rem bigint_divmod10_step { qlo rem }
     word 1 lsl { word }
   end
@@ -82,14 +88,21 @@ fun: bigint_log_decimal { lo hi }
     ifz lo hi or then leave end
   end
 
-  buf 40 + ptr
-  +for: pos
+  ptr { pos }
+  loop
+    pos buf 40 + < while
     pos @u8 logc
+    inc: pos
   end
 end
 
 fun: main { -- exit }
-  1 18 lsl for 184 fib { -- } end
+  1 18 lsl { ind }
+  loop
+    dec: ind
+    ind >=0 while
+    184 fib { -- }
+  end
   \ 184 fib bigint_log_decimal lf
   0
 end

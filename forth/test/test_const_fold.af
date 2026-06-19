@@ -31,12 +31,15 @@ fun: cf_expect_word { XT -- err }
     " [test] instruction length mismatch: expected %zd, actual %zd" exp_len act_len errf throw
   end
 
-  exp_len 0 +for: ind
+  0 { ind }
+  loop
+    ind exp_len < while
     CF_EXPECT_INSTRS ind 4 * + @u32 { exp }
     XT ind cf_actual_instr          { act }
     if exp act <> then
       " [test] instruction mismatch at %zd: expected 0x%zx, actual 0x%zx" ind exp act errf throw
     end
+    inc: ind
   end
 end
 

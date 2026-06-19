@@ -75,8 +75,11 @@ fun: main
     " branch 2" log lf
   end
 
-  12 0 +for: ind
+  0 { ind }
+  loop
+    ind 12 < while
     " current number: %zd" ind logf lf
+    inc: ind
   end
 end
 
@@ -412,7 +415,16 @@ More ergonomic control flow structures:
 - Any amount of conditional branches is terminated with a single `end`.
 - Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
-Because the system uses native function calls, there is no return stack; see below.
+Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave while cont` auxiliaries. Other loop forms don't buy anything.
+
+```forth
+loop
+  predicate while
+  body
+  if done then leave end
+  if skip then cont end
+end
+```
 
 There is no `state` or `does>`. Instead, the system uses two wordlists:
 - "exec" — runtime words; not immediate.

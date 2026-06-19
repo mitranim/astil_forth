@@ -2,14 +2,21 @@ import' std:lang.af
 
 fun: fib { ind -- out }
   0 1 { prev next }
-  ind for
+  loop
+    dec: ind
+    ind >=0 while
     prev next + next { next prev }
   end
   next
 end
 
 fun: main { -- exit }
-  1 20 lsl for 91 fib { -- } end
+  1 20 lsl { ind }
+  loop
+    dec: ind
+    ind >=0 while
+    91 fib { -- }
+  end
   \ 91 fib log_int lf
   0
 end

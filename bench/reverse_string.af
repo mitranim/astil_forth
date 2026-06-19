@@ -17,7 +17,10 @@ end
 fun: main { -- exit }
   s" 0123456789abcdef" { str len }
 
-  1 22 lsl inc for
+  1 22 lsl inc { ind }
+  loop
+    dec: ind
+    ind >=0 while
     str len reverse
   end
 

@@ -46,15 +46,21 @@ The resulting register allocator is trivial, and does _not_ rely on intrinsic kn
 ```forth
 \ Stack-CC:
 : example_loop
-  12 0 +for: ind
+  0 { ind }
+  loop
+    ind 12 < while
     123 ind * drop
+    inc: ind
   end
 ;
 
 \ Reg-CC:
 : example_loop
-  12 0 +for: ind
+  0 { ind }
+  loop
+    ind 12 < while
     123 ind * { -- } \ Ignores the value.
+    inc: ind
   end
 ;
 

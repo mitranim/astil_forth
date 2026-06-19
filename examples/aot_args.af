@@ -14,9 +14,12 @@ fun: main { argc argv envp -- exit }
   if argc then
     " [main] args (%zd):" argc logf lf
 
-    argc 0 +for: ind
+    0 { ind }
+    loop
+      ind argc < while
       ind cells argv + @ { arg }
       " arg %zd: %s" ind arg logf lf
+      inc: ind
     end
   else
     " [main] args: empty" log lf

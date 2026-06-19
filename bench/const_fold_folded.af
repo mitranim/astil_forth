@@ -15,7 +15,10 @@ end
 fun: main { -- exit }
   0 { acc }
 
-  RUNS for
+  RUNS { ind }
+  loop
+    dec: ind
+    ind >=0 while
     acc folded_step { acc }
   end
 

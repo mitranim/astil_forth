@@ -15,18 +15,23 @@ fun: find_prime { flags cap -- num }
 
   flags cap flags_ceil 0 3 { ceil num step }
 
-  ceil flags +for: ptr0
+  flags { ptr0 }
+  loop
+    ptr0 ceil < while
     if ptr0 @u8 then
       ptr0 step + { ptr1 }
 
-      ceil ptr0 step +loop: ptr1
+      loop
+        ptr1 ceil < while
         0 ptr1 !8
+        ptr1 step + { ptr1 }
       end
 
       num inc { num }
     end
 
     step 2 + { step }
+    ptr0 inc { ptr0 }
   end
 
   num
@@ -35,7 +40,10 @@ end
 fun: main { -- exit }
   \ FLAGS CAP find_prime log_int lf
 
-  RUNS for
+  RUNS { ind }
+  loop
+    dec: ind
+    ind >=0 while
     FLAGS CAP find_prime { -- }
   end
 
