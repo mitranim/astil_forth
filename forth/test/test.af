@@ -1658,8 +1658,8 @@ test_asm_new_bits
 fun: test_asm_cmp_branch { -- err }
   T{ 1 8 0 asm_cmp_branch <T> 0b10110100000000000000000001000001 }T
   T{ 1 8 1 asm_cmp_branch <T> 0b10110101000000000000000001000001 }T
-  T{ 1 8 asm_cmp_branch_zero     <T> 0b10110100000000000000000001000001 }T
-  T{ 1 8 asm_cmp_branch_not_zero <T> 0b10110101000000000000000001000001 }T
+  T{ 1 8 asm_cbz          <T> 0b10110100000000000000000001000001 }T
+  T{ 1 8 asm_cbnz         <T> 0b10110101000000000000000001000001 }T
 end
 test_asm_cmp_branch
 

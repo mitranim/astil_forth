@@ -465,13 +465,13 @@ fun: asm_pattern_cmp_branch ( Xt off19 -- instr_mask )
 end
 
 \ cbz x1, <off>
-fun: asm_cmp_branch_zero ( Xt off19 -- instr )
+fun: asm_cbz ( Xt off19 -- instr )
   asm_pattern_cmp_branch
   0b1_011010_0_0000000000000000000_00000 or
 end
 
 \ cbnz x1, <off>
-fun: asm_cmp_branch_not_zero ( Xt off19 -- instr )
+fun: asm_cbnz ( Xt off19 -- instr )
   asm_pattern_cmp_branch
   0b1_011010_1_0000000000000000000_00000 or
 end
@@ -1133,13 +1133,13 @@ fun: patch_branch_back    ( adr -- ) off_from_pc   asm_branch swap !32 end \ b <
 
 fun: if_pop ( nop if_adr -- )
   \ cbz x1, <else|end>
-  dup off_to_pc 1 swap asm_cmp_branch_zero swap !32
+  dup off_to_pc 1 swap asm_cbz swap !32
   execute
 end
 
 fun: ifn_pop ( nop ifn_adr -- )
   \ cbnz x1, <else|end>
-  dup off_to_pc 1 swap asm_cmp_branch_not_zero swap !32
+  dup off_to_pc 1 swap asm_cbnz swap !32
   execute
 end
 

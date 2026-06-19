@@ -622,10 +622,10 @@ fun: asm_cmp_branch { Xt off19 not_zero -- instr }
 end
 
 \ cbz x1, <off>
-fun: asm_cmp_branch_zero { Xt off19 -> instr } 0 asm_cmp_branch end
+fun: asm_cbz { Xt off19 -> instr } 0 asm_cmp_branch end
 
 \ cbnz x1, <off>
-fun: asm_cmp_branch_not_zero { Xt off19 -> instr } 1 asm_cmp_branch end
+fun: asm_cbnz { Xt off19 -> instr } 1 asm_cmp_branch end
 
 \ Not supported on M3 Pro.
 \ cb.<cond> Xt, #imm6, #off9

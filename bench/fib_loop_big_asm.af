@@ -19,19 +19,19 @@ fun: fib { _depth -- lo hi } [
   5 comp_realloc_reg
   6 comp_realloc_reg
 
-  4 0   asm_mov_reg             comp_instr \ mov  x4, x0
-  0 1   asm_mov_imm             comp_instr \ mov  x0, 1
-  1     asm_zero_reg            comp_instr \ eor  x1, x1, x1
-  2     asm_zero_reg            comp_instr \ eor  x2, x2, x2
-  3     asm_zero_reg            comp_instr \ eor  x3, x3, x3
-  5 0   asm_mov_reg             comp_instr \ mov  x5, x0 -- <loop>
-  6 1   asm_mov_reg             comp_instr \ mov  x6, x1
-  0 0 2 asm_adds_reg            comp_instr \ adds x0, x0, x2
-  1 1 3 asm_adc_reg             comp_instr \ adc  x1, x1, x3
-  2 5   asm_mov_reg             comp_instr \ mov  x2, x5
-  3 6   asm_mov_reg             comp_instr \ mov  x3, x6
-  4 4 1 asm_sub_imm             comp_instr \ sub  x4, x4, 1
-  4 -28 asm_cmp_branch_not_zero comp_instr \ cbnz x4, <loop>
+  4 0   asm_mov_reg  comp_instr \ mov  x4, x0
+  0 1   asm_mov_imm  comp_instr \ mov  x0, 1
+  1     asm_zero_reg comp_instr \ eor  x1, x1, x1
+  2     asm_zero_reg comp_instr \ eor  x2, x2, x2
+  3     asm_zero_reg comp_instr \ eor  x3, x3, x3
+  5 0   asm_mov_reg  comp_instr \ mov  x5, x0 -- <loop>
+  6 1   asm_mov_reg  comp_instr \ mov  x6, x1
+  0 0 2 asm_adds_reg comp_instr \ adds x0, x0, x2
+  1 1 3 asm_adc_reg  comp_instr \ adc  x1, x1, x3
+  2 5   asm_mov_reg  comp_instr \ mov  x2, x5
+  3 6   asm_mov_reg  comp_instr \ mov  x3, x6
+  4 4 1 asm_sub_imm  comp_instr \ sub  x4, x4, 1
+  4 -28 asm_cbnz     comp_instr \ cbnz x4, <loop>
 
   2 comp_args_set
 ] end

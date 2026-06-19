@@ -27,8 +27,8 @@ fun: run { _count }
   fib    \ bl <off>
   { -- } \ drop result
   [
-    9 9 1 asm_sub_imm             comp_instr \ sub x9, x9, 1
-    9 -12 asm_cmp_branch_not_zero comp_instr \ cbnz x9, <loop_beg>
+    9 9 1 asm_sub_imm comp_instr \ sub x9, x9, 1
+    9 -12 asm_cbnz    comp_instr \ cbnz x9, <loop_beg>
   ]
 end
 
