@@ -119,7 +119,6 @@ end
 4      let: ASM_INSTR_SIZE
 8      let: ASM_PARAM_LEN_MAX
 16     let: ASM_ARG_LEN_MAX
-8      let: ASM_REG_SCRATCH \ Dangerous; high chance of collision.
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP
@@ -1999,6 +1998,12 @@ fun: cont_meta_instr_adr { meta -> adr }
   cont_meta_instr_off_get instr_adr
 end
 
+fun: cont_meta_loop_exit_branch_off_get { meta -- off }
+  meta cont_meta_instr_off_get { off }
+  meta CONT_MASK_LOOP_COND_REL bit_mask_get instr_off_pack
+  off +
+end
+
 fun: reserve_instr { -- off err }
   here_write instr_off { off }
   ASM_PLACEHOLDER comp_instr
@@ -2394,9 +2399,9 @@ end
 
 \ Begins a definition; terminate with `end`.
 fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
-  read_word       { str len }
-  str len strndup { str } \ Leak if comp error before `struct_end_xt` done.
-  xt' struct_end_xt  { fun }
+  read_word         { str len }
+  str len strndup   { str } \ Leak if comp error before `struct_end_xt` done.
+  xt' struct_end_xt { fun }
   str len 0 0 fun
 end
 
@@ -3300,7 +3305,7 @@ end
 \ Position of the topmost loop metadata cell on the main control stack.
 \ Each loop pushes the following frame:
 \
-\   prev_loop_ind loop_frame_end_xt meta loop_pop
+\   prev_loop_ind loop_frame_end_xt meta end_xt
 \                                   ^
 \                                   LOOP_IND points here
 \
@@ -3310,7 +3315,7 @@ end
 \ do not carry loop-specific extra cells on the main control stack.
 \
 \ In stack signatures below, `prev_loop_ind loop_frame_end_xt` is often
-\ shortened to `<loop_prev>`, and `meta loop_pop` is the part returned by
+\ shortened to `<loop_prev>`, and `meta end_xt` is the part returned by
 \ each loop word for `end` to consume.
 \
 \ LOOP-ELSE-GAP: loops currently support only same-arity exits. Future
@@ -3356,7 +3361,7 @@ end
 
 fun: loop_back_close { meta ctx -- err }
   meta CONT_MASK_INP_LEN bit_mask_get ctx comp_args_valid
-  meta loop_back
+  meta loop_back \ b <beg>
 end
 
 fun: loop_branch_exit { meta ctx -- meta err }
@@ -3413,7 +3418,6 @@ fun: while_end_xt { -- err }
   LOOP_AUX s> { meta }
   meta CONT_MASK_OUT_LEN bit_mask_get { reg }
   reg meta if_patch
-
   LOOP_AUX s> execute
 end
 
@@ -3454,11 +3458,9 @@ fun: loop_counted_end_xt { meta -- err }
   ( LOOP_AUX: …aux… -- )
   ( C: <loop_prev> -- )
   comp_barrier
-  meta cont_meta_instr_off_get { beg_off }
-  meta CONT_MASK_LOOP_COND_REL bit_mask_get instr_off_pack
-  beg_off + instr_adr { cond_adr }
+  meta cont_meta_loop_exit_branch_off_get instr_adr { cond_adr }
 
-  meta " arguments before ending counted loop" loop_back_close
+  meta " arguments before ending counted loop" loop_back_close \ b <beg>
   execute'' end  \ Run `loop_frame_end_xt`.
 
   \ Retropatch `b.<cond> <end>`.
@@ -3467,24 +3469,23 @@ fun: loop_counted_end_xt { meta -- err }
   off cond asm_branch_cond cond_adr !32
 end
 
-fun: loop_counted_init { meta beg_off end_off cond -- meta loop_pop err }
+fun: loop_counted_init { meta beg_off end_off cond -- meta end_xt err }
   cond meta CONT_MASK_META_COND bit_mask_set { meta }
   end_off beg_off - instr_off_unpack { cond_rel }
-  4 low_bits { max }
-  if cond_rel max u> then
+  if cond_rel 4 low_bits u> then
     " internal error: counted-loop branch offset overflow" throw
   end
   cond_rel meta CONT_MASK_LOOP_COND_REL bit_mask_set
   xt' loop_counted_end_xt
 end
 
-fun: for_loop_countdown_init { cur ctx -- meta loop_pop err }
+fun: for_loop_countdown_init { cur ctx -- meta end_xt err }
   ( C: -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
 
   \ LOOP-ELSE-GAP: countdown loops consume the limit into a local and record
-  \ the post-pop arg length as the only loop entry arity.
+  \ post-pop arg length as loop entry arity.
   cur comp_pop_into_local            \ mov <cur>, xN | str xN, [FP, <cur>]
   loop_frame_init
   comp_barrier                       \ Clobber / relocate locals.
@@ -3520,7 +3521,7 @@ end
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
-fun_comp: for { -- meta loop_pop err }
+fun_comp: for { -- meta end_xt err }
   ( C: -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
@@ -3535,7 +3536,7 @@ end
 \   -for: ind
 \     ind .
 \   end
-fun_comp: -for: { -- meta loop_pop err }
+fun_comp: -for: { -- meta end_xt err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil -- )
   ( LOOP_AUX: -- nop )
@@ -3547,7 +3548,7 @@ end
 \
 \   ceil floor +for: ind       end
 \   123  45    +for: ind ind . end
-fun_comp: +for: { -- meta loop_pop err }
+fun_comp: +for: { -- meta end_xt err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor -- )
 
@@ -3588,7 +3589,7 @@ fun_comp: +for: { -- meta loop_pop err }
 end
 
 \ Like in `+for:` and `+loop:`, the range is `[floor,ceil)`.
-fun_comp: -loop: { -- meta loop_pop err }
+fun_comp: -loop: { -- meta end_xt err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor step -- )
   ( LOOP_AUX: -- nop )
@@ -3639,7 +3640,7 @@ end
 \ holding a value which is out of range. For example, then
 \ `ceil floor step` is `7 3 2`, the loop iterates twice,
 \ with indexes `3` and `5`, and the index outside is `8`.
-fun_comp: +loop: { -- meta loop_pop err }
+fun_comp: +loop: { -- meta end_xt err }
   ( C: "name" -- <loop_prev> )
   ( E: ceil floor step -- )
 
