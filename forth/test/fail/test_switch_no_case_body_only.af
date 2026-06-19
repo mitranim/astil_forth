@@ -1,9 +1,0 @@
-\ Must fail to compile. Empty switch is useless.
-fun: test_switch_no_case_body_only_fail { val -- one two three }
-  -1 -1 { one two }
-  val switch
-    10 { one }
-    20 5 + { two }
-  end
-  one val two
-end

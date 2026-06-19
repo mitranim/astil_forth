@@ -1948,7 +1948,7 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 \ - 15..63: instruction offset
 \ -     14: exec_prev
 \ -     13: 0 / 1 = `cbz` / `cbnz`
-\ -     12: has_else_or_case
+\ -     12: has_else
 \ -     11: has_out_len
 \ -     10: has_inp_len
 \ -   5..9: out_len
@@ -1971,11 +1971,11 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 ASM_ARG_LEN_MAX bit_len low_bits let: CONT_MASK_INP_LEN
 CONT_MASK_INP_LEN CONT_MASK_INP_LEN bit_len lsl let: CONT_MASK_OUT_LEN
 
-1 CONT_MASK_OUT_LEN bit_len  lsl let: CONT_MASK_HAS_INP
-CONT_MASK_HAS_INP          1 lsl let: CONT_MASK_HAS_OUT
-CONT_MASK_HAS_OUT          1 lsl let: CONT_MASK_HAS_ELSE_OR_CASE
-CONT_MASK_HAS_ELSE_OR_CASE 1 lsl let: CONT_MASK_CBNZ
-CONT_MASK_CBNZ 1 lsl let: CONT_MASK_EXEC_PREV
+1 CONT_MASK_OUT_LEN bit_len   lsl let: CONT_MASK_HAS_INP
+CONT_MASK_HAS_INP           1 lsl let: CONT_MASK_HAS_OUT
+CONT_MASK_HAS_OUT           1 lsl let: CONT_MASK_HAS_ELSE
+CONT_MASK_HAS_ELSE          1 lsl let: CONT_MASK_CBNZ
+CONT_MASK_CBNZ 1 lsl              let: CONT_MASK_EXEC_PREV
 
 CONT_MASK_EXEC_PREV bit_len low_bits invert let: CONT_MASK_INSTR_OFF
 
@@ -2061,7 +2061,7 @@ fun: if_end_xt { meta -- err } [ redefine ]
   comp_barrier
   meta CONT_MASK_INP_LEN bit_mask_get meta if_patch
 
-  meta CONT_MASK_HAS_ELSE_OR_CASE and =0 then
+  meta CONT_MASK_HAS_ELSE and =0 then
     meta CONT_MASK_INP_LEN bit_mask_get
     " arguments before ending conditional without `else`"
     comp_args_valid
@@ -2113,7 +2113,7 @@ fun_comp: else { meta end_xt -- meta end_xt err }
   reserve_instr { off }
 
   meta
-    CONT_MASK_HAS_ELSE_OR_CASE or
+    CONT_MASK_HAS_ELSE or
     CONT_MASK_EXEC_PREV bit_mask_unset
   STACK >s
   end_xt execute
@@ -2144,76 +2144,6 @@ fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
   meta else_xt
   meta CONT_MASK_EXEC_PREV or CONT_MASK_CBNZ or xt' if_end_xt
 end
-
-\ ## Switch
-
-fun: switch_end_xt { _val meta -- err }
-  comp_barrier
-
-  ifz meta CONT_MASK_HAS_ELSE_OR_CASE and then
-    " pointless empty `switch`" throw
-  end
-
-  ifz meta CONT_MASK_HAS_OUT and then
-    " internal error: non-empty `switch` without inferred output length" throw
-  end
-
-  meta CONT_MASK_OUT_LEN bit_mask_get " arguments before ending `switch`" comp_args_valid
-end
-
-fun_comp: switch { -- val meta end_xt err } ( E: … val -- … )
-  1 " arguments before `switch`" comp_args_min
-  nil 0 comp_local { val }
-  val comp_pop_into_local
-  val CONT_MASK_EXEC_PREV xt' switch_end_xt
-end
-
-fun: case_else_xt { _val meta -- err } meta else_end_xt end
-
-fun: case_end_xt
-  { pmeta pxt val meta -- pmeta pxt val meta else_xt err }
-  comp_barrier
-
-  if meta CONT_MASK_HAS_OUT and then
-    meta CONT_MASK_OUT_LEN bit_mask_get " arguments before ending `case`" comp_args_valid
-  else
-    comp_args_get meta CONT_MASK_OUT_LEN bit_mask_set CONT_MASK_HAS_OUT or { meta }
-  end
-
-  meta CONT_MASK_INP_LEN bit_mask_get comp_args_set
-  meta cont_meta_instr_adr { adr }
-  reserve_instr meta cont_meta_instr_off_set { meta }
-  here_write adr - ASM_NE asm_branch_cond adr !32 \ b.ne <case_end>
-
-  meta CONT_MASK_OUT_LEN bit_mask_get      { len   }
-  len pmeta CONT_MASK_OUT_LEN bit_mask_set { pmeta }
-  pmeta CONT_MASK_HAS_OUT          or      { pmeta }
-  pmeta CONT_MASK_HAS_ELSE_OR_CASE or      { pmeta }
-
-  pmeta pxt val meta xt' case_else_xt
-end
-
-fun_comp: case
-  { val pmeta pxt -- val pmeta pxt val meta case_xt err }
-  ( E: pred -- )
-
-  1 " arguments before `case`" comp_args_min
-  comp_args_get dec { len }
-  val comp_push_from_local
-  comp_barrier
-  len len inc asm_cmp_reg comp_instr \ cmp <pred>, <val>
-  len comp_args_set
-
-  \ Remaining argument length just before this case
-  \ remains valid if this case is not entered. This
-  \ value is used by `case_end_xt` to reset args.
-  len pmeta CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
-  reserve_instr meta cont_meta_instr_off_set { meta } \ b.ne <case_end>
-
-  val pmeta pxt val meta xt' case_end_xt
-end
-
-
 
 \ ## Types
 \

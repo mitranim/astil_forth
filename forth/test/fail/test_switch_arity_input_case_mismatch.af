@@ -1,8 +1,0 @@
-use' ../../lang.af
-
-fun: test_switch_arity_input_case_mismatch_fail { val key -- out }
-  val key switch
-    30 case 40 end
-  end
-end
-

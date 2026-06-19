@@ -1,4 +1,0 @@
-\ Must fail to compile. Empty switch is useless.
-fun: test_switch_no_case_output_body_only_fail { val -- out }
-  val switch val inc end
-end
