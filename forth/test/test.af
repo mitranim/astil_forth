@@ -1445,6 +1445,27 @@ fun: test_asm_cmp_branch { -- err }
 end
 test_asm_cmp_branch
 
+fun: test_asm_append_imm_to_reg { -- err }
+  32 alloca { buf }
+
+  T{ 0 0 buf asm_append_imm_to_reg <T> buf 4 + }T
+  T{ buf @u32 <T> 0b1_10_100101_00_0000000000000000_00000 }T \ movz x0, #0
+
+  T{ 0 -1 buf asm_append_imm_to_reg <T> buf 4 + }T
+  T{ buf @u32 <T> 0b1_00_100101_00_0000000000000000_00000 }T \ movn x0, #0
+
+  T{ 3 0x1234_5678_9abc_def0 buf asm_append_imm_to_reg <T> buf 16 + }T
+  T{ buf      @u32 <T> 0b1_10_100101_00_1101111011110000_00011 }T \ movz x3, #0xdef0
+  T{ buf 4  + @u32 <T> 0b1_11_100101_01_1001101010111100_00011 }T \ movk x3, #0x9abc, lsl #16
+  T{ buf 8  + @u32 <T> 0b1_11_100101_10_0101011001111000_00011 }T \ movk x3, #0x5678, lsl #32
+  T{ buf 12 + @u32 <T> 0b1_11_100101_11_0001001000110100_00011 }T \ movk x3, #0x1234, lsl #48
+
+  T{ 3 -305419896 buf asm_append_imm_to_reg <T> buf 8 + }T
+  T{ buf     @u32 <T> 0b1_00_100101_00_0101011001110111_00011 }T \ movn x3, #0x5677
+  T{ buf 4  + @u32 <T> 0b1_11_100101_01_1110110111001011_00011 }T \ movk x3, #0xedcb, lsl #16
+end
+test_asm_append_imm_to_reg
+
 fun: test_cstr_eq { -- err }
   T{ nil           nil    cstr= <T> true  }T
   T{ nil           " one" cstr= <T> false }T
@@ -2689,6 +2710,7 @@ fun: main_run { -- err }
   test_bit_masks
   test_asm_new_bits
   test_asm_cmp_branch
+  test_asm_append_imm_to_reg
   test_cstr_eq
   test_cstr_less
   test_int_to_cell

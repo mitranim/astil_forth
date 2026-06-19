@@ -3397,6 +3397,38 @@ fun_comp: cont { -- err }
   meta loop_back
 end
 
+\ ## Assembler continued
+
+fun: asm_append_instr { instr out -- out } instr out !32 out 4 + end
+fun: asm_imm16_lane { val hw -- lane } val hw 4 lsl lsr 0xffff and end
+
+fun: asm_movk_needed { neg lane -- bool }
+  if neg then lane 0xffff <> else lane 0 <> end
+end
+
+fun: asm_append_movk_if_needed { reg neg hw imm out -- out }
+  imm hw asm_imm16_lane { lane }
+  if neg lane asm_movk_needed then
+    reg 0b11 hw lane asm_mov_wide out asm_append_instr
+  else
+    out
+  end
+end
+
+\ Writes instructions for loading `imm` into `reg`,
+\ returns updated instruction buffer address.
+fun: asm_append_imm_to_reg { reg imm out -- out }
+  imm 0 < { neg }
+
+  imm 0 asm_imm16_lane { lane }
+  if neg then 0b00 lane invert 0xffff and else 0b10 lane end { opc lane }
+  reg opc 0 lane asm_mov_wide out asm_append_instr { out } \ movn|movz
+
+  reg neg 1 imm out asm_append_movk_if_needed { out }
+  reg neg 2 imm out asm_append_movk_if_needed { out }
+  reg neg 3 imm out asm_append_movk_if_needed
+end
+
 \ ## String comparison continued
 
 \ `strncmp` doesn't like null string pointers.
