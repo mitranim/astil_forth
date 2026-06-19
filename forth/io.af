@@ -1,5 +1,5 @@
-import' ./lang.af
-import' ./time.af \ Defines `Timespec`.
+use' ./lang.af
+use' ./time.af \ Defines `Timespec`.
 
 \ ## Libc IO
 \

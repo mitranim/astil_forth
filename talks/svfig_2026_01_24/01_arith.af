@@ -1,5 +1,5 @@
-import' std:lang_s.af
-import' std:testing_s.af
+use' lang_s.af
+use' testing_s.af
 
 \ Basic arithmetic.
 

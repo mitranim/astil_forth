@@ -1,4 +1,4 @@
-\ Requires `std:lang.af`.
+\ Requires `lang.af`.
 
 fun: test_switch_arity_case_mismatch_fail { val -- out }
   val switch

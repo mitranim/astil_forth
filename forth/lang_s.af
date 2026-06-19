@@ -1788,5 +1788,5 @@ end
 
 \ ## Misc
 
-\ Comptime analogue of top-level `import'`.
-fun_comp: import' read_word comp_str compile' import end
+\ Comptime analogue of top-level import.
+fun_comp: use' read_word comp_str compile' use end

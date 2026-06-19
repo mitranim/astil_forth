@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 fun: fib { _src -- _out } [
   0 comp_realloc_reg

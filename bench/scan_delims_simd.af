@@ -1,5 +1,5 @@
-import' std:lang.af
-import' std:simd.af
+use' lang.af
+use' simd.af
 
 \ BOT-GENERATED
 

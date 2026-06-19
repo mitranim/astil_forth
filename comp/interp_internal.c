@@ -446,17 +446,12 @@ static Err interp_import_stdin(Interp *interp) {
   return nullptr;
 }
 
-static char *resolve_import_path(const char *prev, const char *next) {
-  {
-    deferred(chars_deinit) char *path = path_join(prev, next, false);
-    const auto                   out  = realpath(path, nullptr);
-    if (out) return out;
-  }
+static char *resolve_local_import_path(const char *prev, const char *next) {
+  deferred(chars_deinit) char *path = path_join(prev, next, false);
+  return realpath(path, nullptr);
+}
 
-  // Imports with the scheme `std:` are resolved magically.
-  next = str_without_prefix(next, "std:");
-  if (!next || !next[0]) return nullptr;
-
+static char *resolve_std_import_path(const char *next) {
   // Try relative to the interpreter executable.
   const auto exec = get_exec_path();
   if (exec && is_path_abs(exec)) {
@@ -479,6 +474,11 @@ static char *resolve_import_path(const char *prev, const char *next) {
   }
 
   return nullptr;
+}
+
+static char *resolve_import_path(const char *prev, const char *next) {
+  if (is_path_implicit_rel(next)) return resolve_std_import_path(next);
+  return resolve_local_import_path(prev, next);
 }
 
 static Err interp_import_inner(
@@ -522,8 +522,7 @@ static Err interp_import_inner(
 
   // Registering the import before interpreting the file
   // enables partial cyclic imports and reduces surprise.
-  dict_set(imports, path, EMPTY); // The dict owns the path now.
-  path = nullptr;                 // No `free` on success.
+  dict_set(imports, strdup(path), EMPTY); // The dict owns the key copy.
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
   try(interp_err(read, interp_loop(interp)));

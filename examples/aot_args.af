@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 \ To receive CLI args and env, declare them as arguments in `main`.
 \ Our compiler doesn't validate the input signature of `main`.

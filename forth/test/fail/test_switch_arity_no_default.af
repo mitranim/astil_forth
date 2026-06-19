@@ -1,4 +1,4 @@
-\ Requires `std:lang.af`.
+\ Requires `lang.af`.
 
 fun: test_switch_arity_no_default_fail { val -- out }
   val switch

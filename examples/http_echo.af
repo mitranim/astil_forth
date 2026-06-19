@@ -1,5 +1,5 @@
-import' std:lang.af
-import' ./http_util.af
+use' lang.af
+use' ./http_util.af
 
 \ Simple example of a single-threaded "HTTP" server which echoes requests
 \ back to clients. HTTP in quotes because it responds with HTTP without

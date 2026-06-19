@@ -1,5 +1,5 @@
-import' ./lang.af
-import' ./io.af
+use' ./lang.af
+use' ./io.af
 
 \ ## Libc network IO
 \

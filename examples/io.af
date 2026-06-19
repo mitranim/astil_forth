@@ -1,5 +1,5 @@
-import' std:lang.af
-import' std:io.af
+use' lang.af
+use' io.af
 
 \ The paths assume the script is being run from repo root:
 \

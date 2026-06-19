@@ -1,4 +1,4 @@
-import' std:lang_s.af
+use' lang_s.af
 
 1 0 extern: sleep
 1 1 extern: time

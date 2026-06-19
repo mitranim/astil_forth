@@ -1,6 +1,6 @@
-import' ../lang.af
-import' ../testing.af
-import' ../arena.af
+use' ../lang.af
+use' ../testing.af
+use' ../arena.af
 
 \ We test both JIT-compiled and AOT-compiled modes.
 \ For AOT, every test must be called in `main_run`.
@@ -591,7 +591,7 @@ end
 test_switch_input_arity
 
 fun: test_switch_missing_case_pred { -- err } [ false try_all ]
-  import' ./fail/test_cont_meta_switch_case_missing_pred.af
+  use' ./fail/test_cont_meta_switch_case_missing_pred.af
   " arguments before `case`" T_err_contains
 end
 test_switch_missing_case_pred
@@ -1096,7 +1096,7 @@ end
 test_cont_meta_loop_inputs
 
 fun: test_cont_meta_loop_arity_bad { -- err } [ false try_all ]
-  import' ./fail/test_cont_meta_loop_arity_bad.af
+  use' ./fail/test_cont_meta_loop_arity_bad.af
   " loop" T_err_contains
 end
 test_cont_meta_loop_arity_bad
@@ -2005,15 +2005,15 @@ end
 test_struct_11
 
 fun: test_catch_invalid { -- err } [ false try_all ]
-  import' ./fail/test_catch_invalid_exec.af
+  use' ./fail/test_catch_invalid_exec.af
   " useless attempt to catch an error when calling word `nop` which does not throw"
   T_err_contains try
 
-  import' ./fail/test_catch_invalid_comp.af
+  use' ./fail/test_catch_invalid_comp.af
   " word `nop` not found in wordlist 2 (WORDLIST_COMP)"
   T_err_contains try
 
-  import' ./fail/test_catch_requires_try_all.af
+  use' ./fail/test_catch_requires_try_all.af
   " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
   T_err_contains try
 
@@ -2104,14 +2104,14 @@ end
 test_disabling_try_all
 
 fun: test_unused_local_error { -- err } [ false try_all ]
-  import' ./fail/test_unused_local.af
+  use' ./fail/test_unused_local.af
   " unused local"
   T_err_contains
 end
 test_unused_local_error
 
 fun: test_discard_param_read { -- err } [ false try_all ]
-  import' ./fail/test_discard_param_read.af
+  use' ./fail/test_discard_param_read.af
   " undefined word"
   T_err_contains
 end
@@ -2122,14 +2122,14 @@ fun: discard_param_push_suffix { val _ignored -> out } end
 fun: test_discard_param_push { -- err } [ false try_all ]
   T{ 10 20 discard_param_push_suffix <T> 10 }T
 
-  import' ./fail/test_discard_param_push.af
+  use' ./fail/test_discard_param_push.af
   " unable to use non-trailing discard parameter with `->`"
   T_err_contains
 end
 test_discard_param_push
 
 fun: test_discard_assign_read { -- err } [ false try_all ]
-  import' ./fail/test_discard_assign_read.af
+  use' ./fail/test_discard_assign_read.af
   " undefined word"
   T_err_contains
 end
@@ -2139,7 +2139,7 @@ fun: test_named_local_anon_style { (anon_0) -- out } (anon_0) end
 T{ 123 test_named_local_anon_style <T> 123 }T
 
 fun: test_unpopped_anon_local { -- err } [ false try_all ]
-  import' ./fail/test_unpopped_anon_local.af
+  use' ./fail/test_unpopped_anon_local.af
   " unused local"
   T_err_contains
 end
@@ -2315,7 +2315,7 @@ end
 test_max_output_regs_with_err
 
 fun: test_file_throw_import_catch { -- err } [ false try_all ]
-  import' ./fail/test_root_throw.af
+  use' ./fail/test_root_throw.af
   " test_err" T_err_contains
 end
 test_file_throw_import_catch
@@ -2341,175 +2341,175 @@ end
 test_has_err_not_auto_marked
 
 fun: test_has_err_not_contagious { -- err } [ false try_all ]
-  import' ./fail/test_has_err_not_contagious.af
+  use' ./fail/test_has_err_not_contagious.af
   " caller has no error output for implicit `try_all`"
   T_err_contains
 end
 test_has_err_not_contagious
 
 fun: test_throw_requires_err { -- err } [ false try_all ]
-  import' ./fail/test_throw_requires_err.af
+  use' ./fail/test_throw_requires_err.af
   " unable to `throw`: current word has no error output"
   T_err_contains
 end
 test_throw_requires_err
 
 fun: test_too_many_input_regs { -- err } [ false try_all ]
-  import' ./fail/test_too_many_input_regs.af
+  use' ./fail/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
   T_err_contains
 end
 test_too_many_input_regs
 
 fun: test_too_many_output_regs { -- err } [ false try_all ]
-  import' ./fail/test_too_many_output_regs.af
+  use' ./fail/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   T_err_contains
 end
 test_too_many_output_regs
 
 fun: test_too_many_output_regs_with_err { -- err } [ false try_all ]
-  import' ./fail/test_too_many_output_regs_with_err.af
+  use' ./fail/test_too_many_output_regs_with_err.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   T_err_contains
 end
 test_too_many_output_regs_with_err
 
 fun: test_too_many_comptime_arg_regs { -- err } [ false try_all ]
-  import' ./fail/test_too_many_comptime_arg_regs.af
+  use' ./fail/test_too_many_comptime_arg_regs.af
   " too many arguments: 16 registers available, 17 arguments provided"
   T_err_contains
 end
 test_too_many_comptime_arg_regs
 
 fun: test_too_many_execute_raw_args { -- err } [ false try_all ]
-  import' ./fail/test_too_many_execute_raw_args.af
+  use' ./fail/test_too_many_execute_raw_args.af
   " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided"
   T_err_contains
 end
 test_too_many_execute_raw_args
 
 fun: test_comptime_stack_underflow { -- err } [ false try_all ]
-  import' ./fail/test_comptime_stack_underflow.af
+  use' ./fail/test_comptime_stack_underflow.af
   " in `some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
   T_err_contains
 end
 test_comptime_stack_underflow
 
 fun: test_cond_arity_bare_if { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_bare_if.af
+  use' ./fail/test_cond_arity_bare_if.af
   " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
   T_err_contains
 end
 test_cond_arity_bare_if
 
 fun: test_cond_arity_else_mismatch { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_else_mismatch.af
+  use' ./fail/test_cond_arity_else_mismatch.af
   " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
   T_err_contains
 end
 test_cond_arity_else_mismatch
 
 fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_elif_mismatch.af
+  use' ./fail/test_cond_arity_elif_mismatch.af
   " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_cond_arity_elif_mismatch
 
 fun: test_cond_arity_elifz_mismatch { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_elifz_mismatch.af
+  use' ./fail/test_cond_arity_elifz_mismatch.af
   " in `test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_cond_arity_elifz_mismatch
 
 fun: test_cond_arity_no_else { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_no_else.af
+  use' ./fail/test_cond_arity_no_else.af
   " arguments before ending conditional without `else`: arity mismatch"
   T_err_contains
 end
 test_cond_arity_no_else
 
 fun: test_cond_arity_no_else_less { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_no_else_less.af
+  use' ./fail/test_cond_arity_no_else_less.af
   " arguments before ending conditional without `else`: arity mismatch"
   T_err_contains
 end
 test_cond_arity_no_else_less
 
 fun: test_cond_arity_no_else_more { -- err } [ false try_all ]
-  import' ./fail/test_cond_arity_no_else_more.af
+  use' ./fail/test_cond_arity_no_else_more.af
   " arguments before ending conditional without `else`: arity mismatch"
   T_err_contains
 end
 test_cond_arity_no_else_more
 
 fun: test_switch_arity_case_mismatch { -- err } [ false try_all ]
-  import' ./fail/test_switch_arity_case_mismatch.af
+  use' ./fail/test_switch_arity_case_mismatch.af
   " in `test_switch_arity_case_mismatch_fail` (WORDLIST_EXEC): arguments before ending `case`: arity mismatch: required: 1, provided: 2"
   T_err_contains
 end
 test_switch_arity_case_mismatch
 
 fun: test_switch_arity_input_case_mismatch { -- err } [ false try_all ]
-  import' ./fail/test_switch_arity_input_case_mismatch.af
+  use' ./fail/test_switch_arity_input_case_mismatch.af
   " in `test_switch_arity_input_case_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
   T_err_contains
 end
 test_switch_arity_input_case_mismatch
 
 fun: test_switch_arity_input_cases_mismatch { -- err } [ false try_all ]
-  import' ./fail/test_switch_arity_input_cases_mismatch.af
+  use' ./fail/test_switch_arity_input_cases_mismatch.af
   " in `test_switch_arity_input_cases_mismatch_fail` (WORDLIST_EXEC): arguments before ending `case`: arity mismatch: required: 2, provided: 3"
   T_err_contains
 end
 test_switch_arity_input_cases_mismatch
 
 fun: test_switch_arity_input_case_too_many { -- err } [ false try_all ]
-  import' ./fail/test_switch_arity_input_case_too_many.af
+  use' ./fail/test_switch_arity_input_case_too_many.af
   " too many arguments: 16 registers available, 17 arguments provided"
   T_err_contains
 end
 test_switch_arity_input_case_too_many
 
 fun: test_switch_arity_no_default { -- err } [ false try_all ]
-  import' ./fail/test_switch_arity_no_default.af
+  use' ./fail/test_switch_arity_no_default.af
   " in `test_switch_arity_no_default_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 0"
   T_err_contains
 end
 test_switch_arity_no_default
 
 fun: test_switch_no_case_empty { -- err } [ false try_all ]
-  import' ./fail/test_switch_no_case_empty.af
+  use' ./fail/test_switch_no_case_empty.af
   " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_empty
 
 fun: test_switch_no_case_body_only { -- err } [ false try_all ]
-  import' ./fail/test_switch_no_case_body_only.af
+  use' ./fail/test_switch_no_case_body_only.af
   " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_body_only
 
 fun: test_switch_no_case_output_body_only { -- err } [ false try_all ]
-  import' ./fail/test_switch_no_case_output_body_only.af
+  use' ./fail/test_switch_no_case_output_body_only.af
   " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_output_body_only
 
 fun: test_switch_no_case_input_empty { -- err } [ false try_all ]
-  import' ./fail/test_switch_no_case_input_empty.af
+  use' ./fail/test_switch_no_case_input_empty.af
   " pointless empty `switch`"
   T_err_contains
 end
 test_switch_no_case_input_empty
 
 fun: test_switch_no_case_input_body { -- err } [ false try_all ]
-  import' ./fail/test_switch_no_case_input_body.af
+  use' ./fail/test_switch_no_case_input_body.af
   " pointless empty `switch`"
   T_err_contains
 end
@@ -2616,17 +2616,19 @@ end
 test_arena_errors
 
 fun: test_word_len_over { -- err }
-  s" ./fail/test_word_len_over.af" catch' import { err }
+  s" ./fail/test_word_len_over.af" catch' use { err }
   err " word length 128 exceeds max word length 127" T_err_contains
 end
 test_word_len_over
 
-s" ./test_import_empty.af" import
+s" ./test_import_empty.af" use
 
-T{ s" ./test_interp_ret.af" import <T> 123 }T
+T{ s" ./test_interp_ret.af" use <T> 123 }T
 
-import' ./test_const_fold.af
-import' ./test_simd.af
+s" testing.af" use
+
+use' ./test_const_fold.af
+use' ./test_simd.af
 
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on

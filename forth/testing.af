@@ -1,4 +1,4 @@
-import' ./lang.af
+use' ./lang.af
 
 \ Similar to the common Forth testing words:
 \

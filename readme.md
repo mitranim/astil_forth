@@ -62,7 +62,7 @@ Unlike other compiler writers, I focused on keeping the system clear and educati
 IO and conditionals:
 
 ```forth
-import' std:lang.af
+use' lang.af
 
 fun: main
   " hello world!" log lf
@@ -255,22 +255,24 @@ make install
 astil --help
 
 # Register-based calling convention:
-astil std:lang.af -  # REPL mode.
-astil some_file.af   # One-shot run.
-astil some_file.af - # Run file, then REPL.
+astil lang.af -  # REPL mode.
+astil <file>   # One-shot run.
+astil <file> - # Run file, then REPL.
 
 # Stack-based calling convention:
-astil_s std:lang_s.af - # REPL mode.
-astil_s some_file.af    # One-shot run.
-astil_s some_file.af -  # Run file, then REPL.
+astil_s lang_s.af - # REPL mode.
+astil_s <file>    # One-shot run.
+astil_s <file> -  # Run file, then REPL.
 ```
 
-Don't forget to `import' std:lang.af` (or `lang_s.af` for stack-CC) inside your program, or on the command line. Without it, the language does not exist.
+Don't forget to import `lang.af` via `use' lang.af` (or `use' lang_s.af` for stack-CC) inside your program, or via CLI args.
+
+Note on "use": absolute or explicitly-relative paths are resolved against the current file (PWD in REPL); unprefixed paths are "standard library" only.
 
 The REPL is barebones. For a better experience, using `rlwrap` is recommended:
 
 ```sh
-rlwrap astil std:lang.af -
+rlwrap astil lang.af -
 
 # Or use this shortcut from repo root:
 make repl
@@ -278,8 +280,8 @@ make repl
 
 Compile executables via `--build`:
 
-```forth
-astil my_program.af --build=out.exe
+```sh
+astil <file> --build=out.exe
 ./out.exe
 ```
 
@@ -446,7 +448,7 @@ Special _semantic_ roles get special _syntactic_ roles:
 Examples:
 - Words which declare: `fun: let: var: to:` and more.
   - Syntax highlighters are encouraged to scope the next word like a declaration.
-- Parsing words: `import' xt' postpone' compile'`.
+- Parsing words: `use' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
 - Unusual control words: `T{ }T`.
 - Well-known control words don't use special characters: `if then else elif end ret` and several more. Syntax highlighters should hardcode them.

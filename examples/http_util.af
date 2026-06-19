@@ -1,7 +1,7 @@
-import' std:lang.af
-import' std:net.af
-import' std:errno.af
-import' std:pthread.af
+use' lang.af
+use' net.af
+use' errno.af
+use' pthread.af
 
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 

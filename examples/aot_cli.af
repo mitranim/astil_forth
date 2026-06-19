@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 \ ## AOT compilation
 \
@@ -30,7 +30,7 @@ main
 \ You can "automatically" make an executable from a REPL session.
 \ In your shell:
 \
-\   astil std:lang.af - --build=out.exe
+\   astil lang.af - --build=out.exe
 \
 \ In the Forth REPL:
 \

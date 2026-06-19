@@ -1,5 +1,5 @@
-import' std:lang.af
-import' std:time.af
+use' lang.af
+use' time.af
 
 fun: main { -- err }
   \ Allocate a C-compatible struct on the system stack,

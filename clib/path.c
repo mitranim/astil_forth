@@ -22,6 +22,14 @@ static bool is_path_abs(const char *path) {
   return !!path && (path[0] == '/' || path_has_volume(path));
 }
 
+static bool is_path_explicit_rel(const char *path) {
+  return !!path && path[0] == '.';
+}
+
+static bool is_path_implicit_rel(const char *path) {
+  return !!path && !is_path_abs(path) && !is_path_explicit_rel(path);
+}
+
 /*
 Strictly relative paths look like this: `file.ext` or `dir/file.ext`.
 They don't begin with any of:

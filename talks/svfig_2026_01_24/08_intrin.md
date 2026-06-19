@@ -37,9 +37,9 @@ char
 parse
 parse_word
 
-import
-import"
-import'
+use
+use"
+use'
 extern_got
 extern:
 

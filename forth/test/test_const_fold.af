@@ -1,5 +1,5 @@
-import' ../lang.af
-import' ../testing.af
+use' ../lang.af
+use' ../testing.af
 
 true try_all
 

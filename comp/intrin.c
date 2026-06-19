@@ -243,7 +243,7 @@ static Err interp_parse_word(Interp *interp, const char **out_buf, Ind *out_len)
   return read_word(interp_reader(interp), out_buf, out_len);
 }
 
-static Err intrin_import_tick(Interp *interp) {
+static Err intrin_use_tick(Interp *interp) {
   Word_str path;
   try(interp_read_word(interp, &path));
   try(interp_import(interp, path.buf));
@@ -812,7 +812,7 @@ static const USED auto INTRIN_READ_WORD = (Sym){
 };
 
 static const USED auto INTRIN_IMPORT = (Sym){
-  .name.buf = "import",
+  .name.buf = "use",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_import,
   .inp_len  = 2,
@@ -821,9 +821,9 @@ static const USED auto INTRIN_IMPORT = (Sym){
 };
 
 static const USED auto INTRIN_IMPORT_TICK = (Sym){
-  .name.buf = "import'",
+  .name.buf = "use'",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_import_tick,
+  .intrin   = (void *)intrin_use_tick,
   .out_len  = 1,
   .has_err  = true,
 };

@@ -87,7 +87,7 @@ xt' main " out.exe" compile_executable
 You can repeatedly update a program's state, and snapshot each state into its own executable:
 
 ```sh
-astil std:lang.af -
+astil lang.af -
 ```
 
 ```forth

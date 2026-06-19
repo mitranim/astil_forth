@@ -16,11 +16,11 @@ static void print_help() {
     "\n"
     "For an interactive REPL session, use `/dev/stdin` or `-`\n"
     "as a \"file name\", in any order. Note: you need to import\n"
-    "`std:lang.af` first, in order to bootstrap the language.\n"
+    "`lang.af` first thing; otherwise language doesn't exist.\n"
     "Hint: to exit the REPL, press Ctrl+D to terminate stdin.\n"
     "Hint: for a better experience, install and use `rlwrap`:\n"
     "\n"
-    "  rlwrap astil std:lang.af -\n"
+    "  rlwrap astil lang.af -\n"
     "  rlwrap astil <file0> -\n"
     "  rlwrap astil <file0> <file1> -\n"
     "\n"
@@ -57,7 +57,8 @@ static void print_help() {
     "  ./out.exe\n"
     "\n"
 #endif // CALL_CONV_STACK
-    "Hint: each `std:*` import searches the following locations:\n"
+    "Hint: paths beginning with `/` or `.` are local.\n"
+    "Other import paths search standard library locations:\n"
     "- Directory `forth` relative to the path of the executable.\n"
     "- Directory `$HOME/.local/share/astil` with `make install`.\n",
     stderr
@@ -102,7 +103,8 @@ static Err main_run(int argc, const char *argv[]) {
       Timing time = {.prefix = "[import] "};
       if (timing) timing_beg(&time);
 
-      try(interp_import(&interp, val));
+      deferred(chars_deinit) char *path = realpath(val, nullptr);
+      try(interp_import(&interp, path ? path : val));
 
       if (timing) timing_end(&time);
       continue;

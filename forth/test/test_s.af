@@ -1,5 +1,5 @@
-import' ../lang_s.af
-import' ../testing_s.af
+use' ../lang_s.af
+use' ../testing_s.af
 
 T{       <T>       }T
 T{ 10    <T> 10    }T
@@ -54,7 +54,7 @@ end
 test_recur_throw
 
 fun: test_recur_late_throw_invalid
-  s" ./fail/test_stack_recur_then_throw.af" catch' import { err }
+  s" ./fail/test_stack_recur_then_throw.af" catch' use { err }
   err " hint: add `[ true throws ]` before `recur`" T_err_contains
 end
 test_recur_late_throw_invalid
@@ -682,13 +682,15 @@ end
 test_catch_2
 
 fun: test_word_len_over
-  s" ./fail/test_word_len_over.af" catch' import { err }
+  s" ./fail/test_word_len_over.af" catch' use { err }
   err " word length 128 exceeds max word length 127" T_err_contains
 end
 test_word_len_over
 
-s" ./test_import_empty.af" import
+s" ./test_import_empty.af" use
 
-T{ s" ./test_interp_ret.af" import <T> 123 }T
+T{ s" ./test_interp_ret.af" use <T> 123 }T
+
+s" testing_s.af" use
 
 " [test] ok" log lf

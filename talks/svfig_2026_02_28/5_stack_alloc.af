@@ -1,5 +1,5 @@
-import' std:lang.af
-import' std:testing.af
+use' lang.af
+use' testing.af
 
 \ See `./5_stack_alloc.md` which is the actual slide.
 

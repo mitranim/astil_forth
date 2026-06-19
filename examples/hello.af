@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 " hello world! (using libc IO)" log lf
 

@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 fun: fib { ind -- out }
   if ind 1 <= then 1 ret end

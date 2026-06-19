@@ -1,4 +1,4 @@
-import' ../../lang.af
+use' ../../lang.af
 
 fun: test_switch_arity_input_cases_mismatch_fail { val key -- out0 out1 }
   val key switch

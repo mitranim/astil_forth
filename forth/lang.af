@@ -4019,8 +4019,8 @@ fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun --
   ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
 end
 
-\ Comptime analogue of top-level `import'`.
-fun_comp: import' { -- err } read_word comp_str compile' import end
+\ Comptime analogue of top-level import.
+fun_comp: use' { -- err } read_word comp_str compile' use end
 
 \ For internal use below. Each `ccmp` runs only if previous test didn't pass;
 \ otherwise it sets condition flags to our `nzcv` fallback. The final `cset`

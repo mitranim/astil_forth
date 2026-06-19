@@ -1,4 +1,4 @@
-import' ./lang.af
+use' ./lang.af
 
 \ ## Libc time
 \

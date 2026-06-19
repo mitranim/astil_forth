@@ -1,5 +1,5 @@
 \ Must fail to compile: stack-CC requires throwing metadata before `recur`.
-import' ../../lang_s.af
+use' ../../lang_s.af
 
 fun: test_stack_recur_then_throw_fail ( val -- val )
   ifz dup then ret end

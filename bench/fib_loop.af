@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 fun: fib { ind -- out }
   0 1 { prev next }

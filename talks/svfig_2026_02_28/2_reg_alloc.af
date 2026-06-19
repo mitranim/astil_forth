@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 \ See the actual slide `./2_reg_alloc.md`.
 \

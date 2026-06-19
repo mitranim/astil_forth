@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 fun: reverse { str len }
   str           { low }

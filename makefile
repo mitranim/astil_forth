@@ -141,15 +141,15 @@ run_c_w:
 
 .PHONY: repl
 repl:
-	$(MAKE) run args='std:lang.af -'
+	$(MAKE) run args='lang.af -'
 
 .PHONY: repl_s
 repl_s:
-	$(MAKE) run_s args='std:lang_s.af -'
+	$(MAKE) run_s args='lang_s.af -'
 
 .PHONY: test
 test:
-	make run args='forth/test/test.af --build=$(TEST_EXE)'
+	make run args='./forth/test/test.af --build=$(TEST_EXE)'
 	./$(TEST_EXE)
 
 # 	$(MAKE) test_repl

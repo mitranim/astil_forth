@@ -7,8 +7,8 @@
 
   "variants": [
     {
-      "name": "std:lang.af",
-      "cmd": ["astil", "std:lang.af", "$file"],
+      "name": "lang.af",
+      "cmd": ["astil", "lang.af", "$file"],
     },
     {
       "name": "trace",

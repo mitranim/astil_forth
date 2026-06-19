@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 \ ## AOT compilation
 \
@@ -32,7 +32,7 @@ xt' main " out.exe" compile_executable
 \ You can make an executable inside a REPL session.
 \ In your shell:
 \
-\   astil std:lang.af -
+\   astil lang.af -
 \
 \ In the Forth REPL:
 \
@@ -55,7 +55,7 @@ xt' main " out.exe" compile_executable
 \
 \ Shell:
 \
-\   astil std:lang.af -
+\   astil lang.af -
 \
 \ Forth:
 \

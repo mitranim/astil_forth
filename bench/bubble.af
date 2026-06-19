@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 \ Translated from Gforth's `bubble.fs`.
 

@@ -1,4 +1,4 @@
-import' std:lang.af
+use' lang.af
 
 \ See `./1_disasm.md`.
 
