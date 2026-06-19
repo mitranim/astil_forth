@@ -1921,7 +1921,8 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 \ SYNC[control_meta_layout]:
 \
 \ - 63..32: instruction offset
-\ - 19..31: frame-specific small data; counted loops -> offset of `b.<cond>`
+\ - 23..31: frame-specific small data; currently unused
+\ - 19..22: counted-loop `b.<cond>` offset relative to `<loop_beg>`, packed
 \ - 15..18: frame-specific Arm64 condition code
 \ -     14: exec_prev
 \ -     13: 0 / 1 = `cbz` / `cbnz`
@@ -1948,21 +1949,17 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 ASM_ARG_LEN_MAX bit_len low_bits let: CONT_MASK_INP_LEN
 CONT_MASK_INP_LEN CONT_MASK_INP_LEN bit_len lsl let: CONT_MASK_OUT_LEN
 
-1 CONT_MASK_OUT_LEN bit_len lsl  let: CONT_MASK_HAS_INP
-CONT_MASK_HAS_INP  1 lsl         let: CONT_MASK_HAS_OUT
-CONT_MASK_HAS_OUT  1 lsl         let: CONT_MASK_HAS_ELSE_OR_CASE
+1 CONT_MASK_OUT_LEN bit_len  lsl let: CONT_MASK_HAS_INP
+CONT_MASK_HAS_INP          1 lsl let: CONT_MASK_HAS_OUT
+CONT_MASK_HAS_OUT          1 lsl let: CONT_MASK_HAS_ELSE_OR_CASE
 CONT_MASK_HAS_ELSE_OR_CASE 1 lsl let: CONT_MASK_CBNZ
-CONT_MASK_CBNZ     1 lsl         let: CONT_MASK_EXEC_PREV
+CONT_MASK_CBNZ             1 lsl let: CONT_MASK_EXEC_PREV
 
 CONT_MASK_EXEC_PREV bit_len       let: CONT_META_COND_OFF
 4 low_bits CONT_META_COND_OFF lsl let: CONT_MASK_META_COND
 
-CONT_MASK_META_COND bit_len      let: CONT_LOOP_COND_OFF
-32 low_bits invert               let: CONT_MASK_INSTR_OFF
-
-32 CONT_LOOP_COND_OFF -
-low_bits CONT_LOOP_COND_OFF lsl
-let: CONT_MASK_LOOP_COND_OFF
+4 low_bits CONT_MASK_META_COND bit_len lsl let: CONT_MASK_LOOP_COND_REL
+32 low_bits invert let: CONT_MASK_INSTR_OFF
 
 fun: cont_meta_instr_off_set { off meta -- meta }
   off instr_off_pack meta CONT_MASK_INSTR_OFF bit_mask_set
@@ -3418,7 +3415,7 @@ fun: loop_counted_end_xt { meta -- err }
   ( C: <loop_prev> -- )
   comp_barrier
   meta cont_meta_instr_off_get { beg_off }
-  meta CONT_MASK_LOOP_COND_OFF bit_mask_get instr_off_unpack
+  meta CONT_MASK_LOOP_COND_REL bit_mask_get instr_off_pack
   beg_off + instr_adr { cond_adr }
 
   meta " arguments before ending counted loop" loop_back_close
@@ -3432,7 +3429,12 @@ end
 
 fun: loop_counted_init { meta beg_off end_off cond -- meta loop_pop err }
   cond meta CONT_MASK_META_COND bit_mask_set { meta }
-  end_off beg_off - instr_off_pack meta CONT_MASK_LOOP_COND_OFF bit_mask_set
+  end_off beg_off - instr_off_unpack { cond_rel }
+  4 low_bits { max }
+  if cond_rel max u> then
+    " internal error: counted-loop branch offset overflow" throw
+  end
+  cond_rel meta CONT_MASK_LOOP_COND_REL bit_mask_set
   xt' loop_counted_end_xt
 end
 
