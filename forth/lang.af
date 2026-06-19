@@ -2125,7 +2125,8 @@ fun_comp: elif { meta end_xt -> else_meta else_xt meta end_xt err }
 end
 
 fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
-  execute'' else
+  execute'' else { meta else_xt }
+  meta else_xt
   meta CONT_MASK_EXEC_PREV or CONT_MASK_CBNZ or xt' if_end_xt
 end
 

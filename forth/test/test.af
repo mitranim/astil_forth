@@ -2635,6 +2635,13 @@ fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
 end
 test_cond_arity_elif_mismatch
 
+fun: test_cond_arity_elifz_mismatch { -- err } [ false try_all ]
+  import' ./fail/test_cond_arity_elifz_mismatch.af
+  " in `test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
+  T_err_contains
+end
+test_cond_arity_elifz_mismatch
+
 fun: test_cond_arity_no_else { -- err } [ false try_all ]
   import' ./fail/test_cond_arity_no_else.af
   " arguments before ending conditional without `else`: arity mismatch"
