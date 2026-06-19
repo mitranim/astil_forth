@@ -583,6 +583,63 @@ fun: test_const_fold_derived { -- err }
 end
 test_const_fold_derived
 
+fun: const_fold_low_bits_fun { -- out } 5 low_bits end
+fun: const_fold_bits_trunc_fun { -- out } 0b10110101 4 bits_trunc end
+fun: const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 bits_clear end
+
+fun: low_bits_instr_fun { len -- out } len low_bits end
+fun: bits_trunc_instr_fun { imm len -- out } imm len bits_trunc end
+fun: bits_clear_instr_fun { imm mask -- out } imm mask bits_clear end
+
+fun: test_const_fold_bits { -- err }
+  T{ const_fold_low_bits_fun   <T> 31 }T
+  T{ const_fold_bits_trunc_fun  <T> 5 }T
+  T{ const_fold_bits_clear_fun <T> 0b11000011 }T
+  T{ 5 low_bits_instr_fun <T> 31 }T
+  T{ 0b10110101 4 bits_trunc_instr_fun <T> 5 }T
+  T{ 0b11110011 0b00110000 bits_clear_instr_fun <T> 0b11000011 }T
+  ifz has_interp then ret end
+
+  cf_expect_clear
+  0 31 cf_expect_load
+  cf_expect_ret
+  xt' const_fold_low_bits_fun cf_expect_word
+
+  cf_expect_clear
+  0 5 cf_expect_load
+  cf_expect_ret
+  xt' const_fold_bits_trunc_fun cf_expect_word
+
+  cf_expect_clear
+  0 0b11000011 cf_expect_load
+  cf_expect_ret
+  xt' const_fold_bits_clear_fun cf_expect_word
+
+  cf_expect_clear
+  1 1 cf_expect_load
+  1 1 0 asm_lsl_reg cf_expect_instr
+  0 1 1 asm_sub_imm cf_expect_instr
+  cf_expect_ret
+  xt' low_bits_instr_fun cf_expect_word
+
+  cf_expect_clear
+  2 1 cf_expect_load
+  2 2 1 asm_lsl_reg cf_expect_instr
+  2 2 1 asm_sub_imm cf_expect_instr
+  0 0 2 asm_and_reg cf_expect_instr
+  asm_nop cf_expect_instr
+  cf_expect_ret
+  xt' bits_trunc_instr_fun cf_expect_word
+
+  cf_expect_clear
+  1 1 asm_mvn cf_expect_instr
+  0 0 1 asm_and_reg cf_expect_instr
+  asm_nop cf_expect_instr
+  cf_expect_ret
+  xt' bits_clear_instr_fun cf_expect_word
+end
+test_const_fold_bits
+
 fun: const_fold_int_to_cell_fun { -- out0 out1 }
   -1 int_to_cell
   123 int_to_cell
@@ -721,6 +778,7 @@ fun: test_const_fold_all { -- err }
   test_const_fold_compare2
   test_const_fold_ucompare2
   test_const_fold_derived
+  test_const_fold_bits
   test_const_fold_int_to_cell
   test_const_fold_unary_large_imm
   test_const_fold_fallback_0_1_1_2

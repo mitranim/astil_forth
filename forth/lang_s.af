@@ -131,7 +131,7 @@ fun: swap ( i1 i2 -- i2 i1 ) [
 ] end
 
 fun: low_bits ( bit_len -- bits ) 1 swap lsl dec end
-fun: bit_trunc ( imm bit_len -- imm ) low_bits and end
+fun: bits_trunc ( imm bit_len -- imm ) low_bits and end
 
 \ cmp Xn, <imm>
 fun: asm_cmp_imm ( Xn imm -- instr )
@@ -166,10 +166,10 @@ fun: =0 ( int -- bool ) [
 
 \ Shared by a lot of load and store instructions. 64-bit only.
 fun: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr_mask )
-  3 lsr 7 bit_trunc 15 lsl    \ imm7
-  swap              5  lsl or \ Xn
-  swap              10 lsl or \ Xt2
-                           or \ Xt1
+  3 lsr 7 bits_trunc 15 lsl    \ imm7
+  swap               5  lsl or \ Xn
+  swap               10 lsl or \ Xt2
+                            or \ Xt1
 end
 
 \ ldp Xt1, Xt2, [Xn, <imm>]!
@@ -212,9 +212,9 @@ end
 \ Patches these bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
 fun: asm_pattern_load_store ( Xt Xn imm9 -- instr_mask )
-  9 bit_trunc 12 lsl    \ imm9
-  swap        5  lsl or \ Xn
-                     or \ Xt
+  9 bits_trunc 12 lsl    \ imm9
+  swap         5  lsl or \ Xn
+                      or \ Xt
 end
 
 \ ldr Xt, [Xn, <imm>]!
@@ -297,9 +297,9 @@ end
 
 \ Shared by some integer arithmetic and load/store instructions.
 fun: asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
-  12 bit_trunc 10 lsl    \ imm12
-  swap          5 lsl or \ Xn
-                      or \ Xd
+  12 bits_trunc 10 lsl    \ imm12
+  swap           5 lsl or \ Xn
+                       or \ Xd
 end
 
 \ Immediate offset must be unsigned.
@@ -446,22 +446,22 @@ end
 
 \ b <off>
 fun: asm_branch ( off26 -- instr )
-  2  lsr       \ Offset is implicitly times 4.
-  26 bit_trunc \ Offset may be negative.
+  2  lsr        \ Offset is implicitly times 4.
+  26 bits_trunc \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 or
 end
 
 \ b.<cond> <off>
 fun: asm_branch_cond ( off19 cond -- instr )
-  swap 2 asr 19 bit_trunc 5 lsl \ `off19`; implicitly times 4.
-  or                            \ cond
+  swap 2 asr 19 bits_trunc 5 lsl \ `off19`; implicitly times 4.
+  or                             \ cond
   0b010_101_00_0000000000000000000_0_0000 or
 end
 
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch ( Xt off19 -- instr_mask )
-  2 lsr 19 bit_trunc 5 lsl \ off19
-                        or \ Xt
+  2 lsr 19 bits_trunc 5 lsl \ off19
+                         or \ Xt
 end
 
 \ cbz x1, <off>
@@ -754,19 +754,19 @@ fun: -cell  ( adr  -- adr  ) CELL - end
 
 \ lsl Xd, Xn, <imm>
 fun: asm_lsl_imm ( Xd Xn imm6 -- instr )
-  dup negate 64 mod 6 bit_trunc 16 lsl    \ immr
-  63 rot -          6 bit_trunc 10 lsl or \ imms
-  swap                           5 lsl or \ Xn
-                                       or \ Xd
+  dup negate 64 mod 6 bits_trunc 16 lsl    \ immr
+  63 rot -          6 bits_trunc 10 lsl or \ imms
+  swap                            5 lsl or \ Xn
+                                        or \ Xd
   0b1_10_100110_1_000000_000000_00000_00000 or
 end
 
 \ tbz Xt, <bit>, <imm>
 fun: asm_test_bit_branch_zero ( Xt bit imm14 -- instr )
-  2 lsr 14 bit_trunc 5 lsl    \ imm14
-  over        5 lsr 31 lsl or \ b5
-  swap  5 bit_trunc 19 lsl or \ b40
-                           or \ Xt
+  2 lsr 14 bits_trunc 5 lsl    \ imm14
+  over         5 lsr 31 lsl or \ b5
+  swap  5 bits_trunc 19 lsl or \ b40
+                            or \ Xt
   0b0_01_101_1_0_00000_00000000000000_00000 or
 end
 

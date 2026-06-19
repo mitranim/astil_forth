@@ -227,7 +227,7 @@ fun: mod { i0 i1 -> i2 } [
 ] end
 
 fun: low_bits   { len      -- bits } 1 len lsl dec end
-fun: bit_trunc  { imm len  -- imm  } len low_bits imm and end
+fun: bits_trunc { imm len  -- imm  } len low_bits imm and end
 fun: bits_clear { imm mask -- out  } mask invert imm and end
 
 \ ## Early assembler
@@ -276,7 +276,7 @@ fun: =0 { int -> bool } [
 fun: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
   Xt2 10 lsl { Xt2 }
   Xn  5  lsl { Xn }
-  imm7 3 lsr 7 bit_trunc 15 lsl Xt1 or Xt2 or Xn or
+  imm7 3 lsr 7 bits_trunc 15 lsl Xt1 or Xt2 or Xn or
 end
 
 \ Shared by a lot of load and store instructions.
@@ -284,7 +284,7 @@ end
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
 fun: asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
   Xn 5 lsl { Xn }
-  imm9 9 bit_trunc 12 lsl Xt or Xn or
+  imm9 9 bits_trunc 12 lsl Xt or Xn or
 end
 
 \ Shared by register-offset load and store instructions.
@@ -305,7 +305,7 @@ end
 \ Shared by some integer arithmetic and load/store instructions.
 fun: asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
   Xn 5 lsl { Xn }
-  imm12 12 bit_trunc 10 lsl Xd or Xn or
+  imm12 12 bits_trunc 10 lsl Xd or Xn or
 end
 
 fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
@@ -318,12 +318,12 @@ fun: instr_off_unpack { packed -- off } packed 2 lsr end
 
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
-  off19 instr_off_unpack 19 bit_trunc 5 lsl Xt or
+  off19 instr_off_unpack 19 bits_trunc 5 lsl Xt or
 end
 
 \ `off9` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
-  off9 instr_off_unpack 9 bit_trunc 5 lsl { off9 }
+  off9 instr_off_unpack 9 bits_trunc 5 lsl { off9 }
   cond 21 lsl Xt or off9 or
 end
 
@@ -586,8 +586,8 @@ end
 
 \ lsl Xd, Xn, #imm6
 fun: asm_lsl_imm { Xd Xn imm6 -- instr }
-  64 imm6 - 6 bit_trunc 16 lsl { immr }
-  63 imm6 -          6 bit_trunc 10 lsl { imms }
+  64 imm6 - 6 bits_trunc 16 lsl { immr }
+  63 imm6 - 6 bits_trunc 10 lsl { imms }
   Xn 5 lsl Xd or imms or immr or 0b1_10_100110_1_000000_000000_00000_00000 or
 end
 
@@ -605,13 +605,13 @@ end
 \ b <off>
 fun: asm_branch { off26 -> instr }
   instr_off_unpack \ Offset is implicitly times 4.
-  26 bit_trunc     \ Offset may be negative.
+  26 bits_trunc    \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 or
 end
 
 \ b.<cond> <off>
 fun: asm_branch_cond { off19 cond -- instr }
-  off19 instr_off_unpack 19 bit_trunc 5 lsl \ Implicitly times 4.
+  off19 instr_off_unpack 19 bits_trunc 5 lsl \ Implicitly times 4.
   cond or 0b010_101_00_0000000000000000000_0_0000 or
 end
 
@@ -773,6 +773,32 @@ fun_comp: lsr { -- err }
 end
 
 fun: lsr { i0 bits -> i1 } [ redefine ] lsr end
+
+fun_comp: low_bits { -- err }
+  comp_args1_reg        { reg }
+  comp_alloc_next_reg   { tmp }
+  1 tmp comp_load
+  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
+  reg tmp 1 asm_sub_imm comp_instr   \ sub Xn, Xt, #1
+  reg inc comp_args_set
+end
+
+fun_comp: bits_trunc { -- err }
+  comp_args2_regs     { imm len }
+  comp_alloc_next_reg { tmp }
+  1 tmp comp_load
+  tmp tmp len asm_lsl_reg comp_instr \ lsl Xt, Xt, Xlen
+  tmp tmp 1 asm_sub_imm comp_instr   \ sub Xt, Xt, #1
+  imm imm tmp asm_and_reg comp_instr \ and Ximm, Ximm, Xt
+  len comp_args_set
+end
+
+fun_comp: bits_clear { -- err }
+  comp_args2_regs { imm mask }
+  mask mask asm_mvn comp_instr       \ mvn Xmask, Xmask
+  imm imm mask asm_and_reg comp_instr \ and Ximm, Ximm, Xmask
+  mask comp_args_set
+end
 
 fun_comp: invert { -- err }
   comp_args1_reg { reg }
@@ -1087,9 +1113,9 @@ fun: -cell { adr -> adr } -cell end
 
 \ tbz Xt, #bit, #imm14
 fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
-  imm14 instr_off_unpack 14 bit_trunc 5 lsl { imm14 } \ Implicitly times 4.
+  imm14 instr_off_unpack 14 bits_trunc 5 lsl { imm14 } \ Implicitly times 4.
   bit 5 lsr 31 lsl { b5 }
-  bit 5 bit_trunc 19 lsl \ b40
+  bit 5 bits_trunc 19 lsl \ b40
   Xt or imm14 or b5 or
   0b0_01_101_1_0_00000_00000000000000_00000 or
 end
@@ -1097,7 +1123,7 @@ end
 \ adr Xd, #imm21
 fun: asm_adr { Xd imm21 -- instr }
   imm21 0b11 and { low }
-  imm21 instr_off_unpack 19 bit_trunc 5 lsl { high }
+  imm21 instr_off_unpack 19 bits_trunc 5 lsl { high }
   high low or Xd or
   0b0_00_100_00_0000000000000000000_00000 or
 end
@@ -1110,7 +1136,7 @@ end
 \
 \ Requires caution to avoid messing up the link register.
 fun: asm_branch_link_off { imm26 -> instr }
-  instr_off_unpack 26 bit_trunc \ Implicitly times 4.
+  instr_off_unpack 26 bits_trunc \ Implicitly times 4.
   0b100_101_00000000000000000000000000 or
 end
 
@@ -3055,6 +3081,20 @@ end
 
 fun_comp: odd { -- err } [ redefine ]
   if cf_fold_cleared1 then odd cf_fold_done else { -- } execute'' odd end
+end
+
+fun_comp: low_bits { -- err } [ redefine ]
+  if cf_fold_cleared1 then low_bits cf_fold_done else { -- } execute'' low_bits end
+end
+
+fun_comp: bits_trunc { -- err } [ redefine ]
+  if cf_fold_cleared2 then bits_trunc cf_fold_done
+  else { -- } execute'' bits_trunc end
+end
+
+fun_comp: bits_clear { -- err } [ redefine ]
+  if cf_fold_cleared2 then bits_clear cf_fold_done
+  else { -- } execute'' bits_clear end
 end
 
 fun_comp: align_down { -- err } [ redefine ]
