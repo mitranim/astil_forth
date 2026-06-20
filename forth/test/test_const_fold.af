@@ -421,12 +421,18 @@ end
 fun: const_fold_lsl_imm_fun { val -- out } val 3 lsl end
 fun: const_fold_lsr_imm_fun { val -- out } val 3 lsr end
 fun: const_fold_asr_imm_fun { val -- out } val 2 asr end
+fun: const_fold_and_rhs_imm_fun { val -- out } val 0xff and end
+fun: const_fold_and_lhs_imm_fun { val -- out } 0xff val and end
+fun: const_fold_and_bad_imm_fun { val -- out } val 0 and end
 
 fun: test_const_fold_bit_shift { -- err }
   T{ const_fold_bit_shift_fun <T> 14 8 6 48 8 -16 }T
   T{ 6 const_fold_lsl_imm_fun <T> 48 }T
   T{ 64 const_fold_lsr_imm_fun <T> 8 }T
   T{ -64 const_fold_asr_imm_fun <T> -16 }T
+  T{ 0x1234 const_fold_and_rhs_imm_fun <T> 0x34 }T
+  T{ 0x1234 const_fold_and_lhs_imm_fun <T> 0x34 }T
+  T{ 0x1234 const_fold_and_bad_imm_fun <T> 0 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -452,6 +458,18 @@ fun: test_const_fold_bit_shift { -- err }
   0 0 2 asm_asr_imm cf_expect_instr
   cf_expect_ret
   xt' const_fold_asr_imm_fun cf_expect_word
+
+  cf_expect_clear
+  0 0 0xff asm_and_imm cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_and_rhs_imm_fun cf_expect_word
+
+  cf_expect_clear
+  2 0 asm_mov_reg cf_expect_instr
+  1 2 asm_mov_reg cf_expect_instr
+  0 1 0xff asm_and_imm cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_and_lhs_imm_fun cf_expect_word
 end
 test_const_fold_bit_shift
 

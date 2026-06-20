@@ -2777,12 +2777,16 @@ fun: asm_logical_imm_enc { imm -- N immr imms err }
   size 1 lsl negate ones dec or 0x3f and
 end
 
-fun: asm_logical_imm_instr { Xd Xn imm op -- instr err }
+fun: asm_logical_imm_mask { imm op -- mask err }
   imm asm_logical_imm_enc { N immr imms }
   op
   N    22 lsl or
   immr 16 lsl or
   imms 10 lsl or
+end
+
+fun: asm_logical_imm_instr { Xd Xn imm op -- instr err }
+  imm op asm_logical_imm_mask
   Xn   5  lsl or
   Xd          or
 end
@@ -2907,8 +2911,8 @@ fun: cf_imm_u12 { imm -- ok }
   imm 0 >= imm ASM_MAX_IMM12 <= and
 end
 
-fun: cf_emit_cmp_imm_cset { reg0 reg_src imm cond -- err }
-  reg_src imm asm_cmp_imm comp_instr \ cmp Xn, #imm12
+fun: cf_emit_cmp_imm_cset { reg0 reg1 imm cond -- err }
+  reg1 imm asm_cmp_imm comp_instr \ cmp Xn, #imm12
   reg0 cond asm_cset      comp_instr \ cset Xd, cond
 end
 
@@ -3017,12 +3021,12 @@ end
 
 fun: cf_fold_cmp_lhs_imm { reg0 reg1 arg1 cond -- ok err }
   reg0 comp_arg { arg0 }
-  arg0 cf_arg_foldable_imm { imm0 foldable0 }
-  ifz foldable0 then false ret end
-  ifz imm0 cf_imm_u12 then false ret end
+  arg0 cf_arg_foldable_imm { imm foldable }
+  ifz foldable then false ret end
+  ifz imm cf_imm_u12 then false ret end
 
   instr' cf_emit_cmp_imm_cset { emit }
-  reg0 reg1 arg0 arg1 imm0 cond emit cf_fold_lhs_imm_raw
+  reg0 reg1 arg0 arg1 imm cond emit cf_fold_lhs_imm_raw
 end
 
 fun: cf_fold_cmp_imm { rhs_cond lhs_cond -- ok err }
@@ -3068,17 +3072,17 @@ end
 1 let: CF_SHIFT_LSR
 2 let: CF_SHIFT_ASR
 
-fun: cf_emit_shift_imm { reg0 reg_src imm shift -- err }
+fun: cf_emit_shift_imm { reg0 reg1 imm shift -- err }
   if shift CF_SHIFT_LSL = then
     64 imm - 6 bits_trunc { immr }
     63 imm - 6 bits_trunc { imms }
-    reg0 reg_src immr imms ASM_OP_UBFM asm_bitfield comp_instr \ lsl Xd, Xn, #imm6
+    reg0 reg1 immr imms ASM_OP_UBFM asm_bitfield comp_instr \ lsl Xd, Xn, #imm6
     ret
   end
 
   imm 6 bits_trunc { immr }
   if shift CF_SHIFT_LSR = then ASM_OP_UBFM else ASM_OP_SBFM end { bitfield_op }
-  reg0 reg_src immr 63 bitfield_op asm_bitfield comp_instr \ lsr|asr Xd, Xn, #imm6
+  reg0 reg1 immr 63 bitfield_op asm_bitfield comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
 fun: cf_fold_shift_imm { shift -- ok err }
@@ -3091,6 +3095,32 @@ fun: cf_fold_shift_imm { shift -- ok err }
   imm 0 >= imm 63 <= and { fits }
   instr' cf_emit_shift_imm { emit }
   reg0 arg1 imm shift emit fits cf_fold_rhs_imm_checked
+end
+
+fun: cf_emit_logical_imm_mask { reg0 reg1 _imm mask -- err }
+  mask reg1 5 lsl or reg0 or comp_instr \ and|orr|eor Xd, Xn, #imm
+end
+
+fun: cf_fold_logical_imm { op -- ok err }
+  comp_top_arg_regs2 { reg0 reg1 }
+  reg1 comp_arg { arg1 }
+  arg1 cf_arg_foldable_imm { imm foldable }
+
+  instr' cf_emit_logical_imm_mask { emit }
+
+  if foldable then
+    imm op catch' asm_logical_imm_mask { mask err }
+    if err then false ret end
+    reg0 arg1 imm mask emit true cf_fold_rhs_imm_checked ret
+  end
+
+  reg0 comp_arg { arg0 }
+  arg0 cf_arg_foldable_imm { imm foldable }
+  ifz foldable then false ret end
+
+  imm op catch' asm_logical_imm_mask { mask err }
+  if err then false ret end
+  reg0 reg1 arg0 arg1 imm mask emit cf_fold_lhs_imm_raw
 end
 
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
@@ -3261,7 +3291,9 @@ fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: and { -- err } [ redefine ]
-  if cf_fold_cleared2 then and cf_fold_done else { -- } execute'' and end
+  if cf_fold_cleared2 then and cf_fold_done
+  else { -- } ifz ASM_OP_AND_IMM cf_fold_logical_imm then execute'' and end
+  end
 end
 
 \ Bitwise and into a local: `mask and: some_val`.
