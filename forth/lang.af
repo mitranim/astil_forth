@@ -962,11 +962,15 @@ end
 \ Chooses a non-zero value, preferring the second input.
 fun: fallback { one two -> out } fallback end
 
+fun: comp_emit_is_aligned_to_reg { out adr size -- err }
+  size size 1 asm_sub_imm comp_instr \ sub Xd, Xn, 1
+  size adr    asm_tst     comp_instr \ tst Xn, Xm
+  out ASM_EQ  asm_cset    comp_instr \ cset Xd, eq
+end
+
 fun_comp: is_aligned_to { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg1 reg1 1    asm_sub_imm comp_instr \ sub Xd, Xn, 1
-  reg1 reg0      asm_tst     comp_instr
-  reg0 ASM_EQ    asm_cset    comp_instr \ cset Xd, eq
+  reg0 reg0 reg1 comp_emit_is_aligned_to_reg
   reg1 comp_args_set
 end
 
@@ -2843,11 +2847,13 @@ end
 0b1_00_100100_0_000000_000000_00000_00000 let: ASM_OP_AND_IMM
 0b1_01_100100_0_000000_000000_00000_00000 let: ASM_OP_ORR_IMM
 0b1_10_100100_0_000000_000000_00000_00000 let: ASM_OP_EOR_IMM
+0b1_11_100100_0_000000_000000_00000_00000 let: ASM_OP_ANDS_IMM
 
 fun: asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM asm_logical_imm_instr end
 fun: asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM asm_logical_imm_instr end
 fun: asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM asm_logical_imm_instr end
 fun: asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm invert ASM_OP_AND_IMM asm_logical_imm_instr end
+fun: asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM asm_logical_imm_instr end
 
 \ ## Constant folding and locals mutation
 \
@@ -3119,6 +3125,15 @@ end
 
 fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
   mask reg1 5 lsl or reg0 or comp_instr \ and|orr|eor Xd, Xn, #imm
+end
+
+fun: cf_align_validate { size _ -- aux ok }
+  size dec ASM_OP_ANDS_IMM catch' asm_logical_imm_mask =0
+end
+
+fun: cf_align_emit { out adr _size mask -- err }
+  mask adr 5 lsl or 31 or comp_instr \ tst Xn, #imm
+  out ASM_EQ asm_cset comp_instr      \ cset Xd, eq
 end
 
 fun: cf_addsub_validate { imm add -- aux ok }
@@ -3879,6 +3894,17 @@ fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   reg reg 1 asm_and_imm comp_instr \ and Xd, Xd, #1
   loc reg comp_loc_mut_store
+end
+
+fun_comp: is_aligned_to { -- err } [ redefine ]
+  if cf_fold_cleared2 then is_aligned_to cf_fold_done
+  else
+    { -- }
+    false nil nil
+    instr' cf_align_validate instr' cf_align_emit
+    if cf_fold2 then ret end
+    execute'' is_aligned_to
+  end
 end
 
 fun_comp: align_down { -- err } [ redefine ]
