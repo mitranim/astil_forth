@@ -946,6 +946,16 @@ end
 
 fun: umax { i0 i1 -> i0|i1 } umax end
 
+fun_comp: fallback { -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg1 0                asm_cmp_imm comp_instr \ cmp x1, 0
+  reg0 reg1 reg0 ASM_NE asm_csel    comp_instr \ csel x0, x1, x0, ne
+  reg1 comp_args_set
+end
+
+\ Chooses a non-zero value, preferring the second input.
+fun: fallback { one two -> out } fallback end
+
 fun_comp: is_aligned_to { -- err }
   comp_args2_regs { reg0 reg1 }
   reg1 reg1 1    asm_sub_imm comp_instr \ sub Xd, Xn, 1
@@ -976,16 +986,6 @@ fun_comp: align_up { -- err }
 end
 
 fun: align_up { len wid -> len } align_up end
-
-fun_comp: fallback { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg1 0                asm_cmp_imm comp_instr \ cmp x1, 0
-  reg0 reg1 reg0 ASM_NE asm_csel    comp_instr \ csel x0, x1, x0, ne
-  reg1 comp_args_set
-end
-
-\ Chooses a non-zero value, preferring the second input.
-fun: fallback { one two -> out } fallback end
 
 \ Flip all the bits.
 fun_comp: invert { -- err }
@@ -2469,19 +2469,30 @@ end
 fun: sym_name { XT -> str } Sym_name Sym_word_buf end
 
 \ SYNC[sym_fields].
-fun: sym_instr { XT -> instr } Sym_union @ end
+fun_comp: sym_instr { -- err } ( E: XT -- instr )
+  execute'' Sym_union execute'' @
+end
+
+fun: sym_instr { XT -> instr } sym_instr end
 
 \ For internal use below.
 fun: comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
-  next_word comp_push compile' sym_instr
+  next_word comp_push
+  execute'' sym_instr
 end
 
 \ Similar to `xt'` and `xt''`, but instead of returning an execution token,
 \ which is `Sym *`, returns the address of the first executable instruction
 \ of the next word.
 \
-\ Intended for callbacks passed to foreign callers
-\ such as `pthread_create` or `qsort`.
+\ Intended use cases:
+\
+\ - Where XT introspection     needed -> `xt'    + execute`.
+\ - Where XT introspection not needed -> `instr' + execute_raw`.
+\
+\ This is the same as a "function pointer" in C. When passing callbacks to
+\ foreign callers such as `pthread_create` or `qsort`, this "just works",
+\ since we use the standard calling convention.
 fun: instr' { -- instr err } execute' xt' sym_instr end
 
 fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
@@ -3062,8 +3073,7 @@ end
 fun: cf_logical_validate { imm aux -- aux ok }
   aux 1 and { inv }
   aux inv - { op }
-  if inv then imm invert { imm } end
-  imm op catch' asm_logical_imm_mask =0
+  if inv then imm invert else imm end op catch' asm_logical_imm_mask =0
 end
 
 fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
@@ -3111,7 +3121,7 @@ fun: comp_loc_emit_arith_reg { loc reg_op -- err }
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_imm_mut { reg_op aux validate emit -- err }
+fun: comp_loc_mut_imm { reg_op aux validate emit -- err }
   ( C: "name" -- ) ( E: imm -- )
 
   comp_loc_mut_arg_prepare { reg arg loc imm foldable }
@@ -3130,7 +3140,7 @@ fun: comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
   comp_args_get dec loc
 end
 
-fun: comp_loc_fixed_imm_mut { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
+fun: comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   reg reg imm aux emit execute_raw
   loc reg comp_loc_mut_store
@@ -3171,14 +3181,14 @@ fun: comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
   loc candidate comp_loc_mut_store
 end
 
-fun: comp_loc_cset_zero_mut { cond -- err } ( C: "name" -- ) ( E: -- )
+fun: comp_loc_mut_cset_zero { cond -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   reg      asm_cmp_zero comp_instr \ cmp Xn, #0
   reg cond asm_cset     comp_instr \ cset Xd, cond
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_cmp_imm_mut { cond validate emit -- err } ( C: "name" -- ) ( E: rhs -- )
+fun: comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rhs -- )
   comp_loc_mut_arg_prepare { reg arg loc imm foldable }
 
   if foldable then
@@ -3192,14 +3202,14 @@ fun: comp_loc_cmp_imm_mut { cond validate emit -- err } ( C: "name" -- ) ( E: rh
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_align_down_mut { -- err } ( C: "name" -- ) ( E: wid -- )
+fun: comp_loc_mut_align_down { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_arg_init { wid len loc }
   wid         asm_neg     comp_instr \ neg Xd, Xd
   wid len wid asm_and_reg comp_instr \ and Xd, Xn, Xm
   loc wid comp_loc_mut_store
 end
 
-fun: comp_loc_align_up_mut { -- err } ( C: "name" -- ) ( E: wid -- )
+fun: comp_loc_mut_align_up { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_arg_init { wid len loc }
   len len wid asm_add_reg comp_instr \ add Xd, Xn, Xm
   len len 1   asm_sub_imm comp_instr \ sub Xd, Xn, #1
@@ -3208,7 +3218,7 @@ fun: comp_loc_align_up_mut { -- err } ( C: "name" -- ) ( E: wid -- )
   loc wid comp_loc_mut_store
 end
 
-fun: comp_loc_bit_mask_get_mut { -- err } ( C: "name" -- ) ( E: mask -- )
+fun: comp_loc_mut_bit_mask_get { -- err } ( C: "name" -- ) ( E: mask -- )
   comp_loc_arg_init { mask src loc }
   src src mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
   mask mask     asm_rbit    comp_instr \ rbit Xd, Xn
@@ -3217,7 +3227,7 @@ fun: comp_loc_bit_mask_get_mut { -- err } ( C: "name" -- ) ( E: mask -- )
   loc mask comp_loc_mut_store
 end
 
-fun: comp_loc_bit_mask_set_mut { -- err } ( C: "name" -- ) ( E: inp mask -- )
+fun: comp_loc_mut_bit_mask_set { -- err } ( C: "name" -- ) ( E: inp mask -- )
   comp_args2_regs { inp mask }
   read_word comp_local { loc }
   loc comp_push_from_local
@@ -3232,7 +3242,7 @@ fun: comp_loc_bit_mask_set_mut { -- err } ( C: "name" -- ) ( E: inp mask -- )
   loc inp comp_loc_mut_store
 end
 
-fun: comp_loc_bits_trunc_mut { -- err } ( C: "name" -- ) ( E: len -- )
+fun: comp_loc_mut_bits_trunc { -- err } ( C: "name" -- ) ( E: len -- )
   comp_loc_arg_init { len val loc }
   comp_alloc_next_reg { tmp }
   1 tmp comp_load
@@ -3246,144 +3256,144 @@ fun_comp: or { -- err } [ redefine ]
   if cf_fold_cleared2 then or cf_fold_done
   else
     { -- }
-    instr' cf_logical_validate { validate }
-    instr' cf_logical_emit { emit }
-    if true ASM_OP_ORR_IMM ASM_OP_ORR_IMM validate emit cf_fold2 then ret end
+    true ASM_OP_ORR_IMM ASM_OP_ORR_IMM
+    instr' cf_logical_validate instr' cf_logical_emit
+    if cf_fold2 then ret end
     execute'' or
   end
 end
 
 \ Bitwise or into a local: `mask or: some_val`.
 fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
-  instr' cf_logical_validate { validate }
-  instr' cf_logical_emit { emit }
-  ASM_OP_ORR_REG ASM_OP_ORR_IMM validate emit comp_loc_imm_mut
+  ASM_OP_ORR_REG ASM_OP_ORR_IMM
+  instr' cf_logical_validate instr' cf_logical_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: and { -- err } [ redefine ]
   if cf_fold_cleared2 then and cf_fold_done
   else
     { -- }
-    instr' cf_logical_validate { validate }
-    instr' cf_logical_emit { emit }
-    if true ASM_OP_AND_IMM ASM_OP_AND_IMM validate emit cf_fold2 then ret end
+    true ASM_OP_AND_IMM ASM_OP_AND_IMM
+    instr' cf_logical_validate instr' cf_logical_emit
+    if cf_fold2 then ret end
     execute'' and
   end
 end
 
 \ Bitwise and into a local: `mask and: some_val`.
 fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
-  instr' cf_logical_validate { validate }
-  instr' cf_logical_emit { emit }
-  ASM_OP_AND_REG ASM_OP_AND_IMM validate emit comp_loc_imm_mut
+  ASM_OP_AND_REG ASM_OP_AND_IMM
+  instr' cf_logical_validate instr' cf_logical_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: xor { -- err } [ redefine ]
   if cf_fold_cleared2 then xor cf_fold_done
   else
     { -- }
-    instr' cf_logical_validate { validate }
-    instr' cf_logical_emit { emit }
-    if true ASM_OP_EOR_IMM ASM_OP_EOR_IMM validate emit cf_fold2 then ret end
+    true ASM_OP_EOR_IMM ASM_OP_EOR_IMM
+    instr' cf_logical_validate instr' cf_logical_emit
+    if cf_fold2 then ret end
     execute'' xor
   end
 end
 
 \ Bitwise xor into a local: `mask xor: some_val`.
 fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
-  instr' cf_logical_validate { validate }
-  instr' cf_logical_emit { emit }
-  ASM_OP_EOR_REG ASM_OP_EOR_IMM validate emit comp_loc_imm_mut
+  ASM_OP_EOR_REG ASM_OP_EOR_IMM
+  instr' cf_logical_validate instr' cf_logical_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: lsl { -- err } [ redefine ]
   if cf_fold_cleared2 then lsl cf_fold_done
   else
     { -- }
-    instr' cf_shift_validate { validate }
-    instr' cf_shift_emit { emit }
-    if false ASM_OP_LSL_REG ASM_OP_LSL_REG validate emit cf_fold2 then ret end
+    false ASM_OP_LSL_REG ASM_OP_LSL_REG
+    instr' cf_shift_validate instr' cf_shift_emit
+    if cf_fold2 then ret end
     execute'' lsl
   end
 end
 
 \ Shift a local left: `bits lsl: some_val`.
 fun_comp: lsl: { -- err } ( C: "name" -- ) ( E: bits -- )
-  instr' cf_shift_validate { validate }
-  instr' cf_shift_emit { emit }
-  ASM_OP_LSL_REG ASM_OP_LSL_REG validate emit comp_loc_imm_mut
+  ASM_OP_LSL_REG ASM_OP_LSL_REG
+  instr' cf_shift_validate instr' cf_shift_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: lsr { -- err } [ redefine ]
   if cf_fold_cleared2 then lsr cf_fold_done
   else
     { -- }
-    instr' cf_shift_validate { validate }
-    instr' cf_shift_emit { emit }
-    if false ASM_OP_LSR_REG ASM_OP_LSR_REG validate emit cf_fold2 then ret end
+    false ASM_OP_LSR_REG ASM_OP_LSR_REG
+    instr' cf_shift_validate instr' cf_shift_emit
+    if cf_fold2 then ret end
     execute'' lsr
   end
 end
 
 \ Shift a local right logically: `bits lsr: some_val`.
 fun_comp: lsr: { -- err } ( C: "name" -- ) ( E: bits -- )
-  instr' cf_shift_validate { validate }
-  instr' cf_shift_emit { emit }
-  ASM_OP_LSR_REG ASM_OP_LSR_REG validate emit comp_loc_imm_mut
+  ASM_OP_LSR_REG ASM_OP_LSR_REG
+  instr' cf_shift_validate instr' cf_shift_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: asr { -- err } [ redefine ]
   if cf_fold_cleared2 then asr cf_fold_done
   else
     { -- }
-    instr' cf_shift_validate { validate }
-    instr' cf_shift_emit { emit }
-    if false ASM_OP_ASR_REG ASM_OP_ASR_REG validate emit cf_fold2 then ret end
+    false ASM_OP_ASR_REG ASM_OP_ASR_REG
+    instr' cf_shift_validate instr' cf_shift_emit
+    if cf_fold2 then ret end
     execute'' asr
   end
 end
 
 \ Shift a local right arithmetically: `bits asr: some_val`.
 fun_comp: asr: { -- err } ( C: "name" -- ) ( E: bits -- )
-  instr' cf_shift_validate { validate }
-  instr' cf_shift_emit { emit }
-  ASM_OP_ASR_REG ASM_OP_ASR_REG validate emit comp_loc_imm_mut
+  ASM_OP_ASR_REG ASM_OP_ASR_REG
+  instr' cf_shift_validate instr' cf_shift_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: + { -- err } [ redefine ]
   if cf_fold_cleared2 then + cf_fold_done
   else
     { -- }
-    instr' cf_addsub_validate { validate }
-    instr' cf_addsub_emit { emit }
-    if true true true validate emit cf_fold2 then ret end
+    true true true
+    instr' cf_addsub_validate instr' cf_addsub_emit
+    if cf_fold2 then ret end
     execute'' +
   end
 end
 
 \ Add a step to a local: `step +: some_val`.
 fun_comp: +: { -- err } ( C: "name" -- ) ( E: imm -- )
-  instr' cf_addsub_validate { validate }
-  instr' cf_addsub_emit { emit }
-  ASM_OP_ADD_REG true validate emit comp_loc_imm_mut
+  ASM_OP_ADD_REG true
+  instr' cf_addsub_validate instr' cf_addsub_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: - { -- err } [ redefine ]
   if cf_fold_cleared2 then - cf_fold_done
   else
     { -- }
-    instr' cf_addsub_validate { validate }
-    instr' cf_addsub_emit { emit }
-    if false false false validate emit cf_fold2 then ret end
+    false false false
+    instr' cf_addsub_validate instr' cf_addsub_emit
+    if cf_fold2 then ret end
     execute'' -
   end
 end
 
 \ Subtract a step from a local: `step -: some_val`.
 fun_comp: -: { -- err } ( C: "name" -- ) ( E: imm -- )
-  instr' cf_addsub_validate { validate }
-  instr' cf_addsub_emit { emit }
-  ASM_OP_SUB_REG false validate emit comp_loc_imm_mut
+  ASM_OP_SUB_REG false
+  instr' cf_addsub_validate instr' cf_addsub_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: * { -- err } [ redefine ]
@@ -3447,8 +3457,7 @@ end
 
 \ Increment a local: `inc: some_val`.
 fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
-  instr' cf_addsub_emit { emit }
-  1 true emit comp_loc_fixed_imm_mut
+  1 true instr' cf_addsub_emit comp_loc_mut_fixed
 end
 
 fun_comp: dec { -- err } [ redefine ]
@@ -3457,8 +3466,7 @@ end
 
 \ Decrement a local: `dec: some_val`.
 fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
-  instr' cf_addsub_emit { emit }
-  1 false emit comp_loc_fixed_imm_mut
+  1 false instr' cf_addsub_emit comp_loc_mut_fixed
 end
 
 fun_comp: negate { -- err } [ redefine ]
@@ -3558,6 +3566,17 @@ fun_comp: umax: { -- err } ( C: "name" -- ) ( E: candidate -- )
   false ASM_HI comp_loc_mut_csel
 end
 
+\ No partial CF: adopted child of the min/max family.
+fun_comp: fallback { -- err } [ redefine ]
+  if cf_fold_cleared2 then fallback cf_fold_done
+  else { -- } execute'' fallback end
+end
+
+\ Fallback into a local: `candidate fallback: some_val`.
+fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  true ASM_NE comp_loc_mut_csel
+end
+
 fun_comp: int_to_cell { -- err } [ redefine ]
   if cf_fold_cleared1 then int_to_cell cf_fold_done
   else { -- } execute'' int_to_cell end
@@ -3576,7 +3595,7 @@ end
 
 \ Test local equals zero in place: `=0: some_val`.
 fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_EQ comp_loc_cset_zero_mut
+  ASM_EQ comp_loc_mut_cset_zero
 end
 
 fun_comp: <>0 { -- err } [ redefine ]
@@ -3585,7 +3604,7 @@ end
 
 \ Test local not equal zero in place: `<>0: some_val`.
 fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_NE comp_loc_cset_zero_mut
+  ASM_NE comp_loc_mut_cset_zero
 end
 
 fun_comp: <0 { -- err } [ redefine ]
@@ -3594,7 +3613,7 @@ end
 
 \ Test local less than zero in place: `<0: some_val`.
 fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_LT comp_loc_cset_zero_mut
+  ASM_LT comp_loc_mut_cset_zero
 end
 
 fun_comp: >0 { -- err } [ redefine ]
@@ -3603,7 +3622,7 @@ end
 
 \ Test local greater than zero in place: `>0: some_val`.
 fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_GT comp_loc_cset_zero_mut
+  ASM_GT comp_loc_mut_cset_zero
 end
 
 fun_comp: <=0 { -- err } [ redefine ]
@@ -3612,7 +3631,7 @@ end
 
 \ Test local less than or equal zero in place: `<=0: some_val`.
 fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_LE comp_loc_cset_zero_mut
+  ASM_LE comp_loc_mut_cset_zero
 end
 
 fun_comp: >=0 { -- err } [ redefine ]
@@ -3621,187 +3640,177 @@ end
 
 \ Test local greater than or equal zero in place: `>=0: some_val`.
 fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_GE comp_loc_cset_zero_mut
+  ASM_GE comp_loc_mut_cset_zero
 end
 
 fun_comp: = { -- err } [ redefine ]
   if cf_fold_cleared2 then = cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_EQ ASM_EQ validate emit cf_fold2 then ret end
+    true ASM_EQ ASM_EQ
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' =
   end
 end
 
 \ Compare a local for equality in place: `rhs =: some_val`.
 fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_EQ validate emit comp_loc_cmp_imm_mut
+  ASM_EQ instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: <> { -- err } [ redefine ]
   if cf_fold_cleared2 then <> cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_NE ASM_NE validate emit cf_fold2 then ret end
+    true ASM_NE ASM_NE
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' <>
   end
 end
 
 \ Compare a local for inequality in place: `rhs <>: some_val`.
 fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_NE validate emit comp_loc_cmp_imm_mut
+  ASM_NE instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: > { -- err } [ redefine ]
   if cf_fold_cleared2 then > cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_GT ASM_LT validate emit cf_fold2 then ret end
+    true ASM_GT ASM_LT
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' >
   end
 end
 
 \ Compare a local greater-than in place: `rhs >: some_val`.
 fun_comp: >: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_GT validate emit comp_loc_cmp_imm_mut
+  ASM_GT instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: < { -- err } [ redefine ]
   if cf_fold_cleared2 then < cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_LT ASM_GT validate emit cf_fold2 then ret end
+    true ASM_LT ASM_GT
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' <
   end
 end
 
 \ Compare a local less-than in place: `rhs <: some_val`.
 fun_comp: <: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_LT validate emit comp_loc_cmp_imm_mut
+  ASM_LT instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: <= { -- err } [ redefine ]
   if cf_fold_cleared2 then <= cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_LE ASM_GE validate emit cf_fold2 then ret end
+    true ASM_LE ASM_GE
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' <=
   end
 end
 
 \ Compare a local less/equal in place: `rhs <=: some_val`.
 fun_comp: <=: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_LE validate emit comp_loc_cmp_imm_mut
+  ASM_LE instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: >= { -- err } [ redefine ]
   if cf_fold_cleared2 then >= cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_GE ASM_LE validate emit cf_fold2 then ret end
+    true ASM_GE ASM_LE
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' >=
   end
 end
 
 \ Compare a local greater/equal in place: `rhs >=: some_val`.
 fun_comp: >=: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_GE validate emit comp_loc_cmp_imm_mut
+  ASM_GE instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: u> { -- err } [ redefine ]
   if cf_fold_cleared2 then u> cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_HI ASM_LO validate emit cf_fold2 then ret end
+    true ASM_HI ASM_LO
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' u>
   end
 end
 
 \ Compare a local unsigned greater-than in place: `rhs u>: some_val`.
 fun_comp: u>: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_HI validate emit comp_loc_cmp_imm_mut
+  ASM_HI instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: u< { -- err } [ redefine ]
   if cf_fold_cleared2 then u< cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_LO ASM_HI validate emit cf_fold2 then ret end
+    true ASM_LO ASM_HI
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' u<
   end
 end
 
 \ Compare a local unsigned less-than in place: `rhs u<: some_val`.
 fun_comp: u<: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_LO validate emit comp_loc_cmp_imm_mut
+  ASM_LO instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: u<= { -- err } [ redefine ]
   if cf_fold_cleared2 then u<= cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_LS ASM_HS validate emit cf_fold2 then ret end
+    true ASM_LS ASM_HS
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' u<=
   end
 end
 
 \ Compare a local unsigned less/equal in place: `rhs u<=: some_val`.
 fun_comp: u<=: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_LS validate emit comp_loc_cmp_imm_mut
+  ASM_LS instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: u>= { -- err } [ redefine ]
   if cf_fold_cleared2 then u>= cf_fold_done
   else
     { -- }
-    instr' cf_cmp_validate { validate }
-    instr' cf_emit_cmp_imm_cset { emit }
-    if true ASM_HS ASM_LS validate emit cf_fold2 then ret end
+    true ASM_HS ASM_LS
+    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+    if cf_fold2 then ret end
     execute'' u>=
   end
 end
 
 \ Compare a local unsigned greater/equal in place: `rhs u>=: some_val`.
 fun_comp: u>=: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  instr' cf_cmp_validate { validate }
-  instr' cf_emit_cmp_imm_cset { emit }
-  ASM_HS validate emit comp_loc_cmp_imm_mut
+  ASM_HS instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  comp_loc_mut_cmp_imm
 end
 
 fun_comp: cells { -- err } [ redefine ]
@@ -3810,8 +3819,7 @@ end
 
 \ Scale a local by cell size: `cells: some_val`.
 fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
-  instr' cf_shift_emit { emit }
-  3 ASM_OP_LSL_REG emit comp_loc_fixed_imm_mut
+  3 ASM_OP_LSL_REG instr' cf_shift_emit comp_loc_mut_fixed
 end
 
 fun_comp: /cells { -- err } [ redefine ]
@@ -3820,8 +3828,7 @@ end
 
 \ Divide a local by cell size: `/cells: some_val`.
 fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
-  instr' cf_shift_emit { emit }
-  3 ASM_OP_ASR_REG emit comp_loc_fixed_imm_mut
+  3 ASM_OP_ASR_REG instr' cf_shift_emit comp_loc_mut_fixed
 end
 
 fun_comp: +cell { -- err } [ redefine ]
@@ -3830,8 +3837,7 @@ end
 
 \ Add one cell to a local: `+cell: some_val`.
 fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
-  instr' cf_addsub_emit { emit }
-  CELL true emit comp_loc_fixed_imm_mut
+  CELL true instr' cf_addsub_emit comp_loc_mut_fixed
 end
 
 fun_comp: -cell { -- err } [ redefine ]
@@ -3840,8 +3846,7 @@ end
 
 \ Subtract one cell from a local: `-cell: some_val`.
 fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
-  instr' cf_addsub_emit { emit }
-  CELL false emit comp_loc_fixed_imm_mut
+  CELL false instr' cf_addsub_emit comp_loc_mut_fixed
 end
 
 fun_comp: odd { -- err }
@@ -3869,7 +3874,7 @@ end
 
 \ Align a local down: `wid align_down: some_val`.
 fun_comp: align_down: { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_align_down_mut
+  comp_loc_mut_align_down
 end
 
 fun_comp: align_up { -- err } [ redefine ]
@@ -3879,17 +3884,7 @@ end
 
 \ Align a local up: `wid align_up: some_val`.
 fun_comp: align_up: { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_align_up_mut
-end
-
-fun_comp: fallback { -- err } [ redefine ]
-  if cf_fold_cleared2 then fallback cf_fold_done
-  else { -- } execute'' fallback end
-end
-
-\ Fallback into a local: `candidate fallback: some_val`.
-fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  true ASM_NE comp_loc_mut_csel
+  comp_loc_mut_align_up
 end
 
 fun_comp: invert { -- err } [ redefine ]
@@ -3924,24 +3919,24 @@ end
 
 \ Truncate a local to low bits: `len bits_trunc: some_val`.
 fun_comp: bits_trunc: { -- err } ( C: "name" -- ) ( E: len -- )
-  comp_loc_bits_trunc_mut
+  comp_loc_mut_bits_trunc
 end
 
 fun_comp: bits_clear { -- err } [ redefine ]
   if cf_fold_cleared2 then bits_clear cf_fold_done
   else
     { -- }
-    instr' cf_logical_validate { validate }
-    instr' cf_logical_emit { emit }
-    if false ASM_OP_AND_IMM 1 or ASM_OP_AND_IMM 1 or validate emit cf_fold2 then ret end execute'' bits_clear
+    false ASM_OP_AND_IMM 1 or ASM_OP_AND_IMM 1 or
+    instr' cf_logical_validate instr' cf_logical_emit
+    if cf_fold2 then ret end execute'' bits_clear
   end
 end
 
 \ Clear bits in a local by mask: `mask bits_clear: some_val`.
 fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
-  instr' cf_logical_validate { validate }
-  instr' cf_logical_emit { emit }
-  ASM_OP_BIC_REG ASM_OP_AND_IMM 1 or validate emit comp_loc_imm_mut
+  ASM_OP_BIC_REG ASM_OP_AND_IMM 1 or
+  instr' cf_logical_validate instr' cf_logical_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: bit_mask_get { -- err } [ redefine ]
@@ -3951,7 +3946,7 @@ end
 
 \ Extract masked bits from a local: `mask bit_mask_get: some_val`.
 fun_comp: bit_mask_get: { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_loc_bit_mask_get_mut
+  comp_loc_mut_bit_mask_get
 end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
@@ -3961,7 +3956,7 @@ end
 
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
 fun_comp: bit_mask_set: { -- err } ( C: "name" -- ) ( E: inp mask -- )
-  comp_loc_bit_mask_set_mut
+  comp_loc_mut_bit_mask_set
 end
 
 \ ## Stack manipulation continued
