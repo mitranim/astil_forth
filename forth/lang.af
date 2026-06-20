@@ -587,8 +587,9 @@ end
 fun: asr { i0 bits -> i1 } [ 0 0 1 asm_asr_reg comp_out0 ] end \ asr x0, x0, x1
 
 \ lsl Xd, Xn, Xm
+0b1_0_0_11010110_00000_0010_00_00000_00000 let: ASM_OP_LSL_REG
 fun: asm_lsl_reg { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_0_0_11010110_00000_0010_00_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_LSL_REG or
 end
 
 \ lsl Xd, Xn, #imm6
@@ -3502,6 +3503,11 @@ end
 \ Clear bits in a local by mask: `mask bit_mask_unset=: some_val`.
 fun_comp: bit_mask_unset=: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_BIC_REG comp_loc_reg_pattern_step
+end
+
+\ Shift a local left: `bits lsl=: some_val`.
+fun_comp: lsl=: { -- err } ( C: "name" -- ) ( E: bits -- )
+  ASM_OP_LSL_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting

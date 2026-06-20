@@ -648,6 +648,14 @@ fun: loc_logic_bit_mask_unset_fun { mask -- out0 out1 }
   val0 val1
 end
 
+fun: loc_shift_lsl_fun { shift -- out0 out1 }
+  0b1011 { val0 }
+  shift lsl=: val0
+  5 { val1 }
+  2 lsl=: val1
+  val0 val1
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -657,6 +665,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 0b001010 loc_logic_or_fun <T> 0b111111 0b111111 }T
   T{ 0b101010 loc_logic_xor_fun <T> 0b011111 0b111111 }T
   T{ 0b101010 loc_logic_bit_mask_unset_fun <T> 0b010101 0b110101 }T
+  T{ 3 loc_shift_lsl_fun <T> 88 20 }T
   ifz has_interp then ret end
 
   cf_expect_clear
