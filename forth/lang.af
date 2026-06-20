@@ -2831,13 +2831,6 @@ fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
   if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or
 end
 
-fun: cf_fold_reg0_arg1_instr { reg0 arg1 instr -- err }
-  arg1 cf_arg_rewind_clear
-  reg0 comp_realloc_reg
-  instr comp_instr
-  reg0 inc comp_args_set
-end
-
 fun: cf_fold_rhs_imm_raw { reg0 arg1 imm aux emit -- err }
   arg1 cf_arg_rewind_clear
   reg0 comp_realloc_reg
@@ -3050,31 +3043,34 @@ fun: cf_fold_addsub_imm { add -- ok err }
   reg0 reg1 arg0 arg1 imm true emit cf_fold_lhs_imm_raw
 end
 
-fun: cf_fold_shift_imm_args { -- reg0 arg1 imm ok err }
+0 let: CF_SHIFT_LSL
+1 let: CF_SHIFT_LSR
+2 let: CF_SHIFT_ASR
+
+fun: cf_emit_shift_imm { reg0 reg_src imm shift -- err }
+  if shift CF_SHIFT_LSL = then
+    64 imm - 6 bits_trunc { immr }
+    63 imm - 6 bits_trunc { imms }
+    reg0 reg_src immr imms ASM_OP_UBFM asm_bitfield comp_instr \ lsl Xd, Xn, #imm6
+    ret
+  end
+
+  imm 6 bits_trunc { immr }
+  if shift CF_SHIFT_LSR = then ASM_OP_UBFM else ASM_OP_SBFM end { bitfield_op }
+  reg0 reg_src immr 63 bitfield_op asm_bitfield comp_instr \ lsr|asr Xd, Xn, #imm6
+end
+
+fun: cf_fold_shift_imm { shift -- ok err }
   comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
   arg1 cf_arg_foldable_imm { imm foldable }
 
-  ifz foldable then 0 0 0 false ret end
-  if imm 0 < imm 63 > or then 0 0 0 false ret end
-  ifz arg1 cf_arg_current then 0 0 0 false ret end
-  reg0 arg1 imm true
-end
+  ifz foldable then false ret end
+  if imm 0 < imm 63 > or then false ret end
+  ifz arg1 cf_arg_current then false ret end
 
-fun: cf_fold_shift_imm { bitfield_op lsl -- ok err }
-  cf_fold_shift_imm_args { reg0 arg1 imm ok }
-  ifz ok then false ret end
-
-  if lsl then
-    64 imm - 6 bits_trunc { immr }
-    63 imm - 6 bits_trunc { imms }
-  else
-    imm 6 bits_trunc { immr }
-    63 { imms }
-  end
-
-  reg0 reg0 immr imms bitfield_op asm_bitfield { instr }
-  reg0 arg1 instr cf_fold_reg0_arg1_instr
+  instr' cf_emit_shift_imm { emit }
+  reg0 arg1 imm shift emit cf_fold_rhs_imm_raw
   true
 end
 
@@ -3265,7 +3261,7 @@ end
 
 fun_comp: lsl { -- err } [ redefine ]
   if cf_fold_cleared2 then lsl cf_fold_done
-  else { -- } ifz ASM_OP_UBFM true cf_fold_shift_imm then execute'' lsl end
+  else { -- } ifz CF_SHIFT_LSL cf_fold_shift_imm then execute'' lsl end
   end
 end
 
@@ -3276,7 +3272,7 @@ end
 
 fun_comp: lsr { -- err } [ redefine ]
   if cf_fold_cleared2 then lsr cf_fold_done
-  else { -- } ifz ASM_OP_UBFM false cf_fold_shift_imm then execute'' lsr end
+  else { -- } ifz CF_SHIFT_LSR cf_fold_shift_imm then execute'' lsr end
   end
 end
 
@@ -3287,7 +3283,7 @@ end
 
 fun_comp: asr { -- err } [ redefine ]
   if cf_fold_cleared2 then asr cf_fold_done
-  else { -- } ifz ASM_OP_SBFM false cf_fold_shift_imm then execute'' asr end
+  else { -- } ifz CF_SHIFT_ASR cf_fold_shift_imm then execute'' asr end
   end
 end
 
