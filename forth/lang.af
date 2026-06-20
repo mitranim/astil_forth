@@ -2824,14 +2824,6 @@ fun: cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
   reg1 inc comp_args_set
 end
 
-\ For compiling words which modify a local by applying the given function.
-fun: comp_loc_mut { fun -- err } ( C: "name" -- ) ( E: -- )
-  read_word comp_local { loc }
-  loc comp_push_from_local \ mov x0, <loc> | ldr x0, [FP, <loc>]
-  fun comp_call            \ blr <fun>
-  loc comp_pop_into_local  \ mov <loc>, x0 | str x0, [FP, <loc>]
-end
-
 \ Fits the unsigned immediate accepted by our `add/sub #imm12` helpers.
 fun: comp_loc_step_imm12 { imm -- mag ok }
   if imm >=0 then imm imm ASM_MAX_IMM12 <= ret end
@@ -2857,6 +2849,14 @@ fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
   reg reg inc mag asm_pattern_arith_imm
   if imm >=0 then imm_pos_op else imm_neg_op end or comp_instr
 
+  loc reg comp_loc_step_store
+end
+
+fun: comp_loc_imm1_step { imm_op -- err } ( C: "name" -- ) ( E: -- )
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  comp_args_get dec { reg }
+  reg reg 1 asm_pattern_arith_imm imm_op or comp_instr
   loc reg comp_loc_step_store
 end
 
@@ -3083,14 +3083,18 @@ fun_comp: inc { -- err } [ redefine ]
 end
 
 \ Increment a local: `inc: some_val`.
-fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
+fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
+  ASM_OP_ADD_IMM comp_loc_imm1_step
+end
 
 fun_comp: dec { -- err } [ redefine ]
   if cf_fold_cleared1 then dec cf_fold_done else { -- } execute'' dec end
 end
 
 \ Decrement a local: `dec: some_val`.
-fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
+fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
+  ASM_OP_SUB_IMM comp_loc_imm1_step
+end
 
 fun_comp: negate { -- err } [ redefine ]
   if cf_fold_cleared1 then negate cf_fold_done else { -- } execute'' negate end
