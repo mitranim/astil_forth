@@ -3352,6 +3352,11 @@ fun_comp: <= { -- err } [ redefine ]
   if cf_fold_cleared2 then <= cf_fold_done else { -- } execute'' <= end
 end
 
+\ Compare a local less/equal in place: `rhs <=: some_val`.
+fun_comp: <=: { -- err } ( C: "name" -- ) ( E: rhs -- )
+  ASM_LE comp_loc_cset_reg_step
+end
+
 fun_comp: >= { -- err } [ redefine ]
   if cf_fold_cleared2 then >= cf_fold_done else { -- } execute'' >= end
 end
