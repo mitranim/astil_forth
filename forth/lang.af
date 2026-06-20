@@ -3179,6 +3179,28 @@ fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
   read_word comp_local reg_op comp_loc_reg_pattern_emit
 end
 
+fun: comp_loc_logical_imm_step { reg_op imm_op inv -- err }
+  ( C: "name" -- ) ( E: mask -- )
+
+  comp_loc_step_prepare { reg arg loc imm foldable }
+
+  if foldable then
+    imm imm_op inv cf_logical_imm_mask { mask ok }
+    if ok then
+      if arg cf_arg_current then
+        arg cf_arg_rewind_clear
+      end
+      reg comp_realloc_reg
+      loc comp_push_from_local
+      mask reg inc 5 lsl or reg or comp_instr \ and|orr|eor Xd, Xn, #imm
+      loc reg comp_loc_step_store
+      ret
+    end
+  end
+
+  loc reg_op comp_loc_reg_pattern_emit
+end
+
 fun: comp_loc_arg_begin { -- arg cur loc err }
   comp_args1_reg { arg }
   read_word comp_local { loc }
@@ -3301,7 +3323,7 @@ end
 
 \ Bitwise or into a local: `mask or: some_val`.
 fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_ORR_REG comp_loc_reg_pattern_step
+  ASM_OP_ORR_REG ASM_OP_ORR_IMM false comp_loc_logical_imm_step
 end
 
 fun_comp: and { -- err } [ redefine ]
@@ -3312,7 +3334,7 @@ end
 
 \ Bitwise and into a local: `mask and: some_val`.
 fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_AND_REG comp_loc_reg_pattern_step
+  ASM_OP_AND_REG ASM_OP_AND_IMM false comp_loc_logical_imm_step
 end
 
 fun_comp: xor { -- err } [ redefine ]
@@ -3323,7 +3345,7 @@ end
 
 \ Bitwise xor into a local: `mask xor: some_val`.
 fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_EOR_REG comp_loc_reg_pattern_step
+  ASM_OP_EOR_REG ASM_OP_EOR_IMM false comp_loc_logical_imm_step
 end
 
 fun_comp: lsl { -- err } [ redefine ]
@@ -3850,7 +3872,7 @@ end
 
 \ Clear bits in a local by mask: `mask bits_clear: some_val`.
 fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_BIC_REG comp_loc_reg_pattern_step
+  ASM_OP_BIC_REG ASM_OP_AND_IMM true comp_loc_logical_imm_step
 end
 
 fun_comp: bit_mask_get { -- err } [ redefine ]

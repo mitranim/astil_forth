@@ -815,6 +815,18 @@ fun: loc_logic_xor_fun { mask -- out0 out1 }
   val0 val1
 end
 
+fun: loc_logic_imm_fun { -- out0 out1 out2 out3 }
+  0x1234 { val0 }
+  0xff or: val0
+  0x1234 { val1 }
+  0xff and: val1
+  0x1234 { val2 }
+  0xff xor: val2
+  0x1234 { val3 }
+  0xff bits_clear: val3
+  val0 val1 val2 val3
+end
+
 fun: loc_shift_lsl_fun { shift -- out0 out1 }
   0b1011 { val0 }
   shift lsl: val0
@@ -1153,6 +1165,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 0b101010 loc_logic_and_fun <T> 0b100000 0b110100 }T
   T{ 0b001010 loc_logic_or_fun <T> 0b111111 0b111111 }T
   T{ 0b101010 loc_logic_xor_fun <T> 0b011111 0b111111 }T
+  T{ loc_logic_imm_fun <T> 0x12ff 0x34 0x12cb 0x1200 }T
   T{ 3 loc_shift_lsl_fun <T> 88 20 }T
   T{ 3 loc_shift_lsr_fun <T> 11 20 }T
   T{ 3 loc_shift_asr_fun <T> -11 -20 }T
@@ -1203,6 +1216,34 @@ fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_ule_fun <T> 1 0 }T
   T{ 7 loc_uge_fun <T> 1 0 }T
   ifz has_interp then ret end
+
+  cf_expect_clear
+  0 0x1234 cf_expect_load
+  4 0 asm_mov_reg cf_expect_instr
+  1 4 asm_mov_reg cf_expect_instr
+  0 1 0xff asm_orr_imm cf_expect_instr
+  4 0 asm_mov_reg cf_expect_instr
+  0 0x1234 cf_expect_load
+  5 0 asm_mov_reg cf_expect_instr
+  1 5 asm_mov_reg cf_expect_instr
+  0 1 0xff asm_and_imm cf_expect_instr
+  5 0 asm_mov_reg cf_expect_instr
+  0 0x1234 cf_expect_load
+  6 0 asm_mov_reg cf_expect_instr
+  1 6 asm_mov_reg cf_expect_instr
+  0 1 0xff asm_eor_imm cf_expect_instr
+  6 0 asm_mov_reg cf_expect_instr
+  0 0x1234 cf_expect_load
+  7 0 asm_mov_reg cf_expect_instr
+  1 7 asm_mov_reg cf_expect_instr
+  0 1 0xff asm_bic_imm cf_expect_instr
+  7 0 asm_mov_reg cf_expect_instr
+  0 4 asm_mov_reg cf_expect_instr
+  1 5 asm_mov_reg cf_expect_instr
+  2 6 asm_mov_reg cf_expect_instr
+  3 7 asm_mov_reg cf_expect_instr
+  cf_expect_ret
+  xt' loc_logic_imm_fun cf_expect_word
 
   cf_expect_clear
   4 0 asm_mov_reg cf_expect_instr
