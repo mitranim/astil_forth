@@ -576,9 +576,20 @@ fun: asm_csneg { Xd Xn Xm cond -> instr }
   asm_pattern_arith_csel 0b1_1_0_11010100_00000_0000_0_1_00000_00000 or
 end
 
-\ asr Xd, Xn, imm6
-fun: asm_asr_imm { Xd Xn imm6 -> instr }
-  asm_pattern_arith_reg 0b1_00_100110_1_000000_111111_00000_00000 or
+0b1_00_100110_1_000000_000000_00000_00000 let: ASM_OP_SBFM
+0b1_10_100110_1_000000_000000_00000_00000 let: ASM_OP_UBFM
+
+fun: asm_bitfield { Xd Xn immr imms op -- instr }
+  imms 10 lsl { imms }
+  immr 16 lsl { immr }
+  Xn   5  lsl { Xn }
+  Xd Xn or immr or imms or op or
+end
+
+\ asr Xd, Xn, #imm6
+fun: asm_asr_imm { Xd Xn imm6 -- instr }
+  imm6 6 bits_trunc { immr }
+  Xd Xn immr 63 ASM_OP_SBFM asm_bitfield
 end
 
 \ asr Xd, Xn, Xm
@@ -598,15 +609,15 @@ end
 
 \ lsl Xd, Xn, #imm6
 fun: asm_lsl_imm { Xd Xn imm6 -- instr }
-  64 imm6 - 6 bits_trunc 16 lsl { immr }
-  63 imm6 - 6 bits_trunc 10 lsl { imms }
-  Xn 5 lsl Xd or imms or immr or 0b1_10_100110_1_000000_000000_00000_00000 or
+  64 imm6 - 6 bits_trunc { immr }
+  63 imm6 - 6 bits_trunc { imms }
+  Xd Xn immr imms ASM_OP_UBFM asm_bitfield
 end
 
 \ lsr Xd, Xn, #imm6
 fun: asm_lsr_imm { Xd Xn imm6 -- instr }
-  imm6 6 bits_trunc 16 lsl { immr }
-  Xn 5 lsl Xd or immr or 0b1_10_100110_1_000000_111111_00000_00000 or
+  imm6 6 bits_trunc { immr }
+  Xd Xn immr 63 ASM_OP_UBFM asm_bitfield
 end
 
 \ lsr Xd, Xn, Xm
@@ -1186,15 +1197,7 @@ end
 
 \ sbfm Xd, Xn, immr, imms
 fun: asm_bitfield_move { Xd Xn immr imms -- instr }
-  imms 10 lsl { imms }
-  immr 16 lsl { immr }
-  Xn   5  lsl { Xn }
-
-  0b1_00_100110_1_000000_000000_00000_00000
-  Xd   or
-  Xn   or
-  immr or
-  imms or
+  Xd Xn immr imms ASM_OP_SBFM asm_bitfield
 end
 
 \ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
