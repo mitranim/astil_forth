@@ -506,8 +506,9 @@ fun: asm_sub_reg_words { Xd Xn Xm -> instr }
 end
 
 \ orr Xd, Xn, Xm
+0b1_01_01010_00_0_00000_000000_00000_00000 let: ASM_OP_ORR_REG
 fun: asm_orr_reg { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_01_01010_00_0_00000_000000_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_ORR_REG or
 end
 
 \ and Xd, Xn, Xm
@@ -3486,6 +3487,11 @@ end
 \ Bitwise and into a local: `mask and=: some_val`.
 fun_comp: and=: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_AND_REG comp_loc_reg_pattern_step
+end
+
+\ Bitwise or into a local: `mask or=: some_val`.
+fun_comp: or=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_ORR_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
