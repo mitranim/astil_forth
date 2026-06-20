@@ -3459,11 +3459,16 @@ fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
   read_word comp_local reg_op comp_loc_reg_pattern_emit
 end
 
-fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
-  comp_args1_reg { divisor }
+fun: comp_loc_arg_begin { -- arg loc cur err }
+  comp_args1_reg { arg }
   read_word comp_local { loc }
   loc comp_push_from_local
-  divisor inc { dividend }
+  arg inc { cur }
+  arg loc cur
+end
+
+fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
+  comp_loc_arg_begin { divisor loc dividend }
   comp_alloc_next_reg { quotient }
   quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr
   divisor quotient divisor dividend asm_msub comp_instr
@@ -3471,30 +3476,21 @@ fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
 end
 
 fun: comp_loc_csel_step { cond -- err } ( C: "name" -- ) ( E: candidate -- )
-  comp_args1_reg { candidate }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  candidate inc { cur }
+  comp_loc_arg_begin { candidate loc cur }
   cur candidate asm_cmp_reg comp_instr
   candidate cur candidate cond asm_csel comp_instr
   loc candidate comp_loc_step_store
 end
 
 fun: comp_loc_align_down_step { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_args1_reg { wid }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  wid inc { len }
+  comp_loc_arg_begin { wid loc len }
   wid asm_neg comp_instr
   wid len wid asm_and_reg comp_instr
   loc wid comp_loc_step_store
 end
 
 fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_args1_reg { wid }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  wid inc { len }
+  comp_loc_arg_begin { wid loc len }
   len len wid asm_add_reg comp_instr
   len len 1   asm_sub_imm comp_instr
   wid         asm_neg     comp_instr
@@ -3503,10 +3499,7 @@ fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
 end
 
 fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_args1_reg { mask }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  mask inc { src }
+  comp_loc_arg_begin { mask loc src }
   src src mask  asm_and_reg comp_instr
   mask mask     asm_rbit    comp_instr
   mask mask     asm_clz     comp_instr
@@ -3515,10 +3508,7 @@ fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
-  comp_args1_reg { len }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  len inc { val }
+  comp_loc_arg_begin { len loc val }
   comp_alloc_next_reg { tmp }
   1 tmp comp_load
   tmp tmp len asm_lsl_reg comp_instr
