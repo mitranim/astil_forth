@@ -2866,7 +2866,6 @@ end
 fun: cf_emit_cmp_imm_cset { reg0 reg_src imm cond -- err }
   reg_src imm asm_cmp_imm comp_instr \ cmp Xn, #imm12
   reg0 cond asm_cset      comp_instr \ cset Xd, cond
-  reg0 inc comp_args_set
 end
 
 fun: cf_foldables2 { reg0 reg1 -- arg0 arg1 imm0 imm1 ok err }
@@ -2970,9 +2969,8 @@ fun: cf_fold_cmp_rhs_imm { reg0 arg1 imm cond -- ok err }
   ifz arg1 cf_arg_current then false ret end
   ifz imm cf_imm_u12 then false ret end
 
-  arg1 cf_arg_rewind_clear
-  reg0 comp_realloc_reg
-  reg0 reg0 imm cond cf_emit_cmp_imm_cset
+  instr' cf_emit_cmp_imm_cset { emit }
+  reg0 arg1 imm cond emit cf_fold_rhs_imm_raw
   true
 end
 
@@ -2982,23 +2980,8 @@ fun: cf_fold_eq_lhs_imm { reg0 reg1 arg1 -- ok err }
   ifz foldable0 then false ret end
   ifz imm0 cf_imm_u12 then false ret end
 
-  arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc1 }
-  ifz loc1 then false ret end
-
-  comp_code_len { code_len }
-  arg0 comp_arg_imm_ceil { ceil0 }
-  nil { fix1 }
-  if code_len ceil0 <> then
-    if code_len ceil0 inc <> then false ret end
-    arg1 reg1 cf_arg_read_fixup { fix1 ok }
-    ifz ok then false ret end
-  end
-
-  arg0 cf_arg_rewind_clear
-  if fix1 then fix1 cf_read_fixup_move_here end
-  reg0 comp_realloc_reg
-  reg0 reg1 imm0 ASM_EQ cf_emit_cmp_imm_cset
-  true
+  instr' cf_emit_cmp_imm_cset { emit }
+  reg0 reg1 arg0 arg1 imm0 ASM_EQ emit cf_fold_lhs_imm_raw
 end
 
 fun: cf_fold_eq_imm { -- ok err }
