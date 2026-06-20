@@ -2842,6 +2842,13 @@ fun: comp_loc_step_store { loc reg -- err }
   loc comp_pop_into_local
 end
 
+fun: comp_loc_unary_begin { -- loc reg err } ( C: "name" -- ) ( E: -- )
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  comp_args_get dec { reg }
+  loc reg
+end
+
 fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
   reg comp_realloc_reg
   loc comp_push_from_local
@@ -3102,6 +3109,13 @@ end
 
 fun_comp: invert { -- err } [ redefine ]
   if cf_fold_cleared1 then invert cf_fold_done else { -- } execute'' invert end
+end
+
+\ Invert a local: `invert: some_val`.
+fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
+  comp_loc_unary_begin { loc reg }
+  reg reg asm_mvn comp_instr
+  loc reg comp_loc_step_store
 end
 
 fun_comp: abs { -- err } [ redefine ]
