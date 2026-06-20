@@ -262,11 +262,24 @@ test_comp_args_set_max_len
 fun: const_fold_fallback_0_1_fun { val -- out } val 20 + end
 fun: const_fold_add_imm_lhs_fun { val -- out } 20 val + end
 fun: const_fold_sub_imm_fun { val -- out } val 20 - end
+fun: const_fold_add_lhs_imm_no_reloc_fun { num -- out }
+  num num { -- }
+  10 num +
+end
 
 fun: test_const_fold_fallback_0_1 { -- err }
   T{ 22 const_fold_fallback_0_1_fun <T> 42 }T
   T{ 23 const_fold_add_imm_lhs_fun <T> 43 }T
   T{ 62 const_fold_sub_imm_fun <T> 42 }T
+  T{ 22 const_fold_add_lhs_imm_no_reloc_fun <T> 32 }T
+  ifz has_interp then ret end
+
+  cf_expect_clear
+  1 0 asm_mov_reg cf_expect_instr
+  0 1 10 asm_add_imm cf_expect_instr
+  asm_nop cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_add_lhs_imm_no_reloc_fun cf_expect_word
 end
 test_const_fold_fallback_0_1
 

@@ -2837,9 +2837,33 @@ fun: cf_fold_addsub_imm { add -- ok err }
   rhs comp_arg { arg_rhs }
   arg_rhs cf_arg_foldable_imm { imm foldable }
 
-  ifz foldable then false ret end
-  ifz arg_rhs cf_arg_current then false ret end
+  ifz foldable then
+    ifz add then false ret end
 
+    lhs comp_arg { arg_lhs }
+    arg_lhs cf_arg_foldable_imm { imm_lhs foldable_lhs }
+    ifz foldable_lhs then false ret end
+
+    imm_lhs comp_loc_step_imm12 { mag_lhs fits_lhs }
+    ifz fits_lhs then false ret end
+
+    arg_rhs Interp_comp_arg_loc @ { loc_rhs }
+    ifz loc_rhs then false ret end
+
+    comp_code_len { code_len }
+    arg_lhs comp_arg_imm_ceil { lhs_ceil }
+    if code_len lhs_ceil <> then false ret end
+
+    arg_lhs cf_rewind_to_before_arg
+    arg_lhs cf_arg_clear
+
+    lhs rhs mag_lhs asm_pattern_arith_imm
+    if imm_lhs >=0 then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12
+    lhs inc comp_args_set
+    true ret
+  end
+
+  ifz arg_rhs cf_arg_current then false ret end
   imm comp_loc_step_imm12 { mag fits }
   ifz fits then false ret end
 
