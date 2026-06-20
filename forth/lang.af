@@ -603,6 +603,12 @@ fun: asm_lsl_imm { Xd Xn imm6 -- instr }
   Xn 5 lsl Xd or imms or immr or 0b1_10_100110_1_000000_000000_00000_00000 or
 end
 
+\ lsr Xd, Xn, #imm6
+fun: asm_lsr_imm { Xd Xn imm6 -- instr }
+  imm6 6 bits_trunc 16 lsl { immr }
+  Xn 5 lsl Xd or immr or 0b1_10_100110_1_000000_111111_00000_00000 or
+end
+
 \ lsr Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_01_00000_00000 let: ASM_OP_LSR_REG
 fun: asm_lsr_reg { Xd Xn Xm -> instr }
@@ -2925,16 +2931,31 @@ fun: cf_fold_addsub_imm { add -- ok err }
   if add then reg0 reg1 arg1 cf_fold_add_lhs_imm else false end
 end
 
-fun: cf_fold_lsl_imm { -- ok err }
+fun: cf_fold_shift_imm_args { -- reg0 arg1 imm ok err }
   comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
   arg1 cf_arg_foldable_imm { imm foldable }
 
-  ifz foldable then false ret end
-  if imm 0 < imm 63 > or then false ret end
-  ifz arg1 cf_arg_current then false ret end
+  ifz foldable then 0 0 0 false ret end
+  if imm 0 < imm 63 > or then 0 0 0 false ret end
+  ifz arg1 cf_arg_current then 0 0 0 false ret end
+  reg0 arg1 imm true
+end
+
+fun: cf_fold_lsl_imm { -- ok err }
+  cf_fold_shift_imm_args { reg0 arg1 imm ok }
+  ifz ok then false ret end
 
   reg0 reg0 imm asm_lsl_imm { instr }
+  reg0 arg1 instr cf_fold_reg0_arg1_instr
+  true
+end
+
+fun: cf_fold_lsr_imm { -- ok err }
+  cf_fold_shift_imm_args { reg0 arg1 imm ok }
+  ifz ok then false ret end
+
+  reg0 reg0 imm asm_lsr_imm { instr }
   reg0 arg1 instr cf_fold_reg0_arg1_instr
   true
 end
@@ -3135,7 +3156,8 @@ fun_comp: lsl: { -- err } ( C: "name" -- ) ( E: bits -- )
 end
 
 fun_comp: lsr { -- err } [ redefine ]
-  if cf_fold_cleared2 then lsr cf_fold_done else { -- } execute'' lsr end
+  if cf_fold_cleared2 then lsr cf_fold_done
+  else { -- } if cf_fold_lsr_imm then ret end execute'' lsr end
 end
 
 \ Shift a local right logically: `bits lsr: some_val`.
