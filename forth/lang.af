@@ -2979,23 +2979,23 @@ fun: cf_fold_cmp_rhs_imm { reg0 arg1 imm cond -- ok err }
   reg0 arg1 imm cond emit fits cf_fold_rhs_imm_checked
 end
 
-fun: cf_fold_eq_lhs_imm { reg0 reg1 arg1 -- ok err }
+fun: cf_fold_cmp_lhs_imm { reg0 reg1 arg1 cond -- ok err }
   reg0 comp_arg { arg0 }
   arg0 cf_arg_foldable_imm { imm0 foldable0 }
   ifz foldable0 then false ret end
   ifz imm0 cf_imm_u12 then false ret end
 
   instr' cf_emit_cmp_imm_cset { emit }
-  reg0 reg1 arg0 arg1 imm0 ASM_EQ emit cf_fold_lhs_imm_raw
+  reg0 reg1 arg0 arg1 imm0 cond emit cf_fold_lhs_imm_raw
 end
 
-fun: cf_fold_eq_imm { -- ok err }
+fun: cf_fold_cmp_imm { cond -- ok err }
   comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
   arg1 cf_arg_foldable_imm { imm foldable }
 
-  if foldable then reg0 arg1 imm ASM_EQ cf_fold_cmp_rhs_imm ret end
-  reg0 reg1 arg1 cf_fold_eq_lhs_imm
+  if foldable then reg0 arg1 imm cond cf_fold_cmp_rhs_imm ret end
+  reg0 reg1 arg1 cond cf_fold_cmp_lhs_imm
 end
 
 fun: cf_emit_addsub_imm { reg0 reg1 imm add -- err }
@@ -3543,7 +3543,7 @@ end
 
 fun_comp: = { -- err } [ redefine ]
   if cf_fold_cleared2 then = cf_fold_done
-  else { -- } if cf_fold_eq_imm then ret end execute'' = end
+  else { -- } if ASM_EQ cf_fold_cmp_imm then ret end execute'' = end
 end
 
 \ Compare a local for equality in place: `rhs =: some_val`.
@@ -3552,7 +3552,8 @@ fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: <> { -- err } [ redefine ]
-  if cf_fold_cleared2 then <> cf_fold_done else { -- } execute'' <> end
+  if cf_fold_cleared2 then <> cf_fold_done
+  else { -- } if ASM_NE cf_fold_cmp_imm then ret end execute'' <> end
 end
 
 \ Compare a local for inequality in place: `rhs <>: some_val`.
