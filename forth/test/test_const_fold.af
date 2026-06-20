@@ -846,6 +846,14 @@ fun: loc_low_bits_fun { val -- out }
   val
 end
 
+fun: loc_bits_clear_fun { mask -- out0 out1 }
+  0b110101 { val0 }
+  mask bits_clear: val0
+  0b110101 { val1 }
+  0b001010 bits_clear: val1
+  val0 val1
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -885,6 +893,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 100 loc_sub_cell_fun <T> 92 }T
   T{ 101 loc_odd_fun <T> 1 }T
   T{ 5 loc_low_bits_fun <T> 31 }T
+  T{ 0b101010 loc_bits_clear_fun <T> 0b010101 0b110101 }T
   ifz has_interp then ret end
 
   cf_expect_clear

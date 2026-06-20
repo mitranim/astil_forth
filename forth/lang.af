@@ -3370,6 +3370,11 @@ fun_comp: bits_clear { -- err } [ redefine ]
   else { -- } execute'' bits_clear end
 end
 
+\ Clear bits in a local by mask: `mask bits_clear: some_val`.
+fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_BIC_REG comp_loc_reg_pattern_step
+end
+
 fun_comp: align_down { -- err } [ redefine ]
   if cf_fold_cleared2 then align_down cf_fold_done
   else { -- } execute'' align_down end
