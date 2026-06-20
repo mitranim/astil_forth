@@ -806,6 +806,11 @@ fun: loc_bit_ctz_fun { val -- out }
   val
 end
 
+fun: loc_bit_len_fun { val -- out }
+  bit_len: val
+  val
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -837,6 +842,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ -42 loc_abs_fun <T> 42 }T
   T{ 8 loc_bit_clz_fun <T> 60 }T
   T{ 40 loc_bit_ctz_fun <T> 3 }T
+  T{ 40 loc_bit_len_fun <T> 6 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -883,6 +889,13 @@ fun: test_const_fold_loc_step { -- err }
   0 0 asm_clz cf_expect_instr
   cf_expect_ret
   xt' loc_bit_ctz_fun cf_expect_word
+
+  cf_expect_clear
+  0 0 asm_clz cf_expect_instr
+  1 64 cf_expect_load
+  0 1 0 asm_sub_reg cf_expect_instr
+  cf_expect_ret
+  xt' loc_bit_len_fun cf_expect_word
 end
 test_const_fold_loc_step
 
