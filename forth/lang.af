@@ -3132,7 +3132,7 @@ fun: comp_loc_emit_arith_reg { loc reg_op -- err }
 end
 
 fun: comp_loc_imm_mut { reg_op aux validate emit -- err }
-  ( C: "name" -- ) ( E: step -- )
+  ( C: "name" -- ) ( E: imm -- )
 
   comp_loc_mut_arg_prepare { reg arg loc imm foldable }
 
@@ -3150,15 +3150,13 @@ fun: comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
   comp_args_get dec loc
 end
 
-fun: comp_loc_fixed_imm_mut { imm aux emit -- err }
-  ( C: "name" -- ) ( E: -- )
-
+fun: comp_loc_fixed_imm_mut { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   reg reg imm aux emit execute_raw
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_mut_arith_reg { reg_op -- err } ( C: "name" -- ) ( E: step -- )
+fun: comp_loc_mut_arith_reg { reg_op -- err } ( C: "name" -- ) ( E: imm -- )
   1 nil comp_args_min
   read_word comp_local reg_op comp_loc_emit_arith_reg
 end
@@ -3179,17 +3177,17 @@ fun: comp_loc_mut_mod { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
   loc divisor comp_loc_mut_store
 end
 
-fun: comp_loc_mut_csel { cond -- err } ( C: "name" -- ) ( E: candidate -- )
+fun: comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
   comp_loc_arg_init { candidate cur loc }
-  cur candidate                asm_cmp_reg comp_instr \ cmp Xn, Xm
-  candidate cur candidate cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
-  loc candidate comp_loc_mut_store
-end
 
-fun: comp_loc_mut_fallback { -- err } ( C: "name" -- ) ( E: candidate -- )
-  comp_loc_arg_init { candidate cur loc }
-  candidate 0                    asm_cmp_imm comp_instr \ cmp Xn, #0
-  candidate candidate cur ASM_NE asm_csel    comp_instr \ csel Xd, Xn, Xm, ne
+  if zero then
+    candidate 0                  asm_cmp_imm comp_instr \ cmp Xn, #0
+    candidate candidate cur cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  else
+    cur candidate                asm_cmp_reg comp_instr \ cmp Xn, Xm
+    candidate cur candidate cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  end
+
   loc candidate comp_loc_mut_store
 end
 
@@ -3377,7 +3375,7 @@ fun_comp: + { -- err } [ redefine ]
 end
 
 \ Add a step to a local: `step +: some_val`.
-fun_comp: +: { -- err } ( C: "name" -- ) ( E: step -- )
+fun_comp: +: { -- err } ( C: "name" -- ) ( E: imm -- )
   instr' cf_addsub_validate { validate }
   instr' cf_addsub_emit { emit }
   ASM_OP_ADD_REG true validate emit comp_loc_imm_mut
@@ -3395,7 +3393,7 @@ fun_comp: - { -- err } [ redefine ]
 end
 
 \ Subtract a step from a local: `step -: some_val`.
-fun_comp: -: { -- err } ( C: "name" -- ) ( E: step -- )
+fun_comp: -: { -- err } ( C: "name" -- ) ( E: imm -- )
   instr' cf_addsub_validate { validate }
   instr' cf_addsub_emit { emit }
   ASM_OP_SUB_REG false validate emit comp_loc_imm_mut
@@ -3543,7 +3541,7 @@ end
 
 \ Minimum into a local: `candidate min: some_val`.
 fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_LT comp_loc_mut_csel
+  false ASM_LT comp_loc_mut_csel
 end
 
 fun_comp: umin { -- err } [ redefine ]
@@ -3552,7 +3550,7 @@ end
 
 \ Unsigned minimum into a local: `candidate umin: some_val`.
 fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_LO comp_loc_mut_csel
+  false ASM_LO comp_loc_mut_csel
 end
 
 fun_comp: max { -- err } [ redefine ]
@@ -3561,7 +3559,7 @@ end
 
 \ Maximum into a local: `candidate max: some_val`.
 fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_GT comp_loc_mut_csel
+  false ASM_GT comp_loc_mut_csel
 end
 
 fun_comp: umax { -- err } [ redefine ]
@@ -3570,7 +3568,7 @@ end
 
 \ Unsigned maximum into a local: `candidate umax: some_val`.
 fun_comp: umax: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_HI comp_loc_mut_csel
+  false ASM_HI comp_loc_mut_csel
 end
 
 fun_comp: int_to_cell { -- err } [ redefine ]
@@ -3824,7 +3822,7 @@ end
 
 \ Fallback into a local: `candidate fallback: some_val`.
 fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  comp_loc_mut_fallback
+  true ASM_NE comp_loc_mut_csel
 end
 
 fun_comp: invert { -- err } [ redefine ]
