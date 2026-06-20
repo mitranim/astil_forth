@@ -3439,6 +3439,7 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg comp_loc_step_store
 end
 
+\ No partial CF: `csel` needs both values in regs; constants still cost `mov`.
 fun_comp: min { -- err } [ redefine ]
   if cf_fold_cleared2 then min cf_fold_done else { -- } execute'' min end
 end
