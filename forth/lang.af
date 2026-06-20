@@ -2916,6 +2916,13 @@ fun: comp_loc_cset_zero_step { cond -- err } ( C: "name" -- ) ( E: -- )
   loc reg comp_loc_step_store
 end
 
+fun: comp_loc_cset_reg_step { cond -- err } ( C: "name" -- ) ( E: rhs -- )
+  comp_loc_arg_begin { rhs loc lhs }
+  lhs rhs asm_cmp_reg comp_instr
+  rhs cond asm_cset comp_instr
+  loc rhs comp_loc_step_store
+end
+
 fun: comp_loc_align_down_step { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_arg_begin { wid loc len }
   wid asm_neg comp_instr
@@ -3307,6 +3314,11 @@ end
 
 fun_comp: = { -- err } [ redefine ]
   if cf_fold_cleared2 then = cf_fold_done else { -- } execute'' = end
+end
+
+\ Compare a local for equality in place: `rhs =: some_val`.
+fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
+  ASM_EQ comp_loc_cset_reg_step
 end
 
 fun_comp: <> { -- err } [ redefine ]
