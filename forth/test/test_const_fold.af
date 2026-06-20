@@ -768,6 +768,14 @@ fun: loc_bit_mask_get_fun { mask -- out0 out1 }
   val0 val1
 end
 
+fun: loc_bits_trunc_fun { len -- out0 out1 }
+  0b101101 { val0 }
+  len bits_trunc=: val0
+  0b101101 { val1 }
+  3 bits_trunc=: val1
+  val0 val1
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -792,6 +800,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 8 loc_align_down_fun <T> 72 64 }T
   T{ 8 loc_align_up_fun <T> 80 80 }T
   T{ 0b111111110000 loc_bit_mask_get_fun <T> 0b100011 0b100011 }T
+  T{ 4 loc_bits_trunc_fun <T> 0b1101 0b101 }T
   ifz has_interp then ret end
 
   cf_expect_clear

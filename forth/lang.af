@@ -3514,6 +3514,19 @@ fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
   loc mask comp_loc_step_store
 end
 
+fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
+  comp_args1_reg { len }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  len inc { val }
+  comp_alloc_next_reg { tmp }
+  1 tmp comp_load
+  tmp tmp len asm_lsl_reg comp_instr
+  tmp tmp 1   asm_sub_imm comp_instr
+  len val tmp asm_and_reg comp_instr
+  loc len comp_loc_step_store
+end
+
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
 fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
@@ -3638,6 +3651,11 @@ end
 \ Extract masked bits from a local: `mask bit_mask_get=: some_val`.
 fun_comp: bit_mask_get=: { -- err } ( C: "name" -- ) ( E: mask -- )
   comp_loc_bit_mask_get_step
+end
+
+\ Truncate a local to low bits: `len bits_trunc=: some_val`.
+fun_comp: bits_trunc=: { -- err } ( C: "name" -- ) ( E: len -- )
+  comp_loc_bits_trunc_step
 end
 
 \ ## Vargs and formatting
