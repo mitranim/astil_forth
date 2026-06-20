@@ -836,6 +836,11 @@ fun: loc_sub_cell_fun { val -- out }
   val
 end
 
+fun: loc_odd_fun { val -- out }
+  odd: val
+  val
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -873,6 +878,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 56 loc_div_cells_fun <T> 7 }T
   T{ 100 loc_add_cell_fun <T> 108 }T
   T{ 100 loc_sub_cell_fun <T> 92 }T
+  T{ 101 loc_odd_fun <T> 1 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -951,6 +957,11 @@ fun: test_const_fold_loc_step { -- err }
   0 0 CELL asm_sub_imm cf_expect_instr
   cf_expect_ret
   xt' loc_sub_cell_fun cf_expect_word
+
+  cf_expect_clear
+  0 0 0b1_000000_000000 asm_and_imm_enc cf_expect_instr
+  cf_expect_ret
+  xt' loc_odd_fun cf_expect_word
 end
 test_const_fold_loc_step
 
