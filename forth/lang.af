@@ -2934,6 +2934,21 @@ fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
   loc mask comp_loc_step_store
 end
 
+fun: comp_loc_bit_mask_set_step { -- err } ( C: "name" -- ) ( E: inp mask -- )
+  comp_args2_regs { inp mask }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  mask inc { src }
+  comp_alloc_next_reg { shift }
+  src   src   mask  asm_bic     comp_instr
+  shift mask        asm_rbit    comp_instr
+  shift shift       asm_clz     comp_instr
+  inp   inp   shift asm_lsl_reg comp_instr
+  inp   inp   mask  asm_and_reg comp_instr
+  inp   inp   src   asm_orr_reg comp_instr
+  loc inp comp_loc_step_store
+end
+
 fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
   comp_loc_arg_begin { len loc val }
   comp_alloc_next_reg { tmp }
@@ -3435,6 +3450,11 @@ end
 fun_comp: bit_mask_set { -- err } [ redefine ]
   if cf_fold_cleared3 then bit_mask_set cf_fold_done
   else { -- } execute'' bit_mask_set end
+end
+
+\ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
+fun_comp: bit_mask_set: { -- err } ( C: "name" -- ) ( E: inp mask -- )
+  comp_loc_bit_mask_set_step
 end
 
 \ ## Stack manipulation continued
