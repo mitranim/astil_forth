@@ -3300,6 +3300,11 @@ fun_comp: >=0 { -- err } [ redefine ]
   if cf_fold_cleared1 then >=0 cf_fold_done else { -- } execute'' >=0 end
 end
 
+\ Test local greater than or equal zero in place: `>=0: some_val`.
+fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
+  ASM_GE comp_loc_cset_zero_step
+end
+
 fun_comp: = { -- err } [ redefine ]
   if cf_fold_cleared2 then = cf_fold_done else { -- } execute'' = end
 end

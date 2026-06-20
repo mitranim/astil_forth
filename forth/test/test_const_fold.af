@@ -893,6 +893,11 @@ fun: loc_le_zero_fun { val -- out }
   val
 end
 
+fun: loc_ge_zero_fun { val -- out }
+  >=0: val
+  val
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -940,6 +945,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ -7 loc_lt_zero_fun <T> 1 }T
   T{ 7 loc_gt_zero_fun <T> 1 }T
   T{ 0 loc_le_zero_fun <T> 1 }T
+  T{ 0 loc_ge_zero_fun <T> 1 }T
   ifz has_interp then ret end
 
   cf_expect_clear
