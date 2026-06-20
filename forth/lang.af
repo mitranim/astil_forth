@@ -2960,6 +2960,15 @@ fun: cf_fold_lsr_imm { -- ok err }
   true
 end
 
+fun: cf_fold_asr_imm { -- ok err }
+  cf_fold_shift_imm_args { reg0 arg1 imm ok }
+  ifz ok then false ret end
+
+  reg0 reg0 imm asm_asr_imm { instr }
+  reg0 arg1 instr cf_fold_reg0_arg1_instr
+  true
+end
+
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
   cf_top_arg_foldable { reg arg imm foldable }
   read_word comp_local { loc }
@@ -3166,7 +3175,8 @@ fun_comp: lsr: { -- err } ( C: "name" -- ) ( E: bits -- )
 end
 
 fun_comp: asr { -- err } [ redefine ]
-  if cf_fold_cleared2 then asr cf_fold_done else { -- } execute'' asr end
+  if cf_fold_cleared2 then asr cf_fold_done
+  else { -- } if cf_fold_asr_imm then ret end execute'' asr end
 end
 
 \ Shift a local right arithmetically: `bits asr: some_val`.
