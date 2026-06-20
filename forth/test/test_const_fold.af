@@ -567,6 +567,26 @@ fun: const_fold_eq_rhs_imm_fun { val -- out } val 20 = end
 fun: const_fold_eq_lhs_imm_fun { val -- out } 20 val = end
 fun: const_fold_ne_rhs_imm_fun { val -- out } val 20 <> end
 fun: const_fold_ne_lhs_imm_fun { val -- out } 20 val <> end
+fun: const_fold_gt_rhs_imm_fun { val -- out } val 20 > end
+fun: const_fold_gt_lhs_imm_fun { val -- out } 20 val > end
+
+fun: cf_expect_cmp_rhs_imm { XT cond -- err }
+  cf_expect_clear
+  0 20 asm_cmp_imm cf_expect_instr
+  0 cond asm_cset cf_expect_instr
+  cf_expect_ret
+  XT cf_expect_word
+end
+
+fun: cf_expect_cmp_lhs_imm { XT cond -- err }
+  cf_expect_clear
+  2 0 asm_mov_reg cf_expect_instr
+  1 2 asm_mov_reg cf_expect_instr
+  1 20 asm_cmp_imm cf_expect_instr
+  0 cond asm_cset cf_expect_instr
+  cf_expect_ret
+  XT cf_expect_word
+end
 
 fun: test_const_fold_compare2 { -- err }
   T{ const_fold_compare2_fun <T> 3 7 1 1 1 1 1 1 }T
@@ -578,6 +598,10 @@ fun: test_const_fold_compare2 { -- err }
   T{ 21 const_fold_ne_rhs_imm_fun <T> 1 }T
   T{ 20 const_fold_ne_lhs_imm_fun <T> 0 }T
   T{ 21 const_fold_ne_lhs_imm_fun <T> 1 }T
+  T{ 21 const_fold_gt_rhs_imm_fun <T> 1 }T
+  T{ 20 const_fold_gt_rhs_imm_fun <T> 0 }T
+  T{ 19 const_fold_gt_lhs_imm_fun <T> 1 }T
+  T{ 20 const_fold_gt_lhs_imm_fun <T> 0 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -591,33 +615,13 @@ fun: test_const_fold_compare2 { -- err }
   7 1 cf_expect_load
   cf_expect_ret
 
-  cf_expect_clear
-  0 20 asm_cmp_imm cf_expect_instr
-  0 ASM_EQ asm_cset cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_eq_rhs_imm_fun cf_expect_word
+  xt' const_fold_eq_rhs_imm_fun ASM_EQ cf_expect_cmp_rhs_imm
+  xt' const_fold_ne_rhs_imm_fun ASM_NE cf_expect_cmp_rhs_imm
+  xt' const_fold_gt_rhs_imm_fun ASM_GT cf_expect_cmp_rhs_imm
 
-  cf_expect_clear
-  0 20 asm_cmp_imm cf_expect_instr
-  0 ASM_NE asm_cset cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_ne_rhs_imm_fun cf_expect_word
-
-  cf_expect_clear
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 asm_mov_reg cf_expect_instr
-  1 20 asm_cmp_imm cf_expect_instr
-  0 ASM_EQ asm_cset cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_eq_lhs_imm_fun cf_expect_word
-
-  cf_expect_clear
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 asm_mov_reg cf_expect_instr
-  1 20 asm_cmp_imm cf_expect_instr
-  0 ASM_NE asm_cset cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_ne_lhs_imm_fun cf_expect_word
+  xt' const_fold_eq_lhs_imm_fun ASM_EQ cf_expect_cmp_lhs_imm
+  xt' const_fold_ne_lhs_imm_fun ASM_NE cf_expect_cmp_lhs_imm
+  xt' const_fold_gt_lhs_imm_fun ASM_LT cf_expect_cmp_lhs_imm
 end
 test_const_fold_compare2
 
