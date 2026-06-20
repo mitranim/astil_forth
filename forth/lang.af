@@ -3459,6 +3459,17 @@ fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
   read_word comp_local reg_op comp_loc_reg_pattern_emit
 end
 
+fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
+  comp_args1_reg { divisor }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  divisor inc { dividend }
+  comp_alloc_next_reg { quotient }
+  quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr
+  divisor quotient divisor dividend asm_msub comp_instr
+  loc divisor comp_loc_step_store
+end
+
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
 fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
@@ -3538,6 +3549,11 @@ end
 \ Signed divide a local: `divisor /=: some_val`.
 fun_comp: /=: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_SDIV_REG comp_loc_reg_pattern_step
+end
+
+\ Signed remainder into a local: `divisor mod=: some_val`.
+fun_comp: mod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_SDIV_REG comp_loc_rem_step
 end
 
 \ ## Vargs and formatting
