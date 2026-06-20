@@ -858,62 +858,72 @@ end
 
 fun: asr { i0 bits -> i1 } [ redefine ] asr end
 
+fun: comp_emit_mod { out dividend divisor div_op -- err }
+  comp_alloc_next_reg { quotient }
+  quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr \ sdiv|udiv Xd, Xn, Xm
+  out quotient divisor dividend asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+end
+
 fun_comp: mod { -- err }
-  comp_args2_regs     { reg0 reg1 }
-  comp_alloc_next_reg { tmp }
-  tmp reg0 reg1      asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
-  reg0 tmp reg1 reg0 asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 ASM_OP_SDIV_REG comp_emit_mod
   reg1 comp_args_set
 end
 
 fun: mod { i0 i1 -> i2 } [ redefine ] mod end
 
 fun_comp: umod { -- err }
-  comp_args2_regs     { reg0 reg1 }
-  comp_alloc_next_reg { tmp }
-  tmp  reg0 reg1     asm_udiv comp_instr \ udiv Xd, Xn, Xm
-  reg0 tmp reg1 reg0 asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 ASM_OP_UDIV_REG comp_emit_mod
   reg1 comp_args_set
 end
 
 fun: umod { i0 i1 -> i2 } umod end
 
-fun_comp: /mod { -- err }
-  comp_args2_regs2    { rem quo }
-  rem quo             { dividend divisor }
+fun: comp_emit_divmod { reg0 reg1 div_op -- tmp err }
+  reg0 reg1 reg0 reg1 { rem quo dividend divisor }
   comp_alloc_next_reg { tmp }
-  tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
-  quo dividend tmp     asm_sdiv    comp_instr \ sdiv Xd, Xn, Xm
-  rem quo tmp dividend asm_msub    comp_instr \ msub Xd, Xn, Xm, Xa
-  tmp comp_args_set
+  tmp divisor asm_mov_reg comp_instr \ mov Xd, Xm
+  quo dividend tmp asm_pattern_arith_reg div_op or comp_instr \ sdiv|udiv Xd, Xn, Xm
+  rem quo tmp dividend asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  tmp
+end
+
+fun_comp: /mod { -- err }
+  comp_args2_regs2 { rem quo }
+  rem quo ASM_OP_SDIV_REG comp_emit_divmod comp_args_set
 end
 
 fun: /mod { dividend divisor -> rem quo } /mod end
 
 fun_comp: u/mod { -- err }
-  comp_args2_regs2    { rem quo }
-  rem quo             { dividend divisor }
-  comp_alloc_next_reg { tmp }
-  tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
-  quo dividend tmp     asm_udiv    comp_instr \ udiv Xd, Xn, Xm
-  rem quo tmp dividend asm_msub    comp_instr \ msub Xd, Xn, Xm, Xa
-  tmp comp_args_set
+  comp_args2_regs2 { rem quo }
+  rem quo ASM_OP_UDIV_REG comp_emit_divmod comp_args_set
 end
 
 fun: u/mod { dividend divisor -> rem quo } u/mod end
 
-fun_comp: abs { -- err }
-  comp_args1_reg { reg }
+fun: comp_emit_abs { reg -- err }
   reg                asm_cmp_zero comp_instr \ cmp Xn, #0
   reg reg reg ASM_PL asm_csneg    comp_instr \ cneg Xd, Xn, cond
 end
 
+fun_comp: abs { -- err } comp_args1_reg comp_emit_abs end
 fun: abs { int -> +int } abs end
+
+fun: comp_emit_csel_reg { out cmp_lhs cmp_rhs lhs rhs cond -- err }
+  cmp_lhs cmp_rhs  asm_cmp_reg comp_instr \ cmp Xn, Xm
+  out lhs rhs cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+end
+
+fun: comp_emit_csel_nonzero { out nonzero zero cond -- err }
+  nonzero 0             asm_cmp_imm comp_instr \ cmp Xn, #0
+  out nonzero zero cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+end
 
 fun_comp: min { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
-  reg0 reg0 reg1 ASM_LT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg0 reg0 reg1 reg0 reg1 ASM_LT comp_emit_csel_reg
   reg1 comp_args_set
 end
 
@@ -921,8 +931,7 @@ fun: min { i0 i1 -> i0|i1 } min end
 
 fun_comp: umin { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
-  reg0 reg0 reg1 ASM_LO asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg0 reg0 reg1 reg0 reg1 ASM_LO comp_emit_csel_reg
   reg1 comp_args_set
 end
 
@@ -930,8 +939,7 @@ fun: umin { i0 i1 -> i0|i1 } umin end
 
 fun_comp: max { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
-  reg0 reg0 reg1 ASM_GT asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg0 reg0 reg1 reg0 reg1 ASM_GT comp_emit_csel_reg
   reg1 comp_args_set
 end
 
@@ -939,8 +947,7 @@ fun: max { i0 i1 -> i0|i1 } max end
 
 fun_comp: umax { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg1             asm_cmp_reg comp_instr \ cmp Xn, Xm
-  reg0 reg0 reg1 ASM_HI asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+  reg0 reg0 reg1 reg0 reg1 ASM_HI comp_emit_csel_reg
   reg1 comp_args_set
 end
 
@@ -948,8 +955,7 @@ fun: umax { i0 i1 -> i0|i1 } umax end
 
 fun_comp: fallback { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg1 0                asm_cmp_imm comp_instr \ cmp x1, 0
-  reg0 reg1 reg0 ASM_NE asm_csel    comp_instr \ csel x0, x1, x0, ne
+  reg0 reg1 reg0 ASM_NE comp_emit_csel_nonzero
   reg1 comp_args_set
 end
 
@@ -966,22 +972,31 @@ end
 
 fun: is_aligned_to { adr size -> bool } is_aligned_to end
 
+fun: comp_emit_align_down { out len wid -- err }
+  wid         asm_neg     comp_instr \ neg Xd, Xd
+  out len wid asm_and_reg comp_instr \ and Xd, Xn, Xm
+end
+
 fun_comp: align_down { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg1           asm_neg     comp_instr \ neg Xd, Xd
-  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
+  reg0 reg0 reg1 comp_emit_align_down
   reg1 comp_args_set
 end
 
 fun: align_down { len wid -> len } align_down end
 
 \ Assumes power of two.
+fun: comp_emit_align_up { out tmp len wid -- err }
+  tmp len wid asm_add_reg comp_instr \ add Xd, Xn, Xm
+  tmp tmp 1   asm_sub_imm comp_instr \ sub Xd, Xn, #1
+  wid         asm_neg     comp_instr \ neg Xd, Xd
+  out tmp wid asm_and_reg comp_instr \ and Xd, Xn, Xm
+end
+
+\ Assumes power of two.
 fun_comp: align_up { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_add_reg comp_instr \ add Xd, Xn, Xm
-  reg0 reg0 1    asm_sub_imm comp_instr \ sub Xd, Xn, 1
-  reg1           asm_neg     comp_instr \ neg Xd, Xd
-  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
+  reg0 reg0 reg0 reg1 comp_emit_align_up
   reg1 comp_args_set
 end
 
@@ -996,12 +1011,16 @@ end
 fun: invert { i0 -> i1 } [ redefine ] invert end
 
 \ 1-based index of the highest bit.
-fun_comp: bit_len { -- err }
-  comp_args1_reg      { reg }
-  comp_alloc_next_reg { tmp }
+fun: comp_emit_bit_len { reg tmp -- err }
   reg reg     asm_clz     comp_instr \ clz Xd, Xn
   tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
   reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
+end
+
+fun_comp: bit_len { -- err }
+  comp_args1_reg      { reg }
+  comp_alloc_next_reg { tmp }
+  reg tmp comp_emit_bit_len
   tmp comp_args_set
 end
 
@@ -1010,7 +1029,7 @@ fun: bit_len { val -> len } bit_len end
 \ "count leading zeros" (in high bits)
 fun_comp: bit_clz { -- err }
   comp_args1_reg { reg }
-  reg reg asm_clz comp_instr \ neg Xd, Xn
+  reg reg asm_clz comp_instr \ clz Xd, Xn
 end
 
 fun: bit_clz { num -> bool } bit_clz end
@@ -1018,32 +1037,40 @@ fun: bit_clz { num -> bool } bit_clz end
 \ "count trailing zeros" (in low bits)
 \
 \ Fallback version of `ctz Xd, Xn` for chips without `ctz`.
-fun_comp: bit_ctz { -- err }
-  comp_args1_reg { reg }
+fun: comp_emit_bit_ctz { reg -- err }
   reg reg asm_rbit comp_instr \ rbit Xd, Xn
-  reg reg asm_clz  comp_instr \ clz Xd, Xd
+  reg reg asm_clz  comp_instr \ ctz Xd, Xd
 end
 
+fun_comp: bit_ctz { -- err } comp_args1_reg comp_emit_bit_ctz end
 fun: bit_ctz { num -> bool } bit_ctz end
+
+fun: comp_emit_low_bits { reg tmp -- err }
+  1 tmp comp_load
+  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
+  reg tmp 1 asm_sub_imm comp_instr   \ sub Xn, Xt, #1
+end
 
 fun_comp: low_bits { -- err }
   comp_args1_reg        { reg }
   comp_alloc_next_reg   { tmp }
-  1 tmp comp_load
-  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
-  reg tmp 1 asm_sub_imm comp_instr   \ sub Xn, Xt, #1
+  reg tmp comp_emit_low_bits
   reg inc comp_args_set
 end
 
 fun: low_bits { len -> bits } [ redefine ] low_bits end
 
-fun_comp: bits_trunc { -- err }
-  comp_args2_regs     { imm len }
+fun: comp_emit_bits_trunc { out val len -- err }
   comp_alloc_next_reg { tmp }
   1 tmp comp_load
   tmp tmp len asm_lsl_reg comp_instr \ lsl Xt, Xt, Xlen
-  tmp tmp 1 asm_sub_imm comp_instr   \ sub Xt, Xt, #1
-  imm imm tmp asm_and_reg comp_instr \ and Ximm, Ximm, Xt
+  tmp tmp 1   asm_sub_imm comp_instr \ sub Xt, Xt, #1
+  out val tmp asm_and_reg comp_instr \ and Xd, Xn, Xm
+end
+
+fun_comp: bits_trunc { -- err }
+  comp_args2_regs     { imm len }
+  imm imm len comp_emit_bits_trunc
   len comp_args_set
 end
 
@@ -1059,12 +1086,16 @@ fun: bits_clear { imm mask -> out } bits_clear end
 
 \ Gets bits according to mask and returns them in low bits.
 \ The mask must be nonzero and contiguous.
+fun: comp_emit_bit_mask_get { out tmp src mask -- err }
+  tmp src mask asm_and_reg comp_instr \ and Xd, Xn, Xm
+  mask mask    asm_rbit    comp_instr \ rbit Xd, Xn
+  mask mask    asm_clz     comp_instr \ clz Xd, Xn
+  out tmp mask asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
+end
+
 fun_comp: bit_mask_get { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
-  reg1 reg1      asm_rbit    comp_instr \ rbit Xd, Xn
-  reg1 reg1      asm_clz     comp_instr \ clz Xd, Xn
-  reg0 reg0 reg1 asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
+  reg0 reg0 reg0 reg1 comp_emit_bit_mask_get
   reg1 comp_args_set
 end
 
@@ -1073,6 +1104,16 @@ fun: bit_mask_get { src mask -> out } bit_mask_get end
 \ Sets bits according to the mask.
 \ The input value must be in low bits.
 \ The mask must be nonzero and contiguous.
+fun: comp_emit_bit_mask_set { inp src mask -- err }
+  comp_alloc_next_reg { shift }
+  src   src   mask  asm_bic     comp_instr \ bic Xd, Xn, Xm
+  shift mask        asm_rbit    comp_instr \ rbit Xd, Xn
+  shift shift       asm_clz     comp_instr \ clz Xd, Xn
+  inp   inp   shift asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
+  inp   inp   mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
+  inp   inp   src   asm_orr_reg comp_instr \ orr Xd, Xn, Xm
+end
+
 fun_comp: bit_mask_set { -- err }
   3 nil comp_args_min
   comp_args_get dec { mask }
@@ -1082,14 +1123,7 @@ fun_comp: bit_mask_set { -- err }
   inp  comp_realloc_reg
   src  comp_realloc_reg
   mask comp_realloc_reg
-  comp_alloc_next_reg { shift }
-
-  src   src   mask  asm_bic     comp_instr \ bic Xd, Xn, Xm
-  shift mask        asm_rbit    comp_instr \ rbit Xd, Xn
-  shift shift       asm_clz     comp_instr \ clz Xd, Xn
-  inp   inp   shift asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
-  inp   inp   mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
-  inp   inp   src   asm_orr_reg comp_instr \ orr Xd, Xn, Xm
+  inp src mask comp_emit_bit_mask_set
   inp inc comp_args_set
 end
 
@@ -1169,17 +1203,24 @@ fun: asm_orr_bit { Xd Xn bit -- instr }
   0b1_01_100100_1_000000_000000_00000_00000 or
 end
 
+fun: comp_emit_cmp_cset_reg { out lhs rhs cond -- err }
+  lhs rhs  asm_cmp_reg comp_instr \ cmp Xn, Xm
+  out cond asm_cset    comp_instr \ cset Xd, cond
+end
+
+fun: comp_emit_cset_zero { reg cond -- err }
+  reg      asm_cmp_zero comp_instr \ cmp Xn, #0
+  reg cond asm_cset     comp_instr \ cset Xd, cond
+end
+
 fun: asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
   comp_args2_regs { reg0 reg1 }
-  reg0 reg1 asm_cmp_reg comp_instr \ cmp Xn, Xm
-  reg0 cond asm_cset    comp_instr \ cset Xd, cond
+  reg0 reg0 reg1 cond comp_emit_cmp_cset_reg
   reg1 comp_args_set
 end
 
 fun: asm_comp_cset_zero { cond -- err } ( E: num -- bool )
-  comp_args1_reg { reg }
-  reg      asm_cmp_zero comp_instr \ cmp Xn, #0
-  reg cond asm_cset     comp_instr \ cset Xd, cond
+  comp_args1_reg cond comp_emit_cset_zero
 end
 
 \ sbfm Xd, Xn, immr, imms
@@ -3161,9 +3202,7 @@ end
 
 fun: comp_loc_mut_mod { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
   comp_loc_arg_init { divisor dividend loc }
-  comp_alloc_next_reg { quotient }
-  quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr \ sdiv|udiv Xd, Xn, Xm
-  divisor quotient divisor dividend asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
+  divisor dividend divisor div_op comp_emit_mod
   loc divisor comp_loc_mut_store
 end
 
@@ -3171,11 +3210,9 @@ fun: comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
   comp_loc_arg_init { candidate cur loc }
 
   if zero then
-    candidate 0                  asm_cmp_imm comp_instr \ cmp Xn, #0
-    candidate candidate cur cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+    candidate candidate cur cond comp_emit_csel_nonzero
   else
-    cur candidate                asm_cmp_reg comp_instr \ cmp Xn, Xm
-    candidate cur candidate cond asm_csel    comp_instr \ csel Xd, Xn, Xm, cond
+    candidate cur candidate cur candidate cond comp_emit_csel_reg
   end
 
   loc candidate comp_loc_mut_store
@@ -3183,8 +3220,7 @@ end
 
 fun: comp_loc_mut_cset_zero { cond -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
-  reg      asm_cmp_zero comp_instr \ cmp Xn, #0
-  reg cond asm_cset     comp_instr \ cset Xd, cond
+  reg cond comp_emit_cset_zero
   loc reg comp_loc_mut_store
 end
 
@@ -3197,33 +3233,25 @@ fun: comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rh
   end
 
   loc comp_push_from_local
-  reg inc reg asm_cmp_reg comp_instr \ cmp Xn, Xm
-  reg cond asm_cset      comp_instr \ cset Xd, cond
+  reg reg inc reg cond comp_emit_cmp_cset_reg
   loc reg comp_loc_mut_store
 end
 
 fun: comp_loc_mut_align_down { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_arg_init { wid len loc }
-  wid         asm_neg     comp_instr \ neg Xd, Xd
-  wid len wid asm_and_reg comp_instr \ and Xd, Xn, Xm
+  wid len wid comp_emit_align_down
   loc wid comp_loc_mut_store
 end
 
 fun: comp_loc_mut_align_up { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_arg_init { wid len loc }
-  len len wid asm_add_reg comp_instr \ add Xd, Xn, Xm
-  len len 1   asm_sub_imm comp_instr \ sub Xd, Xn, #1
-  wid         asm_neg     comp_instr \ neg Xd, Xd
-  wid len wid asm_and_reg comp_instr \ and Xd, Xn, Xm
+  wid len len wid comp_emit_align_up
   loc wid comp_loc_mut_store
 end
 
 fun: comp_loc_mut_bit_mask_get { -- err } ( C: "name" -- ) ( E: mask -- )
   comp_loc_arg_init { mask src loc }
-  src src mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
-  mask mask     asm_rbit    comp_instr \ rbit Xd, Xn
-  mask mask     asm_clz     comp_instr \ clz Xd, Xn
-  mask src mask asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
+  mask src src mask comp_emit_bit_mask_get
   loc mask comp_loc_mut_store
 end
 
@@ -3232,23 +3260,13 @@ fun: comp_loc_mut_bit_mask_set { -- err } ( C: "name" -- ) ( E: inp mask -- )
   read_word comp_local { loc }
   loc comp_push_from_local
   mask inc { src }
-  comp_alloc_next_reg { shift }
-  src   src   mask  asm_bic     comp_instr \ bic Xd, Xn, Xm
-  shift mask        asm_rbit    comp_instr \ rbit Xd, Xn
-  shift shift       asm_clz     comp_instr \ clz Xd, Xn
-  inp   inp   shift asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
-  inp   inp   mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
-  inp   inp   src   asm_orr_reg comp_instr \ orr Xd, Xn, Xm
+  inp src mask comp_emit_bit_mask_set
   loc inp comp_loc_mut_store
 end
 
 fun: comp_loc_mut_bits_trunc { -- err } ( C: "name" -- ) ( E: len -- )
   comp_loc_arg_init { len val loc }
-  comp_alloc_next_reg { tmp }
-  1 tmp comp_load
-  tmp tmp len asm_lsl_reg comp_instr \ lsl Xt, Xt, Xlen
-  tmp tmp 1   asm_sub_imm comp_instr \ sub Xt, Xt, #1
-  len val tmp asm_and_reg comp_instr \ and Xval, Xval, Xt
+  len val len comp_emit_bits_trunc
   loc len comp_loc_mut_store
 end
 
@@ -3487,8 +3505,7 @@ end
 \ Absolute-value a local: `abs: some_val`.
 fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
-  reg                asm_cmp_zero comp_instr \ cmp Xn, #0
-  reg reg reg ASM_PL asm_csneg    comp_instr \ cneg Xd, Xn, cond
+  reg comp_emit_abs
   loc reg comp_loc_mut_store
 end
 
@@ -3510,8 +3527,7 @@ end
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
 fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
-  reg reg asm_rbit comp_instr \ rbit Xd, Xn
-  reg reg asm_clz  comp_instr \ clz Xd, Xn
+  reg comp_emit_bit_ctz
   loc reg comp_loc_mut_store
 end
 
@@ -3523,9 +3539,7 @@ end
 fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   comp_alloc_next_reg { tmp }
-  reg reg     asm_clz     comp_instr \ clz Xd, Xn
-  tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
-  reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
+  reg tmp comp_emit_bit_len
   loc reg comp_loc_mut_store
 end
 
@@ -3906,9 +3920,7 @@ end
 fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   comp_alloc_next_reg { tmp }
-  1 tmp comp_load
-  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
-  reg tmp 1   asm_sub_imm comp_instr \ sub Xn, Xt, #1
+  reg tmp comp_emit_low_bits
   loc reg comp_loc_mut_store
 end
 
