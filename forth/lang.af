@@ -552,8 +552,9 @@ fun: asm_udiv { Xd Xn Xm -> instr }
 end
 
 \ sdiv Xd, Xn, Xm
+0b1_0_0_11010110_00000_00001_1_00000_00000 let: ASM_OP_SDIV_REG
 fun: asm_sdiv { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_0_0_11010110_00000_00001_1_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_SDIV_REG or
 end
 
 \ msub Xd, Xn, Xm, Xa
@@ -3532,6 +3533,11 @@ end
 \ Unsigned divide a local: `divisor u/=: some_val`.
 fun_comp: u/=: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_UDIV_REG comp_loc_reg_pattern_step
+end
+
+\ Signed divide a local: `divisor /=: some_val`.
+fun_comp: /=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_SDIV_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
