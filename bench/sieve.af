@@ -6,16 +6,11 @@ use' lang.af
 8192 let: CAP
 CAP  mem: FLAGS
 
-fun: flags_ceil { flags cap -- adr } flags cap + end
-
-fun: reset { flags cap } flags cap 1 fill end
-
 fun: find_prime { flags cap -- num }
-  flags cap reset
-
-  flags cap flags_ceil 0 3 { ceil num step }
-
+  flags cap 1 fill
+  flags cap + 0 3 { ceil num step }
   flags { ptr0 }
+
   loop
     ptr0 ceil < while
     if ptr0 @u8 then

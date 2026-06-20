@@ -610,10 +610,17 @@ fun: const_fold_loc_step_neg_fun { -- out }
   val
 end
 
+fun: const_fold_loc_step_min_fun { -- out }
+  10 { val }
+  -9223372036854775808 +=: val
+  val
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
   T{ const_fold_loc_step_neg_fun <T> 8 }T
+  T{ const_fold_loc_step_min_fun <T> -9223372036854775798 }T
   ifz has_interp then ret end
 
   cf_expect_clear

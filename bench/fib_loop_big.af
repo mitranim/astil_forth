@@ -36,7 +36,6 @@ end
 
 fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   0 0 0 { qlo qhi rem }
-
   hi { word }
   64 { ind }
   loop
