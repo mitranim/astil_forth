@@ -260,9 +260,13 @@ end
 test_comp_args_set_max_len
 
 fun: const_fold_fallback_0_1_fun { val -- out } val 20 + end
+fun: const_fold_add_imm_lhs_fun { val -- out } 20 val + end
+fun: const_fold_sub_imm_fun { val -- out } val 20 - end
 
 fun: test_const_fold_fallback_0_1 { -- err }
   T{ 22 const_fold_fallback_0_1_fun <T> 42 }T
+  T{ 23 const_fold_add_imm_lhs_fun <T> 43 }T
+  T{ 62 const_fold_sub_imm_fun <T> 42 }T
 end
 test_const_fold_fallback_0_1
 

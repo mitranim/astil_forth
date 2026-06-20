@@ -2831,6 +2831,28 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
   0 false
 end
 
+\ Try folding a trailing constant RHS into an add/sub immediate instruction.
+fun: cf_fold_addsub_imm { add -- ok err }
+  comp_top_arg_regs2 { lhs rhs }
+  rhs comp_arg { arg_rhs }
+  arg_rhs cf_arg_foldable_imm { imm foldable }
+
+  ifz foldable then false ret end
+  ifz arg_rhs cf_arg_current then false ret end
+
+  imm comp_loc_step_imm12 { mag fits }
+  ifz fits then false ret end
+
+  arg_rhs cf_rewind_to_before_arg
+  arg_rhs cf_arg_clear
+  lhs comp_realloc_reg
+
+  lhs lhs mag asm_pattern_arith_imm
+  if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12
+  lhs inc comp_args_set
+  true
+end
+
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
   cf_top_arg_foldable { reg arg imm foldable }
   read_word comp_local { loc }
@@ -3049,7 +3071,12 @@ fun_comp: asr: { -- err } ( C: "name" -- ) ( E: bits -- )
 end
 
 fun_comp: + { -- err } [ redefine ]
-  if cf_fold_cleared2 then + cf_fold_done else { -- } execute'' + end
+  if cf_fold_cleared2 then + cf_fold_done
+  else
+    { -- }
+    if true cf_fold_addsub_imm then ret end
+    execute'' +
+  end
 end
 
 \ Add a step to a local: `step +: some_val`.
@@ -3058,7 +3085,12 @@ fun_comp: +: { -- err } ( C: "name" -- ) ( E: step -- )
 end
 
 fun_comp: - { -- err } [ redefine ]
-  if cf_fold_cleared2 then - cf_fold_done else { -- } execute'' - end
+  if cf_fold_cleared2 then - cf_fold_done
+  else
+    { -- }
+    if false cf_fold_addsub_imm then ret end
+    execute'' -
+  end
 end
 
 \ Subtract a step from a local: `step -: some_val`.
