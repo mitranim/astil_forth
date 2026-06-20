@@ -2875,8 +2875,8 @@ fun: cf_fold_rhs_imm_raw { reg0 arg1 imm aux emit -- err }
   reg0 inc comp_args_set
 end
 
-fun: cf_fold_rhs_imm_checked { reg0 arg1 imm aux emit fits -- ok err }
-  ifz fits then false ret end
+fun: cf_fold_rhs_imm_checked { reg0 arg1 imm aux emit ok -- ok err }
+  ifz ok then false ret end
   ifz arg1 cf_arg_current then false ret end
 
   reg0 arg1 imm aux emit cf_fold_rhs_imm_raw
@@ -3035,42 +3035,39 @@ fun: cf_fold_cmp_imm { rhs_cond lhs_cond -- ok err }
   reg0 reg1 arg1 lhs_cond cf_fold_cmp_lhs_imm
 end
 
-fun: cf_emit_addsub_imm { reg0 reg1 imm add -- err }
-  imm comp_loc_step_imm12 { mag _ }
-  reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
+fun: cf_validate_raw { imm aux validate -- aux ok }
+  imm aux validate execute_raw [ 2 comp_args_set ]
 end
 
-\ Try folding a constant operand into an add/sub immediate instruction.
-fun: cf_fold_addsub_imm { add -- ok err }
+fun: cf_fold2 { commutative aux validate emit -- ok err }
   comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
   arg1 cf_arg_foldable_imm { imm foldable }
 
   if foldable then
-    imm comp_loc_step_imm12 { _ fits }
-    instr' cf_emit_addsub_imm { emit }
-    reg0 arg1 imm add emit fits cf_fold_rhs_imm_checked ret
+    \ RHS constant: `num 10 +`.
+    imm aux validate cf_validate_raw { aux ok }
+    reg0 arg1 imm aux emit ok cf_fold_rhs_imm_checked ret
   end
 
-  ifz add then false ret end
+  ifz commutative then false ret end
 
   reg0 comp_arg { arg0 }
   arg0 cf_arg_foldable_imm { imm foldable }
   ifz foldable then false ret end
 
-  imm comp_loc_step_imm12 { _ fits }
-  ifz fits then false ret end
-
-  instr' cf_emit_addsub_imm { emit }
-  reg0 reg1 arg0 arg1 imm true emit cf_fold_lhs_imm_raw
+  \ LHS constant: `10 num +`.
+  imm aux validate cf_validate_raw { aux ok }
+  ifz ok then false ret end
+  reg0 reg1 arg0 arg1 imm aux emit cf_fold_lhs_imm_raw
 end
 
-0 let: CF_SHIFT_LSL
-1 let: CF_SHIFT_LSR
-2 let: CF_SHIFT_ASR
+fun: cf_shift_validate { imm reg_op -- aux ok }
+  reg_op imm 0 >= imm 63 <= and
+end
 
-fun: cf_emit_shift_imm { reg0 reg1 imm shift -- err }
-  if shift CF_SHIFT_LSL = then
+fun: cf_shift_emit { reg0 reg1 imm reg_op -- err }
+  if reg_op ASM_OP_LSL_REG = then
     64 imm - 6 bits_trunc { immr }
     63 imm - 6 bits_trunc { imms }
     reg0 reg1 immr imms ASM_OP_UBFM asm_bitfield comp_instr \ lsl Xd, Xn, #imm6
@@ -3078,61 +3075,29 @@ fun: cf_emit_shift_imm { reg0 reg1 imm shift -- err }
   end
 
   imm 6 bits_trunc { immr }
-  if shift CF_SHIFT_LSR = then ASM_OP_UBFM else ASM_OP_SBFM end { bitfield_op }
+  if reg_op ASM_OP_LSR_REG = then ASM_OP_UBFM else ASM_OP_SBFM end { bitfield_op }
   reg0 reg1 immr 63 bitfield_op asm_bitfield comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
-fun: cf_fold_shift_imm { shift -- ok err }
-  comp_top_arg_regs2 { reg0 reg1 }
-  reg1 comp_arg { arg1 }
-  arg1 cf_arg_foldable_imm { imm foldable }
-
-  ifz foldable then false ret end
-
-  imm 0 >= imm 63 <= and { fits }
-  instr' cf_emit_shift_imm { emit }
-  reg0 arg1 imm shift emit fits cf_fold_rhs_imm_checked
+fun: cf_logical_validate { imm aux -- aux ok }
+  aux 1 and { inv }
+  aux inv - { op }
+  if inv then imm invert { imm } end
+  imm op catch' asm_logical_imm_mask =0
 end
 
-fun: cf_emit_logical_imm_mask { reg0 reg1 _imm mask -- err }
+fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
   mask reg1 5 lsl or reg0 or comp_instr \ and|orr|eor Xd, Xn, #imm
 end
 
-fun: cf_logical_imm_mask { imm op inv -- mask ok }
-  if inv then imm invert else imm end { enc }
-  enc op catch' asm_logical_imm_mask { mask err }
-  if err then 0 false ret end
-  mask true
+fun: cf_addsub_validate { imm add -- aux ok }
+  imm comp_loc_step_imm12 { -- ok }
+  add ok
 end
 
-fun: cf_fold_logical_rhs_imm { op invert -- ok err }
-  comp_top_arg_regs2 { reg0 reg1 }
-  reg1 comp_arg { arg1 }
-  arg1 cf_arg_foldable_imm { imm foldable }
-  ifz foldable then false ret end
-
-  imm op invert cf_logical_imm_mask { mask ok }
-  ifz ok then false ret end
-
-  instr' cf_emit_logical_imm_mask { emit }
-  reg0 arg1 imm mask emit true cf_fold_rhs_imm_checked
-end
-
-fun: cf_fold_logical_comm_imm { op -- ok err }
-  if op false cf_fold_logical_rhs_imm then true ret end
-
-  comp_top_arg_regs2 { reg0 reg1 }
-  instr' cf_emit_logical_imm_mask { emit }
-
-  reg0 comp_arg { arg0 }
-  arg0 cf_arg_foldable_imm { imm foldable }
-  ifz foldable then false ret end
-
-  imm op false cf_logical_imm_mask { mask ok }
-  ifz ok then false ret end
-
-  reg1 comp_arg { arg1 }
-  reg0 reg1 arg0 arg1 imm mask emit cf_fold_lhs_imm_raw
+fun: cf_addsub_emit { reg0 reg1 imm add -- err }
+  imm comp_loc_step_imm12 { mag -- }
+  reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
 end
 
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
@@ -3146,25 +3111,17 @@ fun: comp_loc_step_store { loc reg -- err }
   loc comp_pop_into_local
 end
 
-fun: comp_loc_unary_begin { -- reg loc err } ( C: "name" -- ) ( E: -- )
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  comp_args_get dec loc
-end
+fun: comp_loc_step_imm_checked { reg arg loc imm aux emit ok -- folded err }
+  ifz ok then false ret end
 
-fun: comp_loc_addsub_step_imm { loc reg imm mag add -- err }
+  if arg cf_arg_current then
+    arg cf_arg_rewind_clear
+  end
   reg comp_realloc_reg
   loc comp_push_from_local
-  reg reg inc mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
+  reg reg inc imm aux emit execute_raw
   loc reg comp_loc_step_store
-end
-
-fun: comp_loc_imm1_step { imm_op -- err } ( C: "name" -- ) ( E: -- )
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  comp_args_get dec { reg }
-  reg reg 1 asm_pattern_arith_imm imm_op or comp_instr \ add|sub Xd, Xn, #1
-  loc reg comp_loc_step_store
+  true
 end
 
 fun: comp_loc_reg_pattern_emit { loc reg_op -- err }
@@ -3174,31 +3131,36 @@ fun: comp_loc_reg_pattern_emit { loc reg_op -- err }
   loc reg comp_loc_step_store
 end
 
-fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
-  1 nil comp_args_min
-  read_word comp_local reg_op comp_loc_reg_pattern_emit
-end
-
-fun: comp_loc_logical_imm_step { reg_op imm_op inv -- err }
-  ( C: "name" -- ) ( E: mask -- )
+fun: comp_loc_imm_step { reg_op aux validate emit -- err }
+  ( C: "name" -- ) ( E: step -- )
 
   comp_loc_step_prepare { reg arg loc imm foldable }
 
   if foldable then
-    imm imm_op inv cf_logical_imm_mask { mask ok }
-    if ok then
-      if arg cf_arg_current then
-        arg cf_arg_rewind_clear
-      end
-      reg comp_realloc_reg
-      loc comp_push_from_local
-      mask reg inc 5 lsl or reg or comp_instr \ and|orr|eor Xd, Xn, #imm
-      loc reg comp_loc_step_store
-      ret
-    end
+    imm aux validate cf_validate_raw { aux ok }
+    if reg arg loc imm aux emit ok comp_loc_step_imm_checked then ret end
   end
 
   loc reg_op comp_loc_reg_pattern_emit
+end
+
+fun: comp_loc_unary_begin { -- reg loc err } ( C: "name" -- ) ( E: -- )
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  comp_args_get dec loc
+end
+
+fun: comp_loc_fixed_imm_step { imm aux emit -- err }
+  ( C: "name" -- ) ( E: -- )
+
+  comp_loc_unary_begin { reg loc }
+  reg reg imm aux emit execute_raw
+  loc reg comp_loc_step_store
+end
+
+fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
+  1 nil comp_args_min
+  read_word comp_local reg_op comp_loc_reg_pattern_emit
 end
 
 fun: comp_loc_arg_begin { -- arg cur loc err }
@@ -3295,110 +3257,148 @@ fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
   loc len comp_loc_step_store
 end
 
-\ Mutate a local by a runtime or foldable add/sub constant step.
-fun: comp_loc_addsub_step { add -- err }
-  ( C: "name" -- ) ( E: step -- )
-
-  comp_loc_step_prepare { reg arg loc imm foldable }
-
-  if foldable then
-    imm comp_loc_step_imm12 { mag fits }
-    if fits then
-      if arg cf_arg_current then
-        arg cf_arg_rewind_clear
-      end
-      loc reg imm mag add comp_loc_addsub_step_imm
-      ret
-    end
-  end
-
-  loc if add then ASM_OP_ADD_REG else ASM_OP_SUB_REG end comp_loc_reg_pattern_emit
-end
-
 fun_comp: or { -- err } [ redefine ]
   if cf_fold_cleared2 then or cf_fold_done
-  else { -- } ifz ASM_OP_ORR_IMM cf_fold_logical_comm_imm then execute'' or end
+  else
+    { -- }
+    instr' cf_logical_validate { validate }
+    instr' cf_logical_emit { emit }
+    if true ASM_OP_ORR_IMM validate emit cf_fold2 then ret end
+    execute'' or
   end
 end
 
 \ Bitwise or into a local: `mask or: some_val`.
 fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_ORR_REG ASM_OP_ORR_IMM false comp_loc_logical_imm_step
+  instr' cf_logical_validate { validate }
+  instr' cf_logical_emit { emit }
+  ASM_OP_ORR_REG ASM_OP_ORR_IMM validate emit comp_loc_imm_step
 end
 
 fun_comp: and { -- err } [ redefine ]
   if cf_fold_cleared2 then and cf_fold_done
-  else { -- } ifz ASM_OP_AND_IMM cf_fold_logical_comm_imm then execute'' and end
+  else
+    { -- }
+    instr' cf_logical_validate { validate }
+    instr' cf_logical_emit { emit }
+    if true ASM_OP_AND_IMM validate emit cf_fold2 then ret end
+    execute'' and
   end
 end
 
 \ Bitwise and into a local: `mask and: some_val`.
 fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_AND_REG ASM_OP_AND_IMM false comp_loc_logical_imm_step
+  instr' cf_logical_validate { validate }
+  instr' cf_logical_emit { emit }
+  ASM_OP_AND_REG ASM_OP_AND_IMM validate emit comp_loc_imm_step
 end
 
 fun_comp: xor { -- err } [ redefine ]
   if cf_fold_cleared2 then xor cf_fold_done
-  else { -- } ifz ASM_OP_EOR_IMM cf_fold_logical_comm_imm then execute'' xor end
+  else
+    { -- }
+    instr' cf_logical_validate { validate }
+    instr' cf_logical_emit { emit }
+    if true ASM_OP_EOR_IMM validate emit cf_fold2 then ret end
+    execute'' xor
   end
 end
 
 \ Bitwise xor into a local: `mask xor: some_val`.
 fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_EOR_REG ASM_OP_EOR_IMM false comp_loc_logical_imm_step
+  instr' cf_logical_validate { validate }
+  instr' cf_logical_emit { emit }
+  ASM_OP_EOR_REG ASM_OP_EOR_IMM validate emit comp_loc_imm_step
 end
 
 fun_comp: lsl { -- err } [ redefine ]
   if cf_fold_cleared2 then lsl cf_fold_done
-  else { -- } ifz CF_SHIFT_LSL cf_fold_shift_imm then execute'' lsl end
+  else
+    { -- }
+    instr' cf_shift_validate { validate }
+    instr' cf_shift_emit { emit }
+    if false ASM_OP_LSL_REG validate emit cf_fold2 then ret end
+    execute'' lsl
   end
 end
 
 \ Shift a local left: `bits lsl: some_val`.
 fun_comp: lsl: { -- err } ( C: "name" -- ) ( E: bits -- )
-  ASM_OP_LSL_REG comp_loc_reg_pattern_step
+  instr' cf_shift_validate { validate }
+  instr' cf_shift_emit { emit }
+  ASM_OP_LSL_REG ASM_OP_LSL_REG validate emit comp_loc_imm_step
 end
 
 fun_comp: lsr { -- err } [ redefine ]
   if cf_fold_cleared2 then lsr cf_fold_done
-  else { -- } ifz CF_SHIFT_LSR cf_fold_shift_imm then execute'' lsr end
+  else
+    { -- }
+    instr' cf_shift_validate { validate }
+    instr' cf_shift_emit { emit }
+    if false ASM_OP_LSR_REG validate emit cf_fold2 then ret end
+    execute'' lsr
   end
 end
 
 \ Shift a local right logically: `bits lsr: some_val`.
 fun_comp: lsr: { -- err } ( C: "name" -- ) ( E: bits -- )
-  ASM_OP_LSR_REG comp_loc_reg_pattern_step
+  instr' cf_shift_validate { validate }
+  instr' cf_shift_emit { emit }
+  ASM_OP_LSR_REG ASM_OP_LSR_REG validate emit comp_loc_imm_step
 end
 
 fun_comp: asr { -- err } [ redefine ]
   if cf_fold_cleared2 then asr cf_fold_done
-  else { -- } ifz CF_SHIFT_ASR cf_fold_shift_imm then execute'' asr end
+  else
+    { -- }
+    instr' cf_shift_validate { validate }
+    instr' cf_shift_emit { emit }
+    if false ASM_OP_ASR_REG validate emit cf_fold2 then ret end
+    execute'' asr
   end
 end
 
 \ Shift a local right arithmetically: `bits asr: some_val`.
 fun_comp: asr: { -- err } ( C: "name" -- ) ( E: bits -- )
-  ASM_OP_ASR_REG comp_loc_reg_pattern_step
+  instr' cf_shift_validate { validate }
+  instr' cf_shift_emit { emit }
+  ASM_OP_ASR_REG ASM_OP_ASR_REG validate emit comp_loc_imm_step
 end
 
 fun_comp: + { -- err } [ redefine ]
   if cf_fold_cleared2 then + cf_fold_done
-  else { -- } if true cf_fold_addsub_imm then ret end execute'' + end
+  else
+    { -- }
+    instr' cf_addsub_validate { validate }
+    instr' cf_addsub_emit { emit }
+    if true true validate emit cf_fold2 then ret end
+    execute'' +
+  end
 end
 
 \ Add a step to a local: `step +: some_val`.
 fun_comp: +: { -- err } ( C: "name" -- ) ( E: step -- )
-  true comp_loc_addsub_step
+  instr' cf_addsub_validate { validate }
+  instr' cf_addsub_emit { emit }
+  ASM_OP_ADD_REG true validate emit comp_loc_imm_step
 end
 
 fun_comp: - { -- err } [ redefine ]
   if cf_fold_cleared2 then - cf_fold_done
-  else { -- } if false cf_fold_addsub_imm then ret end execute'' - end
+  else
+    { -- }
+    instr' cf_addsub_validate { validate }
+    instr' cf_addsub_emit { emit }
+    if false false validate emit cf_fold2 then ret end
+    execute'' -
+  end
 end
 
 \ Subtract a step from a local: `step -: some_val`.
 fun_comp: -: { -- err } ( C: "name" -- ) ( E: step -- )
-  false comp_loc_addsub_step
+  instr' cf_addsub_validate { validate }
+  instr' cf_addsub_emit { emit }
+  ASM_OP_SUB_REG false validate emit comp_loc_imm_step
 end
 
 fun_comp: * { -- err } [ redefine ]
@@ -3462,7 +3462,8 @@ end
 
 \ Increment a local: `inc: some_val`.
 fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_OP_ADD_IMM comp_loc_imm1_step
+  instr' cf_addsub_emit { emit }
+  1 true emit comp_loc_fixed_imm_step
 end
 
 fun_comp: dec { -- err } [ redefine ]
@@ -3471,7 +3472,8 @@ end
 
 \ Decrement a local: `dec: some_val`.
 fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_OP_SUB_IMM comp_loc_imm1_step
+  instr' cf_addsub_emit { emit }
+  1 false emit comp_loc_fixed_imm_step
 end
 
 fun_comp: negate { -- err } [ redefine ]
@@ -3743,9 +3745,8 @@ end
 
 \ Scale a local by cell size: `cells: some_val`.
 fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { reg loc }
-  reg reg 3 asm_lsl_imm comp_instr \ lsl Xd, Xn, #shift
-  loc reg comp_loc_step_store
+  instr' cf_shift_emit { emit }
+  3 ASM_OP_LSL_REG emit comp_loc_fixed_imm_step
 end
 
 fun_comp: /cells { -- err } [ redefine ]
@@ -3754,9 +3755,8 @@ end
 
 \ Divide a local by cell size: `/cells: some_val`.
 fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { reg loc }
-  reg reg 3 asm_asr_imm comp_instr \ asr Xd, Xn, #shift
-  loc reg comp_loc_step_store
+  instr' cf_shift_emit { emit }
+  3 ASM_OP_ASR_REG emit comp_loc_fixed_imm_step
 end
 
 fun_comp: +cell { -- err } [ redefine ]
@@ -3765,9 +3765,8 @@ end
 
 \ Add one cell to a local: `+cell: some_val`.
 fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { reg loc }
-  reg reg CELL asm_add_imm comp_instr \ add Xd, Xn, #imm12
-  loc reg comp_loc_step_store
+  instr' cf_addsub_emit { emit }
+  CELL true emit comp_loc_fixed_imm_step
 end
 
 fun_comp: -cell { -- err } [ redefine ]
@@ -3776,9 +3775,8 @@ end
 
 \ Subtract one cell from a local: `-cell: some_val`.
 fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { reg loc }
-  reg reg CELL asm_sub_imm comp_instr \ sub Xd, Xn, #imm12
-  loc reg comp_loc_step_store
+  instr' cf_addsub_emit { emit }
+  CELL false emit comp_loc_fixed_imm_step
 end
 
 fun_comp: odd { -- err }
@@ -3866,13 +3864,19 @@ end
 
 fun_comp: bits_clear { -- err } [ redefine ]
   if cf_fold_cleared2 then bits_clear cf_fold_done
-  else { -- } ifz ASM_OP_AND_IMM true cf_fold_logical_rhs_imm then execute'' bits_clear end
+  else
+    { -- }
+    instr' cf_logical_validate { validate }
+    instr' cf_logical_emit { emit }
+    if false ASM_OP_AND_IMM 1 or validate emit cf_fold2 then ret end execute'' bits_clear
   end
 end
 
 \ Clear bits in a local by mask: `mask bits_clear: some_val`.
 fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_BIC_REG ASM_OP_AND_IMM true comp_loc_logical_imm_step
+  instr' cf_logical_validate { validate }
+  instr' cf_logical_emit { emit }
+  ASM_OP_BIC_REG ASM_OP_AND_IMM 1 or validate emit comp_loc_imm_step
 end
 
 fun_comp: bit_mask_get { -- err } [ redefine ]
