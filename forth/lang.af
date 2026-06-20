@@ -3502,6 +3502,18 @@ fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
   loc wid comp_loc_step_store
 end
 
+fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
+  comp_args1_reg { mask }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  mask inc { src }
+  src src mask  asm_and_reg comp_instr
+  mask mask     asm_rbit    comp_instr
+  mask mask     asm_clz     comp_instr
+  mask src mask asm_lsr_reg comp_instr
+  loc mask comp_loc_step_store
+end
+
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
 fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
@@ -3621,6 +3633,11 @@ end
 \ Align a local up: `wid align_up=: some_val`.
 fun_comp: align_up=: { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_align_up_step
+end
+
+\ Extract masked bits from a local: `mask bit_mask_get=: some_val`.
+fun_comp: bit_mask_get=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  comp_loc_bit_mask_get_step
 end
 
 \ ## Vargs and formatting
