@@ -3282,7 +3282,9 @@ fun: comp_loc_addsub_step { add -- err }
 end
 
 fun_comp: or { -- err } [ redefine ]
-  if cf_fold_cleared2 then or cf_fold_done else { -- } execute'' or end
+  if cf_fold_cleared2 then or cf_fold_done
+  else { -- } ifz ASM_OP_ORR_IMM cf_fold_logical_imm then execute'' or end
+  end
 end
 
 \ Bitwise or into a local: `mask or: some_val`.
