@@ -3098,39 +3098,41 @@ fun: cf_emit_logical_imm_mask { reg0 reg1 _imm mask -- err }
   mask reg1 5 lsl or reg0 or comp_instr \ and|orr|eor Xd, Xn, #imm
 end
 
-fun: cf_fold_logical_imm { op -- ok err }
+fun: cf_logical_imm_mask { imm op inv -- mask ok }
+  if inv then imm invert else imm end { enc }
+  enc op catch' asm_logical_imm_mask { mask err }
+  if err then 0 false ret end
+  mask true
+end
+
+fun: cf_fold_logical_rhs_imm { op invert -- ok err }
   comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
   arg1 cf_arg_foldable_imm { imm foldable }
+  ifz foldable then false ret end
+
+  imm op invert cf_logical_imm_mask { mask ok }
+  ifz ok then false ret end
 
   instr' cf_emit_logical_imm_mask { emit }
+  reg0 arg1 imm mask emit true cf_fold_rhs_imm_checked
+end
 
-  if foldable then
-    imm op catch' asm_logical_imm_mask { mask err }
-    if err then false ret end
-    reg0 arg1 imm mask emit true cf_fold_rhs_imm_checked ret
-  end
+fun: cf_fold_logical_comm_imm { op -- ok err }
+  if op false cf_fold_logical_rhs_imm then true ret end
+
+  comp_top_arg_regs2 { reg0 reg1 }
+  instr' cf_emit_logical_imm_mask { emit }
 
   reg0 comp_arg { arg0 }
   arg0 cf_arg_foldable_imm { imm foldable }
   ifz foldable then false ret end
 
-  imm op catch' asm_logical_imm_mask { mask err }
-  if err then false ret end
-  reg0 reg1 arg0 arg1 imm mask emit cf_fold_lhs_imm_raw
-end
+  imm op false cf_logical_imm_mask { mask ok }
+  ifz ok then false ret end
 
-fun: cf_fold_bic_imm { -- ok err }
-  comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
-  arg1 cf_arg_foldable_imm { imm foldable }
-  ifz foldable then false ret end
-
-  imm invert ASM_OP_AND_IMM catch' asm_logical_imm_mask { mask err }
-  if err then false ret end
-
-  instr' cf_emit_logical_imm_mask { emit }
-  reg0 arg1 imm mask emit true cf_fold_rhs_imm_checked
+  reg0 reg1 arg0 arg1 imm mask emit cf_fold_lhs_imm_raw
 end
 
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
@@ -3293,7 +3295,7 @@ end
 
 fun_comp: or { -- err } [ redefine ]
   if cf_fold_cleared2 then or cf_fold_done
-  else { -- } ifz ASM_OP_ORR_IMM cf_fold_logical_imm then execute'' or end
+  else { -- } ifz ASM_OP_ORR_IMM cf_fold_logical_comm_imm then execute'' or end
   end
 end
 
@@ -3304,7 +3306,7 @@ end
 
 fun_comp: and { -- err } [ redefine ]
   if cf_fold_cleared2 then and cf_fold_done
-  else { -- } ifz ASM_OP_AND_IMM cf_fold_logical_imm then execute'' and end
+  else { -- } ifz ASM_OP_AND_IMM cf_fold_logical_comm_imm then execute'' and end
   end
 end
 
@@ -3315,7 +3317,7 @@ end
 
 fun_comp: xor { -- err } [ redefine ]
   if cf_fold_cleared2 then xor cf_fold_done
-  else { -- } ifz ASM_OP_EOR_IMM cf_fold_logical_imm then execute'' xor end
+  else { -- } ifz ASM_OP_EOR_IMM cf_fold_logical_comm_imm then execute'' xor end
   end
 end
 
@@ -3842,7 +3844,7 @@ end
 
 fun_comp: bits_clear { -- err } [ redefine ]
   if cf_fold_cleared2 then bits_clear cf_fold_done
-  else { -- } ifz cf_fold_bic_imm then execute'' bits_clear end
+  else { -- } ifz ASM_OP_AND_IMM true cf_fold_logical_rhs_imm then execute'' bits_clear end
   end
 end
 
