@@ -954,6 +954,14 @@ fun: loc_ugt_fun { rhs -- out0 out1 }
   val0 val1
 end
 
+fun: loc_ult_fun { rhs -- out0 out1 }
+  7 { val0 }
+  rhs u<: val0
+  -1 { val1 }
+  8 u<: val1
+  val0 val1
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -1009,6 +1017,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_le_fun <T> 1 1 }T
   T{ 7 loc_ge_fun <T> 1 0 }T
   T{ 7 loc_ugt_fun <T> 1 0 }T
+  T{ 8 loc_ult_fun <T> 1 0 }T
   ifz has_interp then ret end
 
   cf_expect_clear
