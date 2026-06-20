@@ -736,13 +736,10 @@ fun: comp_args1_reg2 { -- out0 out1 src err }
   src out1 src
 end
 
-fun: comp_args2_regs2 { -- out0 out1 lhs rhs err }
-  2 nil comp_args_min
-  comp_args_get dec { rhs }
-  rhs dec { lhs }
-  lhs comp_realloc_reg
-  rhs comp_realloc_reg
-  lhs rhs lhs rhs
+fun: comp_args2_regs2 { -- reg0 reg1 err }
+  comp_args2_regs { reg0 reg1 }
+  reg1 comp_realloc_reg
+  reg0 reg1
 end
 
 \ ## Arithmetic continued
@@ -909,7 +906,8 @@ end
 fun: umod { i0 i1 -> i2 } umod end
 
 fun_comp: /mod { -- err }
-  comp_args2_regs2    { rem quo dividend divisor }
+  comp_args2_regs2    { rem quo }
+  rem quo             { dividend divisor }
   comp_alloc_next_reg { tmp }
   tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
   quo dividend tmp     asm_sdiv    comp_instr \ sdiv Xd, Xn, Xm
@@ -920,7 +918,8 @@ end
 fun: /mod { dividend divisor -> rem quo } /mod end
 
 fun_comp: u/mod { -- err }
-  comp_args2_regs2    { rem quo dividend divisor }
+  comp_args2_regs2    { rem quo }
+  rem quo             { dividend divisor }
   comp_alloc_next_reg { tmp }
   tmp divisor          asm_mov_reg comp_instr \ mov Xd, Xm
   quo dividend tmp     asm_udiv    comp_instr \ udiv Xd, Xn, Xm
@@ -1355,9 +1354,9 @@ end
 fun: @2 { adr -> val0 val1 } @2 end
 
 fun_comp: @@2 { -- err }
-  comp_args2_regs2 { val0 val1 adr0 adr1 }
-  val0 adr0 0 asm_load_off comp_instr \ ldr Xt, [Xn]
-  val1 adr1 0 asm_load_off comp_instr \ ldr Xt, [Xn]
+  comp_args2_regs2 { reg0 reg1 }
+  reg0 reg0 0 asm_load_off comp_instr \ ldr Xt, [Xn]
+  reg1 reg1 0 asm_load_off comp_instr \ ldr Xt, [Xn]
 end
 
 fun: @@2 { adr0 adr1 -> val0 val1 } @@2 end
@@ -2758,9 +2757,9 @@ end
 
 fun: cf_arg_read_fixup { arg reg -- fix ok }
   arg Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
-  ifz fix then 0 false ret end
-  if fix Interp_loc_fixup_type @cint LOC_FIX_READ <> then 0 false ret end
-  if fix Interp_loc_fixup_read Interp_loc_read_reg @b reg <> then 0 false ret end
+  ifz fix then nil false ret end
+  if fix Interp_loc_fixup_type @cint LOC_FIX_READ <> then nil false ret end
+  if fix Interp_loc_fixup_read Interp_loc_read_reg @b reg <> then nil false ret end
   fix true
 end
 
@@ -2871,53 +2870,55 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
   0 false
 end
 
-\ Try folding a trailing constant RHS into an add/sub immediate instruction.
-fun: cf_fold_addsub_imm { add -- ok err }
-  comp_top_arg_regs2 { lhs rhs }
-  rhs comp_arg { arg_rhs }
-  arg_rhs cf_arg_foldable_imm { imm foldable }
-
-  ifz foldable then
-    ifz add then false ret end
-
-    lhs comp_arg { arg_lhs }
-    arg_lhs cf_arg_foldable_imm { imm_lhs foldable_lhs }
-    ifz foldable_lhs then false ret end
-
-    imm_lhs comp_loc_step_imm12 { mag_lhs fits_lhs }
-    ifz fits_lhs then false ret end
-
-    arg_rhs Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc_rhs }
-    ifz loc_rhs then false ret end
-
-    comp_code_len { code_len }
-    arg_lhs comp_arg_imm_ceil { lhs_ceil }
-    0 { fix }
-    if code_len lhs_ceil <> then
-      if code_len lhs_ceil inc <> then false ret end
-      arg_rhs rhs cf_arg_read_fixup { read_fix ok }
-      ifz ok then false ret end
-      read_fix { fix }
-    end
-
-    arg_lhs cf_arg_rewind_clear
-    if fix then fix cf_read_fixup_move_here end
-
-    lhs rhs mag_lhs imm_lhs true asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
-    lhs inc comp_args_set
-    true ret
-  end
-
-  ifz arg_rhs cf_arg_current then false ret end
+fun: cf_fold_addsub_rhs_imm { reg0 arg1 imm add -- ok err }
+  ifz arg1 cf_arg_current then false ret end
   imm comp_loc_step_imm12 { mag fits }
   ifz fits then false ret end
 
-  arg_rhs cf_arg_rewind_clear
-  lhs comp_realloc_reg
+  arg1 cf_arg_rewind_clear
+  reg0 comp_realloc_reg
 
-  lhs lhs mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
-  lhs inc comp_args_set
+  reg0 reg0 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
+  reg0 inc comp_args_set
   true
+end
+
+fun: cf_fold_add_lhs_imm { reg0 reg1 arg1 -- ok err }
+  reg0 comp_arg { arg0 }
+  arg0 cf_arg_foldable_imm { imm0 foldable0 }
+  ifz foldable0 then false ret end
+
+  imm0 comp_loc_step_imm12 { mag0 fits0 }
+  ifz fits0 then false ret end
+
+  arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc1 }
+  ifz loc1 then false ret end
+
+  comp_code_len { code_len }
+  arg0 comp_arg_imm_ceil { ceil0 }
+  nil { fix1 }
+  if code_len ceil0 <> then
+    if code_len ceil0 inc <> then false ret end
+    arg1 reg1 cf_arg_read_fixup { fix1 ok }
+    ifz ok then false ret end
+  end
+
+  arg0 cf_arg_rewind_clear
+  if fix1 then fix1 cf_read_fixup_move_here end
+
+  reg0 reg1 mag0 imm0 true asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
+  reg0 inc comp_args_set
+  true
+end
+
+\ Try folding a constant operand into an add/sub immediate instruction.
+fun: cf_fold_addsub_imm { add -- ok err }
+  comp_top_arg_regs2 { reg0 reg1 }
+  reg1 comp_arg { arg1 }
+  arg1 cf_arg_foldable_imm { imm foldable }
+
+  if foldable then reg0 arg1 imm add cf_fold_addsub_rhs_imm ret end
+  if add then reg0 reg1 arg1 cf_fold_add_lhs_imm else false end
 end
 
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
@@ -2931,19 +2932,16 @@ fun: comp_loc_step_store { loc reg -- err }
   loc comp_pop_into_local
 end
 
-fun: comp_loc_unary_begin { -- loc reg err } ( C: "name" -- ) ( E: -- )
+fun: comp_loc_unary_begin { -- reg loc err } ( C: "name" -- ) ( E: -- )
   read_word comp_local { loc }
   loc comp_push_from_local
-  comp_args_get dec { reg }
-  loc reg
+  comp_args_get dec loc
 end
 
 fun: comp_loc_addsub_step_imm { loc reg imm mag add -- err }
   reg comp_realloc_reg
   loc comp_push_from_local
-
   reg reg inc mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
-
   loc reg comp_loc_step_store
 end
 
@@ -2967,16 +2965,16 @@ fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
   read_word comp_local reg_op comp_loc_reg_pattern_emit
 end
 
-fun: comp_loc_arg_begin { -- arg loc cur err }
+fun: comp_loc_arg_begin { -- arg cur loc err }
   comp_args1_reg { arg }
   read_word comp_local { loc }
   loc comp_push_from_local
   arg inc { cur }
-  arg loc cur
+  arg cur loc
 end
 
 fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
-  comp_loc_arg_begin { divisor loc dividend }
+  comp_loc_arg_begin { divisor dividend loc }
   comp_alloc_next_reg { quotient }
   quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr \ sdiv|udiv Xd, Xn, Xm
   divisor quotient divisor dividend asm_msub comp_instr \ msub Xd, Xn, Xm, Xa
@@ -2984,42 +2982,42 @@ fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
 end
 
 fun: comp_loc_csel_step { cond -- err } ( C: "name" -- ) ( E: candidate -- )
-  comp_loc_arg_begin { candidate loc cur }
+  comp_loc_arg_begin { candidate cur loc }
   cur candidate asm_cmp_reg comp_instr \ cmp Xn, Xm
   candidate cur candidate cond asm_csel comp_instr \ csel Xd, Xn, Xm, cond
   loc candidate comp_loc_step_store
 end
 
 fun: comp_loc_fallback_step { -- err } ( C: "name" -- ) ( E: candidate -- )
-  comp_loc_arg_begin { candidate loc cur }
+  comp_loc_arg_begin { candidate cur loc }
   candidate 0 asm_cmp_imm comp_instr \ cmp Xn, #0
   candidate candidate cur ASM_NE asm_csel comp_instr \ csel Xd, Xn, Xm, ne
   loc candidate comp_loc_step_store
 end
 
 fun: comp_loc_cset_zero_step { cond -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg      asm_cmp_zero comp_instr \ cmp Xn, #0
   reg cond asm_cset     comp_instr \ cset Xd, cond
   loc reg comp_loc_step_store
 end
 
 fun: comp_loc_cset_reg_step { cond -- err } ( C: "name" -- ) ( E: rhs -- )
-  comp_loc_arg_begin { rhs loc lhs }
-  lhs rhs asm_cmp_reg comp_instr \ cmp Xn, Xm
-  rhs cond asm_cset comp_instr \ cset Xd, cond
-  loc rhs comp_loc_step_store
+  comp_loc_arg_begin { reg1 reg0 loc }
+  reg0 reg1 asm_cmp_reg comp_instr \ cmp Xn, Xm
+  reg1 cond asm_cset comp_instr \ cset Xd, cond
+  loc reg1 comp_loc_step_store
 end
 
 fun: comp_loc_align_down_step { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_arg_begin { wid loc len }
+  comp_loc_arg_begin { wid len loc }
   wid asm_neg comp_instr \ neg Xd, Xd
   wid len wid asm_and_reg comp_instr \ and Xd, Xn, Xm
   loc wid comp_loc_step_store
 end
 
 fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_arg_begin { wid loc len }
+  comp_loc_arg_begin { wid len loc }
   len len wid asm_add_reg comp_instr \ add Xd, Xn, Xm
   len len 1   asm_sub_imm comp_instr \ sub Xd, Xn, #1
   wid         asm_neg     comp_instr \ neg Xd, Xd
@@ -3028,7 +3026,7 @@ fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
 end
 
 fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_loc_arg_begin { mask loc src }
+  comp_loc_arg_begin { mask src loc }
   src src mask  asm_and_reg comp_instr \ and Xd, Xn, Xm
   mask mask     asm_rbit    comp_instr \ rbit Xd, Xn
   mask mask     asm_clz     comp_instr \ clz Xd, Xn
@@ -3052,7 +3050,7 @@ fun: comp_loc_bit_mask_set_step { -- err } ( C: "name" -- ) ( E: inp mask -- )
 end
 
 fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
-  comp_loc_arg_begin { len loc val }
+  comp_loc_arg_begin { len val loc }
   comp_alloc_next_reg { tmp }
   1 tmp comp_load
   tmp tmp len asm_lsl_reg comp_instr \ lsl Xt, Xt, Xlen
@@ -3234,7 +3232,7 @@ end
 
 \ Negate a local: `negate: some_val`.
 fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg asm_neg comp_instr \ neg Xd, Xn
   loc reg comp_loc_step_store
 end
@@ -3245,7 +3243,7 @@ end
 
 \ Invert a local: `invert: some_val`.
 fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg asm_mvn comp_instr \ mvn Xd, Xm
   loc reg comp_loc_step_store
 end
@@ -3256,7 +3254,7 @@ end
 
 \ Absolute-value a local: `abs: some_val`.
 fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg                asm_cmp_zero comp_instr \ cmp Xn, #0
   reg reg reg ASM_PL asm_csneg    comp_instr \ cneg Xd, Xn, cond
   loc reg comp_loc_step_store
@@ -3268,7 +3266,7 @@ end
 
 \ Count leading zeros in a local: `bit_clz: some_val`.
 fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg asm_clz comp_instr \ clz Xd, Xn
   loc reg comp_loc_step_store
 end
@@ -3279,7 +3277,7 @@ end
 
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
 fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg asm_rbit comp_instr \ rbit Xd, Xn
   reg reg asm_clz  comp_instr \ clz Xd, Xn
   loc reg comp_loc_step_store
@@ -3291,7 +3289,7 @@ end
 
 \ Compute bit length into a local: `bit_len: some_val`.
 fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   comp_alloc_next_reg { tmp }
   reg reg     asm_clz     comp_instr \ clz Xd, Xn
   tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
@@ -3342,7 +3340,7 @@ end
 
 \ Sign-extend a local from int32 to cell: `int_to_cell: some_val`.
 fun_comp: int_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg asm_sign_extend_32 comp_instr \ sxtw Xd, Wn
   loc reg comp_loc_step_store
 end
@@ -3497,7 +3495,7 @@ end
 
 \ Scale a local by cell size: `cells: some_val`.
 fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg 3 asm_lsl_imm comp_instr \ lsl Xd, Xn, #shift
   loc reg comp_loc_step_store
 end
@@ -3508,7 +3506,7 @@ end
 
 \ Divide a local by cell size: `/cells: some_val`.
 fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg 3 asm_asr_imm comp_instr \ asr Xd, Xn, #shift
   loc reg comp_loc_step_store
 end
@@ -3519,7 +3517,7 @@ end
 
 \ Add one cell to a local: `+cell: some_val`.
 fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg CELL asm_add_imm comp_instr \ add Xd, Xn, #imm12
   loc reg comp_loc_step_store
 end
@@ -3530,7 +3528,7 @@ end
 
 \ Subtract one cell from a local: `-cell: some_val`.
 fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg CELL asm_sub_imm comp_instr \ sub Xd, Xn, #imm12
   loc reg comp_loc_step_store
 end
@@ -3541,7 +3539,7 @@ end
 
 \ Test local oddness in place: `odd: some_val`.
 fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   reg reg 0b1_000000_000000 asm_and_imm_enc comp_instr \ and Xd, Xd, 1
   loc reg comp_loc_step_store
 end
@@ -3552,7 +3550,7 @@ end
 
 \ Set a local to a mask of its low bit count: `low_bits: some_val`.
 fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { loc reg }
+  comp_loc_unary_begin { reg loc }
   comp_alloc_next_reg { tmp }
   1 tmp comp_load
   tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
