@@ -2882,7 +2882,7 @@ end
 fun: cf_fold_rhs_imm_raw { reg0 arg1 imm aux emit -- err }
   arg1 cf_arg_rewind_clear
   reg0 comp_realloc_reg
-  reg0 reg0 imm aux emit execute_raw
+  reg0 reg0 imm aux emit execute_raw [ 1 comp_args_set ] try
   reg0 inc comp_args_set
 end
 
@@ -2910,7 +2910,7 @@ fun: cf_fold_lhs_imm_raw { reg0 reg1 arg0 arg1 imm0 aux emit -- ok err }
   arg0 cf_arg_rewind_clear
   if fix1 then fix1 cf_read_fixup_move_here end
   reg0 comp_realloc_reg
-  reg0 reg1 imm0 aux emit execute_raw
+  reg0 reg1 imm0 aux emit execute_raw [ 1 comp_args_set ] try
   reg0 inc comp_args_set
   true
 end
@@ -3109,7 +3109,7 @@ fun: comp_loc_mut_fold_imm_checked { reg arg loc imm aux emit ok -- folded err }
   end
   reg comp_realloc_reg
   loc comp_push_from_local
-  reg reg inc imm aux emit execute_raw
+  reg reg inc imm aux emit execute_raw [ 1 comp_args_set ] try
   loc reg comp_loc_mut_store
   true
 end
@@ -3142,7 +3142,7 @@ end
 
 fun: comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
-  reg reg imm aux emit execute_raw
+  reg reg imm aux emit execute_raw [ 1 comp_args_set ] try
   loc reg comp_loc_mut_store
 end
 
