@@ -3439,18 +3439,16 @@ fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
   loc reg comp_loc_step_store
 end
 
-fun: comp_loc_addsub_step_reg { loc reg_op -- err }
+fun: comp_loc_reg_pattern_emit { loc reg_op -- err }
   comp_args1_reg { reg }
   loc comp_push_from_local
   reg reg inc reg asm_pattern_arith_reg reg_op or comp_instr
   loc reg comp_loc_step_store
 end
 
-fun: comp_loc_reg_pattern_step { reg_op -- err }
-  ( C: "name" -- ) ( E: step -- )
-
-  comp_loc_step_prepare { _reg _arg loc _imm _foldable }
-  loc reg_op comp_loc_addsub_step_reg
+fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
+  1 nil comp_args_min
+  read_word comp_local reg_op comp_loc_reg_pattern_emit
 end
 
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
@@ -3471,7 +3469,7 @@ fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
     end
   end
 
-  loc reg_op comp_loc_addsub_step_reg
+  loc reg_op comp_loc_reg_pattern_emit
 end
 
 \ Add a step to a local: `step +=: some_val`.
