@@ -3470,6 +3470,16 @@ fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
   loc divisor comp_loc_step_store
 end
 
+fun: comp_loc_csel_step { cond -- err } ( C: "name" -- ) ( E: candidate -- )
+  comp_args1_reg { candidate }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  candidate inc { cur }
+  cur candidate asm_cmp_reg comp_instr
+  candidate cur candidate cond asm_csel comp_instr
+  loc candidate comp_loc_step_store
+end
+
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
 fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
@@ -3559,6 +3569,11 @@ end
 \ Unsigned remainder into a local: `divisor umod=: some_val`.
 fun_comp: umod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_UDIV_REG comp_loc_rem_step
+end
+
+\ Minimum into a local: `candidate min=: some_val`.
+fun_comp: min=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  ASM_LT comp_loc_csel_step
 end
 
 \ ## Vargs and formatting
