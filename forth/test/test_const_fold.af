@@ -786,6 +786,11 @@ fun: loc_invert_fun { val -- out }
   val
 end
 
+fun: loc_negate_fun { val -- out }
+  negate: val
+  val
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -813,6 +818,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 4 loc_bits_trunc_fun <T> 0b1101 0b101 }T
   T{ 41 loc_inc_dec_inline_fun <T> }T
   T{ 0b101010 loc_invert_fun <T> 0b101010 invert }T
+  T{ 42 loc_negate_fun <T> -42 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -837,6 +843,11 @@ fun: test_const_fold_loc_step { -- err }
   0 0 asm_mvn cf_expect_instr
   cf_expect_ret
   xt' loc_invert_fun cf_expect_word
+
+  cf_expect_clear
+  0 asm_neg cf_expect_instr
+  cf_expect_ret
+  xt' loc_negate_fun cf_expect_word
 end
 test_const_fold_loc_step
 
