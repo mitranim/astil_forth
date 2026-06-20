@@ -2751,6 +2751,11 @@ fun: cf_arg_clear { arg }
   0 arg Interp_comp_arg_imm_field Interp_reg_imm_has_imm !b
 end
 
+fun: cf_arg_rewind_clear { arg }
+  arg cf_rewind_to_before_arg
+  arg cf_arg_clear
+end
+
 fun: cf_arg_read_fixup { arg reg -- fix ok }
   arg Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
   ifz fix then 0 false ret end
@@ -2762,6 +2767,11 @@ end
 fun: cf_read_fixup_move_here { fix -- err }
   here_write fix Interp_loc_fixup_read Interp_loc_read_instr !
   ASM_PLACEHOLDER comp_instr
+end
+
+fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
+  Xd Xn imm12 asm_pattern_arith_imm
+  if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or
 end
 
 fun: cf_foldables2 { reg0 reg1 -- arg0 arg1 imm0 imm1 ok err }
@@ -2808,8 +2818,7 @@ fun: cf_fold_cleared1 { -- reg imm ok err }
   ifz ok then reg 0 false ret end
   ifz arg cf_arg_current then reg 0 false ret end
 
-  arg cf_rewind_to_before_arg
-  arg cf_arg_clear
+  arg cf_arg_rewind_clear
   reg imm true
 end
 
@@ -2818,8 +2827,7 @@ fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
   reg0 reg1 cf_foldables2 { arg0 arg1 imm0 imm1 ok }
 
   ifz ok then 0 0 0 false ret end
-  arg0 cf_rewind_to_before_arg
-  arg0 cf_arg_clear
+  arg0 cf_arg_rewind_clear
   arg1 cf_arg_clear
   reg0 imm0 imm1 true
 end
@@ -2829,8 +2837,7 @@ fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
   reg0 reg1 cf_foldables2 { arg0 arg1 imm0 imm1 ok }
 
   ifz ok then 0 0 0 0 false ret end
-  arg0 cf_rewind_to_before_arg
-  arg0 cf_arg_clear
+  arg0 cf_arg_rewind_clear
   arg1 cf_arg_clear
   reg0 reg1 imm0 imm1 true
 end
@@ -2840,8 +2847,7 @@ fun: cf_fold_cleared3 { -- reg imm0 imm1 imm2 ok err }
   reg0 reg1 reg2 cf_foldables3 { arg0 arg1 arg2 imm0 imm1 imm2 ok }
 
   ifz ok then 0 0 0 0 false ret end
-  arg0 cf_rewind_to_before_arg
-  arg0 cf_arg_clear
+  arg0 cf_arg_rewind_clear
   arg1 cf_arg_clear
   arg2 cf_arg_clear
   reg0 imm0 imm1 imm2 true
@@ -2894,12 +2900,10 @@ fun: cf_fold_addsub_imm { add -- ok err }
       read_fix { fix }
     end
 
-    arg_lhs cf_rewind_to_before_arg
-    arg_lhs cf_arg_clear
+    arg_lhs cf_arg_rewind_clear
     if fix then fix cf_read_fixup_move_here end
 
-    lhs rhs mag_lhs asm_pattern_arith_imm
-    if imm_lhs >=0 then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12
+    lhs rhs mag_lhs imm_lhs true asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
     lhs inc comp_args_set
     true ret
   end
@@ -2908,12 +2912,10 @@ fun: cf_fold_addsub_imm { add -- ok err }
   imm comp_loc_step_imm12 { mag fits }
   ifz fits then false ret end
 
-  arg_rhs cf_rewind_to_before_arg
-  arg_rhs cf_arg_clear
+  arg_rhs cf_arg_rewind_clear
   lhs comp_realloc_reg
 
-  lhs lhs mag asm_pattern_arith_imm
-  if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12
+  lhs lhs mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
   lhs inc comp_args_set
   true
 end
@@ -2940,8 +2942,7 @@ fun: comp_loc_addsub_step_imm { loc reg imm mag add -- err }
   reg comp_realloc_reg
   loc comp_push_from_local
 
-  reg reg inc mag asm_pattern_arith_imm
-  if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12
+  reg reg inc mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
 
   loc reg comp_loc_step_store
 end
@@ -3070,8 +3071,7 @@ fun: comp_loc_addsub_step { add -- err }
     imm comp_loc_step_imm12 { mag fits }
     if fits then
       if arg cf_arg_current then
-        arg cf_rewind_to_before_arg
-        arg cf_arg_clear
+        arg cf_arg_rewind_clear
       end
       loc reg imm mag add comp_loc_addsub_step_imm
       ret
@@ -3137,11 +3137,7 @@ end
 
 fun_comp: + { -- err } [ redefine ]
   if cf_fold_cleared2 then + cf_fold_done
-  else
-    { -- }
-    if true cf_fold_addsub_imm then ret end
-    execute'' +
-  end
+  else { -- } if true cf_fold_addsub_imm then ret end execute'' + end
 end
 
 \ Add a step to a local: `step +: some_val`.
@@ -3151,11 +3147,7 @@ end
 
 fun_comp: - { -- err } [ redefine ]
   if cf_fold_cleared2 then - cf_fold_done
-  else
-    { -- }
-    if false cf_fold_addsub_imm then ret end
-    execute'' -
-  end
+  else { -- } if false cf_fold_addsub_imm then ret end execute'' - end
 end
 
 \ Subtract a step from a local: `step -: some_val`.
