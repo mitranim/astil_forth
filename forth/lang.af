@@ -225,9 +225,8 @@ fun: mod { i0 i1 -> i2 } [
   1 comp_args_set
 ] end
 
-fun: low_bits   { len      -- bits } 1 len lsl dec end
-fun: bits_trunc { imm len  -- imm  } len low_bits imm and end
-fun: bits_clear { imm mask -- out  } mask invert imm and end
+fun: low_bits   { len     -- bits } 1 len lsl dec end
+fun: bits_trunc { imm len -- imm  } len low_bits imm and end
 
 \ ## Early assembler
 
@@ -791,39 +790,6 @@ end
 
 fun: lsr { i0 bits -> i1 } [ redefine ] lsr end
 
-fun_comp: low_bits { -- err }
-  comp_args1_reg        { reg }
-  comp_alloc_next_reg   { tmp }
-  1 tmp comp_load
-  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
-  reg tmp 1 asm_sub_imm comp_instr   \ sub Xn, Xt, #1
-  reg inc comp_args_set
-end
-
-fun_comp: bits_trunc { -- err }
-  comp_args2_regs     { imm len }
-  comp_alloc_next_reg { tmp }
-  1 tmp comp_load
-  tmp tmp len asm_lsl_reg comp_instr \ lsl Xt, Xt, Xlen
-  tmp tmp 1 asm_sub_imm comp_instr   \ sub Xt, Xt, #1
-  imm imm tmp asm_and_reg comp_instr \ and Ximm, Ximm, Xt
-  len comp_args_set
-end
-
-fun_comp: bits_clear { -- err }
-  comp_args2_regs { imm mask }
-  mask mask asm_mvn comp_instr       \ mvn Xmask, Xmask
-  imm imm mask asm_and_reg comp_instr \ and Ximm, Ximm, Xmask
-  mask comp_args_set
-end
-
-fun_comp: invert { -- err }
-  comp_args1_reg { reg }
-  reg reg asm_mvn comp_instr \ mvn Xd, Xm
-end
-
-fun: invert { i0 -> i1 } [ redefine ] invert end
-
 fun_comp: negate { -- err }
   comp_args1_reg asm_neg comp_instr \ neg Xd, Xn
 end
@@ -980,37 +946,6 @@ end
 
 fun: umax { i0 i1 -> i0|i1 } umax end
 
-\ "count leading zeros" (in high bits)
-fun_comp: bit_clz { -- err }
-  comp_args1_reg { reg }
-  reg reg asm_clz comp_instr \ neg Xd, Xn
-end
-
-fun: bit_clz { num -> bool } bit_clz end
-
-\ "count trailing zeros" (in low bits)
-\
-\ Fallback version of `ctz Xd, Xn` for chips without `ctz`.
-fun_comp: bit_ctz { -- err }
-  comp_args1_reg { reg }
-  reg reg asm_rbit comp_instr \ rbit Xd, Xn
-  reg reg asm_clz  comp_instr \ clz Xd, Xd
-end
-
-fun: bit_ctz { num -> bool } bit_ctz end
-
-\ 1-based index of the highest bit.
-fun_comp: bit_len { -- err }
-  comp_args1_reg      { reg }
-  comp_alloc_next_reg { tmp }
-  reg reg     asm_clz     comp_instr \ clz Xd, Xn
-  tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
-  reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
-  tmp comp_args_set
-end
-
-fun: bit_len { val -> len } bit_len end
-
 fun_comp: is_aligned_to { -- err }
   comp_args2_regs { reg0 reg1 }
   reg1 reg1 1    asm_sub_imm comp_instr \ sub Xd, Xn, 1
@@ -1052,13 +987,75 @@ end
 \ Chooses a non-zero value, preferring the second input.
 fun: fallback { one two -> out } fallback end
 
-fun_comp: bit_mask_unset { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_bic comp_instr \ bic Xd, Xn, Xm
-  reg1 comp_args_set
+\ Flip all the bits.
+fun_comp: invert { -- err }
+  comp_args1_reg { reg }
+  reg reg asm_mvn comp_instr \ mvn Xd, Xm
 end
 
-fun: bit_mask_unset { src mask -> out } bit_mask_unset end
+fun: invert { i0 -> i1 } [ redefine ] invert end
+
+\ 1-based index of the highest bit.
+fun_comp: bit_len { -- err }
+  comp_args1_reg      { reg }
+  comp_alloc_next_reg { tmp }
+  reg reg     asm_clz     comp_instr \ clz Xd, Xn
+  tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
+  reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
+  tmp comp_args_set
+end
+
+fun: bit_len { val -> len } bit_len end
+
+\ "count leading zeros" (in high bits)
+fun_comp: bit_clz { -- err }
+  comp_args1_reg { reg }
+  reg reg asm_clz comp_instr \ neg Xd, Xn
+end
+
+fun: bit_clz { num -> bool } bit_clz end
+
+\ "count trailing zeros" (in low bits)
+\
+\ Fallback version of `ctz Xd, Xn` for chips without `ctz`.
+fun_comp: bit_ctz { -- err }
+  comp_args1_reg { reg }
+  reg reg asm_rbit comp_instr \ rbit Xd, Xn
+  reg reg asm_clz  comp_instr \ clz Xd, Xd
+end
+
+fun: bit_ctz { num -> bool } bit_ctz end
+
+fun_comp: low_bits { -- err }
+  comp_args1_reg        { reg }
+  comp_alloc_next_reg   { tmp }
+  1 tmp comp_load
+  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
+  reg tmp 1 asm_sub_imm comp_instr   \ sub Xn, Xt, #1
+  reg inc comp_args_set
+end
+
+fun: low_bits { len -> bits } [ redefine ] low_bits end
+
+fun_comp: bits_trunc { -- err }
+  comp_args2_regs     { imm len }
+  comp_alloc_next_reg { tmp }
+  1 tmp comp_load
+  tmp tmp len asm_lsl_reg comp_instr \ lsl Xt, Xt, Xlen
+  tmp tmp 1 asm_sub_imm comp_instr   \ sub Xt, Xt, #1
+  imm imm tmp asm_and_reg comp_instr \ and Ximm, Ximm, Xt
+  len comp_args_set
+end
+
+fun: bits_trunc { imm len -> imm } [ redefine ] bits_trunc end
+
+fun_comp: bits_clear { -- err }
+  comp_args2_regs { imm mask }
+  imm imm mask asm_bic comp_instr \ bic Ximm, Ximm, Xmask
+  mask comp_args_set
+end
+
+fun: bits_clear { imm mask -> out } bits_clear end
 
 \ Gets bits according to mask and returns them in low bits.
 \ The mask must be nonzero and contiguous.
@@ -2119,7 +2116,7 @@ fun_comp: else { meta end_xt -- meta end_xt err }
 
   meta
     CONT_MASK_HAS_ELSE or
-    CONT_MASK_EXEC_PREV bit_mask_unset
+    CONT_MASK_EXEC_PREV bits_clear
   STACK >s
   end_xt execute
 
@@ -3123,6 +3120,19 @@ fun: cf_fold_logical_imm { op -- ok err }
   reg0 reg1 arg0 arg1 imm mask emit cf_fold_lhs_imm_raw
 end
 
+fun: cf_fold_bic_imm { -- ok err }
+  comp_top_arg_regs2 { reg0 reg1 }
+  reg1 comp_arg { arg1 }
+  arg1 cf_arg_foldable_imm { imm foldable }
+  ifz foldable then false ret end
+
+  imm invert ASM_OP_AND_IMM catch' asm_logical_imm_mask { mask err }
+  if err then false ret end
+
+  instr' cf_emit_logical_imm_mask { emit }
+  reg0 arg1 imm mask emit true cf_fold_rhs_imm_checked
+end
+
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
   cf_top_arg_foldable { reg arg imm foldable }
   read_word comp_local { loc }
@@ -3451,17 +3461,6 @@ fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg comp_loc_step_store
 end
 
-fun_comp: invert { -- err } [ redefine ]
-  if cf_fold_cleared1 then invert cf_fold_done else { -- } execute'' invert end
-end
-
-\ Invert a local: `invert: some_val`.
-fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { reg loc }
-  reg reg asm_mvn comp_instr \ mvn Xd, Xm
-  loc reg comp_loc_step_store
-end
-
 fun_comp: abs { -- err } [ redefine ]
   if cf_fold_cleared1 then abs cf_fold_done else { -- } execute'' abs end
 end
@@ -3776,40 +3775,6 @@ fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg comp_loc_step_store
 end
 
-fun_comp: low_bits { -- err } [ redefine ]
-  if cf_fold_cleared1 then low_bits cf_fold_done else { -- } execute'' low_bits end
-end
-
-\ Set a local to a mask of its low bit count: `low_bits: some_val`.
-fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
-  comp_loc_unary_begin { reg loc }
-  comp_alloc_next_reg { tmp }
-  1 tmp comp_load
-  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
-  reg tmp 1   asm_sub_imm comp_instr \ sub Xn, Xt, #1
-  loc reg comp_loc_step_store
-end
-
-fun_comp: bits_trunc { -- err } [ redefine ]
-  if cf_fold_cleared2 then bits_trunc cf_fold_done
-  else { -- } execute'' bits_trunc end
-end
-
-\ Truncate a local to low bits: `len bits_trunc: some_val`.
-fun_comp: bits_trunc: { -- err } ( C: "name" -- ) ( E: len -- )
-  comp_loc_bits_trunc_step
-end
-
-fun_comp: bits_clear { -- err } [ redefine ]
-  if cf_fold_cleared2 then bits_clear cf_fold_done
-  else { -- } execute'' bits_clear end
-end
-
-\ Clear bits in a local by mask: `mask bits_clear: some_val`.
-fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_BIC_REG comp_loc_reg_pattern_step
-end
-
 fun_comp: align_down { -- err } [ redefine ]
   if cf_fold_cleared2 then align_down cf_fold_done
   else { -- } execute'' align_down end
@@ -3840,13 +3805,49 @@ fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
   comp_loc_fallback_step
 end
 
-fun_comp: bit_mask_unset { -- err } [ redefine ]
-  if cf_fold_cleared2 then bit_mask_unset cf_fold_done
-  else { -- } execute'' bit_mask_unset end
+fun_comp: invert { -- err } [ redefine ]
+  if cf_fold_cleared1 then invert cf_fold_done else { -- } execute'' invert end
 end
 
-\ Clear bits in a local by mask: `mask bit_mask_unset: some_val`.
-fun_comp: bit_mask_unset: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Invert a local: `invert: some_val`.
+fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
+  comp_loc_unary_begin { reg loc }
+  reg reg asm_mvn comp_instr \ mvn Xd, Xm
+  loc reg comp_loc_step_store
+end
+
+fun_comp: low_bits { -- err } [ redefine ]
+  if cf_fold_cleared1 then low_bits cf_fold_done else { -- } execute'' low_bits end
+end
+
+\ Set a local to a mask of its low bit count: `low_bits: some_val`.
+fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
+  comp_loc_unary_begin { reg loc }
+  comp_alloc_next_reg { tmp }
+  1 tmp comp_load
+  tmp tmp reg asm_lsl_reg comp_instr \ lsl Xt, Xt, Xn
+  reg tmp 1   asm_sub_imm comp_instr \ sub Xn, Xt, #1
+  loc reg comp_loc_step_store
+end
+
+fun_comp: bits_trunc { -- err } [ redefine ]
+  if cf_fold_cleared2 then bits_trunc cf_fold_done
+  else { -- } execute'' bits_trunc end
+end
+
+\ Truncate a local to low bits: `len bits_trunc: some_val`.
+fun_comp: bits_trunc: { -- err } ( C: "name" -- ) ( E: len -- )
+  comp_loc_bits_trunc_step
+end
+
+fun_comp: bits_clear { -- err } [ redefine ]
+  if cf_fold_cleared2 then bits_clear cf_fold_done
+  else { -- } ifz cf_fold_bic_imm then execute'' bits_clear end
+  end
+end
+
+\ Clear bits in a local by mask: `mask bits_clear: some_val`.
+fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_BIC_REG comp_loc_reg_pattern_step
 end
 

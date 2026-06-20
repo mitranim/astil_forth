@@ -505,28 +505,6 @@ fun: test_const_fold_bit_shift { -- err }
 end
 test_const_fold_bit_shift
 
-fun: const_fold_bit_mask_unset_fun { -- out }
-  0b1001000110100 0b11110000 bit_mask_unset
-end
-
-fun: bit_mask_unset_instr_fun { src mask -> out }
-  bit_mask_unset
-end
-
-fun: test_const_fold_bit_mask_unset { -- err }
-  T{ const_fold_bit_mask_unset_fun <T> 0b1001000000100 }T
-  T{ 0b1001000110100 0b11110000 bit_mask_unset_instr_fun <T> 0b1001000000100 }T
-  ifz has_interp then ret end
-
-  cf_expect_clear
-  0 0b1001000000100 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_bit_mask_unset_fun cf_expect_word
-
-  T{ xt' bit_mask_unset_instr_fun sym_instr @u32 <T> 0b10001010001000010000000000000000 }T
-end
-test_const_fold_bit_mask_unset
-
 fun: const_fold_bit_mask_get_fun { -- out }
   0b1001000110100 0b111111110000 bit_mask_get
 end
@@ -834,14 +812,6 @@ fun: loc_logic_xor_fun { mask -- out0 out1 }
   mask xor: val0
   0b110101 { val1 }
   0b001010 xor: val1
-  val0 val1
-end
-
-fun: loc_logic_bit_mask_unset_fun { mask -- out0 out1 }
-  0b110101 { val0 }
-  mask bit_mask_unset: val0
-  0b110101 { val1 }
-  0b001010 bit_mask_unset: val1
   val0 val1
 end
 
@@ -1183,7 +1153,6 @@ fun: test_const_fold_loc_step { -- err }
   T{ 0b101010 loc_logic_and_fun <T> 0b100000 0b110100 }T
   T{ 0b001010 loc_logic_or_fun <T> 0b111111 0b111111 }T
   T{ 0b101010 loc_logic_xor_fun <T> 0b011111 0b111111 }T
-  T{ 0b101010 loc_logic_bit_mask_unset_fun <T> 0b010101 0b110101 }T
   T{ 3 loc_shift_lsl_fun <T> 88 20 }T
   T{ 3 loc_shift_lsr_fun <T> 11 20 }T
   T{ 3 loc_shift_asr_fun <T> -11 -20 }T
@@ -1330,6 +1299,7 @@ test_const_fold_loc_step
 fun: const_fold_low_bits_fun { -- out } 5 low_bits end
 fun: const_fold_bits_trunc_fun { -- out } 0b10110101 4 bits_trunc end
 fun: const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 bits_clear end
+fun: const_fold_bits_clear_imm_fun { val -- out } val 0xff bits_clear end
 
 fun: low_bits_instr_fun { len -- out } len low_bits end
 fun: bits_trunc_instr_fun { imm len -- out } imm len bits_trunc end
@@ -1339,6 +1309,7 @@ fun: test_const_fold_bits { -- err }
   T{ const_fold_low_bits_fun   <T> 31 }T
   T{ const_fold_bits_trunc_fun  <T> 5 }T
   T{ const_fold_bits_clear_fun <T> 0b11000011 }T
+  T{ 0x1234 const_fold_bits_clear_imm_fun <T> 0x1200 }T
   T{ 5 low_bits_instr_fun <T> 31 }T
   T{ 0b10110101 4 bits_trunc_instr_fun <T> 5 }T
   T{ 0b11110011 0b00110000 bits_clear_instr_fun <T> 0b11000011 }T
@@ -1360,6 +1331,11 @@ fun: test_const_fold_bits { -- err }
   xt' const_fold_bits_clear_fun cf_expect_word
 
   cf_expect_clear
+  0 0 0xff asm_bic_imm cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_bits_clear_imm_fun cf_expect_word
+
+  cf_expect_clear
   1 1 cf_expect_load
   1 1 0 asm_lsl_reg cf_expect_instr
   0 1 1 asm_sub_imm cf_expect_instr
@@ -1376,8 +1352,7 @@ fun: test_const_fold_bits { -- err }
   xt' bits_trunc_instr_fun cf_expect_word
 
   cf_expect_clear
-  1 1 asm_mvn cf_expect_instr
-  0 0 1 asm_and_reg cf_expect_instr
+  0 0 1 asm_bic cf_expect_instr
   asm_nop cf_expect_instr
   cf_expect_ret
   xt' bits_clear_instr_fun cf_expect_word
@@ -1541,7 +1516,6 @@ fun: test_const_fold_all { -- err }
   test_const_fold_unary
   test_const_fold_zero_cmp
   test_const_fold_bit_shift
-  test_const_fold_bit_mask_unset
   test_const_fold_bit_mask_get_set
   test_const_fold_div_mod
   test_const_fold_compare2
