@@ -586,6 +586,50 @@ fun: test_const_fold_derived { -- err }
 end
 test_const_fold_derived
 
+fun: loc_step_fun { diff -- out0 out1 }
+  10 { val0 }
+  diff +=: val0
+  10 { val1 }
+  diff -=: val1
+  val0 val1
+end
+
+fun: const_fold_loc_step_fun { val -- out0 out1 out2 }
+  5 +=: val
+  val
+  3 -=: val
+  val
+  4096 +=: val
+  val
+end
+
+fun: const_fold_loc_step_neg_fun { -- out }
+  10 { val }
+  -5 +=: val
+  -3 -=: val
+  val
+end
+
+fun: test_const_fold_loc_step { -- err }
+  T{ 7 loc_step_fun <T> 17 3 }T
+  T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
+  T{ const_fold_loc_step_neg_fun <T> 8 }T
+  ifz has_interp then ret end
+
+  cf_expect_clear
+  4 0 asm_mov_reg cf_expect_instr
+  1 4 asm_mov_reg cf_expect_instr
+  0 1 5 asm_add_imm cf_expect_instr
+  2 0 asm_mov_reg cf_expect_instr
+  1 2 3 asm_sub_imm cf_expect_instr
+  2 4096 cf_expect_load
+  3 1 asm_mov_reg cf_expect_instr
+  2 3 2 asm_add_reg cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_loc_step_fun cf_expect_word
+end
+test_const_fold_loc_step
+
 fun: const_fold_low_bits_fun { -- out } 5 low_bits end
 fun: const_fold_bits_trunc_fun { -- out } 0b10110101 4 bits_trunc end
 fun: const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 bits_clear end

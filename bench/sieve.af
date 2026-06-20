@@ -24,14 +24,14 @@ fun: find_prime { flags cap -- num }
       loop
         ptr1 ceil < while
         0 ptr1 !8
-        ptr1 step + { ptr1 }
+        step +=: ptr1
       end
 
-      num inc { num }
+      inc: num
     end
 
-    step 2 + { step }
-    ptr0 inc { ptr0 }
+    2 +=: step
+    inc: ptr0
   end
 
   num

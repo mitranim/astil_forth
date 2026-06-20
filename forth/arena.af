@@ -25,7 +25,7 @@ fun: arena_deinit { arn -> err }
   loop
     page ceil < while
     page stack_deinit err fallback { err }
-    page size' Stack + { page }
+    size' Stack +=: page
   end
 
   arn arena_init
@@ -43,7 +43,7 @@ fun: arena_trunc { arn -> }
   loop
     page ceil < while
     page stack_trunc
-    page size' Stack + { page }
+    size' Stack +=: page
   end
 
   floor arn Arena_low !
@@ -67,7 +67,7 @@ fun: arena_alloc { size arn -- adr err }
     page Stack_ceil @ { page_ceil }
     page Stack_top  @ FUND_ALIGN align_up { top }
     if page_ceil top - size >= then top { adr } leave end
-    page size' Stack + { page }
+    size' Stack +=: page
   end
 
   ifz adr then

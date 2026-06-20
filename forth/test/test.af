@@ -678,7 +678,7 @@ fun: test_loop_while { -- err }
     12 { val }
     loop
       val 5 > while
-      val dec { val }
+      dec: val
     end
     val
   <T>
@@ -690,7 +690,7 @@ fun: test_loop_while { -- err }
     loop
       val 5 > while
       val 7 > while
-      val dec { val }
+      dec: val
     end
     val
   <T>
@@ -700,7 +700,7 @@ fun: test_loop_while { -- err }
   T{
     12 { val }
     loop
-      val dec { val }
+      dec: val
       val while
       val while
       val while
@@ -730,19 +730,19 @@ fun: test_loop_manual_countdown { -- err }
 
   T{
     0 12 { val ind }
-    loop dec: ind ind >=0 while       val inc { val }       end
+    loop dec: ind ind >=0 while inc: val end
     val
   <T> 12 }T
 
   T{
     0 12 { val ind }
-    loop dec: ind ind >=0 while       val inc { val } leave end
+    loop dec: ind ind >=0 while inc: val leave end
     val
   <T> 1 }T
 
   T{
     0 12 { val ind }
-    loop dec: ind ind >=0 while leave val inc { val }       end
+    loop dec: ind ind >=0 while leave inc: val end
     val
   <T> 0 }T
 
@@ -752,7 +752,7 @@ fun: test_loop_manual_countdown { -- err }
       dec: ind
       ind >=0 while
       if val 5 > then leave end
-      val inc { val }
+      inc: val
     end
     val
   <T>
@@ -765,7 +765,7 @@ fun: test_loop_manual_countdown { -- err }
       dec: ind
       ind >=0 while
       val 6 < while
-      val inc { val }
+      inc: val
     end
     val
   <T>
@@ -779,7 +779,7 @@ fun: test_loop_manual_countdown { -- err }
       ind >=0 while
       val 5 < while
       val 8 < while
-      val inc { val }
+      inc: val
     end
     val
   <T>
@@ -793,7 +793,7 @@ fun: test_loop_manual_countdown { -- err }
       ind >=0 while
       val 8 < while
       val 5 < while
-      val inc { val }
+      inc: val
     end
     val
   <T>
@@ -807,7 +807,7 @@ fun: test_loop_manual_counting { -- err }
     0 0 { acc ind }
     loop
       ind 12 < while
-      acc ind + { acc }
+      ind +=: acc
       inc: ind
     end
     acc ind
@@ -819,9 +819,9 @@ fun: test_loop_manual_counting { -- err }
     0 { acc }
     8 { ind }
     loop
-      ind 2 - { ind }
+      2 -=: ind
       0 ind <= while
-      acc ind + { acc }
+      ind +=: acc
     end
     acc ind
   <T>
@@ -841,7 +841,7 @@ test_again_loop_basic
 fun: test_again_loop { -- err }
   -1 { len }
   loop
-    len inc { len }
+    inc: len
     if len 7 < then again end
     leave
   end
@@ -861,7 +861,7 @@ fun: test_again_countdown_manual { -- err }
   loop
     dec: ind
     ind >=0 while
-    len inc { len }
+    inc: len
     again
     leave
   end
@@ -890,7 +890,7 @@ fun: again_meta_countdown_manual_top { val len -- out }
   loop
     dec: len
     len >=0 while
-    val inc { val }
+    inc: val
   end
   val
 end

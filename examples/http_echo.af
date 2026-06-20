@@ -29,7 +29,7 @@ fun: read_req { conn buf cap -- len err }
       code " unable to read request" os_err throw
     end
 
-    len wrote + { len }
+    wrote +=: len
     leave
   end
 

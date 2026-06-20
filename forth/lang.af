@@ -3402,6 +3402,73 @@ fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
 \ Decrement a local: `dec: some_val`.
 fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
 
+\ Fits the unsigned immediate accepted by our `add/sub #imm12` helpers.
+fun: comp_loc_step_imm12 { imm -- mag ok }
+  imm abs { mag }
+  mag ASM_MAX_IMM12 <= { ok }
+  mag ok
+end
+
+fun: comp_loc_step_instr { dst loc_reg imm add -- err }
+  imm comp_loc_step_imm12 { mag _ok }
+  if add then imm >=0 else imm <0 end { use_add }
+  if use_add then
+    dst loc_reg mag asm_add_imm
+  else
+    dst loc_reg mag asm_sub_imm
+  end comp_instr
+end
+
+fun: comp_loc_step_imm { loc reg imm add -- err }
+  reg comp_realloc_reg
+  loc comp_push_from_local
+  comp_args_get dec { loc_reg }
+  reg loc_reg imm add comp_loc_step_instr
+  loc_reg comp_args_set
+  loc comp_pop_into_local
+end
+
+fun: comp_loc_step_reg { loc add -- err }
+  comp_args1_reg { step_reg }
+  loc comp_push_from_local
+  comp_args_get dec { loc_reg }
+  if add then
+    step_reg loc_reg step_reg asm_add_reg
+  else
+    step_reg loc_reg step_reg asm_sub_reg
+  end comp_instr
+  loc_reg comp_args_set
+  loc comp_pop_into_local
+end
+
+\ Mutate a local by a runtime or foldable constant step.
+fun: comp_loc_step { add -- err } ( C: "name" -- ) ( E: step -- )
+  1 nil comp_args_min
+  comp_args_get dec { reg }
+  reg comp_arg { arg }
+  arg cf_arg_foldable_imm { imm foldable }
+  read_word comp_local { loc }
+
+  if foldable then
+    imm comp_loc_step_imm12 { _mag fits }
+    if fits then
+      if arg cf_arg_current then
+        arg cf_rewind_to_before_arg
+        arg cf_arg_clear
+      end
+      loc reg imm add comp_loc_step_imm ret
+    end
+  end
+
+  loc add comp_loc_step_reg
+end
+
+\ Add a step to a local: `step +=: some_val`.
+fun_comp: +=: { -- err } ( C: "name" -- ) ( E: step -- ) true comp_loc_step end
+
+\ Subtract a step from a local: `step -=: some_val`.
+fun_comp: -=: { -- err } ( C: "name" -- ) ( E: step -- ) false comp_loc_step end
+
 \ ## Vargs and formatting
 
 4096    let: ERR_CAP
@@ -3426,7 +3493,7 @@ fun: comp_va_beg { floor -- diff err }
 
   ceil { ind }
   loop
-    ind 2 - { ind }
+    2 -=: ind
     floor ind <= while
     ind     { Xd }
     ind inc { Xt }
@@ -3747,7 +3814,7 @@ fun_comp: stack{ { -- err } ( E: stack -- )
     end
 
     str len comp_local STACK >s
-    locs inc { locs }
+    inc: locs
   end
 
   ifz locs then 0 comp_args_set ret end
@@ -4059,7 +4126,7 @@ fun: assert_end_xt { beg -- err }
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 + { ceil }
 
-  ceil 3 - { ceil }
+  3 -=: ceil
   ceil dec @b is_whitespace =0 { fail }
   s" end" ceil 3 str<> fail or { fail }
 

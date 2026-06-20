@@ -40,8 +40,8 @@ fun: bigint_divmod10_step { quo bit rem -- quo rem }
   rem 1 lsl bit + { rem }
   quo 1 lsl       { quo }
   if rem 10 >= then
-    rem 10 - { rem }
-    quo inc  { quo }
+    10 -=: rem
+    inc: quo
   end
   quo rem
 end
@@ -81,7 +81,7 @@ fun: bigint_log_decimal { lo hi }
 
   loop
     lo hi bigint_divmod10 { qlo qhi rem }
-    ptr dec { ptr }
+    dec: ptr
     rem 48 + ptr !8
     qlo { lo }
     qhi { hi }
