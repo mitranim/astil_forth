@@ -524,8 +524,9 @@ fun: asm_and_reg { Xd Xn Xm -> instr }
 end
 
 \ bic Xd, Xn, Xm
+0b1_00_01010_00_1_00000_000000_00000_00000 let: ASM_OP_BIC_REG
 fun: asm_bic { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_00_01010_00_1_00000_000000_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_BIC_REG or
 end
 
 \ and Xd, Xn, #encoded_imm
@@ -1037,7 +1038,7 @@ fun_comp: fallback { -- err }
 end
 
 \ Chooses a non-zero value, preferring the second input.
-fun: fallback { one two -> fallback } fallback end
+fun: fallback { one two -> out } fallback end
 
 fun_comp: bit_mask_unset { -- err }
   comp_args2_regs { reg0 reg1 }
@@ -3496,6 +3497,11 @@ end
 \ Bitwise xor into a local: `mask xor=: some_val`.
 fun_comp: xor=: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_EOR_REG comp_loc_reg_pattern_step
+end
+
+\ Clear bits in a local by mask: `mask bit_mask_unset=: some_val`.
+fun_comp: bit_mask_unset=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_BIC_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
