@@ -2556,9 +2556,30 @@ struct: Interp_reg_imm
   U8   1 field: Interp_reg_imm_has_imm
 end
 
+\ SYNC[loc_fixup_types].
+1 let: LOC_FIX_READ
+2 let: LOC_FIX_RELOC
+
+struct: Interp_loc_read
+  Adr 1 field: Interp_loc_read_loc
+  Adr 1 field: Interp_loc_read_instr
+  U8  1 field: Interp_loc_read_reg
+end
+
+\ SYNC[loc_fixup_fields].
+struct: Interp_loc_fixup
+  Cint            1 field: Interp_loc_fixup_type
+  Interp_loc_read 1 field: Interp_loc_fixup_read
+end
+
 \ SYNC[comp_arg_fields].
+struct: Interp_comp_arg_loc
+  Adr 1 field: Interp_comp_arg_loc_loc
+  Adr 1 field: Interp_comp_arg_loc_fix
+end
+
 struct: Interp_comp_arg
-  Adr            1 field: Interp_comp_arg_loc
+  Interp_comp_arg_loc 1 field: Interp_comp_arg_loc_field
   Interp_reg_imm 1 field: Interp_comp_arg_imm_field
 end
 
@@ -2730,6 +2751,19 @@ fun: cf_arg_clear { arg }
   0 arg Interp_comp_arg_imm_field Interp_reg_imm_has_imm !b
 end
 
+fun: cf_arg_read_fixup { arg reg -- fix ok }
+  arg Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
+  ifz fix then 0 false ret end
+  if fix Interp_loc_fixup_type @cint LOC_FIX_READ <> then 0 false ret end
+  if fix Interp_loc_fixup_read Interp_loc_read_reg @b reg <> then 0 false ret end
+  fix true
+end
+
+fun: cf_read_fixup_move_here { fix -- err }
+  here_write fix Interp_loc_fixup_read Interp_loc_read_instr !
+  ASM_PLACEHOLDER comp_instr
+end
+
 fun: cf_foldables2 { reg0 reg1 -- arg0 arg1 imm0 imm1 ok err }
   reg0 comp_arg            { arg0 }
   reg1 comp_arg            { arg1 }
@@ -2847,15 +2881,22 @@ fun: cf_fold_addsub_imm { add -- ok err }
     imm_lhs comp_loc_step_imm12 { mag_lhs fits_lhs }
     ifz fits_lhs then false ret end
 
-    arg_rhs Interp_comp_arg_loc @ { loc_rhs }
+    arg_rhs Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc_rhs }
     ifz loc_rhs then false ret end
 
     comp_code_len { code_len }
     arg_lhs comp_arg_imm_ceil { lhs_ceil }
-    if code_len lhs_ceil <> then false ret end
+    0 { fix }
+    if code_len lhs_ceil <> then
+      if code_len lhs_ceil inc <> then false ret end
+      arg_rhs rhs cf_arg_read_fixup { read_fix ok }
+      ifz ok then false ret end
+      read_fix { fix }
+    end
 
     arg_lhs cf_rewind_to_before_arg
     arg_lhs cf_arg_clear
+    if fix then fix cf_read_fixup_move_here end
 
     lhs rhs mag_lhs asm_pattern_arith_imm
     if imm_lhs >=0 then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12

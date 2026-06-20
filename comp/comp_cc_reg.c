@@ -157,7 +157,7 @@ static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
   static constexpr U8 ceil = arr_cap(ctx->args);
 
   for (U8 reg = 0; reg < ceil; reg++) {
-    if (ctx->args[reg].loc != loc) continue;
+    if (ctx->args[reg].loc.loc != loc) continue;
     bits_add_to(&bits, reg);
   }
 
@@ -169,7 +169,7 @@ static bool comp_local_has_arg(const Comp_ctx *ctx, const Local *loc) {
 
   static constexpr U8 ceil = arr_cap(ctx->args);
   for (U8 reg = 0; reg < ceil; reg++) {
-    if (ctx->args[reg].loc == loc) return true;
+    if (ctx->args[reg].loc.loc == loc) return true;
   }
 
   return false;
@@ -243,7 +243,7 @@ static Loc_reloc *comp_append_local_reloc_from_reg(
     (Loc_fixup){
       .type  = LOC_FIX_RELOC,
       .reloc = (Loc_reloc){
-        .instr     = asm_append_breakpoint(comp, ASM_CODE_LOC_WRITE),
+        .instr     = asm_append_breakpoint(comp, ASM_CODE_LOC_RELOC),
         .prev      = loc->reloc,
         .loc       = loc,
         .reg       = reg,
@@ -270,7 +270,7 @@ static Err comp_forget_reg(Comp *comp, U8 reg) {
 
   const auto ctx = &comp->ctx;
   const auto arg = &ctx->args[reg];
-  const auto loc = arg->loc;
+  const auto loc = arg->loc.loc;
   *arg           = (Comp_arg){};
 
   if (!loc || loc->stable || comp_local_has_arg(ctx, loc)) return nullptr;
@@ -353,7 +353,7 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
   }
 
   const auto arg  = &ctx->args[reg];
-  const auto prev = arg->loc;
+  const auto prev = arg->loc.loc;
 
   loc->stable = false;
 
@@ -368,11 +368,13 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
       Caution: we reassign only the local while keeping the
       comptime immediate if the register already holds one.
       */
-      arg->loc = loc;
+      arg->loc = (Comp_arg_loc){.loc = loc};
     }
     else {
       const auto arg = &ctx->args[reg0];
-      if (arg->loc == loc) arg->loc = nullptr;
+      if (arg->loc.loc == loc) {
+        arg->loc = (Comp_arg_loc){};
+      }
     }
   }
 
@@ -446,12 +448,12 @@ static Err comp_alloc_next_reg(Comp *comp, U8 *out) {
 }
 
 // Concrete "read" operation used as a fallback by "get".
-static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
+static Loc_fixup *comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
   (void)comp;
 
   comp_local_confirm_relocs(loc);
 
-  stack_push(
+  return stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
       .type = LOC_FIX_READ,
@@ -523,7 +525,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
 
   loc->used = true;
 
-  if (tar_arg->loc == loc) {
+  if (tar_arg->loc.loc == loc) {
     IF_DEBUG(eprintf(
       "[debug] local " FMT_QUOTED
       " already associated with register %d; skipping instructions for \"push to local\"\n",
@@ -533,7 +535,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
     return nullptr;
   }
 
-  const auto prev_loc = tar_arg->loc;
+  const auto prev_loc = tar_arg->loc.loc;
   *tar_arg            = (Comp_arg){};
 
   S8 imm_reg = -1;
@@ -550,7 +552,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   for (S8 src_reg = (int)arr_cap(ctx->args) - 1; src_reg >= 0; src_reg--) {
     const auto src_arg = &ctx->args[src_reg];
 
-    if (src_arg->loc != loc) continue;
+    if (src_arg->loc.loc != loc) continue;
 
     if (src_arg->imm.has_imm) {
       imm_reg = src_reg;
@@ -568,22 +570,22 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
     const auto arg = &ctx->args[imm_reg];
     IF_DEBUG(assert_fatal(arg->imm.has_imm));
     try(comp_append_imm_to_reg(comp, tar_reg, arg->imm.num));
-    tar_arg->loc = loc;
+    tar_arg->loc = (Comp_arg_loc){.loc = loc};
     return nullptr;
   }
 
   if (loc_reg >= 0) {
     asm_append_mov_reg(comp, tar_reg, (U8)loc_reg);
     try(comp_register_clobber(comp, tar_reg));
-    *tar_arg = (Comp_arg){.loc = loc};
+    *tar_arg = (Comp_arg){.loc = {.loc = loc}};
     return nullptr;
   }
 
   if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
 
-  comp_append_local_read(comp, loc, tar_reg);
+  const auto fix = comp_append_local_read(comp, loc, tar_reg);
   try(comp_register_clobber(comp, tar_reg));
-  *tar_arg = (Comp_arg){.loc = loc};
+  *tar_arg = (Comp_arg){.loc = {.loc = loc, .fix = fix}};
   return nullptr;
 }
 
@@ -604,9 +606,9 @@ static Err comp_add_input_param(Comp *comp, Word_str name) {
   const auto ctx = &comp->ctx;
   const auto arg = &ctx->args[reg];
 
-  IF_DEBUG(assert_fatal(!arg->loc));
+  IF_DEBUG(assert_fatal(!arg->loc.loc));
 
-  arg->loc = loc;
+  arg->loc = (Comp_arg_loc){.loc = loc};
   return nullptr;
 }
 

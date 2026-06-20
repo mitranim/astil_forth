@@ -88,7 +88,7 @@ static Err interp_parse_params(Interp *interp) {
     comp->ctx.arg_len = arg_len;
 
     for (U8 ind = 0; ind < arg_len; ind++) {
-      const auto loc = comp->ctx.args[ind].loc;
+      const auto loc = comp->ctx.args[ind].loc.loc;
       if (loc) loc->used = true;
     }
 
@@ -653,7 +653,7 @@ static void intrin_debug_ctx(Interp *interp) {
 
     for (S8 ind = arr_cap(ctx->args) - 1; ind >= 0; ind--) {
       const auto arg = &ctx->args[ind];
-      if (arg->loc || arg->imm.has_imm) {
+      if (arg->loc.loc || arg->imm.has_imm) {
         last_arg = ind;
         break;
       }
@@ -665,8 +665,8 @@ static void intrin_debug_ctx(Interp *interp) {
       for (S8 ind = 0; ind <= last_arg; ind++) {
         const auto arg = &ctx->args[ind];
 
-        if (arg->loc) {
-          const auto name = comp_local_name(arg->loc);
+        if (arg->loc.loc) {
+          const auto name = comp_local_name(arg->loc.loc);
 
           if (arg->imm.has_imm) {
             eprintf(

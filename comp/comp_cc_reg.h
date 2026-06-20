@@ -103,7 +103,9 @@ typedef struct Loc_reloc {
   bool              confirmed; // If not, turn this into a nop.
 } Loc_reloc;
 
+// SYNC[loc_fixup_fields].
 typedef struct {
+  // SYNC[loc_fixup_types].
   enum {
     LOC_FIX_READ = 1,
     LOC_FIX_RELOC,
@@ -137,8 +139,13 @@ Value associated with a register.
 SYNC[comp_arg_fields].
 */
 typedef struct {
-  Local  *loc;
-  Reg_imm imm;
+  Local     *loc;
+  Loc_fixup *fix;
+} Comp_arg_loc;
+
+typedef struct {
+  Comp_arg_loc loc;
+  Reg_imm      imm;
 } Comp_arg;
 
 /*
