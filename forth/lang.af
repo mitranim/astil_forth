@@ -2966,11 +2966,6 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
   0 false
 end
 
-fun: cf_emit_addsub_imm { reg0 reg1 imm add -- err }
-  imm comp_loc_step_imm12 { mag _ }
-  reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
-end
-
 fun: cf_fold_cmp_rhs_imm { reg0 arg1 imm cond -- ok err }
   ifz arg1 cf_arg_current then false ret end
   ifz imm cf_imm_u12 then false ret end
@@ -3013,6 +3008,11 @@ fun: cf_fold_eq_imm { -- ok err }
 
   if foldable then reg0 arg1 imm ASM_EQ cf_fold_cmp_rhs_imm ret end
   reg0 reg1 arg1 cf_fold_eq_lhs_imm
+end
+
+fun: cf_emit_addsub_imm { reg0 reg1 imm add -- err }
+  imm comp_loc_step_imm12 { mag _ }
+  reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
 end
 
 \ Try folding a constant operand into an add/sub immediate instruction.
