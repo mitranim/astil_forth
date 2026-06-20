@@ -540,8 +540,9 @@ fun: asm_and_imm_enc { Xd Xn mask -- instr }
 end
 
 \ mul Xd, Xn, Xm
+0b1_00_11011_000_00000_0_11111_00000_00000 let: ASM_OP_MUL_REG
 fun: asm_mul { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_00_11011_000_00000_0_11111_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_MUL_REG or
 end
 
 \ udiv Xd, Xn, Xm
@@ -3520,6 +3521,11 @@ end
 \ Shift a local right arithmetically: `bits asr=: some_val`.
 fun_comp: asr=: { -- err } ( C: "name" -- ) ( E: bits -- )
   ASM_OP_ASR_REG comp_loc_reg_pattern_step
+end
+
+\ Multiply a local: `factor *=: some_val`.
+fun_comp: *=: { -- err } ( C: "name" -- ) ( E: factor -- )
+  ASM_OP_MUL_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
