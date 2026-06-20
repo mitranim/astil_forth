@@ -3141,6 +3141,13 @@ fun_comp: bit_clz { -- err } [ redefine ]
   if cf_fold_cleared1 then bit_clz cf_fold_done else { -- } execute'' bit_clz end
 end
 
+\ Count leading zeros in a local: `bit_clz: some_val`.
+fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
+  comp_loc_unary_begin { loc reg }
+  reg reg asm_clz comp_instr
+  loc reg comp_loc_step_store
+end
+
 fun_comp: bit_ctz { -- err } [ redefine ]
   if cf_fold_cleared1 then bit_ctz cf_fold_done else { -- } execute'' bit_ctz end
 end
