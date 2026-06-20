@@ -3304,7 +3304,9 @@ fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: xor { -- err } [ redefine ]
-  if cf_fold_cleared2 then xor cf_fold_done else { -- } execute'' xor end
+  if cf_fold_cleared2 then xor cf_fold_done
+  else { -- } ifz ASM_OP_EOR_IMM cf_fold_logical_imm then execute'' xor end
+  end
 end
 
 \ Bitwise xor into a local: `mask xor: some_val`.
