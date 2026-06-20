@@ -600,8 +600,9 @@ fun: asm_lsl_imm { Xd Xn imm6 -- instr }
 end
 
 \ lsr Xd, Xn, Xm
+0b1_0_0_11010110_00000_0010_01_00000_00000 let: ASM_OP_LSR_REG
 fun: asm_lsr_reg { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_0_0_11010110_00000_0010_01_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_LSR_REG or
 end
 
 \ cmp Xn, Xm
@@ -3508,6 +3509,11 @@ end
 \ Shift a local left: `bits lsl=: some_val`.
 fun_comp: lsl=: { -- err } ( C: "name" -- ) ( E: bits -- )
   ASM_OP_LSL_REG comp_loc_reg_pattern_step
+end
+
+\ Shift a local right logically: `bits lsr=: some_val`.
+fun_comp: lsr=: { -- err } ( C: "name" -- ) ( E: bits -- )
+  ASM_OP_LSR_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
