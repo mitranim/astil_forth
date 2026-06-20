@@ -3136,6 +3136,14 @@ fun: cf_align_emit { out adr _size mask -- err }
   out ASM_EQ asm_cset comp_instr      \ cset Xd, eq
 end
 
+fun: cf_align_down_validate { size _ -- aux ok }
+  size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
+end
+
+fun: cf_align_down_emit { out len _size mask -- err }
+  mask len 5 lsl or out or comp_instr \ and Xd, Xn, #imm
+end
+
 fun: cf_addsub_validate { imm add -- aux ok }
   imm cf_addsub_imm12_mag { -- ok }
   add ok
@@ -3177,9 +3185,7 @@ fun: comp_loc_emit_arith_reg { loc reg_op -- err }
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_mut_imm { reg_op aux validate emit -- err }
-  ( C: "name" -- ) ( E: imm -- )
-
+fun: comp_loc_mut_imm_fallback { fallback_aux fallback aux validate emit -- err }
   comp_loc_mut_arg_prepare { reg arg loc imm foldable }
 
   if foldable then
@@ -3187,7 +3193,17 @@ fun: comp_loc_mut_imm { reg_op aux validate emit -- err }
     if reg arg loc imm aux emit ok comp_loc_mut_fold_imm_checked then ret end
   end
 
+  reg loc fallback_aux fallback execute_raw [ 1 comp_args_set ] try
+end
+
+fun: comp_loc_mut_reg_op_fallback { _reg loc reg_op -- err }
   loc reg_op comp_loc_emit_arith_reg
+end
+
+fun: comp_loc_mut_imm { reg_op aux validate emit -- err }
+  ( C: "name" -- ) ( E: imm -- )
+
+  reg_op instr' comp_loc_mut_reg_op_fallback aux validate emit comp_loc_mut_imm_fallback
 end
 
 fun: comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
@@ -3252,10 +3268,10 @@ fun: comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rh
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_mut_align_down { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_arg_init { wid len loc }
-  wid len wid comp_emit_align_down
-  loc wid comp_loc_mut_store
+fun: comp_loc_mut_align_down_fallback { reg loc _ -- err }
+  loc comp_push_from_local
+  reg reg inc reg comp_emit_align_down
+  loc reg comp_loc_mut_store
 end
 
 fun: comp_loc_mut_align_up { -- err } ( C: "name" -- ) ( E: wid -- )
@@ -3909,12 +3925,20 @@ end
 
 fun_comp: align_down { -- err } [ redefine ]
   if cf_fold_cleared2 then align_down cf_fold_done
-  else { -- } execute'' align_down end
+  else
+    { -- }
+    false nil nil
+    instr' cf_align_down_validate instr' cf_align_down_emit
+    if cf_fold2 then ret end
+    execute'' align_down
+  end
 end
 
 \ Align a local down: `wid align_down: some_val`.
 fun_comp: align_down: { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_mut_align_down
+  nil instr' comp_loc_mut_align_down_fallback
+  nil instr' cf_align_down_validate instr' cf_align_down_emit
+  comp_loc_mut_imm_fallback
 end
 
 fun_comp: align_up { -- err } [ redefine ]
