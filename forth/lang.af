@@ -3301,6 +3301,13 @@ fun_comp: /cells { -- err } [ redefine ]
   if cf_fold_cleared1 then /cells cf_fold_done else { -- } execute'' /cells end
 end
 
+\ Divide a local by cell size: `/cells: some_val`.
+fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
+  comp_loc_unary_begin { loc reg }
+  reg reg 3 asm_asr_imm comp_instr
+  loc reg comp_loc_step_store
+end
+
 fun_comp: +cell { -- err } [ redefine ]
   if cf_fold_cleared1 then +cell cf_fold_done else { -- } execute'' +cell end
 end

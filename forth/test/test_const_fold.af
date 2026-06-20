@@ -821,6 +821,11 @@ fun: loc_cells_fun { val -- out }
   val
 end
 
+fun: loc_div_cells_fun { val -- out }
+  /cells: val
+  val
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -855,6 +860,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 40 loc_bit_len_fun <T> 6 }T
   T{ 0xffffffff loc_int_to_cell_fun <T> -1 }T
   T{ 7 loc_cells_fun <T> 56 }T
+  T{ 56 loc_div_cells_fun <T> 7 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -918,6 +924,11 @@ fun: test_const_fold_loc_step { -- err }
   0 0 3 asm_lsl_imm cf_expect_instr
   cf_expect_ret
   xt' loc_cells_fun cf_expect_word
+
+  cf_expect_clear
+  0 0 3 asm_asr_imm cf_expect_instr
+  cf_expect_ret
+  xt' loc_div_cells_fun cf_expect_word
 end
 test_const_fold_loc_step
 
