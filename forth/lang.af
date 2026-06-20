@@ -511,8 +511,9 @@ fun: asm_orr_reg { Xd Xn Xm -> instr }
 end
 
 \ and Xd, Xn, Xm
+0b1_00_01010_00_0_00000_000000_00000_00000 let: ASM_OP_AND_REG
 fun: asm_and_reg { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_00_01010_00_0_00000_000000_00000_00000 or
+  asm_pattern_arith_reg ASM_OP_AND_REG or
 end
 
 \ bic Xd, Xn, Xm
@@ -3444,6 +3445,13 @@ fun: comp_loc_addsub_step_reg { loc reg_op -- err }
   loc reg comp_loc_step_store
 end
 
+fun: comp_loc_reg_pattern_step { reg_op -- err }
+  ( C: "name" -- ) ( E: step -- )
+
+  comp_loc_step_prepare { _reg _arg loc _imm _foldable }
+  loc reg_op comp_loc_addsub_step_reg
+end
+
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
 fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
@@ -3473,6 +3481,11 @@ end
 \ Subtract a step from a local: `step -=: some_val`.
 fun_comp: -=: { -- err } ( C: "name" -- ) ( E: step -- )
   ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_addsub_step
+end
+
+\ Bitwise and into a local: `mask and=: some_val`.
+fun_comp: and=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_AND_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
