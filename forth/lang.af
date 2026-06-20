@@ -3144,6 +3144,17 @@ fun: cf_align_down_emit { out len _size mask -- err }
   mask len 5 lsl or out or comp_instr \ and Xd, Xn, #imm
 end
 
+fun: cf_align_up_validate { size _ -- aux ok }
+  size dec cf_imm_u12 { add_ok }
+  size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask { mask mask_err }
+  mask add_ok mask_err =0 and
+end
+
+fun: cf_align_up_emit { out len size mask -- err }
+  out len size dec asm_add_imm comp_instr \ add Xd, Xn, #imm12
+  mask out 5 lsl or out or comp_instr  \ and Xd, Xn, #imm
+end
+
 fun: cf_addsub_validate { imm add -- aux ok }
   imm cf_addsub_imm12_mag { -- ok }
   add ok
@@ -3274,10 +3285,10 @@ fun: comp_loc_mut_align_down_fallback { reg loc _ -- err }
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_mut_align_up { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_arg_init { wid len loc }
-  wid len len wid comp_emit_align_up
-  loc wid comp_loc_mut_store
+fun: comp_loc_mut_align_up_fallback { reg loc _ -- err }
+  loc comp_push_from_local
+  reg reg inc reg inc reg comp_emit_align_up
+  loc reg comp_loc_mut_store
 end
 
 fun: comp_loc_mut_bit_mask_get { -- err } ( C: "name" -- ) ( E: mask -- )
@@ -3943,12 +3954,20 @@ end
 
 fun_comp: align_up { -- err } [ redefine ]
   if cf_fold_cleared2 then align_up cf_fold_done
-  else { -- } execute'' align_up end
+  else
+    { -- }
+    false nil nil
+    instr' cf_align_up_validate instr' cf_align_up_emit
+    if cf_fold2 then ret end
+    execute'' align_up
+  end
 end
 
 \ Align a local up: `wid align_up: some_val`.
 fun_comp: align_up: { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_mut_align_up
+  nil instr' comp_loc_mut_align_up_fallback
+  nil instr' cf_align_up_validate instr' cf_align_up_emit
+  comp_loc_mut_imm_fallback
 end
 
 fun_comp: invert { -- err } [ redefine ]
