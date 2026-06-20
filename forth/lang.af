@@ -2849,12 +2849,12 @@ fun: comp_loc_unary_begin { -- loc reg err } ( C: "name" -- ) ( E: -- )
   loc reg
 end
 
-fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
+fun: comp_loc_addsub_step_imm { loc reg imm mag add -- err }
   reg comp_realloc_reg
   loc comp_push_from_local
 
   reg reg inc mag asm_pattern_arith_imm
-  if imm >=0 then imm_pos_op else imm_neg_op end or comp_instr \ add|sub Xd, Xn, #imm12
+  if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or comp_instr \ add|sub Xd, Xn, #imm12
 
   loc reg comp_loc_step_store
 end
@@ -2973,8 +2973,8 @@ fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
   loc len comp_loc_step_store
 end
 
-\ Mutate a local by a runtime or foldable add/sub-style constant step.
-fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
+\ Mutate a local by a runtime or foldable add/sub constant step.
+fun: comp_loc_addsub_step { add -- err }
   ( C: "name" -- ) ( E: step -- )
 
   comp_loc_step_prepare { reg arg loc imm foldable }
@@ -2986,12 +2986,12 @@ fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
         arg cf_rewind_to_before_arg
         arg cf_arg_clear
       end
-      loc reg imm mag imm_pos_op imm_neg_op comp_loc_addsub_step_imm
+      loc reg imm mag add comp_loc_addsub_step_imm
       ret
     end
   end
 
-  loc reg_op comp_loc_reg_pattern_emit
+  loc if add then ASM_OP_ADD_REG else ASM_OP_SUB_REG end comp_loc_reg_pattern_emit
 end
 
 fun_comp: or { -- err } [ redefine ]
@@ -3054,7 +3054,7 @@ end
 
 \ Add a step to a local: `step +: some_val`.
 fun_comp: +: { -- err } ( C: "name" -- ) ( E: step -- )
-  ASM_OP_ADD_IMM ASM_OP_SUB_IMM ASM_OP_ADD_REG comp_loc_addsub_step
+  true comp_loc_addsub_step
 end
 
 fun_comp: - { -- err } [ redefine ]
@@ -3063,7 +3063,7 @@ end
 
 \ Subtract a step from a local: `step -: some_val`.
 fun_comp: -: { -- err } ( C: "name" -- ) ( E: step -- )
-  ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_addsub_step
+  false comp_loc_addsub_step
 end
 
 fun_comp: * { -- err } [ redefine ]
