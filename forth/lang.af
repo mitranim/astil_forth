@@ -2973,29 +2973,9 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
   0 false
 end
 
-fun: cf_emit_addsub_imm { reg0 reg_src imm add -- err }
+fun: cf_emit_addsub_imm { reg0 reg1 imm add -- err }
   imm comp_loc_step_imm12 { mag _ }
-  reg0 reg_src mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
-end
-
-fun: cf_fold_addsub_rhs_imm { reg0 arg1 imm add emit -- ok err }
-  ifz arg1 cf_arg_current then false ret end
-  imm comp_loc_step_imm12 { _ fits }
-  ifz fits then false ret end
-
-  reg0 arg1 imm add emit cf_fold_rhs_imm_raw
-  true
-end
-
-fun: cf_fold_add_lhs_imm { reg0 reg1 arg1 emit -- ok err }
-  reg0 comp_arg { arg0 }
-  arg0 cf_arg_foldable_imm { imm0 foldable0 }
-  ifz foldable0 then false ret end
-
-  imm0 comp_loc_step_imm12 { _ fits0 }
-  ifz fits0 then false ret end
-
-  reg0 reg1 arg0 arg1 imm0 true emit cf_fold_lhs_imm_raw
+  reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
 end
 
 fun: cf_fold_cmp_rhs_imm { reg0 arg1 imm cond -- ok err }
@@ -3043,13 +3023,31 @@ fun: cf_fold_eq_imm { -- ok err }
 end
 
 \ Try folding a constant operand into an add/sub immediate instruction.
-fun: cf_fold_addsub_imm { emit add -- ok err }
+fun: cf_fold_addsub_imm { add -- ok err }
   comp_top_arg_regs2 { reg0 reg1 }
   reg1 comp_arg { arg1 }
   arg1 cf_arg_foldable_imm { imm foldable }
 
-  if foldable then reg0 arg1 imm add emit cf_fold_addsub_rhs_imm ret end
-  if add then reg0 reg1 arg1 emit cf_fold_add_lhs_imm else false end
+  if foldable then
+    ifz arg1 cf_arg_current then false ret end
+    imm comp_loc_step_imm12 { _ fits }
+    ifz fits then false ret end
+    instr' cf_emit_addsub_imm { emit }
+    reg0 arg1 imm add emit cf_fold_rhs_imm_raw
+    true ret
+  end
+
+  ifz add then false ret end
+
+  reg0 comp_arg { arg0 }
+  arg0 cf_arg_foldable_imm { imm foldable }
+  ifz foldable then false ret end
+
+  imm comp_loc_step_imm12 { _ fits }
+  ifz fits then false ret end
+
+  instr' cf_emit_addsub_imm { emit }
+  reg0 reg1 arg0 arg1 imm true emit cf_fold_lhs_imm_raw
 end
 
 fun: cf_fold_shift_imm_args { -- reg0 arg1 imm ok err }
@@ -3300,7 +3298,7 @@ end
 
 fun_comp: + { -- err } [ redefine ]
   if cf_fold_cleared2 then + cf_fold_done
-  else { -- } if instr' cf_emit_addsub_imm true cf_fold_addsub_imm then ret end execute'' + end
+  else { -- } if true cf_fold_addsub_imm then ret end execute'' + end
 end
 
 \ Add a step to a local: `step +: some_val`.
@@ -3310,7 +3308,7 @@ end
 
 fun_comp: - { -- err } [ redefine ]
   if cf_fold_cleared2 then - cf_fold_done
-  else { -- } if instr' cf_emit_addsub_imm false cf_fold_addsub_imm then ret end execute'' - end
+  else { -- } if false cf_fold_addsub_imm then ret end execute'' - end
 end
 
 \ Subtract a step from a local: `step -: some_val`.
