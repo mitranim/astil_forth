@@ -3602,7 +3602,8 @@ fun_comp: >=: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: u> { -- err } [ redefine ]
-  if cf_fold_cleared2 then u> cf_fold_done else { -- } execute'' u> end
+  if cf_fold_cleared2 then u> cf_fold_done
+  else { -- } if ASM_HI ASM_LO cf_fold_cmp_imm then ret end execute'' u> end
 end
 
 \ Compare a local unsigned greater-than in place: `rhs u>: some_val`.
