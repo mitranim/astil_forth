@@ -173,7 +173,7 @@ fun: comp_instr_clobbers_imm_fun { -- val }
 end
 
 fun: test_comp_instr_clobbers_imm { -- err }
-  T{ comp_instr_clobbers_imm_fun <T> 0xffff_ffff }T
+  T{ comp_instr_clobbers_imm_fun <T> 0b11111111_11111111_11111111_11111111 }T
 end
 test_comp_instr_clobbers_imm
 
@@ -1263,7 +1263,8 @@ fun: test_const_fold_loc_step { -- err }
   xt' loc_sub_cell_fun cf_expect_word
 
   cf_expect_clear
-  0 0 0b1_000000_000000 asm_and_imm_enc cf_expect_instr
+  0 0 1 asm_and_imm { instr }
+  instr cf_expect_instr
   cf_expect_ret
   xt' loc_odd_fun cf_expect_word
 

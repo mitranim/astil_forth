@@ -1242,6 +1242,23 @@ fun: test_asm_new_bits { -- err }
   T{ 2 3 asm_rbit <T> 0b11011010110000000000000001100010 }T
   T{ 2 3 asm_clz  <T> 0b11011010110000000001000001100010 }T
   T{ 2 3 asm_ctz  <T> 0b11011010110000000001100001100010 }T
+  T{ 1 asm_logical_imm_enc <T> 1 0 0 }T
+  T{ 0xff asm_logical_imm_enc <T> 1 0 7 }T
+  T{ 0x00ff_00ff_00ff_00ff asm_logical_imm_enc <T> 0 0 39 }T
+  T{ 0x8000_0000_0000_0000 asm_logical_imm_enc <T> 1 1 0 }T
+  T{ 0 catch' asm_logical_imm_enc { -- err } <T> }T
+  err " unable to encode logical immediate: 0 is reserved" T_str_eq
+  T{ -1 catch' asm_logical_imm_enc { -- err } <T> }T
+  err " unable to encode logical immediate: all ones is reserved" T_str_eq
+  T{ 0x1234_5678_9abc_def0 catch' asm_logical_imm_enc { -- err } <T> }T
+  err " unable to encode logical immediate: value is not a repeated bitmask" T_str_eq
+  T{ 0 0 1 asm_and_imm <T> 0b1_00_100100_1_000000_000000_00000_00000 }T
+  T{ 0 0 1 asm_orr_imm <T> 0b1_01_100100_1_000000_000000_00000_00000 }T
+  T{ 0 0 1 asm_eor_imm <T> 0b1_10_100100_1_000000_000000_00000_00000 }T
+  0 0 -2 asm_and_imm { bic_exp }
+  T{ 0 0 1 asm_bic_imm <T> bic_exp }T
+  T{ 0 0 0 catch' asm_and_imm { _instr err } <T> }T
+  err " unable to encode logical immediate: 0 is reserved" T_str_eq
 end
 test_asm_new_bits
 

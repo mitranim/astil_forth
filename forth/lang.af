@@ -529,16 +529,6 @@ fun: asm_bic { Xd Xn Xm -> instr }
   asm_pattern_arith_reg ASM_OP_BIC_REG or
 end
 
-\ and Xd, Xn, #encoded_imm
-\
-\ Caller must pre-encode the immediate into the mask.
-\ Auto-encoding requires conditionals and maybe loops.
-\ TODO implement later.
-fun: asm_and_imm_enc { Xd Xn mask -- instr }
-  mask 10 lsl { mask }
-  Xn 5 lsl Xd or mask or 0b1_00_100100_0_000000_000000_00000_00000 or
-end
-
 \ mul Xd, Xn, Xm
 0b1_00_11011_000_00000_0_11111_00000_00000 let: ASM_OP_MUL_REG
 fun: asm_mul { Xd Xn Xm -> instr }
@@ -1257,13 +1247,6 @@ true try_all
 
 fun: within  { num one two -- bool } one num  > num two  > or =0 end
 fun: uwithin { num one two -- bool } one num u> num two u> or =0 end
-
-fun_comp: odd { -- err }
-  comp_args1_reg { reg }
-  reg reg 0b1_000000_000000 asm_and_imm_enc comp_instr \ and Xd, Xd, 1
-end
-
-fun: odd { val -> bool } odd end
 
 \ ## Memory load / store
 
@@ -2760,6 +2743,59 @@ fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun --
   ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
 end
 
+\ ## Assembler continued -- logical immediate
+
+fun: asm_ror64 { val rot -- out }
+  rot 63 and { rot }
+  ifz rot then val ret end
+
+  val rot lsr
+  val 64 rot - lsl
+  or
+end
+
+fun: asm_logical_imm_enc { imm -- N immr imms err }
+  if imm 0 = then
+    " unable to encode logical immediate: 0 is reserved" throw
+  end
+  if imm invert 0 = then
+    " unable to encode logical immediate: all ones is reserved" throw
+  end
+
+  imm imm inc and bit_ctz { rot }
+  imm rot asm_ror64 { norm }
+  norm bit_clz { zeros }
+  norm invert bit_ctz { ones }
+  zeros ones + { size }
+
+  if imm size asm_ror64 imm <> then
+    " unable to encode logical immediate: value is not a repeated bitmask" throw
+  end
+
+  size 6 lsr
+  rot negate size dec and
+  size 1 lsl negate ones dec or 0x3f and
+end
+
+fun: asm_logical_imm_instr { Xd Xn imm op -- instr err }
+  imm asm_logical_imm_enc { N immr imms }
+  op
+  N    22 lsl or
+  immr 16 lsl or
+  imms 10 lsl or
+  Xn   5  lsl or
+  Xd          or
+end
+
+0b1_00_100100_0_000000_000000_00000_00000 let: ASM_OP_AND_IMM
+0b1_01_100100_0_000000_000000_00000_00000 let: ASM_OP_ORR_IMM
+0b1_10_100100_0_000000_000000_00000_00000 let: ASM_OP_EOR_IMM
+
+fun: asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM asm_logical_imm_instr end
+fun: asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM asm_logical_imm_instr end
+fun: asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM asm_logical_imm_instr end
+fun: asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm invert ASM_OP_AND_IMM asm_logical_imm_instr end
+
 \ ## Constant folding and locals mutation
 \
 \ When allocating values to registers, the outer compiler detects
@@ -3686,14 +3722,21 @@ fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg comp_loc_step_store
 end
 
-fun_comp: odd { -- err } [ redefine ]
-  if cf_fold_cleared1 then odd cf_fold_done else { -- } execute'' odd end
+fun_comp: odd { -- err }
+  if cf_fold_cleared1 then 1 and cf_fold_done
+  else
+    { -- }
+    comp_args1_reg { reg }
+    reg reg 1 asm_and_imm comp_instr \ and Xd, Xd, #1
+  end
 end
+
+fun: odd { val -> bool } odd end
 
 \ Test local oddness in place: `odd: some_val`.
 fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_begin { reg loc }
-  reg reg 0b1_000000_000000 asm_and_imm_enc comp_instr \ and Xd, Xd, 1
+  reg reg 1 asm_and_imm comp_instr \ and Xd, Xd, #1
   loc reg comp_loc_step_store
 end
 
