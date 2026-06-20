@@ -3480,6 +3480,16 @@ fun: comp_loc_csel_step { cond -- err } ( C: "name" -- ) ( E: candidate -- )
   loc candidate comp_loc_step_store
 end
 
+fun: comp_loc_align_down_step { -- err } ( C: "name" -- ) ( E: wid -- )
+  comp_args1_reg { wid }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  wid inc { len }
+  wid asm_neg comp_instr
+  wid len wid asm_and_reg comp_instr
+  loc wid comp_loc_step_store
+end
+
 \ Mutate a local by a runtime or foldable add/sub-style constant step.
 fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
@@ -3589,6 +3599,11 @@ end
 \ Unsigned maximum into a local: `candidate umax=: some_val`.
 fun_comp: umax=: { -- err } ( C: "name" -- ) ( E: candidate -- )
   ASM_HI comp_loc_csel_step
+end
+
+\ Align a local down: `wid align_down=: some_val`.
+fun_comp: align_down=: { -- err } ( C: "name" -- ) ( E: wid -- )
+  comp_loc_align_down_step
 end
 
 \ ## Vargs and formatting
