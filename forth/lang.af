@@ -2711,6 +2711,55 @@ fun: comp_arg_imm_ceil { val -> ceil }
   Interp_comp_arg_imm_field Interp_reg_imm_ceil @u32
 end
 
+\ ## Raw callbacks
+
+\ Used when calling words with unknown clobbers.
+fun: comp_realloc_regs { -- err }
+  0  comp_realloc_reg \ x0
+  1  comp_realloc_reg \ x1
+  2  comp_realloc_reg \ x2
+  3  comp_realloc_reg \ x3
+  4  comp_realloc_reg \ x4
+  5  comp_realloc_reg \ x5
+  6  comp_realloc_reg \ x6
+  7  comp_realloc_reg \ x7
+  8  comp_realloc_reg \ x8
+  9  comp_realloc_reg \ x9
+  10 comp_realloc_reg \ x10
+  11 comp_realloc_reg \ x11
+  12 comp_realloc_reg \ x12
+  13 comp_realloc_reg \ x13
+  14 comp_realloc_reg \ x14
+  15 comp_realloc_reg \ x15
+end
+
+\ blr x0
+fun: execute_raw { _fun } [ 0 asm_branch_link_reg comp_instr ] end
+
+\ Takes any amount of args where the last arg is assumed to be a raw
+\ instruction address, known in C as "function pointer". Invokes the
+\ function with the preceding args. Assumes no outputs. The caller
+\ may assume outputs afterwards: `[ N comp_args_set ]`.
+fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
+  comp_args_get { len }
+
+  ifz len then
+    " unable to compile `execute_raw`: at least 1 argument is required" throw
+  end
+
+  if len ASM_PARAM_LEN_MAX inc > then
+    " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided" throw
+  end
+
+  comp_realloc_regs \ Assume full clobber.
+  0 comp_args_set
+
+  \ The frame record is a workaround for "leaf" callers without their own.
+  ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x29, x30, [sp, #-16]!
+  len dec asm_branch_link_reg comp_instr                             \ blr <fun>
+  ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
+end
+
 \ ## Constant folding and locals mutation
 \
 \ When allocating values to registers, the outer compiler detects
@@ -4168,16 +4217,6 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
   arg_len comp_args_set
 end
 
-\ Used when calling words with unknown clobbers.
-fun: comp_realloc_regs { -- err }
-  ASM_ARG_LEN_MAX { reg }
-  loop
-    dec: reg
-    reg 0 >= while
-    reg comp_realloc_reg
-  end
-end
-
 fun_comp: logf { -- err } ( E: fmt …vargs… -- )
   1 comp_va_beg { len }
   compile' printf
@@ -4616,44 +4655,6 @@ end
 fun: indirect_to' { decl -- err } ( C: "name" -- )
   WORDLIST_EXEC next_word { XT }
   decl XT indirect_to
-end
-
-\ ## Misc
-
-\ blr x0
-fun: execute_raw { _fun } [ 0 asm_branch_link_reg comp_instr ] end
-
-\ Takes any amount of args where the last arg is assumed to be a raw
-\ instruction address, known in C as "function pointer". Invokes the
-\ function with the preceding args. Assumes no outputs or errors.
-\
-\ TODO: tell the compiler about the call. We want the compiler
-\ to emit prologue and epilogue, track clobbers, and so on.
-\
-\ TODO: verify that clobbering works properly.
-fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
-  comp_args_get { len }
-
-  ifz len then
-    " unable to compile `execute_raw`: at least 1 argument is required" throw
-  end
-
-  if len ASM_PARAM_LEN_MAX inc > then
-    " unable to compile `execute_raw`: %zd param registers available, %zd arguments provided"
-    ASM_PARAM_LEN_MAX len dec errf throw
-  end
-
-  comp_realloc_regs
-  0 comp_args_set
-
-  \ The frame record is a workaround for "leaf" functions using `execute_raw`.
-  \
-  \   stp x29, x30, [sp, #-16]!
-  \   blr <fun>
-  \   ldp x29, x30, [sp], #16
-  ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x29, x30, [sp, #-16]!
-  len dec asm_branch_link_reg comp_instr                             \ blr <fun>
-  ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
 end
 
 \ Comptime analogue of top-level import.
