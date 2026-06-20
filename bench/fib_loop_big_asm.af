@@ -40,7 +40,7 @@ fun: bigint_divmod10_step { quo bit rem -- quo rem }
   rem 1 lsl bit + { rem }
   quo 1 lsl       { quo }
   if rem 10 >= then
-    10 -=: rem
+    10 -: rem
     inc: quo
   end
   quo rem

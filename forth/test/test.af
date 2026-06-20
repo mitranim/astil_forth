@@ -807,7 +807,7 @@ fun: test_loop_manual_counting { -- err }
     0 0 { acc ind }
     loop
       ind 12 < while
-      ind +=: acc
+      ind +: acc
       inc: ind
     end
     acc ind
@@ -819,9 +819,9 @@ fun: test_loop_manual_counting { -- err }
     0 { acc }
     8 { ind }
     loop
-      2 -=: ind
+      2 -: ind
       0 ind <= while
-      ind +=: acc
+      ind +: acc
     end
     acc ind
   <T>

@@ -23,7 +23,7 @@ fun: init
   loop
     ptr BUF CAP + < while
     ptr init_chunk
-    16 +=: ptr
+    16 +: ptr
   end
 end
 
@@ -60,7 +60,7 @@ fun: scan { pat rounds -- count }
         4 4 2 asm_add_2d    comp_instr \ add    v4.2d, v4.2d, v2.2d
         0 comp_args_set
       ]
-      16 +=: ptr
+      16 +: ptr
     end
   end
   [

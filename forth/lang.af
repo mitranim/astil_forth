@@ -2955,8 +2955,8 @@ fun_comp: or { -- err } [ redefine ]
   if cf_fold_cleared2 then or cf_fold_done else { -- } execute'' or end
 end
 
-\ Bitwise or into a local: `mask or=: some_val`.
-fun_comp: or=: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Bitwise or into a local: `mask or: some_val`.
+fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_ORR_REG comp_loc_reg_pattern_step
 end
 
@@ -2964,8 +2964,8 @@ fun_comp: and { -- err } [ redefine ]
   if cf_fold_cleared2 then and cf_fold_done else { -- } execute'' and end
 end
 
-\ Bitwise and into a local: `mask and=: some_val`.
-fun_comp: and=: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Bitwise and into a local: `mask and: some_val`.
+fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_AND_REG comp_loc_reg_pattern_step
 end
 
@@ -2973,8 +2973,8 @@ fun_comp: xor { -- err } [ redefine ]
   if cf_fold_cleared2 then xor cf_fold_done else { -- } execute'' xor end
 end
 
-\ Bitwise xor into a local: `mask xor=: some_val`.
-fun_comp: xor=: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Bitwise xor into a local: `mask xor: some_val`.
+fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_EOR_REG comp_loc_reg_pattern_step
 end
 
@@ -2982,8 +2982,8 @@ fun_comp: lsl { -- err } [ redefine ]
   if cf_fold_cleared2 then lsl cf_fold_done else { -- } execute'' lsl end
 end
 
-\ Shift a local left: `bits lsl=: some_val`.
-fun_comp: lsl=: { -- err } ( C: "name" -- ) ( E: bits -- )
+\ Shift a local left: `bits lsl: some_val`.
+fun_comp: lsl: { -- err } ( C: "name" -- ) ( E: bits -- )
   ASM_OP_LSL_REG comp_loc_reg_pattern_step
 end
 
@@ -2991,8 +2991,8 @@ fun_comp: lsr { -- err } [ redefine ]
   if cf_fold_cleared2 then lsr cf_fold_done else { -- } execute'' lsr end
 end
 
-\ Shift a local right logically: `bits lsr=: some_val`.
-fun_comp: lsr=: { -- err } ( C: "name" -- ) ( E: bits -- )
+\ Shift a local right logically: `bits lsr: some_val`.
+fun_comp: lsr: { -- err } ( C: "name" -- ) ( E: bits -- )
   ASM_OP_LSR_REG comp_loc_reg_pattern_step
 end
 
@@ -3000,8 +3000,8 @@ fun_comp: asr { -- err } [ redefine ]
   if cf_fold_cleared2 then asr cf_fold_done else { -- } execute'' asr end
 end
 
-\ Shift a local right arithmetically: `bits asr=: some_val`.
-fun_comp: asr=: { -- err } ( C: "name" -- ) ( E: bits -- )
+\ Shift a local right arithmetically: `bits asr: some_val`.
+fun_comp: asr: { -- err } ( C: "name" -- ) ( E: bits -- )
   ASM_OP_ASR_REG comp_loc_reg_pattern_step
 end
 
@@ -3009,8 +3009,8 @@ fun_comp: + { -- err } [ redefine ]
   if cf_fold_cleared2 then + cf_fold_done else { -- } execute'' + end
 end
 
-\ Add a step to a local: `step +=: some_val`.
-fun_comp: +=: { -- err } ( C: "name" -- ) ( E: step -- )
+\ Add a step to a local: `step +: some_val`.
+fun_comp: +: { -- err } ( C: "name" -- ) ( E: step -- )
   ASM_OP_ADD_IMM ASM_OP_SUB_IMM ASM_OP_ADD_REG comp_loc_addsub_step
 end
 
@@ -3018,8 +3018,8 @@ fun_comp: - { -- err } [ redefine ]
   if cf_fold_cleared2 then - cf_fold_done else { -- } execute'' - end
 end
 
-\ Subtract a step from a local: `step -=: some_val`.
-fun_comp: -=: { -- err } ( C: "name" -- ) ( E: step -- )
+\ Subtract a step from a local: `step -: some_val`.
+fun_comp: -: { -- err } ( C: "name" -- ) ( E: step -- )
   ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_addsub_step
 end
 
@@ -3027,8 +3027,8 @@ fun_comp: * { -- err } [ redefine ]
   if cf_fold_cleared2 then * cf_fold_done else { -- } execute'' * end
 end
 
-\ Multiply a local: `factor *=: some_val`.
-fun_comp: *=: { -- err } ( C: "name" -- ) ( E: factor -- )
+\ Multiply a local: `factor *: some_val`.
+fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
   ASM_OP_MUL_REG comp_loc_reg_pattern_step
 end
 
@@ -3036,8 +3036,8 @@ fun_comp: / { -- err } [ redefine ]
   if cf_fold_cleared2 then / cf_fold_done else { -- } execute'' / end
 end
 
-\ Signed divide a local: `divisor /=: some_val`.
-fun_comp: /=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+\ Signed divide a local: `divisor /: some_val`.
+fun_comp: /: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_SDIV_REG comp_loc_reg_pattern_step
 end
 
@@ -3045,8 +3045,8 @@ fun_comp: u/ { -- err } [ redefine ]
   if cf_fold_cleared2 then u/ cf_fold_done else { -- } execute'' u/ end
 end
 
-\ Unsigned divide a local: `divisor u/=: some_val`.
-fun_comp: u/=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+\ Unsigned divide a local: `divisor u/: some_val`.
+fun_comp: u/: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_UDIV_REG comp_loc_reg_pattern_step
 end
 
@@ -3054,8 +3054,8 @@ fun_comp: mod { -- err } [ redefine ]
   if cf_fold_cleared2 then mod cf_fold_done else { -- } execute'' mod end
 end
 
-\ Signed remainder into a local: `divisor mod=: some_val`.
-fun_comp: mod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+\ Signed remainder into a local: `divisor mod: some_val`.
+fun_comp: mod: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_SDIV_REG comp_loc_rem_step
 end
 
@@ -3063,8 +3063,8 @@ fun_comp: umod { -- err } [ redefine ]
   if cf_fold_cleared2 then umod cf_fold_done else { -- } execute'' umod end
 end
 
-\ Unsigned remainder into a local: `divisor umod=: some_val`.
-fun_comp: umod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+\ Unsigned remainder into a local: `divisor umod: some_val`.
+fun_comp: umod: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_UDIV_REG comp_loc_rem_step
 end
 
@@ -3120,8 +3120,8 @@ fun_comp: min { -- err } [ redefine ]
   if cf_fold_cleared2 then min cf_fold_done else { -- } execute'' min end
 end
 
-\ Minimum into a local: `candidate min=: some_val`.
-fun_comp: min=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+\ Minimum into a local: `candidate min: some_val`.
+fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
   ASM_LT comp_loc_csel_step
 end
 
@@ -3129,8 +3129,8 @@ fun_comp: umin { -- err } [ redefine ]
   if cf_fold_cleared2 then umin cf_fold_done else { -- } execute'' umin end
 end
 
-\ Unsigned minimum into a local: `candidate umin=: some_val`.
-fun_comp: umin=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+\ Unsigned minimum into a local: `candidate umin: some_val`.
+fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
   ASM_LO comp_loc_csel_step
 end
 
@@ -3138,8 +3138,8 @@ fun_comp: max { -- err } [ redefine ]
   if cf_fold_cleared2 then max cf_fold_done else { -- } execute'' max end
 end
 
-\ Maximum into a local: `candidate max=: some_val`.
-fun_comp: max=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+\ Maximum into a local: `candidate max: some_val`.
+fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
   ASM_GT comp_loc_csel_step
 end
 
@@ -3147,8 +3147,8 @@ fun_comp: umax { -- err } [ redefine ]
   if cf_fold_cleared2 then umax cf_fold_done else { -- } execute'' umax end
 end
 
-\ Unsigned maximum into a local: `candidate umax=: some_val`.
-fun_comp: umax=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+\ Unsigned maximum into a local: `candidate umax: some_val`.
+fun_comp: umax: { -- err } ( C: "name" -- ) ( E: candidate -- )
   ASM_HI comp_loc_csel_step
 end
 
@@ -3250,8 +3250,8 @@ fun_comp: bits_trunc { -- err } [ redefine ]
   else { -- } execute'' bits_trunc end
 end
 
-\ Truncate a local to low bits: `len bits_trunc=: some_val`.
-fun_comp: bits_trunc=: { -- err } ( C: "name" -- ) ( E: len -- )
+\ Truncate a local to low bits: `len bits_trunc: some_val`.
+fun_comp: bits_trunc: { -- err } ( C: "name" -- ) ( E: len -- )
   comp_loc_bits_trunc_step
 end
 
@@ -3265,8 +3265,8 @@ fun_comp: align_down { -- err } [ redefine ]
   else { -- } execute'' align_down end
 end
 
-\ Align a local down: `wid align_down=: some_val`.
-fun_comp: align_down=: { -- err } ( C: "name" -- ) ( E: wid -- )
+\ Align a local down: `wid align_down: some_val`.
+fun_comp: align_down: { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_align_down_step
 end
 
@@ -3275,8 +3275,8 @@ fun_comp: align_up { -- err } [ redefine ]
   else { -- } execute'' align_up end
 end
 
-\ Align a local up: `wid align_up=: some_val`.
-fun_comp: align_up=: { -- err } ( C: "name" -- ) ( E: wid -- )
+\ Align a local up: `wid align_up: some_val`.
+fun_comp: align_up: { -- err } ( C: "name" -- ) ( E: wid -- )
   comp_loc_align_up_step
 end
 
@@ -3290,8 +3290,8 @@ fun_comp: bit_mask_unset { -- err } [ redefine ]
   else { -- } execute'' bit_mask_unset end
 end
 
-\ Clear bits in a local by mask: `mask bit_mask_unset=: some_val`.
-fun_comp: bit_mask_unset=: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Clear bits in a local by mask: `mask bit_mask_unset: some_val`.
+fun_comp: bit_mask_unset: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_BIC_REG comp_loc_reg_pattern_step
 end
 
@@ -3300,8 +3300,8 @@ fun_comp: bit_mask_get { -- err } [ redefine ]
   else { -- } execute'' bit_mask_get end
 end
 
-\ Extract masked bits from a local: `mask bit_mask_get=: some_val`.
-fun_comp: bit_mask_get=: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Extract masked bits from a local: `mask bit_mask_get: some_val`.
+fun_comp: bit_mask_get: { -- err } ( C: "name" -- ) ( E: mask -- )
   comp_loc_bit_mask_get_step
 end
 
@@ -3671,7 +3671,7 @@ fun: comp_va_beg { floor -- diff err }
 
   ceil { ind }
   loop
-    2 -=: ind
+    2 -: ind
     floor ind <= while
     ind     { Xd }
     ind inc { Xt }
@@ -4304,7 +4304,7 @@ fun: assert_end_xt { beg -- err }
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 + { ceil }
 
-  3 -=: ceil
+  3 -: ceil
   ceil dec @b is_whitespace =0 { fail }
   s" end" ceil 3 str<> fail or { fail }
 

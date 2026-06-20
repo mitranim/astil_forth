@@ -20,7 +20,7 @@ fun: init
   loop
     ptr BUF CAP + < while
     ptr init_chunk
-    16 +=: ptr
+    16 +: ptr
   end
 end
 
@@ -38,7 +38,7 @@ fun: scan { rounds -- out }
     BUF { ptr }
     loop
       ptr BUF CAP + < while
-      ptr @u8 delim? +=: out
+      ptr @u8 delim? +: out
       inc: ptr
     end
   end
