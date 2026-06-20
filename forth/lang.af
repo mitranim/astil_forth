@@ -3413,34 +3413,42 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
   0 false
 end
 
-fun: comp_loc_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
+fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
+  1 nil comp_args_min
+  comp_args_get dec { reg }
+  reg comp_arg { arg }
+  read_word comp_local { loc }
+  arg cf_arg_foldable_imm { imm foldable }
+  reg arg loc imm foldable
+end
+
+fun: comp_loc_step_store { loc reg -- err }
+  reg inc comp_args_set
+  loc comp_pop_into_local
+end
+
+fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
   reg comp_realloc_reg
   loc comp_push_from_local
 
   reg reg inc mag asm_pattern_arith_imm
   if imm >=0 then imm_pos_op else imm_neg_op end or comp_instr
 
-  reg inc comp_args_set
-  loc comp_pop_into_local
+  loc reg comp_loc_step_store
 end
 
-fun: comp_loc_step_reg { loc reg_op -- err }
+fun: comp_loc_addsub_step_reg { loc reg_op -- err }
   comp_args1_reg { reg }
   loc comp_push_from_local
   reg reg inc reg asm_pattern_arith_reg reg_op or comp_instr
-  reg inc comp_args_set
-  loc comp_pop_into_local
+  loc reg comp_loc_step_store
 end
 
-\ Mutate a local by a runtime or foldable constant step.
-fun: comp_loc_step { imm_pos_op imm_neg_op reg_op -- err }
+\ Mutate a local by a runtime or foldable add/sub-style constant step.
+fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
   ( C: "name" -- ) ( E: step -- )
 
-  1 nil comp_args_min
-  comp_args_get dec { reg }
-  reg comp_arg { arg }
-  read_word comp_local { loc }
-  arg cf_arg_foldable_imm { imm foldable }
+  comp_loc_step_prepare { reg arg loc imm foldable }
 
   if foldable then
     imm comp_loc_step_imm12 { mag fits }
@@ -3449,22 +3457,22 @@ fun: comp_loc_step { imm_pos_op imm_neg_op reg_op -- err }
         arg cf_rewind_to_before_arg
         arg cf_arg_clear
       end
-      loc reg imm mag imm_pos_op imm_neg_op comp_loc_step_imm
+      loc reg imm mag imm_pos_op imm_neg_op comp_loc_addsub_step_imm
       ret
     end
   end
 
-  loc reg_op comp_loc_step_reg
+  loc reg_op comp_loc_addsub_step_reg
 end
 
 \ Add a step to a local: `step +=: some_val`.
 fun_comp: +=: { -- err } ( C: "name" -- ) ( E: step -- )
-  ASM_OP_ADD_IMM ASM_OP_SUB_IMM ASM_OP_ADD_REG comp_loc_step
+  ASM_OP_ADD_IMM ASM_OP_SUB_IMM ASM_OP_ADD_REG comp_loc_addsub_step
 end
 
 \ Subtract a step from a local: `step -=: some_val`.
 fun_comp: -=: { -- err } ( C: "name" -- ) ( E: step -- )
-  ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_step
+  ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_addsub_step
 end
 
 \ ## Vargs and formatting
