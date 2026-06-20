@@ -577,6 +577,8 @@ fun: const_fold_ge_rhs_imm_fun { val -- out } val 20 >= end
 fun: const_fold_ge_lhs_imm_fun { val -- out } 20 val >= end
 fun: const_fold_ugt_rhs_imm_fun { val -- out } val 20 u> end
 fun: const_fold_ugt_lhs_imm_fun { val -- out } 20 val u> end
+fun: const_fold_ult_rhs_imm_fun { val -- out } val 20 u< end
+fun: const_fold_ult_lhs_imm_fun { val -- out } 20 val u< end
 
 fun: cf_expect_cmp_rhs_imm { XT cond -- err }
   cf_expect_clear
@@ -626,6 +628,10 @@ fun: test_const_fold_compare2 { -- err }
   T{ 20 const_fold_ugt_rhs_imm_fun <T> 0 }T
   T{ 19 const_fold_ugt_lhs_imm_fun <T> 1 }T
   T{ 20 const_fold_ugt_lhs_imm_fun <T> 0 }T
+  T{ 19 const_fold_ult_rhs_imm_fun <T> 1 }T
+  T{ 20 const_fold_ult_rhs_imm_fun <T> 0 }T
+  T{ 21 const_fold_ult_lhs_imm_fun <T> 1 }T
+  T{ 20 const_fold_ult_lhs_imm_fun <T> 0 }T
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -646,6 +652,7 @@ fun: test_const_fold_compare2 { -- err }
   xt' const_fold_le_rhs_imm_fun ASM_LE cf_expect_cmp_rhs_imm
   xt' const_fold_ge_rhs_imm_fun ASM_GE cf_expect_cmp_rhs_imm
   xt' const_fold_ugt_rhs_imm_fun ASM_HI cf_expect_cmp_rhs_imm
+  xt' const_fold_ult_rhs_imm_fun ASM_LO cf_expect_cmp_rhs_imm
 
   xt' const_fold_eq_lhs_imm_fun ASM_EQ cf_expect_cmp_lhs_imm
   xt' const_fold_ne_lhs_imm_fun ASM_NE cf_expect_cmp_lhs_imm
@@ -654,6 +661,7 @@ fun: test_const_fold_compare2 { -- err }
   xt' const_fold_le_lhs_imm_fun ASM_GE cf_expect_cmp_lhs_imm
   xt' const_fold_ge_lhs_imm_fun ASM_LE cf_expect_cmp_lhs_imm
   xt' const_fold_ugt_lhs_imm_fun ASM_LO cf_expect_cmp_lhs_imm
+  xt' const_fold_ult_lhs_imm_fun ASM_HI cf_expect_cmp_lhs_imm
 end
 test_const_fold_compare2
 
