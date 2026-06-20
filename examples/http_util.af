@@ -17,10 +17,10 @@ fun: net_accept_loop { sock handler }
 
     if conn is_err_flag then
       errno { code }
-      if code EINTR = then cont end
+      if code EINTR = then again end
       code strerror { msg }
       " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg elogf elf
-      cont
+      again
     end
 
     " [srv] accepted connection" elog elf
@@ -42,10 +42,10 @@ fun: net_accept_loop_threaded { sock handler }
 
     if conn is_err_flag then
       errno { code }
-      if code EINTR = then cont end
+      if code EINTR = then again end
       code strerror { msg }
       " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg elogf elf
-      cont
+      again
     end
 
     " [srv] accepted connection" elog elf

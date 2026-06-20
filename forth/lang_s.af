@@ -1251,10 +1251,10 @@ end
 \ the address of the first instruction inside the loop.
 \
 \ Warning: the implementation of count-up loops in this file is not compatible
-\ with `cont` because they update counters and check bounds at the end, rather
+\ with `again` because they update counters and check bounds at the end, rather
 \ than at the start. The issue was fixed for reg-CC, but not for stack-CC.
-fun_comp: cont
-  ifz LOOP_FRAME @ dup then " `cont` requires an ancestor loop frame" throw end
+fun_comp: again
+  ifz LOOP_FRAME @ dup then " `again` requires an ancestor loop frame" throw end
   sp_at @ loop_end \ b <beg>
 end
 

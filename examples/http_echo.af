@@ -25,7 +25,7 @@ fun: read_req { conn buf cap -- len err }
 
     if wrote is_err_flag then
       errno { code }
-      if code EINTR = then cont end
+      if code EINTR = then again end
       code " unable to read request" os_err throw
     end
 

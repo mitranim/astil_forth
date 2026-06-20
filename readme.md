@@ -417,14 +417,14 @@ More ergonomic control flow structures:
 - Any amount of conditional branches is terminated with a single `end`.
 - Any amount of `leave` or `while` is terminated with the same `end` as the loop.
 
-Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave while cont` auxiliaries. Other loop forms don't buy anything.
+Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave while again` auxiliaries. Other loop forms don't buy anything.
 
 ```forth
 loop
   predicate while
   body
   if done then leave end
-  if skip then cont end
+  if skip then again end
 end
 ```
 

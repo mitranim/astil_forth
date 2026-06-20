@@ -333,12 +333,12 @@ fun: test_loop_countdown
 end
 test_loop_countdown
 
-fun: test_cont_loop
+fun: test_again_loop
   T{
     -1
     loop
       inc dup
-      if dup 7 < then cont end
+      if dup 7 < then again end
       leave
     end
     drop
@@ -346,14 +346,14 @@ fun: test_cont_loop
     0 1 2 3 4 5 6 7
   }T
 end
-test_cont_loop
+test_again_loop
 
-fun: test_cont_for
+fun: test_again_for
   T{
     -1
     7 for
       inc dup
-      cont
+      again
       leave
     end
     drop
@@ -361,7 +361,7 @@ fun: test_cont_for
     0 1 2 3 4 5 6
   }T
 end
-test_cont_for
+test_again_for
 
 fun: test_sc 10 20 30 stack_len .sc end
 \ test_sc
