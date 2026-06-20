@@ -3586,6 +3586,11 @@ fun_comp: max=: { -- err } ( C: "name" -- ) ( E: candidate -- )
   ASM_GT comp_loc_csel_step
 end
 
+\ Unsigned maximum into a local: `candidate umax=: some_val`.
+fun_comp: umax=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  ASM_HI comp_loc_csel_step
+end
+
 \ ## Vargs and formatting
 
 4096    let: ERR_CAP
