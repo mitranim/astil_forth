@@ -34,7 +34,7 @@ fun: main { argc argv envp -- exit }
         envp @ { pair }
         pair while
         " pair: %s" pair logf lf
-        envp +cell { envp }
+        +cell: envp
       end
     end
   end

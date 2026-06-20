@@ -3645,7 +3645,7 @@ fun: mem_unprot { addr size -> err } PROT_RW mem_prot end
 \ This is the preferred way to acquire memory pages from the OS.
 \ Size is counted in bytes; to allocate cells, use `size cells`.
 fun: stack_init { size stack -- err }
-  size PAGE_SIZE align_up   { size }
+  PAGE_SIZE align_up: size
   PAGE_SIZE 1 lsl size +    { bytelen } \ + space for 2 guards
   bytelen PROT_NONE mem_map { cellar }
   cellar PAGE_SIZE +        { floor }
