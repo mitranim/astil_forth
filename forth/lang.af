@@ -2838,6 +2838,14 @@ fun: cf_fold_rhs_imm_raw { reg0 arg1 imm aux emit -- err }
   reg0 inc comp_args_set
 end
 
+fun: cf_fold_rhs_imm_checked { reg0 arg1 imm aux emit fits -- ok err }
+  ifz fits then false ret end
+  ifz arg1 cf_arg_current then false ret end
+
+  reg0 arg1 imm aux emit cf_fold_rhs_imm_raw
+  true
+end
+
 fun: cf_fold_lhs_imm_raw { reg0 reg1 arg0 arg1 imm0 aux emit -- ok err }
   arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc1 }
   ifz loc1 then false ret end
@@ -2966,12 +2974,9 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
 end
 
 fun: cf_fold_cmp_rhs_imm { reg0 arg1 imm cond -- ok err }
-  ifz arg1 cf_arg_current then false ret end
-  ifz imm cf_imm_u12 then false ret end
-
+  imm cf_imm_u12 { fits }
   instr' cf_emit_cmp_imm_cset { emit }
-  reg0 arg1 imm cond emit cf_fold_rhs_imm_raw
-  true
+  reg0 arg1 imm cond emit fits cf_fold_rhs_imm_checked
 end
 
 fun: cf_fold_eq_lhs_imm { reg0 reg1 arg1 -- ok err }
@@ -3005,12 +3010,9 @@ fun: cf_fold_addsub_imm { add -- ok err }
   arg1 cf_arg_foldable_imm { imm foldable }
 
   if foldable then
-    ifz arg1 cf_arg_current then false ret end
     imm comp_loc_step_imm12 { _ fits }
-    ifz fits then false ret end
     instr' cf_emit_addsub_imm { emit }
-    reg0 arg1 imm add emit cf_fold_rhs_imm_raw
-    true ret
+    reg0 arg1 imm add emit fits cf_fold_rhs_imm_checked ret
   end
 
   ifz add then false ret end
@@ -3049,12 +3051,10 @@ fun: cf_fold_shift_imm { shift -- ok err }
   arg1 cf_arg_foldable_imm { imm foldable }
 
   ifz foldable then false ret end
-  if imm 0 < imm 63 > or then false ret end
-  ifz arg1 cf_arg_current then false ret end
 
+  imm 0 >= imm 63 <= and { fits }
   instr' cf_emit_shift_imm { emit }
-  reg0 arg1 imm shift emit cf_fold_rhs_imm_raw
-  true
+  reg0 arg1 imm shift emit fits cf_fold_rhs_imm_checked
 end
 
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
