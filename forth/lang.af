@@ -3397,6 +3397,11 @@ fun_comp: u>= { -- err } [ redefine ]
   if cf_fold_cleared2 then u>= cf_fold_done else { -- } execute'' u>= end
 end
 
+\ Compare a local unsigned greater/equal in place: `rhs u>=: some_val`.
+fun_comp: u>=: { -- err } ( C: "name" -- ) ( E: rhs -- )
+  ASM_HS comp_loc_cset_reg_step
+end
+
 fun_comp: cells { -- err } [ redefine ]
   if cf_fold_cleared1 then cells cf_fold_done else { -- } execute'' cells end
 end
