@@ -3556,6 +3556,11 @@ fun_comp: mod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
   ASM_OP_SDIV_REG comp_loc_rem_step
 end
 
+\ Unsigned remainder into a local: `divisor umod=: some_val`.
+fun_comp: umod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_UDIV_REG comp_loc_rem_step
+end
+
 \ ## Vargs and formatting
 
 4096    let: ERR_CAP

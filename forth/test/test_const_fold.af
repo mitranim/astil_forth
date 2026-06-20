@@ -704,6 +704,14 @@ fun: loc_mod_fun { divisor -- out0 out1 }
   val0 val1
 end
 
+fun: loc_umod_fun { divisor -- out0 out1 }
+  -1 { val0 }
+  divisor umod=: val0
+  81 { val1 }
+  10 umod=: val1
+  val0 val1
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -720,6 +728,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 4 loc_udiv_fun <T> 25 27 }T
   T{ 4 loc_sdiv_fun <T> -25 -27 }T
   T{ 6 loc_mod_fun <T> -4 1 }T
+  T{ 10 loc_umod_fun <T> 5 1 }T
   ifz has_interp then ret end
 
   cf_expect_clear
