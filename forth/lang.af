@@ -2682,7 +2682,7 @@ fun: comp_arg_imm_ceil { val -> ceil }
   Interp_comp_arg_imm_field Interp_reg_imm_ceil @u32
 end
 
-\ ## Constant folding
+\ ## Constant folding and locals mutation
 \
 \ When allocating values to registers, the outer compiler detects
 \ comptime immediates. We can access this by directly reading the
@@ -2820,56 +2820,251 @@ fun: cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
   reg1 inc comp_args_set
 end
 
+\ For compiling words which modify a local by applying the given function.
+fun: comp_loc_mut { fun -- err } ( C: "name" -- ) ( E: -- )
+  read_word comp_local { loc }
+  loc comp_push_from_local \ mov x0, <loc> | ldr x0, [FP, <loc>]
+  fun comp_call            \ blr <fun>
+  loc comp_pop_into_local  \ mov <loc>, x0 | str x0, [FP, <loc>]
+end
+
+\ Fits the unsigned immediate accepted by our `add/sub #imm12` helpers.
+fun: comp_loc_step_imm12 { imm -- mag ok }
+  if imm >=0 then imm imm ASM_MAX_IMM12 <= ret end
+  if imm ASM_MAX_IMM12 negate >= then imm negate true ret end
+  0 false
+end
+
+fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
+  1 nil comp_args_min
+  comp_args_get dec { reg }
+  reg comp_arg { arg }
+  read_word comp_local { loc }
+  arg cf_arg_foldable_imm { imm foldable }
+  reg arg loc imm foldable
+end
+
+fun: comp_loc_step_store { loc reg -- err }
+  reg inc comp_args_set
+  loc comp_pop_into_local
+end
+
+fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
+  reg comp_realloc_reg
+  loc comp_push_from_local
+
+  reg reg inc mag asm_pattern_arith_imm
+  if imm >=0 then imm_pos_op else imm_neg_op end or comp_instr
+
+  loc reg comp_loc_step_store
+end
+
+fun: comp_loc_reg_pattern_emit { loc reg_op -- err }
+  comp_args1_reg { reg }
+  loc comp_push_from_local
+  reg reg inc reg asm_pattern_arith_reg reg_op or comp_instr
+  loc reg comp_loc_step_store
+end
+
+fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
+  1 nil comp_args_min
+  read_word comp_local reg_op comp_loc_reg_pattern_emit
+end
+
+fun: comp_loc_arg_begin { -- arg loc cur err }
+  comp_args1_reg { arg }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  arg inc { cur }
+  arg loc cur
+end
+
+fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
+  comp_loc_arg_begin { divisor loc dividend }
+  comp_alloc_next_reg { quotient }
+  quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr
+  divisor quotient divisor dividend asm_msub comp_instr
+  loc divisor comp_loc_step_store
+end
+
+fun: comp_loc_csel_step { cond -- err } ( C: "name" -- ) ( E: candidate -- )
+  comp_loc_arg_begin { candidate loc cur }
+  cur candidate asm_cmp_reg comp_instr
+  candidate cur candidate cond asm_csel comp_instr
+  loc candidate comp_loc_step_store
+end
+
+fun: comp_loc_align_down_step { -- err } ( C: "name" -- ) ( E: wid -- )
+  comp_loc_arg_begin { wid loc len }
+  wid asm_neg comp_instr
+  wid len wid asm_and_reg comp_instr
+  loc wid comp_loc_step_store
+end
+
+fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
+  comp_loc_arg_begin { wid loc len }
+  len len wid asm_add_reg comp_instr
+  len len 1   asm_sub_imm comp_instr
+  wid         asm_neg     comp_instr
+  wid len wid asm_and_reg comp_instr
+  loc wid comp_loc_step_store
+end
+
+fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
+  comp_loc_arg_begin { mask loc src }
+  src src mask  asm_and_reg comp_instr
+  mask mask     asm_rbit    comp_instr
+  mask mask     asm_clz     comp_instr
+  mask src mask asm_lsr_reg comp_instr
+  loc mask comp_loc_step_store
+end
+
+fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
+  comp_loc_arg_begin { len loc val }
+  comp_alloc_next_reg { tmp }
+  1 tmp comp_load
+  tmp tmp len asm_lsl_reg comp_instr
+  tmp tmp 1   asm_sub_imm comp_instr
+  len val tmp asm_and_reg comp_instr
+  loc len comp_loc_step_store
+end
+
+\ Mutate a local by a runtime or foldable add/sub-style constant step.
+fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
+  ( C: "name" -- ) ( E: step -- )
+
+  comp_loc_step_prepare { reg arg loc imm foldable }
+
+  if foldable then
+    imm comp_loc_step_imm12 { mag fits }
+    if fits then
+      if arg cf_arg_current then
+        arg cf_rewind_to_before_arg
+        arg cf_arg_clear
+      end
+      loc reg imm mag imm_pos_op imm_neg_op comp_loc_addsub_step_imm
+      ret
+    end
+  end
+
+  loc reg_op comp_loc_reg_pattern_emit
+end
+
 fun_comp: or { -- err } [ redefine ]
   if cf_fold_cleared2 then or cf_fold_done else { -- } execute'' or end
+end
+
+\ Bitwise or into a local: `mask or=: some_val`.
+fun_comp: or=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_ORR_REG comp_loc_reg_pattern_step
 end
 
 fun_comp: and { -- err } [ redefine ]
   if cf_fold_cleared2 then and cf_fold_done else { -- } execute'' and end
 end
 
+\ Bitwise and into a local: `mask and=: some_val`.
+fun_comp: and=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_AND_REG comp_loc_reg_pattern_step
+end
+
 fun_comp: xor { -- err } [ redefine ]
   if cf_fold_cleared2 then xor cf_fold_done else { -- } execute'' xor end
+end
+
+\ Bitwise xor into a local: `mask xor=: some_val`.
+fun_comp: xor=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_EOR_REG comp_loc_reg_pattern_step
 end
 
 fun_comp: lsl { -- err } [ redefine ]
   if cf_fold_cleared2 then lsl cf_fold_done else { -- } execute'' lsl end
 end
 
+\ Shift a local left: `bits lsl=: some_val`.
+fun_comp: lsl=: { -- err } ( C: "name" -- ) ( E: bits -- )
+  ASM_OP_LSL_REG comp_loc_reg_pattern_step
+end
+
 fun_comp: lsr { -- err } [ redefine ]
   if cf_fold_cleared2 then lsr cf_fold_done else { -- } execute'' lsr end
+end
+
+\ Shift a local right logically: `bits lsr=: some_val`.
+fun_comp: lsr=: { -- err } ( C: "name" -- ) ( E: bits -- )
+  ASM_OP_LSR_REG comp_loc_reg_pattern_step
 end
 
 fun_comp: asr { -- err } [ redefine ]
   if cf_fold_cleared2 then asr cf_fold_done else { -- } execute'' asr end
 end
 
+\ Shift a local right arithmetically: `bits asr=: some_val`.
+fun_comp: asr=: { -- err } ( C: "name" -- ) ( E: bits -- )
+  ASM_OP_ASR_REG comp_loc_reg_pattern_step
+end
+
 fun_comp: + { -- err } [ redefine ]
   if cf_fold_cleared2 then + cf_fold_done else { -- } execute'' + end
+end
+
+\ Add a step to a local: `step +=: some_val`.
+fun_comp: +=: { -- err } ( C: "name" -- ) ( E: step -- )
+  ASM_OP_ADD_IMM ASM_OP_SUB_IMM ASM_OP_ADD_REG comp_loc_addsub_step
 end
 
 fun_comp: - { -- err } [ redefine ]
   if cf_fold_cleared2 then - cf_fold_done else { -- } execute'' - end
 end
 
+\ Subtract a step from a local: `step -=: some_val`.
+fun_comp: -=: { -- err } ( C: "name" -- ) ( E: step -- )
+  ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_addsub_step
+end
+
 fun_comp: * { -- err } [ redefine ]
   if cf_fold_cleared2 then * cf_fold_done else { -- } execute'' * end
+end
+
+\ Multiply a local: `factor *=: some_val`.
+fun_comp: *=: { -- err } ( C: "name" -- ) ( E: factor -- )
+  ASM_OP_MUL_REG comp_loc_reg_pattern_step
 end
 
 fun_comp: / { -- err } [ redefine ]
   if cf_fold_cleared2 then / cf_fold_done else { -- } execute'' / end
 end
 
+\ Signed divide a local: `divisor /=: some_val`.
+fun_comp: /=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_SDIV_REG comp_loc_reg_pattern_step
+end
+
 fun_comp: u/ { -- err } [ redefine ]
   if cf_fold_cleared2 then u/ cf_fold_done else { -- } execute'' u/ end
+end
+
+\ Unsigned divide a local: `divisor u/=: some_val`.
+fun_comp: u/=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_UDIV_REG comp_loc_reg_pattern_step
 end
 
 fun_comp: mod { -- err } [ redefine ]
   if cf_fold_cleared2 then mod cf_fold_done else { -- } execute'' mod end
 end
 
+\ Signed remainder into a local: `divisor mod=: some_val`.
+fun_comp: mod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_SDIV_REG comp_loc_rem_step
+end
+
 fun_comp: umod { -- err } [ redefine ]
   if cf_fold_cleared2 then umod cf_fold_done else { -- } execute'' umod end
+end
+
+\ Unsigned remainder into a local: `divisor umod=: some_val`.
+fun_comp: umod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  ASM_OP_UDIV_REG comp_loc_rem_step
 end
 
 fun_comp: /mod { -- err } [ redefine ]
@@ -2886,9 +3081,15 @@ fun_comp: inc { -- err } [ redefine ]
   if cf_fold_cleared1 then inc cf_fold_done else { -- } execute'' inc end
 end
 
+\ Increment a local: `inc: some_val`.
+fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
+
 fun_comp: dec { -- err } [ redefine ]
   if cf_fold_cleared1 then dec cf_fold_done else { -- } execute'' dec end
 end
+
+\ Decrement a local: `dec: some_val`.
+fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
 
 fun_comp: negate { -- err } [ redefine ]
   if cf_fold_cleared1 then negate cf_fold_done else { -- } execute'' negate end
@@ -2918,16 +3119,36 @@ fun_comp: min { -- err } [ redefine ]
   if cf_fold_cleared2 then min cf_fold_done else { -- } execute'' min end
 end
 
+\ Minimum into a local: `candidate min=: some_val`.
+fun_comp: min=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  ASM_LT comp_loc_csel_step
+end
+
 fun_comp: umin { -- err } [ redefine ]
   if cf_fold_cleared2 then umin cf_fold_done else { -- } execute'' umin end
+end
+
+\ Unsigned minimum into a local: `candidate umin=: some_val`.
+fun_comp: umin=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  ASM_LO comp_loc_csel_step
 end
 
 fun_comp: max { -- err } [ redefine ]
   if cf_fold_cleared2 then max cf_fold_done else { -- } execute'' max end
 end
 
+\ Maximum into a local: `candidate max=: some_val`.
+fun_comp: max=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  ASM_GT comp_loc_csel_step
+end
+
 fun_comp: umax { -- err } [ redefine ]
   if cf_fold_cleared2 then umax cf_fold_done else { -- } execute'' umax end
+end
+
+\ Unsigned maximum into a local: `candidate umax=: some_val`.
+fun_comp: umax=: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  ASM_HI comp_loc_csel_step
 end
 
 fun_comp: int_to_cell { -- err } [ redefine ]
@@ -3028,6 +3249,11 @@ fun_comp: bits_trunc { -- err } [ redefine ]
   else { -- } execute'' bits_trunc end
 end
 
+\ Truncate a local to low bits: `len bits_trunc=: some_val`.
+fun_comp: bits_trunc=: { -- err } ( C: "name" -- ) ( E: len -- )
+  comp_loc_bits_trunc_step
+end
+
 fun_comp: bits_clear { -- err } [ redefine ]
   if cf_fold_cleared2 then bits_clear cf_fold_done
   else { -- } execute'' bits_clear end
@@ -3038,9 +3264,19 @@ fun_comp: align_down { -- err } [ redefine ]
   else { -- } execute'' align_down end
 end
 
+\ Align a local down: `wid align_down=: some_val`.
+fun_comp: align_down=: { -- err } ( C: "name" -- ) ( E: wid -- )
+  comp_loc_align_down_step
+end
+
 fun_comp: align_up { -- err } [ redefine ]
   if cf_fold_cleared2 then align_up cf_fold_done
   else { -- } execute'' align_up end
+end
+
+\ Align a local up: `wid align_up=: some_val`.
+fun_comp: align_up=: { -- err } ( C: "name" -- ) ( E: wid -- )
+  comp_loc_align_up_step
 end
 
 fun_comp: fallback { -- err } [ redefine ]
@@ -3053,9 +3289,19 @@ fun_comp: bit_mask_unset { -- err } [ redefine ]
   else { -- } execute'' bit_mask_unset end
 end
 
+\ Clear bits in a local by mask: `mask bit_mask_unset=: some_val`.
+fun_comp: bit_mask_unset=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_BIC_REG comp_loc_reg_pattern_step
+end
+
 fun_comp: bit_mask_get { -- err } [ redefine ]
   if cf_fold_cleared2 then bit_mask_get cf_fold_done
   else { -- } execute'' bit_mask_get end
+end
+
+\ Extract masked bits from a local: `mask bit_mask_get=: some_val`.
+fun_comp: bit_mask_get=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  comp_loc_bit_mask_get_step
 end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
@@ -3399,254 +3645,6 @@ fun: str<>  { str0 len0 str1 len1 -> bool } compare <>0 end
 fun: cstr=  { cstr0 cstr1 -> bool } ccompare =0  end
 fun: cstr<  { cstr0 cstr1 -> bool } ccompare <0  end
 fun: cstr<> { cstr0 cstr1 -> bool } ccompare <>0 end
-
-\ ## Locals mutation
-
-\ For compiling words which modify a local by applying the given function.
-fun: comp_loc_mut { fun -- err } ( C: "name" -- ) ( E: -- )
-  read_word comp_local { loc }
-  loc comp_push_from_local \ mov x0, <loc> | ldr x0, [FP, <loc>]
-  fun comp_call            \ blr <fun>
-  loc comp_pop_into_local  \ mov <loc>, x0 | str x0, [FP, <loc>]
-end
-
-\ Increment a local: `inc: some_val`.
-fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
-
-\ Decrement a local: `dec: some_val`.
-fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
-
-\ Fits the unsigned immediate accepted by our `add/sub #imm12` helpers.
-fun: comp_loc_step_imm12 { imm -- mag ok }
-  if imm >=0 then imm imm ASM_MAX_IMM12 <= ret end
-  if imm ASM_MAX_IMM12 negate >= then imm negate true ret end
-  0 false
-end
-
-fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
-  1 nil comp_args_min
-  comp_args_get dec { reg }
-  reg comp_arg { arg }
-  read_word comp_local { loc }
-  arg cf_arg_foldable_imm { imm foldable }
-  reg arg loc imm foldable
-end
-
-fun: comp_loc_step_store { loc reg -- err }
-  reg inc comp_args_set
-  loc comp_pop_into_local
-end
-
-fun: comp_loc_addsub_step_imm { loc reg imm mag imm_pos_op imm_neg_op -- err }
-  reg comp_realloc_reg
-  loc comp_push_from_local
-
-  reg reg inc mag asm_pattern_arith_imm
-  if imm >=0 then imm_pos_op else imm_neg_op end or comp_instr
-
-  loc reg comp_loc_step_store
-end
-
-fun: comp_loc_reg_pattern_emit { loc reg_op -- err }
-  comp_args1_reg { reg }
-  loc comp_push_from_local
-  reg reg inc reg asm_pattern_arith_reg reg_op or comp_instr
-  loc reg comp_loc_step_store
-end
-
-fun: comp_loc_reg_pattern_step { reg_op -- err } ( C: "name" -- ) ( E: step -- )
-  1 nil comp_args_min
-  read_word comp_local reg_op comp_loc_reg_pattern_emit
-end
-
-fun: comp_loc_arg_begin { -- arg loc cur err }
-  comp_args1_reg { arg }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  arg inc { cur }
-  arg loc cur
-end
-
-fun: comp_loc_rem_step { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
-  comp_loc_arg_begin { divisor loc dividend }
-  comp_alloc_next_reg { quotient }
-  quotient dividend divisor asm_pattern_arith_reg div_op or comp_instr
-  divisor quotient divisor dividend asm_msub comp_instr
-  loc divisor comp_loc_step_store
-end
-
-fun: comp_loc_csel_step { cond -- err } ( C: "name" -- ) ( E: candidate -- )
-  comp_loc_arg_begin { candidate loc cur }
-  cur candidate asm_cmp_reg comp_instr
-  candidate cur candidate cond asm_csel comp_instr
-  loc candidate comp_loc_step_store
-end
-
-fun: comp_loc_align_down_step { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_arg_begin { wid loc len }
-  wid asm_neg comp_instr
-  wid len wid asm_and_reg comp_instr
-  loc wid comp_loc_step_store
-end
-
-fun: comp_loc_align_up_step { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_arg_begin { wid loc len }
-  len len wid asm_add_reg comp_instr
-  len len 1   asm_sub_imm comp_instr
-  wid         asm_neg     comp_instr
-  wid len wid asm_and_reg comp_instr
-  loc wid comp_loc_step_store
-end
-
-fun: comp_loc_bit_mask_get_step { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_loc_arg_begin { mask loc src }
-  src src mask  asm_and_reg comp_instr
-  mask mask     asm_rbit    comp_instr
-  mask mask     asm_clz     comp_instr
-  mask src mask asm_lsr_reg comp_instr
-  loc mask comp_loc_step_store
-end
-
-fun: comp_loc_bits_trunc_step { -- err } ( C: "name" -- ) ( E: len -- )
-  comp_loc_arg_begin { len loc val }
-  comp_alloc_next_reg { tmp }
-  1 tmp comp_load
-  tmp tmp len asm_lsl_reg comp_instr
-  tmp tmp 1   asm_sub_imm comp_instr
-  len val tmp asm_and_reg comp_instr
-  loc len comp_loc_step_store
-end
-
-\ Mutate a local by a runtime or foldable add/sub-style constant step.
-fun: comp_loc_addsub_step { imm_pos_op imm_neg_op reg_op -- err }
-  ( C: "name" -- ) ( E: step -- )
-
-  comp_loc_step_prepare { reg arg loc imm foldable }
-
-  if foldable then
-    imm comp_loc_step_imm12 { mag fits }
-    if fits then
-      if arg cf_arg_current then
-        arg cf_rewind_to_before_arg
-        arg cf_arg_clear
-      end
-      loc reg imm mag imm_pos_op imm_neg_op comp_loc_addsub_step_imm
-      ret
-    end
-  end
-
-  loc reg_op comp_loc_reg_pattern_emit
-end
-
-\ Add a step to a local: `step +=: some_val`.
-fun_comp: +=: { -- err } ( C: "name" -- ) ( E: step -- )
-  ASM_OP_ADD_IMM ASM_OP_SUB_IMM ASM_OP_ADD_REG comp_loc_addsub_step
-end
-
-\ Subtract a step from a local: `step -=: some_val`.
-fun_comp: -=: { -- err } ( C: "name" -- ) ( E: step -- )
-  ASM_OP_SUB_IMM ASM_OP_ADD_IMM ASM_OP_SUB_REG comp_loc_addsub_step
-end
-
-\ Bitwise and into a local: `mask and=: some_val`.
-fun_comp: and=: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_AND_REG comp_loc_reg_pattern_step
-end
-
-\ Bitwise or into a local: `mask or=: some_val`.
-fun_comp: or=: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_ORR_REG comp_loc_reg_pattern_step
-end
-
-\ Bitwise xor into a local: `mask xor=: some_val`.
-fun_comp: xor=: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_EOR_REG comp_loc_reg_pattern_step
-end
-
-\ Clear bits in a local by mask: `mask bit_mask_unset=: some_val`.
-fun_comp: bit_mask_unset=: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_BIC_REG comp_loc_reg_pattern_step
-end
-
-\ Shift a local left: `bits lsl=: some_val`.
-fun_comp: lsl=: { -- err } ( C: "name" -- ) ( E: bits -- )
-  ASM_OP_LSL_REG comp_loc_reg_pattern_step
-end
-
-\ Shift a local right logically: `bits lsr=: some_val`.
-fun_comp: lsr=: { -- err } ( C: "name" -- ) ( E: bits -- )
-  ASM_OP_LSR_REG comp_loc_reg_pattern_step
-end
-
-\ Shift a local right arithmetically: `bits asr=: some_val`.
-fun_comp: asr=: { -- err } ( C: "name" -- ) ( E: bits -- )
-  ASM_OP_ASR_REG comp_loc_reg_pattern_step
-end
-
-\ Multiply a local: `factor *=: some_val`.
-fun_comp: *=: { -- err } ( C: "name" -- ) ( E: factor -- )
-  ASM_OP_MUL_REG comp_loc_reg_pattern_step
-end
-
-\ Unsigned divide a local: `divisor u/=: some_val`.
-fun_comp: u/=: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_UDIV_REG comp_loc_reg_pattern_step
-end
-
-\ Signed divide a local: `divisor /=: some_val`.
-fun_comp: /=: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_SDIV_REG comp_loc_reg_pattern_step
-end
-
-\ Signed remainder into a local: `divisor mod=: some_val`.
-fun_comp: mod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_SDIV_REG comp_loc_rem_step
-end
-
-\ Unsigned remainder into a local: `divisor umod=: some_val`.
-fun_comp: umod=: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_UDIV_REG comp_loc_rem_step
-end
-
-\ Minimum into a local: `candidate min=: some_val`.
-fun_comp: min=: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_LT comp_loc_csel_step
-end
-
-\ Unsigned minimum into a local: `candidate umin=: some_val`.
-fun_comp: umin=: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_LO comp_loc_csel_step
-end
-
-\ Maximum into a local: `candidate max=: some_val`.
-fun_comp: max=: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_GT comp_loc_csel_step
-end
-
-\ Unsigned maximum into a local: `candidate umax=: some_val`.
-fun_comp: umax=: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  ASM_HI comp_loc_csel_step
-end
-
-\ Align a local down: `wid align_down=: some_val`.
-fun_comp: align_down=: { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_align_down_step
-end
-
-\ Align a local up: `wid align_up=: some_val`.
-fun_comp: align_up=: { -- err } ( C: "name" -- ) ( E: wid -- )
-  comp_loc_align_up_step
-end
-
-\ Extract masked bits from a local: `mask bit_mask_get=: some_val`.
-fun_comp: bit_mask_get=: { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_loc_bit_mask_get_step
-end
-
-\ Truncate a local to low bits: `len bits_trunc=: some_val`.
-fun_comp: bits_trunc=: { -- err } ( C: "name" -- ) ( E: len -- )
-  comp_loc_bits_trunc_step
-end
 
 \ ## Vargs and formatting
 
