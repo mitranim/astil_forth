@@ -632,6 +632,14 @@ fun: loc_logic_or_fun { mask -- out0 out1 }
   val0 val1
 end
 
+fun: loc_logic_xor_fun { mask -- out0 out1 }
+  0b110101 { val0 }
+  mask xor=: val0
+  0b110101 { val1 }
+  0b001010 xor=: val1
+  val0 val1
+end
+
 fun: test_const_fold_loc_step { -- err }
   T{ 7 loc_step_fun <T> 17 3 }T
   T{ 10 const_fold_loc_step_fun <T> 15 12 4108 }T
@@ -639,6 +647,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ const_fold_loc_step_min_fun <T> -9223372036854775798 }T
   T{ 0b101010 loc_logic_and_fun <T> 0b100000 0b110100 }T
   T{ 0b001010 loc_logic_or_fun <T> 0b111111 0b111111 }T
+  T{ 0b101010 loc_logic_xor_fun <T> 0b011111 0b111111 }T
   ifz has_interp then ret end
 
   cf_expect_clear

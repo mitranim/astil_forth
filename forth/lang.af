@@ -511,6 +511,12 @@ fun: asm_orr_reg { Xd Xn Xm -> instr }
   asm_pattern_arith_reg ASM_OP_ORR_REG or
 end
 
+\ eor Xd, Xn, Xm
+0b1_10_01010_00_0_00000_000000_00000_00000 let: ASM_OP_EOR_REG
+fun: asm_eor_reg { Xd Xn Xm -> instr }
+  asm_pattern_arith_reg ASM_OP_EOR_REG or
+end
+
 \ and Xd, Xn, Xm
 0b1_00_01010_00_0_00000_000000_00000_00000 let: ASM_OP_AND_REG
 fun: asm_and_reg { Xd Xn Xm -> instr }
@@ -578,11 +584,6 @@ end
 
 \ Arithmetic (sign-preserving) right shift.
 fun: asr { i0 bits -> i1 } [ 0 0 1 asm_asr_reg comp_out0 ] end \ asr x0, x0, x1
-
-\ eor Xd, Xn, Xm
-fun: asm_eor_reg { Xd Xn Xm -> instr }
-  asm_pattern_arith_reg 0b1_10_01010_00_0_00000_000000_00000_00000 or
-end
 
 \ lsl Xd, Xn, Xm
 fun: asm_lsl_reg { Xd Xn Xm -> instr }
@@ -3490,6 +3491,11 @@ end
 \ Bitwise or into a local: `mask or=: some_val`.
 fun_comp: or=: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_ORR_REG comp_loc_reg_pattern_step
+end
+
+\ Bitwise xor into a local: `mask xor=: some_val`.
+fun_comp: xor=: { -- err } ( C: "name" -- ) ( E: mask -- )
+  ASM_OP_EOR_REG comp_loc_reg_pattern_step
 end
 
 \ ## Vargs and formatting
