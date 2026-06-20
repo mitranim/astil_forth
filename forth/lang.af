@@ -2945,29 +2945,19 @@ fun: cf_fold_shift_imm_args { -- reg0 arg1 imm ok err }
   reg0 arg1 imm true
 end
 
-fun: cf_fold_lsl_imm { -- ok err }
+fun: cf_fold_shift_imm { bitfield_op lsl -- ok err }
   cf_fold_shift_imm_args { reg0 arg1 imm ok }
   ifz ok then false ret end
 
-  reg0 reg0 imm asm_lsl_imm { instr }
-  reg0 arg1 instr cf_fold_reg0_arg1_instr
-  true
-end
+  if lsl then
+    64 imm - 6 bits_trunc { immr }
+    63 imm - 6 bits_trunc { imms }
+  else
+    imm 6 bits_trunc { immr }
+    63 { imms }
+  end
 
-fun: cf_fold_lsr_imm { -- ok err }
-  cf_fold_shift_imm_args { reg0 arg1 imm ok }
-  ifz ok then false ret end
-
-  reg0 reg0 imm asm_lsr_imm { instr }
-  reg0 arg1 instr cf_fold_reg0_arg1_instr
-  true
-end
-
-fun: cf_fold_asr_imm { -- ok err }
-  cf_fold_shift_imm_args { reg0 arg1 imm ok }
-  ifz ok then false ret end
-
-  reg0 reg0 imm asm_asr_imm { instr }
+  reg0 reg0 immr imms bitfield_op asm_bitfield { instr }
   reg0 arg1 instr cf_fold_reg0_arg1_instr
   true
 end
@@ -3159,7 +3149,8 @@ end
 
 fun_comp: lsl { -- err } [ redefine ]
   if cf_fold_cleared2 then lsl cf_fold_done
-  else { -- } if cf_fold_lsl_imm then ret end execute'' lsl end
+  else { -- } ifz ASM_OP_UBFM true cf_fold_shift_imm then execute'' lsl end
+  end
 end
 
 \ Shift a local left: `bits lsl: some_val`.
@@ -3169,7 +3160,8 @@ end
 
 fun_comp: lsr { -- err } [ redefine ]
   if cf_fold_cleared2 then lsr cf_fold_done
-  else { -- } if cf_fold_lsr_imm then ret end execute'' lsr end
+  else { -- } ifz ASM_OP_UBFM false cf_fold_shift_imm then execute'' lsr end
+  end
 end
 
 \ Shift a local right logically: `bits lsr: some_val`.
@@ -3179,7 +3171,8 @@ end
 
 fun_comp: asr { -- err } [ redefine ]
   if cf_fold_cleared2 then asr cf_fold_done
-  else { -- } if cf_fold_asr_imm then ret end execute'' asr end
+  else { -- } ifz ASM_OP_SBFM false cf_fold_shift_imm then execute'' asr end
+  end
 end
 
 \ Shift a local right arithmetically: `bits asr: some_val`.
