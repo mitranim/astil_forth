@@ -2760,12 +2760,16 @@ fun: cf_foldables3 { reg0 reg1 reg2 -- arg0 arg1 arg2 imm0 imm1 imm2 ok err }
   0 0 0 0 0 0 false
 end
 
-fun: cf_fold_cleared1 { -- reg imm ok err }
+fun: cf_top_arg_foldable { -- reg arg imm ok err }
   1 nil comp_args_min
   comp_args_get dec { reg }
-
   reg comp_arg { arg }
   arg cf_arg_foldable_imm { imm ok }
+  reg arg imm ok
+end
+
+fun: cf_fold_cleared1 { -- reg imm ok err }
+  cf_top_arg_foldable { reg arg imm ok }
 
   ifz ok then reg 0 false ret end
   ifz arg cf_arg_current then reg 0 false ret end
@@ -2836,11 +2840,8 @@ fun: comp_loc_step_imm12 { imm -- mag ok }
 end
 
 fun: comp_loc_step_prepare { -- reg arg loc imm foldable err }
-  1 nil comp_args_min
-  comp_args_get dec { reg }
-  reg comp_arg { arg }
+  cf_top_arg_foldable { reg arg imm foldable }
   read_word comp_local { loc }
-  arg cf_arg_foldable_imm { imm foldable }
   reg arg loc imm foldable
 end
 
