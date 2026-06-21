@@ -82,7 +82,7 @@ fun: scan { pat len -- count }
   [ 0 4 5 comp_u16x8_pair_sum_umov_d0 1 comp_args_set ]
 end
 
-fun: main { -- exit }
+fun: run { -- err }
   init
   0 { out }
   RUNS { run }
@@ -92,6 +92,11 @@ fun: main { -- exit }
     BUF CAP scan +: out
   end
   " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
-  if out WANT <> then 1 else 0 end
+  assert out WANT = end
+end
+
+fun: main { -- exit }
+  catch' run { err }
+  ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 main

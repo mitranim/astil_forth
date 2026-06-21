@@ -14,7 +14,7 @@ fun: runtime_step { acc -- out }
   acc runtime_const acc +
 end
 
-fun: main { -- exit }
+fun: run { -- err }
   0 { acc }
 
   RUNS { ind }
@@ -24,6 +24,11 @@ fun: main { -- exit }
     acc runtime_step { acc }
   end
 
-  if acc EXPECT <> then 1 else 0 end
+  assert acc EXPECT = end
+end
+
+fun: main { -- exit }
+  run { err }
+  ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 main

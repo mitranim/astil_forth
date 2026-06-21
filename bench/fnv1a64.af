@@ -33,7 +33,7 @@ fun: fnv1a64 { hash buf len -- out }
   hash
 end
 
-fun: main { -- exit }
+fun: run { -- err }
   init
   OFFSET { hash }
   RUNS { runs }
@@ -43,6 +43,11 @@ fun: main { -- exit }
     hash BUF CAP fnv1a64 { hash }
   end
   " FNV1A64_PRINT" getenv if then " 0x%zx" hash logf lf end
-  if hash WANT <> then 1 else 0 end
+  assert hash WANT = end
+end
+
+fun: main { -- exit }
+  run { err }
+  ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 main
