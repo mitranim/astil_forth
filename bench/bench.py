@@ -164,6 +164,18 @@ bench("const_fold_runtime_astil_aot", "bench/const_fold_runtime.af", "bench/cons
 bench("const_fold_folded_astil_reg", "bench/const_fold_folded.af", "./astil.exe bench/const_fold_folded.af", setup=(BUILD,), tools=("clang",))
 bench("const_fold_runtime_astil_reg", "bench/const_fold_runtime.af", "./astil.exe bench/const_fold_runtime.af", setup=(BUILD,), tools=("clang",))
 
+section("FNV-1A 64")
+bench("fnv1a64_clang", "bench/fnv1a64.c", "bench/fnv1a64.exe", setup=c_exe("bench/fnv1a64.c", "bench/fnv1a64.exe"), tools=("clang",))
+bench("fnv1a64_astil_aot", "bench/fnv1a64.af", "bench/fnv1a64_astil.exe", setup=aot("bench/fnv1a64.af", "bench/fnv1a64_astil.exe"), tools=("clang",))
+bench("fnv1a64_astil_reg", "bench/fnv1a64.af", "./astil.exe bench/fnv1a64.af", setup=(BUILD,), tools=("clang",))
+bench("fnv1a64_astil_stack", "bench/fnv1a64_s.af", "./astil_s.exe bench/fnv1a64_s.af", setup=(BUILD,), tools=("clang",))
+bench("fnv1a64_gforth", "bench/fnv1a64_g.fs", "gforth bench/fnv1a64_g.fs -e bye", tools=("gforth",))
+bench("fnv1a64_luajit", "bench/fnv1a64.lua", "luajit bench/fnv1a64.lua", tools=("luajit",))
+bench("fnv1a64_js_bun", "bench/fnv1a64.mjs", "bun run bench/fnv1a64.mjs", tools=("bun",))
+bench("fnv1a64_cl_sbcl", "bench/fnv1a64.lisp", "sbcl --script bench/fnv1a64.lisp", tools=("sbcl",))
+bench("fnv1a64_pypy", "bench/fnv1a64.py", "pypy3 bench/fnv1a64.py", tools=("pypy3",))
+bench("fnv1a64_python", "bench/fnv1a64.py", "python3 bench/fnv1a64.py", tools=("python3",))
+
 section("SCAN DELIMS")
 bench("scan_delims_c_simd", "bench/scan_delims_simd.c", "bench/scan_delims_simd.exe", setup=c_exe("bench/scan_delims_simd.c", "bench/scan_delims_simd.exe"), tools=("clang",))
 bench("scan_delims_c_naive", "bench/scan_delims_naive.c", "bench/scan_delims_naive.exe", setup=c_exe("bench/scan_delims_naive.c", "bench/scan_delims_naive.exe"), tools=("clang",))

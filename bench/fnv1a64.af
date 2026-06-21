@@ -1,0 +1,48 @@
+use' lang.af
+
+\ BOT-ASSISTED
+
+0xcbf29ce484222325 let: OFFSET
+0x100000001b3      let: PRIME
+0x8d8a704cbb222325 let: WANT
+512   let: RUNS
+65536 let: CAP
+CAP   mem: BUF
+
+1 1 extern: getenv
+
+fun: init
+  s" 0123456789abcdef" { chunk len }
+  BUF { ptr }
+  0 { ind }
+  loop
+    ptr BUF CAP + < while
+    chunk ind len mod + @u8 ptr !8
+    inc: ptr
+    inc: ind
+  end
+end
+
+fun: fnv1a64 { hash buf len -- out }
+  buf { ptr }
+  loop
+    ptr buf len + < while
+    hash ptr @u8 xor PRIME * { hash }
+    inc: ptr
+  end
+  hash
+end
+
+fun: main { -- exit }
+  init
+  OFFSET { hash }
+  RUNS { runs }
+  loop
+    dec: runs
+    runs >=0 while
+    hash BUF CAP fnv1a64 { hash }
+  end
+  " FNV1A64_PRINT" getenv if then " 0x%zx" hash logf lf end
+  if hash WANT <> then 1 else 0 end
+end
+main
