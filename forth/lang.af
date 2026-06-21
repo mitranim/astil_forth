@@ -3159,6 +3159,19 @@ fun: cf_bits_trunc_validate { len _ -- aux ok }
   len low_bits ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
 end
 
+fun: cf_bit_mask_get_validate { mask _ -- aux ok }
+  mask ASM_OP_AND_IMM catch' asm_logical_imm_mask { instr_mask err }
+  if err then nil false ret end
+  mask bit_ctz 32 lsl instr_mask or true
+end
+
+fun: cf_bit_mask_get_emit { out src _mask aux -- err }
+  aux 32 bits_trunc { instr_mask }
+  aux 32 lsr        { shift      }
+  instr_mask src 5 lsl or out or comp_instr \ and Xd, Xn, #imm
+  out out shift asm_lsr_imm comp_instr      \ lsr Xd, Xn, #imm6
+end
+
 fun: cf_addsub_validate { imm add -- aux ok }
   imm cf_addsub_imm12_mag { -- ok }
   add ok
@@ -3295,10 +3308,10 @@ fun: comp_loc_mut_align_up_fallback { reg loc _ -- err }
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_mut_bit_mask_get { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_loc_arg_init { mask src loc }
-  mask src src mask comp_emit_bit_mask_get
-  loc mask comp_loc_mut_store
+fun: comp_loc_mut_bit_mask_get_fallback { reg loc _ -- err }
+  loc comp_push_from_local
+  reg reg inc reg inc reg comp_emit_bit_mask_get
+  loc reg comp_loc_mut_store
 end
 
 fun: comp_loc_mut_bit_mask_set { -- err } ( C: "name" -- ) ( E: inp mask -- )
@@ -4034,12 +4047,20 @@ end
 
 fun_comp: bit_mask_get { -- err } [ redefine ]
   if cf_fold_cleared2 then bit_mask_get cf_fold_done
-  else { -- } execute'' bit_mask_get end
+  else
+    { -- }
+    false nil nil
+    instr' cf_bit_mask_get_validate instr' cf_bit_mask_get_emit
+    if cf_fold2 then ret end
+    execute'' bit_mask_get
+  end
 end
 
 \ Extract masked bits from a local: `mask bit_mask_get: some_val`.
 fun_comp: bit_mask_get: { -- err } ( C: "name" -- ) ( E: mask -- )
-  comp_loc_mut_bit_mask_get
+  nil instr' comp_loc_mut_bit_mask_get_fallback
+  nil instr' cf_bit_mask_get_validate instr' cf_bit_mask_get_emit
+  comp_loc_mut_imm_fallback
 end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
