@@ -265,6 +265,7 @@ static Err comp_register_clobber(Comp *comp, U8 reg) {
   return nullptr;
 }
 
+// See comment on `Local` for explanation.
 static Err comp_forget_reg(Comp *comp, U8 reg) {
   try(asm_validate_arg_reg(reg));
 
@@ -744,13 +745,6 @@ static Err comp_before_append_ret(Comp *comp) {
     ": unable to compile return: redundant nil error; hint: the compiler implicitly inserts nil error values",
     sym->name.buf
   );
-}
-
-// See comment on `Local` for explanation.
-static Err comp_barrier(Comp *comp) {
-  try(comp_require_current_sym(comp, nullptr));
-  try(comp_forget_regs(comp, ASM_REGS_VOLATILE));
-  return nullptr;
 }
 
 static Err err_alloca_size_zero() {

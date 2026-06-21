@@ -14,8 +14,7 @@ static Err err_redundant_param(const char *name, const char *infix) {
 
 static Err err_non_trailing_discard_param_push(const char *name) {
   return errf(
-    "in " FMT_QUOTED
-    ": unable to use non-trailing discard parameter with `->`",
+    "in " FMT_QUOTED ": unable to use non-trailing discard parameter with `->`",
     name
   );
 }
@@ -84,7 +83,7 @@ static Err interp_parse_params(Interp *interp) {
       return err_non_trailing_discard_param_push(sym->name.buf);
     }
 
-    const U8 arg_len = sym->inp_len - (U8)trailing_discard_len;
+    const U8 arg_len  = sym->inp_len - (U8)trailing_discard_len;
     comp->ctx.arg_len = arg_len;
 
     for (U8 ind = 0; ind < arg_len; ind++) {
@@ -240,7 +239,6 @@ static Err intrin_recur(Interp *interp) {
   try(interp_require_current_sym(interp, &sym));
 
   const auto comp = &interp->comp;
-
   try(comp_validate_recur_args(comp));
 
   /*
@@ -249,6 +247,7 @@ static Err intrin_recur(Interp *interp) {
   all locals at this callsite.
   */
   try(comp_forget_regs(comp, ASM_REGS_VOLATILE));
+  bits_add_all_to(&sym->clobber, ASM_REGS_VOLATILE);
   try(comp_append_recur(comp));
 
   comp->ctx.arg_len = sym->out_len;
@@ -530,7 +529,7 @@ static Err intrin_comp_args_set(Sint len, Interp *interp) {
 }
 
 static Err intrin_comp_barrier(Interp *interp) {
-  return comp_barrier(&interp->comp);
+  return comp_forget_regs(&interp->comp, ASM_REGS_VOLATILE);
 }
 
 static Err intrin_comp_alloc_next_reg(Interp *interp, Sint *out) {

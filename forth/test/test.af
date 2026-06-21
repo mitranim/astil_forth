@@ -414,6 +414,18 @@ fun: test_recursion { -- err }
 end
 test_recursion
 
+fun: recursive_fib_fun { ind -- out }
+  if ind 1 <= then 1 ret end
+  ind 1 - recur { prev }
+  ind 2 - recur
+  prev +
+end
+
+fun: test_recursive_saved_local { -- err }
+  T{ 10 recursive_fib_fun <T> 89 }T
+end
+test_recursive_saved_local
+
 fun: recur_reg_clobber_fun { val -- out }
   -1 -2   { -- }            \ Unconditionally clobber x0 x1.
   ifz val then 0 ret end
