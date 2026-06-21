@@ -2875,90 +2875,19 @@ fun: cf_arg_current { arg -- ok }
   arg comp_arg_imm_ceil len =
 end
 
-fun: cf_args_contiguous { arg0 arg1 -- ok }
-  comp_code_len           { code_len }
-  arg0 comp_arg_imm_ceil  { ceil0 }
-  arg1 comp_arg_imm_floor { floor1 }
-  arg1 comp_arg_imm_ceil  { ceil1 }
-  code_len ceil1 = ceil0 floor1 = and
-end
-
-fun: cf_args_contiguous3 { arg0 arg1 arg2 -- ok }
-  comp_code_len           { code_len }
-  arg0 comp_arg_imm_ceil  { ceil0 }
-  arg1 comp_arg_imm_floor { floor1 }
-  arg1 comp_arg_imm_ceil  { ceil1 }
-  arg2 comp_arg_imm_floor { floor2 }
-  arg2 comp_arg_imm_ceil  { ceil2 }
-  code_len ceil2 = ceil1 floor2 = and ceil0 floor1 = and
-end
-
-fun: cf_rewind_to_before_arg { arg }
-  comp_writable_instrs { instrs }
-  arg comp_arg_imm_floor instrs Interp_list_len !32
-end
-
 fun: cf_arg_clear { arg }
   0 arg Interp_comp_arg_imm_field Interp_reg_imm_has_imm !b
 end
 
 fun: cf_arg_rewind_clear { arg }
-  arg cf_rewind_to_before_arg
+  comp_writable_instrs { instrs }
+  arg comp_arg_imm_floor instrs Interp_list_len !32
   arg cf_arg_clear
-end
-
-fun: cf_arg_read_fixup { arg reg -- fix ok }
-  arg Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
-  ifz fix then nil false ret end
-  if fix Interp_loc_fixup_type @cint LOC_FIX_READ <> then nil false ret end
-  if fix Interp_loc_fixup_read Interp_loc_read_reg @b reg <> then nil false ret end
-  fix true
-end
-
-fun: cf_read_fixup_move_here { fix -- err }
-  here_write fix Interp_loc_fixup_read Interp_loc_read_instr !
-  ASM_PLACEHOLDER comp_instr
 end
 
 fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
   Xd Xn imm12 asm_pattern_arith_imm
   if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or
-end
-
-fun: cf_fold_rhs_imm { reg0 arg1 imm aux emit -- err }
-  arg1 cf_arg_rewind_clear
-  reg0 comp_realloc_reg
-  reg0 reg0 imm aux emit execute_raw [ 1 comp_args_set ] try
-  reg0 inc comp_args_set
-end
-
-fun: cf_fold_rhs_imm_checked { reg0 arg1 imm aux emit ok -- ok err }
-  ifz ok then false ret end
-  ifz arg1 cf_arg_current then false ret end
-
-  reg0 arg1 imm aux emit cf_fold_rhs_imm
-  true
-end
-
-fun: cf_fold_lhs_imm { reg0 reg1 arg0 arg1 imm0 aux emit -- ok err }
-  arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc1 }
-  ifz loc1 then false ret end
-
-  comp_code_len { code_len }
-  arg0 comp_arg_imm_ceil { ceil0 }
-  nil { fix1 }
-  if code_len ceil0 <> then
-    if code_len ceil0 inc <> then false ret end
-    arg1 reg1 cf_arg_read_fixup { fix1 ok }
-    ifz ok then false ret end
-  end
-
-  arg0 cf_arg_rewind_clear
-  if fix1 then fix1 cf_read_fixup_move_here end
-  reg0 comp_realloc_reg
-  reg0 reg1 imm0 aux emit execute_raw [ 1 comp_args_set ] try
-  reg0 inc comp_args_set
-  true
 end
 
 fun: cf_imm_u12 { imm -- ok }
@@ -2982,27 +2911,17 @@ fun: cf_foldables2 { reg0 reg1 -- arg0 arg1 imm0 imm1 ok err }
   arg1 cf_arg_foldable_imm { imm1 ok1 }
 
   if ok0 ok1 and then
-    if arg0 arg1 cf_args_contiguous then arg0 arg1 imm0 imm1 true ret end
-  end
+    comp_code_len           { code_len }
+    arg0 comp_arg_imm_ceil  { ceil0 }
+    arg1 comp_arg_imm_floor { floor1 }
+    arg1 comp_arg_imm_ceil  { ceil1 }
 
-  0 0 0 0 false
-end
-
-fun: cf_foldables3 { reg0 reg1 reg2 -- arg0 arg1 arg2 imm0 imm1 imm2 ok err }
-  reg0 comp_arg            { arg0 }
-  reg1 comp_arg            { arg1 }
-  reg2 comp_arg            { arg2 }
-  arg0 cf_arg_foldable_imm { imm0 ok0 }
-  arg1 cf_arg_foldable_imm { imm1 ok1 }
-  arg2 cf_arg_foldable_imm { imm2 ok2 }
-
-  if ok0 ok1 ok2 and and then
-    if arg0 arg1 arg2 cf_args_contiguous3 then
-      arg0 arg1 arg2 imm0 imm1 imm2 true ret
+    if code_len ceil1 = ceil0 floor1 = and then
+      arg0 arg1 imm0 imm1 true ret
     end
   end
 
-  0 0 0 0 0 0 false
+  0 0 0 0 false
 end
 
 fun: cf_top_arg_foldable { -- reg arg imm ok err }
@@ -3043,17 +2962,6 @@ fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
   reg0 reg1 imm0 imm1 true
 end
 
-fun: cf_fold_cleared3 { -- reg imm0 imm1 imm2 ok err }
-  comp_top_arg_regs3           { reg0 reg1 reg2 }
-  reg0 reg1 reg2 cf_foldables3 { arg0 arg1 arg2 imm0 imm1 imm2 ok }
-
-  ifz ok then 0 0 0 0 false ret end
-  arg0 cf_arg_rewind_clear
-  arg1 cf_arg_clear
-  arg2 cf_arg_clear
-  reg0 imm0 imm1 imm2 true
-end
-
 fun: cf_fold_done { reg imm -- err }
   imm reg comp_load
   reg inc comp_args_set
@@ -3084,7 +2992,14 @@ fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
   if foldable then
     \ RHS constant: `num 10 +`.
     imm rhs_aux validate cf_validate { aux ok }
-    reg0 arg1 imm aux emit ok cf_fold_rhs_imm_checked ret
+    ifz ok then false ret end
+    ifz arg1 cf_arg_current then false ret end
+
+    arg1 cf_arg_rewind_clear
+    reg0 comp_realloc_reg
+    reg0 reg0 imm aux emit execute_raw [ 1 comp_args_set ] try
+    reg0 inc comp_args_set
+    true ret
   end
 
   ifz lhs then false ret end
@@ -3096,7 +3011,32 @@ fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
   \ LHS constant: `10 num +`.
   imm lhs_aux validate cf_validate { aux ok }
   ifz ok then false ret end
-  reg0 reg1 arg0 arg1 imm aux emit cf_fold_lhs_imm
+
+  arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc1 }
+  ifz loc1 then false ret end
+
+  comp_code_len { code_len }
+  arg0 comp_arg_imm_ceil { ceil0 }
+  nil { fix1 }
+  if code_len ceil0 <> then
+    if code_len ceil0 inc <> then false ret end
+
+    arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
+    ifz fix then false ret end
+    if fix Interp_loc_fixup_type @cint LOC_FIX_READ <> then false ret end
+    if fix Interp_loc_fixup_read Interp_loc_read_reg @b reg1 <> then false ret end
+    fix { fix1 }
+  end
+
+  arg0 cf_arg_rewind_clear
+  if fix1 then
+    here_write fix1 Interp_loc_fixup_read Interp_loc_read_instr !
+    ASM_PLACEHOLDER comp_instr
+  end
+  reg0 comp_realloc_reg
+  reg0 reg1 imm aux emit execute_raw [ 1 comp_args_set ] try
+  reg0 inc comp_args_set
+  true
 end
 
 fun: cf_shift_validate { imm reg_op -- aux ok err }
@@ -3159,14 +3099,11 @@ fun: cf_bits_trunc_validate { len _ -- aux ok err }
   len low_bits ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
 end
 
-fun: cf_bit_mask_valid { mask -- ok }
-  ifz mask then false ret end
-  mask mask bit_ctz lsr { packed }
-  packed packed inc and =0
-end
-
 fun: cf_bit_mask_validate { mask -- err }
-  if mask cf_bit_mask_valid then ret end
+  if mask then
+    mask mask bit_ctz lsr { packed }
+    if packed packed inc and =0 then ret end
+  end
   " invalid bit mask: expected nonzero contiguous mask" throw
 end
 
@@ -3267,14 +3204,17 @@ fun: comp_loc_mut_imm_fallback { fallback_aux fallback aux validate emit -- err 
   reg loc fallback_aux fallback execute_raw [ 1 comp_args_set ] try
 end
 
-fun: comp_loc_mut_reg_op_fallback { _reg loc reg_op -- err }
-  loc reg_op comp_loc_emit_arith_reg
-end
-
 fun: comp_loc_mut_imm { reg_op aux validate emit -- err }
   ( C: "name" -- ) ( E: imm -- )
 
-  reg_op instr' comp_loc_mut_reg_op_fallback aux validate emit comp_loc_mut_imm_fallback
+  comp_loc_mut_arg_prepare { reg arg loc imm foldable }
+
+  if foldable then
+    imm aux validate cf_validate { aux ok }
+    if reg arg loc imm aux emit ok comp_loc_mut_fold_imm_checked then ret end
+  end
+
+  loc reg_op comp_loc_emit_arith_reg
 end
 
 fun: comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
@@ -3289,23 +3229,12 @@ fun: comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   loc reg comp_loc_mut_store
 end
 
-fun: comp_loc_mut_arith_reg { reg_op -- err } ( C: "name" -- ) ( E: imm -- )
-  1 nil comp_args_min
-  read_word comp_local reg_op comp_loc_emit_arith_reg
-end
-
 fun: comp_loc_arg_init { -- arg cur loc err }
   comp_args1_reg { arg }
   read_word comp_local { loc }
   loc comp_push_from_local
   arg inc { cur }
   arg cur loc
-end
-
-fun: comp_loc_mut_mod { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
-  comp_loc_arg_init { divisor dividend loc }
-  divisor dividend divisor div_op comp_emit_mod
-  loc divisor comp_loc_mut_store
 end
 
 fun: comp_loc_mut_mod_fallback { divisor loc div_op -- err }
@@ -3362,15 +3291,6 @@ fun: comp_loc_mut_bit_mask_get_fallback { reg loc _ -- err }
   loc comp_push_from_local
   reg reg inc reg inc reg comp_emit_bit_mask_get
   loc reg comp_loc_mut_store
-end
-
-fun: comp_loc_mut_bit_mask_set { -- err } ( C: "name" -- ) ( E: inp mask -- )
-  comp_args2_regs { inp mask }
-  read_word comp_local { loc }
-  loc comp_push_from_local
-  mask inc { src }
-  inp src mask comp_emit_bit_mask_set
-  loc inp comp_loc_mut_store
 end
 
 fun: comp_loc_mut_bits_trunc_fallback { reg loc _ -- err }
@@ -3550,7 +3470,8 @@ end
 
 \ Signed divide a local: `divisor /: some_val`.
 fun_comp: /: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_SDIV_REG comp_loc_mut_arith_reg
+  1 nil comp_args_min
+  read_word comp_local ASM_OP_SDIV_REG comp_loc_emit_arith_reg
 end
 
 fun_comp: u/ { -- err } [ redefine ]
@@ -3577,7 +3498,9 @@ end
 
 \ Signed remainder into a local: `divisor mod: some_val`.
 fun_comp: mod: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_SDIV_REG comp_loc_mut_mod
+  comp_loc_arg_init { divisor dividend loc }
+  divisor dividend divisor ASM_OP_SDIV_REG comp_emit_mod
+  loc divisor comp_loc_mut_store
 end
 
 fun_comp: umod { -- err } [ redefine ]
@@ -4146,7 +4069,29 @@ fun_comp: bit_mask_get: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
-  if cf_fold_cleared3 then { reg inp src mask }
+  comp_top_arg_regs3 { reg src_reg mask_reg }
+  reg      comp_arg { arg0 }
+  src_reg  comp_arg { arg1 }
+  mask_reg comp_arg { arg2 }
+  arg0 cf_arg_foldable_imm { inp  ok0 }
+  arg1 cf_arg_foldable_imm { src  ok1 }
+  arg2 cf_arg_foldable_imm { mask ok2 }
+
+  if ok0 ok1 ok2 and and then
+    comp_code_len           { code_len }
+    arg0 comp_arg_imm_ceil  { ceil0 }
+    arg1 comp_arg_imm_floor { floor1 }
+    arg1 comp_arg_imm_ceil  { ceil1 }
+    arg2 comp_arg_imm_floor { floor2 }
+    arg2 comp_arg_imm_ceil  { ceil2 }
+
+    ifz code_len ceil2 = ceil1 floor2 = and ceil0 floor1 = and then
+      execute'' bit_mask_set ret
+    end
+
+    arg0 cf_arg_rewind_clear
+    arg1 cf_arg_clear
+    arg2 cf_arg_clear
     mask cf_bit_mask_validate
     reg inp src mask bit_mask_set cf_fold_done
   \ No partial CF yet: useful for constant masks, but requires ternary partial-CF.
@@ -4155,7 +4100,12 @@ end
 
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
 fun_comp: bit_mask_set: { -- err } ( C: "name" -- ) ( E: inp mask -- )
-  comp_loc_mut_bit_mask_set
+  comp_args2_regs { inp mask }
+  read_word comp_local { loc }
+  loc comp_push_from_local
+  mask inc { src }
+  inp src mask comp_emit_bit_mask_set
+  loc inp comp_loc_mut_store
 end
 
 \ ## Stack manipulation continued
