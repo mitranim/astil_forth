@@ -1577,11 +1577,15 @@ fun: test_const_fold_all { -- err }
   test_comp_instr_clobbers_imm
   test_comp_args_set_clears_added_imm
   test_comp_args_set_clears_truncated_imm
+  test_comp_args_set_clears_added_local
+  test_comp_args_set_clears_truncated_local
+  test_comp_args_set_max_len
   test_const_fold_fallback_0_1
   test_const_fold_large_imm
   test_const_fold_ugly_imm
   test_const_fold_negative_lane_imm
   test_const_fold_unary
+  test_const_fold_bit_count
   test_const_fold_zero_cmp
   test_const_fold_bit_shift
   test_const_fold_bit_mask_get_set
@@ -1589,6 +1593,7 @@ fun: test_const_fold_all { -- err }
   test_const_fold_compare2
   test_const_fold_ucompare2
   test_const_fold_derived
+  test_const_fold_loc_step
   test_const_fold_bits
   test_const_fold_int_to_cell
   test_const_fold_unary_large_imm
