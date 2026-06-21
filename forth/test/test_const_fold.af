@@ -563,7 +563,15 @@ fun: test_const_fold_bit_mask_get_set { -- err }
   xt' const_fold_bit_mask_get_fun cf_expect_word
 
   cf_expect_clear
-  0 0b1101010110100 cf_expect_load
+  0 0b10101011      cf_expect_load
+  1 0b1001000110100 cf_expect_load
+  2 0b111111110000  cf_expect_load
+  1 1 2 asm_bic     cf_expect_instr
+  3 2   asm_rbit    cf_expect_instr
+  3 3   asm_clz     cf_expect_instr
+  0 0 3 asm_lsl_reg cf_expect_instr
+  0 0 2 asm_and_reg cf_expect_instr
+  0 0 1 asm_orr_reg cf_expect_instr
   cf_expect_ret
   xt' const_fold_bit_mask_set_fun cf_expect_word
 end
@@ -571,9 +579,6 @@ test_const_fold_bit_mask_get_set
 
 fun: test_const_fold_bit_mask_errors { -- err } [ false try_all ]
   use' ./fail/test_const_fold_bit_mask_get_bad.af
-  " invalid bit mask: expected nonzero contiguous mask" T_err_contains try
-
-  use' ./fail/test_const_fold_bit_mask_set_bad.af
   " invalid bit mask: expected nonzero contiguous mask" T_err_contains try
 end
 test_const_fold_bit_mask_errors

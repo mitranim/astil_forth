@@ -2731,13 +2731,6 @@ fun: comp_top_arg_regs2 { -- reg0 reg1 err }
   reg1 dec reg1
 end
 
-fun: comp_top_arg_regs3 { -- reg0 reg1 reg2 err }
-  3 nil comp_args_min
-  comp_args_get dec { reg2 }
-  reg2 dec { reg1 }
-  reg1 dec reg1 reg2
-end
-
 fun: comp_arg_imm_floor { val -> floor }
   Interp_comp_arg_imm_field Interp_reg_imm_floor @u32
 end
@@ -4069,33 +4062,9 @@ fun_comp: bit_mask_get: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
-  comp_top_arg_regs3 { reg src_reg mask_reg }
-  reg      comp_arg { arg0 }
-  src_reg  comp_arg { arg1 }
-  mask_reg comp_arg { arg2 }
-  arg0 cf_arg_foldable_imm { inp  ok0 }
-  arg1 cf_arg_foldable_imm { src  ok1 }
-  arg2 cf_arg_foldable_imm { mask ok2 }
-
-  if ok0 ok1 ok2 and and then
-    comp_code_len           { code_len }
-    arg0 comp_arg_imm_ceil  { ceil0 }
-    arg1 comp_arg_imm_floor { floor1 }
-    arg1 comp_arg_imm_ceil  { ceil1 }
-    arg2 comp_arg_imm_floor { floor2 }
-    arg2 comp_arg_imm_ceil  { ceil2 }
-
-    ifz code_len ceil2 = ceil1 floor2 = and ceil0 floor1 = and then
-      execute'' bit_mask_set ret
-    end
-
-    arg0 cf_arg_rewind_clear
-    arg1 cf_arg_clear
-    arg2 cf_arg_clear
-    mask cf_bit_mask_validate
-    reg inp src mask bit_mask_set cf_fold_done
-  \ No partial CF yet: useful for constant masks, but requires ternary partial-CF.
-  else { -- } execute'' bit_mask_set end
+  \ No partial CF: useful for constant masks, but requires ternary partial-CF.
+  \ Full CF alone is not worth keeping the ternary-only machinery.
+  execute'' bit_mask_set
 end
 
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
