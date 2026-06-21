@@ -3210,6 +3210,18 @@ fun: cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
   reg0 reg1 shift asm_lsr_imm comp_instr \ lsr Xd, Xn, #imm6
 end
 
+fun: cf_umod_pow2_validate { imm _ -- aux ok err }
+  imm nil cf_pow2_validate { aux ok }
+  ifz ok then nil false ret end
+  aux 0x3f and 0 <> { ok }
+  aux ok
+end
+
+fun: cf_umod_pow2_emit { reg0 reg1 _imm aux -- err }
+  aux 0x3f and low_bits { mask }
+  reg0 reg1 mask asm_and_imm comp_instr \ and Xd, Xn, #imm
+end
+
 fun: cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
   aux 0x3f and { shift }
   reg0 reg1 shift asm_lsl_imm comp_instr \ lsl Xd, Xn, #imm6
@@ -3297,6 +3309,13 @@ end
 
 fun: comp_loc_mut_mod { div_op -- err } ( C: "name" -- ) ( E: divisor -- )
   comp_loc_arg_init { divisor dividend loc }
+  divisor dividend divisor div_op comp_emit_mod
+  loc divisor comp_loc_mut_store
+end
+
+fun: comp_loc_mut_mod_fallback { divisor loc div_op -- err }
+  loc comp_push_from_local
+  divisor inc { dividend }
   divisor dividend divisor div_op comp_emit_mod
   loc divisor comp_loc_mut_store
 end
@@ -3567,12 +3586,21 @@ fun_comp: mod: { -- err } ( C: "name" -- ) ( E: divisor -- )
 end
 
 fun_comp: umod { -- err } [ redefine ]
-  if cf_fold_cleared2 then umod cf_fold_done else { -- } execute'' umod end
+  if cf_fold_cleared2 then umod cf_fold_done
+  else
+    { -- }
+    false nil nil
+    instr' cf_umod_pow2_validate instr' cf_umod_pow2_emit
+    if cf_fold2 then ret end
+    execute'' umod
+  end
 end
 
 \ Unsigned remainder into a local: `divisor umod: some_val`.
 fun_comp: umod: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_UDIV_REG comp_loc_mut_mod
+  ASM_OP_UDIV_REG instr' comp_loc_mut_mod_fallback
+  nil instr' cf_umod_pow2_validate instr' cf_umod_pow2_emit
+  comp_loc_mut_imm_fallback
 end
 
 fun_comp: /mod { -- err } [ redefine ]

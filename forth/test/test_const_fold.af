@@ -600,6 +600,7 @@ end
 fun: const_fold_mul_pow2_rhs_imm_fun { val -- out } val -8 * end
 fun: const_fold_mul_pow2_lhs_imm_fun { val -- out } 8 val * end
 fun: const_fold_udiv_pow2_rhs_imm_fun { val -- out } val 8 u/ end
+fun: const_fold_umod_pow2_rhs_imm_fun { val -- out } val 8 umod end
 
 fun: test_const_fold_div_mod { -- err }
   T{ const_fold_div_mod_fun  <T> 5 5 4 4 5 }T
@@ -608,6 +609,7 @@ fun: test_const_fold_div_mod { -- err }
   T{ 7 const_fold_mul_pow2_rhs_imm_fun <T> -56 }T
   T{ 7 const_fold_mul_pow2_lhs_imm_fun <T> 56 }T
   T{ 64 const_fold_udiv_pow2_rhs_imm_fun <T> 8 }T
+  T{ 31 const_fold_umod_pow2_rhs_imm_fun <T> 7 }T
 
   ifz has_interp then ret end
 
@@ -650,6 +652,11 @@ fun: test_const_fold_div_mod { -- err }
   0 0 3 asm_lsr_imm cf_expect_instr
   cf_expect_ret
   xt' const_fold_udiv_pow2_rhs_imm_fun cf_expect_word
+
+  cf_expect_clear
+  0 0 7 asm_and_imm cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_umod_pow2_rhs_imm_fun cf_expect_word
 end
 test_const_fold_div_mod
 
@@ -976,6 +983,12 @@ fun: loc_umod_fun { divisor -- out0 out1 }
   val0 val1
 end
 
+fun: loc_umod_pow2_fun { -- out }
+  -1 { val }
+  8 umod: val
+  val
+end
+
 fun: loc_min_fun { candidate -- out0 out1 }
   -100 { val0 }
   candidate min: val0
@@ -1261,6 +1274,7 @@ fun: test_const_fold_loc_step { -- err }
   T{ 4 loc_sdiv_fun <T> -25 -27 }T
   T{ 6 loc_mod_fun <T> -4 1 }T
   T{ 10 loc_umod_fun <T> 5 1 }T
+  T{ loc_umod_pow2_fun <T> 7 }T
   T{ 6 loc_min_fun <T> -100 -10 }T
   T{ 6 loc_umin_fun <T> 6 10 }T
   T{ 6 loc_max_fun <T> 6 81 }T
@@ -1360,6 +1374,14 @@ fun: test_const_fold_loc_step { -- err }
   0 1 3 asm_lsr_imm cf_expect_instr
   cf_expect_ret
   xt' loc_udiv_pow2_fun cf_expect_word
+
+  cf_expect_clear
+  0 -1 cf_expect_load
+  2 0 asm_mov_reg cf_expect_instr
+  1 2 asm_mov_reg cf_expect_instr
+  0 1 7 asm_and_imm cf_expect_instr
+  cf_expect_ret
+  xt' loc_umod_pow2_fun cf_expect_word
 
   cf_expect_clear
   0 0 1 asm_add_imm cf_expect_instr
