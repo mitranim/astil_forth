@@ -569,6 +569,15 @@ fun: test_const_fold_bit_mask_get_set { -- err }
 end
 test_const_fold_bit_mask_get_set
 
+fun: test_const_fold_bit_mask_errors { -- err } [ false try_all ]
+  use' ./fail/test_const_fold_bit_mask_get_bad.af
+  " invalid bit mask: expected nonzero contiguous mask" T_err_contains try
+
+  use' ./fail/test_const_fold_bit_mask_set_bad.af
+  " invalid bit mask: expected nonzero contiguous mask" T_err_contains try
+end
+test_const_fold_bit_mask_errors
+
 fun: const_fold_div_mod_fun { -- out0 out1 out2 out3 out4 }
   29 5 /
   29 5 u/

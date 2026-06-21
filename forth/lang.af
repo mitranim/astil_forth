@@ -2970,7 +2970,7 @@ fun: cf_emit_cmp_imm_cset { reg0 reg1 imm cond -- err }
   reg0 cond asm_cset      comp_instr \ cset Xd, cond
 end
 
-fun: cf_cmp_validate { imm cond -- aux ok }
+fun: cf_cmp_validate { imm cond -- aux ok err }
   imm cf_imm_u12 { ok }
   cond ok
 end
@@ -3072,8 +3072,8 @@ fun: cf_addsub_imm12_mag { imm -- mag ok }
   0 false
 end
 
-fun: cf_validate_raw { imm aux validate -- aux ok }
-  imm aux validate execute_raw [ 2 comp_args_set ]
+fun: cf_validate_raw { imm aux validate -- aux ok err }
+  imm aux validate execute_raw [ 3 comp_args_set ] try
 end
 
 fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
@@ -3099,7 +3099,7 @@ fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
   reg0 reg1 arg0 arg1 imm aux emit cf_fold_lhs_imm_raw
 end
 
-fun: cf_shift_validate { imm reg_op -- aux ok }
+fun: cf_shift_validate { imm reg_op -- aux ok err }
   reg_op imm 0 >= imm 63 <= and
 end
 
@@ -3116,7 +3116,7 @@ fun: cf_shift_emit { reg0 reg1 imm reg_op -- err }
   reg0 reg1 immr 63 bitfield_op asm_bitfield comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
-fun: cf_logical_validate { imm aux -- aux ok }
+fun: cf_logical_validate { imm aux -- aux ok err }
   aux 1 and { inv }
   aux inv - { op }
   if inv then imm invert else imm end op catch' asm_logical_imm_mask =0
@@ -3126,7 +3126,7 @@ fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
   mask reg1 5 lsl or reg0 or comp_instr \ and|orr|eor Xd, Xn, #imm
 end
 
-fun: cf_align_validate { size _ -- aux ok }
+fun: cf_align_validate { size _ -- aux ok err }
   size dec ASM_OP_ANDS_IMM catch' asm_logical_imm_mask =0
 end
 
@@ -3135,7 +3135,7 @@ fun: cf_align_emit { out adr _size mask -- err }
   out ASM_EQ asm_cset comp_instr      \ cset Xd, eq
 end
 
-fun: cf_align_down_validate { size _ -- aux ok }
+fun: cf_align_down_validate { size _ -- aux ok err }
   size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
 end
 
@@ -3143,7 +3143,7 @@ fun: cf_align_down_emit { out len _size mask -- err }
   mask len 5 lsl or out or comp_instr \ and Xd, Xn, #imm
 end
 
-fun: cf_align_up_validate { size _ -- aux ok }
+fun: cf_align_up_validate { size _ -- aux ok err }
   size dec cf_imm_u12 { add_ok }
   size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask { mask mask_err }
   mask add_ok mask_err =0 and
@@ -3154,12 +3154,24 @@ fun: cf_align_up_emit { out len size mask -- err }
   mask out 5 lsl or out or comp_instr  \ and Xd, Xn, #imm
 end
 
-fun: cf_bits_trunc_validate { len _ -- aux ok }
+fun: cf_bits_trunc_validate { len _ -- aux ok err }
   if len 0 <= len 64 >= or then nil false ret end
   len low_bits ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
 end
 
-fun: cf_bit_mask_get_validate { mask _ -- aux ok }
+fun: cf_bit_mask_valid { mask -- ok }
+  ifz mask then false ret end
+  mask mask bit_ctz lsr { packed }
+  packed packed inc and =0
+end
+
+fun: cf_bit_mask_validate { mask -- err }
+  if mask cf_bit_mask_valid then ret end
+  " invalid bit mask: expected nonzero contiguous mask" throw
+end
+
+fun: cf_bit_mask_get_validate { mask _ -- aux ok err }
+  mask cf_bit_mask_validate
   mask ASM_OP_AND_IMM catch' asm_logical_imm_mask { instr_mask err }
   if err then nil false ret end
   mask bit_ctz 32 lsl instr_mask or true
@@ -3172,7 +3184,7 @@ fun: cf_bit_mask_get_emit { out src _mask aux -- err }
   out out shift asm_lsr_imm comp_instr      \ lsr Xd, Xn, #imm6
 end
 
-fun: cf_addsub_validate { imm add -- aux ok }
+fun: cf_addsub_validate { imm add -- aux ok err }
   imm cf_addsub_imm12_mag { -- ok }
   add ok
 end
@@ -4046,7 +4058,9 @@ fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: bit_mask_get { -- err } [ redefine ]
-  if cf_fold_cleared2 then bit_mask_get cf_fold_done
+  if cf_fold_cleared2 then { reg src mask }
+    mask cf_bit_mask_validate
+    reg src mask bit_mask_get cf_fold_done
   else
     { -- }
     false nil nil
@@ -4064,7 +4078,9 @@ fun_comp: bit_mask_get: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
-  if cf_fold_cleared3 then bit_mask_set cf_fold_done
+  if cf_fold_cleared3 then { reg inp src mask }
+    mask cf_bit_mask_validate
+    reg inp src mask bit_mask_set cf_fold_done
   \ No partial CF yet: useful for constant masks, but requires ternary partial-CF.
   else { -- } execute'' bit_mask_set end
 end
