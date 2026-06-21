@@ -311,7 +311,6 @@ make debug_run '<file>' RECOVERY=false
 
 - [`./forth`](./forth):
   - [`lang.af`](./forth/lang.af) — language core.
-  - [`testing.af`](./forth/testing.af) — simple testing utils.
   - Other files — optional small libraries; mostly interfaces to `libc` IO.
 - [`./examples`](./examples) — how to use `libc` for IO, networking, threading.
 - [`./comp`](./comp) — outer interpreter / compiler in C. Mostly library-style code with a small "main" entry point.
@@ -441,17 +440,16 @@ Word-modifiers like `comp_only` are used inside definitions, not outside. Modifi
 Special _semantic_ roles get special _syntactic_ roles:
 - Word-parsing words which declare end with `:`.
 - Word-parsing words which don't declare end with `'`.
-- Unusual control-related words begin with `#` or use the `T{ }T` naming style.
+- Unusual control-related words begin with `#`.
 
 Examples:
 - Words which declare: `fun: let: var: to:` and more.
   - Syntax highlighters are encouraged to scope the next word like a declaration.
 - Parsing words: `use' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
-- Unusual control words: `T{ }T`.
-- Well-known control words don't use special characters: `if then else elif end ret` and several more. Syntax highlighters should hardcode them.
+- Well-known control words don't use special characters: `if then else elif end ret assert` and several more. Syntax highlighters should hardcode them.
 
-Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names. These are commonly used as delimiters, like `T{ }T`.
+Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names.
 
 ### No return stack
 

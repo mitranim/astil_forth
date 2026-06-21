@@ -1,5 +1,4 @@
 use' lang.af
-use' testing.af
 
 \ See `./5_stack_alloc.md` which is the actual slide.
 

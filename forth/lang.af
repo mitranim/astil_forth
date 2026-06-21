@@ -1926,7 +1926,7 @@ end
 1 1 extern: fflush           ( file              -- err        )
 1 1 extern: fpurge           ( file              -- err        )
 
-\ Variadic formatting words; see vararg support below.
+\ Variadic formatting words; see varg support below.
 1 1 extern: printf    ( fmt               … -- len|err )
 2 1 extern: fprintf   ( file fmt          … -- len|err )
 2 1 extern: sprintf   ( buf fmt           … -- len|err )
@@ -4951,6 +4951,8 @@ end
 \ Comptime analogue of top-level import.
 fun_comp: use' { -- err } read_word comp_str compile' use end
 
+\ ## Multi-comparisons
+
 \ For internal use below. Each `ccmp` runs only if previous test didn't pass;
 \ otherwise it sets condition flags to our `nzcv` fallback. The final `cset`
 \ sets the final bool based on resulting flags.
@@ -4977,8 +4979,6 @@ fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
   0 cond_end asm_cset comp_instr \ cset x0, <cond>
   1 comp_args_set
 end
-
-\ ## Multi-comparisons
 
 0b1000 let: ASM_NZCV_N
 0b0100 let: ASM_NZCV_Z
@@ -5030,6 +5030,34 @@ fun: assert_bin_cond { lhs rhs cond ctx op -- err }
   " assertion failed: %s%s (0x%zx 0x%zx %s)" ctx op lhs rhs op errf
 end
 
+fun: assert_str_eq { act exp -- err }
+  ifz exp then
+    ifz act then ret end
+    " expected string to be nil; got: %s" act errf throw
+  end
+
+  ifz act then
+    " unexpected nil string; expected: %s" exp errf throw
+  end
+
+  if act exp cstr= then ret end
+
+  \ TODO format with newlines; our reader doesn't support escapes yet.
+  " expected string: %s; actual string: %s" exp act errf
+end
+
+fun: assert_str_has { act exp -- err }
+  ifz act then
+    " missing string; expected string to have: %s"
+    exp errf throw
+  end
+
+  if act exp strstr then ret end
+
+  " expected string to have: %s; actual string: %s"
+  exp act errf throw
+end
+
 fun: assert_body { beg -- str len err }
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 + { ceil }
@@ -5039,7 +5067,7 @@ fun: assert_body { beg -- str len err }
   s" end" ceil 3 str<> fail or { fail }
 
   if fail then
-    " invalid use of `assert`: must be terminated with `end`" throw
+    " invalid assertion shape: must be terminated with `end`" throw
   end
 
   loop beg  @b is_whitespace while inc: beg  end

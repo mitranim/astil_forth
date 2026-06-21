@@ -1,5 +1,4 @@
 use' ../lang.af
-use' ../testing.af
 use' ../arena.af
 
 \ We test both JIT-compiled and AOT-compiled modes.
@@ -7,14 +6,11 @@ use' ../arena.af
 
 true try_all
 
-T{       <T>       }T
-T{ 10    <T> 10    }T
-T{ 10 20 <T> 10 20 }T
-
 fun: test_test { -- err }
-  T{       <T>       }T
-  T{ 10    <T> 10    }T
-  T{ 10 20 <T> 10 20 }T
+  assert= 10 10 end
+  10 20 { one two }
+  assert= one 10 end
+  assert= two 20 end
 end
 test_test
 
@@ -23,45 +19,102 @@ fun: test_empty_comment { -- err }
   \
   10 20 30
   { one two three }
-  T{ one two three <T> 10 20 30 }T
+  assert= one 10 end
+  assert= two 20 end
+  assert= three 30 end
 end
 test_empty_comment
 
 fun: test_locals { -- err }
-  T{          { }                                     <T>          }T
-  T{          { -- }                                  <T>          }T
-  T{ 10       { }                                     <T> 10       }T
-  T{ 10 20    { }                                     <T> 10 20    }T
-  T{ 10       { }                  20                 <T> 10 20    }T
-  T{          { }                  10 20              <T> 10 20    }T
-  T{ 10       { -- }                                  <T>          }T
-  T{ 10 20    { -- }                                  <T>          }T
-  T{ 10       { one }                                 <T>          }T
-  T{ 20       { one }              one                <T> 20       }T
-  T{ 30       { one }              one one            <T> 30 30    }T
-  T{ 40       { one -- }           one one            <T> 40 40    }T
-  T{ 10 20    { one two }          one two            <T> 10 20    }T
-  T{ 10 20    { one two }                             <T>          }T
-  T{ 10 20    { one two -- }                          <T>          }T
-  T{ 30 40    { one two }          one                <T> 30       }T
-  T{ 50 60    { one two -- }       one                <T> 50       }T
-  T{ 10 20    { one two }          two                <T> 20       }T
-  T{ 30 40    { one two }          one two            <T> 30 40    }T
-  T{ 50 60    { one two }          two one            <T> 60 50    }T
-  T{ 10 20    { one two }          two one one        <T> 20 10 10 }T
-  T{ 30 40    { one two }          two one two        <T> 40 30 40 }T
-  T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
-  T{ 30 40    { one two }          one one two        <T> 30 30 40 }T
-  T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
-  T{ 30 40    { one --     }       one one            <T> 30 30    }T
-  T{ 10 20    { one --     }       one one            <T> 10 10    }T
-  T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
-  T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
-  T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
-  T{ 10 20 30 { -- }                                  <T>          }T
-  T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
-  T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
-  T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
+  { }
+  { -- }
+  10 { } { val0 }
+  assert= val0 10 end
+  10 20 { } { val1 val2 }
+  assert= val1 10 end
+  assert= val2 20 end
+  10 { } 20 { val3 val4 }
+  assert= val3 10 end
+  assert= val4 20 end
+  { } 10 20 { val5 val6 }
+  assert= val5 10 end
+  assert= val6 20 end
+  10 { -- }
+  10 20 { -- }
+  10 { one }
+  20 { one } one { val7 }
+  assert= val7 20 end
+  30 { one } one one { val8 val9 }
+  assert= val8 30 end
+  assert= val9 30 end
+  40 { one -- } one one { val10 val11 }
+  assert= val10 40 end
+  assert= val11 40 end
+  10 20 { one two } one two { val12 val13 }
+  assert= val12 10 end
+  assert= val13 20 end
+  10 20 { one two }
+  10 20 { one two -- }
+  30 40 { one two } one { val14 }
+  assert= val14 30 end
+  50 60 { one two -- } one { val15 }
+  assert= val15 50 end
+  10 20 { one two } two { val16 }
+  assert= val16 20 end
+  30 40 { one two } one two { val17 val18 }
+  assert= val17 30 end
+  assert= val18 40 end
+  50 60 { one two } two one { val19 val20 }
+  assert= val19 60 end
+  assert= val20 50 end
+  10 20 { one two } two one one { val21 val22 val23 }
+  assert= val21 20 end
+  assert= val22 10 end
+  assert= val23 10 end
+  30 40 { one two } two one two { val24 val25 val26 }
+  assert= val24 40 end
+  assert= val25 30 end
+  assert= val26 40 end
+  10 20 { one two } one two one { val27 val28 val29 }
+  assert= val27 10 end
+  assert= val28 20 end
+  assert= val29 10 end
+  30 40 { one two } one one two { val30 val31 val32 }
+  assert= val30 30 end
+  assert= val31 30 end
+  assert= val32 40 end
+  10 20 { one two -- } one one two { val33 val34 val35 }
+  assert= val33 10 end
+  assert= val34 10 end
+  assert= val35 20 end
+  30 40 { one -- } one one { val36 val37 }
+  assert= val36 30 end
+  assert= val37 30 end
+  10 20 { one -- } one one { val38 val39 }
+  assert= val38 10 end
+  assert= val39 10 end
+  10 20 30 { one two three } one two three { val40 val41 val42 }
+  assert= val40 10 end
+  assert= val41 20 end
+  assert= val42 30 end
+  10 20 30 { one two three } three one two { val43 val44 val45 }
+  assert= val43 30 end
+  assert= val44 10 end
+  assert= val45 20 end
+  10 20 30 { one two three } two three one { val46 val47 val48 }
+  assert= val46 20 end
+  assert= val47 30 end
+  assert= val48 10 end
+  10 20 30 { -- }
+  10 20 { one two } one two { one two } one two { val49 val50 }
+  assert= val49 10 end
+  assert= val50 20 end
+  10 20 { one two } 30 40 { one two } one two { val51 val52 }
+  assert= val51 30 end
+  assert= val52 40 end
+  10 20 { one two } 30 40 { two one } one two { val53 val54 }
+  assert= val53 40 end
+  assert= val54 30 end
 end
 test_locals
 
@@ -71,49 +124,43 @@ fun: test_params_push_sum3 { one two three -> sum } + + end
 fun: test_params_push_void { val -> } TEST_PARAMS_PUSH_VOID_VAL ! end
 
 fun: test_params_push { -- err }
-  T{ 10 20    test_params_push_sum  <T> 30 }T
-  T{ 10 20 30 test_params_push_sum3 <T> 60 }T
-  T{ 10       test_params_push_void <T>    }T
-  T{ TEST_PARAMS_PUSH_VOID_VAL @    <T> 10 }T
+  10 test_params_push_void
+  assert= 10 20 test_params_push_sum 30 end
+  assert= 10 20 30 test_params_push_sum3 60 end
+  assert= TEST_PARAMS_PUSH_VOID_VAL @ 10 end
 end
 test_params_push
 
-\ In top-level interpretation, `./testing.af` inspects the default Forth stack
-\ to compare expected with provided values. All of below should be equivalent.
-T{ 10          <T> 10 }T
-T{ 10 STACK >s <T> 10 }T
-T{ 10 STACK s> <T> 10 }T
-
-\ Stack operations are tested early because they're used by conditionals,
-\ loops, and testing utils themselves, which makes testing kinda cycling.
+\ Stack operations are tested early because they're used by conditionals and
+\ loops, which makes testing kinda cyclic.
 fun: test_stack_primitives { -- err }
-  T{ size' Stack <T> 40 }T
+  assert= size' Stack 40 end
 
   alloca' Stack { stk }
   stk size' Stack erase
 
-  T{ stk stack_len_cells <T> 0 }T
-  T{ stk stack_cap_cells <T> 0 }T
+  assert= stk stack_len_cells 0 end
+  assert= stk stack_cap_cells 0 end
 
   32 stk stack_init
 
-  T{ stk stack_len_cells <T> 0    }T
-  T{ stk stack_cap_cells <T> 2048 }T \ Adjusted to mem page size.
+  assert= stk stack_len_cells 0 end
+  assert= stk stack_cap_cells 2048 end \ Adjusted to mem page size.
 
   10 stk >s
-  T{ stk stack_len_cells <T> 1  }T
-  T{ stk s>              <T> 10 }T
-  T{ stk stack_len_cells <T> 0  }T
+  assert= stk stack_len_cells 1 end
+  assert= stk s> 10 end
+  assert= stk stack_len_cells 0 end
 
   20 stk >s
   30 stk >s
-  T{ stk stack_len_cells            <T> 2  }T
-  T{ 0 CELL -        stk stack_rel@ <T> 30 }T
-  T{ 0 CELL - CELL - stk stack_rel@ <T> 20 }T
-  T{ stk s>                         <T> 30 }T
-  T{ stk stack_len_cells            <T> 1  }T
-  T{ stk s>                         <T> 20 }T
-  T{ stk stack_len_cells            <T> 0  }T
+  assert= stk stack_len_cells 2 end
+  assert= 0 CELL - stk stack_rel@ 30 end
+  assert= 0 CELL - CELL - stk stack_rel@ 20 end
+  assert= stk s> 30 end
+  assert= stk stack_len_cells 1 end
+  assert= stk s> 20 end
+  assert= stk stack_len_cells 0 end
 
   stk stack_deinit
 end
@@ -123,49 +170,56 @@ fun: test_to_stack_variadic { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
-  T{ stk stack_len_cells <T> 0 }T
+  assert= stk stack_len_cells 0 end
 
   10 stk >>s
-  T{ stk stack_len_cells <T> 1  }T
-  T{ stk s>              <T> 10 }T
-  T{ stk stack_len_cells <T> 0  }T
+  assert= stk stack_len_cells 1 end
+  assert= stk s> 10 end
+  assert= stk stack_len_cells 0 end
 
   666 stk >>s
-  T{ stk stack_len_cells <T> 1   }T
-  T{ stk s>              <T> 666 }T
-  T{ stk stack_len_cells <T> 0   }T
+  assert= stk stack_len_cells 1 end
+  assert= stk s> 666 end
+  assert= stk stack_len_cells 0 end
 
-  T{ stk stack_len_cells <T> 0 }T
+  assert= stk stack_len_cells 0 end
   stk >>s
-  T{ stk stack_len_cells <T> 0 }T
+  assert= stk stack_len_cells 0 end
 
   20 30 stk >>s
-  T{ stk stack_len_cells <T> 2  }T
-  T{ stk s>              <T> 30 }T
-  T{ stk stack_len_cells <T> 1  }T
-  T{ stk s>              <T> 20 }T
-  T{ stk stack_len_cells <T> 0  }T
+  assert= stk stack_len_cells 2 end
+  assert= stk s> 30 end
+  assert= stk stack_len_cells 1 end
+  assert= stk s> 20 end
+  assert= stk stack_len_cells 0 end
 
   40 50 60 stk >>s
-  T{ stk stack_len_cells <T> 3  }T
-  T{ stk s>              <T> 60 }T
-  T{ stk stack_len_cells <T> 2  }T
-  T{ stk s>              <T> 50 }T
-  T{ stk stack_len_cells <T> 1  }T
-  T{ stk s>              <T> 40 }T
-  T{ stk stack_len_cells <T> 0  }T
+  assert= stk stack_len_cells 3 end
+  assert= stk s> 60 end
+  assert= stk stack_len_cells 2 end
+  assert= stk s> 50 end
+  assert= stk stack_len_cells 1 end
+  assert= stk s> 40 end
+  assert= stk stack_len_cells 0 end
 
   stk stack_deinit
 end
 test_to_stack_variadic
 
 fun: test_reg_cc_stack_words { -- err }
-  T{ 10 20 drop        <T> 10       }T
-  T{ 10 20 swap        <T> 20 10    }T
-  T{ 10 20 30 drop     <T> 10 20    }T
-  T{ 10 20 30 swap     <T> 10 30 20 }T
-  T{ 10 20 + 30 drop   <T> 30       }T
-  T{ 10 20 - 30 swap - <T> 40       }T
+  assert= 10 20 drop 10 end
+  10 20 swap { val0 val1 }
+  assert= val0 20 end
+  assert= val1 10 end
+  10 20 30 drop { val2 val3 }
+  assert= val2 10 end
+  assert= val3 20 end
+  10 20 30 swap { val4 val5 val6 }
+  assert= val4 10 end
+  assert= val5 30 end
+  assert= val6 20 end
+  assert= 10 20 + 30 drop 30 end
+  assert= 10 20 - 30 swap - 40 end
 end
 test_reg_cc_stack_words
 
@@ -173,24 +227,30 @@ fun: test_stack_braces { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
-  T{ stk stack_len_cells <T> 0 }T
+  assert= stk stack_len_cells 0 end
   stk stack{ }
-  T{ stk stack_len_cells <T> 0 }T
+  assert= stk stack_len_cells 0 end
 
   10 stk >>s
-  T{ stk stack_len_cells <T> 1 }T
+  assert= stk stack_len_cells 1 end
   stk stack{ one }
-  T{ stk stack_len_cells one <T> 0 10 }T
+  assert= stk stack_len_cells 0 end
+  assert= one 10 end
 
   10 20 stk >>s
-  T{ stk stack_len_cells <T> 2 }T
+  assert= stk stack_len_cells 2 end
   stk stack{ one two }
-  T{ stk stack_len_cells one two <T> 0 10 20 }T
+  assert= stk stack_len_cells 0 end
+  assert= one 10 end
+  assert= two 20 end
 
   10 20 30 stk >>s
-  T{ stk stack_len_cells <T> 3 }T
+  assert= stk stack_len_cells 3 end
   stk stack{ one two three }
-  T{ stk stack_len_cells one two three <T> 0 10 20 30 }T
+  assert= stk stack_len_cells 0 end
+  assert= one 10 end
+  assert= two 20 end
+  assert= three 30 end
 
   stk stack_deinit
 end
@@ -205,123 +265,106 @@ fun: test_conditionals { -- err }
   \ doesn't support outputs.
   \ if false then 10 end
 
-  T{ if false then 10 else 20 end <T> 20 }T
-  T{ if true  then 10 else 20 end <T> 10 }T
+  assert= if false then 10 else 20 end 20 end
+  assert= if true then 10 else 20 end 10 end
 
-  T{ ifz false then 10 else 20 end <T> 10 }T
-  T{ ifz true  then 10 else 20 end <T> 20 }T
+  assert= ifz false then 10 else 20 end 10 end
+  assert= ifz true then 10 else 20 end 20 end
 
-  T{
+  assert=
     if false then 10 elif true then 20 else 30 end
-  <T>
     20
-  }T
+  end
 
-  T{
+  assert=
     if false then 10 elifz false then 20 else 30 end
-  <T>
     20
-  }T
+  end
 
-  T{
-    10 { loc }
-    if false then 20 else 30 end { out }
-    loc out
-  <T>
-    10 30
-  }T
+  10 { loc }
+  if false then 20 else 30 end { out }
+  assert= loc 10 end
+  assert= out 30 end
 
-  T{ -1 { val } if false then 10 { val } end val <T> -1 }T
-  T{ -1 { val } if true  then 10 { val } end val <T> 10 }T
+  assert= -1 { val } if false then 10 { val } end val -1 end
+  assert= -1 { val } if true then 10 { val } end val 10 end
 
-  T{ if false then 10 else 20 end <T> 20 }T
-  T{ if true  then 10 else 20 end <T> 10 }T
+  assert= if false then 10 else 20 end 20 end
+  assert= if true then 10 else 20 end 10 end
 
-  T{ -1 { val } ifz false then 10 { val } end val <T> 10 }T
-  T{ -1 { val } ifz true  then 10 { val } end val <T> -1 }T
+  assert= -1 { val } ifz false then 10 { val } end val 10 end
+  assert= -1 { val } ifz true then 10 { val } end val -1 end
 
-  T{ ifz false then 10 else 20 end <T> 10 }T
-  T{ ifz true  then 10 else 20 end <T> 20 }T
+  assert= ifz false then 10 else 20 end 10 end
+  assert= ifz true then 10 else 20 end 20 end
 
-  T{
+  assert=
     -1 { val }
     if false then 10 { val } elif false then 20 { val } end val
-  <T>
     -1
-  }T
+  end
 
-  T{
+  assert=
     if false then 10 elif false then 20 else 30 end
-  <T>
     30
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     if false then 10 { val } elif true then 20 { val } end val
-  <T>
     20
-  }T
+  end
 
-  T{
+  assert=
     if false then 10 elif true then 20 else 30 end
-  <T>
     20
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     if true then 10 { val } elif false then 20 { val } end val
-  <T>
     10
-  }T
+  end
 
-  T{
+  assert=
     if true then 10 elif false then 20 else 30 end
-  <T>
     10
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     if false then 10 { val } elifz false then 20 { val } end val
-  <T>
     20
-  }T
+  end
 
-  T{
+  assert=
     if false then 10 elifz false then 20 else 30 end
-  <T>
     20
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     if false then 10 { val } elifz true then 20 { val } end val
-  <T>
     -1
-  }T
+  end
 
-  T{
+  assert=
     if false then 10 elifz true then 20 else 30 end
-  <T>
     30
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     if true then 10 { val } elifz false then 20 { val } end val
-  <T>
     10
-  }T
+  end
 
-  T{
+  assert=
     if true then 10 elifz false then 20 else 30 end
-  <T>
     10
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     if false then
       10 { val }
@@ -331,9 +374,8 @@ fun: test_conditionals { -- err }
       end
     end
     val
-  <T>
     20
-  }T
+  end
 
 end
 test_conditionals
@@ -374,33 +416,53 @@ fun: cond_input_max { A B C D E F G flag -- A B C D E F G }
 end
 
 fun: test_cond_input_arity { -- err }
-  T{ 123 false cond_input_if <T> 123 }T
-  T{ 123 true  cond_input_if <T> 123 }T
+  assert= 123 false cond_input_if 123 end
+  assert= 123 true cond_input_if 123 end
 
-  T{ 234 false cond_input_ifn <T> 234 }T
-  T{ 234 true  cond_input_ifn <T> 234 }T
+  assert= 234 false cond_input_ifn 234 end
+  assert= 234 true cond_input_ifn 234 end
 
-  T{ 345 false cond_input_if_else <T> 345 }T
-  T{ 345 true  cond_input_if_else <T> 345 }T
+  assert= 345 false cond_input_if_else 345 end
+  assert= 345 true cond_input_if_else 345 end
 
-  T{ 456 false false cond_input_elif <T> 456 }T
-  T{ 456 false true  cond_input_elif <T> 456 }T
-  T{ 456 true  false cond_input_elif <T> 456 }T
+  assert= 456 false false cond_input_elif 456 end
+  assert= 456 false true cond_input_elif 456 end
+  assert= 456 true false cond_input_elif 456 end
 
-  T{ 567 false false cond_input_elifn <T> 567 }T
-  T{ 567 false true  cond_input_elifn <T> 567 }T
-  T{ 567 true  false cond_input_elifn <T> 567 }T
+  assert= 567 false false cond_input_elifn 567 end
+  assert= 567 false true cond_input_elifn 567 end
+  assert= 567 true false cond_input_elifn 567 end
 
-  T{ false false cond_input_elif_diff <T> 20 40 }T
-  T{ false true  cond_input_elif_diff <T> 20 30 }T
-  T{ true  false cond_input_elif_diff <T> 10 11 }T
+  false false cond_input_elif_diff { val0 val1 }
+  assert= val0 20 end
+  assert= val1 40 end
+  false true cond_input_elif_diff { val2 val3 }
+  assert= val2 20 end
+  assert= val3 30 end
+  true false cond_input_elif_diff { val4 val5 }
+  assert= val4 10 end
+  assert= val5 11 end
 
-  T{ false false cond_input_elif_diff_no_else <T> 20 }T
-  T{ false true  cond_input_elif_diff_no_else <T> 20 }T
-  T{ true  false cond_input_elif_diff_no_else <T> 10 }T
+  assert= false false cond_input_elif_diff_no_else 20 end
+  assert= false true cond_input_elif_diff_no_else 20 end
+  assert= true false cond_input_elif_diff_no_else 10 end
 
-  T{ 0 1 2 3 4 5 6 false cond_input_max <T> 0 1 2 3 4 5 6 }T
-  T{ 0 1 2 3 4 5 6 true  cond_input_max <T> 0 1 2 3 4 5 6 }T
+  0 1 2 3 4 5 6 false cond_input_max { val6 val7 val8 val9 val10 val11 val12 }
+  assert= val6 0 end
+  assert= val7 1 end
+  assert= val8 2 end
+  assert= val9 3 end
+  assert= val10 4 end
+  assert= val11 5 end
+  assert= val12 6 end
+  0 1 2 3 4 5 6 true cond_input_max { val13 val14 val15 val16 val17 val18 val19 }
+  assert= val13 0 end
+  assert= val14 1 end
+  assert= val15 2 end
+  assert= val16 3 end
+  assert= val17 4 end
+  assert= val18 5 end
+  assert= val19 6 end
 end
 test_cond_input_arity
 
@@ -410,7 +472,7 @@ fun: recursive_fun { val -- val }
 end
 
 fun: test_recursion { -- err }
-  T{ 123 recursive_fun <T> 13 }T
+  assert= 123 recursive_fun 13 end
 end
 test_recursion
 
@@ -422,7 +484,7 @@ fun: recursive_fib_fun { ind -- out }
 end
 
 fun: test_recursive_saved_local { -- err }
-  T{ 10 recursive_fib_fun <T> 89 }T
+  assert= 10 recursive_fib_fun 89 end
 end
 test_recursive_saved_local
 
@@ -435,7 +497,7 @@ fun: recur_reg_clobber_fun { val -- out }
 end
 
 fun: test_recur_reg_clobber { -- err }
-  T{ 10 recur_reg_clobber_fun <T> 11 }T
+  assert= 10 recur_reg_clobber_fun 11 end
 end
 test_recur_reg_clobber
 
@@ -596,27 +658,33 @@ end
 fun: test_recur_with_err { -- err }
   [ false try_all ]
 
-  T{ 2 recur_err_non_try_fun { out0 err0 } <T>         }T
-  T{ out0 err0                             <T> 100 nil }T
-  T{ 4 recur_err_non_try_fun { _out1 err1 } <T>         }T
-  err1 " recur_err_non_try" T_str_eq try
+  2 recur_err_non_try_fun { out0 err0 }
+  assert= out0 100 end try
+  assert= err0 nil end try
+  4 recur_err_non_try_fun { _out1 err1 }
+  err1 " recur_err_non_try" assert_str_eq try
 
   [ true try_all ]
 
-  T{ 2 catch' recur_err_manual_try_fun               <T> 100 nil }T
-  T{ 4 catch' recur_err_manual_try_fun { _out2 err2 } <T>         }T
-  err2 " recur_err_manual" T_str_eq
+  2 catch' recur_err_manual_try_fun { out2 err2 }
+  assert= out2 100 end
+  assert= err2 nil end
+  4 catch' recur_err_manual_try_fun { _out3 err3 }
+  err3 " recur_err_manual" assert_str_eq
 
-  T{ 2 catch' recur_err_auto_try_fun <T> 100 nil }T
+  2 catch' recur_err_auto_try_fun { out4 err4 }
+  assert= out4 100 end
+  assert= err4 nil end
 
   [ false try_all ]
 
-  T{ 4 recur_err_auto_try_fun { _out3 err3 } err3 <>0 <T> true }T
+  4 recur_err_auto_try_fun { _out5 err5 }
+  assert err5 <>0 end try
 
   [ true try_all ]
 
-  4 catch' recur_err_auto_try_fun { _out4 err4 }
-  err4 " recur_err_auto" T_str_eq
+  4 catch' recur_err_auto_try_fun { _out6 err6 }
+  err6 " recur_err_auto" assert_str_eq
 end
 test_recur_with_err
 
@@ -626,78 +694,80 @@ fun: test_sleep_loop loop " sleeping" log lf 1 sleep end end
 \ test_sleep_loop
 
 fun: test_loop_leave { -- err }
-  T{ -1 { val } loop            leave abort             end val <T> -1 }T
-  T{ -1 { val } loop 10 { val } leave abort             end val <T> 10 }T
-  T{ -1 { val } loop 10 { val } leave abort leave abort end val <T> 10 }T
+  assert=
+    -1 { val } loop leave abort end val
+    -1
+  end
+  assert=
+    -1 { val } loop 10 { val } leave abort end val
+    10
+  end
+  assert=
+    -1 { val } loop 10 { val } leave abort leave abort end val
+    10
+  end
 end
 test_loop_leave
 
 fun: test_loop_nested { -- err }
-  T{
-    -1 { one }
-    -2 { two }
-    -3 { three }
+  -1 { one }
+  -2 { two }
+  -3 { three }
+  loop
+    10 { one }
     loop
-      10 { one }
-      loop
-        20 { two }
-        leave
-      end
-      30 { three }
+      20 { two }
       leave
     end
-    one two three
-  <T>
-    10 20 30
-  }T
+    30 { three }
+    leave
+  end
+  assert= one 10 end
+  assert= two 20 end
+  assert= three 30 end
 end
 test_loop_nested
 
 fun: test_loop_while { -- err }
-  T{
+  assert=
     -1 { val }
     loop false while 10 { val } end
     val
-  <T>
     -1
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     loop 10 { val } false while 20 { val } end
     val
-  <T>
     10
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     loop 10 { val } false while 20 { val } true while end
     val
-  <T>
     10
-  }T
+  end
 
-  T{
+  assert=
     -1 { val }
     loop 10 { val } true while 20 { val } false while end
     val
-  <T>
     20
-  }T
+  end
 
-  T{
+  assert=
     12 { val }
     loop
       val 5 > while
       dec: val
     end
     val
-  <T>
     5
-  }T
+  end
 
-  T{
+  assert=
     12 { val }
     loop
       val 5 > while
@@ -705,11 +775,10 @@ fun: test_loop_while { -- err }
       dec: val
     end
     val
-  <T>
     7
-  }T
+  end
 
-  T{
+  assert=
     12 { val }
     loop
       dec: val
@@ -718,47 +787,67 @@ fun: test_loop_while { -- err }
       val while
     end
     val
-  <T>
     0
-  }T
+  end
 end
 test_loop_while
 
 fun: test_loop_while_leave { -- err }
-  T{ -1 { val } loop            false while 10 { val } leave end val <T> -1 }T
-  T{ -1 { val } loop            true  while 10 { val } leave end val <T> 10 }T
-  T{ -1 { val } loop 10 { val } false while 20 { val } leave end val <T> 10 }T
-  T{ -1 { val } loop 10 { val } true  while 20 { val } leave end val <T> 20 }T
-  T{ -1 { val } loop 10 { val } true  while leave 20 { val } end val <T> 10 }T
-  T{ -1 { val } loop leave 10 { val } true  while 20 { val } end val <T> -1 }T
+  assert=
+    -1 { val } loop false while 10 { val } leave end val
+    -1
+  end
+  assert=
+    -1 { val } loop true while 10 { val } leave end val
+    10
+  end
+  assert=
+    -1 { val } loop 10 { val } false while 20 { val } leave end val
+    10
+  end
+  assert=
+    -1 { val } loop 10 { val } true while 20 { val } leave end val
+    20
+  end
+  assert=
+    -1 { val } loop 10 { val } true while leave 20 { val } end val
+    10
+  end
+  assert=
+    -1 { val } loop leave 10 { val } true while 20 { val } end val
+    -1
+  end
 end
 test_loop_while_leave
 
 fun: test_loop_manual_countdown { -- err }
   \ Should terminate right away.
-  T{ -12 { ind } loop dec: ind ind >=0 while end <T> }T
-  T{ -1  { ind } loop dec: ind ind >=0 while end <T> }T
-  T{ 0   { ind } loop dec: ind ind >=0 while end <T> }T
+  -12 { ind } loop dec: ind ind >=0 while end
+  -1 { ind } loop dec: ind ind >=0 while end
+  0 { ind } loop dec: ind ind >=0 while end
 
-  T{
+  assert=
     0 12 { val ind }
     loop dec: ind ind >=0 while inc: val end
     val
-  <T> 12 }T
+    12
+  end
 
-  T{
+  assert=
     0 12 { val ind }
     loop dec: ind ind >=0 while inc: val leave end
     val
-  <T> 1 }T
+    1
+  end
 
-  T{
+  assert=
     0 12 { val ind }
     loop dec: ind ind >=0 while leave inc: val end
     val
-  <T> 0 }T
+    0
+  end
 
-  T{
+  assert=
     0 12 { val ind }
     loop
       dec: ind
@@ -767,11 +856,10 @@ fun: test_loop_manual_countdown { -- err }
       inc: val
     end
     val
-  <T>
     6
-  }T
+  end
 
-  T{
+  assert=
     0 12 { val ind }
     loop
       dec: ind
@@ -780,11 +868,10 @@ fun: test_loop_manual_countdown { -- err }
       inc: val
     end
     val
-  <T>
     6
-  }T
+  end
 
-  T{
+  assert=
     0 12 { val ind }
     loop
       dec: ind
@@ -794,11 +881,10 @@ fun: test_loop_manual_countdown { -- err }
       inc: val
     end
     val
-  <T>
     5
-  }T
+  end
 
-  T{
+  assert=
     0 12 { val ind }
     loop
       dec: ind
@@ -808,37 +894,30 @@ fun: test_loop_manual_countdown { -- err }
       inc: val
     end
     val
-  <T>
     5
-  }T
+  end
 end
 test_loop_manual_countdown
 
 fun: test_loop_manual_counting { -- err }
-  T{
-    0 0 { acc ind }
-    loop
-      ind 12 < while
-      ind +: acc
-      inc: ind
-    end
-    acc ind
-  <T>
-    66 12
-  }T
+  0 0 { acc ind }
+  loop
+    ind 12 < while
+    ind +: acc
+    inc: ind
+  end
+  assert= acc 66 end
+  assert= ind 12 end
 
-  T{
-    0 { acc }
-    8 { ind }
-    loop
-      2 -: ind
-      0 ind <= while
-      ind +: acc
-    end
-    acc ind
-  <T>
-    12 -2
-  }T
+  0 { acc }
+  8 { ind }
+  loop
+    2 -: ind
+    0 ind <= while
+    ind +: acc
+  end
+  assert= acc 12 end
+  assert= ind -2 end
 end
 test_loop_manual_counting
 
@@ -857,7 +936,7 @@ fun: test_again_loop { -- err }
     if len 7 < then again end
     leave
   end
-  T{ len <T> 7 }T
+  assert= len 7 end
 end
 test_again_loop
 
@@ -877,7 +956,7 @@ fun: test_again_countdown_manual { -- err }
     again
     leave
   end
-  T{ len <T> 7 }T
+  assert= len 7 end
 end
 test_again_countdown_manual
 
@@ -908,16 +987,16 @@ fun: again_meta_countdown_manual_top { val len -- out }
 end
 
 fun: test_again_meta_loop_inputs { -- err }
-  T{ 10 again_meta_loop_leave_top <T> 11 }T
-  T{ 10 again_meta_loop_while_top <T> 11 }T
+  assert= 10 again_meta_loop_leave_top 11 end
+  assert= 10 again_meta_loop_while_top 11 end
 
-  T{ 10 3 again_meta_countdown_manual_top <T> 13 }T
+  assert= 10 3 again_meta_countdown_manual_top 13 end
 end
 test_again_meta_loop_inputs
 
 fun: test_again_meta_loop_arity_bad { -- err } [ false try_all ]
   use' ./fail/test_again_meta_loop_arity_bad.af
-  " loop" T_err_contains
+  " loop" assert_str_has
 end
 test_again_meta_loop_arity_bad
 
@@ -926,180 +1005,180 @@ test_again_meta_loop_arity_bad
 \ Load/store is used internally by testing utils. The test is kinda cyclic.
 fun: test_load_store { -- err }
   if has_interp then
-    T{ VAR @ <T> 123 }T
+    assert= VAR @ 123 end
   else
-    T{ VAR @ <T> 345 }T \ Preserved in AOT from this test.
+    assert= VAR @ 345 end \ Preserved in AOT from this test.
   end
 
-  T{ 234 VAR ! <T>     }T
-  T{ VAR @     <T> 234 }T
-  T{ 345 VAR ! <T>     }T
-  T{ VAR @     <T> 345 }T
+  234 VAR !
+  assert= VAR @ 234 end
+  345 VAR !
+  assert= VAR @ 345 end
 end
 test_load_store
 
 fun: test_asm_csel_order { -- err }
-  T{ 0 1 2 ASM_PL asm_csel  <T> 0b10011010100000100101000000100000 }T \ csel  x0, x1, x2, pl
-  T{ 0 1 2 ASM_PL asm_csneg <T> 0b11011010100000100101010000100000 }T \ csneg x0, x1, x2, pl
+  assert=
+    0 1 2 ASM_PL asm_csel
+    0b10011010100000100101000000100000
+  end \ csel  x0, x1, x2, pl
+  assert=
+    0 1 2 ASM_PL asm_csneg
+    0b11011010100000100101010000100000
+  end \ csneg x0, x1, x2, pl
 end
 test_asm_csel_order
 
 fun: test_negate { -- err }
-  T{ 0    negate <T> 0    }T
-  T{ 123  negate <T> -123 }T
-  T{ -123 negate <T> 123  }T
+  assert= 0 negate 0 end
+  assert= 123 negate -123 end
+  assert= -123 negate 123 end
 end
 test_negate
 
-\ `=` is used by the testing tools, so this test is almost meaningless.
+\ This mostly verifies the normal word path; assertion comparisons use their own
+\ emitted branches.
 fun: test_equal { -- err }
-  T{  0    0   = <T> 1 }T
-  T{  0    123 = <T> 0 }T
-  T{  123  0   = <T> 0 }T
-  T{ -123  0   = <T> 0 }T
-  T{ -123  123 = <T> 0 }T
-  T{  123 -123 = <T> 0 }T
-  T{ -123 -123 = <T> 1 }T
-  T{  123  123 = <T> 1 }T
+  assert= 0 0 = 1 end
+  assert= 0 123 = 0 end
+  assert= 123 0 = 0 end
+  assert= -123 0 = 0 end
+  assert= -123 123 = 0 end
+  assert= 123 -123 = 0 end
+  assert= -123 -123 = 1 end
+  assert= 123 123 = 1 end
 end
 test_equal
 
 fun: test_not_equal { -- err }
-  T{  0    0   <> <T> 0 }T
-  T{  0    123 <> <T> 1 }T
-  T{  123  0   <> <T> 1 }T
-  T{ -123  0   <> <T> 1 }T
-  T{ -123  123 <> <T> 1 }T
-  T{  123 -123 <> <T> 1 }T
-  T{ -123 -123 <> <T> 0 }T
-  T{  123  123 <> <T> 0 }T
+  assert= 0 0 <> 0 end
+  assert= 0 123 <> 1 end
+  assert= 123 0 <> 1 end
+  assert= -123 0 <> 1 end
+  assert= -123 123 <> 1 end
+  assert= 123 -123 <> 1 end
+  assert= -123 -123 <> 0 end
+  assert= 123 123 <> 0 end
 end
 test_not_equal
 
 fun: test_greater { -- err }
-  T{  0    0   > <T> 0 }T
-  T{  0    123 > <T> 0 }T
-  T{  123  0   > <T> 1 }T
-  T{ -123  0   > <T> 0 }T
-  T{ -123  123 > <T> 0 }T
-  T{  123 -123 > <T> 1 }T
-  T{ -123 -123 > <T> 0 }T
-  T{  123  123 > <T> 0 }T
+  assert= 0 0 > 0 end
+  assert= 0 123 > 0 end
+  assert= 123 0 > 1 end
+  assert= -123 0 > 0 end
+  assert= -123 123 > 0 end
+  assert= 123 -123 > 1 end
+  assert= -123 -123 > 0 end
+  assert= 123 123 > 0 end
 end
 test_greater
 
 fun: test_lesser { -- err }
-  T{  0    0   < <T> 0 }T
-  T{  0    123 < <T> 1 }T
-  T{  123  0   < <T> 0 }T
-  T{ -123  0   < <T> 1 }T
-  T{ -123  123 < <T> 1 }T
-  T{  123 -123 < <T> 0 }T
-  T{ -123 -123 < <T> 0 }T
-  T{  123  123 < <T> 0 }T
+  assert= 0 0 < 0 end
+  assert= 0 123 < 1 end
+  assert= 123 0 < 0 end
+  assert= -123 0 < 1 end
+  assert= -123 123 < 1 end
+  assert= 123 -123 < 0 end
+  assert= -123 -123 < 0 end
+  assert= 123 123 < 0 end
 end
 test_lesser
 
 fun: test_lesser_equal { -- err }
-  T{  0    0    <= <T> 1 }T
-  T{  0    123  <= <T> 1 }T
-  T{  123  0    <= <T> 0 }T
-  T{ -123  0    <= <T> 1 }T
-  T{ -123  123  <= <T> 1 }T
-  T{  123 -123  <= <T> 0 }T
-  T{ -123 -123  <= <T> 1 }T
-  T{  123  123  <= <T> 1 }T
+  assert= 0 0 <= 1 end
+  assert= 0 123 <= 1 end
+  assert= 123 0 <= 0 end
+  assert= -123 0 <= 1 end
+  assert= -123 123 <= 1 end
+  assert= 123 -123 <= 0 end
+  assert= -123 -123 <= 1 end
+  assert= 123 123 <= 1 end
 end
 test_lesser_equal
 
 fun: test_greater_equal { -- err }
-  T{  0    0    >= <T> 1 }T
-  T{  0    123  >= <T> 0 }T
-  T{  123  0    >= <T> 1 }T
-  T{ -123  0    >= <T> 0 }T
-  T{ -123  123  >= <T> 0 }T
-  T{  123 -123  >= <T> 1 }T
-  T{ -123 -123  >= <T> 1 }T
-  T{  123  123  >= <T> 1 }T
+  assert= 0 0 >= 1 end
+  assert= 0 123 >= 0 end
+  assert= 123 0 >= 1 end
+  assert= -123 0 >= 0 end
+  assert= -123 123 >= 0 end
+  assert= 123 -123 >= 1 end
+  assert= -123 -123 >= 1 end
+  assert= 123 123 >= 1 end
 end
 test_greater_equal
 
 fun: test_unsigned_compare { -- err }
-  T{  0  0 u<  <T> 0 }T
-  T{  0  1 u<  <T> 1 }T
-  T{ -1  0 u<  <T> 0 }T
-  T{  0 -1 u<  <T> 1 }T
-  T{ -1  0 u>  <T> 1 }T
-  T{  0 -1 u>  <T> 0 }T
-  T{  0 -1 u<= <T> 1 }T
-  T{ -1  0 u<= <T> 0 }T
-  T{ -1  0 u>= <T> 1 }T
-  T{  0 -1 u>= <T> 0 }T
+  assert= 0  0 u< 0 end
+  assert= 0  1 u< 1 end
+  assert= -1  0 u< 0 end
+  assert= 0 -1 u< 1 end
+  assert= -1  0 u> 1 end
+  assert= 0 -1 u> 0 end
+  assert= 0 -1 u<= 1 end
+  assert= -1  0 u<= 0 end
+  assert= -1  0 u>= 1 end
+  assert= 0 -1 u>= 0 end
 
-  T{ -1 0 10 within  <T> 0 }T
-  T{ -1 0 10 uwithin <T> 0 }T
-  T{  5 0 10 uwithin <T> 1 }T
-  T{ 10 0 10 uwithin <T> 1 }T
+  assert= -1 0 10 within 0 end
+  assert= -1 0 10 uwithin 0 end
+  assert= 5 0 10 uwithin 1 end
+  assert= 10 0 10 uwithin 1 end
 end
 test_unsigned_compare
 
 fun: test_compare_many { -- err }
-  T{ 10 10 20 =any  <T> true  }T
-  T{ 10 20 10 =any  <T> true  }T
-  T{ 10 11 20 =any  <T> false }T
-  T{ 10 11 20 =none <T> true  }T
-  T{ 10 10 20 =none <T> false }T
+  \ Keep these direct. The multi-check words below lower directly to compare
+  \ and conditional-compare instructions; binding their outputs through locals
+  \ would add local read/write behavior to the assertion path.
+  assert= 10 10 20 =any true end
+  assert= 10 20 10 =any true end
+  assert= 10 11 20 =any false end
+  assert= 10 11 20 =none true end
+  assert= 10 10 20 =none false end
 
-  T{ -5 -4 -3 <any   <T> true  }T
-  T{ -5 -6 -7 <any   <T> false }T
-  T{ -5 -6 -7 >=any  <T> true  }T
-  T{ -5 -4 -3 >=any  <T> false }T
-  T{  5  4  3 >any   <T> true  }T
-  T{  5  6  7 >any   <T> false }T
-  T{  5  6  7 <=any  <T> true  }T
-  T{  5  4  3 <=any  <T> false }T
-  T{ -5 -6 -7 <none  <T> true  }T
-  T{ -5 -4 -7 <none  <T> false }T
-  T{ -5 -4 -3 >=none <T> true  }T
-  T{ -5 -6 -3 >=none <T> false }T
-  T{  5  6  7 >none  <T> true  }T
-  T{  5  4  7 >none  <T> false }T
-  T{  5  4  3 <=none <T> true  }T
-  T{  5  6  3 <=none <T> false }T
+  assert= -5 -4 -3 <any true end
+  assert= -5 -6 -7 <any false end
+  assert= -5 -6 -7 >=any true end
+  assert= -5 -4 -3 >=any false end
+  assert= 5  4  3 >any true end
+  assert= 5  6  7 >any false end
+  assert= 5  6  7 <=any true end
+  assert= 5  4  3 <=any false end
+  assert= -5 -6 -7 <none true end
+  assert= -5 -4 -7 <none false end
+  assert= -5 -4 -3 >=none true end
+  assert= -5 -6 -3 >=none false end
+  assert= 5  6  7 >none true end
+  assert= 5  4  7 >none false end
+  assert= 5  4  3 <=none true end
+  assert= 5  6  3 <=none false end
 
-  T{  0 -1  1 u<any   <T> true  }T
-  T{ -1  0  1 u<any   <T> false }T
-  T{ -1  0  1 u>=any  <T> true  }T
-  T{  0 -1  1 u>=any  <T> false }T
-  T{ -1  0  1 u>any   <T> true  }T
-  T{  0 -1  1 u>any   <T> false }T
-  T{  0 -1  1 u<=any  <T> true  }T
-  T{ -1  0  1 u<=any  <T> false }T
-  T{ -1  0  1 u<none  <T> true  }T
-  T{  0 -1  1 u<none  <T> false }T
-  T{  0 -1  1 u>=none <T> true  }T
-  T{ -1  0  1 u>=none <T> false }T
-  T{  0 -1  1 u>none  <T> true  }T
-  T{ -1  0  1 u>none  <T> false }T
-  T{ -1  0  1 u<=none <T> true  }T
-  T{  0 -1  1 u<=none <T> false }T
+  assert= 0 -1  1 u<any true end
+  assert= -1  0  1 u<any false end
+  assert= -1  0  1 u>=any true end
+  assert= 0 -1  1 u>=any false end
+  assert= -1  0  1 u>any true end
+  assert= 0 -1  1 u>any false end
+  assert= 0 -1  1 u<=any true end
+  assert= -1  0  1 u<=any false end
+  assert= -1  0  1 u<none true end
+  assert= 0 -1  1 u<none false end
+  assert= 0 -1  1 u>=none true end
+  assert= -1  0  1 u>=none false end
+  assert= 0 -1  1 u>none true end
+  assert= -1  0  1 u>none false end
+  assert= -1  0  1 u<=none true end
+  assert= 0 -1  1 u<=none false end
 end
 test_compare_many
-
-fun: assert_ok { val -- err }
-  assert
-    val 10 =
-  end
-end
 
 fun: assert_fail { -- err }
   assert
     123 456 =
   end
-end
-
-fun: assert_bin_ok { -- err }
-  assert= 10 10 end
 end
 
 fun: assert_bin_ops_ok { -- err }
@@ -1122,242 +1201,291 @@ fun: assert_bin_lt_fail { -- err }
   assert< 456 123 end
 end
 
+fun: assert_no_try_all_ok { -- err } [ false try_all ]
+  assert= 10 10 end try
+  assert<> 10 20 end try
+end
+
 fun: test_assert { -- err }
-  T{ 10 assert_ok <T> }T
-  T{ assert_bin_ok <T> }T
-  T{ assert_bin_ops_ok <T> }T
-  T{ catch' assert_fail { err } <T> }T
-  err " assertion failed: 123 456 =" T_err_contains
-  T{ catch' assert_bin_fail { err } <T> }T
-  err " assertion failed: 123 456 = (0x7b 0x1c8 =)" T_err_contains
-  T{ catch' assert_bin_lt_fail { err } <T> }T
-  err " assertion failed: 456 123 < (0x1c8 0x7b <)" T_err_contains
+  assert 10 10 = end
+  assert= 10 10 end
+  assert_bin_ops_ok
+  assert_no_try_all_ok
+  catch' assert_fail { err }
+  err " assertion failed: 123 456 =" assert_str_has
+  catch' assert_bin_fail { err }
+  err " assertion failed: 123 456 = (0x7b 0x1c8 =)" assert_str_has
+  catch' assert_bin_lt_fail { err }
+  err " assertion failed: 456 123 < (0x1c8 0x7b <)" assert_str_has
 end
 test_assert
 
 fun: test_arith { -- err }
-  T{ 234 123 - <T> 111   }T
-  T{ 234 123 + <T> 357   }T
-  T{ 234 123 * <T> 28782 }T
-  T{ 234 123 / <T> 1     }T
+  assert= 234 123 - 111 end
+  assert= 234 123 + 357 end
+  assert= 234 123 * 28782 end
+  assert= 234 123 / 1 end
 end
 test_arith
 
 fun: test_comptime_stack_arith { -- err }
-  T{ 234 123 -                            <T> 111    }T
-  T{ 234 123 +                            <T> 357    }T
-  T{ 234 123 *                            <T> 28782  }T
-  T{ 10 20 + 30 40 - *                    <T> -300   }T
-  T{ 10 20 + 100 30 - *                   <T> 2100   }T
-  T{ 24 4 / 64 8 u/ +                     <T> 14     }T
-  T{ 29 5 mod 20 6 mod +                  <T> 6      }T
-  T{ 29 5 /mod 20 6 /mod + + +            <T> 14     }T
-  T{ 1 4 lsl 128 3 lsr +                  <T> 32     }T
-  T{ -128 2 asr 0xff and                  <T> 224    }T
-  T{ 0b1010 0b1100 or 0b0110 xor          <T> 0b1000 }T
-  T{ 10 20 < 30 5 > +                     <T> 2      }T
-  T{ 10 20 30 + =0 +                      <T> 10     }T
-  T{ 10 20 30 + <>0 +                     <T> 11     }T
-  T{ -123 abs 10 20 min 30 40 max + +     <T> 173    }T
-  T{ 255 bit_len 256 bit_len +            <T> 17     }T
+  assert= 234 123 - 111 end
+  assert= 234 123 + 357 end
+  assert= 234 123 * 28782 end
+  assert= 10 20 + 30 40 - * -300 end
+  assert= 10 20 + 100 30 - * 2100 end
+  assert= 24 4 / 64 8 u/ + 14 end
+  assert= 29 5 mod 20 6 mod + 6 end
+  assert= 29 5 /mod 20 6 /mod + + + 14 end
+  assert= 1 4 lsl 128 3 lsr + 32 end
+  assert= -128 2 asr 0xff and 224 end
+  assert= 0b1010 0b1100 or 0b0110 xor 0b1000 end
+  assert= 10 20 < 30 5 > + 2 end
+  assert= 10 20 30 + =0 + 10 end
+  assert= 10 20 30 + <>0 + 11 end
+  assert= -123 abs 10 20 min 30 40 max + + 173 end
+  assert= 255 bit_len 256 bit_len + 17 end
 end
 test_comptime_stack_arith
 
 fun: test_mod { -- err }
-  T{ 12 1 mod <T> 0 }T
-  T{ 12 2 mod <T> 0 }T
-  T{ 12 3 mod <T> 0 }T
-  T{ 12 4 mod <T> 0 }T
-  T{ 12 5 mod <T> 2 }T
-  T{ 12 6 mod <T> 0 }T
-  T{ 12 7 mod <T> 5 }T
-  T{ 12 8 mod <T> 4 }T
-  T{ 12 9 mod <T> 3 }T
+  assert= 12 1 mod 0 end
+  assert= 12 2 mod 0 end
+  assert= 12 3 mod 0 end
+  assert= 12 4 mod 0 end
+  assert= 12 5 mod 2 end
+  assert= 12 6 mod 0 end
+  assert= 12 7 mod 5 end
+  assert= 12 8 mod 4 end
+  assert= 12 9 mod 3 end
 end
 test_mod
 
 fun: test_slash_mod { -- err }
-  T{ 12 1 /mod <T> 0 12 }T
-  T{ 12 2 /mod <T> 0 6  }T
-  T{ 12 3 /mod <T> 0 4  }T
-  T{ 12 4 /mod <T> 0 3  }T
-  T{ 12 5 /mod <T> 2 2  }T
-  T{ 12 6 /mod <T> 0 2  }T
-  T{ 12 7 /mod <T> 5 1  }T
-  T{ 12 8 /mod <T> 4 1  }T
-  T{ 12 9 /mod <T> 3 1  }T
+  12 1 /mod { mod div }
+  assert= mod 0 end
+  assert= div 12 end
+  12 2 /mod { mod div }
+  assert= mod 0 end
+  assert= div 6 end
+  12 3 /mod { mod div }
+  assert= mod 0 end
+  assert= div 4 end
+  12 4 /mod { mod div }
+  assert= mod 0 end
+  assert= div 3 end
+  12 5 /mod { mod div }
+  assert= mod 2 end
+  assert= div 2 end
+  12 6 /mod { mod div }
+  assert= mod 0 end
+  assert= div 2 end
+  12 7 /mod { mod div }
+  assert= mod 5 end
+  assert= div 1 end
+  12 8 /mod { mod div }
+  assert= mod 4 end
+  assert= div 1 end
+  12 9 /mod { mod div }
+  assert= mod 3 end
+  assert= div 1 end
 end
 test_slash_mod
 
 fun: test_unsigned_div_mod { -- err }
-  T{ -1 2 u/    <T> 9223372036854775807 }T
-  T{ -1 2 umod  <T> 1                   }T
-  T{ -1 2 u/mod <T> 1 9223372036854775807 }T
+  assert= -1 2 u/ 9223372036854775807 end
+  assert= -1 2 umod 1 end
+  -1 2 u/mod { mod div }
+  assert= mod 1 end
+  assert= div 9223372036854775807 end
 end
 test_unsigned_div_mod
 
 fun: test_abs { -- err }
-  T{    0 abs <T>   0 }T
-  T{ -123 abs <T> 123 }T
-  T{  123 abs <T> 123 }T
+  assert= 0 abs 0 end
+  assert= -123 abs 123 end
+  assert= 123 abs 123 end
 end
 test_abs
 
 fun: test_min { -- err }
-  T{  123  234 min <T>  123 }T
-  T{  234  123 min <T>  123 }T
-  T{  0    123 min <T>  0   }T
-  T{  123  0   min <T>  0   }T
-  T{  0   -123 min <T> -123 }T
-  T{ -123  0   min <T> -123 }T
-  T{ -123  234 min <T> -123 }T
-  T{  234 -123 min <T> -123 }T
+  assert= 123  234 min 123 end
+  assert= 234  123 min 123 end
+  assert= 0    123 min 0 end
+  assert= 123  0   min 0 end
+  assert= 0   -123 min -123 end
+  assert= -123  0   min -123 end
+  assert= -123  234 min -123 end
+  assert= 234 -123 min -123 end
 end
 test_min
 
 fun: test_umin { -- err }
-  T{  123  234 umin <T>  123 }T
-  T{  234  123 umin <T>  123 }T
-  T{  0   -123 umin <T>  0   }T
-  T{ -123  0   umin <T>  0   }T
-  T{ -123  234 umin <T>  234 }T
-  T{  234 -123 umin <T>  234 }T
+  assert= 123  234 umin 123 end
+  assert= 234  123 umin 123 end
+  assert= 0   -123 umin 0 end
+  assert= -123  0   umin 0 end
+  assert= -123  234 umin 234 end
+  assert= 234 -123 umin 234 end
 end
 test_umin
 
 fun: test_max { -- err }
-  T{  123  234 max <T>  234 }T
-  T{  234  123 max <T>  234 }T
-  T{  0    123 max <T>  123 }T
-  T{  123  0   max <T>  123 }T
-  T{  0   -123 max <T>  0   }T
-  T{ -123  0   max <T>  0   }T
-  T{ -123  234 max <T>  234 }T
-  T{  234 -123 max <T>  234 }T
+  assert= 123  234 max 234 end
+  assert= 234  123 max 234 end
+  assert= 0    123 max 123 end
+  assert= 123  0   max 123 end
+  assert= 0   -123 max 0 end
+  assert= -123  0   max 0 end
+  assert= -123  234 max 234 end
+  assert= 234 -123 max 234 end
 end
 test_max
 
 fun: test_umax { -- err }
-  T{  123  234 umax <T>  234 }T
-  T{  234  123 umax <T>  234 }T
-  T{  0   -123 umax <T> -123 }T
-  T{ -123  0   umax <T> -123 }T
-  T{ -123  234 umax <T> -123 }T
-  T{  234 -123 umax <T> -123 }T
+  assert= 123  234 umax 234 end
+  assert= 234  123 umax 234 end
+  assert= 0   -123 umax -123 end
+  assert= -123  0   umax -123 end
+  assert= -123  234 umax -123 end
+  assert= 234 -123 umax -123 end
 end
 test_umax
 
 fun: test_bit_len { -- err }
-  T{ 0   bit_len <T> 0 }T
-  T{ 1   bit_len <T> 1 }T
-  T{ 2   bit_len <T> 2 }T
-  T{ 3   bit_len <T> 2 }T
-  T{ 8   bit_len <T> 4 }T
-  T{ 255 bit_len <T> 8 }T
-  T{ 256 bit_len <T> 9 }T
+  assert= 0   bit_len 0 end
+  assert= 1   bit_len 1 end
+  assert= 2   bit_len 2 end
+  assert= 3   bit_len 2 end
+  assert= 8   bit_len 4 end
+  assert= 255 bit_len 8 end
+  assert= 256 bit_len 9 end
 end
 test_bit_len
 
 fun: test_bit_counts { -- err }
-  T{ 0 bit_clz <T> 64 }T
-  T{ 1 bit_clz <T> 63 }T
-  T{ 0b1000000000000000000000000000000000000000000000000000000000000000 bit_clz <T> 0 }T
+  assert= 0 bit_clz 64 end
+  assert= 1 bit_clz 63 end
+  assert=
+    0b1000000000000000000000000000000000000000000000000000000000000000 bit_clz
+    0
+  end
 
-  T{ 0 bit_ctz <T> 64 }T
-  T{ 1 bit_ctz <T> 0  }T
-  T{ 8 bit_ctz <T> 3  }T
-  T{ 0b1000000000000000000000000000000000000000000000000000000000000000 bit_ctz <T> 63 }T
+  assert= 0 bit_ctz 64 end
+  assert= 1 bit_ctz 0 end
+  assert= 8 bit_ctz 3 end
+  assert=
+    0b1000000000000000000000000000000000000000000000000000000000000000 bit_ctz
+    63
+  end
 end
 test_bit_counts
 
 fun: test_bit_masks { -- err }
-  T{ 0b1001000110100 0b111111110000 bit_mask_get <T> 0b100011 }T
-  T{ 0b1001000110100 0b11110000 bits_clear <T> 0b1001000000100 }T
-  T{ 0b10101011 0b1001000110100 0b111111110000 bit_mask_set <T> 0b1101010110100 }T
-  T{ 0b0 0b1001000110100 0b111111110000 bit_mask_set <T> 0b1000000000100 }T
-  T{ 99 0b10101011 0b1001000110100 0b111111110000 bit_mask_set <T> 99 0b1101010110100 }T
+  assert= 0b1001000110100 0b111111110000 bit_mask_get 0b100011 end
+  assert= 0b1001000110100 0b11110000 bits_clear 0b1001000000100 end
+  assert=
+    0b10101011 0b1001000110100 0b111111110000 bit_mask_set
+    0b1101010110100
+  end
+  assert=
+    0b0 0b1001000110100 0b111111110000 bit_mask_set
+    0b1000000000100
+  end
+  99 0b10101011 0b1001000110100 0b111111110000 bit_mask_set { val mask }
+  assert= val 99 end
+  assert= mask 0b1101010110100 end
 end
 test_bit_masks
 
 fun: test_asm_new_bits { -- err }
-  T{ 2 3 4 asm_bic  <T> 0b10001010001001000000000001100010 }T
-  T{ 2 3 asm_rbit <T> 0b11011010110000000000000001100010 }T
-  T{ 2 3 asm_clz  <T> 0b11011010110000000001000001100010 }T
-  T{ 2 3 asm_ctz  <T> 0b11011010110000000001100001100010 }T
-  T{ 1 asm_logical_imm_enc <T> 1 0 0 }T
-  T{ 0xff asm_logical_imm_enc <T> 1 0 7 }T
-  T{ 0x00ff_00ff_00ff_00ff asm_logical_imm_enc <T> 0 0 39 }T
-  T{ 0x8000_0000_0000_0000 asm_logical_imm_enc <T> 1 1 0 }T
-  T{ 0 catch' asm_logical_imm_enc { -- err } <T> }T
-  err " unable to encode logical immediate: 0 is reserved" T_str_eq
-  T{ -1 catch' asm_logical_imm_enc { -- err } <T> }T
-  err " unable to encode logical immediate: all ones is reserved" T_str_eq
-  T{ 0x1234_5678_9abc_def0 catch' asm_logical_imm_enc { -- err } <T> }T
-  err " unable to encode logical immediate: value is not a repeated bitmask" T_str_eq
-  T{ 0 0 1 asm_and_imm <T> 0b1_00_100100_1_000000_000000_00000_00000 }T
-  T{ 0 0 1 asm_orr_imm <T> 0b1_01_100100_1_000000_000000_00000_00000 }T
-  T{ 0 0 1 asm_eor_imm <T> 0b1_10_100100_1_000000_000000_00000_00000 }T
+  assert= 2 3 4 asm_bic 0b10001010001001000000000001100010 end
+  assert= 2 3 asm_rbit 0b11011010110000000000000001100010 end
+  assert= 2 3 asm_clz 0b11011010110000000001000001100010 end
+  assert= 2 3 asm_ctz 0b11011010110000000001100001100010 end
+  1 asm_logical_imm_enc { n immr imms }
+  assert= n 1 end
+  assert= immr 0 end
+  assert= imms 0 end
+  0xff asm_logical_imm_enc { n immr imms }
+  assert= n 1 end
+  assert= immr 0 end
+  assert= imms 7 end
+  0x00ff_00ff_00ff_00ff asm_logical_imm_enc { n immr imms }
+  assert= n 0 end
+  assert= immr 0 end
+  assert= imms 39 end
+  0x8000_0000_0000_0000 asm_logical_imm_enc { n immr imms }
+  assert= n 1 end
+  assert= immr 1 end
+  assert= imms 0 end
+  0 catch' asm_logical_imm_enc { -- err }
+  err " unable to encode logical immediate: 0 is reserved" assert_str_eq
+  -1 catch' asm_logical_imm_enc { -- err }
+  err " unable to encode logical immediate: all ones is reserved" assert_str_eq
+  0x1234_5678_9abc_def0 catch' asm_logical_imm_enc { -- err }
+  err " unable to encode logical immediate: value is not a repeated bitmask" assert_str_eq
+  assert= 0 0 1 asm_and_imm 0b1_00_100100_1_000000_000000_00000_00000 end
+  assert= 0 0 1 asm_orr_imm 0b1_01_100100_1_000000_000000_00000_00000 end
+  assert= 0 0 1 asm_eor_imm 0b1_10_100100_1_000000_000000_00000_00000 end
   0 0 -2 asm_and_imm { bic_exp }
-  T{ 0 0 1 asm_bic_imm <T> bic_exp }T
-  T{ 0 0 0 catch' asm_and_imm { _instr err } <T> }T
-  err " unable to encode logical immediate: 0 is reserved" T_str_eq
+  assert= 0 0 1 asm_bic_imm bic_exp end
+  0 0 0 catch' asm_and_imm { _instr err }
+  err " unable to encode logical immediate: 0 is reserved" assert_str_eq
 end
 test_asm_new_bits
 
 fun: test_asm_cmp_branch { -- err }
-  T{ 1 8 0 asm_cmp_branch <T> 0b10110100000000000000000001000001 }T
-  T{ 1 8 1 asm_cmp_branch <T> 0b10110101000000000000000001000001 }T
-  T{ 1 8 asm_cbz          <T> 0b10110100000000000000000001000001 }T
-  T{ 1 8 asm_cbnz         <T> 0b10110101000000000000000001000001 }T
+  assert= 1 8 0 asm_cmp_branch 0b10110100000000000000000001000001 end
+  assert= 1 8 1 asm_cmp_branch 0b10110101000000000000000001000001 end
+  assert= 1 8 asm_cbz 0b10110100000000000000000001000001 end
+  assert= 1 8 asm_cbnz 0b10110101000000000000000001000001 end
 end
 test_asm_cmp_branch
 
 fun: test_asm_append_imm_to_reg { -- err }
   32 alloca { buf }
 
-  T{ 0 0 buf asm_append_imm_to_reg <T> buf 4 + }T
-  T{ buf @u32 <T> 0b1_10_100101_00_0000000000000000_00000 }T \ movz x0, #0
+  assert= 0 0 buf asm_append_imm_to_reg buf 4 + end
+  assert= buf @u32 0b1_10_100101_00_0000000000000000_00000 end \ movz x0, #0
 
-  T{ 0 -1 buf asm_append_imm_to_reg <T> buf 4 + }T
-  T{ buf @u32 <T> 0b1_00_100101_00_0000000000000000_00000 }T \ movn x0, #0
+  assert= 0 -1 buf asm_append_imm_to_reg buf 4 + end
+  assert= buf @u32 0b1_00_100101_00_0000000000000000_00000 end \ movn x0, #0
 
-  T{ 3 0x1234_5678_9abc_def0 buf asm_append_imm_to_reg <T> buf 16 + }T
-  T{ buf      @u32 <T> 0b1_10_100101_00_1101111011110000_00011 }T \ movz x3, #0xdef0
-  T{ buf 4  + @u32 <T> 0b1_11_100101_01_1001101010111100_00011 }T \ movk x3, #0x9abc, lsl #16
-  T{ buf 8  + @u32 <T> 0b1_11_100101_10_0101011001111000_00011 }T \ movk x3, #0x5678, lsl #32
-  T{ buf 12 + @u32 <T> 0b1_11_100101_11_0001001000110100_00011 }T \ movk x3, #0x1234, lsl #48
+  assert= 3 0x1234_5678_9abc_def0 buf asm_append_imm_to_reg buf 16 + end
+  assert= buf      @u32 0b1_10_100101_00_1101111011110000_00011 end \ movz x3, #0xdef0
+  assert= buf 4  + @u32 0b1_11_100101_01_1001101010111100_00011 end \ movk x3, #0x9abc, lsl #16
+  assert= buf 8  + @u32 0b1_11_100101_10_0101011001111000_00011 end \ movk x3, #0x5678, lsl #32
+  assert= buf 12 + @u32 0b1_11_100101_11_0001001000110100_00011 end \ movk x3, #0x1234, lsl #48
 
-  T{ 3 -305419896 buf asm_append_imm_to_reg <T> buf 8 + }T
-  T{ buf     @u32 <T> 0b1_00_100101_00_0101011001110111_00011 }T \ movn x3, #0x5677
-  T{ buf 4  + @u32 <T> 0b1_11_100101_01_1110110111001011_00011 }T \ movk x3, #0xedcb, lsl #16
+  assert= 3 -305419896 buf asm_append_imm_to_reg buf 8 + end
+  assert= buf     @u32 0b1_00_100101_00_0101011001110111_00011 end \ movn x3, #0x5677
+  assert= buf 4  + @u32 0b1_11_100101_01_1110110111001011_00011 end \ movk x3, #0xedcb, lsl #16
 end
 test_asm_append_imm_to_reg
 
 fun: test_cstr_eq { -- err }
-  T{ nil           nil    cstr= <T> true  }T
-  T{ nil           " one" cstr= <T> false }T
-  T{ " one"        nil    cstr= <T> false }T
-  T{ " one" strdup " two" cstr= <T> false }T
-  T{ " two" strdup " one" cstr= <T> false }T
-  T{ " one" strdup " one" cstr= <T> true  }T
+  assert= nil           nil    cstr= true end
+  assert= nil           " one" cstr= false end
+  assert= " one"        nil    cstr= false end
+  assert= " one" strdup " two" cstr= false end
+  assert= " two" strdup " one" cstr= false end
+  assert= " one" strdup " one" cstr= true end
 end
 test_cstr_eq
 
 fun: test_str_slice { -- err }
-  T{ s" one" s" two" str= <T> false }T
+  assert= s" one" s" two" str= false end
 end
 test_str_slice
 
-fun: first_str_head { str0 _len0 _str1 _len1 -- char } str0 @u8 end
-T{ s" one" s" two" first_str_head <T> char' o }T
-
 fun: test_cstr_less { -- err }
-  T{ nil           nil    cstr< <T> false }T
-  T{ nil           " one" cstr< <T> true  }T
-  T{ " one"        nil    cstr< <T> false }T
-  T{ " one" strdup " two" cstr< <T> true  }T
-  T{ " two" strdup " one" cstr< <T> false }T
-  T{ " one" strdup " one" cstr< <T> false }T
+  assert= nil           nil    cstr< false end
+  assert= nil           " one" cstr< true end
+  assert= " one"        nil    cstr< false end
+  assert= " one" strdup " two" cstr< true end
+  assert= " two" strdup " one" cstr< false end
+  assert= " one" strdup " one" cstr< false end
 end
 test_cstr_less
 
@@ -1367,18 +1495,18 @@ fun: int32_negative { -- val } [
 ] end
 
 fun: test_int_to_cell { -- err }
-  T{ int32_negative             <T> 0xffff_ffff           }T
-  T{ int32_negative int_to_cell <T> 0xffff_ffff_ffff_ffff }T
-  T{ int32_negative int_to_cell <T> -1                    }T
+  assert= int32_negative 0xffff_ffff end
+  assert= int32_negative int_to_cell 0xffff_ffff_ffff_ffff end
+  assert= int32_negative int_to_cell -1 end
 end
 test_int_to_cell
 
 fun: test_is_err_flag_regression { -- err }
-  T{ -1 invert =0 <T> true }T
-  T{ +1           <T> 1    }T
-  T{ 1024 cells   <T> 8192 }T
-  T{ -1 is_err_flag <T> true  }T
-  T{ 0  is_err_flag <T> false }T
+  assert -1 invert =0 end
+  assert= +1 1 end
+  assert= 1024 cells 8192 end
+  assert= -1 is_err_flag true end
+  assert= 0  is_err_flag false end
 end
 test_is_err_flag_regression
 
@@ -1388,7 +1516,7 @@ fun: test_comptime_arg_stack_sum16_fun { -- val }
 end
 
 fun: test_comptime_arg_stack_sum16 { -- err }
-  T{ test_comptime_arg_stack_sum16_fun <T> 120 }T
+  assert= test_comptime_arg_stack_sum16_fun 120 end
 end
 test_comptime_arg_stack_sum16
 
@@ -1398,7 +1526,7 @@ fun: test_comptime_arg_stack_swap16_fun { -- val }
 end
 
 fun: test_comptime_arg_stack_swap16 { -- err }
-  T{ test_comptime_arg_stack_swap16_fun <T> 92 }T
+  assert= test_comptime_arg_stack_swap16_fun 92 end
 end
 test_comptime_arg_stack_swap16
 
@@ -1409,7 +1537,7 @@ fun: test_assign_all_arg_regs_fun { -- val }
 end
 
 fun: test_assign_all_arg_regs { -- err }
-  T{ test_assign_all_arg_regs_fun <T> 120 }T
+  assert= test_assign_all_arg_regs_fun 120 end
 end
 test_assign_all_arg_regs
 
@@ -1419,7 +1547,7 @@ fun: test_comptime_arg_stack_mod_scratch_fun { -- val }
 end
 
 fun: test_comptime_arg_stack_mod_scratch { -- err }
-  T{ test_comptime_arg_stack_mod_scratch_fun <T> 1038 }T
+  assert= test_comptime_arg_stack_mod_scratch_fun 1038 end
 end
 test_comptime_arg_stack_mod_scratch
 
@@ -1428,17 +1556,17 @@ fun: test_comptime_arg_stack_to_stack_9 { -- err }
   32 stk stack_init
 
   0 1 2 3 4 5 6 7 8 stk >>s
-  T{ stk stack_len_cells <T> 9 }T
-  T{ stk s> <T> 8  }T
-  T{ stk s> <T> 7  }T
-  T{ stk s> <T> 6  }T
-  T{ stk s> <T> 5  }T
-  T{ stk s> <T> 4  }T
-  T{ stk s> <T> 3  }T
-  T{ stk s> <T> 2  }T
-  T{ stk s> <T> 1  }T
-  T{ stk s> <T> 0  }T
-  T{ stk stack_len_cells <T> 0 }T
+  assert= stk stack_len_cells 9 end
+  assert= stk s> 8 end
+  assert= stk s> 7 end
+  assert= stk s> 6 end
+  assert= stk s> 5 end
+  assert= stk s> 4 end
+  assert= stk s> 3 end
+  assert= stk s> 2 end
+  assert= stk s> 1 end
+  assert= stk s> 0 end
+  assert= stk stack_len_cells 0 end
 
   stk stack_deinit
 end
@@ -1447,18 +1575,22 @@ test_comptime_arg_stack_to_stack_9
 fun: fallback_high_regs_fun { keep one two -- keep out } keep one two fallback end
 
 fun: test_fallback { -- err }
-  T{ 0  0  fallback <T> 0  }T
-  T{ 0  1  fallback <T> 1  }T
-  T{ 1  0  fallback <T> 1  }T
-  T{ 0  -1 fallback <T> -1 }T
-  T{ -1 0  fallback <T> -1 }T
-  T{ 0  10 fallback <T> 10 }T
-  T{ 10 0  fallback <T> 10 }T
-  T{ 10 20 fallback <T> 20 }T
-  T{ 20 10 fallback <T> 10 }T
+  assert= 0  0  fallback 0 end
+  assert= 0  1  fallback 1 end
+  assert= 1  0  fallback 1 end
+  assert= 0  -1 fallback -1 end
+  assert= -1 0  fallback -1 end
+  assert= 0  10 fallback 10 end
+  assert= 10 0  fallback 10 end
+  assert= 10 20 fallback 20 end
+  assert= 20 10 fallback 10 end
 
-  T{ 99 0 1 fallback_high_regs_fun <T> 99 1 }T
-  T{ 99 7 0 fallback_high_regs_fun <T> 99 7 }T
+  99 0 1 fallback_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 1 end
+  99 7 0 fallback_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 7 end
 end
 test_fallback
 
@@ -1468,7 +1600,7 @@ fun: test_vargs_printf { -- err }
   lf
 
   s" numbers (should be 10 20 30): 10 20 30" { __ len }
-  T{ printed <T> len }T
+  assert= printed len end
 end
 \ test_vargs_printf
 
@@ -1486,8 +1618,8 @@ fun: test_strf { -- err }
   4096 { cap }
   4096 alloca { buf }
 
-  T{ buf cap " numbers: %zd %zd %zd" 10 20 30 strf <T> buf }T
-  buf " numbers: 10 20 30" T_str_eq
+  assert= buf cap " numbers: %zd %zd %zd" 10 20 30 strf buf end
+  buf " numbers: 10 20 30" assert_str_eq
 
 end
 test_strf
@@ -1495,11 +1627,11 @@ test_strf
 fun: test_errf { -- err }
   ERR_BUF_0 { buf }
 
-  T{ " codes: %zd %zd %zd" 10 20 30 errf <T> buf }T
-  buf " codes: 10 20 30" T_str_eq
+  assert= " codes: %zd %zd %zd" 10 20 30 errf buf end
+  buf " codes: 10 20 30" assert_str_eq
 
-  T{ " codes: %zd %zd %zd" 40 50 60 errf <T> buf }T
-  buf " codes: 40 50 60" T_str_eq
+  assert= " codes: %zd %zd %zd" 40 50 60 errf buf end
+  buf " codes: 40 50 60" assert_str_eq
 
 end
 test_errf
@@ -1513,16 +1645,27 @@ end
 \ it "pops" only the last one, assuming it to be error or nil. By accident,
 \ we also allow to "push" subsequent arguments. Works exactly like a stack.
 fun: test_try_multiple { -- err }
-  T{ nil try <T> }T
-  T{ nil nil try try <T> }T
-  T{ nil try nil try <T> }T
-  T{ 10 nil try <T> 10 }T
-  T{ 20 nil nil try try <T> 20 }T
-  T{ 20 nil nil try nil try <T> 20 nil }T
-  T{ 10 20 nil try <T> 10 20 }T
-  T{ 10 20 nil nil try try <T> 10 20 }T
-  T{ 10 20 nil try nil try <T> 10 20 }T
-  T{ 10 20 nil try nil try nil <T> 10 20 nil }T
+  nil try
+  nil nil try try
+  nil try nil try
+  assert= 10 nil try 10 end
+  assert= 20 nil nil try try 20 end
+  20 nil nil try nil try { val0 err0 }
+  assert= val0 20 end
+  assert= err0 nil end
+  10 20 nil try { val1 val2 }
+  assert= val1 10 end
+  assert= val2 20 end
+  10 20 nil nil try try { val3 val4 }
+  assert= val3 10 end
+  assert= val4 20 end
+  10 20 nil try nil try { val5 val6 }
+  assert= val5 10 end
+  assert= val6 20 end
+  10 20 nil try nil try nil { val7 val8 err1 }
+  assert= val7 10 end
+  assert= val8 20 end
+  assert= err1 nil end
 end
 test_try_multiple
 
@@ -1533,36 +1676,36 @@ fun: test_wrapf { -- err }
   \ err0 logf lf
   \ err1 logf lf
 
-  err0 " one"      T_str_eq
-  err1 " two: one" T_str_eq
+  err0 " one"      assert_str_eq
+  err1 " two: one" assert_str_eq
 
   err1 " three: %s" err1 wrapf { err2 }
 
   \ `wrapf` rotates two string buffers.
-  T{ err0 err2 = <T> true  }T
-  T{ err0 err1 = <T> false }T
+  assert= err0 err2 end
+  assert<> err0 err1 end
 
-  err2 " three: two: one" T_str_eq
+  err2 " three: two: one" assert_str_eq
 
   err2 " four: %zd: %s" 123 err2 wrapf { err3 }
 
-  T{ err3 err0 = <T> false }T
-  T{ err3 err1 = <T> true  }T
-  T{ err3 err2 = <T> false }T
+  assert<> err3 err0 end
+  assert= err3 err1 end
+  assert<> err3 err2 end
 
-  err3 " four: 123: three: two: one" T_str_eq
+  err3 " four: 123: three: two: one" assert_str_eq
 
 end
 test_wrapf
 
 fun: test_alloca { ptr -- err }
-  T{ ptr @ <T> ptr @ }T \ Should not segfault. The value is undefined.
+  ptr @ { -- } \ Should not segfault. The value is undefined.
 
   123 ptr !
-  T{ ptr @ <T> 123 }T
+  assert= ptr @ 123 end
 
   234 ptr !
-  T{ ptr @ <T> 234 }T
+  assert= ptr @ 234 end
 end
 
 fun: test_alloca_cell { -- err }
@@ -1582,19 +1725,19 @@ fun: test_alloca_align { -- err }
   32 alloca   { adr5 }
 
   \ Compiler ensures natural alignment up to 16.
-  T{ adr0 1  mod <T> 0 }T
-  T{ adr1 2  mod <T> 0 }T
-  T{ adr2 4  mod <T> 0 }T
-  T{ adr3 8  mod <T> 0 }T
-  T{ adr4 16 mod <T> 0 }T
-  T{ adr5 16 mod <T> 0 }T
+  assert= adr0 1  mod 0 end
+  assert= adr1 2  mod 0 end
+  assert= adr2 4  mod 0 end
+  assert= adr3 8  mod 0 end
+  assert= adr4 16 mod 0 end
+  assert= adr5 16 mod 0 end
 
-  T{ adr0 <T> SP 16 - }T
-  T{ adr1 <T> SP 32 - }T
-  T{ adr2 <T> SP 48 - }T
-  T{ adr3 <T> SP 64 - }T
-  T{ adr4 <T> SP 80 - }T
-  T{ adr5 <T> SP 112 - }T
+  assert= adr0 SP 16 - end
+  assert= adr1 SP 32 - end
+  assert= adr2 SP 48 - end
+  assert= adr3 SP 64 - end
+  assert= adr4 SP 80 - end
+  assert= adr5 SP 112 - end
 end
 test_alloca_align
 
@@ -1605,12 +1748,12 @@ fun: test_alloca_big { -- err }
   SIZE_BIG alloca { adr1 }
   SIZE_BIG alloca { adr2 }
 
-  T{ adr0 16 mod <T> 0 }T
-  T{ adr1 16 mod <T> 0 }T
-  T{ adr2 16 mod <T> 0 }T
+  assert= adr0 16 mod 0 end
+  assert= adr1 16 mod 0 end
+  assert= adr2 16 mod 0 end
 
-  T{ adr0 adr1 - <T> SIZE_BIG }T
-  T{ adr1 adr2 - <T> SIZE_BIG }T
+  assert= adr0 adr1 - SIZE_BIG end
+  assert= adr1 adr2 - SIZE_BIG end
 end
 test_alloca_big
 
@@ -1619,8 +1762,8 @@ fun: test_alloca_dynamic { size0 size1 -- err }
   size0 alloca { adr0 }
   size1 alloca { adr1 }
 
-  T{ SP   adr0 - <T> size0 }T
-  T{ adr0 adr1 - <T> size1 }T
+  assert= SP adr0 - size0 end
+  assert= adr0 adr1 - size1 end
 
   adr0 @ { -- } \ Should not segfault.
   adr1 @ { -- } \ Should not segfault.
@@ -1641,31 +1784,31 @@ Opaq_2_2 3 arr: Arr5
 Opaq_3_1 3 arr: Arr6
 
 fun: test_array_sizes { -- err }
-  T{ size' Opaq_1_1 <T> 1 }T
-  T{ size' Opaq_2_2 <T> 2 }T
-  T{ size' Opaq_3_1 <T> 3 }T
-  T{ size' Opaq_5_1 <T> 5 }T
+  assert= size' Opaq_1_1 1 end
+  assert= size' Opaq_2_2 2 end
+  assert= size' Opaq_3_1 3 end
+  assert= size' Opaq_5_1 5 end
 
-  T{ align' Opaq_1_1 <T> 1 }T
-  T{ align' Opaq_2_2 <T> 2 }T
-  T{ align' Opaq_3_1 <T> 1 }T
-  T{ align' Opaq_5_1 <T> 1 }T
+  assert= align' Opaq_1_1 1 end
+  assert= align' Opaq_2_2 2 end
+  assert= align' Opaq_3_1 1 end
+  assert= align' Opaq_5_1 1 end
 
-  T{ size' Arr0 <T> 1 }T
-  T{ size' Arr1 <T> 2 }T
-  T{ size' Arr2 <T> 3 }T
-  T{ size' Arr3 <T> 2 }T
-  T{ size' Arr4 <T> 3 }T
-  T{ size' Arr5 <T> 6 }T
-  T{ size' Arr6 <T> 9 }T
+  assert= size' Arr0 1 end
+  assert= size' Arr1 2 end
+  assert= size' Arr2 3 end
+  assert= size' Arr3 2 end
+  assert= size' Arr4 3 end
+  assert= size' Arr5 6 end
+  assert= size' Arr6 9 end
 
-  T{ align' Arr0 <T> 1 }T
-  T{ align' Arr1 <T> 2 }T
-  T{ align' Arr2 <T> 1 }T
-  T{ align' Arr3 <T> 1 }T
-  T{ align' Arr4 <T> 1 }T
-  T{ align' Arr5 <T> 2 }T
-  T{ align' Arr6 <T> 1 }T
+  assert= align' Arr0 1 end
+  assert= align' Arr1 2 end
+  assert= align' Arr2 1 end
+  assert= align' Arr3 1 end
+  assert= align' Arr4 1 end
+  assert= align' Arr5 2 end
+  assert= align' Arr6 1 end
 end
 test_array_sizes
 
@@ -1682,14 +1825,14 @@ end
 \ Field alignment and padding needs to match C.
 \ We test alignment for a lot more cases below.
 fun: test_struct_fields_basic { -- err }
-  T{ size'  Typ     <T> 16  }T
-  T{ align' Typ     <T> 8   }T
-  T{ 0   Typ_field0 <T> 0   }T
-  T{ 0   Typ_field1 <T> 8   }T
-  T{ 123 Typ_field0 <T> 123 }T
-  T{ 234 Typ_field0 <T> 234 }T
-  T{ 123 Typ_field1 <T> 131 }T
-  T{ 234 Typ_field1 <T> 242 }T
+  assert= size'  Typ 16 end
+  assert= align' Typ 8 end
+  assert= 0   Typ_field0 0 end
+  assert= 0   Typ_field1 8 end
+  assert= 123 Typ_field0 123 end
+  assert= 234 Typ_field0 234 end
+  assert= 123 Typ_field1 131 end
+  assert= 234 Typ_field1 242 end
 end
 test_struct_fields_basic
 
@@ -1702,32 +1845,32 @@ fun: test_struct_fields_load_store { -- err }
   alloca' Typ { ptr }
   ptr size' Typ erase
 
-  T{ ptr Typ_field0 <T> ptr     }T
-  T{ ptr Typ_field1 <T> ptr 8 + }T
+  assert= ptr Typ_field0 ptr end
+  assert= ptr Typ_field1 ptr 8 + end
 
-  T{    ptr Typ_field0 @ <T> 0  }T
-  T{ 10 ptr Typ_field0 ! <T>    }T
-  T{    ptr Typ_field0 @ <T> 10 }T
+  assert= ptr Typ_field0 @ 0 end
+  10 ptr Typ_field0 !
+  assert= ptr Typ_field0 @ 10 end
 
-  T{    ptr Typ_field1 @ <T> 0  }T
-  T{ 20 ptr Typ_field1 ! <T>    }T
-  T{    ptr Typ_field1 @ <T> 20 }T
+  assert= ptr Typ_field1 @ 0 end
+  20 ptr Typ_field1 !
+  assert= ptr Typ_field1 @ 20 end
 
-  T{    ptr Typ_field0 @ <T> 10 }T
-  T{ 30 ptr Typ_field0 ! <T>    }T
-  T{    ptr Typ_field0 @ <T> 30 }T
+  assert= ptr Typ_field0 @ 10 end
+  30 ptr Typ_field0 !
+  assert= ptr Typ_field0 @ 30 end
 
-  T{    ptr Typ_field1 @ <T> 20 }T
-  T{ 40 ptr Typ_field1 ! <T>    }T
-  T{    ptr Typ_field1 @ <T> 40 }T
+  assert= ptr Typ_field1 @ 20 end
+  40 ptr Typ_field1 !
+  assert= ptr Typ_field1 @ 40 end
 end
 test_struct_fields_load_store
 
 struct: Typ0 end
 
 fun: test_struct_0 { -- err }
-  T{ size'  Typ0 <T> 0 }T
-  T{ align' Typ0 <T> 0 }T
+  assert= size'  Typ0 0 end
+  assert= align' Typ0 0 end
 end
 test_struct_0
 
@@ -1736,9 +1879,9 @@ struct: Typ1
 end
 
 fun: test_struct_1 { -- err }
-  T{ size'  Typ1    <T> 1   }T
-  T{ align' Typ1    <T> 1   }T
-  T{ 123 Typ1_field <T> 123 }T
+  assert= size'  Typ1 1 end
+  assert= align' Typ1 1 end
+  assert= 123 Typ1_field 123 end
 end
 test_struct_1
 
@@ -1748,10 +1891,10 @@ struct: Typ2
 end
 
 fun: test_struct_2 { -- err }
-  T{ size'  Typ2     <T> 8   }T
-  T{ align' Typ2     <T> 4   }T
-  T{ 123 Typ2_field0 <T> 123 }T
-  T{ 123 Typ2_field1 <T> 127 }T
+  assert= size'  Typ2 8 end
+  assert= align' Typ2 4 end
+  assert= 123 Typ2_field0 123 end
+  assert= 123 Typ2_field1 127 end
 end
 test_struct_2
 
@@ -1761,12 +1904,12 @@ struct: Typ3
 end
 
 fun: test_struct_3 { -- err }
-  T{ size'  Typ3     <T> 8   }T
-  T{ align' Typ3     <T> 4   }T
-  T{ nil Typ3_field0 <T> 0   }T
-  T{ nil Typ3_field1 <T> 4   }T
-  T{ 123 Typ3_field0 <T> 123 }T
-  T{ 123 Typ3_field1 <T> 127 }T
+  assert= size'  Typ3 8 end
+  assert= align' Typ3 4 end
+  assert= nil Typ3_field0 0 end
+  assert= nil Typ3_field1 4 end
+  assert= 123 Typ3_field0 123 end
+  assert= 123 Typ3_field1 127 end
 end
 test_struct_3
 
@@ -1777,11 +1920,11 @@ struct: Typ4
 end
 
 fun: test_struct_4 { -- err }
-  T{ size'  Typ4     <T> 16  }T
-  T{ align' Typ4     <T> 8   }T
-  T{ 123 Typ4_field0 <T> 123 }T
-  T{ 123 Typ4_field1 <T> 127 }T
-  T{ 123 Typ4_field2 <T> 131 }T
+  assert= size'  Typ4 16 end
+  assert= align' Typ4 8 end
+  assert= 123 Typ4_field0 123 end
+  assert= 123 Typ4_field1 127 end
+  assert= 123 Typ4_field2 131 end
 end
 test_struct_4
 
@@ -1792,11 +1935,11 @@ struct: Typ5
 end
 
 fun: test_struct_5 { -- err }
-  T{ size'  Typ5     <T> 16  }T
-  T{ align' Typ5     <T> 8   }T
-  T{ 123 Typ5_field0 <T> 123 }T
-  T{ 123 Typ5_field1 <T> 127 }T
-  T{ 123 Typ5_field2 <T> 131 }T
+  assert= size'  Typ5 16 end
+  assert= align' Typ5 8 end
+  assert= 123 Typ5_field0 123 end
+  assert= 123 Typ5_field1 127 end
+  assert= 123 Typ5_field2 131 end
 end
 test_struct_5
 
@@ -1807,11 +1950,11 @@ struct: Typ6
 end
 
 fun: test_struct_6 { -- err }
-  T{ size'  Typ6     <T> 24  }T
-  T{ align' Typ6     <T> 8   }T
-  T{ 123 Typ6_field0 <T> 123 }T
-  T{ 123 Typ6_field1 <T> 131 }T
-  T{ 123 Typ6_field2 <T> 139 }T
+  assert= size'  Typ6 24 end
+  assert= align' Typ6 8 end
+  assert= 123 Typ6_field0 123 end
+  assert= 123 Typ6_field1 131 end
+  assert= 123 Typ6_field2 139 end
 end
 test_struct_6
 
@@ -1823,12 +1966,12 @@ struct: Typ7
 end
 
 fun: test_struct_7 { -- err }
-  T{ size'  Typ7     <T> 24  }T
-  T{ align' Typ7     <T> 8   }T
-  T{ 123 Typ7_field0 <T> 123 }T
-  T{ 123 Typ7_field1 <T> 131 }T
-  T{ 123 Typ7_field2 <T> 135 }T
-  T{ 123 Typ7_field3 <T> 139 }T
+  assert= size'  Typ7 24 end
+  assert= align' Typ7 8 end
+  assert= 123 Typ7_field0 123 end
+  assert= 123 Typ7_field1 131 end
+  assert= 123 Typ7_field2 135 end
+  assert= 123 Typ7_field3 139 end
 end
 test_struct_7
 
@@ -1840,12 +1983,12 @@ struct: Typ8
 end
 
 fun: test_struct_8 { -- err }
-  T{ size'  Typ8     <T> 8   }T
-  T{ align' Typ8     <T> 4   }T
-  T{ 123 Typ8_field0 <T> 123 }T
-  T{ 123 Typ8_field1 <T> 124 }T
-  T{ 123 Typ8_field2 <T> 125 }T
-  T{ 123 Typ8_field3 <T> 127 }T
+  assert= size'  Typ8 8 end
+  assert= align' Typ8 4 end
+  assert= 123 Typ8_field0 123 end
+  assert= 123 Typ8_field1 124 end
+  assert= 123 Typ8_field2 125 end
+  assert= 123 Typ8_field3 127 end
 end
 test_struct_8
 
@@ -1855,10 +1998,10 @@ struct: Typ9
 end
 
 fun: test_struct_9 { -- err }
-  T{ size'  Typ9     <T> 129 }T
-  T{ align' Typ9     <T> 1   }T
-  T{ 123 Typ9_field0 <T> 123 }T
-  T{ 123 Typ9_field1 <T> 124 }T
+  assert= size'  Typ9 129 end
+  assert= align' Typ9 1 end
+  assert= 123 Typ9_field0 123 end
+  assert= 123 Typ9_field1 124 end
 end
 test_struct_9
 
@@ -1870,12 +2013,12 @@ struct: Typ10
 end
 
 fun: test_struct_10 { -- err }
-  T{ size'  Typ10     <T> 144 }T
-  T{ align' Typ10     <T> 4   }T
-  T{ 123 Typ10_field0 <T> 123 }T
-  T{ 123 Typ10_field1 <T> 124 }T \ followed by padding 1
-  T{ 123 Typ10_field2 <T> 127 }T \ not followed by padding
-  T{ 123 Typ10_field3 <T> 139 }T
+  assert= size'  Typ10 144 end
+  assert= align' Typ10 4 end
+  assert= 123 Typ10_field0 123 end
+  assert= 123 Typ10_field1 124 end \ followed by padding 1
+  assert= 123 Typ10_field2 127 end \ not followed by padding
+  assert= 123 Typ10_field3 139 end
 end
 test_struct_10
 
@@ -1885,25 +2028,25 @@ struct: Typ11
 end
 
 fun: test_struct_11 { -- err }
-  T{ size'  Typ11     <T> 24  }T
-  T{ align' Typ11     <T> 8   }T
-  T{ 123 Typ11_field0 <T> 123 }T
-  T{ 123 Typ11_field1 <T> 139 }T
+  assert= size'  Typ11 24 end
+  assert= align' Typ11 8 end
+  assert= 123 Typ11_field0 123 end
+  assert= 123 Typ11_field1 139 end
 end
 test_struct_11
 
 fun: test_catch_invalid { -- err } [ false try_all ]
   use' ./fail/test_catch_invalid_exec.af
   " useless attempt to catch an error when calling word `nop` which does not throw"
-  T_err_contains try
+  assert_str_has try
 
   use' ./fail/test_catch_invalid_comp.af
   " word `nop` not found in wordlist 2 (WORDLIST_COMP)"
-  T_err_contains try
+  assert_str_has try
 
   use' ./fail/test_catch_requires_try_all.af
   " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
-  T_err_contains try
+  assert_str_has try
 
 end
 test_catch_invalid
@@ -1919,10 +2062,12 @@ fun: test_catch_0_val { -- val err }
 end
 
 fun: test_catch_0 { -- err }
-  T{ test_catch_0_val          <T> 123     }T
-  T{ catch' test_catch_0_val   <T> 123 nil }T
-  T{ catch' test_throw { err } <T>         }T
-  err " test_err" T_str_eq
+  assert= test_catch_0_val 123 end
+  catch' test_catch_0_val { val err }
+  assert= val 123 end
+  assert= err nil end
+  catch' test_throw { err }
+  err " test_err" assert_str_eq
 end
 test_catch_0
 
@@ -1934,14 +2079,13 @@ fun: test_catch_1_cond { one -- two err }
 end
 
 fun: test_catch_1 { -- err }
-  T{ 123 test_catch_1_cond                    <T> 246     }T
-  T{ 123 catch' test_catch_1_cond             <T> 246 nil }T
-  T{ 0   catch' test_catch_1_cond { val err } <T>         }T
+  assert= 123 test_catch_1_cond 246 end
+  123 catch' test_catch_1_cond { val err }
+  assert= val 246 end
+  assert= err nil end
+  0   catch' test_catch_1_cond { val err }
 
-  err " test_err" T_str_eq
-
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ val <T> err }T
+  err " test_err" assert_str_eq
 end
 test_catch_1
 
@@ -1961,20 +2105,19 @@ fun: test_catch_2_cond { one two -- three four err }
 end
 
 fun: test_catch_2 { -- err }
-  T{ 13 25 test_catch_2_cond        <T> 38 12     }T
-  T{ 13 25 catch' test_catch_2_cond <T> 38 12 nil }T
+  13 25 test_catch_2_cond { one two }
+  assert= one 38 end
+  assert= two 12 end
+  13 25 catch' test_catch_2_cond { one two err }
+  assert= one 38 end
+  assert= two 12 end
+  assert= err nil end
 
-  T{ 0  13 catch' test_catch_2_cond { one two err } <T>      }T
-  err " test_err" T_str_eq
+  0  13 catch' test_catch_2_cond { one two err }
+  err " test_err" assert_str_eq
 
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ one two <T> err true }T
-
-  T{ 12 0  catch' test_catch_2_cond { one two err } <T>      }T
-  err " test_err" T_str_eq
-
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ one two <T> err 0 }T
+  12 0  catch' test_catch_2_cond { one two err }
+  err " test_err" assert_str_eq
 end
 test_catch_2
 
@@ -1987,49 +2130,46 @@ end
 
 fun: test_disabling_try_all { -- err } [ false try_all ]
   test_disabling_try_all_fun { err }
-  err " different_test_err" T_str_eq
+  err " different_test_err" assert_str_eq
 end
 test_disabling_try_all
 
 fun: test_unused_local_error { -- err } [ false try_all ]
   use' ./fail/test_unused_local.af
   " unused local"
-  T_err_contains
+  assert_str_has
 end
 test_unused_local_error
 
 fun: test_discard_param_read { -- err } [ false try_all ]
   use' ./fail/test_discard_param_read.af
   " undefined word"
-  T_err_contains
+  assert_str_has
 end
 test_discard_param_read
 
 fun: discard_param_push_suffix { val _ignored -> out } end
 
 fun: test_discard_param_push { -- err } [ false try_all ]
-  T{ 10 20 discard_param_push_suffix <T> 10 }T
+  assert= 10 20 discard_param_push_suffix 10 end try
 
   use' ./fail/test_discard_param_push.af
   " unable to use non-trailing discard parameter with `->`"
-  T_err_contains
+  assert_str_has
 end
 test_discard_param_push
 
 fun: test_discard_assign_read { -- err } [ false try_all ]
   use' ./fail/test_discard_assign_read.af
   " undefined word"
-  T_err_contains
+  assert_str_has
 end
 test_discard_assign_read
-
-fun: test_named_local_anon_style { (anon_0) -- out } (anon_0) end
-T{ 123 test_named_local_anon_style <T> 123 }T
 
 fun: test_unpopped_anon_local { -- err } [ false try_all ]
   use' ./fail/test_unpopped_anon_local.af
   " unused local"
-  T_err_contains
+  assert_str_has
 end
 test_unpopped_anon_local
 
@@ -2037,8 +2177,8 @@ fun: test_explicit_err_0 { -- err } [ false try_all ]
   test_throw  { err0 }
   " test_err" { err1 }
 
-  T{ err0 err1 = <T> false }T
-  err0 err1 T_str_eq
+  assert<> err0 err1 end try
+  err0 err1 assert_str_eq
 end
 test_explicit_err_0
 
@@ -2051,23 +2191,23 @@ end
 fun: test_explicit_err_1_fun_throwing { -- err }
   \ [ true try_all ] 0 test_explicit_err_1_fun { -- } \ Must throw.
 
-  T{ 123 test_explicit_err_1_fun { val } <T>     }T
-  T{ val                                 <T> 246 }T
-  T{ 123 test_explicit_err_1_fun         <T> 246 }T
+  123 test_explicit_err_1_fun { val }
+  assert= val 246 end
+  assert= 123 test_explicit_err_1_fun 246 end
 end
 test_explicit_err_1_fun_throwing
 
 fun: test_explicit_err_1 { -- err } [ false try_all ]
 
-  T{ 0 test_explicit_err_1_fun { val err } <T> }T
-  err " test_err" T_str_eq try
+  0 test_explicit_err_1_fun { val err }
+  err " test_err" assert_str_eq try
 
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ val <T> err }T
-
-  T{ 123 test_explicit_err_1_fun { val err } <T>         }T
-  T{ val err                                 <T> 246 nil }T
-  T{ 123 test_explicit_err_1_fun             <T> 246 nil }T
+  123 test_explicit_err_1_fun { val err }
+  assert= val 246 end try
+  assert= err nil end try
+  123 test_explicit_err_1_fun { val2 err2 }
+  assert= val2 246 end try
+  assert= err2 nil end try
 end
 test_explicit_err_1
 
@@ -2080,30 +2220,33 @@ end
 fun: test_explicit_err_2_fun_throwing { -- err }
   \ [ true try_all ] 0 123 test_explicit_err_2_fun { -- } \ Must throw.
 
-  T{ 11 22 test_explicit_err_2_fun { val } <T>    }T
-  T{ val                                   <T> 33 }T
-  T{ 11 22 test_explicit_err_2_fun         <T> 33 }T
+  11 22 test_explicit_err_2_fun { val }
+  assert= val 33 end
+  assert= 11 22 test_explicit_err_2_fun 33 end
 
-  T{ 11 0 test_explicit_err_2_fun { val } <T>    }T
-  T{ val                                  <T> 11 }T
-  T{ 11 0 test_explicit_err_2_fun         <T> 11 }T
+  11 0 test_explicit_err_2_fun { val }
+  assert= val 11 end
+  assert= 11 0 test_explicit_err_2_fun 11 end
 end
 test_explicit_err_2_fun_throwing
 
 fun: test_explicit_err_2 { -- err } [ false try_all ]
-  T{ 0 11 test_explicit_err_2_fun { val err } <T> }T
-  err " test_err" T_str_eq try
+  0 11 test_explicit_err_2_fun { val err }
+  err " test_err" assert_str_eq try
 
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ val <T> err }T
+  11 22 test_explicit_err_2_fun { val err }
+  assert= val 33 end try
+  assert= err nil end try
+  11 22 test_explicit_err_2_fun { val2 err2 }
+  assert= val2 33 end try
+  assert= err2 nil end try
 
-  T{ 11 22 test_explicit_err_2_fun { val err } <T>        }T
-  T{ val err                                   <T> 33 nil }T
-  T{ 11 22 test_explicit_err_2_fun             <T> 33 nil }T
-
-  T{ 11 0 test_explicit_err_2_fun { val err } <T>        }T
-  T{ val err                                  <T> 11 nil }T
-  T{ 11 0 test_explicit_err_2_fun             <T> 11 nil }T
+  11 0 test_explicit_err_2_fun { val err }
+  assert= val 11 end try
+  assert= err nil end try
+  11 0 test_explicit_err_2_fun { val3 err3 }
+  assert= val3 11 end try
+  assert= err3 nil end try
 end
 test_explicit_err_2
 
@@ -2118,30 +2261,30 @@ end
 fun: test_explicit_err_3_fun_throwing { -- err }
   \ [ true try_all ] 0 test_explicit_err_3_fun { -- } \ Must throw.
 
-  T{ 123 negate <T> -123 }T
+  assert= 123 negate -123 end
 
-  T{ 123 test_explicit_err_3_fun { one two } <T>          }T
-  T{ one two                                 <T> 246 -123 }T
-  T{ 123 test_explicit_err_3_fun             <T> 246 -123 }T
+  123 test_explicit_err_3_fun { one two }
+  assert= one 246 end
+  assert= two -123 end
+  123 test_explicit_err_3_fun { one two }
+  assert= one 246 end
+  assert= two -123 end
 end
 test_explicit_err_3_fun_throwing
 
 fun: test_explicit_err_3 { -- err } [ false try_all ]
-  T{
-    \ Predictable state of regs x0 x1 x2.
-    123 234 345 { -- }
-    0 test_explicit_err_3_fun { one two err }
-    <T>
-  }T
-  err " test_err" T_str_eq try
+  123 234 345 { -- } \ Predictable state of regs x0 x1 x2.
+  0 test_explicit_err_3_fun { one two err }
+  err " test_err" assert_str_eq try
 
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ one <T> err }T
-  T{ two <T> 234 }T
-
-  T{ 123 test_explicit_err_3_fun { one two err } <T>              }T
-  T{ one two err                                 <T> 246 -123 nil }T
-  T{ 123 test_explicit_err_3_fun                 <T> 246 -123 nil }T
+  123 test_explicit_err_3_fun { one two err }
+  assert= one 246 end try
+  assert= two -123 end try
+  assert= err nil end try
+  123 test_explicit_err_3_fun { one2 two2 err2 }
+  assert= one2 246 end try
+  assert= two2 -123 end try
+  assert= err2 nil end try
 end
 test_explicit_err_3
 
@@ -2156,31 +2299,43 @@ end
 fun: test_explicit_err_4_fun_throwing { -- err }
   \ [ true try_all ] 0 123 test_explicit_err_4_fun { -- } \ Must throw.
 
-  T{ 13 25 test_explicit_err_4_fun { one two } <T>       }T
-  T{ one two                                   <T> 38 12 }T
-  T{ 13 25 test_explicit_err_4_fun             <T> 38 12 }T
+  13 25 test_explicit_err_4_fun { one two }
+  assert= one 38 end
+  assert= two 12 end
+  13 25 test_explicit_err_4_fun { one two }
+  assert= one 38 end
+  assert= two 12 end
 
-  T{ 13 0 test_explicit_err_4_fun { one two } <T>        }T
-  T{ one two                                  <T> 13 -13 }T
-  T{ 13 0 test_explicit_err_4_fun             <T> 13 -13 }T
+  13 0 test_explicit_err_4_fun { one two }
+  assert= one 13 end
+  assert= two -13 end
+  13 0 test_explicit_err_4_fun { one two }
+  assert= one 13 end
+  assert= two -13 end
 end
 test_explicit_err_4_fun_throwing
 
 fun: test_explicit_err_4 { -- err } [ false try_all ]
-  T{ 0 13 test_explicit_err_4_fun { one two err } <T> }T
-  err " test_err" T_str_eq try
+  0 13 test_explicit_err_4_fun { one two err }
+  err " test_err" assert_str_eq try
 
-  \ Accident of register allocation. We're not attached to this behavior.
-  T{ one <T> err }T
-  T{ two <T> 13  }T
+  13 25 test_explicit_err_4_fun { one two err }
+  assert= one 38 end try
+  assert= two 12 end try
+  assert= err nil end try
+  13 25 test_explicit_err_4_fun { one2 two2 err2 }
+  assert= one2 38 end try
+  assert= two2 12 end try
+  assert= err2 nil end try
 
-  T{ 13 25 test_explicit_err_4_fun { one two err } <T>           }T
-  T{ one two err                                   <T> 38 12 nil }T
-  T{ 13 25 test_explicit_err_4_fun                 <T> 38 12 nil }T
-
-  T{ 13 0 test_explicit_err_4_fun { one two err } <T>            }T
-  T{ one two err                                  <T> 13 -13 nil }T
-  T{ 13 0 test_explicit_err_4_fun                 <T> 13 -13 nil }T
+  13 0 test_explicit_err_4_fun { one two err }
+  assert= one 13 end try
+  assert= two -13 end try
+  assert= err nil end try
+  13 0 test_explicit_err_4_fun { one3 two3 err3 }
+  assert= one3 13 end try
+  assert= two3 -13 end try
+  assert= err3 nil end try
 end
 test_explicit_err_4
 
@@ -2189,7 +2344,15 @@ fun: test_max_input_regs { _A _B _C _D _E _F _G _H } end
 
 fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
 fun: test_max_output_regs { -- err } [ redefine ]
-  T{ test_max_output_regs <T> 0 1 2 3 4 5 6 7 }T
+  test_max_output_regs { A B C D E F G H }
+  assert= A 0 end
+  assert= B 1 end
+  assert= C 2 end
+  assert= D 3 end
+  assert= E 4 end
+  assert= F 5 end
+  assert= G 6 end
+  assert= H 7 end
 end
 test_max_output_regs
 
@@ -2198,21 +2361,28 @@ fun: test_max_output_regs_with_err { -- A B C D E F G err }
   0 1 2 3 4 5 6
 end
 fun: test_max_output_regs_with_err { -- err } [ redefine ]
-  T{ test_max_output_regs_with_err <T> 0 1 2 3 4 5 6 }T
+  test_max_output_regs_with_err { A B C D E F G }
+  assert= A 0 end
+  assert= B 1 end
+  assert= C 2 end
+  assert= D 3 end
+  assert= E 4 end
+  assert= F 5 end
+  assert= G 6 end
 end
 test_max_output_regs_with_err
 
 fun: test_file_throw_import_catch { -- err } [ false try_all ]
   use' ./fail/test_root_throw.af
-  " test_err" T_err_contains
+  " test_err" assert_str_has
 end
 test_file_throw_import_catch
 
 fun: test_signature_err_auto_callee { -- err } end
 
 fun: test_signature_err_auto { -- err }
-  T{ xt' test_signature_err_auto_callee Sym_has_err @b <T> true }T
-  T{ xt' test_signature_err_auto_callee Sym_out_len @b <T> 1    }T
+  assert= xt' test_signature_err_auto_callee Sym_has_err @b true end
+  assert= xt' test_signature_err_auto_callee Sym_out_len @b 1 end
 end
 test_signature_err_auto
 
@@ -2223,113 +2393,116 @@ fun: test_has_err_not_auto_marked_caller { -- err_str } [ false try_all ]
 end
 
 fun: test_has_err_not_auto_marked { -- err }
-  T{ xt' test_has_err_not_auto_marked_callee Sym_has_err @b <T> true  }T
-  T{ xt' test_has_err_not_auto_marked_caller Sym_has_err @b <T> false }T
+  assert= xt' test_has_err_not_auto_marked_callee Sym_has_err @b true end
+  assert=
+    xt' test_has_err_not_auto_marked_caller Sym_has_err @b
+    false
+  end
 end
 test_has_err_not_auto_marked
 
 fun: test_has_err_not_contagious { -- err } [ false try_all ]
   use' ./fail/test_has_err_not_contagious.af
   " caller has no error output for implicit `try_all`"
-  T_err_contains
+  assert_str_has
 end
 test_has_err_not_contagious
 
 fun: test_throw_requires_err { -- err } [ false try_all ]
   use' ./fail/test_throw_requires_err.af
   " unable to `throw`: current word has no error output"
-  T_err_contains
+  assert_str_has
 end
 test_throw_requires_err
 
 fun: test_too_many_input_regs { -- err } [ false try_all ]
   use' ./fail/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
-  T_err_contains
+  assert_str_has
 end
 test_too_many_input_regs
 
 fun: test_too_many_output_regs { -- err } [ false try_all ]
   use' ./fail/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
-  T_err_contains
+  assert_str_has
 end
 test_too_many_output_regs
 
 fun: test_too_many_output_regs_with_err { -- err } [ false try_all ]
   use' ./fail/test_too_many_output_regs_with_err.af
   " too many output parameters: 8 registers available, 9 parameters requested"
-  T_err_contains
+  assert_str_has
 end
 test_too_many_output_regs_with_err
 
 fun: test_too_many_comptime_arg_regs { -- err } [ false try_all ]
   use' ./fail/test_too_many_comptime_arg_regs.af
   " too many arguments: 16 registers available, 17 arguments provided"
-  T_err_contains
+  assert_str_has
 end
 test_too_many_comptime_arg_regs
 
 fun: test_too_many_execute_raw_args { -- err } [ false try_all ]
   use' ./fail/test_too_many_execute_raw_args.af
   " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided"
-  T_err_contains
+  assert_str_has
 end
 test_too_many_execute_raw_args
 
 fun: test_comptime_stack_underflow { -- err } [ false try_all ]
   use' ./fail/test_comptime_stack_underflow.af
   " in `some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
-  T_err_contains
+  assert_str_has
 end
 test_comptime_stack_underflow
 
 fun: test_cond_arity_bare_if { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_bare_if.af
   " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_bare_if
 
 fun: test_cond_arity_else_mismatch { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_else_mismatch.af
   " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_else_mismatch
 
 fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_elif_mismatch.af
   " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_elif_mismatch
 
 fun: test_cond_arity_elifz_mismatch { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_elifz_mismatch.af
   " in `test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_elifz_mismatch
 
 fun: test_cond_arity_no_else { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_no_else.af
   " arguments before ending conditional without `else`: arity mismatch"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_no_else
 
 fun: test_cond_arity_no_else_less { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_no_else_less.af
   " arguments before ending conditional without `else`: arity mismatch"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_no_else_less
 
 fun: test_cond_arity_no_else_more { -- err } [ false try_all ]
   use' ./fail/test_cond_arity_no_else_more.af
   " arguments before ending conditional without `else`: arity mismatch"
-  T_err_contains
+  assert_str_has
 end
 test_cond_arity_no_else_more
 
@@ -2339,31 +2512,31 @@ fun: test_arena_alloc { -- err }
   alloca' Arena { arn }
   arn arena_init
 
-  T{ arn stack_len_bytes <T> 0   }T
-  T{ arn Arena_low @     <T> nil }T
+  assert= arn stack_len_bytes 0 end
+  assert= arn Arena_low @ nil end
 
   1 arn arena_alloc { adr0 }
   arn Arena_low @ { page0 }
 
-  T{ page0 stack_cap_bytes <T> ARENA_PAGE_MIN }T
-  T{ page0 stack_len_bytes <T> 1              }T
-  T{ arn   stack_len_bytes <T> size' Stack    }T
+  assert= page0 stack_cap_bytes ARENA_PAGE_MIN end
+  assert= page0 stack_len_bytes 1 end
+  assert= arn   stack_len_bytes size' Stack end
 
   7 arn arena_alloc { adr1 }
 
-  T{ arn Arena_low @       <T> page0          }T
-  T{ adr1 adr0 -           <T> FUND_ALIGN     }T
-  T{ page0 stack_len_bytes <T> FUND_ALIGN 7 + }T
-  T{ arn stack_len_bytes   <T> size' Stack    }T
+  assert= arn Arena_low @ page0 end
+  assert= adr1 adr0 - FUND_ALIGN end
+  assert= page0 stack_len_bytes FUND_ALIGN 7 + end
+  assert= arn stack_len_bytes size' Stack end
 
   ARENA_PAGE_MIN arn arena_alloc { adr2 }
   arn Arena_low @ { page1 }
 
-  T{ page1 page0 <>        <T> true                }T
-  T{ page1 stack_cap_bytes <T> ARENA_PAGE_MIN      }T
-  T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN      }T
-  T{ adr2                  <T> page1 Stack_floor @ }T
-  T{ arn stack_len_bytes   <T> size' Stack 2 *     }T
+  assert<> page1 page0 end
+  assert= page1 stack_cap_bytes ARENA_PAGE_MIN end
+  assert= page1 stack_len_bytes ARENA_PAGE_MIN end
+  assert= adr2 page1 Stack_floor @ end
+  assert= arn stack_len_bytes size' Stack 2 * end
 
   arn arena_deinit
 end
@@ -2380,22 +2553,22 @@ fun: test_arena_trunc { -- err }
   ARENA_PAGE_MIN arn arena_alloc { _adr1 }
   arn Arena_low @ { page1 }
 
-  T{ arn stack_len_bytes   <T> size' Stack 2 * }T
-  T{ page0 stack_len_bytes <T> 7               }T
-  T{ page1 stack_len_bytes <T> ARENA_PAGE_MIN  }T
+  assert= arn stack_len_bytes size' Stack 2 * end
+  assert= page0 stack_len_bytes 7 end
+  assert= page1 stack_len_bytes ARENA_PAGE_MIN end
 
   arn arena_trunc
 
-  T{ arn stack_len_bytes   <T> size' Stack 2 * }T
-  T{ arn Arena_low @       <T> page0           }T
-  T{ page0 stack_len_bytes <T> 0               }T
-  T{ page1 stack_len_bytes <T> 0               }T
+  assert= arn stack_len_bytes size' Stack 2 * end
+  assert= arn Arena_low @ page0 end
+  assert= page0 stack_len_bytes 0 end
+  assert= page1 stack_len_bytes 0 end
 
   11 arn arena_alloc { adr2 }
 
-  T{ adr2                <T> floor0          }T
-  T{ arn Arena_low @     <T> page0           }T
-  T{ arn stack_len_bytes <T> size' Stack 2 * }T
+  assert= adr2 floor0 end
+  assert= arn Arena_low @ page0 end
+  assert= arn stack_len_bytes size' Stack 2 * end
 
   arn arena_deinit
 end
@@ -2410,12 +2583,12 @@ fun: test_arena_deinit { -- err }
 
   arn arena_deinit
 
-  T{ arn stack_len_bytes <T> 0   }T
-  T{ arn Arena_low @     <T> nil }T
+  assert= arn stack_len_bytes 0 end
+  assert= arn Arena_low @ nil end
 
   adr1 catch' test_arena_unprot { err }
-  T{ err <>0 <T> true }T
-  err " unable to mprotect" T_err_contains
+  assert err <>0 end
+  err " unable to mprotect" assert_str_has
 end
 test_arena_deinit
 
@@ -2424,8 +2597,8 @@ fun: test_arena_errors { -- err }
   arn arena_init
 
   0 arn catch' arena_alloc { _adr err }
-  T{ err <>0 <T> true }T
-  err " unable to allocate: size is zero" T_err_contains
+  assert err <>0 end
+  err " unable to allocate: size is zero" assert_str_has
 
   nil arena_trunc
   nil arena_deinit
@@ -2435,15 +2608,11 @@ test_arena_errors
 
 fun: test_word_len_over { -- err }
   s" ./fail/test_word_len_over.af" catch' use { err }
-  err " word length 128 exceeds max word length 127" T_err_contains
+  err " word length 128 exceeds max word length 127" assert_str_has
 end
 test_word_len_over
 
 s" ./test_import_empty.af" use
-
-T{ s" ./test_interp_ret.af" use <T> 123 }T
-
-s" testing.af" use
 
 use' ./test_const_fold.af
 use' ./test_simd.af

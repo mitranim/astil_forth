@@ -20,7 +20,6 @@ static const USED Sym INTRIN[] = {
   INTRIN_COMP_POP_INTO_LOCAL,        // comp_pop_into_local
   INTRIN_COMP_ASSIGN_LOCAL_FROM_REG, // comp_assign_local_from_reg
   INTRIN_TRY_ALL,                    // try_all
-  INTRIN_GET_TRY_ALL,                // get_try_all
   INTRIN_ALLOCA,                     // alloca
   INTRIN_COMPILE_EXECUTABLE,         // compile_executable
   INTRIN_DEBUG_CTX,                  // debug_ctx

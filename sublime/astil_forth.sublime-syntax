@@ -35,7 +35,7 @@ variables:
       loop|for|while|leave|again|
       throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
       try|try[_]{{word}}|{{word}}[_]try|
-      assert|abort|unreachable|fatal|quit|exit
+      assert|assert{{word}}|abort|unreachable|fatal|quit|exit
     )
 
 contexts:

@@ -284,11 +284,6 @@ static void intrin_try_all(bool val, Interp *interp) {
   if (interp->module) interp->module->try_all = val;
 }
 
-static void intrin_get_try_all(Interp *interp, bool *out) {
-  if (interp->comp.ctx.sym) *out = interp->comp.ctx.try_all;
-  else *out = interp->module->try_all;
-}
-
 static Err intrin_comp_only(bool val, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
@@ -747,13 +742,6 @@ static const USED auto INTRIN_TRY_ALL = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_try_all,
   .inp_len  = 1,
-};
-
-static const USED auto INTRIN_GET_TRY_ALL = (Sym){
-  .name.buf = "get_try_all",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_get_try_all,
-  .out_len  = 1,
 };
 
 static const USED auto INTRIN_BRACE = (Sym){
