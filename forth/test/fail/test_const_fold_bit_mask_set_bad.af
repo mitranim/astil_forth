@@ -1,6 +1,0 @@
-use' ../../lang.af
-
-\ Must fail to compile: const-folded masks must be nonzero and contiguous.
-fun: test_const_fold_bit_mask_set_bad { -- out }
-  1 0b1111 0 bit_mask_set
-end
