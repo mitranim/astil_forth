@@ -372,7 +372,7 @@ Comptime words are allowed to operate at the _top_ of the register stack. For ex
 
 ## Performance
 
-See [`./bench`](./bench). Summary: in these _very limited_ microbenchmarks, the reg-CC version of Astil Forth trounces VM interpreters, often outpaces other JITs, and vaguely approximates Clang C with `-O2`. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
+See [`./bench`](./bench). Summary: in these _very limited_ microbenchmarks, the reg-CC version of Astil Forth trounces VM interpreters, approximates other JITs, and vaguely approximates Clang C with `-O2`. Needless to say, this shouldn't be over-generalized. The compiler is simple, stupid.
 
 ## Limitations
 

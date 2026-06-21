@@ -2935,16 +2935,6 @@ fun: cf_fold_cleared1 { -- reg imm ok err }
   reg imm true
 end
 
-fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
-  comp_top_arg_regs2      { reg0 reg1 }
-  reg0 reg1 cf_foldables2 { arg0 arg1 imm0 imm1 ok }
-
-  ifz ok then 0 0 0 false ret end
-  arg0 cf_arg_rewind_clear
-  arg1 cf_arg_clear
-  reg0 imm0 imm1 true
-end
-
 fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
   comp_top_arg_regs2      { reg0 reg1 }
   reg0 reg1 cf_foldables2 { arg0 arg1 imm0 imm1 ok }
@@ -2953,6 +2943,12 @@ fun: cf_fold_cleared2_keep2 { -- reg0 reg1 imm0 imm1 ok err }
   arg0 cf_arg_rewind_clear
   arg1 cf_arg_clear
   reg0 reg1 imm0 imm1 true
+end
+
+fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
+  cf_fold_cleared2_keep2 { reg0 reg1 imm0 imm1 ok }
+  reg1 { -- }
+  reg0 imm0 imm1 ok
 end
 
 fun: cf_fold_done { reg imm -- err }
@@ -2973,8 +2969,8 @@ fun: cf_addsub_imm12_mag { imm -- mag ok }
   0 false
 end
 
-fun: cf_validate { imm aux validate -- aux ok err }
-  imm aux validate execute_raw [ 3 comp_args_set ] try
+fun: cf_validate { imm aux validate -> aux ok err }
+  execute_raw [ 3 comp_args_set ] try
 end
 
 fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }

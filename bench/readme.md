@@ -9,7 +9,11 @@ Microbenchmarks comparing:
 - Common Lisp (SBCL).
 - Python (PyPy and CPython).
 
-Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces VM interpreters, often outpaces other JITs, and vaguely approaches Clang C with `-O2` (x1.5-x2).
+All measurements were done on M3 Pro.
+
+Summary: in these _very limited_ microbenchmarks, the reg-CC implementation of Astil Forth trounces VM interpreters, approximates other JITs, and vaguely approaches Clang C with `-O2` (x1.5-x2).
+
+Caveat: CPU microbenchmarks are sensitive to code layout and instruction selection. Small source changes can shift CPU frontend, cache, and branch-prediction behavior; on M3 Pro, we have seen cosmetic-looking benchmark edits move results by up to ≈10%. Avoid over-generalizing differences in that range.
 
 Naming:
 - `_aot`     -- Astil reg-CC as AOT-compiled executable.
@@ -20,8 +24,6 @@ Naming:
 Each `_reg` and `_stack` benchmark includes the cost of bootstrapping the entire language first. Reg-CC takes longer to bootstrap because it has more features.
 
 In many benchmarks, _startup time skews the measurement_. Adjust them by the "baseline" metrics when comparing.
-
-All measurements were done on M3 Pro.
 
 ## VERSIONS
 
