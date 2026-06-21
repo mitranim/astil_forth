@@ -3526,7 +3526,9 @@ end
 
 \ Unsigned divide a local: `divisor u/: some_val`.
 fun_comp: u/: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_UDIV_REG comp_loc_mut_arith_reg
+  ASM_OP_UDIV_REG nil
+  instr' cf_pow2_validate instr' cf_udiv_pow2_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: mod { -- err } [ redefine ]
