@@ -3527,6 +3527,9 @@ fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
   comp_loc_mut_imm
 end
 
+\ No partial CF: signed pow2 division needs several biasing instructions,
+\ because `asr` rounds negative values down, while signed division rounds
+\ toward zero. Not worth the code size for now.
 fun_comp: / { -- err } [ redefine ]
   if cf_fold_cleared2 then / cf_fold_done else { -- } execute'' / end
 end
