@@ -597,10 +597,13 @@ fun: const_fold_udiv_mod_fun { -- out0 out1 out2 out3 }
   -1 -2 u/mod
 end
 
+fun: const_fold_udiv_pow2_rhs_imm_fun { val -- out } val 8 u/ end
+
 fun: test_const_fold_div_mod { -- err }
   T{ const_fold_div_mod_fun  <T> 5 5 4 4 5 }T
   T{ const_fold_div_zero_fun <T> 0 29 29 0 }T
   T{ const_fold_udiv_mod_fun <T> 1 1 1 1   }T
+  T{ 64 const_fold_udiv_pow2_rhs_imm_fun <T> 8 }T
 
   ifz has_interp then ret end
 
@@ -625,6 +628,11 @@ fun: test_const_fold_div_mod { -- err }
   2 1 cf_expect_load
   3 1 cf_expect_load
   cf_expect_ret
+
+  cf_expect_clear
+  0 0 3 asm_lsr_imm cf_expect_instr
+  cf_expect_ret
+  xt' const_fold_udiv_pow2_rhs_imm_fun cf_expect_word
 end
 test_const_fold_div_mod
 

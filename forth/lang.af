@@ -3194,6 +3194,16 @@ fun: cf_addsub_emit { reg0 reg1 imm add -- err }
   reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
 end
 
+fun: cf_pow2_validate { imm _ -- aux ok err }
+  if imm <=0 then nil false ret end
+  if imm imm dec and then nil false ret end
+  imm bit_ctz true
+end
+
+fun: cf_udiv_pow2_emit { reg0 reg1 _imm shift -- err }
+  reg0 reg1 shift asm_lsr_imm comp_instr \ lsr Xd, Xn, #imm6
+end
+
 fun: comp_loc_mut_arg_prepare { -- reg arg loc imm foldable err }
   cf_top_arg_foldable { reg arg imm foldable }
   read_word comp_local { loc }
@@ -3504,7 +3514,14 @@ fun_comp: /: { -- err } ( C: "name" -- ) ( E: divisor -- )
 end
 
 fun_comp: u/ { -- err } [ redefine ]
-  if cf_fold_cleared2 then u/ cf_fold_done else { -- } execute'' u/ end
+  if cf_fold_cleared2 then u/ cf_fold_done
+  else
+    { -- }
+    false nil nil
+    instr' cf_pow2_validate instr' cf_udiv_pow2_emit
+    if cf_fold2 then ret end
+    execute'' u/
+  end
 end
 
 \ Unsigned divide a local: `divisor u/: some_val`.
