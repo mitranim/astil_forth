@@ -4065,6 +4065,7 @@ end
 
 fun_comp: bit_mask_set { -- err } [ redefine ]
   if cf_fold_cleared3 then bit_mask_set cf_fold_done
+  \ No partial CF yet: useful for constant masks, but requires ternary partial-CF.
   else { -- } execute'' bit_mask_set end
 end
 
