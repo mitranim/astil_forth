@@ -2925,7 +2925,7 @@ fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
   if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or
 end
 
-fun: cf_fold_rhs_imm_raw { reg0 arg1 imm aux emit -- err }
+fun: cf_fold_rhs_imm { reg0 arg1 imm aux emit -- err }
   arg1 cf_arg_rewind_clear
   reg0 comp_realloc_reg
   reg0 reg0 imm aux emit execute_raw [ 1 comp_args_set ] try
@@ -2936,11 +2936,11 @@ fun: cf_fold_rhs_imm_checked { reg0 arg1 imm aux emit ok -- ok err }
   ifz ok then false ret end
   ifz arg1 cf_arg_current then false ret end
 
-  reg0 arg1 imm aux emit cf_fold_rhs_imm_raw
+  reg0 arg1 imm aux emit cf_fold_rhs_imm
   true
 end
 
-fun: cf_fold_lhs_imm_raw { reg0 reg1 arg0 arg1 imm0 aux emit -- ok err }
+fun: cf_fold_lhs_imm { reg0 reg1 arg0 arg1 imm0 aux emit -- ok err }
   arg1 Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc1 }
   ifz loc1 then false ret end
 
@@ -3072,7 +3072,7 @@ fun: cf_addsub_imm12_mag { imm -- mag ok }
   0 false
 end
 
-fun: cf_validate_raw { imm aux validate -- aux ok err }
+fun: cf_validate { imm aux validate -- aux ok err }
   imm aux validate execute_raw [ 3 comp_args_set ] try
 end
 
@@ -3083,7 +3083,7 @@ fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
 
   if foldable then
     \ RHS constant: `num 10 +`.
-    imm rhs_aux validate cf_validate_raw { aux ok }
+    imm rhs_aux validate cf_validate { aux ok }
     reg0 arg1 imm aux emit ok cf_fold_rhs_imm_checked ret
   end
 
@@ -3094,9 +3094,9 @@ fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
   ifz foldable then false ret end
 
   \ LHS constant: `10 num +`.
-  imm lhs_aux validate cf_validate_raw { aux ok }
+  imm lhs_aux validate cf_validate { aux ok }
   ifz ok then false ret end
-  reg0 reg1 arg0 arg1 imm aux emit cf_fold_lhs_imm_raw
+  reg0 reg1 arg0 arg1 imm aux emit cf_fold_lhs_imm
 end
 
 fun: cf_shift_validate { imm reg_op -- aux ok err }
@@ -3265,7 +3265,7 @@ fun: comp_loc_mut_imm_fallback { fallback_aux fallback aux validate emit -- err 
   comp_loc_mut_arg_prepare { reg arg loc imm foldable }
 
   if foldable then
-    imm aux validate cf_validate_raw { aux ok }
+    imm aux validate cf_validate { aux ok }
     if reg arg loc imm aux emit ok comp_loc_mut_fold_imm_checked then ret end
   end
 
@@ -3342,7 +3342,7 @@ fun: comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rh
   comp_loc_mut_arg_prepare { reg arg loc imm foldable }
 
   if foldable then
-    imm cond validate cf_validate_raw { aux ok }
+    imm cond validate cf_validate { aux ok }
     if reg arg loc imm aux emit ok comp_loc_mut_fold_imm_checked then ret end
   end
 
