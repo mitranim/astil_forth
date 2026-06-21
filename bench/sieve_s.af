@@ -26,14 +26,14 @@ fun: find_prime { flags len -- num }
   drop
 end
 
-fun: main
+fun: run
   \ FLAGS LEN find_prime .
 
   RUNS for
     FLAGS LEN find_prime drop
   end
 end
-main
+run
 
 (
 Runs notably slower.

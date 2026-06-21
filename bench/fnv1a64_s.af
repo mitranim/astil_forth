@@ -31,7 +31,7 @@ fun: fnv1a64 { buf len -- hash }
   end
 end
 
-fun: main
+fun: run
   init
   OFFSET
   RUNS for
@@ -39,6 +39,6 @@ fun: main
   end
   { hash }
   " FNV1A64_PRINT" getenv if then " 0x%zx" hash [ 1 ] logf lf end
-  if hash WANT <> then 1 else 0 end
+  if hash WANT <> then " assertion failed: hash WANT =" throw end
 end
-main
+run

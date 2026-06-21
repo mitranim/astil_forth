@@ -14,7 +14,7 @@ fun: reverse { str len }
   end
 end
 
-fun: main { -- exit }
+fun: run
   s" 0123456789abcdef" { str len }
 
   1 22 lsl inc { ind }
@@ -26,7 +26,10 @@ fun: main { -- exit }
 
   \ str log lf
   \ fedcba9876543210
+end
 
+fun: main { -- exit }
+  run
   0
 end
-main
+run

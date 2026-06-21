@@ -8,9 +8,9 @@ fun: fib { ind -- out }
   next
 end
 
-fun: main
+fun: run
   1 20 lsl
   for 91 fib drop end
   \ 91 fib log_int lf
 end
-main
+run

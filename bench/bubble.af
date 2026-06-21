@@ -69,8 +69,13 @@ fun: bubble_sort { list len -- err }
   list len list_verify
 end
 
-fun: main { -- exit }
+fun: run { -- err }
   LIST LEN bubble_sort { err }
+  if err then err throw end
+end
+
+fun: main { -- exit }
+  run { err }
   ifz err then 0 else " error: %s" err elogf elf 1 end
 end
-main
+run

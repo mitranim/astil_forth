@@ -7,9 +7,13 @@ fun: fib { ind -- out }
   prev +
 end
 
-fun: main { -- exit }
+fun: run
   36 fib { -- }
   \ 36 fib log_int lf
+end
+
+fun: main { -- exit }
+  run
   0
 end
-main
+run

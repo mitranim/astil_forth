@@ -96,7 +96,7 @@ fun: bigint_log_decimal { lo hi }
   end
 end
 
-fun: main { -- exit }
+fun: run
   1 18 lsl { ind }
   loop
     dec: ind
@@ -104,6 +104,10 @@ fun: main { -- exit }
     184 fib { -- }
   end
   \ 184 fib bigint_log_decimal lf
+end
+
+fun: main { -- exit }
+  run
   0
 end
-main
+run

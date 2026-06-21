@@ -29,4 +29,4 @@ fun: main { -- exit }
   run { err }
   ifz err then 0 else " error: %s" err elogf elf 1 end
 end
-main
+run

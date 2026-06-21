@@ -32,7 +32,7 @@ fun: find_prime { flags cap -- num }
   num
 end
 
-fun: main { -- exit }
+fun: run
   \ FLAGS CAP find_prime log_int lf
 
   RUNS { ind }
@@ -42,6 +42,10 @@ fun: main { -- exit }
     FLAGS CAP find_prime { -- }
   end
 
+end
+
+fun: main { -- exit }
+  run
   0
 end
-main
+run

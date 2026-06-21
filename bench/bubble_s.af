@@ -81,8 +81,8 @@ end
 \   " CEIL: " log CEIL .sc
 \ end
 
-fun: main
+fun: run
   LIST LEN bubble_sort
   " [bubble] done" log lf
 end
-main
+run

@@ -7,8 +7,8 @@ fun: fib { ind -- out }
   +
 end
 
-fun: main
+fun: run
   36 fib
   \ " fib(36): " log log_int lf
 end
-main
+run
