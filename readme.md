@@ -17,6 +17,7 @@
 - [Performance](#performance)
 - [Limitations](#limitations)
 - [Non-standard](#non-standard)
+- [Bot policies](#bot-policies)
 - [Why so much C code](#why-so-much-c-code)
 - [Lessons](#lessons)
 - [What is JIT](#what-is-jit)
@@ -44,8 +45,6 @@ Non-goals:
 - ANS Forth compatibility.
 - Complex optimizations.
 - Complete stdlib.
-
-The system is mostly human-made. Bots were employed for knowledge search, reviews, tests, and some refactorings.
 
 No dependencies (other than libc). Uses custom assemblers in both C and Forth code.
 
@@ -387,7 +386,6 @@ I had a go, and bounced off the complexity. How to keep an optimizing compiler s
 ### Other limitations
 
 - Currently only Apple Silicon (MacOS + Arm64).
-- Vocabulary / stdlib is somewhat limited.
 - Top-level exceptions print only C traces, not Forth traces. (Opt-in via `--trace`.)
 
 ## Non-standard
@@ -464,6 +462,12 @@ Reg-CC emphasizes named local variables. Locals are kept in registers when possi
 Stack-CC always spills locals to the system stack.
 
 Both conventions make use of temp registers for scratch space.
+
+## Bot policies
+
+The system is human-envisioned, human-designed, and was _not_ touched by any bots during initial months of development.
+
+Later, bots got employed for reviews and many mechanical refactorings. I tried labeling all bot-generated parts, but it became too much work. Just know that I focus highly on unslop. They're useful tools.
 
 ## Why so much C code
 
