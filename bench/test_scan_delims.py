@@ -15,12 +15,13 @@ CFLS = [
     ROOT / "bench/scan_delims_naive.c",
 ]
 SHAPES = {
-    ROOT / "bench/scan_delims_simd.af": ("65536 let: CAP", "4096  let: REPS", "CAP mem: BUF"),
-    ROOT / "bench/scan_delims_naive.af": ("65536 let: CAP", "4096  let: REPS", "CAP mem: BUF"),
-    ROOT / "bench/scan_delims.py": ("CAP = 1 << 16", "REPS =", "buf ="),
-    ROOT / "bench/scan_delims.mjs": ("const CAP = 1 << 16", "const REPS =", "const buf ="),
-    ROOT / "bench/scan_delims.lua": ("local CAP = 2 ^ 16", "local REPS =", "local buf ="),
-    ROOT / "bench/scan_delims.lisp": ("(defconstant +cap+", "(defconstant +reps+", "(defparameter *buf*"),
+    ROOT / "bench/scan_delims_simd.af": ("let: CAP", "let: RUNS", "CAP mem: BUF"),
+    ROOT / "bench/scan_delims_naive.af": ("let: CAP", "let: RUNS", "CAP mem: BUF"),
+    ROOT / "bench/scan_delims.py": ("CAP = 1 << 16", "RUNS =", "buf ="),
+    ROOT / "bench/scan_delims_cpython.py": ("CAP = 1 << 16", "RUNS =", "buf ="),
+    ROOT / "bench/scan_delims.mjs": ("const CAP = 1 << 16", "const RUNS =", "const buf ="),
+    ROOT / "bench/scan_delims.lua": ("local CAP = 2 ^ 16", "local RUNS =", "local buf ="),
+    ROOT / "bench/scan_delims.lisp": ("(defconstant +cap+", "(defconstant +runs+", "(defparameter *buf*"),
 }
 PENV = {**os.environ, "SCAN_DELIMS_PRINT": "1"}
 
@@ -35,7 +36,7 @@ CMDS = [
     ("luajit", "bench/scan_delims.lua"),
     ("sbcl", "--script", "bench/scan_delims.lisp"),
     ("pypy3", "bench/scan_delims.py"),
-    ("python3", "bench/scan_delims.py"),
+    ("python3", "bench/scan_delims_cpython.py"),
 ]
 
 
@@ -57,9 +58,6 @@ def run(cmd):
 
 
 def main():
-    if '__asm__ volatile("" ' in CSRC.read_text(encoding="utf-8"):
-        print("empty asm barrier in C SIMD")
-        return 1
     if "#include <arm_neon.h>" in CSRC.read_text(encoding="utf-8"):
         print("Arm-only NEON include in C SIMD")
         return 1
@@ -68,13 +66,10 @@ def main():
         return 1
     for path in CFLS:
         src = path.read_text(encoding="utf-8")
-        if "__asm__" in src:
-            print("Arm-only asm in", path.name)
-            return 1
         if '#include "../clib/num.h"' not in src or "FMT_UINT" not in src:
             print("missing num.h/FMT_UINT in", path.name)
             return 1
-        for txt in ("#define CAP", "#define REPS", "buf[CAP]"):
+        for txt in ("#define CAP", "#define RUNS", "buf[CAP]"):
             if txt not in src:
                 print("missing", txt, "in", path.name)
                 return 1

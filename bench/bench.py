@@ -186,7 +186,7 @@ bench("scan_delims_luajit", "bench/scan_delims.lua", "luajit bench/scan_delims.l
 bench("scan_delims_js_bun", "bench/scan_delims.mjs", "bun run bench/scan_delims.mjs", tools=("bun",))
 bench("scan_delims_cl_sbcl", "bench/scan_delims.lisp", "sbcl --script bench/scan_delims.lisp", tools=("sbcl",))
 bench("scan_delims_pypy", "bench/scan_delims.py", "pypy3 bench/scan_delims.py", tools=("pypy3",))
-bench("scan_delims_python", "bench/scan_delims.py", "python3 bench/scan_delims.py", tools=("python3",))
+bench("scan_delims_python", "bench/scan_delims_cpython.py", "python3 bench/scan_delims_cpython.py", tools=("python3",))
 
 
 def parse_args() -> argparse.Namespace:

@@ -1,24 +1,43 @@
--- BOT-GENERATED
+-- BOT-ASSISTED
 
 local ffi = require("ffi")
 local CAP = 2 ^ 16
-local REPS = (2 ^ 24) / (CAP / 16)
+local RUNS = (2 ^ 24) / (CAP / 16)
 local WANT = (2 ^ 24) * 9
-local pat = ffi.new("uint8_t[16]", {123, 97, 44, 98, 58, 99, 91, 100,
-                                    93, 101, 125, 32, 10, 9, 102, 103})
+local pat = "{a,b:c[d]e} \n\tfg"
 local buf = ffi.new("uint8_t[?]", CAP)
-for i = 0, CAP - 1 do buf[i] = pat[bit.band(i, 15)] end
+local dels = ffi.new("uint8_t[256]")
+local LBRACE = string.byte("{")
+local RBRACE = string.byte("}")
+local LBRACK = string.byte("[")
+local RBRACK = string.byte("]")
+local COLON = string.byte(":")
+local COMMA = string.byte(",")
+local SPACE = string.byte(" ")
+local LF = string.byte("\n")
+local TAB = string.byte("\t")
 
-local function is_delim(c)
-  return c == 123 or c == 125 or c == 91 or c == 93 or c == 58 or
-         c == 44 or c == 32 or c == 10 or c == 9
+dels[LBRACE] = 1
+dels[RBRACE] = 1
+dels[LBRACK] = 1
+dels[RBRACK] = 1
+dels[COLON] = 1
+dels[COMMA] = 1
+dels[SPACE] = 1
+dels[LF] = 1
+dels[TAB] = 1
+
+for ind = 0, CAP - 1 do buf[ind] = pat:byte((ind % #pat) + 1) end
+
+local function scan(buf, cap, dels)
+  local out = 0
+  for ind = 0, cap - 1 do
+    out = out + dels[buf[ind]]
+  end
+  return out
 end
 
 local out = 0
-for _ = 1, REPS do
-  for j = 0, CAP - 1 do
-    if is_delim(buf[j]) then out = out + 1 end
-  end
-end
+for _ = 1, RUNS do out = out + scan(buf, CAP, dels) end
 if os.getenv("SCAN_DELIMS_PRINT") then print(out) end
-if out ~= WANT then os.exit(1) end
+if out ~= WANT then error("mismatch: expected " .. WANT .. "; got " .. out) end

@@ -1,52 +1,75 @@
 use' lang.af
 
-\ BOT-GENERATED
+\ BOT-ASSISTED
 
-65536 let: CAP
-4096  let: REPS
+65536     let: CAP
+4096      let: RUNS
 150994944 let: WANT
+
 CAP mem: BUF
+16  mem: PAT
+256 mem: DELS
+
 1 1 extern: getenv
 
-fun: init_chunk { ptr }
-  123 ptr      !8  97 ptr 1  + !8  44 ptr 2  + !8  98 ptr 3  + !8
-  58  ptr 4  + !8  99 ptr 5  + !8  91 ptr 6  + !8 100 ptr 7  + !8
-  93  ptr 8  + !8 101 ptr 9  + !8 125 ptr 10 + !8  32 ptr 11 + !8
-  10  ptr 12 + !8   9 ptr 13 + !8 102 ptr 14 + !8 103 ptr 15 + !8
-end
+char' { PAT 0  + !b
+char' a PAT 1  + !b
+char' , PAT 2  + !b
+char' b PAT 3  + !b
+char' : PAT 4  + !b
+char' c PAT 5  + !b
+char' [ PAT 6  + !b
+char' d PAT 7  + !b
+char' ] PAT 8  + !b
+char' e PAT 9  + !b
+char' } PAT 10 + !b
+SPACE   PAT 11 + !b
+LF      PAT 12 + !b
+TAB     PAT 13 + !b
+char' f PAT 14 + !b
+char' g PAT 15 + !b
+
+1 DELS char' { + !b
+1 DELS char' } + !b
+1 DELS char' [ + !b
+1 DELS char' ] + !b
+1 DELS char' : + !b
+1 DELS char' , + !b
+1 DELS SPACE   + !b
+1 DELS LF      + !b
+1 DELS TAB     + !b
 
 fun: init
   BUF { ptr }
+  0 { ind }
   loop
     ptr BUF CAP + < while
-    ptr init_chunk
-    16 +: ptr
+    PAT ind 15 and + @b ptr !b
+    inc: ptr
+    inc: ind
   end
 end
 
-fun: delim? { c -- yes }
-  c 123 = c 125 = or c 91 = or c 93 = or c 58 = or c 44 = or
-  c 32 = or c 10 = or c 9 = or
-end
-
-fun: scan { rounds -- out }
-  0 { out }
-  rounds { ind }
+fun: scan { buf len dels -- out }
+  buf { ptr }
+  buf len + { ceil }
+  0
   loop
-    dec: ind
-    ind >=0 while
-    BUF { ptr }
-    loop
-      ptr BUF CAP + < while
-      ptr @u8 delim? +: out
-      inc: ptr
-    end
+    ptr ceil < while
+    ptr @u8 dels + @u8 +
+    inc: ptr
   end
-  out
 end
 
 fun: main { -- exit }
-  init REPS scan { out }
+  init
+  0 { out }
+  RUNS { run }
+  loop
+    dec: run
+    run >=0 while
+    BUF CAP DELS scan +: out
+  end
   " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
   if out WANT <> then 1 else 0 end
 end

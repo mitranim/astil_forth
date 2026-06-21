@@ -20,21 +20,31 @@ fun: asm_movi_2d_zero { Vd -> instr }
 end
 
 \ Shared by 3-vector ops.
-fun: asm_vec3_16b { Vd Vn Vm -> instr_mask } 16 lsl swap 5 lsl or or end
+fun: asm_pattern_vec3_16b { Vd Vn Vm -> instr_mask } 16 lsl swap 5 lsl or or end
 
 \ cmeq Vd.16b, Vn.16b, Vm.16b
 fun: asm_cmeq_16b { Vd Vn Vm -> instr }
-  asm_vec3_16b 0b0_11_01110_00_1_00000_100011_00000_00000 or
+  asm_pattern_vec3_16b 0b0_11_01110_00_1_00000_100011_00000_00000 or
 end
 
 \ orr Vd.16b, Vn.16b, Vm.16b
 fun: asm_orr_16b { Vd Vn Vm -> instr }
-  asm_vec3_16b 0b0_10_01110_10_1_00000_000111_00000_00000 or
+  asm_pattern_vec3_16b 0b0_10_01110_10_1_00000_000111_00000_00000 or
 end
 
 \ and Vd.16b, Vn.16b, Vm.16b
 fun: asm_and_16b { Vd Vn Vm -> instr }
-  asm_vec3_16b 0b0_10_01110_00_1_00000_000111_00000_00000 or
+  asm_pattern_vec3_16b 0b0_10_01110_00_1_00000_000111_00000_00000 or
+end
+
+\ add Vd.16b, Vn.16b, Vm.16b
+fun: asm_add_16b { Vd Vn Vm -> instr }
+  asm_pattern_vec3_16b 0b0_10_01110_00_1_00000_100001_00000_00000 or
+end
+
+\ cmhi Vd.16b, Vn.16b, Vm.16b
+fun: asm_cmhi_16b { Vd Vn Vm -> instr }
+  asm_pattern_vec3_16b 0b0_11_01110_00_1_00000_001101_00000_00000 or
 end
 
 \ addv Bd, Vn.16b
@@ -45,6 +55,16 @@ end
 \ uaddlp Vd.8h, Vn.16b
 fun: asm_uaddlp_8h { Vd Vn -> instr }
   5 lsl or 0b0_11_01110_00_1_00000_001010_00000_00000 or
+end
+
+\ uaddw Vd.8h, Vn.8h, Vm.8b
+fun: asm_uaddw_8h { Vd Vn Vm -> instr }
+  asm_pattern_vec3_16b 0b0_01_01110_00_1_00000_000100_00000_00000 or
+end
+
+\ uaddw2 Vd.8h, Vn.8h, Vm.16b
+fun: asm_uaddw2_8h { Vd Vn Vm -> instr }
+  asm_pattern_vec3_16b 0b0_11_01110_00_1_00000_000100_00000_00000 or
 end
 
 \ uaddlp Vd.4s, Vn.8h
@@ -59,12 +79,12 @@ end
 
 \ add Vd.2d, Vn.2d, Vm.2d
 fun: asm_add_2d { Vd Vn Vm -> instr }
-  asm_vec3_16b 0b0_10_01110_11_1_00000_100001_00000_00000 or
+  asm_pattern_vec3_16b 0b0_10_01110_11_1_00000_100001_00000_00000 or
 end
 
 \ addp Vd.2d, Vn.2d, Vm.2d
 fun: asm_addp_2d { Vd Vn Vm -> instr }
-  asm_vec3_16b 0b0_10_01110_11_1_00000_101111_00000_00000 or
+  asm_pattern_vec3_16b 0b0_10_01110_11_1_00000_101111_00000_00000 or
 end
 
 \ umov Wd, Vn.b[0]
@@ -75,9 +95,4 @@ end
 \ umov Xd, Vn.d[0]
 fun: asm_umov_d0 { Xd Vn -> instr }
   5 lsl or 0b0_10_01110_00_0_01000_001111_00000_00000 or
-end
-
-\ subs Xd, Xn, #imm12
-fun: asm_subs_imm { Xd Xn imm12 -> instr }
-  asm_sub_imm 0b0_0_1_00000000000000000000000000000 or
 end

@@ -494,6 +494,11 @@ fun: asm_sub_reg { Xd Xn Xm -> instr }
   asm_pattern_arith_reg ASM_OP_SUB_REG or
 end
 
+\ subs Xd, Xn, #imm12
+fun: asm_subs_imm { Xd Xn imm12 -> instr }
+  asm_sub_imm 0b0_0_1_00000000000000000000000000000 or
+end
+
 \ subs Xd, Xn, Xm
 fun: asm_subs_reg { Xd Xn Xm -> instr }
   asm_sub_reg 0b0_0_1_00000000000000000000000000000 or
@@ -1881,10 +1886,12 @@ fun_comp: catch'' { -- err } WORDLIST_COMP catch end
 1 let: STDOUT
 2 let: STDERR
 
-10 let: LF
-13 let: CR
+7  let: BELL
+8  let: BACKSPACE
 9  let: TAB
+10 let: LF
 11 let: VTAB
+13 let: CR
 32 let: SPACE
 
 3 mem: CRLF    \ \r\n\0

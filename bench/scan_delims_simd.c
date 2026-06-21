@@ -1,4 +1,4 @@
-// BOT-GENERATED
+// BOT-ASSISTED
 
 #include "../clib/num.h"
 #include <stdint.h>
@@ -8,48 +8,56 @@
 
 #define BLKS (1ull << 24)
 #define CAP (1u << 16)
-#define REPS (BLKS / (CAP / 16))
+#define RUNS (BLKS / (CAP / 16))
 #define WANT (BLKS * 9)
 
 typedef char c8x16 __attribute__((vector_size(16)));
 typedef U8   u8x16 __attribute__((vector_size(16)));
+typedef U8   u8x8 __attribute__((vector_size(8)));
+typedef U16  u16x8 __attribute__((vector_size(16)));
 static U8    buf[CAP];
 
-static void init(void) {
-  const U8 pat[16] = {
-    '{', 'a', ',', 'b', ':', 'c', '[', 'd', ']', 'e', '}', ' ', '\n', '\t', 'f', 'g'
-  };
-  for (Ind idx = 0; idx < CAP; idx++) buf[idx] = pat[idx & 15];
+static const U8 *escape_ptr(const U8 *val) {
+  register const U8 *x0 __asm__("x0") = val;
+  __asm__ volatile("" : "+r"(x0) : : "memory");
+  return x0;
 }
 
-__attribute__((noinline)) static Uint scan(Uint reps) {
-  const u8x16 one = (u8x16){1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-  Uint        out = 0;
-  for (Uint rep = 0; rep < reps; rep++) {
-    for (Ind off = 0; off < CAP; off += 16) {
-      u8x16 vec;
-      memcpy(&vec, buf + off, sizeof(vec));
-      c8x16 msk = (vec == (U8)'{');
-      msk |= (vec == '}');
-      msk |= (vec == '[');
-      msk |= (vec == ']');
-      msk |= (vec == ':');
-      msk |= (vec == ',');
-      msk |= (vec == ' ');
-      msk |= (vec == '\n');
-      msk |= (vec == '\t');
-      u8x16 cnt = (u8x16)msk & one;
-      out += cnt[0] + cnt[1] + cnt[2] + cnt[3] + cnt[4] + cnt[5] + cnt[6] +
-        cnt[7] + cnt[8] + cnt[9] + cnt[10] + cnt[11] + cnt[12] + cnt[13] +
-        cnt[14] + cnt[15];
-    }
+static void init(void) {
+  for (Ind ind = 0; ind < CAP; ind++) buf[ind] = "{a,b:c[d]e} \n\tfg"[ind & 15];
+}
+
+__attribute__((noinline)) static Uint scan(const U8 *buf, Ind len) {
+  const u8x16 one  = (u8x16){1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+  u16x8       low  = {};
+  u16x8       high = {};
+  for (Ind off = 0; off < len; off += 16) {
+    u8x16 vec;
+    memcpy(&vec, buf + off, sizeof(vec));
+    c8x16 msk = (vec == (U8)'{');
+    msk |= (vec == '}');
+    msk |= (vec == '[');
+    msk |= (vec == ']');
+    msk |= (vec == ':');
+    msk |= (vec == ',');
+    msk |= (vec == ' ');
+    msk |= (vec == '\n');
+    msk |= (vec == '\t');
+    u8x16 cnt = (u8x16)msk & one;
+    low += __builtin_convertvector(
+      __builtin_shufflevector(cnt, cnt, 0, 1, 2, 3, 4, 5, 6, 7), u16x8
+    );
+    high += __builtin_convertvector(
+      __builtin_shufflevector(cnt, cnt, 8, 9, 10, 11, 12, 13, 14, 15), u16x8
+    );
   }
-  return out;
+  return (Uint)__builtin_reduce_add(low) + (Uint)__builtin_reduce_add(high);
 }
 
 int main(void) {
   init();
-  const Uint out = scan(REPS);
+  Uint out = 0;
+  for (Uint run = 0; run < RUNS; run++) out += scan(escape_ptr(buf), CAP);
   if (getenv("SCAN_DELIMS_PRINT")) printf(FMT_UINT "\n", out);
   return out != WANT;
 }

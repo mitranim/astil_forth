@@ -1,29 +1,32 @@
-; BOT-GENERATED
+; BOT-ASSISTED
 
 (declaim (optimize (speed 3) (safety 0) (debug 0)))
 (defconstant +cap+ (ash 1 16))
-(defconstant +reps+ (/ (ash 1 24) (/ +cap+ 16)))
+(defconstant +runs+ (/ (ash 1 24) (/ +cap+ 16)))
 (defconstant +want+ (* (ash 1 24) 9))
-(defparameter *pat*
-  (make-array 16 :element-type '(unsigned-byte 8)
-                 :initial-contents '(123 97 44 98 58 99 91 100
-                                      93 101 125 32 10 9 102 103)))
 (defparameter *buf* (make-array +cap+ :element-type '(unsigned-byte 8)))
+(defparameter *dels* (make-array 256 :element-type '(unsigned-byte 8) :initial-element 0))
 
-(dotimes (i +cap+)
-  (setf (aref *buf* i) (aref *pat* (logand i 15))))
+(let ((pat (format nil "{a,b:c[d]e} ~%~cfg" #\Tab)))
+  (declare (type simple-string pat))
+  (dotimes (ind +cap+)
+    (setf (aref *buf* ind) (char-code (char pat (logand ind 15))))))
 
-(declaim (inline delim-p))
-(defun delim-p (c)
-  (declare (type (unsigned-byte 8) c))
-  (if (or (= c 123) (= c 125) (= c 91) (= c 93) (= c 58)
-          (= c 44) (= c 32) (= c 10) (= c 9))
-      1 0))
+(dolist (char '(#\{ #\} #\[ #\] #\: #\, #\Space #\Newline #\Tab))
+  (setf (aref *dels* (char-code char)) 1))
+
+(defun scan (buf cap dels)
+  (declare (type (simple-array (unsigned-byte 8) (*)) buf)
+           (type (simple-array (unsigned-byte 8) (*)) dels)
+           (type fixnum cap))
+  (let ((out 0))
+    (declare (type fixnum out))
+    (dotimes (ind cap out)
+      (incf out (aref dels (aref buf ind))))))
 
 (let ((out 0))
   (declare (type fixnum out))
-  (dotimes (_ +reps+)
-    (dotimes (j +cap+)
-      (incf out (delim-p (aref *buf* j)))))
+  (dotimes (_ +runs+)
+    (incf out (scan *buf* +cap+ *dels*)))
   (when (sb-ext:posix-getenv "SCAN_DELIMS_PRINT") (format t "~D~%" out))
-  (unless (= out +want+) (sb-ext:exit :code 1)))
+  (unless (= out +want+) (error "mismatch: expected ~d; got ~d" +want+ out)))

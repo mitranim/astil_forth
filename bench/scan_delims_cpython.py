@@ -1,18 +1,16 @@
-# BOT-ASSISTED
-
 import os
 
 CAP = 1 << 16
 RUNS = (1 << 24) // (CAP // 16)
 WANT = (1 << 24) * 9
 PAT = b"{a,b:c[d]e} \n\tfg"
-DELS = bytes(1 if c in b"{}[]:, \n\t" else 0 for c in range(256))
+DELS = b"{}[]:, \n\t"
 
 
 def scan(buf: bytes, dels: bytes) -> int:
     out = 0
-    for c in buf:
-        out += dels[c]
+    for c in dels:
+        out += buf.count(c)
     return out
 
 

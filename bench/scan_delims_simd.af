@@ -1,77 +1,104 @@
 use' lang.af
 use' simd.af
 
-\ BOT-GENERATED
+\ BOT-ASSISTED
 
 true try_all
 
 65536 let: CAP
-4096  let: REPS
+4096  let: RUNS
 150994944 let: WANT
 CAP mem: BUF
+16  mem: PAT
 1 1 extern: getenv
 
-fun: init_chunk { ptr }
-  123 ptr      !8  97 ptr 1  + !8  44 ptr 2  + !8  98 ptr 3  + !8
-  58  ptr 4  + !8  99 ptr 5  + !8  91 ptr 6  + !8 100 ptr 7  + !8
-  93  ptr 8  + !8 101 ptr 9  + !8 125 ptr 10 + !8  32 ptr 11 + !8
-  10  ptr 12 + !8   9 ptr 13 + !8 102 ptr 14 + !8 103 ptr 15 + !8
-end
+char' { PAT 0  + !b
+char' a PAT 1  + !b
+char' , PAT 2  + !b
+char' b PAT 3  + !b
+char' : PAT 4  + !b
+char' c PAT 5  + !b
+char' [ PAT 6  + !b
+char' d PAT 7  + !b
+char' ] PAT 8  + !b
+char' e PAT 9  + !b
+char' } PAT 10 + !b
+SPACE   PAT 11 + !b
+LF      PAT 12 + !b
+TAB     PAT 13 + !b
+char' f PAT 14 + !b
+char' g PAT 15 + !b
 
 fun: init
   BUF { ptr }
+  0 { ind }
   loop
     ptr BUF CAP + < while
-    ptr init_chunk
+    PAT ind 15 and + @u8 ptr !8
+    inc: ptr
+    inc: ind
+  end
+end
+
+fun: scan { pat len -- count }
+  [ 4          asm_movi_2d_zero comp_instr ] \ movi v4.2d, #0
+  [ 5          asm_movi_2d_zero comp_instr ] \ movi v5.2d, #0
+  [ 6  223     asm_movi_16b     comp_instr ] \ movi v6.16b, #223
+  [ 7  char' [ asm_movi_16b     comp_instr ] \ movi v7.16b, #'['
+  [ 8  char' ] asm_movi_16b     comp_instr ] \ movi v8.16b, #']'
+  [ 9  char' : asm_movi_16b     comp_instr ] \ movi v9.16b, #':'
+  [ 10 char' , asm_movi_16b     comp_instr ] \ movi v10.16b, #','
+  [ 11 SPACE   asm_movi_16b     comp_instr ] \ movi v11.16b, #' '
+  [ 12 247     asm_movi_16b     comp_instr ] \ movi v12.16b, #-9
+  [ 13 2       asm_movi_16b     comp_instr ] \ movi v13.16b, #2
+  [ 14 1       asm_movi_16b     comp_instr ] \ movi v14.16b, #1
+  pat { ptr }
+  loop
+    ptr pat len + < while
+    ptr [
+      0 comp_realloc_reg
+      0 0   asm_ld1_16b   comp_instr \ ld1  {v0.16b}, [x0]
+      2 0 6  asm_and_16b  comp_instr \ and  v2.16b, v0.16b, v6.16b
+      3 2 7  asm_cmeq_16b comp_instr \ cmeq v3.16b, v2.16b, v7.16b
+      2 2 8  asm_cmeq_16b comp_instr \ cmeq v2.16b, v2.16b, v8.16b
+      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
+      3 0 9  asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v9.16b
+      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
+      3 0 10 asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v10.16b
+      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
+      3 0 11 asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v11.16b
+      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
+      3 0 12 asm_add_16b  comp_instr \ add  v3.16b, v0.16b, v12.16b
+      3 13 3 asm_cmhi_16b comp_instr \ cmhi v3.16b, v13.16b, v3.16b
+      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
+      2 2 14 asm_and_16b  comp_instr \ and  v2.16b, v2.16b, v14.16b
+      4 4 2 asm_uaddw_8h  comp_instr \ uaddw  v4.8h, v4.8h, v2.8b
+      5 5 2 asm_uaddw2_8h comp_instr \ uaddw2 v5.8h, v5.8h, v2.16b
+      0 comp_args_set
+    ]
     16 +: ptr
   end
-end
-
-fun: scan_init { chr -- err }
-  1 chr asm_movi_16b comp_instr \ movi v1.16b, #chr
-  2 0 1 asm_cmeq_16b comp_instr \ cmeq v2.16b, v0.16b, v1.16b
-end
-
-fun: scan_next { chr -- err }
-  1 chr asm_movi_16b comp_instr \ movi v1.16b, #chr
-  3 0 1 asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v1.16b
-  2 2 3 asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
-end
-
-fun: scan { pat rounds -- count }
-  [ 4 asm_movi_2d_zero comp_instr ] \ movi v4.2d, #0
-  rounds { ind }
-  loop
-    dec: ind
-    ind >=0 while
-    pat { ptr }
-    loop
-      ptr pat CAP + < while
-      ptr [
-        0 comp_realloc_reg
-        0 0   asm_ld1_16b   comp_instr \ ld1  {v0.16b}, [x0]
-        123 scan_init 125 scan_next 91 scan_next 93 scan_next
-         58 scan_next  44 scan_next 32 scan_next 10 scan_next 9 scan_next
-        1 1   asm_movi_16b  comp_instr \ movi v1.16b, #1
-        2 2 1 asm_and_16b   comp_instr \ and  v2.16b, v2.16b, v1.16b
-        2 2   asm_uaddlp_8h comp_instr \ uaddlp v2.8h, v2.16b
-        2 2   asm_uaddlp_4s comp_instr \ uaddlp v2.4s, v2.8h
-        2 2   asm_uaddlp_2d comp_instr \ uaddlp v2.2d, v2.4s
-        4 4 2 asm_add_2d    comp_instr \ add    v4.2d, v4.2d, v2.2d
-        0 comp_args_set
-      ]
-      16 +: ptr
-    end
-  end
   [
-    4 4 4 asm_addp_2d comp_instr \ addp v4.2d, v4.2d, v4.2d
-    0 4   asm_umov_d0 comp_instr \ umov x0, v4.d[0]
+    4 4   asm_uaddlp_4s comp_instr \ uaddlp v4.4s, v4.8h
+    5 5   asm_uaddlp_4s comp_instr \ uaddlp v5.4s, v5.8h
+    4 4   asm_uaddlp_2d comp_instr \ uaddlp v4.2d, v4.4s
+    5 5   asm_uaddlp_2d comp_instr \ uaddlp v5.2d, v5.4s
+    4 4 5 asm_add_2d    comp_instr \ add   v4.2d, v4.2d, v5.2d
+    4 4 4 asm_addp_2d   comp_instr \ addp v4.2d, v4.2d, v4.2d
+    0 4   asm_umov_d0   comp_instr \ umov x0, v4.d[0]
     1 comp_args_set
   ]
 end
 
 fun: main { -- exit }
-  init BUF REPS scan { out }
+  init
+  0 { out }
+  RUNS { run }
+  loop
+    dec: run
+    run >=0 while
+    BUF CAP scan +: out
+  end
   " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
   if out WANT <> then 1 else 0 end
 end

@@ -1,20 +1,40 @@
-// BOT-GENERATED
+// BOT-ASSISTED
 
-const CAP = 1 << 16;
-const REPS = (1 << 24) / (CAP / 16);
-const WANT = (1 << 24) * 9;
-const pat = new Uint8Array([123, 97, 44, 98, 58, 99, 91, 100, 93, 101, 125, 32, 10, 9, 102, 103]);
-const buf = new Uint8Array(CAP);
-for (let i = 0; i < CAP; i++) buf[i] = pat[i & 15];
+const CAP = 1 << 16
+const RUNS = (1 << 24) / (CAP / 16)
+const WANT = (1 << 24) * 9
+const pat = Buffer.from("{a,b:c[d]e} \n\tfg")
+const buf = new Uint8Array(CAP)
+const dels = new Uint8Array(256)
+const LBRACE = "{".charCodeAt(0)
+const RBRACE = "}".charCodeAt(0)
+const LBRACK = "[".charCodeAt(0)
+const RBRACK = "]".charCodeAt(0)
+const COLON = ":".charCodeAt(0)
+const COMMA = ",".charCodeAt(0)
+const SPACE = " ".charCodeAt(0)
+const LF = "\n".charCodeAt(0)
+const TAB = "\t".charCodeAt(0)
 
-function isDelim(c) {
-  return c === 123 || c === 125 || c === 91 || c === 93 || c === 58 ||
-    c === 44 || c === 32 || c === 10 || c === 9;
+dels[LBRACE] = 1
+dels[RBRACE] = 1
+dels[LBRACK] = 1
+dels[RBRACK] = 1
+dels[COLON] = 1
+dels[COMMA] = 1
+dels[SPACE] = 1
+dels[LF] = 1
+dels[TAB] = 1
+
+for (let ind = 0; ind < CAP; ind++) buf[ind] = pat[ind % pat.length]
+
+function scan(buf, dels) {
+  let out = 0
+  for (let ind = 0; ind < buf.length; ind++) out += dels[buf[ind]]
+  return out
 }
 
-let out = 0;
-for (let i = 0; i < REPS; i++) {
-  for (let j = 0; j < CAP; j++) out += isDelim(buf[j]);
-}
-if (process.env.SCAN_DELIMS_PRINT) console.log(out);
-if (out !== WANT) process.exit(1);
+let out = 0
+for (let run = 0; run < RUNS; run++) out += scan(buf, dels)
+if (process.env.SCAN_DELIMS_PRINT) console.log(out)
+if (out !== WANT) throw Error(`mismatch: expected ${WANT}; got ${out}`)
