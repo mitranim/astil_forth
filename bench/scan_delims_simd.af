@@ -40,54 +40,46 @@ fun: init
   end
 end
 
+fun: scan_delim_consts { -- err }
+  4          asm_movi_2d_zero comp_instr \ movi v4.2d, #0
+  5          asm_movi_2d_zero comp_instr \ movi v5.2d, #0
+  6  223     asm_movi_16b     comp_instr \ movi v6.16b, #223
+  7  char' [ asm_movi_16b     comp_instr \ movi v7.16b, #'['
+  8  char' ] asm_movi_16b     comp_instr \ movi v8.16b, #']'
+  9  char' : asm_movi_16b     comp_instr \ movi v9.16b, #':'
+  10 char' , asm_movi_16b     comp_instr \ movi v10.16b, #','
+  11 SPACE   asm_movi_16b     comp_instr \ movi v11.16b, #' '
+  12 247     asm_movi_16b     comp_instr \ movi v12.16b, #-9
+  13 2       asm_movi_16b     comp_instr \ movi v13.16b, #2
+  14 1       asm_movi_16b     comp_instr \ movi v14.16b, #1
+end
+
+fun: scan_delim_mask { -- err }
+  2 0 6     asm_and_16b comp_instr \ and  v2.16b, v0.16b, v6.16b
+  2 3 2 7 8 comp_cmeq_pair_mask_16b
+  2 3 0 9   comp_cmeq_or_mask_16b
+  2 3 0 10  comp_cmeq_or_mask_16b
+  2 3 0 11  comp_cmeq_or_mask_16b
+  3 0 12 13 comp_u8_range_mask_16b
+  2 2 3     asm_orr_16b comp_instr \ orr  v2.16b, v2.16b, v3.16b
+  2 14      comp_mask_to_u8_lanes_16b
+end
+
 fun: scan { pat len -- count }
-  [ 4          asm_movi_2d_zero comp_instr ] \ movi v4.2d, #0
-  [ 5          asm_movi_2d_zero comp_instr ] \ movi v5.2d, #0
-  [ 6  223     asm_movi_16b     comp_instr ] \ movi v6.16b, #223
-  [ 7  char' [ asm_movi_16b     comp_instr ] \ movi v7.16b, #'['
-  [ 8  char' ] asm_movi_16b     comp_instr ] \ movi v8.16b, #']'
-  [ 9  char' : asm_movi_16b     comp_instr ] \ movi v9.16b, #':'
-  [ 10 char' , asm_movi_16b     comp_instr ] \ movi v10.16b, #','
-  [ 11 SPACE   asm_movi_16b     comp_instr ] \ movi v11.16b, #' '
-  [ 12 247     asm_movi_16b     comp_instr ] \ movi v12.16b, #-9
-  [ 13 2       asm_movi_16b     comp_instr ] \ movi v13.16b, #2
-  [ 14 1       asm_movi_16b     comp_instr ] \ movi v14.16b, #1
+  [ scan_delim_consts ]
   pat { ptr }
   loop
     ptr pat len + < while
     ptr [
       0 comp_realloc_reg
-      0 0   asm_ld1_16b   comp_instr \ ld1  {v0.16b}, [x0]
-      2 0 6  asm_and_16b  comp_instr \ and  v2.16b, v0.16b, v6.16b
-      3 2 7  asm_cmeq_16b comp_instr \ cmeq v3.16b, v2.16b, v7.16b
-      2 2 8  asm_cmeq_16b comp_instr \ cmeq v2.16b, v2.16b, v8.16b
-      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
-      3 0 9  asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v9.16b
-      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
-      3 0 10 asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v10.16b
-      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
-      3 0 11 asm_cmeq_16b comp_instr \ cmeq v3.16b, v0.16b, v11.16b
-      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
-      3 0 12 asm_add_16b  comp_instr \ add  v3.16b, v0.16b, v12.16b
-      3 13 3 asm_cmhi_16b comp_instr \ cmhi v3.16b, v13.16b, v3.16b
-      2 2 3  asm_orr_16b  comp_instr \ orr  v2.16b, v2.16b, v3.16b
-      2 2 14 asm_and_16b  comp_instr \ and  v2.16b, v2.16b, v14.16b
-      4 4 2 asm_uaddw_8h  comp_instr \ uaddw  v4.8h, v4.8h, v2.8b
-      5 5 2 asm_uaddw2_8h comp_instr \ uaddw2 v5.8h, v5.8h, v2.16b
+      0 0 asm_ld1_16b comp_instr \ ld1  {v0.16b}, [x0]
+      scan_delim_mask
+      4 5 2 comp_u8x16_counts_accum
       0 comp_args_set
     ]
     16 +: ptr
   end
-  [
-    4 4   asm_uaddlp_4s comp_instr \ uaddlp v4.4s, v4.8h
-    5 5   asm_uaddlp_4s comp_instr \ uaddlp v5.4s, v5.8h
-    4 4   asm_uaddlp_2d comp_instr \ uaddlp v4.2d, v4.4s
-    5 5   asm_uaddlp_2d comp_instr \ uaddlp v5.2d, v5.4s
-    4 4 5 asm_add_2d    comp_instr \ add   v4.2d, v4.2d, v5.2d
-    4 4 4 asm_addp_2d   comp_instr \ addp v4.2d, v4.2d, v4.2d
-    0 4   asm_umov_d0   comp_instr \ umov x0, v4.d[0]
-    1 comp_args_set
-  ]
+  [ 0 4 5 comp_u16x8_pair_sum_umov_d0 1 comp_args_set ]
 end
 
 fun: main { -- exit }

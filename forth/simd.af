@@ -2,6 +2,8 @@ use' ./lang.af
 
 \ BOT-ASSISTED
 
+true try_all
+
 \ ld1 {Vt.16b}, [Xn]
 fun: asm_ld1_16b { Vt Xn -> instr }
   5 lsl or 0b01001100010_00000_011100_00000_00000 or
@@ -95,4 +97,45 @@ end
 \ umov Xd, Vn.d[0]
 fun: asm_umov_d0 { Xd Vn -> instr }
   5 lsl or 0b0_10_01110_00_0_01000_001111_00000_00000 or
+end
+
+\ Set `Vmask.16b` to `(Vsrc == Va) | (Vsrc == Vb)`.
+fun: comp_cmeq_pair_mask_16b { Vmask Vtmp Vsrc Va Vb -- err }
+  Vtmp  Vsrc  Va   asm_cmeq_16b comp_instr \ cmeq Vtmp.16b, Vsrc.16b, Va.16b
+  Vmask Vsrc  Vb   asm_cmeq_16b comp_instr \ cmeq Vmask.16b, Vsrc.16b, Vb.16b
+  Vmask Vmask Vtmp asm_orr_16b  comp_instr \ orr  Vmask.16b, Vmask.16b, Vtmp.16b
+end
+
+\ OR `(Vsrc == Vconst)` into `Vmask.16b`.
+fun: comp_cmeq_or_mask_16b { Vmask Vtmp Vsrc Vconst -- err }
+  Vtmp  Vsrc  Vconst asm_cmeq_16b comp_instr \ cmeq Vtmp.16b, Vsrc.16b, Vconst.16b
+  Vmask Vmask Vtmp   asm_orr_16b  comp_instr \ orr  Vmask.16b, Vmask.16b, Vtmp.16b
+end
+
+\ Set `Vdst.16b` to `Vsrc.16b` in byte range [`-Vbias`, `-Vbias + Vlimit`).
+fun: comp_u8_range_mask_16b { Vdst Vsrc Vbias Vlimit -- err }
+  Vdst Vsrc   Vbias asm_add_16b  comp_instr \ add  Vdst.16b, Vsrc.16b, Vbias.16b
+  Vdst Vlimit Vdst  asm_cmhi_16b comp_instr \ cmhi Vdst.16b, Vlimit.16b, Vdst.16b
+end
+
+\ Convert all-ones/all-zero predicate bytes to 1/0 byte lanes.
+fun: comp_mask_to_u8_lanes_16b { Vmask Vone -- err }
+  Vmask Vmask Vone asm_and_16b comp_instr \ and Vmask.16b, Vmask.16b, Vone.16b
+end
+
+\ Accumulate byte counts from 0/1 lanes in `Vmask.16b` into two `8h` accumulators.
+fun: comp_u8x16_counts_accum { Vlow Vhigh Vmask -- err }
+  Vlow  Vlow  Vmask asm_uaddw_8h  comp_instr \ uaddw Vlow.8h, Vlow.8h, Vmask.8b
+  Vhigh Vhigh Vmask asm_uaddw2_8h comp_instr \ uaddw2 Vhigh.8h, Vhigh.8h, Vmask.16b
+end
+
+\ Horizontally sum paired `8h` accumulators into `Xd`.
+fun: comp_u16x8_pair_sum_umov_d0 { Xd Vlow Vhigh -- err }
+  Vlow  Vlow        asm_uaddlp_4s comp_instr \ uaddlp Vlow.4s, Vlow.8h
+  Vhigh Vhigh       asm_uaddlp_4s comp_instr \ uaddlp Vhigh.4s, Vhigh.8h
+  Vlow  Vlow        asm_uaddlp_2d comp_instr \ uaddlp Vlow.2d, Vlow.4s
+  Vhigh Vhigh       asm_uaddlp_2d comp_instr \ uaddlp Vhigh.2d, Vhigh.4s
+  Vlow  Vlow  Vhigh asm_add_2d    comp_instr \ add Vlow.2d, Vlow.2d, Vhigh.2d
+  Vlow  Vlow  Vlow  asm_addp_2d   comp_instr \ addp Vlow.2d, Vlow.2d, Vlow.2d
+  Xd    Vlow        asm_umov_d0   comp_instr \ umov Xd, Vlow.d[0]
 end
