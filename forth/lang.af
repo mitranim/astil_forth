@@ -3194,14 +3194,28 @@ fun: cf_addsub_emit { reg0 reg1 imm add -- err }
   reg0 reg1 mag imm add asm_addsub_imm comp_instr \ add|sub Xd, Xn, #imm12
 end
 
-fun: cf_pow2_validate { imm _ -- aux ok err }
-  if imm <=0 then nil false ret end
+fun: cf_pow2_validate { imm signed -- aux ok err }
+  imm <0 { neg }
+  if neg then
+    ifz signed then nil false ret end
+    imm negate { imm }
+  end
+  ifz imm then nil false ret end
   if imm imm dec and then nil false ret end
-  imm bit_ctz true
+  imm bit_ctz neg 6 lsl or true
 end
 
-fun: cf_udiv_pow2_emit { reg0 reg1 _imm shift -- err }
+fun: cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
+  aux 0x3f and { shift }
   reg0 reg1 shift asm_lsr_imm comp_instr \ lsr Xd, Xn, #imm6
+end
+
+fun: cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
+  aux 0x3f and { shift }
+  reg0 reg1 shift asm_lsl_imm comp_instr \ lsl Xd, Xn, #imm6
+  if aux 0x40 and then
+    reg0 asm_neg comp_instr \ neg Xd, Xn
+  end
 end
 
 fun: comp_loc_mut_arg_prepare { -- reg arg loc imm foldable err }
@@ -3496,12 +3510,21 @@ fun_comp: -: { -- err } ( C: "name" -- ) ( E: imm -- )
 end
 
 fun_comp: * { -- err } [ redefine ]
-  if cf_fold_cleared2 then * cf_fold_done else { -- } execute'' * end
+  if cf_fold_cleared2 then * cf_fold_done
+  else
+    { -- }
+    true true true
+    instr' cf_pow2_validate instr' cf_mul_pow2_emit
+    if cf_fold2 then ret end
+    execute'' *
+  end
 end
 
 \ Multiply a local: `factor *: some_val`.
 fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
-  ASM_OP_MUL_REG comp_loc_mut_arith_reg
+  ASM_OP_MUL_REG true
+  instr' cf_pow2_validate instr' cf_mul_pow2_emit
+  comp_loc_mut_imm
 end
 
 fun_comp: / { -- err } [ redefine ]
