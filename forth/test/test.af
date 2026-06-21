@@ -1098,10 +1098,40 @@ fun: assert_fail { -- err }
   end
 end
 
+fun: assert_bin_ok { -- err }
+  assert= 10 10 end
+end
+
+fun: assert_bin_ops_ok { -- err }
+  assert<>  10 20 end
+  assert>   20 10 end
+  assert<   10 20 end
+  assert<=  10 20 end
+  assert>=  20 10 end
+  assertu>  -1 0  end
+  assertu<  0  -1 end
+  assertu<= 0  -1 end
+  assertu>= -1 0  end
+end
+
+fun: assert_bin_fail { -- err }
+  assert= 123 456 end
+end
+
+fun: assert_bin_lt_fail { -- err }
+  assert< 456 123 end
+end
+
 fun: test_assert { -- err }
   T{ 10 assert_ok <T> }T
+  T{ assert_bin_ok <T> }T
+  T{ assert_bin_ops_ok <T> }T
   T{ catch' assert_fail { err } <T> }T
   err " assertion failed: 123 456 =" T_err_contains
+  T{ catch' assert_bin_fail { err } <T> }T
+  err " assertion failed: 123 456 = (0x7b 0x1c8 =)" T_err_contains
+  T{ catch' assert_bin_lt_fail { err } <T> }T
+  err " assertion failed: 456 123 < (0x1c8 0x7b <)" T_err_contains
 end
 test_assert
 

@@ -4978,6 +4978,8 @@ fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
   1 comp_args_set
 end
 
+\ ## Multi-comparisons
+
 0b1000 let: ASM_NZCV_N
 0b0100 let: ASM_NZCV_Z
 0b0010 let: ASM_NZCV_C
@@ -5014,6 +5016,8 @@ fun_comp: >none   { -- err } " >none"   ASM_LE ASM_NZCV_GT_OK ASM_LE comp_cmp_ma
 fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT comp_cmp_many end
 true try_all
 
+\ ## Assertions
+
 fun: is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
 
 fun: assert_cond { cond ctx -- err }
@@ -5021,8 +5025,12 @@ fun: assert_cond { cond ctx -- err }
   " assertion failed: %s" ctx errf
 end
 
-fun: assert_end_xt { beg -- err }
-  1 " when compiling `assert`" comp_args_valid
+fun: assert_bin_cond { lhs rhs cond ctx op -- err }
+  if cond then ret end
+  " assertion failed: %s%s (0x%zx 0x%zx %s)" ctx op lhs rhs op errf
+end
+
+fun: assert_body { beg -- str len err }
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 + { ceil }
 
@@ -5034,17 +5042,51 @@ fun: assert_end_xt { beg -- err }
     " invalid use of `assert`: must be terminated with `end`" throw
   end
 
-  loop beg  @b is_whitespace while inc: beg end
+  loop beg  @b is_whitespace while inc: beg  end
   loop ceil @b is_whitespace while dec: ceil end
 
   ceil beg - { len }
-  beg len comp_cstr
+  beg len
+end
+
+fun: assert_end_xt { beg -- err }
+  1 " when compiling `assert`" comp_args_valid
+  beg assert_body comp_cstr
   compile' assert_cond
 end
 
-fun_comp: assert { -- beg fun err } ( E: cond -- )
+fun: assert_bin_end_xt { beg op op_len cond -- err }
+  2 " when compiling binary assert" comp_args_valid
+  comp_args2_regs { lhs rhs }
+  comp_alloc_next_reg lhs rhs cond comp_emit_cmp_cset_reg
+  beg assert_body comp_cstr
+  op op_len comp_cstr
+  compile' assert_bin_cond
+end
+
+fun: assert_init { end_xt -- beg end_xt err }
   interp Interp_module @ Interp_module_reader { read }
   read Interp_reader_src @ read Interp_reader_pos @u32 +
-  xt' assert_end_xt
+  end_xt
+end
+
+fun: assert_bin_init { op op_len cond -- beg op op_len cond end_xt err }
+  xt' assert_bin_end_xt assert_init { beg end_xt }
+  beg op op_len cond end_xt
+end
+
+fun_comp: assert { -- beg fun err } ( E: cond -- )
+  xt' assert_end_xt assert_init
   [ true comp_only ]
 end
+
+fun_comp: assert=   { -- beg op op_len cond fun err } s" ="   ASM_EQ assert_bin_init [ true comp_only ] end
+fun_comp: assert<>  { -- beg op op_len cond fun err } s" <>"  ASM_NE assert_bin_init [ true comp_only ] end
+fun_comp: assert>   { -- beg op op_len cond fun err } s" >"   ASM_GT assert_bin_init [ true comp_only ] end
+fun_comp: assert<   { -- beg op op_len cond fun err } s" <"   ASM_LT assert_bin_init [ true comp_only ] end
+fun_comp: assert<=  { -- beg op op_len cond fun err } s" <="  ASM_LE assert_bin_init [ true comp_only ] end
+fun_comp: assert>=  { -- beg op op_len cond fun err } s" >="  ASM_GE assert_bin_init [ true comp_only ] end
+fun_comp: assertu>  { -- beg op op_len cond fun err } s" u>"  ASM_HI assert_bin_init [ true comp_only ] end
+fun_comp: assertu<  { -- beg op op_len cond fun err } s" u<"  ASM_LO assert_bin_init [ true comp_only ] end
+fun_comp: assertu<= { -- beg op op_len cond fun err } s" u<=" ASM_LS assert_bin_init [ true comp_only ] end
+fun_comp: assertu>= { -- beg op op_len cond fun err } s" u>=" ASM_HS assert_bin_init [ true comp_only ] end
