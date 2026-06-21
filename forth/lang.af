@@ -993,8 +993,7 @@ fun: align_down { len wid -> len } align_down end
 fun: comp_emit_align_up { out tmp len wid -- err }
   tmp len wid asm_add_reg comp_instr \ add Xd, Xn, Xm
   tmp tmp 1   asm_sub_imm comp_instr \ sub Xd, Xn, #1
-  wid         asm_neg     comp_instr \ neg Xd, Xd
-  out tmp wid asm_and_reg comp_instr \ and Xd, Xn, Xm
+  out tmp wid comp_emit_align_down
 end
 
 \ Assumes power of two.
