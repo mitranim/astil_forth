@@ -9,25 +9,27 @@
 (fntyp reset-flags (bytes-t) t)
 (defun reset-flags (flags) (fill flags 1))
 
-(fntyp find-prime (bytes-t) t)
+(fntyp find-prime (bytes-t) fixnum)
 (defun find-prime (flags)
+  (declare (bytes-t flags))
   (reset-flags flags)
   (let
     (
       (num 0)
       (step 3)
+      (len (length flags))
     )
-    (declare (fixnum num step))
+    (declare (fixnum num step len))
     (loop
-      :for ind
-      :below (length flags)
+      :for ind fixnum
+      :below len
       :do
       (when
         (/= (aref flags ind) 0)
         (loop
-          :for ind1
+          :for ind1 fixnum
           :from (+ ind step)
-          :below (length flags)
+          :below len
           :by step
           :do (setf (aref flags ind1) 0)
         )
@@ -39,12 +41,14 @@
   )
 )
 
+(declaim (ftype (function (fixnum fixnum) null) main))
 (defun main (len runs)
+  (declare (fixnum len runs))
   (
     let
     ((flags (make-array len :element-type 'byte-t)))
     (declare (bytes-t flags))
-    (loop :repeat runs :do (find-prime flags))
+    (dotimes (_ runs) (find-prime flags))
     ; (princ (find-prime flags)) (write-char #\newline)
   )
 )
