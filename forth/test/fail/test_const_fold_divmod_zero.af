@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_divmod_zero { -- rem quo } 29 0 /mod end

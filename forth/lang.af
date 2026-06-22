@@ -3018,6 +3018,42 @@ fun: cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
   reg1 inc comp_args_set
 end
 
+fun: cf_reject_rhs2 { reg0 reg1 imm0 imm1 bad msg -- reg0 reg1 imm0 imm1 err }
+  if imm1 bad = then msg throw end
+  reg0 reg1 imm0 imm1
+end
+
+fun: cf_reject_rhs_imm { bad msg -- err }
+  comp_top_arg_regs2 { reg0 reg1 }
+  reg0 { -- }
+  reg1 comp_arg cf_arg_foldable_imm { imm ok }
+  if ok then if imm bad = then msg throw end end
+end
+
+fun: cf_reject_top_imm2 { bad0 msg0 bad1 msg1 -- err }
+  cf_top_arg_foldable { reg arg imm ok }
+  reg { -- }
+  arg { -- }
+  if ok then
+    if imm bad0 = then msg0 throw end
+    if imm bad1 = then msg1 throw end
+  end
+end
+
+fun: cf_fold2_reject { lhs bad0 msg0 bad1 msg1 -- reg imm0 imm1 ok err }
+  cf_fold_cleared2 { reg imm0 imm1 ok }
+  ifz ok then reg imm0 imm1 false ret end
+
+  if imm1 bad0 = lhs imm0 bad0 = and or then msg0 throw end
+
+  if msg1 then
+    if imm1 bad1 = lhs imm0 bad1 = and or then msg1 throw end
+  end
+
+  reg imm0 imm1
+  true
+end
+
 \ Fits the unsigned immediate accepted by our `add/sub #imm12` helpers.
 fun: cf_addsub_imm12_mag { imm -- mag ok }
   if imm >=0 then imm imm ASM_MAX_IMM12 <= ret end
@@ -3085,6 +3121,7 @@ fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
 end
 
 fun: cf_shift_validate { imm reg_op -- aux ok err }
+  ifz imm then " redundant arithmetic" throw end
   reg_op imm 0 >= imm 63 <= and
 end
 
@@ -3104,7 +3141,10 @@ end
 fun: cf_logical_validate { imm aux -- aux ok err }
   aux 1 and { inv }
   aux inv - { op }
-  if inv then imm invert else imm end op catch' asm_logical_imm_mask =0
+  imm 0 = imm -1 = op ASM_OP_EOR_IMM <> and or { edge }
+  if inv then imm invert else imm end { imm }
+  if edge then " redundant arithmetic" throw end
+  imm op catch' asm_logical_imm_mask =0
 end
 
 fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
@@ -3112,6 +3152,7 @@ fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
 end
 
 fun: cf_align_validate { size _ -- aux ok err }
+  if size 1 = then " redundant arithmetic" throw end
   size dec ASM_OP_ANDS_IMM catch' asm_logical_imm_mask =0
 end
 
@@ -3121,6 +3162,7 @@ fun: cf_align_emit { out adr _size mask -- err }
 end
 
 fun: cf_align_down_validate { size _ -- aux ok err }
+  if size 1 = then " redundant arithmetic" throw end
   size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
 end
 
@@ -3129,6 +3171,7 @@ fun: cf_align_down_emit { out len _size mask -- err }
 end
 
 fun: cf_align_up_validate { size _ -- aux ok err }
+  if size 1 = then " redundant arithmetic" throw end
   size dec cf_imm_u12 { add_ok }
   size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask { mask mask_err }
   mask add_ok mask_err =0 and
@@ -3140,7 +3183,7 @@ fun: cf_align_up_emit { out len size mask -- err }
 end
 
 fun: cf_bits_trunc_validate { len _ -- aux ok err }
-  if len 0 <= len 64 >= or then nil false ret end
+  if len 0 <= len 64 >= or then " redundant arithmetic" throw end
   len low_bits ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
 end
 
@@ -3153,6 +3196,7 @@ fun: cf_bit_mask_validate { mask -- err }
 end
 
 fun: cf_bit_mask_get_validate { mask _ -- aux ok err }
+  if mask -1 = then " redundant arithmetic" throw end
   mask cf_bit_mask_validate
   mask ASM_OP_AND_IMM catch' asm_logical_imm_mask { instr_mask err }
   if err then nil false ret end
@@ -3167,6 +3211,7 @@ fun: cf_bit_mask_get_emit { out src _mask aux -- err }
 end
 
 fun: cf_addsub_validate { imm add -- aux ok err }
+  ifz imm then " redundant arithmetic" throw end
   imm cf_addsub_imm12_mag { -- ok }
   add ok
 end
@@ -3177,16 +3222,25 @@ fun: cf_addsub_emit { reg0 reg1 imm add -- err }
 end
 
 fun: cf_pow2_validate { imm flags -- aux ok err }
+  " redundant arithmetic" { err }
+  ifz imm then
+    if flags 1 and then err throw end
+    nil false ret
+  end
+  if imm 1 = then err throw end
   imm <0 { neg }
   if neg then
     ifz flags 1 and then nil false ret end
     imm negate { imm }
   end
-  ifz imm then nil false ret end
   if imm imm dec and then nil false ret end
   imm bit_ctz neg 6 lsl or { aux }
-  if flags 2 and aux 0x3f and =0 and then nil false ret end
   aux true
+end
+
+fun: cf_pow2_validate_reject_1 { imm msg -- aux ok err }
+  if imm 1 = then msg throw end
+  imm nil cf_pow2_validate
 end
 
 fun: cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
@@ -3345,14 +3399,13 @@ fun: comp_loc_mut_bits_trunc_fallback { reg loc _ -- err }
 end
 
 fun_comp: or { -- err } [ redefine ]
-  if cf_fold_cleared2 then or cf_fold_done
-  else
-    { -- }
-    true ASM_OP_ORR_IMM ASM_OP_ORR_IMM
-    instr' cf_logical_validate instr' cf_logical_emit
-    if cf_fold2 then ret end
-    execute'' or
-  end
+  " redundant arithmetic" { err }
+  true 0 err -1 err cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 or cf_fold_done ret end
+  true ASM_OP_ORR_IMM ASM_OP_ORR_IMM
+  instr' cf_logical_validate instr' cf_logical_emit
+  if cf_fold2 then ret end
+  execute'' or
 end
 
 \ Bitwise or into a local: `mask or: some_val`.
@@ -3363,14 +3416,13 @@ fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: and { -- err } [ redefine ]
-  if cf_fold_cleared2 then and cf_fold_done
-  else
-    { -- }
-    true ASM_OP_AND_IMM ASM_OP_AND_IMM
-    instr' cf_logical_validate instr' cf_logical_emit
-    if cf_fold2 then ret end
-    execute'' and
-  end
+  " redundant arithmetic" { err }
+  true 0 err -1 err cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 and cf_fold_done ret end
+  true ASM_OP_AND_IMM ASM_OP_AND_IMM
+  instr' cf_logical_validate instr' cf_logical_emit
+  if cf_fold2 then ret end
+  execute'' and
 end
 
 \ Bitwise and into a local: `mask and: some_val`.
@@ -3381,14 +3433,12 @@ fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: xor { -- err } [ redefine ]
-  if cf_fold_cleared2 then xor cf_fold_done
-  else
-    { -- }
-    true ASM_OP_EOR_IMM ASM_OP_EOR_IMM
-    instr' cf_logical_validate instr' cf_logical_emit
-    if cf_fold2 then ret end
-    execute'' xor
-  end
+  true 0 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 xor cf_fold_done ret end
+  true ASM_OP_EOR_IMM ASM_OP_EOR_IMM
+  instr' cf_logical_validate instr' cf_logical_emit
+  if cf_fold2 then ret end
+  execute'' xor
 end
 
 \ Bitwise xor into a local: `mask xor: some_val`.
@@ -3399,14 +3449,12 @@ fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: lsl { -- err } [ redefine ]
-  if cf_fold_cleared2 then lsl cf_fold_done
-  else
-    { -- }
-    false ASM_OP_LSL_REG ASM_OP_LSL_REG
-    instr' cf_shift_validate instr' cf_shift_emit
-    if cf_fold2 then ret end
-    execute'' lsl
-  end
+  false 0 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 lsl cf_fold_done ret end
+  false ASM_OP_LSL_REG ASM_OP_LSL_REG
+  instr' cf_shift_validate instr' cf_shift_emit
+  if cf_fold2 then ret end
+  execute'' lsl
 end
 
 \ Shift a local left: `bits lsl: some_val`.
@@ -3417,14 +3465,12 @@ fun_comp: lsl: { -- err } ( C: "name" -- ) ( E: bits -- )
 end
 
 fun_comp: lsr { -- err } [ redefine ]
-  if cf_fold_cleared2 then lsr cf_fold_done
-  else
-    { -- }
-    false ASM_OP_LSR_REG ASM_OP_LSR_REG
-    instr' cf_shift_validate instr' cf_shift_emit
-    if cf_fold2 then ret end
-    execute'' lsr
-  end
+  false 0 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 lsr cf_fold_done ret end
+  false ASM_OP_LSR_REG ASM_OP_LSR_REG
+  instr' cf_shift_validate instr' cf_shift_emit
+  if cf_fold2 then ret end
+  execute'' lsr
 end
 
 \ Shift a local right logically: `bits lsr: some_val`.
@@ -3435,14 +3481,12 @@ fun_comp: lsr: { -- err } ( C: "name" -- ) ( E: bits -- )
 end
 
 fun_comp: asr { -- err } [ redefine ]
-  if cf_fold_cleared2 then asr cf_fold_done
-  else
-    { -- }
-    false ASM_OP_ASR_REG ASM_OP_ASR_REG
-    instr' cf_shift_validate instr' cf_shift_emit
-    if cf_fold2 then ret end
-    execute'' asr
-  end
+  false 0 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 asr cf_fold_done ret end
+  false ASM_OP_ASR_REG ASM_OP_ASR_REG
+  instr' cf_shift_validate instr' cf_shift_emit
+  if cf_fold2 then ret end
+  execute'' asr
 end
 
 \ Shift a local right arithmetically: `bits asr: some_val`.
@@ -3453,14 +3497,12 @@ fun_comp: asr: { -- err } ( C: "name" -- ) ( E: bits -- )
 end
 
 fun_comp: + { -- err } [ redefine ]
-  if cf_fold_cleared2 then + cf_fold_done
-  else
-    { -- }
-    true true true
-    instr' cf_addsub_validate instr' cf_addsub_emit
-    if cf_fold2 then ret end
-    execute'' +
-  end
+  true 0 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 + cf_fold_done ret end
+  true true true
+  instr' cf_addsub_validate instr' cf_addsub_emit
+  if cf_fold2 then ret end
+  execute'' +
 end
 
 \ Add a step to a local: `step +: some_val`.
@@ -3471,14 +3513,12 @@ fun_comp: +: { -- err } ( C: "name" -- ) ( E: imm -- )
 end
 
 fun_comp: - { -- err } [ redefine ]
-  if cf_fold_cleared2 then - cf_fold_done
-  else
-    { -- }
-    false false false
-    instr' cf_addsub_validate instr' cf_addsub_emit
-    if cf_fold2 then ret end
-    execute'' -
-  end
+  false 0 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 - cf_fold_done ret end
+  false false false
+  instr' cf_addsub_validate instr' cf_addsub_emit
+  if cf_fold2 then ret end
+  execute'' -
 end
 
 \ Subtract a step from a local: `step -: some_val`.
@@ -3489,14 +3529,13 @@ fun_comp: -: { -- err } ( C: "name" -- ) ( E: imm -- )
 end
 
 fun_comp: * { -- err } [ redefine ]
-  if cf_fold_cleared2 then * cf_fold_done
-  else
-    { -- }
-    true true true
-    instr' cf_pow2_validate instr' cf_mul_pow2_emit
-    if cf_fold2 then ret end
-    execute'' *
-  end
+  " redundant arithmetic" { err }
+  true 0 err 1 err cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 * cf_fold_done ret end
+  true true true
+  instr' cf_pow2_validate instr' cf_mul_pow2_emit
+  if cf_fold2 then ret end
+  execute'' *
 end
 
 \ Multiply a local: `factor *: some_val`.
@@ -3510,70 +3549,116 @@ end
 \ because `asr` rounds negative values down, while signed division rounds
 \ toward zero. Not worth the code size for now.
 fun_comp: / { -- err } [ redefine ]
-  if cf_fold_cleared2 then / cf_fold_done else { -- } execute'' / end
+  " redundant arithmetic: division by 0 -> 0" { err0 }
+  " redundant arithmetic: division by 1" { err1 }
+  false 0 err0 1 err1 cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 / cf_fold_done ret end
+  0 err0 cf_reject_rhs_imm 1 err1 cf_reject_rhs_imm
+  execute'' /
 end
 
 \ Signed divide a local: `divisor /: some_val`.
 fun_comp: /: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  " redundant arithmetic: division by 0 -> 0" { err0 }
+  " redundant arithmetic: division by 1" { err1 }
+  0 err0 1 err1 cf_reject_top_imm2
   1 nil comp_args_min
   read_word comp_local ASM_OP_SDIV_REG comp_loc_emit_arith_reg
 end
 
 fun_comp: u/ { -- err } [ redefine ]
-  if cf_fold_cleared2 then u/ cf_fold_done
-  else
-    { -- }
-    false nil nil
-    instr' cf_pow2_validate instr' cf_udiv_pow2_emit
-    if cf_fold2 then ret end
-    execute'' u/
-  end
+  " redundant arithmetic: division by 0 -> 0" { err0 }
+  " redundant arithmetic: division by 1" { err1 }
+  false 0 err0 1 err1 cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 u/ cf_fold_done ret end
+  0 err0 cf_reject_rhs_imm
+  1 err1 cf_reject_rhs_imm
+  false err1 nil
+  instr' cf_pow2_validate_reject_1 instr' cf_udiv_pow2_emit
+  if cf_fold2 then ret end
+  execute'' u/
 end
 
 \ Unsigned divide a local: `divisor u/: some_val`.
 fun_comp: u/: { -- err } ( C: "name" -- ) ( E: divisor -- )
-  ASM_OP_UDIV_REG nil
-  instr' cf_pow2_validate instr' cf_udiv_pow2_emit
+  " redundant arithmetic: division by 0 -> 0" { err0 }
+  " redundant arithmetic: division by 1" { err1 }
+  0 err0 1 err1 cf_reject_top_imm2
+  ASM_OP_UDIV_REG err1
+  instr' cf_pow2_validate_reject_1 instr' cf_udiv_pow2_emit
   comp_loc_mut_imm
 end
 
 fun_comp: mod { -- err } [ redefine ]
-  if cf_fold_cleared2 then mod cf_fold_done else { -- } execute'' mod end
+  " redundant arithmetic: modulo by 0 -> dividend" { err0 }
+  " redundant arithmetic: modulo by 1" { err1 }
+  false 0 err0 1 err1 cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 mod cf_fold_done ret end
+  0 err0 cf_reject_rhs_imm 1 err1 cf_reject_rhs_imm
+  execute'' mod
 end
 
 \ Signed remainder into a local: `divisor mod: some_val`.
 fun_comp: mod: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  " redundant arithmetic: modulo by 0 -> dividend" { err0 }
+  " redundant arithmetic: modulo by 1" { err1 }
+  0 err0 1 err1 cf_reject_top_imm2
   comp_loc_arg_init { divisor dividend loc }
   divisor dividend divisor ASM_OP_SDIV_REG comp_emit_mod
   loc divisor comp_loc_mut_store
 end
 
 fun_comp: umod { -- err } [ redefine ]
-  if cf_fold_cleared2 then umod cf_fold_done
-  else
-    { -- }
-    false 2 nil
-    instr' cf_pow2_validate instr' cf_umod_pow2_emit
-    if cf_fold2 then ret end
-    execute'' umod
-  end
+  " redundant arithmetic: modulo by 0 -> dividend" { err0 }
+  " redundant arithmetic: modulo by 1" { err1 }
+  false 0 err0 1 err1 cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 umod cf_fold_done ret end
+  0 err0 cf_reject_rhs_imm
+  1 err1 cf_reject_rhs_imm
+  false err1 nil
+  instr' cf_pow2_validate_reject_1 instr' cf_umod_pow2_emit
+  if cf_fold2 then ret end
+  execute'' umod
 end
 
 \ Unsigned remainder into a local: `divisor umod: some_val`.
 fun_comp: umod: { -- err } ( C: "name" -- ) ( E: divisor -- )
+  " redundant arithmetic: modulo by 0 -> dividend" { err0 }
+  " redundant arithmetic: modulo by 1" { err1 }
+  0 err0 1 err1 cf_reject_top_imm2
   ASM_OP_UDIV_REG instr' comp_loc_mut_mod_fallback
-  2 instr' cf_pow2_validate instr' cf_umod_pow2_emit
+  err1 instr' cf_pow2_validate_reject_1 instr' cf_umod_pow2_emit
   comp_loc_mut_imm_fallback
 end
 
 fun_comp: /mod { -- err } [ redefine ]
-  if cf_fold_cleared2_keep2 then /mod cf_fold_done2
-  else { -- } execute'' /mod end
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" { err0 }
+  " redundant arithmetic: division by 1" { err1 }
+  if cf_fold_cleared2_keep2
+  then
+    0 err0 cf_reject_rhs2
+    1 err1 cf_reject_rhs2
+    /mod cf_fold_done2
+  else
+    { -- }
+    0 err0 cf_reject_rhs_imm 1 err1 cf_reject_rhs_imm
+    execute'' /mod
+  end
 end
 
 fun_comp: u/mod { -- err } [ redefine ]
-  if cf_fold_cleared2_keep2 then u/mod cf_fold_done2
-  else { -- } execute'' u/mod end
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" { err0 }
+  " redundant arithmetic: division by 1" { err1 }
+  if cf_fold_cleared2_keep2
+  then
+    0 err0 cf_reject_rhs2
+    1 err1 cf_reject_rhs2
+    u/mod cf_fold_done2
+  else
+    { -- }
+    0 err0 cf_reject_rhs_imm 1 err1 cf_reject_rhs_imm
+    execute'' u/mod
+  end
 end
 
 fun_comp: inc { -- err } [ redefine ]
@@ -3765,7 +3850,8 @@ fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: = { -- err } [ redefine ]
-  if cf_fold_cleared2 then = cf_fold_done
+  if cf_fold_cleared2
+  then = cf_fold_done
   else
     { -- }
     true ASM_EQ ASM_EQ
@@ -3782,7 +3868,8 @@ fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: <> { -- err } [ redefine ]
-  if cf_fold_cleared2 then <> cf_fold_done
+  if cf_fold_cleared2
+  then <> cf_fold_done
   else
     { -- }
     true ASM_NE ASM_NE
@@ -3799,7 +3886,8 @@ fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: > { -- err } [ redefine ]
-  if cf_fold_cleared2 then > cf_fold_done
+  if cf_fold_cleared2
+  then > cf_fold_done
   else
     { -- }
     true ASM_GT ASM_LT
@@ -3816,7 +3904,8 @@ fun_comp: >: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: < { -- err } [ redefine ]
-  if cf_fold_cleared2 then < cf_fold_done
+  if cf_fold_cleared2
+  then < cf_fold_done
   else
     { -- }
     true ASM_LT ASM_GT
@@ -3833,7 +3922,8 @@ fun_comp: <: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: <= { -- err } [ redefine ]
-  if cf_fold_cleared2 then <= cf_fold_done
+  if cf_fold_cleared2
+  then <= cf_fold_done
   else
     { -- }
     true ASM_LE ASM_GE
@@ -3850,7 +3940,8 @@ fun_comp: <=: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: >= { -- err } [ redefine ]
-  if cf_fold_cleared2 then >= cf_fold_done
+  if cf_fold_cleared2
+  then >= cf_fold_done
   else
     { -- }
     true ASM_GE ASM_LE
@@ -3867,7 +3958,8 @@ fun_comp: >=: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: u> { -- err } [ redefine ]
-  if cf_fold_cleared2 then u> cf_fold_done
+  if cf_fold_cleared2
+  then u> cf_fold_done
   else
     { -- }
     true ASM_HI ASM_LO
@@ -3884,7 +3976,8 @@ fun_comp: u>: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: u< { -- err } [ redefine ]
-  if cf_fold_cleared2 then u< cf_fold_done
+  if cf_fold_cleared2
+  then u< cf_fold_done
   else
     { -- }
     true ASM_LO ASM_HI
@@ -3901,7 +3994,8 @@ fun_comp: u<: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: u<= { -- err } [ redefine ]
-  if cf_fold_cleared2 then u<= cf_fold_done
+  if cf_fold_cleared2
+  then u<= cf_fold_done
   else
     { -- }
     true ASM_LS ASM_HS
@@ -3918,7 +4012,8 @@ fun_comp: u<=: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: u>= { -- err } [ redefine ]
-  if cf_fold_cleared2 then u>= cf_fold_done
+  if cf_fold_cleared2
+  then u>= cf_fold_done
   else
     { -- }
     true ASM_HS ASM_LS
@@ -3989,25 +4084,21 @@ fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: is_aligned_to { -- err } [ redefine ]
-  if cf_fold_cleared2 then is_aligned_to cf_fold_done
-  else
-    { -- }
-    false nil nil
-    instr' cf_align_validate instr' cf_align_emit
-    if cf_fold2 then ret end
-    execute'' is_aligned_to
-  end
+  false 1 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 is_aligned_to cf_fold_done ret end
+  false nil nil
+  instr' cf_align_validate instr' cf_align_emit
+  if cf_fold2 then ret end
+  execute'' is_aligned_to
 end
 
 fun_comp: align_down { -- err } [ redefine ]
-  if cf_fold_cleared2 then align_down cf_fold_done
-  else
-    { -- }
-    false nil nil
-    instr' cf_align_down_validate instr' cf_align_down_emit
-    if cf_fold2 then ret end
-    execute'' align_down
-  end
+  false 1 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 align_down cf_fold_done ret end
+  false nil nil
+  instr' cf_align_down_validate instr' cf_align_down_emit
+  if cf_fold2 then ret end
+  execute'' align_down
 end
 
 \ Align a local down: `wid align_down: some_val`.
@@ -4018,14 +4109,12 @@ fun_comp: align_down: { -- err } ( C: "name" -- ) ( E: wid -- )
 end
 
 fun_comp: align_up { -- err } [ redefine ]
-  if cf_fold_cleared2 then align_up cf_fold_done
-  else
-    { -- }
-    false nil nil
-    instr' cf_align_up_validate instr' cf_align_up_emit
-    if cf_fold2 then ret end
-    execute'' align_up
-  end
+  false 1 " redundant arithmetic" 0 nil cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 align_up cf_fold_done ret end
+  false nil nil
+  instr' cf_align_up_validate instr' cf_align_up_emit
+  if cf_fold2 then ret end
+  execute'' align_up
 end
 
 \ Align a local up: `wid align_up: some_val`.
@@ -4059,14 +4148,13 @@ fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bits_trunc { -- err } [ redefine ]
-  if cf_fold_cleared2 then bits_trunc cf_fold_done
-  else
-    { -- }
-    false nil nil
-    instr' cf_bits_trunc_validate instr' cf_logical_emit
-    if cf_fold2 then ret end
-    execute'' bits_trunc
-  end
+  " redundant arithmetic" { err }
+  false 0 err 64 err cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 bits_trunc cf_fold_done ret end
+  false nil nil
+  instr' cf_bits_trunc_validate instr' cf_logical_emit
+  if cf_fold2 then ret end
+  execute'' bits_trunc
 end
 
 \ Truncate a local to low bits: `len bits_trunc: some_val`.
@@ -4077,13 +4165,12 @@ fun_comp: bits_trunc: { -- err } ( C: "name" -- ) ( E: len -- )
 end
 
 fun_comp: bits_clear { -- err } [ redefine ]
-  if cf_fold_cleared2 then bits_clear cf_fold_done
-  else
-    { -- }
-    false ASM_OP_AND_IMM 1 or ASM_OP_AND_IMM 1 or
-    instr' cf_logical_validate instr' cf_logical_emit
-    if cf_fold2 then ret end execute'' bits_clear
-  end
+  " redundant arithmetic" { err }
+  false 0 err -1 err cf_fold2_reject { reg imm0 imm1 ok }
+  if ok then reg imm0 imm1 bits_clear cf_fold_done ret end
+  false ASM_OP_AND_IMM 1 or ASM_OP_AND_IMM 1 or
+  instr' cf_logical_validate instr' cf_logical_emit
+  if cf_fold2 then ret end execute'' bits_clear
 end
 
 \ Clear bits in a local by mask: `mask bits_clear: some_val`.
@@ -4094,7 +4181,9 @@ fun_comp: bits_clear: { -- err } ( C: "name" -- ) ( E: mask -- )
 end
 
 fun_comp: bit_mask_get { -- err } [ redefine ]
-  if cf_fold_cleared2 then { reg src mask }
+  if cf_fold_cleared2
+  then { reg src mask }
+    if mask -1 = then " redundant arithmetic" throw end
     mask cf_bit_mask_validate
     reg src mask bit_mask_get cf_fold_done
   else

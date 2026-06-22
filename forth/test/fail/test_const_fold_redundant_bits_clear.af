@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_redundant_bits_clear { val -- out } val 0 bits_clear end

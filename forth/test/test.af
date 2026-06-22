@@ -27,7 +27,7 @@ test_empty_comment
 
 fun: test_locals { -- err }
   { }
-  { -- }
+  10 { -- }
   10 { } { val0 }
   assert= val0 10 end
   10 20 { } { val1 val2 }
@@ -1333,7 +1333,7 @@ fun: test_comptime_stack_arith { -- err }
   assert= -128 2 asr 0xff and 224 end
   assert= 0b1010 0b1100 or 0b0110 xor 0b1000 end
   assert= 10 20 < 30 5 > + 2 end
-  assert= 10 20 30 + =0 + 10 end
+  assert= 20 30 + =0 false end
   assert= 10 20 30 + <>0 + 11 end
   assert= -123 abs 10 20 min 30 40 max + + 173 end
   assert= 255 bit_len 256 bit_len + 17 end
@@ -1341,7 +1341,6 @@ end
 test_comptime_stack_arith
 
 fun: test_mod { -- err }
-  assert= 12 1 mod 0 end
   assert= 12 2 mod 0 end
   assert= 12 3 mod 0 end
   assert= 12 4 mod 0 end
@@ -1354,9 +1353,6 @@ end
 test_mod
 
 fun: test_slash_mod { -- err }
-  12 1 /mod { mod div }
-  assert= mod 0 end
-  assert= div 12 end
   12 2 /mod { mod div }
   assert= mod 0 end
   assert= div 6 end
@@ -1603,22 +1599,22 @@ end
 test_is_err_flag_regression
 
 fun: test_comptime_arg_stack_sum16_fun { -- val }
-  0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+  100 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   + + + + + + + + + + + + + + +
 end
 
 fun: test_comptime_arg_stack_sum16 { -- err }
-  assert= test_comptime_arg_stack_sum16_fun 120 end
+  assert= test_comptime_arg_stack_sum16_fun 220 end
 end
 test_comptime_arg_stack_sum16
 
 fun: test_comptime_arg_stack_swap16_fun { -- val }
-  0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+  100 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   swap - + + + + + + + + + + + + + +
 end
 
 fun: test_comptime_arg_stack_swap16 { -- err }
-  assert= test_comptime_arg_stack_swap16_fun 92 end
+  assert= test_comptime_arg_stack_swap16_fun 192 end
 end
 test_comptime_arg_stack_swap16
 
@@ -1817,7 +1813,6 @@ fun: test_alloca_align { -- err }
   32 alloca   { adr5 }
 
   \ Compiler ensures natural alignment up to 16.
-  assert= adr0 1  mod 0 end
   assert= adr1 2  mod 0 end
   assert= adr2 4  mod 0 end
   assert= adr3 8  mod 0 end
@@ -2257,6 +2252,13 @@ fun: test_discard_assign_read { -- err } [ false try_all ]
   assert_str_has
 end
 test_discard_assign_read
+
+fun: test_redundant_discard { -- err } [ false try_all ]
+  use' ./fail/test_redundant_discard.af
+  " redundant discard"
+  assert_str_has
+end
+test_redundant_discard
 
 fun: test_unpopped_anon_local { -- err } [ false try_all ]
   use' ./fail/test_unpopped_anon_local.af

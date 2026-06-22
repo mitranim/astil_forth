@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_rhs_divmod_zero { val -- rem quo } val 0 /mod end

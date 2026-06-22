@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_redundant_loc_umod_one { val -- out } 1 umod: val val end

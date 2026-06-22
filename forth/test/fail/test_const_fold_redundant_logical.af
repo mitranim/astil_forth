@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_redundant_logical { val -- out } val -1 and end

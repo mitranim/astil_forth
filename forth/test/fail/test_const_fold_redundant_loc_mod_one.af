@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_redundant_loc_mod_one { val -- out } 1 mod: val val end

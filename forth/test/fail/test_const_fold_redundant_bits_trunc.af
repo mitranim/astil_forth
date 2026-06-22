@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: test_const_fold_redundant_bits_trunc { val -- out } val 64 bits_trunc end

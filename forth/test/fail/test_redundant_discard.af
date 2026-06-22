@@ -1,0 +1,4 @@
+fun: test_redundant_discard { -- out }
+  { -- }
+  0
+end

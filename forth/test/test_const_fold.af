@@ -482,9 +482,9 @@ fun: const_fold_or_rhs_imm_fun { val -- out } val 0xff or end
 fun: const_fold_or_lhs_imm_fun { val -- out } 0xff val or end
 fun: const_fold_and_rhs_imm_fun { val -- out } val 0xff and end
 fun: const_fold_and_lhs_imm_fun { val -- out } 0xff val and end
-fun: const_fold_and_bad_imm_fun { val -- out } val 0 and end
 fun: const_fold_xor_rhs_imm_fun { val -- out } val 0xff xor end
 fun: const_fold_xor_lhs_imm_fun { val -- out } 0xff val xor end
+fun: const_fold_xor_invert_fun { val -- out } val -1 xor end
 fun: const_fold_is_aligned_rhs_imm_fun { val -- out } val 8 is_aligned_to end
 fun: const_fold_align_down_rhs_imm_fun { val -- out } val 16 align_down end
 fun: const_fold_align_up_rhs_imm_fun { val -- out } val 16 align_up end
@@ -506,9 +506,9 @@ fun: test_const_fold_bit_shift { -- err }
   assert= 0x1234 const_fold_or_lhs_imm_fun 0x12ff end
   assert= 0x1234 const_fold_and_rhs_imm_fun 0x34 end
   assert= 0x1234 const_fold_and_lhs_imm_fun 0x34 end
-  assert= 0x1234 const_fold_and_bad_imm_fun 0 end
   assert= 0x1234 const_fold_xor_rhs_imm_fun 0x12cb end
   assert= 0x1234 const_fold_xor_lhs_imm_fun 0x12cb end
+  assert= 0x1234 const_fold_xor_invert_fun 0xffffffffffffedcb end
   assert= 0x1238 const_fold_is_aligned_rhs_imm_fun true end
   assert= 0x1234 const_fold_is_aligned_rhs_imm_fun false end
   assert= 0x1234 const_fold_align_down_rhs_imm_fun 0x1230 end
@@ -592,17 +592,125 @@ fun: test_const_fold_bit_mask_errors { -- err } [ false try_all ]
 end
 test_const_fold_bit_mask_errors
 
+fun: test_const_fold_redundant_arith_errors { -- err } [ false try_all ]
+  use' ./fail/test_const_fold_redundant_logical.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_addsub.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_shift.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_const_shift.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_mul_zero.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_div_one.af
+  " redundant arithmetic: division by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_udiv_one.af
+  " redundant arithmetic: division by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_mod_one.af
+  " redundant arithmetic: modulo by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_umod_one.af
+  " redundant arithmetic: modulo by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_divmod_one.af
+  " redundant arithmetic: division by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_udivmod_one.af
+  " redundant arithmetic: division by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_div_one.af
+  " redundant arithmetic: division by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_udiv_one.af
+  " redundant arithmetic: division by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_mod_one.af
+  " redundant arithmetic: modulo by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_umod_one.af
+  " redundant arithmetic: modulo by 1" assert_str_has try
+
+  use' ./fail/test_const_fold_div_zero.af
+  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+
+  use' ./fail/test_const_fold_udiv_zero.af
+  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+
+  use' ./fail/test_const_fold_mod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_umod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_divmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_udivmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_div_zero.af
+  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_udiv_zero.af
+  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_mod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_loc_umod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_rhs_div_zero.af
+  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+
+  use' ./fail/test_const_fold_rhs_udiv_zero.af
+  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+
+  use' ./fail/test_const_fold_rhs_mod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_rhs_umod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_rhs_divmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_rhs_udivmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_align_down.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_align_up.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_is_aligned.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_bits_trunc.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_bits_clear.af
+  " redundant arithmetic" assert_str_has try
+
+  use' ./fail/test_const_fold_redundant_bit_mask_get.af
+  " redundant arithmetic" assert_str_has try
+end
+test_const_fold_redundant_arith_errors
+
 fun: const_fold_div_mod_fun { -- out0 out1 out2 out3 out4 }
   29 5 /
   29 5 u/
   29 5 mod
   29 5 /mod
-end
-
-fun: const_fold_div_zero_fun { -- out0 out1 out2 out3 }
-  29 0 /
-  29 0 mod
-  29 0 /mod
 end
 
 fun: const_fold_udiv_mod_fun { -- out0 out1 out2 out3 }
@@ -623,16 +731,11 @@ fun: test_const_fold_div_mod { -- err }
   assert= out2 4 end
   assert= out3 4 end
   assert= out4 5 end
-  const_fold_div_zero_fun { out5 out6 out7 out8 }
-  assert= out5 0 end
-  assert= out6 29 end
-  assert= out7 29 end
-  assert= out8 0 end
-  const_fold_udiv_mod_fun { out9 out10 out11 out12 }
-  assert= out9 1 end
-  assert= out10 1 end
-  assert= out11 1 end
-  assert= out12 1 end
+  const_fold_udiv_mod_fun { out5 out6 out7 out8 }
+  assert= out5 1 end
+  assert= out6 1 end
+  assert= out7 1 end
+  assert= out8 1 end
   assert= 7 const_fold_mul_pow2_rhs_imm_fun -56 end
   assert= 7 const_fold_mul_pow2_lhs_imm_fun 56 end
   assert= 64 const_fold_udiv_pow2_rhs_imm_fun 8 end
@@ -648,14 +751,6 @@ fun: test_const_fold_div_mod { -- err }
   4 5  cf_expect_load
   cf_expect_ret
   xt' const_fold_div_mod_fun cf_expect_word
-
-  cf_expect_clear
-  0 0  cf_expect_load
-  1 29 cf_expect_load
-  2 29 cf_expect_load
-  3 0  cf_expect_load
-  cf_expect_ret
-  xt' const_fold_div_zero_fun cf_expect_word
 
   cf_expect_clear
   0 1 cf_expect_load
