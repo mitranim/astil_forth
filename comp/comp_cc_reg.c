@@ -300,16 +300,22 @@ static Err comp_forget_regs(Comp *comp, Bits regs) {
 static Err comp_args_set(Comp *comp, Sint next) {
   if (!(next >= 0 && next <= ASM_ARG_LEN_MAX)) return err_too_many_args(next);
 
-  const auto ctx   = &comp->ctx;
-  const U8   prev  = ctx->arg_len;
-  const U8   len   = (U8)next;
-  const U8   floor = MIN(prev, len);
-  const U8   ceil  = MAX(prev, len);
+  const auto ctx  = &comp->ctx;
+  const U8   prev = ctx->arg_len;
+  const U8   len  = (U8)next;
 
-  for (U8 reg = floor; reg < ceil; reg++) {
-    try(comp_forget_reg(comp, reg));
+  /*
+  Growing means the program has done something to the intermediary
+  registers. Their values are now unknown to us.
+
+  We don't need this when shrinking, because it only indicates
+  logical consumption of values without clobbering those regs.
+  */
+  if (len > prev) {
+    for (U8 reg = prev; reg < len; reg++) {
+      ctx->args[reg] = (Comp_arg){};
+    }
   }
-
   ctx->arg_len = len;
   return nullptr;
 }

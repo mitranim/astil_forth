@@ -300,6 +300,7 @@ test_comp_args_set_max_len
 fun: const_fold_fallback_0_1_fun { val -- out } val 20 + end
 fun: const_fold_add_imm_lhs_fun { val -- out } 20 val + end
 fun: const_fold_sub_imm_fun { val -- out } val 20 - end
+fun: arg_add_no_reloc_fun { one two -- out } one two + end
 fun: const_fold_add_lhs_imm_no_reloc_fun { num -- out }
   num num { -- }
   10 num +
@@ -309,15 +310,16 @@ fun: test_const_fold_fallback_0_1 { -- err }
   assert= 22 const_fold_fallback_0_1_fun 42 end
   assert= 23 const_fold_add_imm_lhs_fun 43 end
   assert= 62 const_fold_sub_imm_fun 42 end
+  assert= 1 2 arg_add_no_reloc_fun 3 end
   assert= 22 const_fold_add_lhs_imm_no_reloc_fun 32 end
   ifz has_interp then ret end
 
+  0 0 1 asm_add_reg xt' arg_add_no_reloc_fun cf_expect_word1
   0 1 20 asm_add_imm xt' const_fold_add_imm_lhs_fun cf_expect_lhs_imm1
 
   cf_expect_clear
   1 0 asm_mov_reg cf_expect_instr
   0 1 10 asm_add_imm cf_expect_instr
-  asm_nop cf_expect_instr
   cf_expect_ret
   xt' const_fold_add_lhs_imm_no_reloc_fun cf_expect_word
 end
@@ -1555,13 +1557,13 @@ fun: test_const_fold_bits { -- err }
   2 2 1 asm_lsl_reg cf_expect_instr
   2 2 1 asm_sub_imm cf_expect_instr
   0 0 2 asm_and_reg cf_expect_instr
-  asm_nop cf_expect_instr
   cf_expect_ret
   xt' bits_trunc_instr_fun cf_expect_word
 
-  0 0 1 asm_bic { instr0 }
-  asm_nop { instr1 }
-  instr0 instr1 xt' bits_clear_instr_fun cf_expect_word2
+  cf_expect_clear
+  0 0 1 asm_bic cf_expect_instr
+  cf_expect_ret
+  xt' bits_clear_instr_fun cf_expect_word
 end
 test_const_fold_bits
 
