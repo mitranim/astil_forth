@@ -241,9 +241,11 @@ end
 fun: asm_cmp_zero { Xn -> instr } 0 asm_cmp_imm end
 
 \ cset Xd, <cond>
+0b1_0_0_11010100_11111_0000_0_1_11111_00000 let: ASM_OP_CSET
+
 fun: asm_cset { Xd cond -- instr }
   cond 1 xor 12 lsl { cond }
-  Xd cond or 0b1_0_0_11010100_11111_0000_0_1_11111_00000 or
+  Xd cond or ASM_OP_CSET or
 end
 
 \ ccmp Xd, Xm, <nzcv>, <cond>
@@ -1998,7 +2000,8 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 \
 \ SYNC[control_meta_layout]:
 \
-\ - 15..63: instruction offset
+\ - 19..63: instruction offset
+\ - 15..18: branch_cond + 1, or 0 for none
 \ -     14: exec_prev
 \ -     13: 0 / 1 = `cbz` / `cbnz`
 \ -     12: has_else
@@ -2024,13 +2027,14 @@ fun: instr_adr     { off -> adr } interp_instrs + end
 ASM_ARG_LEN_MAX bit_len low_bits let: CONT_MASK_INP_LEN
 CONT_MASK_INP_LEN CONT_MASK_INP_LEN bit_len lsl let: CONT_MASK_OUT_LEN
 
-1 CONT_MASK_OUT_LEN bit_len   lsl let: CONT_MASK_HAS_INP
-CONT_MASK_HAS_INP           1 lsl let: CONT_MASK_HAS_OUT
-CONT_MASK_HAS_OUT           1 lsl let: CONT_MASK_HAS_ELSE
-CONT_MASK_HAS_ELSE          1 lsl let: CONT_MASK_CBNZ
-CONT_MASK_CBNZ 1 lsl              let: CONT_MASK_EXEC_PREV
+1 CONT_MASK_OUT_LEN bit_len   lsl      let: CONT_MASK_HAS_INP
+CONT_MASK_HAS_INP           1 lsl      let: CONT_MASK_HAS_OUT
+CONT_MASK_HAS_OUT           1 lsl      let: CONT_MASK_HAS_ELSE
+CONT_MASK_HAS_ELSE          1 lsl      let: CONT_MASK_CBNZ
+CONT_MASK_CBNZ 1 lsl                   let: CONT_MASK_EXEC_PREV
+0b1111 CONT_MASK_EXEC_PREV bit_len lsl let: CONT_MASK_BRANCH_COND
 
-CONT_MASK_EXEC_PREV bit_len low_bits invert let: CONT_MASK_INSTR_OFF
+CONT_MASK_BRANCH_COND bit_len low_bits invert let: CONT_MASK_INSTR_OFF
 
 fun: again_meta_instr_off_set { off meta -- meta }
   off instr_off_pack meta CONT_MASK_INSTR_OFF bit_mask_set
@@ -2089,7 +2093,7 @@ fun: if_patch { reg meta -- err }
   meta again_meta_instr_adr { adr }
   here_write adr - { off }
   meta CONT_MASK_CBNZ and { cbnz }
-  reg off cbnz asm_cmp_branch adr !32
+  reg off cbnz asm_cmp_branch adr !32 \ cbz/cbnz Xn, <target>
 end
 
 fun: if_end_xt { meta -- err }
@@ -2098,11 +2102,50 @@ fun: if_end_xt { meta -- err }
   meta CONT_MASK_INP_LEN bit_mask_get meta if_patch
 end
 
+\ Early definition; used in bare form: `pred then end`.
 fun_comp: then { -- meta end_xt err } ( E: pred -- )
   comp_barrier
   1 " arguments before `then`" comp_args_valid
   0 comp_args_set
   reserve_instr 0 again_meta_instr_off_set xt' if_end_xt
+end
+
+fun: asm_cset_decode { instr -- reg cond ok }
+  \ `cset` with `Rd` and `cond` masked out.
+  0b1_1_1_11111111_11111_0000_1_1_11111_00000 { mask }
+
+  instr 0b11111 and { reg }
+  instr 12 lsr 0b1111 and 1 xor { cond }
+
+  instr mask and ASM_OP_CSET =
+  cond ASM_AL <> and
+  cond ASM_NV <> and { ok }
+
+  reg cond ok
+end
+
+fun: control_try_cset_branch { pred_reg branch_on_true meta -- meta fused err }
+  here_write ASM_INSTR_SIZE - { adr }
+  adr @u32 asm_cset_decode { cset_reg cond ok }
+  ok cset_reg pred_reg = and { fused }
+  fused then
+    branch_on_true =0 then cond 1 xor { cond } end
+    cond inc meta CONT_MASK_BRANCH_COND bit_mask_set { meta }
+    adr instr_off meta again_meta_instr_off_set { meta }
+  end
+  meta fused
+end
+
+fun: if_patch { reg meta -- err } [ redefine ]
+  meta CONT_MASK_BRANCH_COND bit_mask_get { cond }
+  cond then
+    meta again_meta_instr_adr { adr }
+    here_write adr - { off }
+    cond dec { cond }
+    off cond asm_branch_cond adr !32 \ b.<cond> <target>
+    ret
+  end
+  reg meta if_patch
 end
 
 \ Now that we have nullary conditionals, we can redefine
@@ -2127,8 +2170,8 @@ end
 fun_comp: if  { -- meta end_xt } nil            xt' if_end_xt end
 fun_comp: ifz { -- meta end_xt } CONT_MASK_CBNZ xt' if_end_xt end
 
-\ Caution: after this definition, `if ifz` are required
-\ and bare `then` is invalid.
+\ Caution: after this definition, `if ifz` are required,
+\ and bare `then` is invalid. Shape: `if pred then end`.
 fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ redefine ]
   comp_barrier
   " arguments before `then`" { ctx }
@@ -2146,7 +2189,13 @@ fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ redefine ]
   end
 
   len comp_args_set
-  reserve_instr meta again_meta_instr_off_set end_xt
+  len meta CONT_MASK_CBNZ and meta control_try_cset_branch { meta fused }
+
+  \ Fused path patches old `cset`; fallback reserves a fresh `cbz/cbnz`.
+  fused =0 then
+    reserve_instr meta again_meta_instr_off_set { meta }
+  end
+  meta end_xt
 end
 
 fun: else_patch { meta -- err }
@@ -4345,8 +4394,13 @@ fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
   comp_barrier
   inp_len comp_args_set
 
-  reserve_instr meta again_meta_instr_off_set LOOP_AUX >s
-  xt' while_end_xt                           LOOP_AUX >s
+  out_len false meta control_try_cset_branch { meta fused }
+  if fused =0 then
+    reserve_instr meta again_meta_instr_off_set { meta }
+  end
+
+  meta LOOP_AUX >s
+  xt' while_end_xt LOOP_AUX >s
 end
 
 \ Goes back to loop start.
