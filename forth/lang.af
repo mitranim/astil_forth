@@ -2036,16 +2036,16 @@ CONT_MASK_CBNZ 1 lsl                   let: CONT_MASK_EXEC_PREV
 
 CONT_MASK_BRANCH_COND bit_len low_bits invert let: CONT_MASK_INSTR_OFF
 
-fun: again_meta_instr_off_set { off meta -- meta }
+fun: cont_meta_instr_off_set { off meta -- meta }
   off instr_off_pack meta CONT_MASK_INSTR_OFF bit_mask_set
 end
 
-fun: again_meta_instr_off_get { meta -> off }
+fun: cont_meta_instr_off_get { meta -> off }
   CONT_MASK_INSTR_OFF bit_mask_get instr_off_unpack
 end
 
-fun: again_meta_instr_adr { meta -> adr }
-  again_meta_instr_off_get instr_adr
+fun: cont_meta_instr_adr { meta -> adr }
+  cont_meta_instr_off_get instr_adr
 end
 
 fun: reserve_instr { -- off err }
@@ -2090,7 +2090,7 @@ end
 \ instructions reserved by each `else elif elifz`.
 
 fun: if_patch { reg meta -- err }
-  meta again_meta_instr_adr { adr }
+  meta cont_meta_instr_adr { adr }
   here_write adr - { off }
   meta CONT_MASK_CBNZ and { cbnz }
   reg off cbnz asm_cmp_branch adr !32 \ cbz/cbnz Xn, <target>
@@ -2107,7 +2107,7 @@ fun_comp: then { -- meta end_xt err } ( E: pred -- )
   comp_barrier
   1 " arguments before `then`" comp_args_valid
   0 comp_args_set
-  reserve_instr 0 again_meta_instr_off_set xt' if_end_xt
+  reserve_instr 0 cont_meta_instr_off_set xt' if_end_xt
 end
 
 fun: asm_cset_decode { instr -- reg cond ok }
@@ -2131,7 +2131,7 @@ fun: control_try_cset_branch { pred_reg branch_on_true meta -- meta fused err }
   fused then
     branch_on_true =0 then cond 1 xor { cond } end
     cond inc meta CONT_MASK_BRANCH_COND bit_mask_set { meta }
-    adr instr_off meta again_meta_instr_off_set { meta }
+    adr instr_off meta cont_meta_instr_off_set { meta }
   end
   meta fused
 end
@@ -2139,7 +2139,7 @@ end
 fun: if_patch { reg meta -- err } [ redefine ]
   meta CONT_MASK_BRANCH_COND bit_mask_get { cond }
   cond then
-    meta again_meta_instr_adr { adr }
+    meta cont_meta_instr_adr { adr }
     here_write adr - { off }
     cond dec { cond }
     off cond asm_branch_cond adr !32 \ b.<cond> <target>
@@ -2193,13 +2193,13 @@ fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ redefine ]
 
   \ Fused path patches old `cset`; fallback reserves a fresh `cbz/cbnz`.
   fused =0 then
-    reserve_instr meta again_meta_instr_off_set { meta }
+    reserve_instr meta cont_meta_instr_off_set { meta }
   end
   meta end_xt
 end
 
 fun: else_patch { meta -- err }
-  meta again_meta_instr_adr { adr }
+  meta cont_meta_instr_adr { adr }
   here_write adr - asm_branch adr !32
 end
 
@@ -2220,7 +2220,7 @@ fun_comp: else { meta end_xt -- meta end_xt err }
   STACK >s
   end_xt execute
 
-  off meta again_meta_instr_off_set { meta }
+  off meta cont_meta_instr_off_set { meta }
   meta CONT_MASK_HAS_OUT and { has }
 
   if has then
@@ -4335,7 +4335,7 @@ fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
 end
 
 fun: loop_back { meta -> err }
-  again_meta_instr_adr { adr }
+  cont_meta_instr_adr { adr }
   here_write { out }
   adr out - asm_branch comp_instr \ b <beg>
 end
@@ -4351,11 +4351,11 @@ fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
   comp_barrier
   loop_frame_init
   comp_args_get 0 CONT_MASK_INP_LEN bit_mask_set CONT_MASK_HAS_INP or { meta }
-  here_write instr_off meta again_meta_instr_off_set xt' loop_end_xt
+  here_write instr_off meta cont_meta_instr_off_set xt' loop_end_xt
 end
 
 fun: leave_end_xt { -- err }
-  LOOP_AUX s> again_meta_instr_adr { adr }
+  LOOP_AUX s> cont_meta_instr_adr { adr }
   here_write adr - asm_branch adr !32
   LOOP_AUX s> execute
 end
@@ -4369,7 +4369,7 @@ fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_end_xt )
 
   len comp_args_set
   comp_barrier
-  reserve_instr 0 again_meta_instr_off_set LOOP_AUX >s
+  reserve_instr 0 cont_meta_instr_off_set LOOP_AUX >s
   xt' leave_end_xt LOOP_AUX >s
 end
 
@@ -4396,7 +4396,7 @@ fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
 
   out_len false meta control_try_cset_branch { meta fused }
   if fused =0 then
-    reserve_instr meta again_meta_instr_off_set { meta }
+    reserve_instr meta cont_meta_instr_off_set { meta }
   end
 
   meta LOOP_AUX >s

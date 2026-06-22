@@ -1052,7 +1052,7 @@ fun: test_again_countdown_manual { -- err }
 end
 test_again_countdown_manual
 
-fun: again_meta_loop_leave_top { val -- out }
+fun: cont_meta_loop_leave_top { val -- out }
   val
   loop
     inc
@@ -1060,7 +1060,7 @@ fun: again_meta_loop_leave_top { val -- out }
   end
 end
 
-fun: again_meta_loop_while_top { val -- out }
+fun: cont_meta_loop_while_top { val -- out }
   val
   loop
     inc
@@ -1069,7 +1069,7 @@ fun: again_meta_loop_while_top { val -- out }
   end
 end
 
-fun: again_meta_countdown_manual_top { val len -- out }
+fun: cont_meta_countdown_manual_top { val len -- out }
   loop
     dec: len
     len >=0 while
@@ -1078,19 +1078,19 @@ fun: again_meta_countdown_manual_top { val len -- out }
   val
 end
 
-fun: test_again_meta_loop_inputs { -- err }
-  assert= 10 again_meta_loop_leave_top 11 end
-  assert= 10 again_meta_loop_while_top 11 end
+fun: test_cont_meta_loop_inputs { -- err }
+  assert= 10 cont_meta_loop_leave_top 11 end
+  assert= 10 cont_meta_loop_while_top 11 end
 
-  assert= 10 3 again_meta_countdown_manual_top 13 end
+  assert= 10 3 cont_meta_countdown_manual_top 13 end
 end
-test_again_meta_loop_inputs
+test_cont_meta_loop_inputs
 
-fun: test_again_meta_loop_arity_bad { -- err } [ false try_all ]
-  use' ./fail/test_again_meta_loop_arity_bad.af
+fun: test_cont_meta_loop_arity_bad { -- err } [ false try_all ]
+  use' ./fail/test_cont_meta_loop_arity_bad.af
   " loop" assert_str_has
 end
-test_again_meta_loop_arity_bad
+test_cont_meta_loop_arity_bad
 
 123 var: VAR
 
@@ -2733,7 +2733,7 @@ fun: main_run { -- err }
   test_again_loop_basic
   test_again_loop
   test_again_countdown_manual
-  test_again_meta_loop_inputs
+  test_cont_meta_loop_inputs
   test_load_store
   test_negate
   test_equal
