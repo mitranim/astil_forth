@@ -35,3 +35,15 @@ Comptime uses interpreter-provided stack for control frames; it can be viewed wi
 ## Scripting
 
 You can run one-off Astil Forth scripts by passing `--eval=<script_content>` to the interpreter. Needs `lang.af` too; full form usually like this: `make run args='lang.af --eval="<script_content>"'`.
+
+## Code reuse
+
+Avoid blatant duplication.
+
+Reuse existing functions which cleanly fit the use case.
+
+Avoid creating non-reusable functions for just one new callsite.
+
+Dedup blatantly redundant logic via reusable functions; threshold: 3+ lines; 2+ callsites.
+
+When deleting callsites, fold non-reusable auxiliary functions into the last remaining callsite.
