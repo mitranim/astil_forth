@@ -27,8 +27,8 @@ static void print_help() {
     "Flags:\n"
     "\n"
 #ifndef CALL_CONV_STACK
-    "  --slop   -- disable checks of unused locals\n"
     "  --build  -- AOT-compile a Mach-O executable\n"
+    "  --slop   -- disable sloppy-code diagnostics\n"
 #endif // CALL_CONV_STACK
     "  --debug  -- extremely verbose debug logging\n"
     "  --trace  -- enable C stack traces on errors\n"

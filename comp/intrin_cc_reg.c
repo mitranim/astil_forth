@@ -147,6 +147,10 @@ static Err intrin_brace(Interp *interp) {
     return err_str("redundant assignment: there are no available arguments");
   }
 
+  if (!ctx->slop && !arg_max && discard && !loc_len) {
+    return err_str("redundant discard: there are no available arguments");
+  }
+
   if (discard >= 0) {
     while (loc_len) {
       loc_len--; // Doing this in condition check triggers UB traps.

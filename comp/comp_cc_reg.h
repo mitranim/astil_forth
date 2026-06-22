@@ -176,5 +176,5 @@ typedef struct {
   bool       compiling;  // Turned on by `:` and `]`, turned off by `[`.
   bool       has_alloca; // True if SP is dynamically adjusted in the body.
   bool       try_all;    // Auto-"try" when calling words with `.has_err`.
-  bool       slop;       // Disable validation of used/unused locals.
+  bool       slop;       // Disable rejection of sloppy code.
 } Comp_ctx;

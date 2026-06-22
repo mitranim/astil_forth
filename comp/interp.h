@@ -45,7 +45,7 @@ typedef struct {
   Comp        comp;      // Code and compilation context.
   Interp_snap snap;      // Stable snapshot for rewinding.
   bool        welcomed;  // Already printed REPL help.
-  bool        slop;      // Disable validation of used/unused locals in reg-CC.
+  bool        slop;      // Disable validation of sloppy code in reg-CC.
 } Interp;
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);
