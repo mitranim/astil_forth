@@ -31,3 +31,7 @@ In reg-CC, the most useful ones are: `dis'` for disassembly; `#debug_ctx` for co
 Avoid `debug_on` because it blows your mind with too much output.
 
 Comptime uses interpreter-provided stack for control frames; it can be viewed with `debug_stack` when debugging control flow structures or root-level operations.
+
+## Scripting
+
+You can run one-off Astil Forth scripts by passing `--eval=<script_content>` to the interpreter. Needs `lang.af` too; full form usually like this: `make run args='lang.af --eval="<script_content>"'`.
