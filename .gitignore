@@ -23,6 +23,7 @@
 !/scripts
 /scripts/*
 !/scripts/*.py
+!/scripts/*.md
 
 !/bench
 /bench/*

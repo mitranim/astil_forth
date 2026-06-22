@@ -133,78 +133,87 @@ test_params_push
 
 \ Stack operations are tested early because they're used by conditionals and
 \ loops, which makes testing kinda cyclic.
+fun: test_stack_len_bytes { stack -> len }
+  drop
+  stack Stack_top @ stack Stack_floor @ -
+end
+
+fun: test_stack_cap_bytes { stack -> len }
+  drop
+  stack Stack_ceil @ stack Stack_floor @ -
+end
+
+fun: test_stack_len_cells { stack -> len } drop stack test_stack_len_bytes /cells end
+fun: test_stack_cap_cells { stack -> len } drop stack test_stack_cap_bytes /cells end
+
 fun: test_stack_primitives { -- err }
   assert= size' Stack 40 end
 
   alloca' Stack { stk }
   stk size' Stack erase
 
-  assert= stk stack_len_cells 0 end
-  assert= stk stack_cap_cells 0 end
+  assert= stk test_stack_len_cells 0 end
+  assert= stk test_stack_cap_cells 0 end
 
   32 stk stack_init
 
-  assert= stk stack_len_cells 0 end
-  assert= stk stack_cap_cells 2048 end \ Adjusted to mem page size.
+  assert= stk test_stack_len_cells 0 end
+  assert= stk test_stack_cap_cells 2048 end \ Adjusted to mem page size.
 
   10 stk >s
-  assert= stk stack_len_cells 1 end
+  assert= stk test_stack_len_cells 1 end
   assert= stk s> 10 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
   20 stk >s
   30 stk >s
-  assert= stk stack_len_cells 2 end
-  assert= 0 CELL - stk stack_rel@ 30 end
-  assert= 0 CELL - CELL - stk stack_rel@ 20 end
+  assert= stk test_stack_len_cells 2 end
+  assert= stk Stack_top @ -cell @ 30 end
+  assert= stk Stack_top @ -cell -cell @ 20 end
   assert= stk s> 30 end
-  assert= stk stack_len_cells 1 end
+  assert= stk test_stack_len_cells 1 end
   assert= stk s> 20 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
   stk stack_deinit
 end
 test_stack_primitives
 
-fun: test_to_stack_variadic { -- err }
+fun: test_to_stack_sequence { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
-  10 stk >>s
-  assert= stk stack_len_cells 1 end
+  10 stk >s
+  assert= stk test_stack_len_cells 1 end
   assert= stk s> 10 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
-  666 stk >>s
-  assert= stk stack_len_cells 1 end
+  666 stk >s
+  assert= stk test_stack_len_cells 1 end
   assert= stk s> 666 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
-  assert= stk stack_len_cells 0 end
-  stk >>s
-  assert= stk stack_len_cells 0 end
-
-  20 30 stk >>s
-  assert= stk stack_len_cells 2 end
+  20 stk >s 30 stk >s
+  assert= stk test_stack_len_cells 2 end
   assert= stk s> 30 end
-  assert= stk stack_len_cells 1 end
+  assert= stk test_stack_len_cells 1 end
   assert= stk s> 20 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
-  40 50 60 stk >>s
-  assert= stk stack_len_cells 3 end
+  40 stk >s 50 stk >s 60 stk >s
+  assert= stk test_stack_len_cells 3 end
   assert= stk s> 60 end
-  assert= stk stack_len_cells 2 end
+  assert= stk test_stack_len_cells 2 end
   assert= stk s> 50 end
-  assert= stk stack_len_cells 1 end
+  assert= stk test_stack_len_cells 1 end
   assert= stk s> 40 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
   stk stack_deinit
 end
-test_to_stack_variadic
+test_to_stack_sequence
 
 fun: test_reg_cc_stack_words { -- err }
   assert= 10 20 drop 10 end
@@ -227,27 +236,27 @@ fun: test_stack_braces { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
   stk stack{ }
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
-  10 stk >>s
-  assert= stk stack_len_cells 1 end
+  10 stk >s
+  assert= stk test_stack_len_cells 1 end
   stk stack{ one }
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
   assert= one 10 end
 
-  10 20 stk >>s
-  assert= stk stack_len_cells 2 end
+  10 stk >s 20 stk >s
+  assert= stk test_stack_len_cells 2 end
   stk stack{ one two }
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
   assert= one 10 end
   assert= two 20 end
 
-  10 20 30 stk >>s
-  assert= stk stack_len_cells 3 end
+  10 stk >s 20 stk >s 30 stk >s
+  assert= stk test_stack_len_cells 3 end
   stk stack{ one two three }
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
   assert= one 10 end
   assert= two 20 end
   assert= three 30 end
@@ -1639,12 +1648,13 @@ fun: test_comptime_arg_stack_mod_scratch { -- err }
 end
 test_comptime_arg_stack_mod_scratch
 
-fun: test_comptime_arg_stack_to_stack_9 { -- err }
+fun: test_stack_push_9 { -- err }
   alloca' Stack { stk }
   32 stk stack_init
 
-  0 1 2 3 4 5 6 7 8 stk >>s
-  assert= stk stack_len_cells 9 end
+  0 stk >s 1 stk >s 2 stk >s 3 stk >s 4 stk >s
+  5 stk >s 6 stk >s 7 stk >s 8 stk >s
+  assert= stk test_stack_len_cells 9 end
   assert= stk s> 8 end
   assert= stk s> 7 end
   assert= stk s> 6 end
@@ -1654,11 +1664,11 @@ fun: test_comptime_arg_stack_to_stack_9 { -- err }
   assert= stk s> 2 end
   assert= stk s> 1 end
   assert= stk s> 0 end
-  assert= stk stack_len_cells 0 end
+  assert= stk test_stack_len_cells 0 end
 
   stk stack_deinit
 end
-test_comptime_arg_stack_to_stack_9
+test_stack_push_9
 
 fun: fallback_high_regs_fun { keep one two -- keep out } keep one two fallback end
 
@@ -2606,31 +2616,31 @@ fun: test_arena_alloc { -- err }
   alloca' Arena { arn }
   arn arena_init
 
-  assert= arn stack_len_bytes 0 end
+  assert= arn test_stack_len_bytes 0 end
   assert= arn Arena_low @ nil end
 
   1 arn arena_alloc { adr0 }
   arn Arena_low @ { page0 }
 
-  assert= page0 stack_cap_bytes ARENA_PAGE_MIN end
-  assert= page0 stack_len_bytes 1 end
-  assert= arn   stack_len_bytes size' Stack end
+  assert= page0 test_stack_cap_bytes ARENA_PAGE_MIN end
+  assert= page0 test_stack_len_bytes 1 end
+  assert= arn   test_stack_len_bytes size' Stack end
 
   7 arn arena_alloc { adr1 }
 
   assert= arn Arena_low @ page0 end
   assert= adr1 adr0 - FUND_ALIGN end
-  assert= page0 stack_len_bytes FUND_ALIGN 7 + end
-  assert= arn stack_len_bytes size' Stack end
+  assert= page0 test_stack_len_bytes FUND_ALIGN 7 + end
+  assert= arn test_stack_len_bytes size' Stack end
 
   ARENA_PAGE_MIN arn arena_alloc { adr2 }
   arn Arena_low @ { page1 }
 
   assert<> page1 page0 end
-  assert= page1 stack_cap_bytes ARENA_PAGE_MIN end
-  assert= page1 stack_len_bytes ARENA_PAGE_MIN end
+  assert= page1 test_stack_cap_bytes ARENA_PAGE_MIN end
+  assert= page1 test_stack_len_bytes ARENA_PAGE_MIN end
   assert= adr2 page1 Stack_floor @ end
-  assert= arn stack_len_bytes size' Stack 2 * end
+  assert= arn test_stack_len_bytes size' Stack 2 * end
 
   arn arena_deinit
 end
@@ -2647,22 +2657,22 @@ fun: test_arena_trunc { -- err }
   ARENA_PAGE_MIN arn arena_alloc { _adr1 }
   arn Arena_low @ { page1 }
 
-  assert= arn stack_len_bytes size' Stack 2 * end
-  assert= page0 stack_len_bytes 7 end
-  assert= page1 stack_len_bytes ARENA_PAGE_MIN end
+  assert= arn test_stack_len_bytes size' Stack 2 * end
+  assert= page0 test_stack_len_bytes 7 end
+  assert= page1 test_stack_len_bytes ARENA_PAGE_MIN end
 
   arn arena_trunc
 
-  assert= arn stack_len_bytes size' Stack 2 * end
+  assert= arn test_stack_len_bytes size' Stack 2 * end
   assert= arn Arena_low @ page0 end
-  assert= page0 stack_len_bytes 0 end
-  assert= page1 stack_len_bytes 0 end
+  assert= page0 test_stack_len_bytes 0 end
+  assert= page1 test_stack_len_bytes 0 end
 
   11 arn arena_alloc { adr2 }
 
   assert= adr2 floor0 end
   assert= arn Arena_low @ page0 end
-  assert= arn stack_len_bytes size' Stack 2 * end
+  assert= arn test_stack_len_bytes size' Stack 2 * end
 
   arn arena_deinit
 end
@@ -2677,7 +2687,7 @@ fun: test_arena_deinit { -- err }
 
   arn arena_deinit
 
-  assert= arn stack_len_bytes 0 end
+  assert= arn test_stack_len_bytes 0 end
   assert= arn Arena_low @ nil end
 
   adr1 catch' test_arena_unprot { err }
@@ -2718,7 +2728,7 @@ fun: main_run { -- err }
   test_test
   test_locals
   test_stack_primitives
-  test_to_stack_variadic
+  test_to_stack_sequence
   test_reg_cc_stack_words
   test_stack_braces
   test_conditionals
@@ -2770,7 +2780,7 @@ fun: main_run { -- err }
   test_comptime_arg_stack_sum16
   test_comptime_arg_stack_swap16
   test_comptime_arg_stack_mod_scratch
-  test_comptime_arg_stack_to_stack_9
+  test_stack_push_9
   test_fallback
   \ test_vargs_printf
   \ test_logf

@@ -83,7 +83,10 @@ fun_comp: compile'' { -- err } 2 compile_next end
 
 fun: semicolon { -- err } execute'' ; end
 
-fun: let_init { str len val -- err } ( C: "name" -- ) ( E: -- val )
+\ Similar to standard `constant`.
+fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
+  read_word { str len }
+
   \ Execution-time semantics.
   str len define_fun
     0 1 0 comp_signature_set ( -- val )
@@ -96,11 +99,6 @@ fun: let_init { str len val -- err } ( C: "name" -- ) ( E: -- val )
     0 1 1 comp_signature_set ( -- err )
     val comp_push compile' comp_push
   semicolon
-end
-
-\ Similar to standard `constant`.
-fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
-  read_word val let_init
   [ 0 comp_only ]
 end
 
@@ -740,13 +738,10 @@ fun: comp_args2_regs { -- reg0 reg1 err }
   reg0 reg1
 end
 
-fun: comp_args1_reg2 { -- out0 out1 src err }
-  1 nil comp_args_min
-  comp_args_get dec { src }
-  src inc { out1 }
-  src  comp_realloc_reg
-  out1 comp_realloc_reg
-  src out1 src
+fun: comp_args2_arith_reg { op -- err }
+  comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 asm_pattern_arith_reg op or comp_instr \ <op> Xd, Xn, Xm
+  reg1 comp_args_set
 end
 
 fun: comp_args2_regs2 { -- reg0 reg1 err }
@@ -757,43 +752,23 @@ end
 
 \ ## Arithmetic continued
 
-fun_comp: or { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_orr_reg comp_instr \ orr Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: or { -- err } ASM_OP_ORR_REG comp_args2_arith_reg end
 
 fun: or { i0 i1 -> i2 } [ redefine ] or end
 
-fun_comp: and { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_and_reg comp_instr \ and Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: and { -- err } ASM_OP_AND_REG comp_args2_arith_reg end
 
 fun: and { i0 i1 -> i2 } [ redefine ] and end
 
-fun_comp: xor { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_eor_reg comp_instr \ eor Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: xor { -- err } ASM_OP_EOR_REG comp_args2_arith_reg end
 
 fun: xor { i0 i1 -> i2 } [ redefine ] xor end
 
-fun_comp: lsl { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_lsl_reg comp_instr \ lsl Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: lsl { -- err } ASM_OP_LSL_REG comp_args2_arith_reg end
 
 fun: lsl { i0 bits -> i1 } [ redefine ] lsl end
 
-fun_comp: lsr { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_lsr_reg comp_instr \ lsr Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: lsr { -- err } ASM_OP_LSR_REG comp_args2_arith_reg end
 
 fun: lsr { i0 bits -> i1 } [ redefine ] lsr end
 
@@ -817,51 +792,27 @@ end
 
 fun: dec { i0 -> i1 } [ redefine ] dec end
 
-fun_comp: + { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_add_reg comp_instr \ add Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: + { -- err } ASM_OP_ADD_REG comp_args2_arith_reg end
 
 fun: + { i0 i1 -> i2 } [ redefine ] + end
 
-fun_comp: - { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_sub_reg comp_instr \ sub Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: - { -- err } ASM_OP_SUB_REG comp_args2_arith_reg end
 
 fun: - { i0 i1 -> i2 } [ redefine ] - end
 
-fun_comp: * { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_mul comp_instr \ mul Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: * { -- err } ASM_OP_MUL_REG comp_args2_arith_reg end
 
 fun: * { i0 i1 -> i2 } * end
 
-fun_comp: / { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_sdiv comp_instr \ sdiv Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: / { -- err } ASM_OP_SDIV_REG comp_args2_arith_reg end
 
 fun: / { i0 i1 -> i2 } / end
 
-fun_comp: u/ { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_udiv comp_instr \ udiv Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: u/ { -- err } ASM_OP_UDIV_REG comp_args2_arith_reg end
 
 fun: u/ { i0 i1 -> i2 } u/ end
 
-fun_comp: asr { -- err }
-  comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 asm_asr_reg comp_instr \ asr Xd, Xn, Xm
-  reg1 comp_args_set
-end
+fun_comp: asr { -- err } ASM_OP_ASR_REG comp_args2_arith_reg end
 
 fun: asr { i0 bits -> i1 } [ redefine ] asr end
 
@@ -969,15 +920,11 @@ end
 \ Chooses a non-zero value, preferring the second input.
 fun: fallback { one two -> out } fallback end
 
-fun: comp_emit_is_aligned_to_reg { out adr size -- err }
-  size size 1 asm_sub_imm comp_instr \ sub Xd, Xn, 1
-  size adr    asm_tst     comp_instr \ tst Xn, Xm
-  out ASM_EQ  asm_cset    comp_instr \ cset Xd, eq
-end
-
 fun_comp: is_aligned_to { -- err }
   comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 comp_emit_is_aligned_to_reg
+  reg1 reg1 1 asm_sub_imm comp_instr \ sub Xd, Xn, 1
+  reg1 reg0   asm_tst     comp_instr \ tst Xn, Xm
+  reg0 ASM_EQ asm_cset    comp_instr \ cset Xd, eq
   reg1 comp_args_set
 end
 
@@ -1386,8 +1333,12 @@ end
 0b11      store: !culong
 
 fun_comp: @2 { -- err }
-  comp_args1_reg2 { val0 val1 adr }
-  val0 val1 adr 0 asm_load_pair_off comp_instr \ ldp Xt1, Xt2, [Xn]
+  1 nil comp_args_min
+  comp_args_get dec { adr }
+  adr inc { val1 }
+  adr  comp_realloc_reg
+  val1 comp_realloc_reg
+  adr val1 adr 0 asm_load_pair_off comp_instr \ ldp Xt1, Xt2, [Xn]
   val1 inc comp_args_set
 end
 
@@ -1499,17 +1450,8 @@ end
 
 fun: STACK { -- adr } STACK end
 
-fun: comp_load_off { off -- err } ( E: adr -- adr )
-  0 comp_realloc_reg
-  0 0 off asm_load_unscaled_off comp_instr \ ldur x0, [x0, <off>]
-  1 comp_args_set
-end
-
 \ Note: `stack_top` is the top EMPTY cell, not a full one.
-fun: stack?      { stack -> bool  } @ <>0 end
-fun: stack_floor { stack -> floor } [ STACK_OFF_FLOOR comp_load_off ] end
-fun: stack_top   { stack -> top   } [ STACK_OFF_TOP   comp_load_off ] end
-fun: stack_ceil  { stack -> ceil  } [ STACK_OFF_CEIL  comp_load_off ] end
+fun: stack? { stack -> bool  } @ <>0 end
 
 \ ldur <out>, [<stack>, STACK_OFF_TOP]
 fun: asm_stack_top_load { out stack -> instr }
@@ -1521,75 +1463,38 @@ fun: asm_stack_top_store { out stack -> instr }
   STACK_OFF_TOP asm_store_unscaled_off
 end
 
-fun: stack@ { stack -> val } stack_top -cell @ end
-
-fun: stack_rel@ { ind stack -- val } stack stack_top ind + @ end
-
-fun: stack_top! { _top _stack } [
-  0 comp_realloc_reg
-  \ stur <top>, [<stack>, STACK_OFF_TOP]
-  0 1 asm_stack_top_store comp_instr
-  0 comp_args_set
-] end
-
-fun: stack_cell_at { ind stack  -- adr }
-  ind cells { off } stack stack_floor off +
-end
-
-fun: stack_len_bytes { stack -> len }
-  stack_floor { floor }
-  stack stack_top floor -
-end
-
-fun: stack_cap_bytes { stack -> len }
-  stack_floor { floor }
-  stack stack_ceil floor -
-end
-
-fun: stack_len_cells { stack -> len } stack_len_bytes /cells end
-fun: stack_cap_cells { stack -> len } stack_cap_bytes /cells end
-
-fun: stack_trunc { stack -> } stack_floor stack stack_top! end
-
-fun: stack_len_cells_set { len stack -> } stack_cell_at stack stack_top! end
-
-fun: stack_len_cells+ { diff stack }
-  stack stack_len_cells diff + stack stack_len_cells_set
-end
-
-fun: stack_len_cells- { diff stack }
-  stack stack_len_cells diff - stack stack_len_cells_set
-end
-
-fun: stack_drop_cell { stack } 1 stack stack_len_cells- end
-
 \ Pops a cell from a stack. Usage:
 \
 \   stack s> { val }
 \
 \ Mind the backwards order:
 \
-\   10 20 30 stack >>s
+\   10 stack >s 20 stack >s 30 stack >s
 \   stack s> . \ 30
 \   stack s> . \ 20
 \   stack s> . \ 10
 \
 \ Also see `stack{` which is more convenient and less error-prone.
-fun: s> { stack -> val }
-  stack_top -cell { top }
-  top stack stack_top!
-  top @
-end
+fun: s> { _stack -> val } [
+  0 comp_realloc_reg
+  1 comp_realloc_reg
+  1 0 asm_mov_reg comp_instr             \ mov x1, x0
+  0 1 asm_stack_top_load comp_instr      \ ldur x0, [x1, STACK_OFF_TOP]
+  0 0 CELL asm_sub_imm comp_instr        \ sub x0, x0, CELL
+  0 1 asm_stack_top_store comp_instr     \ stur x0, [x1, STACK_OFF_TOP]
+  0 0 0 asm_load_off comp_instr          \ ldr x0, [x0]
+  1 comp_args_set
+] end
 
 \ Pushes a cell to a stack.
-\
-\ Also see `:: >>s` defined later in this file.
-\ Unlike this version, it's variadic.
-fun: >s { val stack }
-  stack stack_top { top }
-  val top !
-  top +cell stack stack_top!
-end
+fun: >s { _val _stack } [
+  2 comp_realloc_reg
+  2 1 asm_stack_top_load comp_instr      \ ldur x2, [x1, STACK_OFF_TOP]
+  0 2 0 asm_store_off comp_instr         \ str x0, [x2]
+  2 2 CELL asm_add_imm comp_instr        \ add x2, x2, CELL
+  2 1 asm_stack_top_store comp_instr     \ stur x2, [x1, STACK_OFF_TOP]
+  0 comp_args_set
+] end
 
 \ ## System stack stuff
 
@@ -1636,15 +1541,11 @@ fun: init_data_word { name name_len adr -- err }
   [ false comp_only ]
 end
 
-fun: var_init { str len val -- err }
-  nil CELL alloc_data { adr }
-  val adr !
-  str len adr init_data_word
-end
-
 \ Similar to standard `variable`, but takes an initial value like `let:`.
 fun: var: { val -- err } ( C: "name" -- ) ( E: -- ptr )
-  read_word val var_init
+  nil CELL alloc_data { adr }
+  val adr !
+  read_word adr init_data_word
 end
 
 \ Shortcut for the standard idiom `create <name> N allot`.
@@ -2566,8 +2467,6 @@ struct: Sym
   U8         1 field: Sym_interp_only
 end
 
-fun: sym_name { XT -> str } Sym_name Sym_word_buf end
-
 \ SYNC[sym_fields].
 fun_comp: sym_instr { -- err } ( E: XT -- instr )
   execute'' Sym_union execute'' @
@@ -2766,12 +2665,8 @@ end
 \ This requires keeping definitions in sync, but gives us an automatic
 \ ABI without the need for an API.
 
-fun: comp_ctx { -- Interp_comp_ctx* }
-  interp Interp_comp_field Interp_comp_ctx_field
-end
-
 fun: comp_arg { reg -- Interp_comp_arg* err }
-  comp_ctx Interp_comp_ctx_args { args }
+  interp Interp_comp_field Interp_comp_ctx_field Interp_comp_ctx_args { args }
   Interp_comp_arg sizeof reg * args +
 end
 
@@ -3054,7 +2949,7 @@ fun: cf_fold2_reject { lhs bad0 msg0 bad1 msg1 -- reg imm0 imm1 ok err }
   true
 end
 
-\ Fits the unsigned immediate accepted by our `add/sub #imm12` helpers.
+\ Fits the unsigned immediate accepted by our `add/sub #imm12` utils.
 fun: cf_addsub_imm12_mag { imm -- mag ok }
   if imm >=0 then imm imm ASM_MAX_IMM12 <= ret end
   if imm ASM_MAX_IMM12 negate >= then imm negate true ret end
@@ -3849,16 +3744,17 @@ fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_GE comp_loc_mut_cset_zero
 end
 
+fun: cf_cmp_fold2_or_execute { fallback rhs_cond lhs_cond -- err }
+  true rhs_cond lhs_cond
+  instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  if cf_fold2 then ret end
+  fallback execute
+end
+
 fun_comp: = { -- err } [ redefine ]
   if cf_fold_cleared2
   then = cf_fold_done
-  else
-    { -- }
-    true ASM_EQ ASM_EQ
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' =
-  end
+  else { -- } xt'' = ASM_EQ ASM_EQ cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local for equality in place: `rhs =: some_val`.
@@ -3870,13 +3766,7 @@ end
 fun_comp: <> { -- err } [ redefine ]
   if cf_fold_cleared2
   then <> cf_fold_done
-  else
-    { -- }
-    true ASM_NE ASM_NE
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' <>
-  end
+  else { -- } xt'' <> ASM_NE ASM_NE cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local for inequality in place: `rhs <>: some_val`.
@@ -3888,13 +3778,7 @@ end
 fun_comp: > { -- err } [ redefine ]
   if cf_fold_cleared2
   then > cf_fold_done
-  else
-    { -- }
-    true ASM_GT ASM_LT
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' >
-  end
+  else { -- } xt'' > ASM_GT ASM_LT cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local greater-than in place: `rhs >: some_val`.
@@ -3906,13 +3790,7 @@ end
 fun_comp: < { -- err } [ redefine ]
   if cf_fold_cleared2
   then < cf_fold_done
-  else
-    { -- }
-    true ASM_LT ASM_GT
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' <
-  end
+  else { -- } xt'' < ASM_LT ASM_GT cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local less-than in place: `rhs <: some_val`.
@@ -3924,13 +3802,7 @@ end
 fun_comp: <= { -- err } [ redefine ]
   if cf_fold_cleared2
   then <= cf_fold_done
-  else
-    { -- }
-    true ASM_LE ASM_GE
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' <=
-  end
+  else { -- } xt'' <= ASM_LE ASM_GE cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local less/equal in place: `rhs <=: some_val`.
@@ -3942,13 +3814,7 @@ end
 fun_comp: >= { -- err } [ redefine ]
   if cf_fold_cleared2
   then >= cf_fold_done
-  else
-    { -- }
-    true ASM_GE ASM_LE
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' >=
-  end
+  else { -- } xt'' >= ASM_GE ASM_LE cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local greater/equal in place: `rhs >=: some_val`.
@@ -3960,13 +3826,7 @@ end
 fun_comp: u> { -- err } [ redefine ]
   if cf_fold_cleared2
   then u> cf_fold_done
-  else
-    { -- }
-    true ASM_HI ASM_LO
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' u>
-  end
+  else { -- } xt'' u> ASM_HI ASM_LO cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local unsigned greater-than in place: `rhs u>: some_val`.
@@ -3978,13 +3838,7 @@ end
 fun_comp: u< { -- err } [ redefine ]
   if cf_fold_cleared2
   then u< cf_fold_done
-  else
-    { -- }
-    true ASM_LO ASM_HI
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' u<
-  end
+  else { -- } xt'' u< ASM_LO ASM_HI cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local unsigned less-than in place: `rhs u<: some_val`.
@@ -3996,13 +3850,7 @@ end
 fun_comp: u<= { -- err } [ redefine ]
   if cf_fold_cleared2
   then u<= cf_fold_done
-  else
-    { -- }
-    true ASM_LS ASM_HS
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' u<=
-  end
+  else { -- } xt'' u<= ASM_LS ASM_HS cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local unsigned less/equal in place: `rhs u<=: some_val`.
@@ -4014,13 +3862,7 @@ end
 fun_comp: u>= { -- err } [ redefine ]
   if cf_fold_cleared2
   then u>= cf_fold_done
-  else
-    { -- }
-    true ASM_HS ASM_LS
-    instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-    if cf_fold2 then ret end
-    execute'' u>=
-  end
+  else { -- } xt'' u>= ASM_HS ASM_LS cf_cmp_fold2_or_execute end
 end
 
 \ Compare a local unsigned greater/equal in place: `rhs u>=: some_val`.
@@ -4236,7 +4078,10 @@ fun_comp: drop { -- err }
   comp_args_get dec comp_args_set
 end
 
-fun: drop { -- err } STACK stack_drop_cell end
+fun: drop { -- err }
+  STACK { stack }
+  stack Stack_top @ -cell stack Stack_top !
+end
 
 fun_comp: swap { -- err }
   2 " for `swap`" comp_args_min
@@ -4252,13 +4097,13 @@ fun_comp: swap { -- err }
   reg0 comp_arg          { arg0 }
   reg1 comp_arg          { arg1 }
   Interp_comp_arg sizeof { size }
-  STACK stack_top        { top }
+  STACK Stack_top @ { top }
   top  arg0 size memcpy
   arg0 arg1 size memcpy
   arg1 top  size memcpy
 end
 
-fun: swap { -- err } STACK stack_top -cell -cell { top } top @2 swap top !2 end
+fun: swap { -- err } STACK Stack_top @ -cell -cell { top } top @2 swap top !2 end
 
 \ ## More memory stuff
 
@@ -4341,7 +4186,7 @@ fun: stack_deinit { stack -- err }
   nil stack STACK_OFF_CEIL  + !
 end
 
-fun: stack_trunc { stack } [ redefine ] if stack then stack stack_trunc end end
+fun: stack_trunc { stack } if stack then stack Stack_floor @ stack Stack_top ! end end
 
 fun: stack_repr { stack }
   ifz stack then " [debug] stack is nil" elog elf ret end
@@ -4404,7 +4249,8 @@ end
 fun: loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
   ifz frame then " missing loop frame" throw end
-  frame STACK stack_cell_at
+  frame cells { off }
+  STACK Stack_floor @ off +
 end
 
 fun: loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
@@ -4417,7 +4263,7 @@ fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
   \ Stash prev loop info; record where caller's `meta` will land.
   LOOP_IND @            STACK >s
   xt' loop_frame_end_xt STACK >s
-  STACK stack_len_cells LOOP_IND !
+  STACK Stack_top @ STACK Stack_floor @ - /cells LOOP_IND !
 
   \ Terminator for `loop_frame_end_xt`.
   xt' nop LOOP_AUX >s
@@ -4817,63 +4663,9 @@ end
 
 \ ## Stack manipulation continued
 
-\ ldur <top>, [<stk>, STACK_OFF_TOP]
-\ ...
-\   str  <arg>, [<top>], 8
-\   str  <arg>, [<top>], 8
-\   str  <arg>, [<top>], 8
-\ ...
-\ stur <top>, [<stk>, STACK_OFF_TOP]
-\
-\ Should usually be followed with `0 comp_args_set`.
-fun: comp_args_to_stack { len stk_reg top_reg -- err } ( E: …args… -- )
-  ifz len then ret end
-
-  top_reg stk_reg asm_stack_top_load comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
-
-  0 { arg_reg }
-  loop
-    arg_reg len < while
-    arg_reg top_reg 8 asm_store_post comp_instr \ str <arg>, [<top>], 8
-    inc: arg_reg
-  end
-
-  top_reg stk_reg asm_stack_top_store comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
-end
-
-\ Variadic alternative to `>s`:
-\
-\   10 20 30 some_stack >>s
-\
-\ TODO drop: too error-prone.
-fun_comp: >>s { -- err } ( E: …args… stack -- )
-  comp_args_get { arg_len }
-
-  ifz arg_len then
-    " unable to use `>>s`: at least 1 argument is required (stack address)"
-    throw
-  end
-
-  arg_len dec { len }
-  ifz len then 0 comp_args_set ret end
-
-  nil 0 comp_local { stk }
-  stk comp_pop_into_local
-
-  if arg_len ASM_ARG_LEN_MAX >= then
-    " unable to use `>>s`: not enough scratch registers" throw
-  end
-
-  stk comp_push_from_local
-  comp_args_get dec { stk_reg }
-  comp_alloc_next_reg { top_reg }
-  len stk_reg top_reg comp_args_to_stack
-  0 comp_args_set
-end
-
 \ Variadic assignment of locals from the stack:
 \
-\   10 20 30 some_stack >>s
+\   10 some_stack >s 20 some_stack >s 30 some_stack >s
 \   some_stack stack{ ten twenty thirty }
 fun_comp: stack{ { -- err } ( E: stack -- )
   comp_args_get { len }
@@ -4926,7 +4718,8 @@ fun: log_cell { num } " %zd 0x%zx" num num logf end
 fun: .        { num -> } log_cell lf end
 
 fun: stack_log_cells { stack -> }
-  stack_len_cells { len }
+  drop
+  stack Stack_top @ stack Stack_floor @ - /cells { len }
 
   ifz len then
     " stack is empty" log lf
@@ -4944,7 +4737,7 @@ fun: stack_log_cells { stack -> }
   loop
     ind len < while
     space space
-    ind stack stack_cell_at @ log_cell
+    stack Stack_floor @ ind cells + @ log_cell
     "  <%zd>" ind logf
     lf
     inc: ind
@@ -5057,9 +4850,9 @@ end
 
 \ This would be a 1-liner without signature checks and error messages.
 fun: indirect_to { decl xt_to -- err }
-  decl Indir_decl_inp @b { decl_inp }
-  xt_to Sym_inp_len     @b { sym_inp }
-  xt_to sym_name           { name }
+  decl Indir_decl_inp @b      { decl_inp }
+  xt_to Sym_inp_len   @b      { sym_inp }
+  xt_to Sym_name Sym_word_buf { name }
 
   if decl_inp sym_inp <> then
     " unable to indirect to `%s`: input count: %zd <> %zd"
@@ -5067,7 +4860,7 @@ fun: indirect_to { decl xt_to -- err }
   end
 
   decl Indir_decl_out @b { decl_out }
-  xt_to Sym_out_len     @b { sym_out }
+  xt_to Sym_out_len   @b { sym_out }
 
   if decl_out sym_out <> then
     " unable to indirect to `%s`: output count: %zd <> %zd"
