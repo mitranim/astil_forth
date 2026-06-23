@@ -215,14 +215,6 @@ fun: - { i0 i1 -> i2 } [
   0b1_1_0_01011_00_0_00001_000000_00000_00000 comp_out0 \ sub x0, x0, x1
 ] end
 
-fun: mod { i0 i1 -> i2 } [
-  0 comp_realloc_reg
-  2 comp_realloc_reg
-  0b1_0_0_11010110_00001_00001_1_00000_00010 comp_instr \ sdiv x2, x0, x1
-  0b1_00_11011_000_00001_1_00000_00010_00000 comp_instr \ msub x0, x2, x1, x0
-  1 comp_args_set
-] end
-
 fun: low_bits   { len     -- bits } 1 len lsl dec end
 fun: bits_trunc { imm len -- imm  } len low_bits imm and end
 
@@ -828,7 +820,7 @@ fun_comp: mod { -- err }
   reg1 comp_args_set
 end
 
-fun: mod { i0 i1 -> i2 } [ redefine ] mod end
+fun: mod { i0 i1 -> i2 } mod end
 
 fun_comp: umod { -- err }
   comp_args2_regs { reg0 reg1 }
