@@ -5,11 +5,9 @@ use' lang_s.af
 8192      let: LEN
 LEN cells mem: LIST
 
-fun: list_ceil { list len -- ceil } len cells list + end
+fun: list_ceil ( list len -- ceil ) cells + end
 
-fun: pseudo_random { seed -- val }
-  seed 1309 * 13849 + 65535 and
-end
+fun: pseudo_random { seed -- val } seed 1309 * 13849 + 65535 and end
 
 fun: list_init { list len -- }
   74755 { seed }
@@ -31,7 +29,7 @@ fun: list_dump { list len -- }
 end
 
 fun: list_verify { list len -- }
-  list len list_ceil -cell
+  len cells list + -cell
   list
   CELL
   +loop: ptr

@@ -5,15 +5,12 @@ use' lang.af
 8192      let: LEN
 LEN cells mem: LIST
 
-fun: list_ceil { list len -- adr } len cells list + end
+fun: list_ceil { list len -> adr } cells + end
 
-fun: pseudo_random { seed -- val }
-  seed 1309 * 13849 + 65535 and
-end
+fun: pseudo_random { seed -- val } seed 1309 * 13849 + 65535 and end
 
 fun: list_init { list len }
   74755 { seed }
-
   list len list_ceil { ceil }
   list { ptr }
   loop
@@ -36,7 +33,7 @@ fun: list_dump { list len }
 end
 
 fun: list_verify { list len -- err }
-  list len list_ceil -cell { ceil }
+  len cells list + -cell { ceil }
   list { ptr }
   loop
     ptr ceil < while
@@ -53,10 +50,7 @@ fun: bubble { list len }
     list { ptr }
     loop
       ptr ceil_ptr < while
-      if ptr @2 > then
-        ptr @2 { one two }
-        two one ptr !2
-      end
+      if ptr @2 > then ptr @2 swap ptr !2 end
       +cell: ptr
     end
   end
