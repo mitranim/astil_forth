@@ -146,7 +146,7 @@ static void buf_reserve(Buf *buf, Ind more) {
   assert_fatal(cap >= goal);
 
   const auto dat = realloc(buf->dat, cap);
-  assert_fatal(dat);
+  if (!dat) abort_traced();
 
   buf->dat = dat;
   buf->cap = cap;
