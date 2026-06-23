@@ -1141,6 +1141,26 @@ fun: test_load_store { -- err }
 end
 test_load_store
 
+fun: test_load_store_pair_swap_fun { one two ptr } one two ptr !swap end
+
+fun: test_load_store_pair_swap { -- err }
+  CELL 2 * alloca { ptr }
+  123 234 ptr !swap
+  ptr @2 { one two }
+  assert= one 234 end
+  assert= two 123 end
+end
+test_load_store_pair_swap
+
+fun: test_load_store_pair_swap_instr { -- err }
+  1 0 2 0 asm_store_pair_off { instr }
+  assert=
+    xt' test_load_store_pair_swap_fun instr test_word_instr_count
+    1
+  end
+end
+test_load_store_pair_swap_instr
+
 fun: test_asm_csel_order { -- err }
   assert=
     0 1 2 ASM_PL asm_csel
@@ -2784,6 +2804,7 @@ fun: main_run { -- err }
   test_again_countdown_manual
   test_cont_meta_loop_inputs
   test_load_store
+  test_load_store_pair_swap
   test_negate
   test_equal
   test_not_equal

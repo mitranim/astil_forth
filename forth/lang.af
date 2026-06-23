@@ -1359,6 +1359,16 @@ end
 
 fun: !2 { val0 val1 adr -> } !2 end
 
+fun_comp: !swap { -- err }
+  comp_args_get dec { adr }
+  adr dec { val1 }
+  val1 dec { val0 }
+  val1 val0 adr 0 asm_store_pair_off comp_instr \ stp Xt2, Xt1, [Xn]
+  val0 comp_args_set
+end
+
+fun: !swap { val0 val1 adr -> } !swap end
+
 fun_comp: @at { -- err }
   comp_args_get dec { off }
   off dec { adr }

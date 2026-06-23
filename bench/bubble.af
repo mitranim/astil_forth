@@ -50,7 +50,7 @@ fun: bubble { list len }
     list { ptr }
     loop
       ptr ceil_ptr < while
-      if ptr @2 > then ptr @2 swap ptr !2 end
+      if ptr @2 > then ptr @2 ptr !swap end
       +cell: ptr
     end
   end
