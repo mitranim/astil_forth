@@ -5,10 +5,10 @@ use' ../simd.af
 true try_all
 
 fun: test_simd_asm { -- err }
-  assert= 0 0   asm_ld1_16b 0b01001100010_00000_011100_00000_00000 end \ ld1  {v0.16b}, [x0]
+  assert= 0 0 asm_ld1_16b 0b01001100010_00000_011100_00000_00000 end \ ld1 {v0.16b}, [x0]
   assert= 1 123 asm_movi_16b 0b01001111000_00011_111001_11011_00001 end \ movi v1.16b, #123
   assert=
-    4     asm_movi_2d_zero
+    4 asm_movi_2d_zero
     0b0_11_01111_00_0_00000_111001_00000_00100
   end \ movi v4.2d, #0
   assert=
@@ -18,38 +18,38 @@ fun: test_simd_asm { -- err }
   assert=
     2 2 3 asm_orr_16b
     0b0_10_01110_10_1_00011_000111_00010_00010
-  end \ orr  v2.16b, v2.16b, v3.16b
+  end \ orr v2.16b, v2.16b, v3.16b
   assert=
     2 2 1 asm_and_16b
     0b0_10_01110_00_1_00001_000111_00010_00010
-  end \ and  v2.16b, v2.16b, v1.16b
+  end \ and v2.16b, v2.16b, v1.16b
   assert=
-    2 2   asm_addv_16b
+    2 2 asm_addv_16b
     0b0_1_0_01110_00_11000_11011_10_00010_00010
   end \ addv b2, v2.16b
   assert=
-    2 2   asm_uaddlp_8h
+    2 2 asm_uaddlp_8h
     0b0_11_01110_00_1_00000_001010_00010_00010
   end \ uaddlp v2.8h, v2.16b
   assert=
-    2 2   asm_uaddlp_4s
+    2 2 asm_uaddlp_4s
     0b0_11_01110_01_1_00000_001010_00010_00010
   end \ uaddlp v2.4s, v2.8h
   assert=
-    2 2   asm_uaddlp_2d
+    2 2 asm_uaddlp_2d
     0b0_11_01110_10_1_00000_001010_00010_00010
   end \ uaddlp v2.2d, v2.4s
-  assert= 4 4 2 asm_add_2d 0b0_10_01110_11_1_00010_100001_00100_00100 end \ add  v4.2d, v4.2d, v2.2d
+  assert= 4 4 2 asm_add_2d 0b0_10_01110_11_1_00010_100001_00100_00100 end \ add v4.2d, v4.2d, v2.2d
   assert=
     4 4 4 asm_addp_2d
     0b0_10_01110_11_1_00100_101111_00100_00100
   end \ addp v4.2d, v4.2d, v4.2d
   assert=
-    3 2   asm_umov_b0
+    3 2 asm_umov_b0
     0b0_0_0_01110_000_00001_001111_00010_00011
   end \ umov w3, v2.b[0]
   assert=
-    0 4   asm_umov_d0
+    0 4 asm_umov_d0
     0b0_10_01110_00_0_01000_001111_00100_00000
   end \ umov x0, v4.d[0]
   assert=

@@ -1,35 +1,35 @@
 use' ../lang_s.af
 use' ../testing_s.af
 
-T{       <T>       }T
-T{ 10    <T> 10    }T
+T{ <T> }T
+T{ 10 <T> 10 }T
 T{ 10 20 <T> 10 20 }T
 
 fun: test_conditionals
-  T{ if  false then 10 end                                                 <T>    }T
-  T{ if  true  then 10 end                                                 <T> 10 }T
-  T{ if  false then 10 else 20 end                                         <T> 20 }T
-  T{ if  true  then 10 else 20 end                                         <T> 10 }T
-  T{ ifz false then 10 end                                                 <T> 10 }T
-  T{ ifz true  then 10 end                                                 <T>    }T
-  T{ ifz false then 10 else 20 end                                         <T> 10 }T
-  T{ ifz true  then 10 else 20 end                                         <T> 20 }T
-  T{ if  true  then 10 elif  true  then 20 end                             <T> 10 }T
-  T{ if  false then 10 elif  true  then 20 end                             <T> 20 }T
-  T{ if  false then 10 elif  true  then 20 else 30 end                     <T> 20 }T
-  T{ if  false then 10 elif  false then 20 else 30 end                     <T> 30 }T
-  T{ if  true  then 10 elif  true  then 20 elif  true  then 30 end         <T> 10 }T
-  T{ if  false then 10 elif  true  then 20 elif  false then 30 end         <T> 20 }T
-  T{ if  false then 10 elif  false then 20 elif  true  then 30 end         <T> 30 }T
-  T{ if  false then 10 elif  false then 20 elif  false then 30 end         <T>    }T
-  T{ if  true  then 10 elif  true  then 20 elif  true  then 30 else 40 end <T> 10 }T
-  T{ if  false then 10 elif  true  then 20 elif  false then 30 else 40 end <T> 20 }T
-  T{ if  false then 10 elif  false then 20 elif  true  then 30 else 40 end <T> 30 }T
-  T{ if  false then 10 elif  false then 20 elif  false then 30 else 40 end <T> 40 }T
+  T{ if false then 10 end <T> }T
+  T{ if true then 10 end <T> 10 }T
+  T{ if false then 10 else 20 end <T> 20 }T
+  T{ if true then 10 else 20 end <T> 10 }T
+  T{ ifz false then 10 end <T> 10 }T
+  T{ ifz true then 10 end <T> }T
+  T{ ifz false then 10 else 20 end <T> 10 }T
+  T{ ifz true then 10 else 20 end <T> 20 }T
+  T{ if true then 10 elif true then 20 end <T> 10 }T
+  T{ if false then 10 elif true then 20 end <T> 20 }T
+  T{ if false then 10 elif true then 20 else 30 end <T> 20 }T
+  T{ if false then 10 elif false then 20 else 30 end <T> 30 }T
+  T{ if true then 10 elif true then 20 elif true then 30 end <T> 10 }T
+  T{ if false then 10 elif true then 20 elif false then 30 end <T> 20 }T
+  T{ if false then 10 elif false then 20 elif true then 30 end <T> 30 }T
+  T{ if false then 10 elif false then 20 elif false then 30 end <T> }T
+  T{ if true then 10 elif true then 20 elif true then 30 else 40 end <T> 10 }T
+  T{ if false then 10 elif true then 20 elif false then 30 else 40 end <T> 20 }T
+  T{ if false then 10 elif false then 20 elif true then 30 else 40 end <T> 30 }T
+  T{ if false then 10 elif false then 20 elif false then 30 else 40 end <T> 40 }T
   T{ ifz false then 10 elifz false then 20 elifz false then 30 else 40 end <T> 10 }T
-  T{ ifz true  then 10 elifz false then 20 elifz false then 30 else 40 end <T> 20 }T
-  T{ ifz true  then 10 elifz true  then 20 elifz false then 30 else 40 end <T> 30 }T
-  T{ ifz true  then 10 elifz true  then 20 elifz true  then 30 else 40 end <T> 40 }T
+  T{ ifz true then 10 elifz false then 20 elifz false then 30 else 40 end <T> 20 }T
+  T{ ifz true then 10 elifz true then 20 elifz false then 30 else 40 end <T> 30 }T
+  T{ ifz true then 10 elifz true then 20 elifz true then 30 else 40 end <T> 40 }T
 end
 test_conditionals
 
@@ -47,8 +47,8 @@ fun: recur_throw_callee ( val -- val )
 end
 
 fun: test_recur_throw
-  T{ 2 catch' recur_throw_callee         <T> 100 nil }T
-  T{ 4 catch' recur_throw_callee { err } <T>         }T
+  T{ 2 catch' recur_throw_callee <T> 100 nil }T
+  T{ 4 catch' recur_throw_callee { err } <T> }T
   err " recur_err_stack" T_str_eq
 end
 test_recur_throw
@@ -65,13 +65,13 @@ fun: test_sleep_loop loop " sleeping" log lf 1 sleep end end
 \ test_sleep_loop
 
 fun: test_loop_leave
-  T{ loop    leave                      end <T>    }T
-  T{ loop 10 leave                      end <T> 10 }T
-  T{ loop 10 leave                      end <T> 10 }T
-  T{ loop 10 leave    leave             end <T> 10 }T
-  T{ loop 10 leave    leave    leave    end <T> 10 }T
-  T{ loop 10 leave 20 leave    leave    end <T> 10 }T
-  T{ loop 10 leave 20 leave 30 leave    end <T> 10 }T
+  T{ loop leave end <T> }T
+  T{ loop 10 leave end <T> 10 }T
+  T{ loop 10 leave end <T> 10 }T
+  T{ loop 10 leave leave end <T> 10 }T
+  T{ loop 10 leave leave leave end <T> 10 }T
+  T{ loop 10 leave 20 leave leave end <T> 10 }T
+  T{ loop 10 leave 20 leave 30 leave end <T> 10 }T
   T{ loop 10 leave 20 leave 30 leave 40 end <T> 10 }T
 end
 test_loop_leave
@@ -93,10 +93,10 @@ end
 test_loop_nested
 
 fun: test_loop_while
-  T{ loop    false while 10             end <T>       }T
-  T{ loop 10 false while 20             end <T> 10    }T
-  T{ loop 10 false while 20 true  while end <T> 10    }T
-  T{ loop 10 true  while 20 false while end <T> 10 20 }T
+  T{ loop false while 10 end <T> }T
+  T{ loop 10 false while 20 end <T> 10 }T
+  T{ loop 10 false while 20 true while end <T> 10 }T
+  T{ loop 10 true while 20 false while end <T> 10 20 }T
 
   T{
     11
@@ -135,22 +135,22 @@ end
 test_loop_while
 
 fun: test_loop_while_leave
-  T{ loop    false while 10 leave    end <T>       }T
-  T{ loop    true  while 10 leave    end <T> 10    }T
-  T{ loop 10 false while 20 leave    end <T> 10    }T
-  T{ loop 10 true  while 20 leave    end <T> 10 20 }T
-  T{ loop 10 true  while    leave 20 end <T> 10    }T
-  T{ loop leave 10 true while 20     end <T>       }T
+  T{ loop false while 10 leave end <T> }T
+  T{ loop true while 10 leave end <T> 10 }T
+  T{ loop 10 false while 20 leave end <T> 10 }T
+  T{ loop 10 true while 20 leave end <T> 10 20 }T
+  T{ loop 10 true while leave 20 end <T> 10 }T
+  T{ loop leave 10 true while 20 end <T> }T
 end
 test_loop_while_leave
 
 fun: test_loop_for
-  T{ -12 for          end <T>             }T
-  T{ -1  for          end <T>             }T
-  T{ 0   for          end <T>             }T
-  T{ 4   for 10       end <T> 10 10 10 10 }T
-  T{ 4   for 10 leave end <T> 10          }T
-  T{ 4   for leave 10 end <T>             }T
+  T{ -12 for end <T> }T
+  T{ -1 for end <T> }T
+  T{ 0 for end <T> }T
+  T{ 4 for 10 end <T> 10 10 10 10 }T
+  T{ 4 for 10 leave end <T> 10 }T
+  T{ 4 for leave 10 end <T> }T
 
   T{
     0
@@ -199,11 +199,11 @@ end
 test_loop_for
 
 fun: test_loop_for_countdown
-  T{ -12 -for: ind ind       end <T>                           }T
-  T{ -1  -for: ind ind       end <T>                           }T
-  T{ 0   -for: ind ind       end <T>                           }T
-  T{ 12  -for: ind ind       end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
-  T{ 12  -for: ind ind leave end <T> 11                        }T
+  T{ -12 -for: ind ind end <T> }T
+  T{ -1 -for: ind ind end <T> }T
+  T{ 0 -for: ind ind end <T> }T
+  T{ 12 -for: ind ind end <T> 11 10 9 8 7 6 5 4 3 2 1 0 }T
+  T{ 12 -for: ind ind leave end <T> 11 }T
 
   T{
     12 -for: ind
@@ -246,15 +246,15 @@ end
 test_loop_for_countdown
 
 fun: test_loop_for_countup
-  T{ 12 -1  +for: ind ind       end <T> -1 0 1 2 3 4 5 6 7 8 9 10 11 }T
-  T{ 12 0   +for: ind ind       end <T>    0 1 2 3 4 5 6 7 8 9 10 11 }T
-  T{ 12 1   +for: ind ind       end <T>      1 2 3 4 5 6 7 8 9 10 11 }T
-  T{ 12 -1  +for: ind ind leave end <T> -1                           }T
-  T{ 12 0   +for: ind ind leave end <T> 0                            }T
-  T{ 12 1   +for: ind ind leave end <T> 1                            }T
+  T{ 12 -1 +for: ind ind end <T> -1 0 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 0 +for: ind ind end <T> 0 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 1 +for: ind ind end <T> 1 2 3 4 5 6 7 8 9 10 11 }T
+  T{ 12 -1 +for: ind ind leave end <T> -1 }T
+  T{ 12 0 +for: ind ind leave end <T> 0 }T
+  T{ 12 1 +for: ind ind leave end <T> 1 }T
 
   T{ 12 1 +for: ind true while ind leave end <T> 1 }T
-  T{ 12 1 +for: ind leave true while ind end <T>   }T
+  T{ 12 1 +for: ind leave true while ind end <T> }T
 
   T{
     12 0 +for: ind
@@ -298,10 +298,10 @@ test_loop_for_countup
 
 fun: test_loop_countup
   T{ 8 0 1 +loop: ind ind end ind <T> 0 1 2 3 4 5 6 7 8 }T
-  T{ 8 0 2 +loop: ind ind end ind <T> 0 2 4 6         8 }T
-  T{ 8 0 3 +loop: ind ind end ind <T> 0 3 6           9 }T
-  T{ 8 0 4 +loop: ind ind end ind <T> 0 4             8 }T
-  T{ 8 0 5 +loop: ind ind end ind <T> 0 5            10 }T
+  T{ 8 0 2 +loop: ind ind end ind <T> 0 2 4 6 8 }T
+  T{ 8 0 3 +loop: ind ind end ind <T> 0 3 6 9 }T
+  T{ 8 0 4 +loop: ind ind end ind <T> 0 4 8 }T
+  T{ 8 0 5 +loop: ind ind end ind <T> 0 5 10 }T
 end
 test_loop_countup
 
@@ -328,8 +328,8 @@ test_loop_countup_nested
 
 fun: test_loop_countdown
   T{ 8 0 1 -loop: ind ind end <T> 7 6 5 4 3 2 1 0 }T
-  T{ 8 0 2 -loop: ind ind end <T> 6 4 2 0         }T
-  T{ 8 0 3 -loop: ind ind end <T> 5 2             }T
+  T{ 8 0 2 -loop: ind ind end <T> 6 4 2 0 }T
+  T{ 8 0 3 -loop: ind ind end <T> 5 2 }T
 end
 test_loop_countdown
 
@@ -368,75 +368,75 @@ fun: test_sc 10 20 30 stack_len .sc end
 
 \ Used internally by testing utils. The test is kinda cyclic.
 123 var: VAR
-T{ VAR @     <T> 123 }T
-T{ 234 VAR ! <T>     }T
-T{ VAR @     <T> 234 }T
-T{ 345 VAR ! <T>     }T
-T{ VAR @     <T> 345 }T
+T{ VAR @ <T> 123 }T
+T{ 234 VAR ! <T> }T
+T{ VAR @ <T> 234 }T
+T{ 345 VAR ! <T> }T
+T{ VAR @ <T> 345 }T
 
-T{ 0    negate <T> 0    }T
-T{ 123  negate <T> -123 }T
-T{ -123 negate <T> 123  }T
+T{ 0 negate <T> 0 }T
+T{ 123 negate <T> -123 }T
+T{ -123 negate <T> 123 }T
 
 \ `=` is used by the testing tools, so this test is almost meaningless.
-T{  0    0   = <T> 1 }T
-T{  0    123 = <T> 0 }T
-T{  123  0   = <T> 0 }T
-T{ -123  0   = <T> 0 }T
-T{ -123  123 = <T> 0 }T
-T{  123 -123 = <T> 0 }T
+T{ 0 0 = <T> 1 }T
+T{ 0 123 = <T> 0 }T
+T{ 123 0 = <T> 0 }T
+T{ -123 0 = <T> 0 }T
+T{ -123 123 = <T> 0 }T
+T{ 123 -123 = <T> 0 }T
 T{ -123 -123 = <T> 1 }T
-T{  123  123 = <T> 1 }T
+T{ 123 123 = <T> 1 }T
 
-T{  0    0   <> <T> 0 }T
-T{  0    123 <> <T> 1 }T
-T{  123  0   <> <T> 1 }T
-T{ -123  0   <> <T> 1 }T
-T{ -123  123 <> <T> 1 }T
-T{  123 -123 <> <T> 1 }T
+T{ 0 0 <> <T> 0 }T
+T{ 0 123 <> <T> 1 }T
+T{ 123 0 <> <T> 1 }T
+T{ -123 0 <> <T> 1 }T
+T{ -123 123 <> <T> 1 }T
+T{ 123 -123 <> <T> 1 }T
 T{ -123 -123 <> <T> 0 }T
-T{  123  123 <> <T> 0 }T
+T{ 123 123 <> <T> 0 }T
 
-T{  0    0   > <T> 0 }T
-T{  0    123 > <T> 0 }T
-T{  123  0   > <T> 1 }T
-T{ -123  0   > <T> 0 }T
-T{ -123  123 > <T> 0 }T
-T{  123 -123 > <T> 1 }T
+T{ 0 0 > <T> 0 }T
+T{ 0 123 > <T> 0 }T
+T{ 123 0 > <T> 1 }T
+T{ -123 0 > <T> 0 }T
+T{ -123 123 > <T> 0 }T
+T{ 123 -123 > <T> 1 }T
 T{ -123 -123 > <T> 0 }T
-T{  123  123 > <T> 0 }T
+T{ 123 123 > <T> 0 }T
 
-T{  0    0   < <T> 0 }T
-T{  0    123 < <T> 1 }T
-T{  123  0   < <T> 0 }T
-T{ -123  0   < <T> 1 }T
-T{ -123  123 < <T> 1 }T
-T{  123 -123 < <T> 0 }T
+T{ 0 0 < <T> 0 }T
+T{ 0 123 < <T> 1 }T
+T{ 123 0 < <T> 0 }T
+T{ -123 0 < <T> 1 }T
+T{ -123 123 < <T> 1 }T
+T{ 123 -123 < <T> 0 }T
 T{ -123 -123 < <T> 0 }T
-T{  123  123 < <T> 0 }T
+T{ 123 123 < <T> 0 }T
 
-T{  0    0    <= <T> 1 }T
-T{  0    123  <= <T> 1 }T
-T{  123  0    <= <T> 0 }T
-T{ -123  0    <= <T> 1 }T
-T{ -123  123  <= <T> 1 }T
-T{  123 -123  <= <T> 0 }T
-T{ -123 -123  <= <T> 1 }T
-T{  123  123  <= <T> 1 }T
+T{ 0 0 <= <T> 1 }T
+T{ 0 123 <= <T> 1 }T
+T{ 123 0 <= <T> 0 }T
+T{ -123 0 <= <T> 1 }T
+T{ -123 123 <= <T> 1 }T
+T{ 123 -123 <= <T> 0 }T
+T{ -123 -123 <= <T> 1 }T
+T{ 123 123 <= <T> 1 }T
 
-T{  0    0    >= <T> 1 }T
-T{  0    123  >= <T> 0 }T
-T{  123  0    >= <T> 1 }T
-T{ -123  0    >= <T> 0 }T
-T{ -123  123  >= <T> 0 }T
-T{  123 -123  >= <T> 1 }T
-T{ -123 -123  >= <T> 1 }T
-T{  123  123  >= <T> 1 }T
+T{ 0 0 >= <T> 1 }T
+T{ 0 123 >= <T> 0 }T
+T{ 123 0 >= <T> 1 }T
+T{ -123 0 >= <T> 0 }T
+T{ -123 123 >= <T> 0 }T
+T{ 123 -123 >= <T> 1 }T
+T{ -123 -123 >= <T> 1 }T
+T{ 123 123 >= <T> 1 }T
 
-T{ 234 123 - <T> 111   }T
-T{ 234 123 + <T> 357   }T
+T{ 234 123 - <T> 111 }T
+T{ 234 123 + <T> 357 }T
 T{ 234 123 * <T> 28782 }T
-T{ 234 123 / <T> 1     }T
+T{ 234 123 / <T> 1 }T
 
 T{ 12 1 mod <T> 0 }T
 T{ 12 2 mod <T> 0 }T
@@ -449,55 +449,55 @@ T{ 12 8 mod <T> 4 }T
 T{ 12 9 mod <T> 3 }T
 
 T{ 12 1 /mod <T> 0 12 }T
-T{ 12 2 /mod <T> 0 6  }T
-T{ 12 3 /mod <T> 0 4  }T
-T{ 12 4 /mod <T> 0 3  }T
-T{ 12 5 /mod <T> 2 2  }T
-T{ 12 6 /mod <T> 0 2  }T
-T{ 12 7 /mod <T> 5 1  }T
-T{ 12 8 /mod <T> 4 1  }T
-T{ 12 9 /mod <T> 3 1  }T
+T{ 12 2 /mod <T> 0 6 }T
+T{ 12 3 /mod <T> 0 4 }T
+T{ 12 4 /mod <T> 0 3 }T
+T{ 12 5 /mod <T> 2 2 }T
+T{ 12 6 /mod <T> 0 2 }T
+T{ 12 7 /mod <T> 5 1 }T
+T{ 12 8 /mod <T> 4 1 }T
+T{ 12 9 /mod <T> 3 1 }T
 
-T{    0 abs <T>   0 }T
+T{ 0 abs <T> 0 }T
 T{ -123 abs <T> 123 }T
-T{  123 abs <T> 123 }T
+T{ 123 abs <T> 123 }T
 
-T{  123  234 min <T>  123 }T
-T{  234  123 min <T>  123 }T
-T{  0    123 min <T>  0   }T
-T{  123  0   min <T>  0   }T
-T{  0   -123 min <T> -123 }T
-T{ -123  0   min <T> -123 }T
-T{ -123  234 min <T> -123 }T
-T{  234 -123 min <T> -123 }T
+T{ 123 234 min <T> 123 }T
+T{ 234 123 min <T> 123 }T
+T{ 0 123 min <T> 0 }T
+T{ 123 0 min <T> 0 }T
+T{ 0 -123 min <T> -123 }T
+T{ -123 0 min <T> -123 }T
+T{ -123 234 min <T> -123 }T
+T{ 234 -123 min <T> -123 }T
 
-T{  123  234 max <T>  234 }T
-T{  234  123 max <T>  234 }T
-T{  0    123 max <T>  123 }T
-T{  123  0   max <T>  123 }T
-T{  0   -123 max <T>  0   }T
-T{ -123  0   max <T>  0   }T
-T{ -123  234 max <T>  234 }T
-T{  234 -123 max <T>  234 }T
+T{ 123 234 max <T> 234 }T
+T{ 234 123 max <T> 234 }T
+T{ 0 123 max <T> 123 }T
+T{ 123 0 max <T> 123 }T
+T{ 0 -123 max <T> 0 }T
+T{ -123 0 max <T> 0 }T
+T{ -123 234 max <T> 234 }T
+T{ 234 -123 max <T> 234 }T
 
 T{ 10 20 30 swap_over <T> 20 10 30 }T
 
-T{ 123 0 ?dup <T> 123     }T
+T{ 123 0 ?dup <T> 123 }T
 T{ 234 1 ?dup <T> 234 234 }T
 
-T{ nil           nil    cstr= <T> true  }T
-T{ nil           " one" cstr= <T> false }T
-T{ " one"        nil    cstr= <T> false }T
+T{ nil nil cstr= <T> true }T
+T{ nil " one" cstr= <T> false }T
+T{ " one" nil cstr= <T> false }T
 T{ " one" strdup " two" cstr= <T> false }T
 T{ " two" strdup " one" cstr= <T> false }T
-T{ " one" strdup " one" cstr= <T> true  }T
+T{ " one" strdup " one" cstr= <T> true }T
 
 T{ s" one" s" two" str= <T> false }T
 
-T{ nil           nil    cstr< <T> false }T
-T{ nil           " one" cstr< <T> true  }T
-T{ " one"        nil    cstr< <T> false }T
-T{ " one" strdup " two" cstr< <T> true  }T
+T{ nil nil cstr< <T> false }T
+T{ nil " one" cstr< <T> true }T
+T{ " one" nil cstr< <T> false }T
+T{ " one" strdup " two" cstr< <T> true }T
 T{ " two" strdup " one" cstr< <T> false }T
 T{ " one" strdup " one" cstr< <T> false }T
 
@@ -542,17 +542,17 @@ end
 \ test_errf_throw
 
 fun: test_to
-  T{ 10 to: one <T>       }T
-  T{ one        <T> 10    }T
-  T{ one one    <T> 10 10 }T
-  T{ 20 to: one <T>       }T
-  T{ one        <T> 20    }T
-  T{ one one    <T> 20 20 }T
-  T{ 30 to: two <T>       }T
-  T{ two        <T> 30    }T
-  T{ one        <T> 20    }T
-  T{ one two    <T> 20 30 }T
-  T{ two one    <T> 30 20 }T
+  T{ 10 to: one <T> }T
+  T{ one <T> 10 }T
+  T{ one one <T> 10 10 }T
+  T{ 20 to: one <T> }T
+  T{ one <T> 20 }T
+  T{ one one <T> 20 20 }T
+  T{ 30 to: two <T> }T
+  T{ two <T> 30 }T
+  T{ one <T> 20 }T
+  T{ one two <T> 20 30 }T
+  T{ two one <T> 30 20 }T
 end
 test_to
 
@@ -566,43 +566,43 @@ end
 test_empty_comment
 
 fun: test_locals
-  T{          { }                                     <T>          }T
-  T{          { -- }                                  <T>          }T
-  T{ 10       { }                                     <T> 10       }T
-  T{ 10 20    { }                                     <T> 10 20    }T
-  T{ 10       { }                  20                 <T> 10 20    }T
-  T{          { }                  10 20              <T> 10 20    }T
-  T{ 10       { one }                                 <T>          }T
-  T{ 10       { one }              one                <T> 10       }T
-  T{ 10       { one }              one one            <T> 10 10    }T
-  T{ 10       { one -- }           one one            <T> 10 10    }T
-  T{ 10       { -- one }                              <T> 10       }T
-  T{ 10 20    { one }                                 <T> 10       }T
-  T{ 10 20    { one }              one                <T> 10 20    }T
-  T{ 10 20    { one }              one one            <T> 10 20 20 }T
-  T{ 10 20    { one -- }           one one            <T> 10 20 20 }T
-  T{ 10 20    { one two }                             <T>          }T
-  T{ 10 20    { one two -- }                          <T>          }T
-  T{ 10 20    { one two }          one                <T> 10       }T
-  T{ 10 20    { one two }          two                <T> 20       }T
-  T{ 10 20    { one two }          one two            <T> 10 20    }T
-  T{ 10 20    { one two }          two one            <T> 20 10    }T
-  T{ 10 20    { one two }          two one one        <T> 20 10 10 }T
-  T{ 10 20    { one two }          two one two        <T> 20 10 20 }T
-  T{ 10 20    { one two }          one two one        <T> 10 20 10 }T
-  T{ 10 20    { one two }          one one two        <T> 10 10 20 }T
-  T{ 10 20    { one two -- }       one one two        <T> 10 10 20 }T
-  T{ 10 20    { one --     }       one one            <T> 10 20 20 }T
-  T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
-  T{ 10 20    { one -- two }       one one            <T> 10 20 20 }T
-  T{ 10 20    { -- one two }                          <T> 10 20    }T
-  T{ 10 20 30 { one two three }    one two three      <T> 10 20 30 }T
-  T{ 10 20 30 { one two three }    three one two      <T> 30 10 20 }T
-  T{ 10 20 30 { one two three }    two three one      <T> 20 30 10 }T
-  T{ 10 20 30 { -- one two three }                    <T> 10 20 30 }T
-  T{ 10 20    { one two } one two { one two } one two <T> 10 20    }T
-  T{ 10 20    { one two } 30 40   { one two } one two <T> 30 40    }T
-  T{ 10 20    { one two } 30 40   { two one } one two <T> 40 30    }T
+  T{ { } <T> }T
+  T{ { -- } <T> }T
+  T{ 10 { } <T> 10 }T
+  T{ 10 20 { } <T> 10 20 }T
+  T{ 10 { } 20 <T> 10 20 }T
+  T{ { } 10 20 <T> 10 20 }T
+  T{ 10 { one } <T> }T
+  T{ 10 { one } one <T> 10 }T
+  T{ 10 { one } one one <T> 10 10 }T
+  T{ 10 { one -- } one one <T> 10 10 }T
+  T{ 10 { -- one } <T> 10 }T
+  T{ 10 20 { one } <T> 10 }T
+  T{ 10 20 { one } one <T> 10 20 }T
+  T{ 10 20 { one } one one <T> 10 20 20 }T
+  T{ 10 20 { one -- } one one <T> 10 20 20 }T
+  T{ 10 20 { one two } <T> }T
+  T{ 10 20 { one two -- } <T> }T
+  T{ 10 20 { one two } one <T> 10 }T
+  T{ 10 20 { one two } two <T> 20 }T
+  T{ 10 20 { one two } one two <T> 10 20 }T
+  T{ 10 20 { one two } two one <T> 20 10 }T
+  T{ 10 20 { one two } two one one <T> 20 10 10 }T
+  T{ 10 20 { one two } two one two <T> 20 10 20 }T
+  T{ 10 20 { one two } one two one <T> 10 20 10 }T
+  T{ 10 20 { one two } one one two <T> 10 10 20 }T
+  T{ 10 20 { one two -- } one one two <T> 10 10 20 }T
+  T{ 10 20 { one -- } one one <T> 10 20 20 }T
+  T{ 10 20 { one -- two } one one <T> 10 20 20 }T
+  T{ 10 20 { one -- two } one one <T> 10 20 20 }T
+  T{ 10 20 { -- one two } <T> 10 20 }T
+  T{ 10 20 30 { one two three } one two three <T> 10 20 30 }T
+  T{ 10 20 30 { one two three } three one two <T> 30 10 20 }T
+  T{ 10 20 30 { one two three } two three one <T> 20 30 10 }T
+  T{ 10 20 30 { -- one two three } <T> 10 20 30 }T
+  T{ 10 20 { one two } one two { one two } one two <T> 10 20 }T
+  T{ 10 20 { one two } 30 40 { one two } one two <T> 30 40 }T
+  T{ 10 20 { one two } 30 40 { two one } one two <T> 40 30 }T
 end
 test_locals
 
@@ -610,27 +610,27 @@ fun: test_local_ref
   ref: val0 ref: val1 ref: val2 { adr0 adr1 adr2 }
   sysstack_frame_ptr { FP }
 
-  T{ FP   <T> sysstack_frame_ptr }T
-  T{ adr0 <T> FP 16 +            }T
-  T{ adr1 <T> FP 24 +            }T
-  T{ adr2 <T> FP 32 +            }T
+  T{ FP <T> sysstack_frame_ptr }T
+  T{ adr0 <T> FP 16 + }T
+  T{ adr1 <T> FP 24 + }T
+  T{ adr2 <T> FP 32 + }T
 
   12 23 34 { val0 val1 val2 }
-  T{ val0   val1   val2   <T> 12 23 34 }T
+  T{ val0 val1 val2 <T> 12 23 34 }T
   T{ adr0 @ adr1 @ adr2 @ <T> 12 23 34 }T
 
   -34 -23 -12 { val0 val1 val2 }
-  T{ val0   val1   val2   <T> -34 -23 -12 }T
+  T{ val0 val1 val2 <T> -34 -23 -12 }T
   T{ adr0 @ adr1 @ adr2 @ <T> -34 -23 -12 }T
 
   21 adr0 ! 32 adr1 ! 43 adr2 !
-  T{ val0   val1   val2   <T> 21 32 43 }T
+  T{ val0 val1 val2 <T> 21 32 43 }T
   T{ adr0 @ adr1 @ adr2 @ <T> 21 32 43 }T
 end
 test_local_ref
 
 fun: test_catch_invalid
-  \ catch'  nop \ Must fail to compile: `nop` doesn't throw.
+  \ catch' nop \ Must fail to compile: `nop` doesn't throw.
   \ catch'' nop \ Must fail to compile: `nop` not in `WORDLIST_COMP`.
 end
 
@@ -642,9 +642,9 @@ fun: test_catch_0_val
 end
 
 fun: test_catch_0
-  T{ test_catch_0_val          <T> 123     }T
-  T{ catch' test_catch_0_val   <T> 123 nil }T
-  T{ catch' test_throw { err } <T>         }T
+  T{ test_catch_0_val <T> 123 }T
+  T{ catch' test_catch_0_val <T> 123 nil }T
+  T{ catch' test_throw { err } <T> }T
   err " test_err" T_str_eq
 end
 test_catch_0
@@ -656,9 +656,9 @@ fun: test_catch_1_cond ( one -- two )
 end
 
 fun: test_catch_1
-  T{ 123 test_catch_1_cond                <T> 246     }T
-  T{ 123 catch' test_catch_1_cond         <T> 246 nil }T
-  T{ 0   catch' test_catch_1_cond { err } <T>         }T
+  T{ 123 test_catch_1_cond <T> 246 }T
+  T{ 123 catch' test_catch_1_cond <T> 246 nil }T
+  T{ 0 catch' test_catch_1_cond { err } <T> }T
   err " test_err" T_str_eq
 end
 test_catch_1
@@ -670,13 +670,13 @@ fun: test_catch_2_cond ( one two -- three four )
 end
 
 fun: test_catch_2
-  T{ 11 22 test_catch_2_cond                <T> 242 242     }T
-  T{ 11 22 catch' test_catch_2_cond         <T> 242 242 nil }T
+  T{ 11 22 test_catch_2_cond <T> 242 242 }T
+  T{ 11 22 catch' test_catch_2_cond <T> 242 242 nil }T
 
-  T{ 0  22 catch' test_catch_2_cond { err } <T> }T
+  T{ 0 22 catch' test_catch_2_cond { err } <T> }T
   err " test_err" T_str_eq
 
-  T{ 11 0  catch' test_catch_2_cond { err } <T> }T
+  T{ 11 0 catch' test_catch_2_cond { err } <T> }T
   err " test_err" T_str_eq
 end
 test_catch_2
