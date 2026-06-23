@@ -1,0 +1,2 @@
+\ Must fail to compile: `[ redefine ]` needs previous definition.
+fun: test_redefine_redundant_marker_word { -- out } [ redefine ] 1 end

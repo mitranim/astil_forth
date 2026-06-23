@@ -138,6 +138,50 @@ static Err interp_wordlist(Interp *interp, Wordlist val, Sym_dict **out) {
   }
 }
 
+static Err interp_validate_redefinition(
+  Interp *interp, const char *name, Wordlist wordlist, bool redefining
+) {
+  const auto module = interp->module;
+  if (module ? module->slop : interp->slop) return nullptr;
+
+  Sym_dict *dict;
+  try(interp_wordlist(interp, wordlist, &dict));
+
+  const auto had = dict_has(dict, name);
+  if (had == redefining) return nullptr;
+
+  const auto read = interp_reader_const(interp);
+  if (read && read->tty) {
+    if (had) {
+      eprintf(
+        "[system] redefined word " FMT_QUOTED " in wordlist %d (%s)\n",
+        name,
+        wordlist,
+        wordlist_name(wordlist)
+      );
+    }
+    return nullptr;
+  }
+
+  if (had) {
+    return errf(
+      "word " FMT_QUOTED
+      " already defined in wordlist %d (%s); hint: use `[ redefine ]` to replace it",
+      name,
+      wordlist,
+      wordlist_name(wordlist)
+    );
+  }
+
+  return errf(
+    "redundant `redefine` marker in word " FMT_QUOTED
+    " which is not previously defined in wordlist %d (%s)",
+    name,
+    wordlist,
+    wordlist_name(wordlist)
+  );
+}
+
 static Err read_interp_num(Interp *interp) {
   Sint num;
   try(read_num(interp_reader(interp), &num));
@@ -660,6 +704,8 @@ static Err interp_extern_fun(
   const auto wordlist = WORDLIST_EXEC;
   Word_str   word;
   try(valid_word(name, (Ind)strlen(name), &word));
+  const auto redef = interp->comp.ctx.redefining;
+  try(interp_validate_redefinition(interp, word.buf, wordlist, redef));
 
   const auto sym = stack_push(
     &interp->syms,
@@ -675,21 +721,11 @@ static Err interp_extern_fun(
   );
 
   const auto dict = &interp->dict_exec;
-  const auto had  = dict_has(dict, sym->name.buf);
   const auto comp = &interp->comp;
   const auto syms = &comp->code.externs;
 
   dict_set(dict, sym->name.buf, sym);
   comp_register_dysym(syms, sym->name.buf, (U64)ext_adr);
-
-  if (had && !interp->comp.ctx.redefining) {
-    eprintf(
-      "[system] redefined word " FMT_QUOTED " in wordlist %d (%s) (as extern)\n",
-      sym->name.buf,
-      wordlist,
-      wordlist_name(wordlist)
-    );
-  }
 
   return nullptr;
 }

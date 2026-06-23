@@ -94,14 +94,7 @@ static Err intrin_semicolon(Interp *interp) {
   Sym_dict *dict;
   try(interp_wordlist(interp, wordlist, &dict));
 
-  if (dict_has(dict, name) && !redef) {
-    eprintf(
-      "[system] redefined word " FMT_QUOTED " in wordlist %d (%s)\n",
-      name,
-      wordlist,
-      wordlist_name(wordlist)
-    );
-  }
+  try(interp_validate_redefinition(interp, name, wordlist, redef));
   dict_set(dict, name, sym);
 
   IF_DEBUG({
@@ -203,7 +196,9 @@ static Err intrin_inline(Interp *interp) {
 }
 
 static Err intrin_redefine(Interp *interp) {
-  try(interp_require_current_sym(interp, nullptr));
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  try(interp_validate_redefinition(interp, sym->name.buf, sym->wordlist, true));
   interp->comp.ctx.redefining = true;
   return nullptr;
 }

@@ -2499,6 +2499,20 @@ fun: test_max_output_regs_with_err { -- err } [ redefine ]
 end
 test_max_output_regs_with_err
 
+fun: test_redefine_missing_marker { -- err } [ false try_all ]
+  use' ./fail/test_redefine_missing_marker.af
+  " hint: use `[ redefine ]` to replace it"
+  assert_str_has
+end
+test_redefine_missing_marker
+
+fun: test_redefine_redundant_marker { -- err } [ false try_all ]
+  use' ./fail/test_redefine_redundant_marker.af
+  " redundant `redefine` marker"
+  assert_str_has
+end
+test_redefine_redundant_marker
+
 fun: test_file_throw_import_catch { -- err } [ false try_all ]
   use' ./fail/test_root_throw.af
   " test_err" assert_str_has
@@ -2851,6 +2865,8 @@ fun: main_run { -- err }
   \ test_has_err_not_auto_marked          \ interp-only
   \ test_has_err_not_contagious           \ interp-only
   \ test_file_throw_import_catch          \ interp-only
+  \ test_redefine_missing_marker          \ interp-only
+  \ test_redefine_redundant_marker        \ interp-only
   \ test_discard_param_push               \ interp-only
   \ test_throw_requires_err               \ interp-only
   \ test_too_many_input_regs              \ interp-only
