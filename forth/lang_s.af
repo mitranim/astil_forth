@@ -1693,7 +1693,7 @@ end
 \ ## Stack printing
 
 fun: log_int  ( num     -- ) " %zd" swap [ 1 ] logf end
-fun: log_cell { num ind -- } " %zd 0x%zx <%zd>" num num ind [ 3 ] logf end
+fun: log_cell { num ind -- } " 0x%zx %zd <%zd>" num num ind [ 3 ] logf end
 fun: .        ( num     -- ) stack_len dec log_cell lf end
 
 fun: .s

@@ -279,7 +279,7 @@ static void debug_stack(Interp *interp) {
 
   for (stack_range(auto, ptr, ints)) {
     eprintf(
-      "[debug]   %p -- " FMT_SINT " " FMT_UINT_HEX "\n", ptr, *ptr, (Uint)*ptr
+      "[debug]   %p -- " FMT_UINT_HEX " " FMT_SINT "\n", ptr, (Uint)*ptr, *ptr
     );
   }
 }

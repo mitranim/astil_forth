@@ -732,9 +732,9 @@ static void intrin_debug_ctx(Interp *interp) {
 
 static void intrin_debug_arg(Sint val, Interp *) {
   eprintf(
-    "[debug] arg: " FMT_SINT " " FMT_UINT_HEX " 0b%s\n",
-    val,
+    "[debug] arg: " FMT_UINT_HEX " " FMT_SINT " 0b%s\n",
     (Uint)val,
+    val,
     uint64_to_bit_str((Uint)val)
   );
 }

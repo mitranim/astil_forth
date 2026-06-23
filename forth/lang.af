@@ -4715,7 +4715,7 @@ end
 \ ## Stack printing
 
 fun: log_int  { num } " %zd" num logf end
-fun: log_cell { num } " %zd 0x%zx" num num logf end
+fun: log_cell { num } " 0x%zx %zd" num num logf end
 fun: .        { num -> } log_cell lf end
 
 fun: stack_log_cells { stack -> }
