@@ -18,6 +18,7 @@ SECTION_OUTPUT = GEN / f".bench-section-{os.getpid()}.md"
 
 HYPERFINE_OPTS = [
     "--warmup=8",
+    "--sort=mean-time",
     "--shell=none",
 ]
 
