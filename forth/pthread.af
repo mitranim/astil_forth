@@ -9,8 +9,8 @@ use' ./lang.af
 \ Posix words directly return an OS error code on failure.
 \ Should always be followed by error check:
 \
-\   some_fun " unable to do X" posix_err? { err }
-\   some_fun " unable to do X" posix_err? try
+\   some_fun " unable to do X" ?posix_err { err }
+\   some_fun " unable to do X" ?posix_err try
 
 \ ## Types
 
@@ -210,7 +210,7 @@ fun: thread_spawn { fun inp -- thread err }
   slot { thread }
 
   thread attr fun inp pthread_create
-  " unable to spawn thread" posix_err? { err }
+  " unable to spawn thread" ?posix_err { err }
   thread @ err
 end
 
@@ -222,14 +222,14 @@ fun: thread_spawn_detached { fun inp -- thread err }
   slot                 { thread }
 
   attr pthread_attr_init
-  " unable to init thread attributes" posix_err? try
+  " unable to init thread attributes" ?posix_err try
 
   attr PTHREAD_CREATE_DETACHED pthread_attr_setdetachstate
-  " unable to mark thread as detached" posix_err? { err }
+  " unable to mark thread as detached" ?posix_err { err }
 
   ifz err then
     thread attr fun inp pthread_create
-    " unable to spawn detached thread" posix_err? { err }
+    " unable to spawn detached thread" ?posix_err { err }
   end
 
   attr pthread_attr_destroy { -- }
@@ -240,6 +240,6 @@ end
 fun: thread_join { thread -- out err }
   slot { out }
   thread out pthread_join
-  " unable to join with thread" posix_err? { err }
+  " unable to join with thread" ?posix_err { err }
   out @ err
 end

@@ -7,10 +7,10 @@ use' ./io.af
 \ translated from C definitions on MacOS 15.3 (24D60).
 \
 \ Procedures which return -1 on error should usually
-\ be followed by the test `is_err_flag` or `os_err?`:
+\ be followed by the test `is_err_flag` or `?os_err`:
 \
-\   some_word " unable to blah" os_err? { err }
-\   some_word " unable to blah" os_err? try
+\   some_word " unable to blah" ?os_err { err }
+\   some_word " unable to blah" ?os_err try
 \
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
@@ -80,7 +80,7 @@ fun: net_addr_info { port -- ainf err }
 end
 
 fun: sock_close { sock -> err }
-  close is_err_flag " unable to close socket" os_err?
+  close is_err_flag " unable to close socket" ?os_err
 end
 
 fun: sock_bind { info backlog -- sock err }
@@ -89,21 +89,21 @@ fun: sock_bind { info backlog -- sock err }
   info Addrinfo_protocol @ { prot }
   fam type prot socket     { sock }
 
-  sock " unable to create network socket" os_err? try
+  sock " unable to create network socket" ?os_err try
 
   alloca' Cint { opt } \ `setsockopt` requires non-nil option address.
   true opt !cint       \ Enable options like `SO_REUSEADDR`.
 
   sock SOL_SOCKET SO_REUSEADDR opt size' Cint setsockopt
-  " unable to `setsockopt`" os_err? { err }
+  " unable to `setsockopt`" ?os_err { err }
 
   ifz err then
     sock info Addrinfo_addr @ info Addrinfo_addrlen @ bind
-    " unable to bind socket" os_err? { err }
+    " unable to bind socket" ?os_err { err }
 
     ifz err then
       sock backlog listen
-      " unable to listen on socket" os_err? { err }
+      " unable to listen on socket" ?os_err { err }
     end
   end
 

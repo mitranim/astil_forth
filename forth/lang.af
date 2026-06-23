@@ -459,9 +459,6 @@ end
 
 \ add Xd, Xn, #imm12
 0b1_0_0_100010_0_000000000000_00000_00000 let: ASM_OP_ADD_IMM
-fun: asm_add_imm { Xd Xn imm12 -> instr }
-  asm_pattern_arith_imm ASM_OP_ADD_IMM or
-end
 
 \ add Xd, Xn, Xm
 0b1_0_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_ADD_REG
@@ -476,9 +473,15 @@ end
 
 \ sub Xd, Xn, #imm12
 0b1_1_0_100010_0_000000000000_00000_00000 let: ASM_OP_SUB_IMM
-fun: asm_sub_imm { Xd Xn imm12 -> instr }
-  asm_pattern_arith_imm ASM_OP_SUB_IMM or
+fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
+  \ Select `add` when `(imm >= 0) == add`, else `sub`.
+  imm 63 lsr add xor negate { sel }
+  ASM_OP_ADD_IMM ASM_OP_SUB_IMM xor sel and ASM_OP_SUB_IMM xor { op }
+  Xd Xn imm12 asm_pattern_arith_imm op or
 end
+
+fun: asm_add_imm { Xd Xn imm12 -> instr } imm12 true  asm_addsub_imm end
+fun: asm_sub_imm { Xd Xn imm12 -> instr } imm12 false asm_addsub_imm end
 
 \ sub Xd, Xn, Xm
 0b1_1_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_SUB_REG
@@ -769,6 +772,8 @@ fun_comp: negate { -- err }
 end
 
 fun: negate { i0 -> i1 } [ redefine ] negate end
+
+fun: ?invert { val cond -> out } negate xor end
 
 fun_comp: inc { -- err }
   comp_args1_reg { reg }
@@ -2829,11 +2834,6 @@ fun: cf_arg_rewind_clear { arg }
   arg cf_arg_clear
 end
 
-fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
-  Xd Xn imm12 asm_pattern_arith_imm
-  if imm >=0 add = then ASM_OP_ADD_IMM else ASM_OP_SUB_IMM end or
-end
-
 fun: cf_imm_u12 { imm -- ok }
   imm 0 >= imm ASM_MAX_IMM12 <= and
 end
@@ -3029,7 +3029,7 @@ fun: cf_shift_emit { reg0 reg1 imm reg_op -- err }
   end
 
   imm 6 bits_trunc { immr }
-  if reg_op ASM_OP_LSR_REG = then ASM_OP_UBFM else ASM_OP_SBFM end { bitfield_op }
+  ASM_OP_SBFM ASM_OP_UBFM ASM_OP_SBFM xor reg_op ASM_OP_LSR_REG = negate and xor { bitfield_op }
   reg0 reg1 immr 63 bitfield_op asm_bitfield comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
@@ -3037,7 +3037,7 @@ fun: cf_logical_validate { imm aux -- aux ok err }
   aux 1 and { inv }
   aux inv - { op }
   imm 0 = imm -1 = op ASM_OP_EOR_IMM <> and or { edge }
-  if inv then imm invert else imm end { imm }
+  imm inv ?invert { imm }
   if edge then " redundant arithmetic" throw end
   imm op catch' asm_logical_imm_mask =0
 end
@@ -4353,7 +4353,7 @@ fun: asm_append_instr { instr out -- out } instr out !32 out 4 + end
 fun: asm_imm16_lane { val hw -- lane } val hw 4 lsl lsr 0xffff and end
 
 fun: asm_movk_needed { neg lane -- bool }
-  if neg then lane 0xffff <> else lane 0 <> end
+  lane 0xffff neg negate and - <>0
 end
 
 fun: asm_append_movk_if_needed { reg neg hw imm out -- out }
@@ -4371,7 +4371,8 @@ fun: asm_append_imm_to_reg { reg imm out -- out }
   imm 0 < { neg }
 
   imm 0 asm_imm16_lane { lane }
-  if neg then 0b00 lane invert 0xffff and else 0b10 lane end { opc lane }
+  lane neg ?invert 0xffff and { lane }
+  neg =0 1 lsl { opc }
   reg opc 0 lane asm_mov_wide out asm_append_instr { out } \ movn|movz
 
   reg neg 1 imm out asm_append_movk_if_needed { out }
@@ -4596,14 +4597,14 @@ end
 \ `-1` and set `errno` on failure. Usage:
 \
 \   0 1 extern: some_fun
-\   some_fun " unable to do X" os_err? try
-fun: os_err? { int ctx -- err_str }
+\   some_fun " unable to do X" ?os_err try
+fun: ?os_err { int ctx -- err_str }
   if int is_err_flag then errno ctx os_err else nil end
 end
 
-\ Like `os_err?`, but for Posix functions which directly
+\ Like `?os_err`, but for Posix functions which directly
 \ return an `errno` code on failure, and zero on success.
-fun: posix_err? { code ctx -- err_str }
+fun: ?posix_err { code ctx -- err_str }
   if code then code ctx os_err else nil end
 end
 

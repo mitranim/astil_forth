@@ -13,11 +13,11 @@ use' ./time.af \ Defines `Timespec`.
 \ and some wrappers which throw descriptive errors.
 \
 \ Procedures which return -1 on error should usually
-\ be followed by `os_err?`. When testing the output
+\ be followed by `?os_err`. When testing the output
 \ manually, use the test `is_err_flag`.
 \
-\   some_word " unable to blah" os_err? { err }
-\   some_word " unable to blah" os_err? try
+\   some_word " unable to blah" ?os_err { err }
+\   some_word " unable to blah" ?os_err try
 
 \ `struct stat`. Used by reference.
 struct: Fstat
@@ -81,7 +81,7 @@ end
 O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 
 \ In all definitions below, `flag` means `(Cint)-1` on failure;
-\ should be tested with `os_err?` or `is_err_flag`.
+\ should be tested with `?os_err` or `is_err_flag`.
 2 1 extern: open  ( path flag -- fdes|flag )
 1 1 extern: close ( fdes      -- flag      )
 2 1 extern: fstat ( fdes stat -- flag      )
