@@ -254,14 +254,18 @@ make install
 astil --help
 
 # Register-based calling convention:
-astil lang.af -  # REPL mode.
-astil <file>   # One-shot run.
-astil <file> - # Run file, then REPL.
+astil lang.af - # REPL mode.
+astil <file>    # One-shot run.
+astil <file> -  # Run file, then REPL.
 
 # Stack-based calling convention:
 astil_s lang_s.af - # REPL mode.
-astil_s <file>    # One-shot run.
-astil_s <file> -  # Run file, then REPL.
+astil_s <file>      # One-shot run.
+astil_s <file> -    # Run file, then REPL.
+
+# One-off scripts via CLI arg or stdin pipe; example for reg-CC:
+astil lang.af --eval='10 20 + . lf'
+printf '10 20 + . lf\n' | astil lang.af -
 ```
 
 Don't forget to import `lang.af` via `use' lang.af` (or `use' lang_s.af` for stack-CC) inside your program, or via CLI args.
