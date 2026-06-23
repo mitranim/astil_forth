@@ -359,15 +359,20 @@ In reg-CC:
 
 ## Register allocation and greediness
 
-The reg-CC version of Astil Forth takes an extremely simple yet effective approach to register allocation. It treats parameter registers as a stack, operating at the _bottom_ of that stack rather than top.
+In reg-CC, inside each word, the compiler uses volatile registers `x0 … x15` as a stack. Example: `10 20 30` lands in `x0 x1 x2`.
 
-Inside every word definition, the "register stack" starts "empty". This lets the compiler immediately assign values to registers without any outer context. When you write code like `10 20 30`, the values are immediately assigned to `x0 x1 x2`. This matches the Arm64 call ABI; a subsequent call to a verb with 3 inputs will "just work" whether it's an Astil Forth word or a C function.
+This matches the platform call ABI (Arm64 only for now). Runtime calls are greedy: a 3-input call requires the current stack to be exactly `x0 x1 x2`, consumes it, and resets the stack to the callee's visible outputs, again starting at `x0`.
 
-Register allocation for locals is trickier and smarter. They often have to be relocated, but the final destinations are unknown until the end of a word definition. The compiler reserves instructions, builds a list of pending relocations, and patches them in a fixup pass. This allows us to preserve the single-pass compilation strategy. The compiler employs several tricks to elide unnecessary relocations.
+To keep values between runtime calls, stash them into locals:
 
-Runtime-only verbs are greedy: they must consume the entire "register stack", replacing it with their outputs. This often requires "stashing" values out of the way into locals, which also makes the code clearer.
+```forth
+runtime_word_0 { one two three }
+runtime_word_1 one + two + three +
+```
 
-Comptime words are allowed to operate at the _top_ of the register stack. For example, all arithmetic words like `+ - * /` come with two definitions. Their runtime definitions are `x0 x1 -> x0`, but their comptime definitions "pop" and "push" top argument registers, often allowing "normal" concatenative code without locals in compiled code. This works by asking and telling about argument registers at comptime: `comp_args_get comp_args_set`.
+Comptime words operate at the top of the stack. That enables true concatenative compiled code; in `10 20 + 30 40 - *`, `+ - *` consume/replace top registers and fold constants when possible.
+
+Register allocation for locals is trickier and smarter. They often need relocation, but final destinations are unknown until end of current word definition. The compiler reserves instructions, builds a list of pending relocations, and patches them in a fixup pass. This allows us to preserve the single-pass compilation strategy. The compiler employs several tricks to elide unnecessary relocations.
 
 ## Performance
 
