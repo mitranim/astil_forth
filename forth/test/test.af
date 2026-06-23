@@ -747,6 +747,18 @@ fun: test_actual_instr { XT ind -- instr }
   XT sym_instr ind 4 * + @u32
 end
 
+fun: test_word_instr_count { XT instr -- count }
+  XT test_sym_instr_len { len }
+  0 { count }
+  0 { ind }
+  loop
+    ind len < while
+    if XT ind test_actual_instr instr = then inc: count end
+    inc: ind
+  end
+  count
+end
+
 fun: test_word_has_branch_cond { XT cond -- bool }
   \ Matches `b.<cond>` while ignoring the PC-relative offset.
   0b11111111_0000000000000000000_1_0000 { mask }
@@ -803,6 +815,17 @@ fun: test_comp_reg_cmp_keeps_rhs_in_arg { -- err }
   assert= xt' test_comp_reg_cmp_keeps_rhs_in_arg_fun test_sym_instr_len 4 end
 end
 test_comp_reg_cmp_keeps_rhs_in_arg
+
+fun: test_execute_raw_leaf_frame_fun { } 0 execute_raw end
+
+fun: test_execute_raw_non_leaf_frame_fun { } 0 sleep 0 execute_raw end
+
+fun: test_execute_raw_frame { -- err }
+  ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre { frame_push }
+  assert= xt' test_execute_raw_leaf_frame_fun frame_push test_word_instr_count 1 end
+  assert= xt' test_execute_raw_non_leaf_frame_fun frame_push test_word_instr_count 1 end
+end
+test_execute_raw_frame
 
 fun: test_if_cset_branch_fusion_fun { val -- out }
   0 { out }

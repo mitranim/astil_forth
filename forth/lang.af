@@ -2733,10 +2733,18 @@ fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun --
   comp_realloc_regs \ Assume full clobber.
   0 comp_args_set
 
-  \ The frame record is a workaround for "leaf" callers without their own.
-  ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x29, x30, [sp, #-16]!
-  len dec asm_branch_link_reg comp_instr                             \ blr <fun>
-  ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
+  \ Emit frame record as workaround for leaf callers without their own.
+  \ Current word may become non-leaf later, but we don't know it yet.
+  interp Interp_comp_field Interp_comp_ctx_field Interp_comp_ctx_sym @ { sym }
+  sym Sym_callees Interp_set_len @u32 0 = { leaf }
+
+  if leaf then
+    ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x29, x30, [sp, #-16]!
+  end
+  len dec asm_branch_link_reg comp_instr \ blr <fun>
+  if leaf then
+    ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 asm_load_pair_post comp_instr  \ ldp x29, x30, [sp], #16
+  end
 end
 
 \ ## Assembler continued -- logical immediate
