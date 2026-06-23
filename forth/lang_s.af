@@ -907,8 +907,8 @@ fun: stack-        ( … diff -- … )   inc cells sp swap - sp! end
 \ which is supported for reg-CC; see `examples/aot.af`.
 
 \ For words which define words. Kinda like `create`.
-fun_comp: word{ compile' : end
-fun_comp: }word compile'' ; 0 comp_only end
+fun_comp: word{ compile' read_word compile' define_fun end
+fun_comp: }word compile'' end 0 comp_only end
 
 \ Similar to standard `constant`.
 fun: let: ( C: val -- ) ( E: -- val ) word{ comp_push }word end

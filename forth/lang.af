@@ -81,8 +81,6 @@ end
 fun_comp: compile'  { -- err } 1 compile_next end
 fun_comp: compile'' { -- err } 2 compile_next end
 
-fun: semicolon { -- err } execute'' ; end
-
 \ Similar to standard `constant`.
 fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   read_word { str len }
@@ -91,14 +89,14 @@ fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   str len define_fun
     0 1 0 comp_signature_set ( -- val )
     val comp_push
-  semicolon
+  execute'' end
 
   \ Compile-time semantics.
   str len define_fun_comp
     0 try_all
     0 1 1 comp_signature_set ( -- err )
     val comp_push compile' comp_push
-  semicolon
+  execute'' end
   [ 0 comp_only ]
 end
 
@@ -1265,7 +1263,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     0 comp_realloc_reg
     0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
     1 comp_args_set
-  semicolon
+  execute'' end
 
   \ Compile-time semantics.
   str len define_fun_comp
@@ -1274,7 +1272,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     size     comp_push
     opc      comp_push
     compile' comp_mem_load
-  semicolon
+  execute'' end
 
   [ false comp_only ]
 end
@@ -1286,7 +1284,7 @@ fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
     2 0 false comp_signature_set
     \ str<size> r0, [x1]
     0 1 0 size 0b00 asm_load_store_imm comp_instr
-  semicolon
+  execute'' end
 
   [ false comp_only ]
 end
@@ -1537,13 +1535,13 @@ fun: init_data_word { name name_len adr -- err }
   name name_len define_fun
     0 1 false comp_signature_set ( E: -- ptr )
     adr comp_next_page_addr
-  semicolon
+  execute'' end
 
   name name_len define_fun_comp
     false try_all
     0 1 true comp_signature_set
     adr comp_push compile' comp_next_page_addr
-  semicolon
+  execute'' end
 
   [ false comp_only ]
 end
@@ -1577,13 +1575,13 @@ fun: buf_init { adr cap -- err }
   str len define_fun
     0 2 false comp_signature_set ( E: -- ptr cap )
     adr cap comp_buf
-  semicolon
+  execute'' end
 
   str len define_fun_comp
     false try_all
     0 1 true comp_signature_set
     adr comp_push cap comp_push compile' comp_buf
-  semicolon
+  execute'' end
 
   [ false comp_only ]
 end
@@ -2371,14 +2369,14 @@ fun: struct_field_define
     1 1 false comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
     if off then off comp_push compile' + end
-  semicolon
+  execute'' end
 
   \ Compile-time semantics.
   name name_len define_fun_comp
     false try_all
     0 1 true comp_signature_set
     off comp_push compile' struct_field_comp
-  semicolon
+  execute'' end
 
   type sizeof len * off + { off }
   struct_align align max off
@@ -4858,7 +4856,7 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
     123 asm_brk comp_instr \ brk 123 -- unreachable
 
     out comp_args_set
-  semicolon
+  execute'' end
 
   [ false comp_only ]
 end

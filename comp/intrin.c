@@ -120,7 +120,15 @@ static Err intrin_semicolon(Interp *interp) {
   return nullptr;
 }
 
+static Sym *interp_semicolon_sym(Interp *interp) { return interp->syms.floor; }
+
 static Err intrin_end(Interp *interp) {
+#ifdef CALL_CONV_STACK
+  if (!stack_len(&interp->ints) && interp->comp.ctx.sym) {
+    return intrin_semicolon(interp);
+  }
+#endif
+
   Sint ptr;
   Sym *sym;
   try(int_stack_pop(&interp->ints, &ptr));
@@ -520,31 +528,6 @@ Some fields are used only in the register-based callvention:
   out_len
   clobber
 */
-
-static const USED auto INTRIN_COLON = (Sym){
-  .name.buf = ":",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_colon,
-  .out_len  = 1,
-  .has_err  = true,
-};
-
-static const USED auto INTRIN_COLON_COLON = (Sym){
-  .name.buf = "::",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_colon_colon,
-  .out_len  = 1,
-  .has_err  = true,
-};
-
-static const USED auto INTRIN_SEMICOLON = (Sym){
-  .name.buf  = ";",
-  .wordlist  = WORDLIST_COMP,
-  .intrin    = (void *)intrin_semicolon,
-  .out_len   = 1,
-  .has_err   = true,
-  .comp_only = true,
-};
 
 static const USED auto INTRIN_END = (Sym){
   .name.buf = "end",

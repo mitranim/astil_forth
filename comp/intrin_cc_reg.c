@@ -186,47 +186,42 @@ static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
   return nullptr;
 }
 
-static Err intrin_colon(Interp *interp) {
+static Err interp_fun_begin(Interp *interp, Wordlist wordlist, Word_str name) {
   try(interp_begin_definition(interp));
-  Word_str name;
-  try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_EXEC, name));
+  try(interp_word_begin(interp, wordlist, name));
   try(interp_parse_params(interp));
   return nullptr;
 }
 
-static Err intrin_colon_colon(Interp *interp) {
-  try(interp_begin_definition(interp));
+static Err intrin_fun_with(Interp *interp, Wordlist wordlist, Sint *out) {
   Word_str name;
   try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_COMP, name));
-  try(interp_parse_params(interp));
+  try(interp_fun_begin(interp, wordlist, name));
+  *out = (Sint)interp_semicolon_sym(interp);
   return nullptr;
 }
 
 static Err intrin_fun(Interp *interp, Sint *out) {
-  try(intrin_colon(interp));
-  *out = (Sint)dict_get(&interp->dict_comp, ";");
-  return nullptr;
+  return intrin_fun_with(interp, WORDLIST_EXEC, out);
 }
 
 static Err intrin_fun_comp(Interp *interp, Sint *out) {
-  try(intrin_colon_colon(interp));
-  *out = (Sint)dict_get(&interp->dict_comp, ";");
-  return nullptr;
+  return intrin_fun_with(interp, WORDLIST_COMP, out);
 }
 
 static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
-  try(interp_word_begin(interp, WORDLIST_EXEC, name));
+  try(interp_fun_begin(interp, WORDLIST_EXEC, name));
+  try(int_stack_push(&interp->ints, (Sint)interp_semicolon_sym(interp)));
   return nullptr;
 }
 
 static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
-  try(interp_word_begin(interp, WORDLIST_COMP, name));
+  try(interp_fun_begin(interp, WORDLIST_COMP, name));
+  try(int_stack_push(&interp->ints, (Sint)interp_semicolon_sym(interp)));
   return nullptr;
 }
 

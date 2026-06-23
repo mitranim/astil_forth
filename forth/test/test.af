@@ -2773,6 +2773,16 @@ fun: test_word_len_over { -- err }
 end
 test_word_len_over
 
+fun: test_dropped_intrinsics_hidden { -- err }
+  s" :" WORDLIST_EXEC catch' find_word { _xt err }
+  err " undefined word" assert_str_has
+  s" ::" WORDLIST_EXEC catch' find_word { _xt err }
+  err " undefined word" assert_str_has
+  s" ;" WORDLIST_COMP catch' find_word { _xt err }
+  err " undefined word" assert_str_has
+end
+test_dropped_intrinsics_hidden
+
 s" ./test_import_empty.af" use
 
 use' ./test_const_fold.af
@@ -2888,6 +2898,7 @@ fun: main_run { -- err }
   \ test_file_throw_import_catch \ interp-only
   \ test_redefine_missing_marker \ interp-only
   \ test_redefine_redundant_marker \ interp-only
+  \ test_dropped_intrinsics_hidden \ interp-only
   \ test_discard_param_push \ interp-only
   \ test_throw_requires_err \ interp-only
   \ test_too_many_input_regs \ interp-only

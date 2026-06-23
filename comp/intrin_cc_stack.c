@@ -59,28 +59,17 @@ static Err interp_valid_name(Interp *interp, Word_str *out) {
   return nullptr;
 }
 
-static Err intrin_colon(Interp *interp) {
+static Err interp_fun_begin(Interp *interp, Wordlist list, Word_str name) {
   try(interp_begin_definition(interp));
-  Word_str name;
-  try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_EXEC, name));
-  return nullptr;
-}
-
-static Err intrin_colon_colon(Interp *interp) {
-  try(interp_begin_definition(interp));
-  Word_str name;
-  try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_COMP, name));
+  try(interp_word_begin(interp, list, name));
   return nullptr;
 }
 
 static Err interp_fun(Interp *interp, Wordlist list) {
-  try(interp_begin_definition(interp));
   Word_str name;
   try(interp_read_word(interp, &name));
-  try(interp_word_begin(interp, list, name));
-  try(int_stack_push(&interp->ints, (Sint)dict_get(&interp->dict_comp, ";")));
+  try(interp_fun_begin(interp, list, name));
+  try(int_stack_push(&interp->ints, (Sint)interp_semicolon_sym(interp)));
   return nullptr;
 }
 
@@ -95,14 +84,14 @@ static Err intrin_fun_comp(Interp *interp) {
 static Err intrin_define_fun(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_EXEC, name));
+  try(interp_fun_begin(interp, WORDLIST_EXEC, name));
   return nullptr;
 }
 
 static Err intrin_define_fun_comp(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
-  try(interp_word_begin(interp, WORDLIST_COMP, name));
+  try(interp_fun_begin(interp, WORDLIST_COMP, name));
   return nullptr;
 }
 

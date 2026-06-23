@@ -27,9 +27,6 @@ static const USED Sym INTRIN[] = {
   INTRIN_DEBUG_ARG,                  // debug_arg
 
   // Shared.
-  INTRIN_COLON,           // :
-  INTRIN_COLON_COLON,     // ::
-  INTRIN_SEMICOLON,       // ;
   INTRIN_END,             // end
   INTRIN_FUN,             // fun:
   INTRIN_FUN_COMP,        // fun_comp:

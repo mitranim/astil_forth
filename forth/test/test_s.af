@@ -687,6 +687,16 @@ fun: test_word_len_over
 end
 test_word_len_over
 
+fun: test_dropped_intrinsics_hidden
+  WORDLIST_EXEC s" :" catch' find_word { err }
+  err " undefined word" T_err_contains
+  WORDLIST_EXEC s" ::" catch' find_word { err }
+  err " undefined word" T_err_contains
+  WORDLIST_COMP s" ;" catch' find_word { err }
+  err " undefined word" T_err_contains
+end
+test_dropped_intrinsics_hidden
+
 s" ./test_import_empty.af" use
 
 T{ s" ./test_interp_ret.af" use <T> 123 }T

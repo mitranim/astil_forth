@@ -53,6 +53,20 @@ static Err interp_init_syms(Interp *interp) {
   const auto syms = &interp->syms;
   const auto comp = &interp->comp;
 
+  // Hidden XT for standard Forth `;`.
+  // Used by defining words that push an XT for `end` to pop and execute.
+  sym_init_intrin(stack_push(
+    syms,
+    (Sym){
+      .name.buf  = ";",
+      .wordlist  = WORDLIST_COMP,
+      .intrin    = (void *)intrin_semicolon,
+      .out_len   = 1,
+      .has_err   = true,
+      .comp_only = true,
+    }
+  ));
+
   for (auto intrin = INTRIN; intrin < arr_ceil(INTRIN); intrin++) {
     const auto sym = stack_push(syms, *intrin);
 
@@ -68,9 +82,6 @@ static Err interp_init_syms(Interp *interp) {
   }
 
   IF_DEBUG({
-    assert_fatal(dict_has(&interp->dict_exec, ":"));
-    assert_fatal(dict_has(&interp->dict_comp, ";"));
-
     const auto            syms = &comp->code.intrins;
     static constexpr auto len  = arr_cap(INTRIN);
 

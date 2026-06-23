@@ -5,9 +5,6 @@
 #endif
 
 static const USED Sym INTRIN[] = {
-  INTRIN_COLON,           // :
-  INTRIN_COLON_COLON,     // ::
-  INTRIN_SEMICOLON,       // ;
   INTRIN_END,             // end
   INTRIN_FUN,             // fun:
   INTRIN_FUN_COMP,        // fun_comp:
