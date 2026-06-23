@@ -223,6 +223,8 @@ fun: word { -- err }
 end
 ```
 
+`try` checks current top arg, moves non-nil error to current word's `err`, and returns. Doesn't zero current word's non-error outputs; they're undefined on total failure.
+
 `try_all` makes this implicit, allowing even shorter code. `try_all` in file root affects the current file (and no other). `try_all` inside a word affects _only_ that word. However, it does _not_ remove errors from signatures. The signature of every word precisely describes its ABI.
 
 ```forth
@@ -236,6 +238,13 @@ end
 
 fun: word [ false try_all ] end \ Only inside this word.
 ```
+
+Failure outputs:
+- Success: return non-error outputs; nil `err` is implicit.
+- Partial failure: return useful non-error outputs and non-nil `err`.
+- Total failure: use `throw` / `try`; non-error outputs are undefined.
+
+Callers, including C/FFI callers, must check `err` before using other outputs, unless callee documents partial-failure contract.
 
 The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally), and make nil errors implicit. Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
 

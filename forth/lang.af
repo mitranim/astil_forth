@@ -1753,6 +1753,10 @@ end
 \ `try` and `throw` which are entirely local. They're basically
 \ like `ret`, but without having to list the non-error outputs.
 \
+\ Error may be partial or total. Each word decides its contract.
+\ On partial failure, non-error outputs are defined.
+\ On total failure, non-error outputs are undefined.
+\
 \ We also support `try_all`, which is a blanket auto-try, where
 \ a "try" is implicitly inserted when calling "erroring" words.
 \ It's opt-in and opt-out per-file and per-word.
