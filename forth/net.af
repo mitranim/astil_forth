@@ -58,7 +58,7 @@ U8 128 arr: Sockaddr_storage
 \ Result is `Addrinfo *` and should be freed with `freeaddrinfo`.
 fun: net_addr_info { port -- ainf err }
   alloca' Addrinfo { hint }
-  hint size' Addrinfo erase
+  hint size' Addrinfo memzero
   AF_UNSPEC   hint Addrinfo_family   !
   SOCK_STREAM hint Addrinfo_socktype !
   AI_PASSIVE  hint Addrinfo_flags    !

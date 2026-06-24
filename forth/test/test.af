@@ -1,5 +1,6 @@
 use' ../lang.af
 use' ../arena.af
+use' ../time.af
 
 \ We test both JIT-compiled and AOT-compiled modes.
 \ For AOT, every test must be called in `main_run`.
@@ -150,7 +151,7 @@ fun: test_stack_primitives { -- err }
   assert= size' Stack 40 end
 
   alloca' Stack { stk }
-  stk size' Stack erase
+  stk size' Stack memzero
 
   assert= stk test_stack_len_cells 0 end
   assert= stk test_stack_cap_cells 0 end
@@ -697,9 +698,7 @@ fun: test_recur_with_err { -- err }
 end
 test_recur_with_err
 
-1 0 extern: sleep
-
-fun: test_sleep_loop loop " sleeping" log lf 1 sleep end end
+fun: test_sleep_loop loop " sleeping" log lf 1 sleep { -- } end end
 \ test_sleep_loop
 
 fun: test_loop_leave { -- err }
@@ -816,9 +815,9 @@ fun: test_comp_reg_cmp_keeps_rhs_in_arg { -- err }
 end
 test_comp_reg_cmp_keeps_rhs_in_arg
 
-fun: test_execute_raw_leaf_frame_fun { } 0 execute_raw end
+fun: test_execute_raw_leaf_frame_fun 0 execute_raw end
 
-fun: test_execute_raw_non_leaf_frame_fun { } 0 sleep 0 execute_raw end
+fun: test_execute_raw_non_leaf_frame_fun 0 sleep { -- } 0 execute_raw end
 
 fun: test_execute_raw_frame { -- err }
   ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre { frame_push }

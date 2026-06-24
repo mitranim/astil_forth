@@ -1651,9 +1651,9 @@ end
 3 0 extern: strlcpy ( out src buf_len -- )
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
 
-fun: move  { src out len  } out src len strncpy end
-fun: fill  { buf len char } buf char len memset end
-fun: erase { buf len ->   } 0 fill end
+fun: move    { src out len  } out src len strncpy end
+fun: fill    { buf len char } buf char len memset end
+fun: memzero { buf len ->   } 0 fill end
 
 \ ## Characters and strings
 

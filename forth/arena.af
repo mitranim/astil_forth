@@ -12,7 +12,7 @@ struct: Arena
   Adr   1 field: Arena_low   \ `Stack*` of active page
 end
 
-fun: arena_init { arn -> } size' Arena erase end
+fun: arena_init { arn -> } size' Arena memzero end
 
 fun: arena_deinit { arn -> err }
   ifz then ret end

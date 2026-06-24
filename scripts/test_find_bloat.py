@@ -395,7 +395,7 @@ class FindBloatTest(unittest.TestCase):
 
         self.assertEqual(["util"], [finding.cluster.key[1] for finding in findings])
 
-    def test_single_use_ranks_asm_helpers_last(self):
+    def test_single_use_ranks_asm_utils_last(self):
         src = textwrap.dedent(
             """
             fun: asm_one { x -- y } x inc end
@@ -410,7 +410,7 @@ class FindBloatTest(unittest.TestCase):
 
         self.assertEqual(["util", "asm_one"], [finding.cluster.key[1] for finding in findings])
 
-    def test_single_use_ranks_known_noise_after_plain_helpers(self):
+    def test_single_use_ranks_known_noise_after_plain_utils(self):
         src = textwrap.dedent(
             """
             fun: while_end_xt { -- err } finish_loop end
