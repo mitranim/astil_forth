@@ -819,7 +819,7 @@ static Ind asm_align_sp_off(Ind off) { return __builtin_align_up(off, 16); }
 // and <reg>, <reg>, 0xfffffffffffffff0
 static void asm_append_sp_align(Comp *comp, U8 reg) {
   try_fatal(asm_validate_reg(reg));
-  asm_append_instr(comp, (Instr)0b1'00'100100'1'111100'111011'00000'00000 | reg);
+  asm_append_instr(comp, (Instr)0b1'00'100100'1'111100'111011'00000'00000 | (reg << 5) | reg);
 }
 
 /*

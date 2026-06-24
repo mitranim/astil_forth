@@ -1910,6 +1910,17 @@ fun: test_alloca_dynamic { size0 size1 -- err }
 end
 32 64 test_alloca_dynamic
 
+fun: test_alloca_dynamic_non_x0 { keep size -- err }
+  keep size alloca { keep2 adr }
+
+  assert= keep2 keep end
+  assert= adr 16 mod 0 end
+
+  123 adr !
+  assert= adr @ 123 end
+end
+77 32 test_alloca_dynamic_non_x0
+
 1 1 opaque: Opaq_1_1
 2 2 opaque: Opaq_2_2
 3 1 opaque: Opaq_3_1
@@ -2861,6 +2872,7 @@ fun: main_run { -- err }
   test_alloca_align
   test_alloca_big
   32 64 test_alloca_dynamic
+  77 32 test_alloca_dynamic_non_x0
   test_array_sizes
   test_struct_fields_basic
   test_struct_fields_load_store
