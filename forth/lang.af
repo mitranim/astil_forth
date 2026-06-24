@@ -1636,6 +1636,7 @@ end
 
 2 1 extern: calloc  ( len size -- addr )
 1 1 extern: malloc  ( size -- addr )
+2 1 extern: realloc ( addr size -- addr )
 1 0 extern: free    ( addr -- )
 3 0 extern: memset  ( buf char len -- )
 3 0 extern: memcpy  ( out src len -- )
