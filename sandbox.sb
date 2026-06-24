@@ -6,6 +6,7 @@
 (deny default)
 (allow process-exec (literal (param "MAIN")))
 (allow file-read*)
+(allow file-write* (literal "/dev/null"))
 (allow file-map-executable)
 (allow dynamic-code-generation)
 (allow sysctl-read)
@@ -20,6 +21,7 @@
 ; We whitelist a few executables for debugging: disassembler,
 ; symbolizer, etc. See the makefile for the listing.
 (allow process-fork)
+(allow signal (target children))
 (allow process-exec (literal (param "EXE0")))
 (allow process-exec (literal (param "EXE1")))
 (allow process-exec (literal (param "EXE2")))
