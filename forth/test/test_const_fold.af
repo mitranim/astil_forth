@@ -416,6 +416,31 @@ fun: test_const_fold_unary { -- err }
 end
 test_const_fold_unary
 
+fun: const_fold_pow2_ceil_fun { -- out0 out1 out2 out3 }
+  0 pow2_ceil
+  1 pow2_ceil
+  4096 pow2_ceil
+  4097 pow2_ceil
+end
+
+fun: test_const_fold_pow2_ceil { -- err }
+  const_fold_pow2_ceil_fun { out0 out1 out2 out3 }
+  assert= out0 1 end
+  assert= out1 1 end
+  assert= out2 4096 end
+  assert= out3 8192 end
+  ifz has_interp then ret end
+
+  cf_expect_clear
+  0 1 cf_expect_load
+  1 1 cf_expect_load
+  2 4096 cf_expect_load
+  3 8192 cf_expect_load
+  cf_expect_ret
+  xt' const_fold_pow2_ceil_fun cf_expect_word
+end
+test_const_fold_pow2_ceil
+
 fun: const_fold_bit_count_fun { -- out0 out1 }
   0 bit_clz
   8 bit_ctz
@@ -1224,6 +1249,11 @@ fun: loc_bit_len_fun { val -- out }
   val
 end
 
+fun: loc_pow2_ceil_fun { val -- out }
+  pow2_ceil: val
+  val
+end
+
 fun: loc_int_to_cell_fun { val -- out }
   int_to_cell: val
   val
@@ -1473,6 +1503,7 @@ fun: test_const_fold_loc_step { -- err }
   assert= 8 loc_bit_clz_fun 60 end
   assert= 40 loc_bit_ctz_fun 3 end
   assert= 40 loc_bit_len_fun 6 end
+  assert= 4097 loc_pow2_ceil_fun 8192 end
   assert= 0xffffffff loc_int_to_cell_fun -1 end
   assert= 7 loc_cells_fun 56 end
   assert= 56 loc_div_cells_fun 7 end
@@ -1827,6 +1858,7 @@ fun: test_const_fold_all { -- err }
   test_const_fold_ugly_imm
   test_const_fold_negative_lane_imm
   test_const_fold_unary
+  test_const_fold_pow2_ceil
   test_const_fold_bit_count
   test_const_fold_zero_cmp
   test_const_fold_bit_shift

@@ -965,7 +965,7 @@ fun: invert { i0 -> i1 } [ redefine ] invert end
 \ 1-based index of the highest bit.
 fun: comp_emit_bit_len { reg tmp -- err }
   reg reg     asm_clz     comp_instr \ clz Xd, Xn
-  tmp 64      asm_mov_imm comp_instr \ mov Xd, #imm
+  64  tmp                 comp_load  \ mov Xd, #imm
   reg tmp reg asm_sub_reg comp_instr \ sub Xd, Xn, Xm
 end
 
@@ -977,6 +977,25 @@ fun_comp: bit_len { -- err }
 end
 
 fun: bit_len { val -> len } bit_len end
+
+fun: comp_emit_pow2_ceil { reg tmp -- err }
+  1 tmp comp_load
+  reg reg tmp reg tmp ASM_HI comp_emit_csel_reg \ csel Xd, Xn, Xm, hi
+  reg reg 1 asm_sub_imm      comp_instr         \ sub Xd, Xn, #1
+  reg reg asm_clz            comp_instr         \ clz Xd, Xn
+  reg asm_neg                comp_instr         \ neg Xd, Xn
+  reg reg 64 asm_add_imm     comp_instr         \ add Xd, Xn, #64
+  reg tmp reg asm_lsl_reg    comp_instr         \ lsl Xd, Xn, Xm
+end
+
+fun_comp: pow2_ceil { -- err }
+  comp_args1_reg      { reg }
+  comp_alloc_next_reg { tmp }
+  reg tmp comp_emit_pow2_ceil
+  reg inc comp_args_set
+end
+
+fun: pow2_ceil { val -- pow2 } 1 val 1 umax dec bit_len lsl end
 
 \ "count leading zeros" (in high bits)
 fun_comp: bit_clz { -- err }
@@ -3639,6 +3658,18 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
   comp_loc_unary_init { reg loc }
   comp_alloc_next_reg { tmp }
   reg tmp comp_emit_bit_len
+  loc reg comp_loc_mut_store
+end
+
+fun_comp: pow2_ceil { -- err } [ redefine ]
+  if cf_fold_cleared1 then pow2_ceil cf_fold_done else { -- } execute'' pow2_ceil end
+end
+
+\ Round local up to power of two: `pow2_ceil: some_val`.
+fun_comp: pow2_ceil: { -- err } ( C: "name" -- ) ( E: -- )
+  comp_loc_unary_init { reg loc }
+  comp_alloc_next_reg { tmp }
+  reg tmp comp_emit_pow2_ceil
   loc reg comp_loc_mut_store
 end
 

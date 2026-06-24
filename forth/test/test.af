@@ -1503,6 +1503,18 @@ fun: test_bit_len { -- err }
 end
 test_bit_len
 
+fun: test_pow2_ceil { -- err }
+  assert= 0 pow2_ceil 1 end
+  assert= 1 pow2_ceil 1 end
+  assert= 2 pow2_ceil 2 end
+  assert= 3 pow2_ceil 4 end
+  assert= 4 pow2_ceil 4 end
+  assert= 4095 pow2_ceil 4096 end
+  assert= 4096 pow2_ceil 4096 end
+  assert= 4097 pow2_ceil 8192 end
+end
+test_pow2_ceil
+
 fun: test_bit_counts { -- err }
   assert= 0 bit_clz 64 end
   assert= 1 bit_clz 63 end
@@ -2847,6 +2859,7 @@ fun: main_run { -- err }
   test_max
   test_umax
   test_bit_len
+  test_pow2_ceil
   test_bit_counts
   test_bit_masks
   test_asm_new_bits
