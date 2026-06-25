@@ -35,14 +35,6 @@ fun: example_seek_and_thou_shall_find { -- err }
   " examples/io.af"       { path }
   path " r" file_open try { file }
 
-  \ Example of disabling implicit "try" to ensure visible control flow.
-  \ This lets us be confident in cleanup code paths.
-  \
-  \ Technically redundant here because implicit "try" has
-  \ NOT been enabled in this example file; the setting is
-  \ per-word and per-file, not across the whole system.
-  [ false try_all ]
-
   37 91 { off cap }
 
   if file off 0 fseek is_err_flag then

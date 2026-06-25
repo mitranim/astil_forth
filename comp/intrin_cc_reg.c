@@ -284,12 +284,27 @@ static Err intrin_catch(Sint wordlist, Interp *interp) {
   return nullptr;
 }
 
-static void intrin_try_all(bool val, Interp *interp) {
-  if (interp->comp.ctx.sym) {
-    interp->comp.ctx.try_all = val;
-    return;
+static Err err_try_all_redundant(bool val) {
+  return errf("redundant `try_all`: already %s", bool_str(val));
+}
+
+static Err intrin_try_all(bool val, Interp *interp) {
+  const auto ctx    = &interp->comp.ctx;
+  const auto module = interp->module;
+  if (ctx->sym) {
+    if (!ctx->slop && ctx->try_all == val) {
+      return err_try_all_redundant(val);
+    }
+    ctx->try_all = val;
+    return nullptr;
   }
-  if (interp->module) interp->module->try_all = val;
+  if (module) {
+    if (!module->slop && module->try_all == val) {
+      return err_try_all_redundant(val);
+    }
+    module->try_all = val;
+  }
+  return nullptr;
 }
 
 static Err intrin_comp_only(bool val, Interp *interp) {
@@ -750,6 +765,8 @@ static const USED auto INTRIN_TRY_ALL = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_try_all,
   .inp_len  = 1,
+  .out_len  = 1,
+  .has_err  = true,
 };
 
 static const USED auto INTRIN_BRACE = (Sym){

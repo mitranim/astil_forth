@@ -2351,27 +2351,28 @@ fun: test_catch_2 { -- err }
 end
 test_catch_2
 
+false try_all
+
 \ Words can disable file-scoped `try_all` and return their error output
 \ explicitly. Callers then handle the error value as an ordinary output.
-fun: test_disabling_try_all_fun { -- err } [ false try_all ]
-  test_throw { _err_ignore }
+fun: test_disabling_try_all_fun { -- err }
+  test_throw { -- }
   " different_test_err"
 end
 
-fun: test_disabling_try_all { -- err } [ false try_all ]
-  test_disabling_try_all_fun { err }
-  err " different_test_err" assert_str_eq
+fun: test_disabling_try_all { -- err }
+  test_disabling_try_all_fun " different_test_err" assert_str_eq
 end
 test_disabling_try_all
 
-fun: test_unused_local_error { -- err } [ false try_all ]
+fun: test_unused_local_error { -- err }
   use' ./fail/test_unused_local.af
   " unused local"
   assert_str_has
 end
 test_unused_local_error
 
-fun: test_discard_param_read { -- err } [ false try_all ]
+fun: test_discard_param_read { -- err }
   use' ./fail/test_discard_param_read.af
   " undefined word"
   assert_str_has
@@ -2380,7 +2381,7 @@ test_discard_param_read
 
 fun: discard_param_push_suffix { val _ignored -> out } end
 
-fun: test_discard_param_push { -- err } [ false try_all ]
+fun: test_discard_param_push { -- err }
   assert= 10 20 discard_param_push_suffix 10 end try
 
   use' ./fail/test_discard_param_push.af
@@ -2389,28 +2390,42 @@ fun: test_discard_param_push { -- err } [ false try_all ]
 end
 test_discard_param_push
 
-fun: test_discard_assign_read { -- err } [ false try_all ]
+fun: test_discard_assign_read { -- err }
   use' ./fail/test_discard_assign_read.af
   " undefined word"
   assert_str_has
 end
 test_discard_assign_read
 
-fun: test_redundant_discard { -- err } [ false try_all ]
+fun: test_redundant_discard { -- err }
   use' ./fail/test_redundant_discard.af
   " redundant discard"
   assert_str_has
 end
 test_redundant_discard
 
-fun: test_unpopped_anon_local { -- err } [ false try_all ]
+fun: test_redundant_try_all_root { -- err }
+  use' ./fail/test_redundant_try_all_root.af
+  " redundant `try_all`"
+  assert_str_has
+end
+test_redundant_try_all_root
+
+fun: test_redundant_try_all_word { -- err }
+  use' ./fail/test_redundant_try_all_word.af
+  " redundant `try_all`"
+  assert_str_has
+end
+test_redundant_try_all_word
+
+fun: test_unpopped_anon_local { -- err }
   use' ./fail/test_unpopped_anon_local.af
   " unused local"
   assert_str_has
 end
 test_unpopped_anon_local
 
-fun: test_explicit_err_0 { -- err } [ false try_all ]
+fun: test_explicit_err_0 { -- err }
   test_throw { err0 }
   " test_err" { err1 }
 
@@ -2418,6 +2433,8 @@ fun: test_explicit_err_0 { -- err } [ false try_all ]
   err0 err1 assert_str_eq
 end
 test_explicit_err_0
+
+true try_all
 
 fun: test_explicit_err_1_fun { one -- two err }
   ifz one then test_throw end

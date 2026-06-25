@@ -1,0 +1,5 @@
+true try_all
+
+fun: test_redundant_try_all_word { -- err }
+  [ true try_all ]
+end
