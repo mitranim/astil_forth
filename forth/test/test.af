@@ -134,18 +134,16 @@ test_params_push
 
 \ Stack operations are tested early because they're used by conditionals and
 \ loops, which makes testing kinda cyclic.
-fun: test_stack_len_bytes { stack -> len }
-  drop
+fun: test_stack_len_bytes { stack -- len }
   stack Stack_top @ stack Stack_floor @ -
 end
 
-fun: test_stack_cap_bytes { stack -> len }
-  drop
+fun: test_stack_cap_bytes { stack -- len }
   stack Stack_ceil @ stack Stack_floor @ -
 end
 
-fun: test_stack_len_cells { stack -> len } drop stack test_stack_len_bytes /cells end
-fun: test_stack_cap_cells { stack -> len } drop stack test_stack_cap_bytes /cells end
+fun: test_stack_len_cells { stack -- len } stack test_stack_len_bytes /cells end
+fun: test_stack_cap_cells { stack -- len } stack test_stack_cap_bytes /cells end
 
 fun: test_stack_primitives { -- err }
   assert= size' Stack 40 end
@@ -217,18 +215,13 @@ end
 test_to_stack_sequence
 
 fun: test_reg_cc_stack_words { -- err }
-  assert= 10 20 drop 10 end
   10 20 swap { val0 val1 }
   assert= val0 20 end
   assert= val1 10 end
-  10 20 30 drop { val2 val3 }
-  assert= val2 10 end
-  assert= val3 20 end
   10 20 30 swap { val4 val5 val6 }
   assert= val4 10 end
   assert= val5 30 end
   assert= val6 20 end
-  assert= 10 20 + 30 drop 30 end
   assert= 10 20 - 30 swap - 40 end
 end
 test_reg_cc_stack_words
@@ -409,15 +402,16 @@ fun: cond_input_elifn { val flag0 flag1 -- out }
 end
 
 fun: cond_input_elif_diff { flag0 flag1 -- out0 out1 }
-  20 flag0 if then drop 10 11
-  elif flag1 then 30
-  else 40
+  if flag0 then 10 11
+  elif flag1 then 20 30
+  else 20 40
   end
 end
 
 fun: cond_input_elif_diff_no_else { flag0 flag1 -- out }
-  20 flag0 if then drop 10
-  elif flag1 then
+  if flag0 then 10
+  elif flag1 then 20
+  else 20
   end
 end
 

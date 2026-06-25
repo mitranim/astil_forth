@@ -4108,16 +4108,6 @@ end
 \ way of manipulating value order is via local names, which is intrinsically
 \ supported by the compiler, and considered clearer for readers of the code.
 
-fun_comp: drop { -- err }
-  1 " for `drop`" comp_args_min
-  comp_args_get dec comp_args_set
-end
-
-fun: drop { -- err }
-  STACK { stack }
-  stack Stack_top @ -cell stack Stack_top !
-end
-
 fun_comp: swap { -- err }
   2 " for `swap`" comp_args_min
 
@@ -4825,8 +4815,7 @@ fun: log_int  { num } " %zd" num logf end
 fun: log_cell { num } " 0x%zx %zd" num num logf end
 fun: .        { num -> } log_cell lf end
 
-fun: stack_log_cells { stack -> }
-  drop
+fun: stack_log_cells { stack }
   stack Stack_top @ stack Stack_floor @ - /cells { len }
 
   ifz len then
