@@ -36,6 +36,10 @@ BreakBeforeBraces: Custom
 BraceWrapping:
   BeforeElse: true
 
+# Requires clang-format 22+.
+BreakAfterOpenBracketLoop: true
+BreakBeforeCloseBracketLoop: true
+
 PenaltyBreakString: 4096
 PenaltyBreakAssignment: 4096
 PenaltyBreakOpenParenthesis: 0
