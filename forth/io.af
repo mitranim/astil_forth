@@ -1,4 +1,5 @@
 use' ./lang.af
+use' ./errno.af
 use' ./time.af \ Defines `Timespec`.
 
 \ ## Libc IO
@@ -191,3 +192,38 @@ fun: file_write_bytes { buf len file -- err }
   if out len = then ret end
   " wrote %zd instead of %zd bytes" out len errf file file_err
 end
+
+\ Best-effort logging/diagnostic write. Intentionally ignores short writes
+\ and OS errors. Prefer `write_all` for protocol/data output.
+fun: write_opt { fdes buf len -> } write { -- } end
+
+fun: write_once { fdes buf len -- wrote err }
+  fdes buf len write { wrote }
+  if wrote is_err_flag then
+    errno " unable to write" os_err { err }
+    0 err ret
+  end
+  wrote
+end
+
+fun: write_all { fdes buf len -- err }
+  loop
+    ifz len then ret end
+
+    fdes buf len write { wrote }
+
+    if wrote is_err_flag then
+      errno { code }
+      if code EINTR = then again end
+      code " unable to write" os_err throw
+    end
+
+    ifz wrote then " unable to write: wrote zero bytes" throw end
+
+    wrote +: buf
+    wrote -: len
+  end
+end
+
+\ Writes `\r\n`; for use in HTTP.
+fun: write_eol { fdes -- err } fdes CRLF 2 write_all end

@@ -44,7 +44,7 @@ fun: example_seek_and_thou_shall_find { -- err }
 
   BUF size' U8 cap file fread { len }
   file ferror { code }
-  file fclose { -- }
+  file fclose { -- } \ Read-only close errors are noise.
 
   if len cap <> then
     code " unable to read file" os_err ret

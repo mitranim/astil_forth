@@ -232,6 +232,8 @@ fun: thread_spawn_detached { fun inp -- thread err }
     " unable to spawn detached thread" ?posix_err { err }
   end
 
+  \ After successful spawn, returning attr cleanup failure
+  \ would lie about thread state and input ownership.
   attr pthread_attr_destroy { -- }
   thread @ err
 end

@@ -12,9 +12,6 @@ use' ./http_util.af
 
 4096 let: BUF_CAP
 
-fun: write_opt { fdes buf len -> } write { -- } end
-fun: write_eol { fdes -> } CRLF 2 write_opt end \ \r\n
-
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
 fun: read_req { conn buf cap -- len err }
   0 { len }
@@ -43,11 +40,11 @@ fun: respond_conn { conn -- err }
   " [srv] incoming request:" elog elf elf
   STDERR buf len write_opt elf
 
-  conn s" HTTP/1.1 200 OK"   write_opt conn write_eol
-  conn s" Connection: close" write_opt conn write_eol
-  conn                                      write_eol
-  conn s" request echo:"     write_opt conn write_eol conn write_eol
-  conn buf len               write_opt conn write_eol
+  conn s" HTTP/1.1 200 OK"   write_all try conn write_eol try
+  conn s" Connection: close" write_all try conn write_eol try
+  conn                                          write_eol try
+  conn s" request echo:"     write_all try conn write_eol try conn write_eol try
+  conn buf len               write_all try conn write_eol try
 
   " [srv] echoed request back to client" elog elf
 end
