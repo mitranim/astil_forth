@@ -1864,8 +1864,30 @@ fun: test_alloca_cell { -- err }
   CELL alloca test_alloca
   size' Cell alloca test_alloca
   alloca' Cell test_alloca
+
+  allocaz' Cell { ptr0 }
+  assert= ptr0 @ 0 end
+
+  allocaz' Cell { ptr1 }
+  assert= ptr1 @ 0 end
+
+  allocaz' Cell { ptr2 }
+  assert= ptr2 @ 0 end
 end
 test_alloca_cell
+
+fun: test_allocaz_fun { left right -- sum err }
+  allocaz' Cell { ptr }
+  assert= ptr @ 0 end
+
+  left right + ptr !
+  ptr @
+end
+
+fun: test_allocaz { -- err }
+  assert= 11 31 test_allocaz_fun 42 end
+end
+test_allocaz
 
 fun: test_alloca_align { -- err }
   systack_ptr { SP }
@@ -2004,8 +2026,7 @@ fun: test_struct_field_comp_arity { val }
 end
 
 fun: test_struct_fields_load_store { -- err }
-  alloca' Typ { ptr }
-  ptr size' Typ erase
+  allocaz' Typ { ptr }
 
   assert= ptr Typ_field0 ptr end
   assert= ptr Typ_field1 ptr 8 + end
@@ -2881,6 +2902,7 @@ fun: main_run { -- err }
   \ test_errf_throw
   test_wrapf
   test_alloca_cell
+  test_allocaz
   test_alloca_align
   test_alloca_big
   32 64 test_alloca_dynamic

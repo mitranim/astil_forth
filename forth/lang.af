@@ -2241,10 +2241,6 @@ fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
   execute' align' comp_push
 end
 
-fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
-  execute'' size' execute'' alloca
-end
-
 fun_comp: is_aligned_to' { -- err } ( C: "type" -- ) ( E: adr -- bool )
   execute'' align' execute'' is_aligned_to
 end
@@ -4391,6 +4387,20 @@ fun_comp: again { -- err }
   meta loop_back
 end
 
+\ ## Memory stuff continued
+
+fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
+  execute'' size' execute'' alloca
+end
+
+fun_comp: allocaz' { -- err } ( C: "type" -- ) ( E: -- adr )
+  execute' size' { size }
+  size comp_push
+  execute'' alloca
+  size comp_push
+  compile' memzero
+  execute'' systack_ptr \ mov x0, sp
+end
 \ ## Assembler continued
 
 fun: asm_append_instr { instr out -- out } instr out !32 out 4 + end
