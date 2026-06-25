@@ -14,7 +14,7 @@ By convention, when last output param is named exactly `err`, current word gets 
 
 `throw` requires 1 arg; requires current word to have its own error output; unconditionally moves input to error output register and returns.
 
-In file root, `true try_all` enables implicit `try` in subsequent word definitions; `false try_all` disables it. Inside word definitions, `try_all` can be toggled at comptime via brackets: `[ false try_all ]`. This is word-scoped and resets on `end` to the file-root setting.
+`true try_all` enables implicit `try`; non-IO code prefers this style. Code which involves resource cleanup prefers `false try_all`, which is the default. This setting is file-scoped and function-scoped.
 
 How to return:
 
