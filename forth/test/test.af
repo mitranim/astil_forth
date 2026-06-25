@@ -1151,6 +1151,53 @@ fun: test_load_store_pair_swap { -- err }
 end
 test_load_store_pair_swap
 
+fun: test_store_cells { -- err }
+  3 cells alloca { ptr }
+  11 22 33 ptr !cells
+
+  assert= ptr @ 11 end
+  assert= ptr +cell @ 22 end
+  assert= ptr +cell +cell @ 33 end
+end
+test_store_cells
+
+fun: test_store_cellz { -- err }
+  4 cells alloca { ptr }
+  " one" " two" " three" ptr !cellz
+
+  ptr @ " one" assert_str_eq
+  ptr +cell @ " two" assert_str_eq
+  ptr +cell +cell @ " three" assert_str_eq
+  assert= ptr 3 cells + @ nil end
+end
+test_store_cellz
+
+fun: test_store_cellz_empty { -- err }
+  CELL alloca { ptr }
+  123 ptr !
+
+  ptr !cellz
+  assert= ptr @ nil end
+end
+test_store_cellz_empty
+
+fun: test_cellz_len_copy { -- err }
+  3 cells alloca { src }
+  " one" " two" src !cellz
+
+  4 cells alloca { dst }
+  src dst cellz_copy { tail }
+  " three" tail !cellz
+
+  assert= src cellz_len 2 end
+  assert= dst cellz_len 3 end
+  dst @ " one" assert_str_eq
+  dst +cell @ " two" assert_str_eq
+  dst +cell +cell @ " three" assert_str_eq
+  assert= dst 3 cells + @ nil end
+end
+test_cellz_len_copy
+
 fun: test_load_store_pair_swap_instr { -- err }
   1 0 2 0 asm_store_pair_off { instr }
   assert=

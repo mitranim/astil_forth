@@ -4401,6 +4401,64 @@ fun_comp: allocaz' { -- err } ( C: "type" -- ) ( E: -- adr )
   compile' memzero
   execute'' systack_ptr \ mov x0, sp
 end
+
+\ Nil-terminated cell-array length, excluding final nil.
+fun: cellz_len { cellz -- len }
+  0 { len }
+  loop
+    cellz @ while
+    +cell: cellz
+    inc: len
+  end
+  len
+end
+
+\ Copy non-nil cells from `src` to `out`; return first append slot.
+fun: cellz_copy { src out -- tail }
+  loop
+    src @ { val }
+    val while
+    val out !
+    +cell: src
+    +cell: out
+  end
+  out
+end
+
+fun: comp_store_cells { nil_term -- err }
+  comp_args_get { len }
+  len dec { adr }
+  0 { ind }
+
+  loop
+    ind 1 + adr < while
+    ind ind 1 + adr ind cells asm_store_pair_off comp_instr \ stp Xi, Xi+1, [Xn, #off]
+    2 +: ind
+  end
+
+  if ind adr < then
+    ind adr ind asm_store_off comp_instr \ str Xi, [Xn, #off]
+  end
+
+  if nil_term then
+    ASM_REG_ZR adr adr asm_store_off comp_instr \ str xzr, [Xn, #off]
+  end
+
+  0 comp_args_set
+end
+
+\ `A B C out !cells` stores `A B C` into consecutive cells at `out`.
+fun_comp: !cells { -- err }
+  2 " for `!cells`" comp_args_min
+  false comp_store_cells
+end
+
+\ `A B C out !cellz` stores `A B C nil` into consecutive cells at `out`.
+fun_comp: !cellz { -- err }
+  1 " for `!cellz`" comp_args_min
+  true comp_store_cells
+end
+
 \ ## Assembler continued
 
 fun: asm_append_instr { instr out -- out } instr out !32 out 4 + end
