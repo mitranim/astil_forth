@@ -3328,8 +3328,7 @@ fun_comp: or { -- err } [ redefine ]
   if ok then reg imm0 imm1 or cf_fold_done ret end
   true ASM_OP_ORR_IMM ASM_OP_ORR_IMM
   instr' cf_logical_validate instr' cf_logical_emit
-  if cf_fold2 then ret end
-  execute'' or
+  ifz cf_fold2 then execute'' or end
 end
 
 \ Bitwise or into a local: `mask or: some_val`.
@@ -3345,8 +3344,7 @@ fun_comp: and { -- err } [ redefine ]
   if ok then reg imm0 imm1 and cf_fold_done ret end
   true ASM_OP_AND_IMM ASM_OP_AND_IMM
   instr' cf_logical_validate instr' cf_logical_emit
-  if cf_fold2 then ret end
-  execute'' and
+  ifz cf_fold2 then execute'' and end
 end
 
 \ Bitwise and into a local: `mask and: some_val`.
@@ -3361,8 +3359,7 @@ fun_comp: xor { -- err } [ redefine ]
   if ok then reg imm0 imm1 xor cf_fold_done ret end
   true ASM_OP_EOR_IMM ASM_OP_EOR_IMM
   instr' cf_logical_validate instr' cf_logical_emit
-  if cf_fold2 then ret end
-  execute'' xor
+  ifz cf_fold2 then execute'' xor end
 end
 
 \ Bitwise xor into a local: `mask xor: some_val`.
@@ -3377,8 +3374,7 @@ fun_comp: lsl { -- err } [ redefine ]
   if ok then reg imm0 imm1 lsl cf_fold_done ret end
   false ASM_OP_LSL_REG ASM_OP_LSL_REG
   instr' cf_shift_validate instr' cf_shift_emit
-  if cf_fold2 then ret end
-  execute'' lsl
+  ifz cf_fold2 then execute'' lsl end
 end
 
 \ Shift a local left: `bits lsl: some_val`.
@@ -3393,8 +3389,7 @@ fun_comp: lsr { -- err } [ redefine ]
   if ok then reg imm0 imm1 lsr cf_fold_done ret end
   false ASM_OP_LSR_REG ASM_OP_LSR_REG
   instr' cf_shift_validate instr' cf_shift_emit
-  if cf_fold2 then ret end
-  execute'' lsr
+  ifz cf_fold2 then execute'' lsr end
 end
 
 \ Shift a local right logically: `bits lsr: some_val`.
@@ -3409,8 +3404,7 @@ fun_comp: asr { -- err } [ redefine ]
   if ok then reg imm0 imm1 asr cf_fold_done ret end
   false ASM_OP_ASR_REG ASM_OP_ASR_REG
   instr' cf_shift_validate instr' cf_shift_emit
-  if cf_fold2 then ret end
-  execute'' asr
+  ifz cf_fold2 then execute'' asr end
 end
 
 \ Shift a local right arithmetically: `bits asr: some_val`.
@@ -3425,8 +3419,7 @@ fun_comp: + { -- err } [ redefine ]
   if ok then reg imm0 imm1 + cf_fold_done ret end
   true true true
   instr' cf_addsub_validate instr' cf_addsub_emit
-  if cf_fold2 then ret end
-  execute'' +
+  ifz cf_fold2 then execute'' + end
 end
 
 \ Add a step to a local: `step +: some_val`.
@@ -3441,8 +3434,7 @@ fun_comp: - { -- err } [ redefine ]
   if ok then reg imm0 imm1 - cf_fold_done ret end
   false false false
   instr' cf_addsub_validate instr' cf_addsub_emit
-  if cf_fold2 then ret end
-  execute'' -
+  ifz cf_fold2 then execute'' - end
 end
 
 \ Subtract a step from a local: `step -: some_val`.
@@ -3458,8 +3450,7 @@ fun_comp: * { -- err } [ redefine ]
   if ok then reg imm0 imm1 * cf_fold_done ret end
   true true true
   instr' cf_pow2_validate instr' cf_mul_pow2_emit
-  if cf_fold2 then ret end
-  execute'' *
+  ifz cf_fold2 then execute'' * end
 end
 
 \ Multiply a local: `factor *: some_val`.
@@ -3499,8 +3490,7 @@ fun_comp: u/ { -- err } [ redefine ]
   1 err1 cf_reject_rhs_imm
   false err1 nil
   instr' cf_pow2_validate_reject_1 instr' cf_udiv_pow2_emit
-  if cf_fold2 then ret end
-  execute'' u/
+  ifz cf_fold2 then execute'' u/ end
 end
 
 \ Unsigned divide a local: `divisor u/: some_val`.
@@ -3541,8 +3531,7 @@ fun_comp: umod { -- err } [ redefine ]
   1 err1 cf_reject_rhs_imm
   false err1 nil
   instr' cf_pow2_validate_reject_1 instr' cf_umod_pow2_emit
-  if cf_fold2 then ret end
-  execute'' umod
+  ifz cf_fold2 then execute'' umod end
 end
 
 \ Unsigned remainder into a local: `divisor umod: some_val`.
@@ -3788,8 +3777,7 @@ end
 fun: cf_cmp_fold2_or_execute { fallback rhs_cond lhs_cond -- err }
   true rhs_cond lhs_cond
   instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
-  if cf_fold2 then ret end
-  fallback execute
+  ifz cf_fold2 then fallback execute end
 end
 
 fun_comp: = { -- err } [ redefine ]
@@ -3971,8 +3959,7 @@ fun_comp: is_aligned_to { -- err } [ redefine ]
   if ok then reg imm0 imm1 is_aligned_to cf_fold_done ret end
   false nil nil
   instr' cf_align_validate instr' cf_align_emit
-  if cf_fold2 then ret end
-  execute'' is_aligned_to
+  ifz cf_fold2 then execute'' is_aligned_to end
 end
 
 fun_comp: align_down { -- err } [ redefine ]
@@ -3980,8 +3967,7 @@ fun_comp: align_down { -- err } [ redefine ]
   if ok then reg imm0 imm1 align_down cf_fold_done ret end
   false nil nil
   instr' cf_align_down_validate instr' cf_align_down_emit
-  if cf_fold2 then ret end
-  execute'' align_down
+  ifz cf_fold2 then execute'' align_down end
 end
 
 \ Align a local down: `wid align_down: some_val`.
@@ -3996,8 +3982,7 @@ fun_comp: align_up { -- err } [ redefine ]
   if ok then reg imm0 imm1 align_up cf_fold_done ret end
   false nil nil
   instr' cf_align_up_validate instr' cf_align_up_emit
-  if cf_fold2 then ret end
-  execute'' align_up
+  ifz cf_fold2 then execute'' align_up end
 end
 
 \ Align a local up: `wid align_up: some_val`.
@@ -4036,8 +4021,7 @@ fun_comp: bits_trunc { -- err } [ redefine ]
   if ok then reg imm0 imm1 bits_trunc cf_fold_done ret end
   false nil nil
   instr' cf_bits_trunc_validate instr' cf_logical_emit
-  if cf_fold2 then ret end
-  execute'' bits_trunc
+  ifz cf_fold2 then execute'' bits_trunc end
 end
 
 \ Truncate a local to low bits: `len bits_trunc: some_val`.
@@ -4053,7 +4037,7 @@ fun_comp: bits_clear { -- err } [ redefine ]
   if ok then reg imm0 imm1 bits_clear cf_fold_done ret end
   false ASM_OP_AND_IMM 1 or ASM_OP_AND_IMM 1 or
   instr' cf_logical_validate instr' cf_logical_emit
-  if cf_fold2 then ret end execute'' bits_clear
+  ifz cf_fold2 then execute'' bits_clear end
 end
 
 \ Clear bits in a local by mask: `mask bits_clear: some_val`.
@@ -4073,8 +4057,7 @@ fun_comp: bit_mask_get { -- err } [ redefine ]
     { -- }
     false nil nil
     instr' cf_bit_mask_get_validate instr' cf_bit_mask_get_emit
-    if cf_fold2 then ret end
-    execute'' bit_mask_get
+    ifz cf_fold2 then execute'' bit_mask_get end
   end
 end
 
