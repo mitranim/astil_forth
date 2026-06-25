@@ -7,7 +7,7 @@ use' lang_s.af
 LEN  mem: FLAGS
 
 fun: find_prime { flags len -- num }
-  flags len 1 fill
+  flags len 1 memfill
 
   0 3 ( num step )
 
@@ -39,7 +39,7 @@ run
 Runs notably slower.
 
 fun: find_prime
-  FLAGS LEN 1 fill
+  FLAGS LEN 1 memfill
 
   0 3 { num step }
 

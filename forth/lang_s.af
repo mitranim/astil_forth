@@ -1014,8 +1014,8 @@ end
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
 
 fun: move    ( src dst len  -- ) swap_over strncpy end
-fun: fill    ( buf len char -- ) swap memset end
-fun: memzero ( buf len      -- ) 0 fill end
+fun: memfill ( buf len char -- ) swap memset end
+fun: memzero ( buf len      -- ) 0 memfill end
 
 \ See `ccompare` below for null-terminated strings.
 fun: compare ( str0 len0 str1 len1 -- direction ) rot max strncmp end

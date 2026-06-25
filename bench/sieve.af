@@ -7,7 +7,7 @@ use' lang.af
 CAP  mem: FLAGS
 
 fun: find_prime { flags cap -- num }
-  flags cap 1 fill
+  flags cap 1 memfill
   flags cap + 0 3 { ceil num step }
   flags { ptr0 }
 

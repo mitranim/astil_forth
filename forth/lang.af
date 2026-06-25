@@ -1648,8 +1648,8 @@ end
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
 
 fun: move    { src out len  } out src len strncpy end
-fun: fill    { buf len char } buf char len memset end
-fun: memzero { buf len ->   } 0 fill end
+fun: memfill { buf len char } buf char len memset end
+fun: memzero { buf len ->   } 0 memfill end
 
 \ ## Characters and strings
 
