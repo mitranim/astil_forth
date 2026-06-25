@@ -24,7 +24,7 @@ fun: arena_deinit { arn -> err }
   floor { page }
   loop
     page ceil < while
-    page stack_deinit err fallback { err }
+    page stack_deinit fallback: err
     size' Stack +: page
   end
 

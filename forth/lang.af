@@ -4387,19 +4387,18 @@ fun_comp: allocaz' { -- err } ( C: "type" -- ) ( E: -- adr )
   execute'' systack_ptr \ mov x0, sp
 end
 
-\ Nil-terminated cell-array length, excluding final nil.
-fun: cellz_len { cellz -- len }
-  0 { len }
+\ Count non-nil cells; stop at nil.
+fun: cellz_len { adr -- len }
+  adr { cur }
   loop
-    cellz @ while
-    +cell: cellz
-    inc: len
+    cur @ while
+    +cell: cur
   end
-  len
+  cur adr - /cells
 end
 
-\ Copy non-nil cells from `src` to `out`; return first append slot.
-fun: cellz_copy { src out -- tail }
+\ Copy non-nil cells from `src` to `out`; return updated `out` address.
+fun: cellz_copy { src out -- next }
   loop
     src @ { val }
     val while
@@ -4411,8 +4410,7 @@ fun: cellz_copy { src out -- tail }
 end
 
 fun: comp_store_cells { nil_term -- err }
-  comp_args_get { len }
-  len dec { adr }
+  comp_args_get dec { adr }
   0 { ind }
 
   loop
@@ -4432,13 +4430,18 @@ fun: comp_store_cells { nil_term -- err }
   0 comp_args_set
 end
 
-\ `A B C out !cells` stores `A B C` into consecutive cells at `out`.
+\ Array initializer. Stores args to cells at address,
+\ which is passed as last arg. Example:
+\
+\   3 cells alloca { out }
+\   10 20 30 out !cells
+\   assert= out +cell @ 20 end
 fun_comp: !cells { -- err }
   2 " for `!cells`" comp_args_min
   false comp_store_cells
 end
 
-\ `A B C out !cellz` stores `A B C nil` into consecutive cells at `out`.
+\ Array initializer. Stores args and trailing nil to cells at address.
 fun_comp: !cellz { -- err }
   1 " for `!cellz`" comp_args_min
   true comp_store_cells
@@ -4448,10 +4451,7 @@ end
 
 fun: asm_append_instr { instr out -- out } instr out !32 out 4 + end
 fun: asm_imm16_lane { val hw -- lane } val hw 4 lsl lsr 0xffff and end
-
-fun: asm_movk_needed { neg lane -- bool }
-  lane 0xffff neg negate and - <>0
-end
+fun: asm_movk_needed { neg lane -- bool } lane 0xffff neg negate and - <>0 end
 
 fun: asm_append_movk_if_needed { reg neg hw imm out -- out }
   imm hw asm_imm16_lane { lane }
@@ -4462,8 +4462,8 @@ fun: asm_append_movk_if_needed { reg neg hw imm out -- out }
   end
 end
 
-\ Writes instructions for loading `imm` into `reg`,
-\ returns updated instruction buffer address.
+\ Writes instructions for loading `imm` into `reg`.
+\ Returns updated instruction buffer address.
 fun: asm_append_imm_to_reg { reg imm out -- out }
   imm 0 < { neg }
 
@@ -4669,7 +4669,7 @@ fun: fatal { err } " fatal: %s" err elogf elf abort end
 0 1 extern: __error
 1 1 extern: strerror
 
-\ We'd like to treat `errno` as a noun. It would have been convenient then
+\ We'd like to treat `errno` as a noun. Would have been convenient if C
 \ `errno` was a regular global variable, like `__stdinp`. Unfortunately,
 \ on MacOS, it's implemented as a macro which calls an external function
 \ which returns `x0` while clobbering `x8` and `x9` on the tested system

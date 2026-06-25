@@ -1141,16 +1141,16 @@ fun: test_cellz_len_copy { -- err }
   3 cells alloca { src }
   " one" " two" src !cellz
 
-  4 cells alloca { dst }
-  src dst cellz_copy { tail }
-  " three" tail !cellz
+  4 cells alloca { tar }
+  src tar cellz_copy { next }
+  " three" next !cellz
 
   assert= src cellz_len 2 end
-  assert= dst cellz_len 3 end
-  dst @ " one" assert_str_eq
-  dst +cell @ " two" assert_str_eq
-  dst +cell +cell @ " three" assert_str_eq
-  assert= dst 3 cells + @ nil end
+  assert= tar cellz_len 3 end
+  tar @ " one" assert_str_eq
+  tar +cell @ " two" assert_str_eq
+  tar +cell +cell @ " three" assert_str_eq
+  assert= tar 3 cells + @ nil end
 end
 test_cellz_len_copy
 
@@ -1321,13 +1321,9 @@ fun: test_compare_many { -- err }
 end
 test_compare_many
 
-fun: assert_fail { -- err }
-  assert
-    123 456 =
-  end
-end
+fun: assert_fail { -- err } assert 123 456 = end end
 
-fun: assert_bin_ops_ok { -- err }
+fun: test_assert_bin_ops { -- err }
   assert<> 10 20 end
   assert> 20 10 end
   assert< 10 20 end
@@ -1347,16 +1343,16 @@ fun: assert_bin_lt_fail { -- err }
   assert< 456 123 end
 end
 
-fun: assert_no_try_all_ok { -- err } [ false try_all ]
+fun: test_assert_try_manual { -- err } [ false try_all ]
   assert= 10 10 end try
-  assert<> 10 20 end try
+  assert<> 10 20 end
 end
 
 fun: test_assert { -- err }
   assert 10 10 = end
   assert= 10 10 end
-  assert_bin_ops_ok
-  assert_no_try_all_ok
+  test_assert_bin_ops
+  test_assert_try_manual
   catch' assert_fail { err }
   err " assertion failed: 123 456 =" assert_str_has
   catch' assert_bin_fail { err }
@@ -2232,8 +2228,7 @@ fun: test_catch_invalid { -- err } [ false try_all ]
 
   use' ./fail/test_catch_requires_try_all.af
   " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
-  assert_str_has try
-
+  assert_str_has
 end
 test_catch_invalid
 
@@ -2625,110 +2620,114 @@ fun: test_has_err_not_auto_marked { -- err }
 end
 test_has_err_not_auto_marked
 
-fun: test_has_err_not_contagious { -- err } [ false try_all ]
+false try_all
+
+fun: test_has_err_not_contagious { -- err }
   use' ./fail/test_has_err_not_contagious.af
   " caller has no error output for implicit `try_all`"
   assert_str_has
 end
 test_has_err_not_contagious
 
-fun: test_throw_requires_err { -- err } [ false try_all ]
+fun: test_throw_requires_err { -- err }
   use' ./fail/test_throw_requires_err.af
   " unable to `throw`: current word has no error output"
   assert_str_has
 end
 test_throw_requires_err
 
-fun: test_too_many_input_regs { -- err } [ false try_all ]
+fun: test_too_many_input_regs { -- err }
   use' ./fail/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
   assert_str_has
 end
 test_too_many_input_regs
 
-fun: test_too_many_output_regs { -- err } [ false try_all ]
+fun: test_too_many_output_regs { -- err }
   use' ./fail/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   assert_str_has
 end
 test_too_many_output_regs
 
-fun: test_too_many_output_regs_with_err { -- err } [ false try_all ]
+fun: test_too_many_output_regs_with_err { -- err }
   use' ./fail/test_too_many_output_regs_with_err.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   assert_str_has
 end
 test_too_many_output_regs_with_err
 
-fun: test_too_many_comptime_arg_regs { -- err } [ false try_all ]
+fun: test_too_many_comptime_arg_regs { -- err }
   use' ./fail/test_too_many_comptime_arg_regs.af
   " too many arguments: 16 registers available, 17 arguments provided"
   assert_str_has
 end
 test_too_many_comptime_arg_regs
 
-fun: test_too_many_execute_raw_args { -- err } [ false try_all ]
+fun: test_too_many_execute_raw_args { -- err }
   use' ./fail/test_too_many_execute_raw_args.af
   " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided"
   assert_str_has
 end
 test_too_many_execute_raw_args
 
-fun: test_comptime_stack_underflow { -- err } [ false try_all ]
+fun: test_comptime_stack_underflow { -- err }
   use' ./fail/test_comptime_stack_underflow.af
   " in `some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
   assert_str_has
 end
 test_comptime_stack_underflow
 
-fun: test_cond_arity_bare_if { -- err } [ false try_all ]
+fun: test_cond_arity_bare_if { -- err }
   use' ./fail/test_cond_arity_bare_if.af
   " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
   assert_str_has
 end
 test_cond_arity_bare_if
 
-fun: test_cond_arity_else_mismatch { -- err } [ false try_all ]
+fun: test_cond_arity_else_mismatch { -- err }
   use' ./fail/test_cond_arity_else_mismatch.af
   " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
   assert_str_has
 end
 test_cond_arity_else_mismatch
 
-fun: test_cond_arity_elif_mismatch { -- err } [ false try_all ]
+fun: test_cond_arity_elif_mismatch { -- err }
   use' ./fail/test_cond_arity_elif_mismatch.af
   " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   assert_str_has
 end
 test_cond_arity_elif_mismatch
 
-fun: test_cond_arity_elifz_mismatch { -- err } [ false try_all ]
+fun: test_cond_arity_elifz_mismatch { -- err }
   use' ./fail/test_cond_arity_elifz_mismatch.af
   " in `test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   assert_str_has
 end
 test_cond_arity_elifz_mismatch
 
-fun: test_cond_arity_no_else { -- err } [ false try_all ]
+fun: test_cond_arity_no_else { -- err }
   use' ./fail/test_cond_arity_no_else.af
   " arguments before ending conditional without `else`: arity mismatch"
   assert_str_has
 end
 test_cond_arity_no_else
 
-fun: test_cond_arity_no_else_less { -- err } [ false try_all ]
+fun: test_cond_arity_no_else_less { -- err }
   use' ./fail/test_cond_arity_no_else_less.af
   " arguments before ending conditional without `else`: arity mismatch"
   assert_str_has
 end
 test_cond_arity_no_else_less
 
-fun: test_cond_arity_no_else_more { -- err } [ false try_all ]
+fun: test_cond_arity_no_else_more { -- err }
   use' ./fail/test_cond_arity_no_else_more.af
   " arguments before ending conditional without `else`: arity mismatch"
   assert_str_has
 end
 test_cond_arity_no_else_more
+
+true try_all
 
 fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN mem_unprot end
 
