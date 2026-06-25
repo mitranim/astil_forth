@@ -69,7 +69,9 @@ static Err interp_fun(Interp *interp, Wordlist list) {
   Word_str name;
   try(interp_read_word(interp, &name));
   try(interp_fun_begin(interp, list, name));
-  try(int_stack_push(&interp->ints, (Sint)interp_semicolon_sym(interp)));
+
+  const auto sym = interp_semicolon_sym(interp);
+  try(int_stack_push(&interp->ints, (Sint)sym));
   return nullptr;
 }
 

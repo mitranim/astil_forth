@@ -197,7 +197,8 @@ static Err intrin_fun_with(Interp *interp, Wordlist wordlist, Sint *out) {
   Word_str name;
   try(interp_read_word(interp, &name));
   try(interp_fun_begin(interp, wordlist, name));
-  *out = (Sint)interp_semicolon_sym(interp);
+  const auto sym = interp_semicolon_sym(interp);
+  *out           = (Sint)sym;
   return nullptr;
 }
 
@@ -213,7 +214,10 @@ static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin(interp, WORDLIST_EXEC, name));
-  try(int_stack_push(&interp->ints, (Sint)interp_semicolon_sym(interp)));
+
+  const auto sym = interp_semicolon_sym(interp);
+  try(int_stack_push(&interp->ints, (Sint)sym));
+
   return nullptr;
 }
 
@@ -221,7 +225,10 @@ static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin(interp, WORDLIST_COMP, name));
-  try(int_stack_push(&interp->ints, (Sint)interp_semicolon_sym(interp)));
+
+  const auto sym = interp_semicolon_sym(interp);
+  try(int_stack_push(&interp->ints, (Sint)sym));
+
   return nullptr;
 }
 

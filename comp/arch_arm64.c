@@ -819,7 +819,10 @@ static Ind asm_align_sp_off(Ind off) { return __builtin_align_up(off, 16); }
 // and <reg>, <reg>, 0xfffffffffffffff0
 static void asm_append_sp_align(Comp *comp, U8 reg) {
   try_fatal(asm_validate_reg(reg));
-  asm_append_instr(comp, (Instr)0b1'00'100100'1'111100'111011'00000'00000 | (reg << 5) | reg);
+  asm_append_instr(
+    comp,
+    (Instr)0b1'00'100100'1'111100'111011'00000'00000 | ((Instr)reg << 5u) | reg
+  );
 }
 
 /*
@@ -1120,7 +1123,10 @@ static void asm_append_imm_to_reg(Comp *comp, U8 reg, Sint src) {
   if (base_hw >= 4) base_hw = 0;
 
   asm_append_mov_wide(
-    comp, reg, opc, base_hw,
+    comp,
+    reg,
+    opc,
+    base_hw,
     asm_mov_wide_base_imm16(neg, asm_imm16_lane(val, base_hw))
   );
 
