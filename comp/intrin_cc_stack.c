@@ -124,6 +124,37 @@ static Err intrin_throw(Interp *interp) {
   return nullptr;
 }
 
+static Err interp_catch(Interp *interp, Wordlist wordlist) {
+  Sym_dict *dict;
+  try(interp_wordlist(interp, wordlist, &dict));
+  Word_str word;
+  try(interp_read_word(interp, &word));
+
+  const auto name = word.buf;
+  const auto sym  = dict_get(dict, name);
+  if (!sym) return err_word_undefined_in_wordlist(name, wordlist);
+  if (!sym->has_err) return err_catch_no_throw(name);
+
+  constexpr bool err_mode = true;
+  const auto     comp     = &interp->comp;
+
+  switch (sym->type) {
+    case SYM_NORM: {
+      try(comp_append_call_norm(comp, sym, err_mode));
+      return nullptr;
+    }
+    case SYM_INTRIN: {
+      try(comp_append_call_intrin(comp, sym, err_mode));
+      return nullptr;
+    }
+    case SYM_EXTERN: {
+      return errf("unable to catch extern word " FMT_QUOTED, name);
+    }
+    default: unreachable();
+  }
+  return nullptr;
+}
+
 static Err intrin_catch(Interp *interp) {
   Sint wordlist;
   try(int_stack_pop(&interp->ints, &wordlist));
@@ -417,6 +448,15 @@ static const USED auto INTRIN_THROWS = (Sym){
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
+};
+
+static const USED auto INTRIN_CATCH = (Sym){
+  .name.buf = "catch",
+  .wordlist = WORDLIST_EXEC,
+  .intrin   = (void *)intrin_catch,
+  .inp_len  = 1,
+  .out_len  = 1,
+  .has_err  = true,
 };
 
 static const USED auto INTRIN_DEBUG_WORD = (Sym){

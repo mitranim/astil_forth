@@ -17,9 +17,9 @@ If you "catch", a call becomes Go-style. The compiler reveals the error and skip
   inner2 { val0 val1 }
 
   \ No exceptions and no hidden instructions:
-  catch' inner0 {           err } \ registers: x0
-  catch' inner1 { val0      err } \ registers: x0 x1
-  catch' inner2 { val0 val1 err } \ registers: x0 x1 x2
+  inner0 catch {           err } \ registers: x0
+  inner1 catch { val0      err } \ registers: x0 x1
+  inner2 catch { val0 val1 err } \ registers: x0 x1 x2
 ;
 ```
 

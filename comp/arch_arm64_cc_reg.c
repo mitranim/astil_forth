@@ -280,28 +280,6 @@ static void asm_append_try(
 }
 
 /*
-Must be used after compiling every call to a non-extern function.
-
-In reg-CC, this doesn't ever "catch"; the name simply mirrors
-stack-CC, where it does; this is invoked from a generic file
-shared by both implementations.
-*/
-static Err asm_append_try_catch(
-  Comp *comp, Sym *caller, const Sym *callee, bool err_mode_auto_try
-) {
-  if (!err_mode_auto_try) return nullptr;
-  if (!callee->has_err) return nullptr;
-
-  const U8   caller_reg = caller->out_len - 1;
-  const auto callee_reg = asm_sym_err_reg(callee);
-
-  IF_DEBUG(assert_fatal(callee_reg >= 0));
-
-  asm_append_try(comp, caller_reg, (U8)callee_reg);
-  return nullptr;
-}
-
-/*
 We use a custom calling convention for interpreter / compiler intrinsics.
 They're implemented in C and some of them want to return multiple outputs.
 The Arm64 ABI supports multiple outputs in general-purpose registers, but
@@ -381,7 +359,7 @@ static Err asm_append_call_intrin(
     }
   }
 
-  try(asm_append_try_catch(comp, caller, callee, err_mode));
+  (void)err_mode;
 
   asm_register_call(comp, caller);
   return nullptr;

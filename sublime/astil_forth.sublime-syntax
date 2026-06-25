@@ -34,7 +34,7 @@ variables:
       if|ifz|then|else|elif|elifz|do|end|
       loop|for|while|leave|again|
       throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
-      try|try[_]{{word}}|{{word}}[_]try|
+      try|try[_]{{word}}|{{word}}[_]try|catch|
       assert|assert{{word}}|abort|unreachable|fatal|quit|exit
     )
 

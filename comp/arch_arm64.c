@@ -1227,7 +1227,11 @@ static Err asm_append_call_norm(
   assert_fatal(comp_code_is_instr_ours(code, fun));
   asm_append_branch_link_to_offset(comp, pc_off);
   asm_register_call(comp, caller);
+#ifdef CALL_CONV_STACK
   try(asm_append_try_catch(comp, caller, callee, err_mode));
+#else
+  (void)err_mode;
+#endif
 
   IF_DEBUG(eprintf(
     "[system] in " FMT_QUOTED ": appended call to " FMT_QUOTED
@@ -1255,7 +1259,12 @@ static Err asm_inline_sym(
     list_push(instrs, instrs->dat[ind]);
   }
 
+#ifdef CALL_CONV_STACK
   try(asm_append_try_catch(comp, caller, callee, err_mode));
+#else
+  (void)caller;
+  (void)err_mode;
+#endif
 
   IF_DEBUG({
     if (floor == ceil) {

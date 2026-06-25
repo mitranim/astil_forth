@@ -137,14 +137,6 @@ static const char *comp_local_name(Local *loc) {
   return "(anonymous)";
 }
 
-static void comp_arg_clear_err(Comp_arg *arg) { arg->err = (Comp_arg_err){}; }
-
-static void comp_arg_set_err(Comp_arg *arg, const Sym *callee) {
-  IF_DEBUG(assert_fatal(!arg->loc.loc));
-  IF_DEBUG(assert_fatal(!arg->imm.has_imm));
-  arg->err = (Comp_arg_err){.callee = callee};
-}
-
 static bool comp_arg_has_known_value(const Comp_arg *arg) {
   return arg->loc.loc || arg->imm.has_imm || arg->err.callee;
 }
@@ -412,7 +404,7 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
       comptime immediate if the register already holds one.
       */
       arg->loc = (Comp_arg_loc){.loc = loc};
-      comp_arg_clear_err(arg);
+      arg->err = (Comp_arg_err){};
     }
     else {
       const auto arg = &ctx->args[reg0];
@@ -695,25 +687,58 @@ static Err comp_before_append_call(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
+static Err comp_append_auto_try(
+  Comp *comp, const Sym *caller, const Sym *callee, Comp_arg_err *out
+) {
+  try_assert(callee->has_err);
+
+  const U8 caller_reg = caller->out_len - 1;
+  const S8 callee_reg = asm_sym_err_reg(callee);
+  try_assert(callee_reg >= 0);
+
+  const auto ctx         = &comp->ctx;
+  const auto instrs      = &comp->code.code_write;
+  const Ind  instr_floor = instrs->len;
+  const Sint fix_len     = stack_len(&ctx->asm_fix);
+  try_assert(fix_len >= 0 && fix_len <= IND_MAX);
+  const Ind fix_ind = (Ind)fix_len;
+
+  asm_append_try(comp, caller_reg, (U8)callee_reg);
+
+  try_assert(instrs->len > instr_floor);
+  try_assert(stack_len(&ctx->asm_fix) == fix_ind + 1);
+
+  *out = (Comp_arg_err){
+    .callee          = callee,
+    .try_instr_floor = instr_floor,
+    .try_instr_ceil  = instrs->len,
+    .try_fix_ind     = fix_ind,
+  };
+  return nullptr;
+}
+
 static Err comp_after_append_call(
   Comp *comp, const Sym *caller, const Sym *callee, bool auto_try
 ) {
-  (void)caller;
-
   const auto ctx = &comp->ctx;
+
+  Comp_arg_err err = {.callee = callee};
+  if (auto_try && callee->has_err) {
+    try(comp_append_auto_try(comp, caller, callee, &err));
+  }
 
   /*
   An error, if any, is returned in the last output GPR. By default errors are
   visible. We also support blanket implicit "try" via "try_all". In that case,
-  `asm_append_call_norm` and `asm_append_call_intrin` auto-insert the "try".
-  Here we just hide the error since it's been checked already.
+  `comp_append_auto_try` inserts the "try" and records it for postfix `catch`.
+  Here we hide the error since it's been checked already.
   */
   ctx->arg_len = callee->out_len - !!(auto_try && callee->has_err);
   for (U8 ind = 0; ind < callee->out_len; ind++) {
     ctx->args[ind] = (Comp_arg){};
   }
   if (callee->has_err) {
-    comp_arg_set_err(&ctx->args[callee->out_len - 1], callee);
+    ctx->args[callee->out_len - 1] = (Comp_arg){.err = err};
   }
   return nullptr;
 }

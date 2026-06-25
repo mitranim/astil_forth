@@ -96,7 +96,7 @@ fun: run { -- err }
 end
 
 fun: main { -- exit }
-  catch' run { err }
+  run catch { err }
   ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 run

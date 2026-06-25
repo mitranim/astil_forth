@@ -645,11 +645,23 @@ fun: recur_fun_with_err { val -- out err }
   val dec recur
 end
 
+fun: recur_catch_fun { val -- out err }
+  ifz val then 100 ret end
+  if val 3 = then 0 " some_error" ret end
+  val dec recur catch
+end
+
 fun: test_recur_with_err { -- err }
-  2 catch' recur_fun_with_err { out err }
+  2 recur_fun_with_err catch { out err }
   assert= out 100 end
   assert= err nil end
-  4 catch' recur_fun_with_err { -- err }
+  4 recur_fun_with_err catch { -- err }
+  err " some_error" assert_str_eq
+
+  2 recur_catch_fun catch { out err }
+  assert= out 100 end
+  assert= err nil end
+  4 recur_catch_fun catch { -- err }
   err " some_error" assert_str_eq
 end
 test_recur_with_err
@@ -1353,11 +1365,11 @@ fun: test_assert { -- err }
   assert= 10 10 end
   test_assert_bin_ops
   test_assert_try_manual
-  catch' assert_fail { err }
+  assert_fail catch { err }
   err " assertion failed: 123 456 =" assert_str_has
-  catch' assert_bin_fail { err }
+  assert_bin_fail catch { err }
   err " assertion failed: 123 456 = (0x7b 0x1c8 =)" assert_str_has
-  catch' assert_bin_lt_fail { err }
+  assert_bin_lt_fail catch { err }
   err " assertion failed: 456 123 < (0x1c8 0x7b <)" assert_str_has
 end
 test_assert
@@ -1553,34 +1565,34 @@ fun: test_asm_new_bits { -- err }
   assert= 2 3 asm_rbit 0b11011010110000000000000001100010 end
   assert= 2 3 asm_clz 0b11011010110000000001000001100010 end
   assert= 2 3 asm_ctz 0b11011010110000000001100001100010 end
-  1 asm_logical_imm_enc { n immr imms }
-  assert= n 1 end
+  1 asm_logical_imm_enc { N immr imms }
+  assert= N 1 end
   assert= immr 0 end
   assert= imms 0 end
-  0xff asm_logical_imm_enc { n immr imms }
-  assert= n 1 end
+  0xff asm_logical_imm_enc { N immr imms }
+  assert= N 1 end
   assert= immr 0 end
   assert= imms 7 end
-  0x00ff_00ff_00ff_00ff asm_logical_imm_enc { n immr imms }
-  assert= n 0 end
+  0x00ff_00ff_00ff_00ff asm_logical_imm_enc { N immr imms }
+  assert= N 0 end
   assert= immr 0 end
   assert= imms 39 end
-  0x8000_0000_0000_0000 asm_logical_imm_enc { n immr imms }
-  assert= n 1 end
+  0x8000_0000_0000_0000 asm_logical_imm_enc { N immr imms }
+  assert= N 1 end
   assert= immr 1 end
   assert= imms 0 end
-  0 catch' asm_logical_imm_enc { -- err }
+  0 asm_logical_imm_enc catch { -- err }
   err " unable to encode logical immediate: 0 is reserved" assert_str_eq
-  -1 catch' asm_logical_imm_enc { -- err }
+  -1 asm_logical_imm_enc catch { -- err }
   err " unable to encode logical immediate: all ones is reserved" assert_str_eq
-  0x1234_5678_9abc_def0 catch' asm_logical_imm_enc { -- err }
+  0x1234_5678_9abc_def0 asm_logical_imm_enc catch { -- err }
   err " unable to encode logical immediate: value is not a repeated bitmask" assert_str_eq
   assert= 0 0 1 asm_and_imm 0b1_00_100100_1_000000_000000_00000_00000 end
   assert= 0 0 1 asm_orr_imm 0b1_01_100100_1_000000_000000_00000_00000 end
   assert= 0 0 1 asm_eor_imm 0b1_10_100100_1_000000_000000_00000_00000 end
   0 0 -2 asm_and_imm { bic_exp }
   assert= 0 0 1 asm_bic_imm bic_exp end
-  0 0 0 catch' asm_and_imm { _instr err }
+  0 0 0 asm_and_imm catch { _instr err }
   err " unable to encode logical immediate: 0 is reserved" assert_str_eq
 end
 test_asm_new_bits
@@ -2219,15 +2231,11 @@ test_struct_11
 
 fun: test_catch_invalid { -- err } [ false try_all ]
   use' ./fail/test_catch_invalid_exec.af
-  " useless attempt to catch an error when calling word `nop` which does not throw"
-  assert_str_has try
-
-  use' ./fail/test_catch_invalid_comp.af
-  " word `nop` not found in wordlist 2 (WORDLIST_COMP)"
+  " unable to `catch`: no hidden `try` to backtrack"
   assert_str_has try
 
   use' ./fail/test_catch_requires_try_all.af
-  " in `test_catch_requires_try_all_outer`: unable to `catch`: implicit `try` is not enabled"
+  " unable to `catch`: no hidden `try` to backtrack"
   assert_str_has
 end
 test_catch_invalid
@@ -2244,10 +2252,10 @@ end
 
 fun: test_catch_0 { -- err }
   assert= test_catch_0_val 123 end
-  catch' test_catch_0_val { val err }
+  test_catch_0_val catch { val err }
   assert= val 123 end
   assert= err nil end
-  catch' test_throw { err }
+  test_throw catch { err }
   err " test_err" assert_str_eq
 end
 test_catch_0
@@ -2261,10 +2269,10 @@ end
 
 fun: test_catch_1 { -- err }
   assert= 123 test_catch_1_cond 246 end
-  123 catch' test_catch_1_cond { val err }
+  123 test_catch_1_cond catch { val err }
   assert= val 246 end
   assert= err nil end
-  0 catch' test_catch_1_cond { val err }
+  0 test_catch_1_cond catch { val err }
 
   err " test_err" assert_str_eq
 end
@@ -2289,15 +2297,15 @@ fun: test_catch_2 { -- err }
   13 25 test_catch_2_cond { one two }
   assert= one 38 end
   assert= two 12 end
-  13 25 catch' test_catch_2_cond { one two err }
+  13 25 test_catch_2_cond catch { one two err }
   assert= one 38 end
   assert= two 12 end
   assert= err nil end
 
-  0 13 catch' test_catch_2_cond { one two err }
+  0 13 test_catch_2_cond catch { one two err }
   err " test_err" assert_str_eq
 
-  12 0 catch' test_catch_2_cond { one two err }
+  12 0 test_catch_2_cond catch { one two err }
   err " test_err" assert_str_eq
 end
 test_catch_2
@@ -2823,7 +2831,7 @@ fun: test_arena_deinit { -- err }
   assert= arn test_stack_len_bytes 0 end
   assert= arn Arena_low @ nil end
 
-  adr1 catch' test_arena_unprot { err }
+  adr1 test_arena_unprot catch { err }
   assert err <>0 end
   err " unable to mprotect" assert_str_has
 end
@@ -2833,7 +2841,7 @@ fun: test_arena_errors { -- err }
   alloca' Arena { arn }
   arn arena_init
 
-  0 arn catch' arena_alloc { _adr err }
+  0 arn arena_alloc catch { _adr err }
   assert err <>0 end
   err " unable to allocate: size is zero" assert_str_has
 
@@ -2844,17 +2852,17 @@ end
 test_arena_errors
 
 fun: test_word_len_over { -- err }
-  s" ./fail/test_word_len_over.af" catch' use { err }
+  s" ./fail/test_word_len_over.af" use catch { err }
   err " word length 128 exceeds max word length 127" assert_str_has
 end
 test_word_len_over
 
 fun: test_dropped_intrinsics_hidden { -- err }
-  s" :" WORDLIST_EXEC catch' find_word { _xt err }
+  s" :" WORDLIST_EXEC find_word catch { _xt err }
   err " undefined word" assert_str_has
-  s" ::" WORDLIST_EXEC catch' find_word { _xt err }
+  s" ::" WORDLIST_EXEC find_word catch { _xt err }
   err " undefined word" assert_str_has
-  s" ;" WORDLIST_COMP catch' find_word { _xt err }
+  s" ;" WORDLIST_COMP find_word catch { _xt err }
   err " undefined word" assert_str_has
 end
 test_dropped_intrinsics_hidden

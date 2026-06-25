@@ -145,6 +145,9 @@ typedef struct {
 
 typedef struct {
   const Sym *callee;
+  Ind        try_instr_floor;
+  Ind        try_instr_ceil;
+  Ind        try_fix_ind;
 } Comp_arg_err;
 
 typedef struct {

@@ -1,4 +1,0 @@
-\ Must fail to compile: `nop` not in `WORDLIST_COMP`.
-fun: test_catch_invalid_comp
-  catch'' nop
-end

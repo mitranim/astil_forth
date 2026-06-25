@@ -1775,8 +1775,8 @@ end
 \ a "try" is implicitly inserted when calling "erroring" words.
 \ It's opt-in and opt-out per-file and per-word.
 \
-\ `catch` serves ONLY to suppress `try_all` for a single call.
-\ By default, without `try_all`, `catch` doesn't even compile.
+\ Under `try_all`, postfix `catch` restores the error output
+\ from the preceding call by backtracking the implicit "try".
 \
 \ Examples:
 \
@@ -1790,6 +1790,7 @@ end
 \     inner try { one two }
 \     [ true try_all ]
 \     inner { one two } \ Implicit "try".
+\     inner catch { one two err }
 \   end
 
 \ Interp-mode version of `throw`, to complement compile-time intrinsic.
@@ -1799,9 +1800,6 @@ fun: throw { _err }
     1 comp_args_set
   ]
 end
-
-fun_comp: catch'  { -- err } WORDLIST_EXEC catch end
-fun_comp: catch'' { -- err } WORDLIST_COMP catch end
 
 \ ## IO
 \
@@ -2598,6 +2596,9 @@ end
 
 struct: Interp_comp_arg_err
   Adr 1 field: Interp_comp_arg_err_callee
+  U32 1 field: Interp_comp_arg_err_try_instr_floor
+  U32 1 field: Interp_comp_arg_err_try_instr_ceil
+  U32 1 field: Interp_comp_arg_err_try_fix_ind
 end
 
 struct: Interp_comp_arg
@@ -3067,7 +3068,7 @@ fun: cf_logical_validate { imm aux -- aux ok err }
   imm 0 = imm -1 = op ASM_OP_EOR_IMM <> and or { edge }
   imm inv ?invert { imm }
   if edge then " redundant arithmetic" throw end
-  imm op catch' asm_logical_imm_mask =0
+  imm op asm_logical_imm_mask catch =0
 end
 
 fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
@@ -3076,7 +3077,7 @@ end
 
 fun: cf_align_validate { size _ -- aux ok err }
   if size 1 = then " redundant arithmetic" throw end
-  size dec ASM_OP_ANDS_IMM catch' asm_logical_imm_mask =0
+  size dec ASM_OP_ANDS_IMM asm_logical_imm_mask catch =0
 end
 
 fun: cf_align_emit { out adr _size mask -- err }
@@ -3086,7 +3087,7 @@ end
 
 fun: cf_align_down_validate { size _ -- aux ok err }
   if size 1 = then " redundant arithmetic" throw end
-  size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
+  size negate ASM_OP_AND_IMM asm_logical_imm_mask catch =0
 end
 
 fun: cf_align_down_emit { out len _size mask -- err }
@@ -3096,7 +3097,7 @@ end
 fun: cf_align_up_validate { size _ -- aux ok err }
   if size 1 = then " redundant arithmetic" throw end
   size dec cf_imm_u12 { add_ok }
-  size negate ASM_OP_AND_IMM catch' asm_logical_imm_mask { mask mask_err }
+  size negate ASM_OP_AND_IMM asm_logical_imm_mask catch { mask mask_err }
   mask add_ok mask_err =0 and
 end
 
@@ -3107,7 +3108,7 @@ end
 
 fun: cf_bits_trunc_validate { len _ -- aux ok err }
   if len 0 <= len 64 >= or then " redundant arithmetic" throw end
-  len low_bits ASM_OP_AND_IMM catch' asm_logical_imm_mask =0
+  len low_bits ASM_OP_AND_IMM asm_logical_imm_mask catch =0
 end
 
 fun: cf_bit_mask_validate { mask -- err }
@@ -3121,7 +3122,7 @@ end
 fun: cf_bit_mask_get_validate { mask _ -- aux ok err }
   if mask -1 = then " redundant arithmetic" throw end
   mask cf_bit_mask_validate
-  mask ASM_OP_AND_IMM catch' asm_logical_imm_mask { instr_mask err }
+  mask ASM_OP_AND_IMM asm_logical_imm_mask catch { instr_mask err }
   if err then nil false ret end
   mask bit_ctz 32 lsl instr_mask or true
 end

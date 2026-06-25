@@ -257,9 +257,7 @@ static Err intrin_recur(Interp *interp) {
   try(comp_forget_regs(comp, ASM_REGS_VOLATILE));
   bits_add_all_to(&sym->clobber, ASM_REGS_VOLATILE);
   try(comp_append_recur(comp));
-
-  comp->ctx.arg_len = sym->out_len;
-  if (comp->ctx.try_all && sym->has_err) try(comp_append_try(comp, sym));
+  try(comp_after_append_call(comp, sym, sym, comp->ctx.try_all));
 
   sym->norm.has_recur = true;
   return nullptr;
@@ -279,8 +277,41 @@ static Err intrin_throw(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_catch(Sint wordlist, Interp *interp) {
-  try(interp_catch(interp, (Wordlist)wordlist));
+static Err err_catch_no_implicit_try() {
+  return err_str("unable to `catch`: no hidden `try` to backtrack");
+}
+
+static Err err_catch_stale() {
+  return err_str("unable to `catch`: implicit `try` no longer current");
+}
+
+static Err intrin_catch(Interp *interp) {
+  const auto comp = &interp->comp;
+  const auto ctx  = &comp->ctx;
+  try(comp_require_current_sym(comp, nullptr));
+
+  if (ctx->arg_len >= (ASM_ARG_LEN_MAX - 1)) return err_catch_no_implicit_try();
+
+  const auto arg = &ctx->args[ctx->arg_len];
+  const auto err = &arg->err;
+
+  if (!err->callee) return err_catch_no_implicit_try();
+  if (!(err->try_instr_floor < err->try_instr_ceil)) {
+    return err_catch_no_implicit_try();
+  }
+
+  const auto instrs = &comp->code.code_write;
+  if (instrs->len != err->try_instr_ceil) return err_catch_stale();
+  if (stack_len(&ctx->asm_fix) != err->try_fix_ind + 1) {
+    return err_catch_stale();
+  }
+
+  instrs->len = err->try_instr_floor;
+  stack_trunc_to(&ctx->asm_fix, err->try_fix_ind);
+  arg->err.try_instr_floor = 0;
+  arg->err.try_instr_ceil  = 0;
+  arg->err.try_fix_ind     = 0;
+  ctx->arg_len++;
   return nullptr;
 }
 
@@ -774,6 +805,14 @@ static const USED auto INTRIN_TRY_ALL = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_try_all,
   .inp_len  = 1,
+  .out_len  = 1,
+  .has_err  = true,
+};
+
+static const USED auto INTRIN_CATCH = (Sym){
+  .name.buf = "catch",
+  .wordlist = WORDLIST_COMP,
+  .intrin   = (void *)intrin_catch,
   .out_len  = 1,
   .has_err  = true,
 };
