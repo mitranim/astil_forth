@@ -107,6 +107,7 @@ fun: sock_bind { info backlog -- sock err }
     end
   end
 
+  \ Best-effort cleanup; keep the primary setup error.
   if err then sock sock_close { -- } end
   sock err
 end
@@ -128,7 +129,7 @@ fun: net_listen { port backlog -- sock err }
   ainf freeaddrinfo
 
   if err then
-    " unable to listen on port %s: socket error: %s %s" port err wrapf { err }
+    err " unable to listen on port %s: socket error: %s" port err wrapf { err }
   elif sock <0 then
     " unable to listen on port %s: no sockets available" port errf { err }
   end
