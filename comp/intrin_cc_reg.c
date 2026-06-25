@@ -532,7 +532,7 @@ static Err intrin_comp_args_min(Sint args, Sint action, Interp *interp) {
   const auto msg     = action ? (const char *)action : "invalid argument count";
 
   if (arg_len < args) {
-    return err_args_arity(sym, msg, args, args, arg_len);
+    return err_args_arity(ctx, sym, msg, args, args, arg_len);
   }
   return nullptr;
 }
@@ -670,7 +670,7 @@ static void intrin_debug_ctx(Interp *interp) {
 
     for (S8 ind = arr_cap(ctx->args) - 1; ind >= 0; ind--) {
       const auto arg = &ctx->args[ind];
-      if (arg->loc.loc || arg->imm.has_imm) {
+      if (comp_arg_has_known_value(arg)) {
         last_arg = ind;
         break;
       }
@@ -707,6 +707,15 @@ static void intrin_debug_ctx(Interp *interp) {
             ind,
             arg->imm.num,
             (Uint)arg->imm.num
+          );
+          continue;
+        }
+
+        if (arg->err.callee) {
+          eprintf(
+            "[debug]     %d -- error from " FMT_QUOTED "\n",
+            ind,
+            arg->err.callee->name.buf
           );
           continue;
         }

@@ -2629,6 +2629,20 @@ fun: test_has_err_not_contagious { -- err }
 end
 test_has_err_not_contagious
 
+fun: test_error_arg_arity_hint { -- err }
+  use' ./fail/test_error_arg_arity_hint.af
+  " top argument is an error output from `err_arg_hint_callee`"
+  assert_str_has
+end
+test_error_arg_arity_hint
+
+fun: test_error_arg_return_range_hint { -- err }
+  use' ./fail/test_error_arg_return_range_hint.af
+  " required: between 0 and 1, provided: 2; hint: top argument is an error output from `err_arg_return_range_callee`"
+  assert_str_has
+end
+test_error_arg_return_range_hint
+
 fun: test_throw_requires_err { -- err }
   use' ./fail/test_throw_requires_err.af
   " unable to `throw`: current word has no error output"

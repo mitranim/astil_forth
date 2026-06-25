@@ -144,8 +144,13 @@ typedef struct {
 } Comp_arg_loc;
 
 typedef struct {
+  const Sym *callee;
+} Comp_arg_err;
+
+typedef struct {
   Comp_arg_loc loc;
   Reg_imm      imm;
+  Comp_arg_err err;
 } Comp_arg;
 
 /*

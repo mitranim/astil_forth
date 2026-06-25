@@ -2596,9 +2596,14 @@ struct: Interp_comp_arg_loc
   Adr 1 field: Interp_comp_arg_loc_fix
 end
 
+struct: Interp_comp_arg_err
+  Adr 1 field: Interp_comp_arg_err_callee
+end
+
 struct: Interp_comp_arg
   Interp_comp_arg_loc 1 field: Interp_comp_arg_loc_field
-  Interp_reg_imm 1 field: Interp_comp_arg_imm_field
+  Interp_reg_imm      1 field: Interp_comp_arg_imm_field
+  Interp_comp_arg_err 1 field: Interp_comp_arg_err_field
 end
 
 \ SYNC[comp_syms_fields].

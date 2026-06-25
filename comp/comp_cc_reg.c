@@ -137,6 +137,18 @@ static const char *comp_local_name(Local *loc) {
   return "(anonymous)";
 }
 
+static void comp_arg_clear_err(Comp_arg *arg) { arg->err = (Comp_arg_err){}; }
+
+static void comp_arg_set_err(Comp_arg *arg, const Sym *callee) {
+  IF_DEBUG(assert_fatal(!arg->loc.loc));
+  IF_DEBUG(assert_fatal(!arg->imm.has_imm));
+  arg->err = (Comp_arg_err){.callee = callee};
+}
+
+static bool comp_arg_has_known_value(const Comp_arg *arg) {
+  return arg->loc.loc || arg->imm.has_imm || arg->err.callee;
+}
+
 static void comp_local_confirm_relocs(Local *loc) {
   auto reloc = loc->reloc;
   loc->reloc = nullptr;
@@ -176,29 +188,53 @@ static bool comp_local_has_arg(const Comp_ctx *ctx, const Local *loc) {
 }
 
 static Err err_args_arity(
-  const Sym *sym, const char *action, Sint min, Sint max, Sint ava
+  const Comp_ctx *ctx,
+  const Sym      *sym,
+  const char     *action,
+  Sint            min,
+  Sint            max,
+  Sint            ava
 ) {
+  const char *hint_beg  = "";
+  const char *hint_name = "";
+  const char *hint_end  = "";
+
+  if (ctx && ava > max && ava > 0 && ava <= (Sint)arr_cap(ctx->args)) {
+    const auto callee = ctx->args[ava - 1].err.callee;
+    if (callee) {
+      hint_beg  = "; hint: top argument is an error output from `";
+      hint_name = callee->name.buf;
+      hint_end  = "`; use `try`, enable `try_all`, or bind it with `{ err }`";
+    }
+  }
+
   if (min == max) {
     return errf(
       "in " FMT_QUOTED " (%s): %s: arity mismatch: required: " FMT_SINT
-      ", provided: " FMT_SINT,
+      ", provided: " FMT_SINT "%s%s%s",
       sym->name.buf,
       wordlist_name(sym->wordlist),
       action,
       max,
-      ava
+      ava,
+      hint_beg,
+      hint_name,
+      hint_end
     );
   }
 
   return errf(
     "in " FMT_QUOTED " (%s): %s: arity mismatch: required: between " FMT_SINT
-    " and " FMT_SINT ", provided: " FMT_SINT,
+    " and " FMT_SINT ", provided: " FMT_SINT "%s%s%s",
     sym->name.buf,
     wordlist_name(sym->wordlist),
     action,
     min,
     max,
-    ava
+    ava,
+    hint_beg,
+    hint_name,
+    hint_end
   );
 }
 
@@ -210,7 +246,7 @@ static Err comp_validate_args(Comp *comp, const char *action, Sint min, Sint max
   const auto arg_len = ctx->arg_len;
 
   if (!(arg_len >= min && arg_len <= max)) {
-    return err_args_arity(sym, action, min, max, arg_len);
+    return err_args_arity(ctx, sym, action, min, max, arg_len);
   }
   return nullptr;
 }
@@ -376,6 +412,7 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
       comptime immediate if the register already holds one.
       */
       arg->loc = (Comp_arg_loc){.loc = loc};
+      comp_arg_clear_err(arg);
     }
     else {
       const auto arg = &ctx->args[reg0];
@@ -533,6 +570,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   loc->used = true;
 
   if (tar_arg->loc.loc == loc) {
+    IF_DEBUG(assert_fatal(!tar_arg->err.callee));
     IF_DEBUG(eprintf(
       "[debug] local " FMT_QUOTED
       " already associated with register %d; skipping instructions for \"push to local\"\n",
@@ -671,8 +709,11 @@ static Err comp_after_append_call(
   Here we just hide the error since it's been checked already.
   */
   ctx->arg_len = callee->out_len - !!(auto_try && callee->has_err);
-  for (U8 ind = 0; ind < ctx->arg_len; ind++) {
+  for (U8 ind = 0; ind < callee->out_len; ind++) {
     ctx->args[ind] = (Comp_arg){};
+  }
+  if (callee->has_err) {
+    comp_arg_set_err(&ctx->args[callee->out_len - 1], callee);
   }
   return nullptr;
 }
