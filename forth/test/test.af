@@ -645,56 +645,18 @@ fun: test_indirect_forward { -- err }
 end
 test_indirect_forward
 
-fun: recur_err_non_try_fun { val -- out err } [ false try_all ]
+fun: recur_fun_with_err { val -- out err }
   ifz val then 100 ret end
-  if val 3 = then 0 " recur_err_non_try" ret end
+  if val 3 = then 0 " some_error" ret end
   val dec recur
 end
 
-fun: recur_err_manual_try_fun { val -- out err } [ false try_all ]
-  ifz val then 100 ret end
-  if val 3 = then 0 " recur_err_manual" ret end
-  val dec recur try { out }
-  out
-end
-
-fun: recur_err_auto_try_fun { val -- out err } [ true try_all ]
-  ifz val then 100 ret end
-  if val 3 = then 0 " recur_err_auto" ret end
-  val dec recur { out }
-  out
-end
-
 fun: test_recur_with_err { -- err }
-  [ false try_all ]
-
-  2 recur_err_non_try_fun { out0 err0 }
-  assert= out0 100 end try
-  assert= err0 nil end try
-  4 recur_err_non_try_fun { _out1 err1 }
-  err1 " recur_err_non_try" assert_str_eq try
-
-  [ true try_all ]
-
-  2 catch' recur_err_manual_try_fun { out2 err2 }
-  assert= out2 100 end
-  assert= err2 nil end
-  4 catch' recur_err_manual_try_fun { _out3 err3 }
-  err3 " recur_err_manual" assert_str_eq
-
-  2 catch' recur_err_auto_try_fun { out4 err4 }
-  assert= out4 100 end
-  assert= err4 nil end
-
-  [ false try_all ]
-
-  4 recur_err_auto_try_fun { _out5 err5 }
-  assert err5 <>0 end try
-
-  [ true try_all ]
-
-  4 catch' recur_err_auto_try_fun { _out6 err6 }
-  err6 " recur_err_auto" assert_str_eq
+  2 catch' recur_fun_with_err { out err }
+  assert= out 100 end
+  assert= err nil end
+  4 catch' recur_fun_with_err { -- err }
+  err " some_error" assert_str_eq
 end
 test_recur_with_err
 
@@ -2452,16 +2414,16 @@ end
 test_explicit_err_1_fun_throwing
 
 fun: test_explicit_err_1 { -- err } [ false try_all ]
-
   0 test_explicit_err_1_fun { val err }
   err " test_err" assert_str_eq try
 
   123 test_explicit_err_1_fun { val err }
   assert= val 246 end try
   assert= err nil end try
+
   123 test_explicit_err_1_fun { val2 err2 }
   assert= val2 246 end try
-  assert= err2 nil end try
+  assert= err2 nil end
 end
 test_explicit_err_1
 
@@ -2500,7 +2462,7 @@ fun: test_explicit_err_2 { -- err } [ false try_all ]
   assert= err nil end try
   11 0 test_explicit_err_2_fun { val3 err3 }
   assert= val3 11 end try
-  assert= err3 nil end try
+  assert= err3 nil end
 end
 test_explicit_err_2
 
@@ -2538,7 +2500,7 @@ fun: test_explicit_err_3 { -- err } [ false try_all ]
   123 test_explicit_err_3_fun { one2 two2 err2 }
   assert= one2 246 end try
   assert= two2 -123 end try
-  assert= err2 nil end try
+  assert= err2 nil end
 end
 test_explicit_err_3
 
@@ -2589,7 +2551,7 @@ fun: test_explicit_err_4 { -- err } [ false try_all ]
   13 0 test_explicit_err_4_fun { one3 two3 err3 }
   assert= one3 13 end try
   assert= two3 -13 end try
-  assert= err3 nil end try
+  assert= err3 nil end
 end
 test_explicit_err_4
 

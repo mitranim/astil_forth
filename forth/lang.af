@@ -2980,7 +2980,7 @@ fun: cf_addsub_imm12_mag { imm -- mag ok }
 end
 
 fun: cf_validate { imm aux validate -> aux ok err }
-  execute_raw [ 3 comp_args_set ] try
+  execute_raw [ 3 comp_args_set ]
 end
 
 fun: cf_fold2 { lhs rhs_aux lhs_aux validate emit -- ok err }
@@ -3218,7 +3218,7 @@ fun: comp_loc_mut_imm_fallback { fallback_aux fallback aux validate emit -- err 
     if reg arg loc imm aux emit ok comp_loc_mut_fold_imm_checked then ret end
   end
 
-  reg loc fallback_aux fallback execute_raw [ 1 comp_args_set ] try
+  reg loc fallback_aux fallback execute_raw [ 1 comp_args_set ]
 end
 
 fun: comp_loc_mut_imm { reg_op aux validate emit -- err }

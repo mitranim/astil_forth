@@ -613,7 +613,7 @@ test_const_fold_bit_mask_get_set
 
 fun: test_const_fold_bit_mask_errors { -- err } [ false try_all ]
   use' ./fail/test_const_fold_bit_mask_get_bad.af
-  " invalid bit mask: expected nonzero contiguous mask" assert_str_has try
+  " invalid bit mask: expected nonzero contiguous mask" assert_str_has
 end
 test_const_fold_bit_mask_errors
 
@@ -727,7 +727,7 @@ fun: test_const_fold_redundant_arith_errors { -- err } [ false try_all ]
   " redundant arithmetic" assert_str_has try
 
   use' ./fail/test_const_fold_redundant_bit_mask_get.af
-  " redundant arithmetic" assert_str_has try
+  " redundant arithmetic" assert_str_has
 end
 test_const_fold_redundant_arith_errors
 
