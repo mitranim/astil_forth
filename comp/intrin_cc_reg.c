@@ -214,6 +214,7 @@ static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin(interp, WORDLIST_EXEC, name));
+  interp->comp.ctx.try_all = false;
 
   const auto sym = interp_semicolon_sym(interp);
   try(int_stack_push(&interp->ints, (Sint)sym));
@@ -225,6 +226,7 @@ static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin(interp, WORDLIST_COMP, name));
+  interp->comp.ctx.try_all = false;
 
   const auto sym = interp_semicolon_sym(interp);
   try(int_stack_push(&interp->ints, (Sint)sym));

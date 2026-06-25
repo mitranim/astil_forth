@@ -93,7 +93,6 @@ fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
 
   \ Compile-time semantics.
   str len define_fun_comp
-    0 try_all
     0 1 1 comp_signature_set ( -- err )
     val comp_push compile' comp_push
   execute'' end
@@ -1286,7 +1285,6 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
 
   \ Compile-time semantics.
   str len define_fun_comp
-    false try_all
     0 1 true comp_signature_set
     size     comp_push
     opc      comp_push
@@ -1557,7 +1555,6 @@ fun: init_data_word { name name_len adr -- err }
   execute'' end
 
   name name_len define_fun_comp
-    false try_all
     0 1 true comp_signature_set
     adr comp_push compile' comp_next_page_addr
   execute'' end
@@ -1597,7 +1594,6 @@ fun: buf_init { adr cap -- err }
   execute'' end
 
   str len define_fun_comp
-    false try_all
     0 1 true comp_signature_set
     adr comp_push cap comp_push compile' comp_buf
   execute'' end
@@ -2389,7 +2385,6 @@ fun: struct_field_define
 
   \ Compile-time semantics.
   name name_len define_fun_comp
-    false try_all
     0 1 true comp_signature_set
     off comp_push compile' struct_field_comp
   execute'' end
