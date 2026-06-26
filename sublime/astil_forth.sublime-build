@@ -7,8 +7,12 @@
 
   "variants": [
     {
-      "name": "lang.af",
+      "name": "with lang.af",
       "cmd": ["astil", "lang.af", "$file"],
+    },
+    {
+      "name": "slopmode",
+      "cmd": ["astil", "lang.af", "--slop=true", "$file"],
     },
     {
       "name": "trace",
