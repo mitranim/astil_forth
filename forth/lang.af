@@ -743,6 +743,13 @@ fun: comp_args2_regs2 { -- reg0 reg1 err }
 end
 
 \ ## Arithmetic continued
+\
+\ This section adds comptime versions of arithmetic words,
+\ which respect the comptime "argument / register stack".
+\ In addition, we ensure they all have runtime versions.
+\
+\ Some runtime redefinitions here are redundant with earlier versions,
+\ but tracking the redundancies is effort. Redefining all is easier.
 
 fun_comp: or { -- err } ASM_OP_ORR_REG comp_args2_arith_reg end
 
@@ -2745,6 +2752,21 @@ fun: execute_raw { _fun } [ 0 asm_branch_link_reg comp_instr ] end
 \ instruction address, known in C as "function pointer". Invokes the
 \ function with the preceding args. Assumes no outputs. The caller
 \ may assume outputs afterwards: `[ N comp_args_set ]`.
+\
+\ Important comptime semantics: words defined with `fun_comp` are compiled
+\ exactly like regular words. Only execution time differs: they execute at
+\ comptime as soon as the reader parses them while compiling another word.
+\
+\ This behavior stacks. Earlier comptime words execute while compiling later
+\ comptime words. For example, using `execute_raw` inside another `fun_comp`
+\ definition invokes `execute_raw` at comptime, and compiles a runtime call
+\ into the currently-defined `fun_comp` word. For the newly-defined comptime
+\ word, that call runs at the comptime of _another_ word where it's used.
+\
+\ Many comptime words manipulate compiler state, sometimes appending
+\ or backtracking instructions or affecting argument count. Comptime
+\ words used in other comptime words tend to affect just the current
+\ target word, with some exceptions like `compile'` / `compile''`.
 fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_args_get { len }
 

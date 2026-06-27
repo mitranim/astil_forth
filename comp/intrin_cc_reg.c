@@ -398,9 +398,9 @@ static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp, const U8 **adr)
 }
 
 /*
-TODO: drop `intrin_comp_page_addr` and `intrin_comp_page_load`.
-Program code now has both `here_write` and `here_exec`, and can
-calculate the offsets on its own.
+Used for PC-relative addressing of compiler-managed memory.
+Could be calculated in Forth on its own; was written early.
+TODO move to language code.
 */
 static Err intrin_comp_page_addr(Sint adr, Sint reg, Interp *interp) {
   try(interp_validate_data_ptr(adr));

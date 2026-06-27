@@ -1,5 +1,10 @@
 use' ../lang.af
 
+\ This file should contain tests for CF-specific optimizations.
+\ It shouldn't bother testing semantic-only arithmetic results;
+\ those should be covered in `./test.af`. It should not bother
+\ testing pessimizations either; no locking down poor codegen.
+
 true try_all
 
 128 mem: CF_EXPECT_INSTRS
