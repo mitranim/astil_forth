@@ -417,7 +417,6 @@ class FindBloatTest(unittest.TestCase):
             fun_comp: leave { -- err } do_leave end
             fun: mem_map { size flags -- addr err } raw_map end
             fun: stack_log_cells { stack -- } stack log_cells end
-            fun_comp: align_up: { loc align -- err } do_align end
             fun: stack: { -- } init_stack end
             fun: var: { -- } init_var end
             fun: cf_align_emit { x -- y } emit_align end
@@ -426,7 +425,7 @@ class FindBloatTest(unittest.TestCase):
             fun: util { x -- y } x dec end
             fun: caller { x -- y }
               x util while_end_xt leave mem_map stack_log_cells
-              align_up: stack: var:
+              stack: var:
               cf_align_emit comp_loc_mut_align_down_fallback asm_brk
             end
             """
@@ -445,7 +444,6 @@ class FindBloatTest(unittest.TestCase):
             fun_comp: leave { -- err } do_leave end
             fun: mem_map { size flags -- addr err } raw_map end
             fun: stack_log_cells { stack -- } stack log_cells end
-            fun_comp: align_up: { loc align -- err } do_align end
             fun: stack: { -- } init_stack end
             fun: var: { -- } init_var end
             fun: cf_align_emit { x -- y } emit_align end
@@ -454,7 +452,7 @@ class FindBloatTest(unittest.TestCase):
             fun: util { x -- y } x dec end
             fun: caller { x -- y }
               x util while_end_xt leave mem_map stack_log_cells
-              align_up: stack: var:
+              stack: var:
               cf_align_emit comp_loc_mut_align_down_fallback asm_brk
             end
             """

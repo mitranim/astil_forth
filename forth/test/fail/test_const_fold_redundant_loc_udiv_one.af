@@ -1,2 +1,0 @@
-use' ../../lang.af
-fun: test_const_fold_redundant_loc_udiv_one { val -- out } 1 u/: val val end

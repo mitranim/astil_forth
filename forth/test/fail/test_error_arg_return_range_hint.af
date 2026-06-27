@@ -1,5 +1,0 @@
-fun: err_arg_return_range_callee { -- val err } 123 end
-
-fun: err_arg_return_range_fail { -- err }
-  err_arg_return_range_callee
-end

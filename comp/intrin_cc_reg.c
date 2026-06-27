@@ -35,10 +35,10 @@ static Err interp_parse_params(Interp *interp) {
     return nullptr;
   }
 
-  const auto comp = &interp->comp;
-
-  bool push_inps            = false;
-  S8   trailing_discard_len = 0;
+  const auto comp                 = &interp->comp;
+  const auto ctx                  = &comp->ctx;
+  bool       push_inps            = false;
+  S8         trailing_discard_len = 0;
 
   for (;;) {
     try(read_valid_word(read, &word));
@@ -83,11 +83,12 @@ static Err interp_parse_params(Interp *interp) {
       return err_non_trailing_discard_param_push(sym->name.buf);
     }
 
-    const U8 arg_len  = sym->inp_len - (U8)trailing_discard_len;
-    comp->ctx.arg_len = arg_len;
+    const U8 arg_len = sym->inp_len - (U8)trailing_discard_len;
+    ctx->arg_len     = arg_len;
 
     for (U8 ind = 0; ind < arg_len; ind++) {
-      const auto loc = comp->ctx.args[ind].loc.loc;
+      const auto arg = &ctx->args[ind];
+      const auto loc = comp_arg_local_ref(arg);
       if (loc) loc->used = true;
     }
 
@@ -287,30 +288,25 @@ static Err err_catch_stale() {
 
 static Err intrin_catch(Interp *interp) {
   const auto comp = &interp->comp;
-  const auto ctx  = &comp->ctx;
   try(comp_require_current_sym(comp, nullptr));
 
-  if (ctx->arg_len >= (ASM_ARG_LEN_MAX - 1)) return err_catch_no_implicit_try();
+  const auto ctx = &comp->ctx;
+  if (ctx->arg_len >= arr_cap(ctx->args)) return err_catch_no_implicit_try();
 
   const auto arg = &ctx->args[ctx->arg_len];
-  const auto err = &arg->err;
+  if (arg->type != COMP_ARG_ERR) return err_catch_no_implicit_try();
 
-  if (!err->callee) return err_catch_no_implicit_try();
-  if (!(err->try_instr_floor < err->try_instr_ceil)) {
-    return err_catch_no_implicit_try();
-  }
-
+  const auto err    = &arg->err;
   const auto instrs = &comp->code.code_write;
   if (instrs->len != err->try_instr_ceil) return err_catch_stale();
+
   if (stack_len(&ctx->asm_fix) != err->try_fix_ind + 1) {
     return err_catch_stale();
   }
 
   instrs->len = err->try_instr_floor;
   stack_trunc_to(&ctx->asm_fix, err->try_fix_ind);
-  arg->err.try_instr_floor = 0;
-  arg->err.try_instr_ceil  = 0;
-  arg->err.try_fix_ind     = 0;
+  *arg = comp_arg_unknown();
   ctx->arg_len++;
   return nullptr;
 }
@@ -563,7 +559,7 @@ static Err intrin_comp_args_min(Sint args, Sint action, Interp *interp) {
   const auto msg     = action ? (const char *)action : "invalid argument count";
 
   if (arg_len < args) {
-    return err_args_arity(ctx, sym, msg, args, args, arg_len);
+    return err_args_arity(sym, msg, args, args, arg_len);
   }
   return nullptr;
 }
@@ -575,6 +571,19 @@ static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
 
 static Err intrin_comp_args_set(Sint len, Interp *interp) {
   return comp_args_set(&interp->comp, len);
+}
+
+static Err intrin_comp_args_fold(
+  Uint    argc,
+  Interp *interp,
+  Sint   *imm0,
+  Sint   *imm1,
+  Sint   *known_count,
+  Sint   *consumed_count
+) {
+  return comp_args_fold(
+    &interp->comp, argc, imm0, imm1, known_count, consumed_count
+  );
 }
 
 static Err intrin_comp_barrier(Interp *interp) {
@@ -701,57 +710,49 @@ static void intrin_debug_ctx(Interp *interp) {
 
     for (S8 ind = arr_cap(ctx->args) - 1; ind >= 0; ind--) {
       const auto arg = &ctx->args[ind];
-      if (comp_arg_has_known_value(arg)) {
+      if (arg->type != COMP_ARG_UNKNOWN) {
         last_arg = ind;
         break;
       }
     }
 
     if (last_arg >= 0) {
-      eprintf("[debug]   known values in argument registers:\n");
+      eprintf("[debug]   argument register metadata:\n");
 
       for (S8 ind = 0; ind <= last_arg; ind++) {
         const auto arg = &ctx->args[ind];
 
-        if (arg->loc.loc) {
-          const auto name = comp_local_name(arg->loc.loc);
+        switch (arg->type) {
+          case COMP_ARG_UNKNOWN: {
+            eprintf("[debug]     %d -- unknown\n", ind);
+            break;
+          }
 
-          if (arg->imm.has_imm) {
+          case COMP_ARG_IMM: {
             eprintf(
-              "[debug]     %d -- local: %s; constant: " FMT_SINT
-              " " FMT_UINT_HEX "\n",
+              "[debug]     %d -- constant: " FMT_SINT " " FMT_UINT_HEX "\n",
               ind,
-              name,
               arg->imm.num,
               (Uint)arg->imm.num
             );
-            continue;
+            break;
           }
 
-          eprintf("[debug]     %d -- local: %s\n", ind, name);
-          continue;
-        }
+          case COMP_ARG_LOCAL: {
+            const auto loc  = arg->local;
+            const auto name = comp_local_name(loc);
 
-        if (arg->imm.has_imm) {
-          eprintf(
-            "[debug]     %d -- constant: " FMT_SINT " " FMT_UINT_HEX "\n",
-            ind,
-            arg->imm.num,
-            (Uint)arg->imm.num
-          );
-          continue;
-        }
+            eprintf("[debug]     %d -- local: %s\n", ind, name);
+            break;
+          }
 
-        if (arg->err.callee) {
-          eprintf(
-            "[debug]     %d -- error from " FMT_QUOTED "\n",
-            ind,
-            arg->err.callee->name.buf
-          );
-          continue;
-        }
+          case COMP_ARG_ERR: {
+            eprintf("[debug]     %d -- error\n", ind);
+            break;
+          }
 
-        eprintf("[debug]     %d -- unknown\n", ind);
+          default: unreachable();
+        }
       }
     }
   }
@@ -880,6 +881,16 @@ static const USED auto INTRIN_COMP_ARGS_SET = (Sym){
   .intrin    = (void *)intrin_comp_args_set,
   .inp_len   = 1,
   .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_ARGS_FOLD = (Sym){
+  .name.buf  = "comp_args_fold",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_args_fold,
+  .inp_len   = 1,
+  .out_len   = 5,
   .has_err   = true,
   .comp_only = true,
 };

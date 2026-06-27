@@ -22,7 +22,9 @@ fun: asm_movi_2d_zero { Vd -> instr }
 end
 
 \ Shared by 3-vector ops.
-fun: asm_pattern_vec3_16b { Vd Vn Vm -> instr_mask } 16 lsl swap 5 lsl or or end
+fun: asm_pattern_vec3_16b { Vd Vn Vm -- instr_mask }
+  Vd Vn 5 lsl or Vm 16 lsl or
+end
 
 \ cmeq Vd.16b, Vn.16b, Vm.16b
 fun: asm_cmeq_16b { Vd Vn Vm -> instr }

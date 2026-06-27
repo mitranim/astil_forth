@@ -38,9 +38,9 @@ fun: fib { _depth -- lo hi } [
 
 fun: bigint_divmod10_step { quo bit rem -- quo rem }
   rem 1 lsl bit + { rem }
-  1 lsl: quo
+  quo 1 lsl { quo }
   if rem 10 >= then
-    10 -: rem
+    rem 10 - { rem }
     inc: quo
   end
   quo rem
@@ -55,7 +55,7 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
     dec: ind
     ind >=0 while
     qhi word 63 lsr rem bigint_divmod10_step { qhi rem }
-    1 lsl: word
+    word 1 lsl { word }
   end
 
   lo { word }
@@ -64,7 +64,7 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
     dec: ind
     ind >=0 while
     qlo word 63 lsr rem bigint_divmod10_step { qlo rem }
-    1 lsl: word
+    word 1 lsl { word }
   end
 
   qlo qhi rem

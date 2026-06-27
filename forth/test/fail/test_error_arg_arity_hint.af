@@ -1,6 +1,0 @@
-fun: err_arg_hint_callee { -- err } end
-
-fun: err_arg_hint_fail { -- err }
-  err_arg_hint_callee
-  nop
-end

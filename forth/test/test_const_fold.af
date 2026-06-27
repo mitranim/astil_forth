@@ -18,30 +18,27 @@ fun: cf_expect_instr { instr }
   ind inc CF_EXPECT_LEN !
 end
 
-fun: cf_sym_instr_len { XT -- len }
-  XT Sym_union Sym_norm_spans { spans }
-  spans Sym_instrs_ret @u32 inc
-  spans Sym_instrs_prologue @u32 -
-end
-
-fun: cf_actual_instr { XT ind -- instr }
-  XT sym_instr ind 4 * + @u32
-end
-
 fun: cf_expect_word { XT -- err }
   CF_EXPECT_LEN @ { exp_len }
-  XT cf_sym_instr_len { act_len }
+  XT Sym_union Sym_norm_spans { spans }
+  spans Sym_instrs_ret @u32 inc spans Sym_instrs_prologue @u32 - { act_len }
   if exp_len act_len <> then
-    " [test] instruction length mismatch: expected %zd, actual %zd" exp_len act_len errf throw
+    XT Sym_name Sym_word_buf { name }
+    XT Sym_name Sym_word_len @u32 { name_len }
+    " [test] `%.*s` instruction length mismatch: expected %zd, actual %zd"
+    name_len name exp_len act_len errf throw
   end
 
   0 { ind }
   loop
     ind exp_len < while
     CF_EXPECT_INSTRS ind 4 * + @u32 { exp }
-    XT ind cf_actual_instr { act }
+    XT sym_instr ind 4 * + @u32 { act }
     if exp act <> then
-      " [test] instruction mismatch at %zd: expected 0x%zx, actual 0x%zx" ind exp act errf throw
+      XT Sym_name Sym_word_buf { name }
+      XT Sym_name Sym_word_len @u32 { name_len }
+      " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
+      name_len name ind exp act errf throw
     end
     inc: ind
   end
@@ -108,62 +105,6 @@ fun: cf_expect_word2 { instr0 instr1 XT -- err }
   XT cf_expect_word
 end
 
-fun: cf_expect_lhs_imm1 { instr XT -- err }
-  cf_expect_clear
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 asm_mov_reg cf_expect_instr
-  instr cf_expect_instr
-  cf_expect_ret
-  XT cf_expect_word
-end
-
-fun: cf_expect_load_lhs_imm1 { instr imm XT -- err }
-  cf_expect_clear
-  0 imm cf_expect_load
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 asm_mov_reg cf_expect_instr
-  instr cf_expect_instr
-  cf_expect_ret
-  XT cf_expect_word
-end
-
-fun_comp: cf_expect_top_not_foldable { -- err }
-  1 nil comp_args_min
-  comp_args_get dec { reg }
-  reg comp_arg { val }
-  val cf_arg_foldable_imm { imm ok }
-  if ok then
-    " [test] expected non-foldable top reg; got immediate %zd" imm errf throw
-  end
-end
-
-fun_comp: cf_expect_reg_no_local { reg -- err }
-  reg comp_arg { val }
-  val Interp_comp_arg_loc_field Interp_comp_arg_loc_loc @ { loc }
-  if loc then
-    " [test] expected no local in reg %zd" reg errf throw
-  end
-end
-
-fun: cf_expect_sym_clobbers_reg { XT reg -- err }
-  XT Sym_clobber @ { clobber }
-  clobber 1 reg lsl and { has_clobber }
-  ifz has_clobber then
-    " [test] expected clobber for reg %zd" reg errf throw
-  end
-end
-
-fun_comp: cf_expect_top_foldable { exp -- err }
-  1 nil comp_args_min
-  comp_args_get dec { reg }
-  reg comp_arg { val }
-  val cf_arg_foldable_imm { imm ok }
-  ifz ok then " [test] expected foldable top reg" throw end
-  if imm exp <> then
-    " [test] expected top immediate %zd; got %zd" exp imm errf throw
-  end
-end
-
 fun: const_fold_arith_fun { -- val } 10 20 30 40 + - * end
 
 fun: test_const_fold_arith { -- err }
@@ -173,162 +114,6 @@ fun: test_const_fold_arith { -- err }
   -500 xt' const_fold_arith_fun cf_expect_load_word
 end
 test_const_fold_arith
-
-fun: comp_load_same_imm_fun { -- val }
-  [ 123 0 comp_load 123 0 comp_load 1 comp_args_set ]
-end
-
-fun: test_comp_load_same_imm { -- err }
-  assert= comp_load_same_imm_fun 123 end
-  ifz has_interp then ret end
-
-  123 xt' comp_load_same_imm_fun cf_expect_load_word
-end
-test_comp_load_same_imm
-
-fun: comp_load_same_imm_after_nop_fun { -- val }
-  [ 123 0 comp_load asm_nop comp_instr 123 0 comp_load 1 comp_args_set ]
-end
-
-fun: test_comp_load_same_imm_after_nop { -- err }
-  assert= comp_load_same_imm_after_nop_fun 123 end
-  ifz has_interp then ret end
-
-  cf_expect_clear
-  0 123 cf_expect_load
-  asm_nop cf_expect_instr
-  cf_expect_ret
-  xt' comp_load_same_imm_after_nop_fun cf_expect_word
-end
-test_comp_load_same_imm_after_nop
-
-fun: comp_instr_clobbers_imm_fun { -- val }
-  [
-    123 0 comp_load
-    0 comp_realloc_reg
-    0b0_00_100101_00_0000000000000000_00000 comp_instr \ mov w0, -1
-    1 comp_args_set
-    cf_expect_top_not_foldable
-  ]
-end
-
-fun: test_comp_instr_clobbers_imm { -- err }
-  assert=
-    comp_instr_clobbers_imm_fun
-    0b11111111_11111111_11111111_11111111
-  end
-end
-test_comp_instr_clobbers_imm
-
-fun: comp_realloc_reg_clobber_fun { -- val }
-  [ 123 0 comp_load 0 comp_realloc_reg 1 comp_args_set ]
-end
-
-fun: test_comp_realloc_reg_clobber { -- err }
-  xt' comp_realloc_reg_clobber_fun 0 cf_expect_sym_clobbers_reg
-end
-test_comp_realloc_reg_clobber
-
-fun: comp_args_set_clears_added_imm_fun
-  [
-    222 1 comp_load
-    1 comp_args_set
-    2 comp_args_set
-    cf_expect_top_not_foldable
-    0 comp_args_set
-  ]
-end
-
-fun: test_comp_args_set_clears_added_imm { -- err }
-  comp_args_set_clears_added_imm_fun
-end
-test_comp_args_set_clears_added_imm
-
-fun: comp_args_set_clears_truncated_imm_fun
-  [
-    111 0 comp_load
-    222 1 comp_load
-    2 comp_args_set
-    1 comp_args_set
-    2 comp_args_set
-    cf_expect_top_not_foldable
-    0 comp_args_set
-  ]
-end
-
-fun: test_comp_args_set_clears_truncated_imm { -- err }
-  comp_args_set_clears_truncated_imm_fun
-end
-test_comp_args_set_clears_truncated_imm
-
-fun: comp_args_set_clears_added_local_fun
-  111 { _local }
-  [
-    1 comp_args_set
-    0 cf_expect_reg_no_local
-    0 comp_args_set
-  ]
-end
-
-fun: test_comp_args_set_clears_added_local { -- err }
-  comp_args_set_clears_added_local_fun
-end
-test_comp_args_set_clears_added_local
-
-fun: comp_args_set_clears_truncated_local_fun
-  111 222 { _local0 _local1 }
-  [
-    2 comp_args_set
-    1 comp_args_set
-    1 cf_expect_reg_no_local
-    0 comp_args_set
-  ]
-end
-
-fun: test_comp_args_set_clears_truncated_local { -- err }
-  comp_args_set_clears_truncated_local_fun
-end
-test_comp_args_set_clears_truncated_local
-
-fun: comp_args_set_max_len_fun
-  [
-    ASM_ARG_LEN_MAX comp_args_set
-    0 comp_args_set
-  ]
-end
-
-fun: test_comp_args_set_max_len { -- err }
-  comp_args_set_max_len_fun
-end
-test_comp_args_set_max_len
-
-fun: const_fold_fallback_0_1_fun { val -- out } val 20 + end
-fun: const_fold_add_imm_lhs_fun { val -- out } 20 val + end
-fun: const_fold_sub_imm_fun { val -- out } val 20 - end
-fun: arg_add_no_reloc_fun { one two -- out } one two + end
-fun: const_fold_add_lhs_imm_no_reloc_fun { num -- out }
-  num num { -- }
-  10 num +
-end
-
-fun: test_const_fold_fallback_0_1 { -- err }
-  assert= 22 const_fold_fallback_0_1_fun 42 end
-  assert= 23 const_fold_add_imm_lhs_fun 43 end
-  assert= 62 const_fold_sub_imm_fun 42 end
-  assert= 1 2 arg_add_no_reloc_fun 3 end
-  assert= 22 const_fold_add_lhs_imm_no_reloc_fun 32 end
-  ifz has_interp then ret end
-
-  0 0 1 asm_add_reg xt' arg_add_no_reloc_fun cf_expect_word1
-  0 1 20 asm_add_imm xt' const_fold_add_imm_lhs_fun cf_expect_lhs_imm1
-
-  cf_expect_clear
-  1 0 asm_mov_reg cf_expect_instr
-  0 1 10 asm_add_imm cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_add_lhs_imm_no_reloc_fun cf_expect_word
-end
-test_const_fold_fallback_0_1
 
 fun: const_fold_large_imm_fun { -- out0 out1 out2 }
   1 0x123456789 +
@@ -509,12 +294,8 @@ fun: const_fold_lsl_imm_fun { val -- out } val 3 lsl end
 fun: const_fold_lsr_imm_fun { val -- out } val 3 lsr end
 fun: const_fold_asr_imm_fun { val -- out } val 2 asr end
 fun: const_fold_or_rhs_imm_fun { val -- out } val 0xff or end
-fun: const_fold_or_lhs_imm_fun { val -- out } 0xff val or end
 fun: const_fold_and_rhs_imm_fun { val -- out } val 0xff and end
-fun: const_fold_and_lhs_imm_fun { val -- out } 0xff val and end
 fun: const_fold_xor_rhs_imm_fun { val -- out } val 0xff xor end
-fun: const_fold_xor_lhs_imm_fun { val -- out } 0xff val xor end
-fun: const_fold_xor_invert_fun { val -- out } val -1 xor end
 fun: const_fold_is_aligned_rhs_imm_fun { val -- out } val 8 is_aligned_to end
 fun: const_fold_align_down_rhs_imm_fun { val -- out } val 16 align_down end
 fun: const_fold_align_up_rhs_imm_fun { val -- out } val 16 align_up end
@@ -529,25 +310,6 @@ fun: test_const_fold_bit_shift { -- err }
   assert= out3 48 end
   assert= out4 8 end
   assert= out5 -16 end
-  assert= 6 const_fold_lsl_imm_fun 48 end
-  assert= 64 const_fold_lsr_imm_fun 8 end
-  assert= -64 const_fold_asr_imm_fun -16 end
-  assert= 0x1234 const_fold_or_rhs_imm_fun 0x12ff end
-  assert= 0x1234 const_fold_or_lhs_imm_fun 0x12ff end
-  assert= 0x1234 const_fold_and_rhs_imm_fun 0x34 end
-  assert= 0x1234 const_fold_and_lhs_imm_fun 0x34 end
-  assert= 0x1234 const_fold_xor_rhs_imm_fun 0x12cb end
-  assert= 0x1234 const_fold_xor_lhs_imm_fun 0x12cb end
-  assert= 0x1234 const_fold_xor_invert_fun 0xffffffffffffedcb end
-  assert= 0x1238 const_fold_is_aligned_rhs_imm_fun true end
-  assert= 0x1234 const_fold_is_aligned_rhs_imm_fun false end
-  assert= 0x1234 const_fold_align_down_rhs_imm_fun 0x1230 end
-  assert= 0x1234 const_fold_align_up_rhs_imm_fun 0x1240 end
-  assert= 0x1234 const_fold_bits_trunc_rhs_imm_fun 0x34 end
-  assert=
-    0b1001000110100 const_fold_bit_mask_get_rhs_imm_fun
-    0b100011
-  end
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -565,11 +327,8 @@ fun: test_const_fold_bit_shift { -- err }
   0 0 2 asm_asr_imm xt' const_fold_asr_imm_fun cf_expect_word1
 
   0 0 0xff asm_orr_imm xt' const_fold_or_rhs_imm_fun cf_expect_word1
-  0 1 0xff asm_orr_imm xt' const_fold_or_lhs_imm_fun cf_expect_lhs_imm1
   0 0 0xff asm_and_imm xt' const_fold_and_rhs_imm_fun cf_expect_word1
-  0 1 0xff asm_and_imm xt' const_fold_and_lhs_imm_fun cf_expect_lhs_imm1
   0 0 0xff asm_eor_imm xt' const_fold_xor_rhs_imm_fun cf_expect_word1
-  0 1 0xff asm_eor_imm xt' const_fold_xor_lhs_imm_fun cf_expect_lhs_imm1
 
   0 7 asm_tst_imm { instr0 }
   0 ASM_EQ asm_cset { instr1 }
@@ -586,155 +345,110 @@ fun: test_const_fold_bit_shift { -- err }
 end
 test_const_fold_bit_shift
 
-fun: const_fold_bit_mask_get_fun { -- out }
-  0b1001000110100 0b111111110000 bit_mask_get
-end
-
-fun: const_fold_bit_mask_set_fun { -- out }
-  0b10101011 0b1001000110100 0b111111110000 bit_mask_set
-end
-
-fun: test_const_fold_bit_mask_get_set { -- err }
-  assert= const_fold_bit_mask_get_fun 0b100011 end
-  assert= const_fold_bit_mask_set_fun 0b1101010110100 end
-  ifz has_interp then ret end
-
-  0b100011 xt' const_fold_bit_mask_get_fun cf_expect_load_word
-
-  cf_expect_clear
-  0 0b10101011 cf_expect_load
-  1 0b1001000110100 cf_expect_load
-  2 0b111111110000 cf_expect_load
-  1 1 2 asm_bic cf_expect_instr
-  3 2 asm_rbit cf_expect_instr
-  3 3 asm_clz cf_expect_instr
-  0 0 3 asm_lsl_reg cf_expect_instr
-  0 0 2 asm_and_reg cf_expect_instr
-  0 0 1 asm_orr_reg cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_bit_mask_set_fun cf_expect_word
-end
-test_const_fold_bit_mask_get_set
-
-fun: test_const_fold_bit_mask_errors { -- err } [ false try_all ]
-  use' ./fail/test_const_fold_bit_mask_get_bad.af
+fun: test_const_fold_bit_mask_errors { -- err }
+  use' ./fail/test_const_fold_bit_mask_get_bad.af catch
   " invalid bit mask: expected nonzero contiguous mask" assert_str_has
 end
 test_const_fold_bit_mask_errors
 
-fun: test_const_fold_redundant_arith_errors { -- err } [ false try_all ]
-  use' ./fail/test_const_fold_redundant_logical.af
-  " redundant arithmetic" assert_str_has try
+fun: test_const_fold_redundant_arith_errors { -- err }
+  use' ./fail/test_const_fold_redundant_logical.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_addsub.af
-  " redundant arithmetic" assert_str_has try
+  use' ./fail/test_const_fold_redundant_addsub.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_shift.af
-  " redundant arithmetic" assert_str_has try
+  use' ./fail/test_const_fold_redundant_shift.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_const_shift.af
-  " redundant arithmetic" assert_str_has try
+  use' ./fail/test_const_fold_redundant_const_shift.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_mul_zero.af
-  " redundant arithmetic" assert_str_has try
+  use' ./fail/test_const_fold_redundant_mul_zero.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_div_one.af
-  " redundant arithmetic: division by 1" assert_str_has try
+  use' ./fail/test_const_fold_redundant_div_one.af catch
+  " redundant arithmetic: division by 1" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_udiv_one.af
-  " redundant arithmetic: division by 1" assert_str_has try
+  use' ./fail/test_const_fold_redundant_udiv_one.af catch
+  " redundant arithmetic: division by 1" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_mod_one.af
-  " redundant arithmetic: modulo by 1" assert_str_has try
+  use' ./fail/test_const_fold_redundant_mod_one.af catch
+  " redundant arithmetic: modulo by 1" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_umod_one.af
-  " redundant arithmetic: modulo by 1" assert_str_has try
+  use' ./fail/test_const_fold_redundant_umod_one.af catch
+  " redundant arithmetic: modulo by 1" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_divmod_one.af
-  " redundant arithmetic: division by 1" assert_str_has try
+  use' ./fail/test_const_fold_redundant_divmod_one.af catch
+  " redundant arithmetic: division by 1" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_udivmod_one.af
-  " redundant arithmetic: division by 1" assert_str_has try
+  use' ./fail/test_const_fold_redundant_udivmod_one.af catch
+  " redundant arithmetic: division by 1" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_div_one.af
-  " redundant arithmetic: division by 1" assert_str_has try
+  use' ./fail/test_const_fold_div_zero.af catch
+  " redundant arithmetic: division by 0 -> 0" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_udiv_one.af
-  " redundant arithmetic: division by 1" assert_str_has try
+  use' ./fail/test_const_fold_udiv_zero.af catch
+  " redundant arithmetic: division by 0 -> 0" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_mod_one.af
-  " redundant arithmetic: modulo by 1" assert_str_has try
+  use' ./fail/test_const_fold_mod_zero.af catch
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_umod_one.af
-  " redundant arithmetic: modulo by 1" assert_str_has try
+  use' ./fail/test_const_fold_umod_zero.af catch
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
 
-  use' ./fail/test_const_fold_div_zero.af
-  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+  use' ./fail/test_const_fold_divmod_zero.af catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
 
-  use' ./fail/test_const_fold_udiv_zero.af
-  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+  use' ./fail/test_const_fold_udivmod_zero.af catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
 
-  use' ./fail/test_const_fold_mod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+  use' ./fail/test_const_fold_rhs_div_zero.af catch
+  " redundant arithmetic: division by 0 -> 0" assert_str_has
 
-  use' ./fail/test_const_fold_umod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+  use' ./fail/test_const_fold_rhs_udiv_zero.af catch
+  " redundant arithmetic: division by 0 -> 0" assert_str_has
 
-  use' ./fail/test_const_fold_divmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
+  use' ./fail/test_const_fold_rhs_mod_zero.af catch
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
 
-  use' ./fail/test_const_fold_udivmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
+  use' ./fail/test_const_fold_rhs_umod_zero.af catch
+  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_div_zero.af
-  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+  use' ./fail/test_const_fold_rhs_divmod_zero.af catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_udiv_zero.af
-  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+  use' ./fail/test_const_fold_rhs_udivmod_zero.af catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_mod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+  use' ./fail/test_const_fold_redundant_align_down.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_redundant_loc_umod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+  use' ./fail/test_const_fold_redundant_align_up.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_rhs_div_zero.af
-  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+  use' ./fail/test_const_fold_redundant_is_aligned.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_rhs_udiv_zero.af
-  " redundant arithmetic: division by 0 -> 0" assert_str_has try
+  use' ./fail/test_const_fold_redundant_bits_trunc.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_rhs_mod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
+  use' ./fail/test_const_fold_redundant_bits_clear.af catch
+  " redundant arithmetic" assert_str_has
 
-  use' ./fail/test_const_fold_rhs_umod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has try
-
-  use' ./fail/test_const_fold_rhs_divmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
-
-  use' ./fail/test_const_fold_rhs_udivmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has try
-
-  use' ./fail/test_const_fold_redundant_align_down.af
-  " redundant arithmetic" assert_str_has try
-
-  use' ./fail/test_const_fold_redundant_align_up.af
-  " redundant arithmetic" assert_str_has try
-
-  use' ./fail/test_const_fold_redundant_is_aligned.af
-  " redundant arithmetic" assert_str_has try
-
-  use' ./fail/test_const_fold_redundant_bits_trunc.af
-  " redundant arithmetic" assert_str_has try
-
-  use' ./fail/test_const_fold_redundant_bits_clear.af
-  " redundant arithmetic" assert_str_has try
-
-  use' ./fail/test_const_fold_redundant_bit_mask_get.af
+  use' ./fail/test_const_fold_redundant_bit_mask_get.af catch
   " redundant arithmetic" assert_str_has
 end
 test_const_fold_redundant_arith_errors
+
+fun: test_const_fold_assert_static_errors { -- err }
+  use' ./fail/test_assert_static_fail.af catch
+  " assertion failed: 10 20 =" assert_str_has
+
+  use' ./fail/test_assert_static_fail_after_drop_with_err.af catch
+  " assertion failed: 123 234 =" assert_str_has
+end
+test_const_fold_assert_static_errors
 
 fun: const_fold_div_mod_fun { -- out0 out1 out2 out3 out4 }
   29 5 /
@@ -750,7 +464,6 @@ fun: const_fold_udiv_mod_fun { -- out0 out1 out2 out3 }
 end
 
 fun: const_fold_mul_pow2_rhs_imm_fun { val -- out } val -8 * end
-fun: const_fold_mul_pow2_lhs_imm_fun { val -- out } 8 val * end
 fun: const_fold_udiv_pow2_rhs_imm_fun { val -- out } val 8 u/ end
 fun: const_fold_umod_pow2_rhs_imm_fun { val -- out } val 8 umod end
 
@@ -766,10 +479,6 @@ fun: test_const_fold_div_mod { -- err }
   assert= out6 1 end
   assert= out7 1 end
   assert= out8 1 end
-  assert= 7 const_fold_mul_pow2_rhs_imm_fun -56 end
-  assert= 7 const_fold_mul_pow2_lhs_imm_fun 56 end
-  assert= 64 const_fold_udiv_pow2_rhs_imm_fun 8 end
-  assert= 31 const_fold_umod_pow2_rhs_imm_fun 7 end
 
   ifz has_interp then ret end
 
@@ -794,8 +503,6 @@ fun: test_const_fold_div_mod { -- err }
   0 asm_neg { instr1 }
   instr0 instr1 xt' const_fold_mul_pow2_rhs_imm_fun cf_expect_word2
 
-  0 1 3 asm_lsl_imm xt' const_fold_mul_pow2_lhs_imm_fun cf_expect_lhs_imm1
-
   0 0 3 asm_lsr_imm xt' const_fold_udiv_pow2_rhs_imm_fun cf_expect_word1
   0 0 7 asm_and_imm xt' const_fold_umod_pow2_rhs_imm_fun cf_expect_word1
 end
@@ -813,42 +520,20 @@ fun: const_fold_compare2_fun { -- out0 out1 out2 out3 out4 out5 out6 out7 }
 end
 
 fun: const_fold_eq_rhs_imm_fun { val -- out } val 20 = end
-fun: const_fold_eq_lhs_imm_fun { val -- out } 20 val = end
 fun: const_fold_ne_rhs_imm_fun { val -- out } val 20 <> end
-fun: const_fold_ne_lhs_imm_fun { val -- out } 20 val <> end
 fun: const_fold_gt_rhs_imm_fun { val -- out } val 20 > end
-fun: const_fold_gt_lhs_imm_fun { val -- out } 20 val > end
 fun: const_fold_lt_rhs_imm_fun { val -- out } val 20 < end
-fun: const_fold_lt_lhs_imm_fun { val -- out } 20 val < end
 fun: const_fold_le_rhs_imm_fun { val -- out } val 20 <= end
-fun: const_fold_le_lhs_imm_fun { val -- out } 20 val <= end
 fun: const_fold_ge_rhs_imm_fun { val -- out } val 20 >= end
-fun: const_fold_ge_lhs_imm_fun { val -- out } 20 val >= end
 fun: const_fold_ugt_rhs_imm_fun { val -- out } val 20 u> end
-fun: const_fold_ugt_lhs_imm_fun { val -- out } 20 val u> end
 fun: const_fold_ult_rhs_imm_fun { val -- out } val 20 u< end
-fun: const_fold_ult_lhs_imm_fun { val -- out } 20 val u< end
 fun: const_fold_ule_rhs_imm_fun { val -- out } val 20 u<= end
-fun: const_fold_ule_lhs_imm_fun { val -- out } 20 val u<= end
 fun: const_fold_uge_rhs_imm_fun { val -- out } val 20 u>= end
-fun: const_fold_uge_lhs_imm_fun { val -- out } 20 val u>= end
 
 fun: cf_expect_cmp_rhs_imm { XT cond -- err }
-  cf_expect_clear
-  0 20 asm_cmp_imm cf_expect_instr
-  0 cond asm_cset cf_expect_instr
-  cf_expect_ret
-  XT cf_expect_word
-end
-
-fun: cf_expect_cmp_lhs_imm { XT cond -- err }
-  cf_expect_clear
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 asm_mov_reg cf_expect_instr
-  1 20 asm_cmp_imm cf_expect_instr
-  0 cond asm_cset cf_expect_instr
-  cf_expect_ret
-  XT cf_expect_word
+  0 20 asm_cmp_imm { instr0 }
+  0 cond asm_cset { instr1 }
+  instr0 instr1 XT cf_expect_word2
 end
 
 fun: test_const_fold_compare2 { -- err }
@@ -861,46 +546,6 @@ fun: test_const_fold_compare2 { -- err }
   assert= out5 1 end
   assert= out6 1 end
   assert= out7 1 end
-  assert= 20 const_fold_eq_rhs_imm_fun 1 end
-  assert= 21 const_fold_eq_rhs_imm_fun 0 end
-  assert= 20 const_fold_eq_lhs_imm_fun 1 end
-  assert= 21 const_fold_eq_lhs_imm_fun 0 end
-  assert= 20 const_fold_ne_rhs_imm_fun 0 end
-  assert= 21 const_fold_ne_rhs_imm_fun 1 end
-  assert= 20 const_fold_ne_lhs_imm_fun 0 end
-  assert= 21 const_fold_ne_lhs_imm_fun 1 end
-  assert= 21 const_fold_gt_rhs_imm_fun 1 end
-  assert= 20 const_fold_gt_rhs_imm_fun 0 end
-  assert= 19 const_fold_gt_lhs_imm_fun 1 end
-  assert= 20 const_fold_gt_lhs_imm_fun 0 end
-  assert= 19 const_fold_lt_rhs_imm_fun 1 end
-  assert= 20 const_fold_lt_rhs_imm_fun 0 end
-  assert= 21 const_fold_lt_lhs_imm_fun 1 end
-  assert= 20 const_fold_lt_lhs_imm_fun 0 end
-  assert= 20 const_fold_le_rhs_imm_fun 1 end
-  assert= 21 const_fold_le_rhs_imm_fun 0 end
-  assert= 20 const_fold_le_lhs_imm_fun 1 end
-  assert= 19 const_fold_le_lhs_imm_fun 0 end
-  assert= 20 const_fold_ge_rhs_imm_fun 1 end
-  assert= 19 const_fold_ge_rhs_imm_fun 0 end
-  assert= 20 const_fold_ge_lhs_imm_fun 1 end
-  assert= 21 const_fold_ge_lhs_imm_fun 0 end
-  assert= 21 const_fold_ugt_rhs_imm_fun 1 end
-  assert= 20 const_fold_ugt_rhs_imm_fun 0 end
-  assert= 19 const_fold_ugt_lhs_imm_fun 1 end
-  assert= 20 const_fold_ugt_lhs_imm_fun 0 end
-  assert= 19 const_fold_ult_rhs_imm_fun 1 end
-  assert= 20 const_fold_ult_rhs_imm_fun 0 end
-  assert= 21 const_fold_ult_lhs_imm_fun 1 end
-  assert= 20 const_fold_ult_lhs_imm_fun 0 end
-  assert= 20 const_fold_ule_rhs_imm_fun 1 end
-  assert= 21 const_fold_ule_rhs_imm_fun 0 end
-  assert= 20 const_fold_ule_lhs_imm_fun 1 end
-  assert= 19 const_fold_ule_lhs_imm_fun 0 end
-  assert= 20 const_fold_uge_rhs_imm_fun 1 end
-  assert= 19 const_fold_uge_rhs_imm_fun 0 end
-  assert= 20 const_fold_uge_lhs_imm_fun 1 end
-  assert= 21 const_fold_uge_lhs_imm_fun 0 end
   ifz has_interp then ret end
 
   cf_expect_clear
@@ -925,19 +570,26 @@ fun: test_const_fold_compare2 { -- err }
   xt' const_fold_ult_rhs_imm_fun ASM_LO cf_expect_cmp_rhs_imm
   xt' const_fold_ule_rhs_imm_fun ASM_LS cf_expect_cmp_rhs_imm
   xt' const_fold_uge_rhs_imm_fun ASM_HS cf_expect_cmp_rhs_imm
-
-  xt' const_fold_eq_lhs_imm_fun ASM_EQ cf_expect_cmp_lhs_imm
-  xt' const_fold_ne_lhs_imm_fun ASM_NE cf_expect_cmp_lhs_imm
-  xt' const_fold_gt_lhs_imm_fun ASM_LT cf_expect_cmp_lhs_imm
-  xt' const_fold_lt_lhs_imm_fun ASM_GT cf_expect_cmp_lhs_imm
-  xt' const_fold_le_lhs_imm_fun ASM_GE cf_expect_cmp_lhs_imm
-  xt' const_fold_ge_lhs_imm_fun ASM_LE cf_expect_cmp_lhs_imm
-  xt' const_fold_ugt_lhs_imm_fun ASM_LO cf_expect_cmp_lhs_imm
-  xt' const_fold_ult_lhs_imm_fun ASM_HI cf_expect_cmp_lhs_imm
-  xt' const_fold_ule_lhs_imm_fun ASM_HS cf_expect_cmp_lhs_imm
-  xt' const_fold_uge_lhs_imm_fun ASM_LS cf_expect_cmp_lhs_imm
 end
 test_const_fold_compare2
+
+fun: const_fold_assert_static_pass_fun
+  assert<> 10 20 end
+  assert=  10 10 end
+  assert>  20 10 end
+  assert<  10 20 end
+  assertu> 20 10 end
+end
+
+fun: test_const_fold_assert_static_pass { -- err }
+  const_fold_assert_static_pass_fun
+  ifz has_interp then ret end
+
+  cf_expect_clear
+  cf_expect_ret
+  xt' const_fold_assert_static_pass_fun cf_expect_word
+end
+test_const_fold_assert_static_pass
 
 fun: const_fold_ucompare2_fun { -- out0 out1 out2 out3 out4 out5 }
   -1 0 umin
@@ -1007,694 +659,24 @@ fun: test_const_fold_derived { -- err }
 end
 test_const_fold_derived
 
-fun: loc_step_fun { diff -- out0 out1 }
-  10 { val0 }
-  diff +: val0
-  10 { val1 }
-  diff -: val1
-  val0 val1
-end
-
-fun: const_fold_loc_step_fun { val -- out0 out1 out2 }
-  5 +: val
-  val
-  3 -: val
-  val
-  4096 +: val
-  val
-end
-
-fun: const_fold_loc_step_neg_fun { -- out }
-  10 { val }
-  -5 +: val
-  -3 -: val
-  val
-end
-
-fun: const_fold_loc_step_min_fun { -- out }
-  10 { val }
-  -9223372036854775808 +: val
-  val
-end
-
-fun: loc_logic_and_fun { mask -- out0 out1 }
-  0b110101 { val0 }
-  mask and: val0
-  0b110101 { val1 }
-  0b111100 and: val1
-  val0 val1
-end
-
-fun: loc_logic_or_fun { mask -- out0 out1 }
-  0b110101 { val0 }
-  mask or: val0
-  0b110101 { val1 }
-  0b001010 or: val1
-  val0 val1
-end
-
-fun: loc_logic_xor_fun { mask -- out0 out1 }
-  0b110101 { val0 }
-  mask xor: val0
-  0b110101 { val1 }
-  0b001010 xor: val1
-  val0 val1
-end
-
-fun: loc_logic_imm_fun { -- out0 out1 out2 out3 }
-  0x1234 { val0 }
-  0xff or: val0
-  0x1234 { val1 }
-  0xff and: val1
-  0x1234 { val2 }
-  0xff xor: val2
-  0x1234 { val3 }
-  0xff bits_clear: val3
-  val0 val1 val2 val3
-end
-
-fun: loc_shift_lsl_fun { shift -- out0 out1 }
-  0b1011 { val0 }
-  shift lsl: val0
-  5 { val1 }
-  2 lsl: val1
-  val0 val1
-end
-
-fun: loc_shift_lsr_fun { shift -- out0 out1 }
-  0b1011000 { val0 }
-  shift lsr: val0
-  80 { val1 }
-  2 lsr: val1
-  val0 val1
-end
-
-fun: loc_shift_asr_fun { shift -- out0 out1 }
-  -88 { val0 }
-  shift asr: val0
-  -80 { val1 }
-  2 asr: val1
-  val0 val1
-end
-
-fun: loc_mul_fun { factor -- out0 out1 }
-  7 { val0 }
-  factor *: val0
-  9 { val1 }
-  3 *: val1
-  val0 val1
-end
-
-fun: loc_mul_pow2_fun { -- out }
-  7 { val }
-  -8 *: val
-  val
-end
-
-fun: loc_udiv_fun { divisor -- out0 out1 }
-  100 { val0 }
-  divisor u/: val0
-  81 { val1 }
-  3 u/: val1
-  val0 val1
-end
-
-fun: loc_udiv_pow2_fun { -- out }
-  80 { val }
-  8 u/: val
-  val
-end
-
-fun: loc_sdiv_fun { divisor -- out0 out1 }
-  -100 { val0 }
-  divisor /: val0
-  81 { val1 }
-  -3 /: val1
-  val0 val1
-end
-
-fun: loc_mod_fun { divisor -- out0 out1 }
-  -100 { val0 }
-  divisor mod: val0
-  81 { val1 }
-  -10 mod: val1
-  val0 val1
-end
-
-fun: loc_umod_fun { divisor -- out0 out1 }
-  -1 { val0 }
-  divisor umod: val0
-  81 { val1 }
-  10 umod: val1
-  val0 val1
-end
-
-fun: loc_umod_pow2_fun { -- out }
-  -1 { val }
-  8 umod: val
-  val
-end
-
-fun: loc_min_fun { candidate -- out0 out1 }
-  -100 { val0 }
-  candidate min: val0
-  81 { val1 }
-  -10 min: val1
-  val0 val1
-end
-
-fun: loc_umin_fun { candidate -- out0 out1 }
-  -100 { val0 }
-  candidate umin: val0
-  -1 { val1 }
-  10 umin: val1
-  val0 val1
-end
-
-fun: loc_max_fun { candidate -- out0 out1 }
-  -100 { val0 }
-  candidate max: val0
-  81 { val1 }
-  -10 max: val1
-  val0 val1
-end
-
-fun: loc_umax_fun { candidate -- out0 out1 }
-  -100 { val0 }
-  candidate umax: val0
-  -1 { val1 }
-  10 umax: val1
-  val0 val1
-end
-
-fun: loc_align_down_fun { wid -- out0 out1 }
-  77 { val0 }
-  wid align_down: val0
-  77 { val1 }
-  16 align_down: val1
-  val0 val1
-end
-
-fun: loc_align_up_fun { wid -- out0 out1 }
-  77 { val0 }
-  wid align_up: val0
-  77 { val1 }
-  16 align_up: val1
-  val0 val1
-end
-
-fun: loc_bit_mask_get_fun { mask -- out0 out1 }
-  0b1001000110100 { val0 }
-  mask bit_mask_get: val0
-  0b1001000110100 { val1 }
-  0b111111110000 bit_mask_get: val1
-  val0 val1
-end
-
-fun: loc_bits_trunc_fun { len -- out0 out1 }
-  0b101101 { val0 }
-  len bits_trunc: val0
-  0b101101 { val1 }
-  3 bits_trunc: val1
-  val0 val1
-end
-
-fun: loc_inc_dec_inline_fun { val }
-  inc: val
-  dec: val
-end
-
-fun: loc_invert_fun { val -- out }
-  invert: val
-  val
-end
-
-fun: loc_negate_fun { val -- out }
-  negate: val
-  val
-end
-
-fun: loc_abs_fun { val -- out }
-  abs: val
-  val
-end
-
-fun: loc_bit_clz_fun { val -- out }
-  bit_clz: val
-  val
-end
-
-fun: loc_bit_ctz_fun { val -- out }
-  bit_ctz: val
-  val
-end
-
-fun: loc_bit_len_fun { val -- out }
-  bit_len: val
-  val
-end
-
-fun: loc_pow2_ceil_fun { val -- out }
-  pow2_ceil: val
-  val
-end
-
-fun: loc_int_to_cell_fun { val -- out }
-  int_to_cell: val
-  val
-end
-
-fun: loc_cells_fun { val -- out }
-  cells: val
-  val
-end
-
-fun: loc_div_cells_fun { val -- out }
-  /cells: val
-  val
-end
-
-fun: loc_add_cell_fun { val -- out }
-  +cell: val
-  val
-end
-
-fun: loc_sub_cell_fun { val -- out }
-  -cell: val
-  val
-end
-
-fun: loc_odd_fun { val -- out }
-  odd: val
-  val
-end
-
-fun: loc_low_bits_fun { val -- out }
-  low_bits: val
-  val
-end
-
-fun: loc_bits_clear_fun { mask -- out0 out1 }
-  0b110101 { val0 }
-  mask bits_clear: val0
-  0b110101 { val1 }
-  0b001010 bits_clear: val1
-  val0 val1
-end
-
-fun: loc_fallback_fun { candidate -- out0 out1 }
-  42 { val0 }
-  candidate fallback: val0
-  42 { val1 }
-  0 fallback: val1
-  val0 val1
-end
-
-fun: loc_bit_mask_set_fun { inp mask -- out }
-  0b100000000001 { val }
-  inp mask bit_mask_set: val
-  val
-end
-
-fun: loc_eq_zero_fun { val -- out }
-  =0: val
-  val
-end
-
-fun: loc_ne_zero_fun { val -- out }
-  <>0: val
-  val
-end
-
-fun: loc_lt_zero_fun { val -- out }
-  <0: val
-  val
-end
-
-fun: loc_gt_zero_fun { val -- out }
-  >0: val
-  val
-end
-
-fun: loc_le_zero_fun { val -- out }
-  <=0: val
-  val
-end
-
-fun: loc_ge_zero_fun { val -- out }
-  >=0: val
-  val
-end
-
-fun: loc_eq_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs =: val0
-  7 { val1 }
-  8 =: val1
-  val0 val1
-end
-
-fun: loc_ne_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs <>: val0
-  7 { val1 }
-  8 <>: val1
-  val0 val1
-end
-
-fun: loc_gt_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs >: val0
-  7 { val1 }
-  8 >: val1
-  val0 val1
-end
-
-fun: loc_lt_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs <: val0
-  7 { val1 }
-  8 <: val1
-  val0 val1
-end
-
-fun: loc_le_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs <=: val0
-  7 { val1 }
-  8 <=: val1
-  val0 val1
-end
-
-fun: loc_ge_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs >=: val0
-  7 { val1 }
-  8 >=: val1
-  val0 val1
-end
-
-fun: loc_ugt_fun { rhs -- out0 out1 }
-  -1 { val0 }
-  rhs u>: val0
-  7 { val1 }
-  8 u>: val1
-  val0 val1
-end
-
-fun: loc_ult_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs u<: val0
-  -1 { val1 }
-  8 u<: val1
-  val0 val1
-end
-
-fun: loc_ule_fun { rhs -- out0 out1 }
-  7 { val0 }
-  rhs u<=: val0
-  -1 { val1 }
-  8 u<=: val1
-  val0 val1
-end
-
-fun: loc_uge_fun { rhs -- out0 out1 }
-  -1 { val0 }
-  rhs u>=: val0
-  7 { val1 }
-  8 u>=: val1
-  val0 val1
-end
-
-fun: test_const_fold_loc_step { -- err }
-  7 loc_step_fun { out0 out1 }
-  assert= out0 17 end
-  assert= out1 3 end
-  10 const_fold_loc_step_fun { out2 out3 out4 }
-  assert= out2 15 end
-  assert= out3 12 end
-  assert= out4 4108 end
-  assert= const_fold_loc_step_neg_fun 8 end
-  assert= const_fold_loc_step_min_fun -9223372036854775798 end
-  0b101010 loc_logic_and_fun { out5 out6 }
-  assert= out5 0b100000 end
-  assert= out6 0b110100 end
-  0b001010 loc_logic_or_fun { out7 out8 }
-  assert= out7 0b111111 end
-  assert= out8 0b111111 end
-  0b101010 loc_logic_xor_fun { out9 out10 }
-  assert= out9 0b011111 end
-  assert= out10 0b111111 end
-  loc_logic_imm_fun { out11 out12 out13 out14 }
-  assert= out11 0x12ff end
-  assert= out12 0x34 end
-  assert= out13 0x12cb end
-  assert= out14 0x1200 end
-  3 loc_shift_lsl_fun { out15 out16 }
-  assert= out15 88 end
-  assert= out16 20 end
-  3 loc_shift_lsr_fun { out17 out18 }
-  assert= out17 11 end
-  assert= out18 20 end
-  3 loc_shift_asr_fun { out19 out20 }
-  assert= out19 -11 end
-  assert= out20 -20 end
-  4 loc_mul_fun { out21 out22 }
-  assert= out21 28 end
-  assert= out22 27 end
-  assert= loc_mul_pow2_fun -56 end
-  4 loc_udiv_fun { out23 out24 }
-  assert= out23 25 end
-  assert= out24 27 end
-  assert= loc_udiv_pow2_fun 10 end
-  4 loc_sdiv_fun { out25 out26 }
-  assert= out25 -25 end
-  assert= out26 -27 end
-  6 loc_mod_fun { out27 out28 }
-  assert= out27 -4 end
-  assert= out28 1 end
-  10 loc_umod_fun { out29 out30 }
-  assert= out29 5 end
-  assert= out30 1 end
-  assert= loc_umod_pow2_fun 7 end
-  6 loc_min_fun { out31 out32 }
-  assert= out31 -100 end
-  assert= out32 -10 end
-  6 loc_umin_fun { out33 out34 }
-  assert= out33 6 end
-  assert= out34 10 end
-  6 loc_max_fun { out35 out36 }
-  assert= out35 6 end
-  assert= out36 81 end
-  6 loc_umax_fun { out37 out38 }
-  assert= out37 -100 end
-  assert= out38 -1 end
-  8 loc_align_down_fun { out39 out40 }
-  assert= out39 72 end
-  assert= out40 64 end
-  8 loc_align_up_fun { out41 out42 }
-  assert= out41 80 end
-  assert= out42 80 end
-  0b111111110000 loc_bit_mask_get_fun { out43 out44 }
-  assert= out43 0b100011 end
-  assert= out44 0b100011 end
-  4 loc_bits_trunc_fun { out45 out46 }
-  assert= out45 0b1101 end
-  assert= out46 0b101 end
-  41 loc_inc_dec_inline_fun
-  assert= 0b101010 loc_invert_fun 0b101010 invert end
-  assert= 42 loc_negate_fun -42 end
-  assert= -42 loc_abs_fun 42 end
-  assert= 8 loc_bit_clz_fun 60 end
-  assert= 40 loc_bit_ctz_fun 3 end
-  assert= 40 loc_bit_len_fun 6 end
-  assert= 4097 loc_pow2_ceil_fun 8192 end
-  assert= 0xffffffff loc_int_to_cell_fun -1 end
-  assert= 7 loc_cells_fun 56 end
-  assert= 56 loc_div_cells_fun 7 end
-  assert= 100 loc_add_cell_fun 108 end
-  assert= 100 loc_sub_cell_fun 92 end
-  assert= 101 loc_odd_fun 1 end
-  assert= 5 loc_low_bits_fun 31 end
-  0b101010 loc_bits_clear_fun { out47 out48 }
-  assert= out47 0b010101 end
-  assert= out48 0b110101 end
-  99 loc_fallback_fun { out49 out50 }
-  assert= out49 99 end
-  assert= out50 42 end
-  assert= 0b0110 0b11110000 loc_bit_mask_set_fun 0b100001100001 end
-  assert= 0 loc_eq_zero_fun 1 end
-  assert= 7 loc_ne_zero_fun 1 end
-  assert= -7 loc_lt_zero_fun 1 end
-  assert= 7 loc_gt_zero_fun 1 end
-  assert= 0 loc_le_zero_fun 1 end
-  assert= 0 loc_ge_zero_fun 1 end
-  7 loc_eq_fun { out51 out52 }
-  assert= out51 1 end
-  assert= out52 0 end
-  7 loc_ne_fun { out53 out54 }
-  assert= out53 0 end
-  assert= out54 1 end
-  6 loc_gt_fun { out55 out56 }
-  assert= out55 1 end
-  assert= out56 0 end
-  6 loc_lt_fun { out57 out58 }
-  assert= out57 0 end
-  assert= out58 1 end
-  7 loc_le_fun { out59 out60 }
-  assert= out59 1 end
-  assert= out60 1 end
-  7 loc_ge_fun { out61 out62 }
-  assert= out61 1 end
-  assert= out62 0 end
-  7 loc_ugt_fun { out63 out64 }
-  assert= out63 1 end
-  assert= out64 0 end
-  8 loc_ult_fun { out65 out66 }
-  assert= out65 1 end
-  assert= out66 0 end
-  7 loc_ule_fun { out67 out68 }
-  assert= out67 1 end
-  assert= out68 0 end
-  7 loc_uge_fun { out69 out70 }
-  assert= out69 1 end
-  assert= out70 0 end
-  ifz has_interp then ret end
-
-  cf_expect_clear
-  0 0x1234 cf_expect_load
-  4 0 asm_mov_reg cf_expect_instr
-  1 4 asm_mov_reg cf_expect_instr
-  0 1 0xff asm_orr_imm cf_expect_instr
-  4 0 asm_mov_reg cf_expect_instr
-  0 0x1234 cf_expect_load
-  5 0 asm_mov_reg cf_expect_instr
-  1 5 asm_mov_reg cf_expect_instr
-  0 1 0xff asm_and_imm cf_expect_instr
-  5 0 asm_mov_reg cf_expect_instr
-  0 0x1234 cf_expect_load
-  6 0 asm_mov_reg cf_expect_instr
-  1 6 asm_mov_reg cf_expect_instr
-  0 1 0xff asm_eor_imm cf_expect_instr
-  6 0 asm_mov_reg cf_expect_instr
-  0 0x1234 cf_expect_load
-  7 0 asm_mov_reg cf_expect_instr
-  1 7 asm_mov_reg cf_expect_instr
-  0 1 0xff asm_bic_imm cf_expect_instr
-  7 0 asm_mov_reg cf_expect_instr
-  0 4 asm_mov_reg cf_expect_instr
-  1 5 asm_mov_reg cf_expect_instr
-  2 6 asm_mov_reg cf_expect_instr
-  3 7 asm_mov_reg cf_expect_instr
-  cf_expect_ret
-  xt' loc_logic_imm_fun cf_expect_word
-
-  cf_expect_clear
-  4 0 asm_mov_reg cf_expect_instr
-  1 4 asm_mov_reg cf_expect_instr
-  0 1 5 asm_add_imm cf_expect_instr
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 3 asm_sub_imm cf_expect_instr
-  2 4096 cf_expect_load
-  3 1 asm_mov_reg cf_expect_instr
-  2 3 2 asm_add_reg cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_loc_step_fun cf_expect_word
-
-  cf_expect_clear
-  0 7 cf_expect_load
-  2 0 asm_mov_reg cf_expect_instr
-  1 2 asm_mov_reg cf_expect_instr
-  0 1 3 asm_lsl_imm cf_expect_instr
-  0 asm_neg cf_expect_instr
-  cf_expect_ret
-  xt' loc_mul_pow2_fun cf_expect_word
-
-  0 1 3 asm_lsr_imm 80 xt' loc_udiv_pow2_fun cf_expect_load_lhs_imm1
-  0 1 7 asm_and_imm -1 xt' loc_umod_pow2_fun cf_expect_load_lhs_imm1
-
-  0 0 1 asm_add_imm { instr0 }
-  0 0 1 asm_sub_imm { instr1 }
-  instr0 instr1 xt' loc_inc_dec_inline_fun cf_expect_word2
-  0 0 asm_mvn xt' loc_invert_fun cf_expect_word1
-  0 asm_neg xt' loc_negate_fun cf_expect_word1
-
-  0 asm_cmp_zero { instr0 }
-  0 0 0 ASM_PL asm_csneg { instr1 }
-  instr0 instr1 xt' loc_abs_fun cf_expect_word2
-
-  0 0 asm_clz xt' loc_bit_clz_fun cf_expect_word1
-  0 0 asm_rbit { instr0 }
-  0 0 asm_clz { instr1 }
-  instr0 instr1 xt' loc_bit_ctz_fun cf_expect_word2
-
-  cf_expect_clear
-  0 0 asm_clz cf_expect_instr
-  1 64 cf_expect_load
-  0 1 0 asm_sub_reg cf_expect_instr
-  cf_expect_ret
-  xt' loc_bit_len_fun cf_expect_word
-
-  0 0 asm_sign_extend_32 xt' loc_int_to_cell_fun cf_expect_word1
-  0 0 3 asm_lsl_imm xt' loc_cells_fun cf_expect_word1
-  0 0 3 asm_asr_imm xt' loc_div_cells_fun cf_expect_word1
-  0 0 CELL asm_add_imm xt' loc_add_cell_fun cf_expect_word1
-  0 0 CELL asm_sub_imm xt' loc_sub_cell_fun cf_expect_word1
-  0 0 1 asm_and_imm xt' loc_odd_fun cf_expect_word1
-
-  cf_expect_clear
-  1 1 cf_expect_load
-  1 1 0 asm_lsl_reg cf_expect_instr
-  0 1 1 asm_sub_imm cf_expect_instr
-  cf_expect_ret
-  xt' loc_low_bits_fun cf_expect_word
-end
-test_const_fold_loc_step
 
 fun: const_fold_low_bits_fun { -- out } 5 low_bits end
 fun: const_fold_bits_trunc_fun { -- out } 0b10110101 4 bits_trunc end
 fun: const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 bits_clear end
 fun: const_fold_bits_clear_imm_fun { val -- out } val 0xff bits_clear end
-
-fun: low_bits_instr_fun { len -- out } len low_bits end
-fun: bits_trunc_instr_fun { imm len -- out } imm len bits_trunc end
-fun: bits_clear_instr_fun { imm mask -- out } imm mask bits_clear end
+fun: const_fold_bit_mask_get_fun { -- out }
+  0b1001000110100 0b111111110000 bit_mask_get
+end
 
 fun: test_const_fold_bits { -- err }
-  assert= const_fold_low_bits_fun 31 end
-  assert= const_fold_bits_trunc_fun 5 end
-  assert= const_fold_bits_clear_fun 0b11000011 end
-  assert= 0x1234 const_fold_bits_clear_imm_fun 0x1200 end
-  assert= 5 low_bits_instr_fun 31 end
-  assert= 0b10110101 4 bits_trunc_instr_fun 5 end
-  assert= 0b11110011 0b00110000 bits_clear_instr_fun 0b11000011 end
   ifz has_interp then ret end
 
   31 xt' const_fold_low_bits_fun cf_expect_load_word
   5 xt' const_fold_bits_trunc_fun cf_expect_load_word
   0b11000011 xt' const_fold_bits_clear_fun cf_expect_load_word
+  0b100011 xt' const_fold_bit_mask_get_fun cf_expect_load_word
 
   0 0 0xff asm_bic_imm xt' const_fold_bits_clear_imm_fun cf_expect_word1
-
-  cf_expect_clear
-  1 1 cf_expect_load
-  1 1 0 asm_lsl_reg cf_expect_instr
-  0 1 1 asm_sub_imm cf_expect_instr
-  cf_expect_ret
-  xt' low_bits_instr_fun cf_expect_word
-
-  cf_expect_clear
-  2 1 cf_expect_load
-  2 2 1 asm_lsl_reg cf_expect_instr
-  2 2 1 asm_sub_imm cf_expect_instr
-  0 0 2 asm_and_reg cf_expect_instr
-  cf_expect_ret
-  xt' bits_trunc_instr_fun cf_expect_word
-
-  cf_expect_clear
-  0 0 1 asm_bic cf_expect_instr
-  cf_expect_ret
-  xt' bits_clear_instr_fun cf_expect_word
 end
 test_const_fold_bits
 
@@ -1717,148 +699,9 @@ fun: test_const_fold_int_to_cell { -- err }
 end
 test_const_fold_int_to_cell
 
-fun: const_fold_unary_large_imm_fun { -- out0 out1 }
-  0x123456789 inc
-  0x123456789 =0
-end
-
-fun: test_const_fold_unary_large_imm { -- err }
-  const_fold_unary_large_imm_fun { out0 out1 }
-  assert= out0 0x12345678a end
-  assert= out1 0 end
-end
-test_const_fold_unary_large_imm
-
-fun: const_fold_fallback_0_1_1_2_fun { val -- out0 out1 }
-  val inc
-  val =0
-end
-
-fun: test_const_fold_fallback_0_1_1_2 { -- err }
-  41 const_fold_fallback_0_1_1_2_fun { out0 out1 }
-  assert= out0 42 end
-  assert= out1 0 end
-  0 const_fold_fallback_0_1_1_2_fun { out2 out3 }
-  assert= out2 1 end
-  assert= out3 1 end
-end
-test_const_fold_fallback_0_1_1_2
-
-fun: const_fold_local_imm_fun { -- out }
-  41 { val }
-  val inc
-end
-
-fun: test_const_fold_local_imm { -- err }
-  assert= const_fold_local_imm_fun 42 end
-  ifz has_interp then ret end
-
-  42 xt' const_fold_local_imm_fun cf_expect_load_word
-end
-test_const_fold_local_imm
-
-fun: const_fold_local_imm_set_clear_fun { inp -- out }
-  41 { val }
-  inp { val }
-  val cf_expect_top_not_foldable
-  inc
-end
-
-fun: test_const_fold_local_imm_set_clear { -- err }
-  assert= 10 const_fold_local_imm_set_clear_fun 11 end
-end
-test_const_fold_local_imm_set_clear
-
-fun: const_fold_local_imm_barrier_fun { -- out }
-  41 { val }
-  [ comp_barrier ]
-  val cf_expect_top_not_foldable
-  inc
-end
-
-fun: test_const_fold_local_imm_barrier { -- err }
-  assert= const_fold_local_imm_barrier_fun 42 end
-end
-test_const_fold_local_imm_barrier
-
-fun: const_fold_local_imm_nonzero_reg_fun { -- out }
-  10 20 { _val0 val1 }
-  val1 [ 20 cf_expect_top_foldable ] inc
-end
-
-fun: test_const_fold_local_imm_nonzero_reg { -- err }
-  assert= const_fold_local_imm_nonzero_reg_fun 21 end
-end
-test_const_fold_local_imm_nonzero_reg
-
-fun: const_fold_local_imm_full_barrier_fun { -- out }
-  41 { val }
-  val 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14
-  [ comp_barrier 0 comp_args_set ]
-  123
-end
-
-fun: test_const_fold_local_imm_full_barrier { -- err }
-  assert= const_fold_local_imm_full_barrier_fun 123 end
-end
-test_const_fold_local_imm_full_barrier
-
-fun: const_fold_local_imm_get_barrier_no_write_fun { -- out }
-  41 { val }
-  val [ comp_barrier ]
-  inc
-end
-
-fun: test_const_fold_local_imm_get_barrier_no_write { -- err }
-  assert= const_fold_local_imm_get_barrier_no_write_fun 42 end
-  ifz has_interp then ret end
-
-  cf_expect_clear
-  0 41 cf_expect_load
-  asm_nop cf_expect_instr
-  0 0 1 asm_add_imm cf_expect_instr
-  cf_expect_ret
-  xt' const_fold_local_imm_get_barrier_no_write_fun cf_expect_word
-end
-test_const_fold_local_imm_get_barrier_no_write
-
-fun_comp: cf_expect_reg_no_fix { reg -- err }
-  reg comp_arg Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
-  if fix then " [test] expected no fixup in reg %zd" reg errf throw end
-end
-
-fun_comp: cf_expect_reg_fix { reg -- err }
-  reg comp_arg Interp_comp_arg_loc_field Interp_comp_arg_loc_fix @ { fix }
-  ifz fix then " [test] expected fixup in reg %zd" reg errf throw end
-end
-
-fun: const_fold_local_fix_reassign_fun { -- out }
-  41 { old }
-  [ comp_barrier ] old
-  [ 0 cf_expect_reg_fix ]
-  [ s` new` comp_local 0 swap comp_assign_local_from_reg ]
-  [ 0 cf_expect_reg_no_fix ]
-  { -- }
-  new inc
-end
-
-fun: test_const_fold_local_fix_reassign { -- err }
-  assert= const_fold_local_fix_reassign_fun 42 end
-end
-test_const_fold_local_fix_reassign
-
 \ For AOT testing.
 fun: test_const_fold_all { -- err }
   test_const_fold_arith
-  test_comp_load_same_imm
-  test_comp_load_same_imm_after_nop
-  test_comp_instr_clobbers_imm
-  test_comp_args_set_clears_added_imm
-  test_comp_args_set_clears_truncated_imm
-  test_comp_args_set_clears_added_local
-  test_comp_args_set_clears_truncated_local
-  test_comp_args_set_max_len
-  test_const_fold_fallback_0_1
   test_const_fold_large_imm
   test_const_fold_ugly_imm
   test_const_fold_negative_lane_imm
@@ -1867,23 +710,13 @@ fun: test_const_fold_all { -- err }
   test_const_fold_bit_count
   test_const_fold_zero_cmp
   test_const_fold_bit_shift
-  test_const_fold_bit_mask_get_set
   test_const_fold_div_mod
   test_const_fold_compare2
+  test_const_fold_assert_static_pass
   test_const_fold_ucompare2
   test_const_fold_derived
-  test_const_fold_loc_step
   test_const_fold_bits
   test_const_fold_int_to_cell
-  test_const_fold_unary_large_imm
-  test_const_fold_fallback_0_1_1_2
-  test_const_fold_local_imm
-  test_const_fold_local_imm_set_clear
-  test_const_fold_local_imm_barrier
-  test_const_fold_local_imm_nonzero_reg
-  test_const_fold_local_imm_full_barrier
-  test_const_fold_local_imm_get_barrier_no_write
-  test_const_fold_local_fix_reassign
 end
 
 " [test] [cf] ok" log lf

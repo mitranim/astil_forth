@@ -35,7 +35,6 @@ SINGLE_USE_PUBLIC_WORDS = {
     ".sc",
     "=any",
     "again",
-    "align_up:",
     "fill",
     "leave",
     "mem_map",

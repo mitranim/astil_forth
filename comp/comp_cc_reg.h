@@ -123,15 +123,18 @@ for the instructions generated for placing them into regs.
 Some parts of the system, such as our constant folding and
 `alloca`, detect and "consume" constants, backtracking the
 instructions. Assembler always encodes immediates inline.
-
-An immediate can be held with or without an associated local.
 */
 typedef struct {
   Sint num;
   Ind  floor; // For backtracking: first instruction.
   Ind  ceil;  // For backtracking: just above last instruction.
-  bool has_imm;
-} Reg_imm;
+} Comp_arg_imm;
+
+typedef struct {
+  Ind try_instr_floor;
+  Ind try_instr_ceil;
+  Ind try_fix_ind;
+} Comp_arg_err;
 
 /*
 Value associated with a register.
@@ -139,21 +142,18 @@ Value associated with a register.
 SYNC[comp_arg_fields].
 */
 typedef struct {
-  Local     *loc;
-  Loc_fixup *fix;
-} Comp_arg_loc;
+  enum {
+    COMP_ARG_UNKNOWN,
+    COMP_ARG_IMM,
+    COMP_ARG_LOCAL,
+    COMP_ARG_ERR,
+  } type;
 
-typedef struct {
-  const Sym *callee;
-  Ind        try_instr_floor;
-  Ind        try_instr_ceil;
-  Ind        try_fix_ind;
-} Comp_arg_err;
-
-typedef struct {
-  Comp_arg_loc loc;
-  Reg_imm      imm;
-  Comp_arg_err err;
+  union {
+    Comp_arg_imm imm;
+    Local       *local;
+    Comp_arg_err err;
+  };
 } Comp_arg;
 
 /*

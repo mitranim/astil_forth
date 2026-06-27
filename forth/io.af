@@ -221,7 +221,7 @@ fun: write_all { fdes buf len -- err }
     ifz wrote then " unable to write: wrote zero bytes" throw end
 
     wrote +: buf
-    wrote -: len
+    len wrote - { len }
   end
 end
 

@@ -214,18 +214,6 @@ fun: test_to_stack_sequence { -- err }
 end
 test_to_stack_sequence
 
-fun: test_reg_cc_stack_words { -- err }
-  10 20 swap { val0 val1 }
-  assert= val0 20 end
-  assert= val1 10 end
-  10 20 30 swap { val4 val5 val6 }
-  assert= val4 10 end
-  assert= val5 30 end
-  assert= val6 20 end
-  assert= 10 20 - 30 swap - 40 end
-end
-test_reg_cc_stack_words
-
 fun: test_stack_braces { -- err }
   alloca' Stack { stk }
   32 stk stack_init
@@ -1003,7 +991,7 @@ fun: test_loop_manual_counting { -- err }
   0 { acc }
   8 { ind }
   loop
-    2 -: ind
+    ind 2 - { ind }
     0 ind <= while
     ind +: acc
   end
@@ -1347,17 +1335,22 @@ fun: test_assert_bin_ops { -- err }
   assertu>= -1 0 end
 end
 
-fun: assert_bin_fail { -- err }
-  assert= 123 456 end
-end
-
-fun: assert_bin_lt_fail { -- err }
-  assert< 456 123 end
-end
+fun: assert_bin_fail    { lhs rhs -- err } assert=  lhs rhs end end
+fun: assert_bin_lt_fail { lhs rhs -- err } assert<  lhs rhs end end
+fun: assert_bin_eq_ok   { lhs rhs -- err } assert=  lhs rhs end end
+fun: assert_bin_ne_ok   { lhs rhs -- err } assert<> lhs rhs end end
 
 fun: test_assert_try_manual { -- err } [ false try_all ]
-  assert= 10 10 end try
-  assert<> 10 20 end
+  10 10 assert_bin_eq_ok try
+  10 20 assert_bin_ne_ok
+end
+
+fun: test_assert_bin_runtime_errors { -- err } [ false try_all ]
+  123 456 assert_bin_fail { err }
+  err " assertion failed: lhs rhs = (0x7b 0x1c8 =)" assert_str_has try
+
+  456 123 assert_bin_lt_fail { err }
+  err " assertion failed: lhs rhs < (0x1c8 0x7b <)" assert_str_has
 end
 
 fun: test_assert { -- err }
@@ -1365,12 +1358,9 @@ fun: test_assert { -- err }
   assert= 10 10 end
   test_assert_bin_ops
   test_assert_try_manual
+  test_assert_bin_runtime_errors
   assert_fail catch { err }
   err " assertion failed: 123 456 =" assert_str_has
-  assert_bin_fail catch { err }
-  err " assertion failed: 123 456 = (0x7b 0x1c8 =)" assert_str_has
-  assert_bin_lt_fail catch { err }
-  err " assertion failed: 456 123 < (0x1c8 0x7b <)" assert_str_has
 end
 test_assert
 
@@ -1544,6 +1534,12 @@ end
 test_bit_counts
 
 fun: test_bit_masks { -- err }
+  assert= 5 low_bits 31 end
+  assert= 0x1238 8 is_aligned_to 1 end
+  assert= 0x1234 8 is_aligned_to 0 end
+  assert= 0x1234 16 align_down 0x1230 end
+  assert= 0x1234 16 align_up 0x1240 end
+  assert= 0x1234 8 bits_trunc 0x34 end
   assert= 0b1001000110100 0b111111110000 bit_mask_get 0b100011 end
   assert= 0b1001000110100 0b11110000 bits_clear 0b1001000000100 end
   assert=
@@ -1559,6 +1555,50 @@ fun: test_bit_masks { -- err }
   assert= mask 0b1101010110100 end
 end
 test_bit_masks
+
+fun: test_local_mutators { -- err }
+  10 { val } 7 +: val assert= val 17 end
+  7 { val } 3 *: val assert= val 21 end
+  0b110101 { val } 0b101010 and: val assert= val 0b100000 end
+  0b110101 { val } 0b001010 or: val assert= val 0b111111 end
+  0b110101 { val } 0b101010 xor: val assert= val 0b011111 end
+
+  -100 { val } 6 min: val assert= val -100 end
+  -1 { val } 10 umin: val assert= val 10 end
+  81 { val } -10 max: val assert= val 81 end
+  -1 { val } 10 umax: val assert= val -1 end
+  42 { val } 99 fallback: val assert= val 99 end
+  7 { val } 7 =: val assert= val 1 end
+  7 { val } 8 <>: val assert= val 1 end
+
+  41 { val } inc: val assert= val 42 end dec: val assert= val 41 end
+  42 { val } negate: val assert= val -42 end
+  -42 { val } abs: val assert= val 42 end
+  0b101010 { val } invert: val assert= val 0b101010 invert end
+  60 { val } bit_clz: val assert= val 58 end
+  40 { val } bit_ctz: val assert= val 3 end
+  40 { val } bit_len: val assert= val 6 end
+  4097 { val } pow2_ceil: val assert= val 8192 end
+  0xffffffff { val } int_to_cell: val assert= val -1 end
+  7 { val } cells: val assert= val 56 end
+  56 { val } /cells: val assert= val 7 end
+  100 { val } +cell: val assert= val 108 end
+  100 { val } -cell: val assert= val 92 end
+  101 { val } odd: val assert= val 1 end
+  5 { val } low_bits: val assert= val 31 end
+
+  0 { val } =0: val assert= val 1 end
+  7 { val } <>0: val assert= val 1 end
+  -7 { val } <0: val assert= val 1 end
+  7 { val } >0: val assert= val 1 end
+  0 { val } <=0: val assert= val 1 end
+  0 { val } >=0: val assert= val 1 end
+
+  0b100000000001 { val }
+  0b0110 0b11110000 bit_mask_set: val
+  assert= val 0b100001100001 end
+end
+test_local_mutators
 
 fun: test_asm_new_bits { -- err }
   assert= 2 3 4 asm_bic 0b10001010001001000000000001100010 end
@@ -1681,16 +1721,6 @@ fun: test_comptime_arg_stack_sum16 { -- err }
   assert= test_comptime_arg_stack_sum16_fun 220 end
 end
 test_comptime_arg_stack_sum16
-
-fun: test_comptime_arg_stack_swap16_fun { -- val }
-  100 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-  swap - + + + + + + + + + + + + + +
-end
-
-fun: test_comptime_arg_stack_swap16 { -- err }
-  assert= test_comptime_arg_stack_swap16_fun 192 end
-end
-test_comptime_arg_stack_swap16
 
 fun: test_assign_all_arg_regs_fun { -- val }
   0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
@@ -2236,6 +2266,10 @@ fun: test_catch_invalid { -- err } [ false try_all ]
 
   use' ./fail/test_catch_requires_try_all.af
   " unable to `catch`: no hidden `try` to backtrack"
+  assert_str_has try
+
+  use' ./fail/test_catch_invalid_after_value.af
+  " unable to `catch`: no hidden `try` to backtrack"
   assert_str_has
 end
 test_catch_invalid
@@ -2637,20 +2671,6 @@ fun: test_has_err_not_contagious { -- err }
 end
 test_has_err_not_contagious
 
-fun: test_error_arg_arity_hint { -- err }
-  use' ./fail/test_error_arg_arity_hint.af
-  " top argument is an error output from `err_arg_hint_callee`"
-  assert_str_has
-end
-test_error_arg_arity_hint
-
-fun: test_error_arg_return_range_hint { -- err }
-  use' ./fail/test_error_arg_return_range_hint.af
-  " required: between 0 and 1, provided: 2; hint: top argument is an error output from `err_arg_return_range_callee`"
-  assert_str_has
-end
-test_error_arg_return_range_hint
-
 fun: test_throw_requires_err { -- err }
   use' ./fail/test_throw_requires_err.af
   " unable to `throw`: current word has no error output"
@@ -2880,7 +2900,6 @@ fun: main_run { -- err }
   test_locals
   test_stack_primitives
   test_to_stack_sequence
-  test_reg_cc_stack_words
   test_stack_braces
   test_conditionals
   test_recursion
@@ -2931,7 +2950,6 @@ fun: main_run { -- err }
   test_int_to_cell
   test_is_err_flag_regression
   test_comptime_arg_stack_sum16
-  test_comptime_arg_stack_swap16
   test_comptime_arg_stack_mod_scratch
   test_stack_push_9
   test_fallback

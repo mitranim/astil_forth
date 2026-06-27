@@ -137,96 +137,142 @@ static const char *comp_local_name(Local *loc) {
   return "(anonymous)";
 }
 
-static bool comp_arg_has_known_value(const Comp_arg *arg) {
-  return arg->loc.loc || arg->imm.has_imm || arg->err.callee;
+static Comp_arg comp_arg_unknown(void) {
+  return (Comp_arg){.type = COMP_ARG_UNKNOWN};
 }
 
-static void comp_local_confirm_relocs(Local *loc) {
-  auto reloc = loc->reloc;
-  loc->reloc = nullptr;
-
-  while (reloc) {
-    reloc->confirmed = true;
-    reloc            = reloc->prev;
-  }
-
-  loc->read = true; // Also confirm all _subsequent_ relocs.
+static Comp_arg comp_arg_local(Local *loc) {
+  return (Comp_arg){
+    .type  = COMP_ARG_LOCAL,
+    .local = loc,
+  };
 }
 
-static const char *comp_local_fmt_reg_bits(Comp *comp, const Local *loc) {
-  const auto ctx = &comp->ctx;
-
-  Bits bits = 0;
-
-  static constexpr U8 ceil = arr_cap(ctx->args);
-
-  for (U8 reg = 0; reg < ceil; reg++) {
-    if (ctx->args[reg].loc.loc != loc) continue;
-    bits_add_to(&bits, reg);
+static Local *comp_arg_local_ref(const Comp_arg *arg) {
+  switch (arg->type) {
+    case COMP_ARG_UNKNOWN: [[fallthrough]];
+    case COMP_ARG_IMM:     [[fallthrough]];
+    case COMP_ARG_ERR:     return nullptr;
+    case COMP_ARG_LOCAL:   return arg->local;
+    default:               unreachable();
   }
-
-  return uint32_to_bit_str((U32)bits);
+  return nullptr;
 }
 
 static bool comp_local_has_arg(const Comp_ctx *ctx, const Local *loc) {
   if (!loc) return false;
 
   static constexpr U8 ceil = arr_cap(ctx->args);
-  for (U8 reg = 0; reg < ceil; reg++) {
-    if (ctx->args[reg].loc.loc == loc) return true;
-  }
 
+  for (U8 reg = 0; reg < ceil; reg++) {
+    const auto arg = &ctx->args[reg];
+    if (comp_arg_local_ref(arg) == loc) return true;
+  }
   return false;
 }
 
-static Err err_args_arity(
-  const Comp_ctx *ctx,
-  const Sym      *sym,
-  const char     *action,
-  Sint            min,
-  Sint            max,
-  Sint            ava
+static Err comp_args_fold(
+  Comp *comp,
+  Uint  argc,
+  Sint *imm0,
+  Sint *imm1,
+  Sint *known_count,
+  Sint *consumed_count
 ) {
-  const char *hint_beg  = "";
-  const char *hint_name = "";
-  const char *hint_end  = "";
+  if (argc < 1 || argc > 2) {
+    return errf("invalid fold arg count: " FMT_UINT, argc);
+  }
 
-  if (ctx && ava > max && ava > 0 && ava <= (Sint)arr_cap(ctx->args)) {
-    const auto callee = ctx->args[ava - 1].err.callee;
-    if (callee) {
-      hint_beg  = "; hint: top argument is an error output from `";
-      hint_name = callee->name.buf;
-      hint_end  = "`; use `try`, enable `try_all`, or bind it with `{ err }`";
+  const auto ctx = &comp->ctx;
+  if (ctx->arg_len < argc) return errf("not enough fold args");
+
+  const U8 reg0 = (U8)(ctx->arg_len - argc);
+  auto     arg0 = &ctx->args[reg0];
+  auto     arg1 = argc == 2 ? &ctx->args[reg0 + 1] : nullptr;
+
+  Comp_arg_imm src0  = {};
+  Comp_arg_imm src1  = {};
+  bool         has0  = false;
+  bool         has1  = false;
+  Uint         known = 0;
+
+  if (arg0->type == COMP_ARG_IMM) {
+    src0 = arg0->imm;
+    has0 = true;
+  }
+
+  if (arg1) {
+    if (arg1->type == COMP_ARG_IMM) {
+      src1 = arg1->imm;
+      has1 = true;
     }
   }
 
+  if (argc == 1) {
+    if (has0) known = 1;
+  }
+  else {
+    if (has1) {
+      known = 1;
+      if (has0) known = 2;
+    }
+  }
+
+  const auto instrs   = &comp->code.code_write;
+  Uint       consumed = 0;
+
+  if (argc == 1) {
+    if (has0 && instrs->len == src0.ceil) {
+      instrs->len = src0.floor;
+      *arg0       = comp_arg_unknown();
+      consumed    = 1;
+    }
+  }
+  else {
+    if (has1 && instrs->len == src1.ceil) {
+      instrs->len = src1.floor;
+      *arg1       = comp_arg_unknown();
+      consumed    = 1;
+
+      if (has0 && instrs->len == src0.ceil) {
+        instrs->len = src0.floor;
+        *arg0       = comp_arg_unknown();
+        consumed    = 2;
+      }
+    }
+  }
+
+  if (imm0) *imm0 = has0 ? src0.num : 0;
+  if (imm1) *imm1 = has1 ? src1.num : 0;
+  if (known_count) *known_count = (Sint)known;
+  if (consumed_count) *consumed_count = (Sint)consumed;
+  return nullptr;
+}
+
+static Err err_args_arity(
+  const Sym *sym, const char *action, Sint min, Sint max, Sint ava
+) {
   if (min == max) {
     return errf(
       "in " FMT_QUOTED " (%s): %s: arity mismatch: required: " FMT_SINT
-      ", provided: " FMT_SINT "%s%s%s",
+      ", provided: " FMT_SINT,
       sym->name.buf,
       wordlist_name(sym->wordlist),
       action,
       max,
-      ava,
-      hint_beg,
-      hint_name,
-      hint_end
+      ava
     );
   }
 
   return errf(
     "in " FMT_QUOTED " (%s): %s: arity mismatch: required: between " FMT_SINT
-    " and " FMT_SINT ", provided: " FMT_SINT "%s%s%s",
+    " and " FMT_SINT ", provided: " FMT_SINT,
     sym->name.buf,
     wordlist_name(sym->wordlist),
     action,
     min,
     max,
-    ava,
-    hint_beg,
-    hint_name,
-    hint_end
+    ava
   );
 }
 
@@ -238,7 +284,7 @@ static Err comp_validate_args(Comp *comp, const char *action, Sint min, Sint max
   const auto arg_len = ctx->arg_len;
 
   if (!(arg_len >= min && arg_len <= max)) {
-    return err_args_arity(ctx, sym, action, min, max, arg_len);
+    return err_args_arity(sym, action, min, max, arg_len);
   }
   return nullptr;
 }
@@ -261,9 +307,7 @@ static Err comp_validate_recur_args(Comp *comp) {
   return nullptr;
 }
 
-static Loc_reloc *comp_append_local_reloc_from_reg(
-  Comp *comp, Local *loc, U8 reg
-) {
+static void comp_append_local_reloc_from_reg(Comp *comp, Local *loc, U8 reg) {
   const auto confirm = loc->read;
 
   const auto fix = stack_push(
@@ -282,7 +326,6 @@ static Loc_reloc *comp_append_local_reloc_from_reg(
 
   loc->stable = true;
   loc->reloc  = &fix->reloc;
-  return loc->reloc;
 }
 
 static Err comp_register_clobber(Comp *comp, U8 reg) {
@@ -299,10 +342,13 @@ static Err comp_forget_reg(Comp *comp, U8 reg) {
 
   const auto ctx = &comp->ctx;
   const auto arg = &ctx->args[reg];
-  const auto loc = arg->loc.loc;
-  *arg           = (Comp_arg){};
+  const auto loc = comp_arg_local_ref(arg);
+  *arg           = comp_arg_unknown();
 
-  if (!loc || loc->stable || comp_local_has_arg(ctx, loc)) return nullptr;
+  if (!loc || loc->stable || comp_local_has_arg(ctx, loc)) {
+    return nullptr;
+  }
+
   comp_append_local_reloc_from_reg(comp, loc, reg);
   IF_DEBUG(assert_fatal(loc->stable));
   return nullptr;
@@ -341,7 +387,7 @@ static Err comp_args_set(Comp *comp, Sint next) {
   */
   if (len > prev) {
     for (U8 reg = prev; reg < len; reg++) {
-      ctx->args[reg] = (Comp_arg){};
+      ctx->args[reg] = comp_arg_unknown();
     }
   }
   ctx->arg_len = len;
@@ -359,10 +405,6 @@ For regular locals, this does not immediately create a "reloc" as those are
 added lazily on clobbers. Does not check, confirm, or invalidate the latest
 pending "reloc" if any; relocs are confirmed by "reads", and link with each
 other for a chain confirmation.
-
-For volatile locals whose address is available to the code we're compiling,
-this has to immediately store the value because it may be read out-of-band
-through the local's address.
 */
 static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
   try(asm_validate_arg_reg(reg));
@@ -388,9 +430,8 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
   }
 
   const auto arg  = &ctx->args[reg];
-  const auto prev = arg->loc.loc;
-
-  loc->stable = false;
+  const auto prev = comp_arg_local_ref(arg);
+  loc->stable     = false;
 
   static constexpr U8 ceil = arr_cap(ctx->args);
 
@@ -399,17 +440,12 @@ static Err comp_assign_local_from_reg(Comp *comp, Local *loc, U8 reg) {
   */
   for (U8 reg0 = 0; reg0 < ceil; reg0++) {
     if (reg == reg0) {
-      /*
-      Caution: we reassign only the local while keeping the
-      comptime immediate if the register already holds one.
-      */
-      arg->loc = (Comp_arg_loc){.loc = loc};
-      arg->err = (Comp_arg_err){};
+      *arg = comp_arg_local(loc);
     }
     else {
       const auto arg = &ctx->args[reg0];
-      if (arg->loc.loc == loc) {
-        arg->loc = (Comp_arg_loc){};
+      if (comp_arg_local_ref(arg) == loc) {
+        *arg = comp_arg_unknown();
       }
     }
   }
@@ -484,12 +520,18 @@ static Err comp_alloc_next_reg(Comp *comp, U8 *out) {
 }
 
 // Concrete "read" operation used as a fallback by "get".
-static Loc_fixup *comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
-  (void)comp;
+static void comp_append_local_read(Comp *comp, Local *loc, U8 reg) {
+  auto reloc = loc->reloc;
+  loc->reloc = nullptr;
 
-  comp_local_confirm_relocs(loc);
+  while (reloc) {
+    reloc->confirmed = true;
+    reloc            = reloc->prev;
+  }
 
-  return stack_push(
+  loc->read = true; // Also confirm all subsequent relocs.
+
+  stack_push(
     &comp->ctx.loc_fix,
     (Loc_fixup){
       .type = LOC_FIX_READ,
@@ -512,11 +554,6 @@ static Err err_local_get_not_inited(const char *name) {
 static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm) {
   try(asm_validate_arg_reg(reg));
 
-  const auto prev = &comp->ctx.args[reg].imm;
-  if (prev->has_imm && prev->num == imm) {
-    return nullptr;
-  }
-
   try(comp_forget_reg(comp, reg));
   try(comp_register_clobber(comp, reg));
 
@@ -526,12 +563,8 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm) {
   asm_append_imm_to_reg(comp, reg, imm);
 
   comp->ctx.args[reg] = (Comp_arg){
-    .imm = (Reg_imm){
-      .num     = imm,
-      .floor   = floor,
-      .ceil    = instrs->len,
-      .has_imm = true,
-    },
+    .type = COMP_ARG_IMM,
+    .imm  = {.num = imm, .floor = floor, .ceil = instrs->len},
   };
 
   IF_DEBUG(eprintf(
@@ -561,8 +594,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
 
   loc->used = true;
 
-  if (tar_arg->loc.loc == loc) {
-    IF_DEBUG(assert_fatal(!tar_arg->err.callee));
+  if (comp_arg_local_ref(tar_arg) == loc) {
     IF_DEBUG(eprintf(
       "[debug] local " FMT_QUOTED
       " already associated with register %d; skipping instructions for \"push to local\"\n",
@@ -572,30 +604,19 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
     return nullptr;
   }
 
-  const auto prev_loc = tar_arg->loc.loc;
-  *tar_arg            = (Comp_arg){};
+  const auto prev_loc = comp_arg_local_ref(tar_arg);
+  *tar_arg            = comp_arg_unknown();
 
-  S8 imm_reg = -1;
   S8 loc_reg = -1;
 
   /*
-  Search for other registers already associated with this local,
-  prioritizing comptime constants / immediates.
-
-  If we find an existing register with the new local, this lets us immediately
-  compile a mov instruction and avoid emitting a fixup. If we find a comptime
-  constant, we can even make this backtrackable.
+  Search for another register already associated with this local. This lets us
+  immediately compile a mov instruction and avoid emitting a fixup.
   */
   for (S8 src_reg = (int)arr_cap(ctx->args) - 1; src_reg >= 0; src_reg--) {
     const auto src_arg = &ctx->args[src_reg];
 
-    if (src_arg->loc.loc != loc) continue;
-
-    if (src_arg->imm.has_imm) {
-      imm_reg = src_reg;
-      continue;
-    }
-
+    if (comp_arg_local_ref(src_arg) != loc) continue;
     loc_reg = src_reg;
   }
 
@@ -603,26 +624,18 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
     comp_append_local_reloc_from_reg(comp, prev_loc, tar_reg);
   }
 
-  if (imm_reg >= 0) {
-    const auto arg = &ctx->args[imm_reg];
-    IF_DEBUG(assert_fatal(arg->imm.has_imm));
-    try(comp_append_imm_to_reg(comp, tar_reg, arg->imm.num));
-    tar_arg->loc = (Comp_arg_loc){.loc = loc};
-    return nullptr;
-  }
-
   if (loc_reg >= 0) {
     asm_append_mov_reg(comp, tar_reg, (U8)loc_reg);
     try(comp_register_clobber(comp, tar_reg));
-    *tar_arg = (Comp_arg){.loc = {.loc = loc}};
+    *tar_arg = comp_arg_local(loc);
     return nullptr;
   }
 
   if (!loc->stable) return err_local_get_not_inited(loc->name.buf);
 
-  const auto fix = comp_append_local_read(comp, loc, tar_reg);
+  comp_append_local_read(comp, loc, tar_reg);
   try(comp_register_clobber(comp, tar_reg));
-  *tar_arg = (Comp_arg){.loc = {.loc = loc, .fix = fix}};
+  *tar_arg = comp_arg_local(loc);
   return nullptr;
 }
 
@@ -643,9 +656,9 @@ static Err comp_add_input_param(Comp *comp, Word_str name) {
   const auto ctx = &comp->ctx;
   const auto arg = &ctx->args[reg];
 
-  IF_DEBUG(assert_fatal(!arg->loc.loc));
+  IF_DEBUG(assert_fatal(arg->type == COMP_ARG_UNKNOWN));
 
-  arg->loc = (Comp_arg_loc){.loc = loc};
+  *arg = comp_arg_local(loc);
   return nullptr;
 }
 
@@ -709,7 +722,6 @@ static Err comp_append_auto_try(
   try_assert(stack_len(&ctx->asm_fix) == fix_ind + 1);
 
   *out = (Comp_arg_err){
-    .callee          = callee,
     .try_instr_floor = instr_floor,
     .try_instr_ceil  = instrs->len,
     .try_fix_ind     = fix_ind,
@@ -720,10 +732,11 @@ static Err comp_append_auto_try(
 static Err comp_after_append_call(
   Comp *comp, const Sym *caller, const Sym *callee, bool auto_try
 ) {
-  const auto ctx = &comp->ctx;
+  const auto ctx          = &comp->ctx;
+  const bool auto_try_err = auto_try && callee->has_err;
 
-  Comp_arg_err err = {.callee = callee};
-  if (auto_try && callee->has_err) {
+  Comp_arg_err err = {};
+  if (auto_try_err) {
     try(comp_append_auto_try(comp, caller, callee, &err));
   }
 
@@ -733,12 +746,12 @@ static Err comp_after_append_call(
   `comp_append_auto_try` inserts the "try" and records it for postfix `catch`.
   Here we hide the error since it's been checked already.
   */
-  ctx->arg_len = callee->out_len - !!(auto_try && callee->has_err);
+  ctx->arg_len = callee->out_len - auto_try_err;
   for (U8 ind = 0; ind < callee->out_len; ind++) {
-    ctx->args[ind] = (Comp_arg){};
+    ctx->args[ind] = comp_arg_unknown();
   }
-  if (callee->has_err) {
-    ctx->args[callee->out_len - 1] = (Comp_arg){.err = err};
+  if (auto_try_err) {
+    ctx->args[callee->out_len - 1] = (Comp_arg){.type = COMP_ARG_ERR, .err = err};
   }
   return nullptr;
 }
@@ -809,8 +822,9 @@ static Err comp_before_append_ret(Comp *comp) {
   }
 
   const auto arg = &ctx->args[err_reg];
-  if (!arg->imm.has_imm) return nullptr;
-  if (arg->imm.num) return nullptr;
+  if (arg->type != COMP_ARG_IMM) return nullptr;
+  const auto err = arg->imm.num;
+  if (err) return nullptr;
 
   return errf(
     "in " FMT_QUOTED
@@ -869,11 +883,13 @@ static Err comp_alloca(Comp *comp) {
 
   const auto ctx = &comp->ctx;
   const U8   reg = (U8)(ctx->arg_len - 1);
-  const auto arg = ctx->args[reg];
+  const auto arg = &ctx->args[reg];
 
-  if (arg.imm.has_imm) {
-    asm_backtrack_instrs_opt(comp, arg.imm.floor, arg.imm.ceil);
-    try(comp_alloca_const(comp, arg.imm.num, reg));
+  if (arg->type == COMP_ARG_IMM) {
+    const auto imm = arg->imm;
+    asm_backtrack_instrs_opt(comp, imm.floor, imm.ceil);
+    try(comp_forget_reg(comp, reg));
+    try(comp_alloca_const(comp, imm.num, reg));
   }
   else {
     try(comp_alloca_dynamic(comp, reg));
