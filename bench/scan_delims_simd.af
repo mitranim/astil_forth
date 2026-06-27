@@ -95,8 +95,8 @@ fun: run { -- err }
   assert out WANT = end
 end
 
-fun: main { -- exit }
-  run catch { err }
+fun: main { -- exit } [ false try_all ]
+  run { err }
   ifz err then 0 else " error: %s" err elogf elf 1 end
 end
 run
