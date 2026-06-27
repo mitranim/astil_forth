@@ -42,8 +42,19 @@ Avoid blatant duplication.
 
 Reuse existing functions which cleanly fit the use case.
 
-Avoid creating non-reusable functions for just one new callsite.
-
 Dedup blatantly redundant logic via reusable functions; threshold: 3+ lines; 2+ callsites.
 
+However, avoid creating non-reusable functions for just one new callsite.
+
 When deleting callsites, fold non-reusable auxiliary functions into the last remaining callsite.
+
+Some reusability criteria:
+- Already-existing multiple callsites where it saves code.
+- Clear separation of domains; for example: pure "asm" functions return instructions; "comp" functions may take them for side effects. Pure functions in general have slightly more reusability.
+
+## Codegen tests
+
+General rule for testing:
+- We test semantics first.
+- Then we test codegen optimizations where applicable.
+- We don't bother testing pessimizations.
