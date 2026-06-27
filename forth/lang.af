@@ -402,52 +402,61 @@ end
 \   0b10 -- ldrsb Xt
 \   0b00 -- strb  Wt
 \
-\ Base instruction variant: "immediate, unsigned offset". Offset is 0.
-fun: asm_load_store_imm { Rt Xn imm12 size opc -- instr }
+\ Base instruction variant: "immediate, unsigned offset". The Arm field is
+\ scaled by access width: for 64-bit loads, imm12 = 2 means byte offset 16.
+fun: asm_load_store_off { Rt Xn imm12 size opc -- instr }
   size 30 lsl         { size }
   opc  22 lsl size or { mask }
   Rt Xn imm12 asm_pattern_arith_imm
   mask or 0b00_111_0_01_00_000000000000_00000_00000 or
 end
 
+\ Generic unscaled load/store. Offset is a signed 9-bit byte offset.
+fun: asm_load_store_unscaled_off { Rt Xn imm9 size opc -- instr }
+  size 30 lsl         { size }
+  opc  22 lsl size or { mask }
+  Rt Xn imm9 asm_pattern_load_store
+  mask or 0b00_111_0_00_00_0_000000000_00_00000_00000 or
+end
+
 \ Unsigned 8-bit.
 \
 \ ldrb Wt, [Xn, imm12]
-fun: asm_load_off_u8 { Wt Xn imm12 -> instr } 0b00 0b01 asm_load_store_imm end
+fun: asm_load_off_u8 { Wt Xn imm12 -> instr } 0b00 0b01 asm_load_store_off end
 
 \ Signed 8-bit.
 \
 \ ldrsb Xt, [Xn, imm12]
-fun: asm_load_off_s8 { Xt Xn imm12 -> instr } 0b00 0b10 asm_load_store_imm end
+fun: asm_load_off_s8 { Xt Xn imm12 -> instr } 0b00 0b10 asm_load_store_off end
 
 \ Either unsigned or signed 8-bit.
 \
 \ strb Wt, [Xn, imm12]
-fun: asm_store_off_u8 { Wt Xn imm12 -> instr } 0b00 0b00 asm_load_store_imm end
+fun: asm_store_off_u8 { Wt Xn imm12 -> instr } 0b00 0b00 asm_load_store_off end
 
 \ ldrh Wt, [Xn, imm12]
-fun: asm_load_off_u16 { Wt Xn imm12 -> instr } 0b01 0b01 asm_load_store_imm end
+fun: asm_load_off_u16 { Wt Xn imm12 -> instr } 0b01 0b01 asm_load_store_off end
 
 \ ldrsh Xt, [Xn, imm12]
-fun: asm_load_off_s16 { Xt Xn imm12 -> instr } 0b01 0b10 asm_load_store_imm end
+fun: asm_load_off_s16 { Xt Xn imm12 -> instr } 0b01 0b10 asm_load_store_off end
 
 \ strh Wt, [Xn, imm12]
-fun: asm_store_off_u16 { Wt Xn imm12 -> instr } 0b01 0b00 asm_load_store_imm end
+fun: asm_store_off_u16 { Wt Xn imm12 -> instr } 0b01 0b00 asm_load_store_off end
 
 \ ldr Wt, [Xn, imm12]
-fun: asm_load_off_u32 { Wt Xn imm12 -> instr } 0b10 0b01 asm_load_store_imm end
+fun: asm_load_off_u32 { Wt Xn imm12 -> instr } 0b10 0b01 asm_load_store_off end
 
 \ ldrsw Xt, [Xn, imm12]
-fun: asm_load_off_s32 { Xt Xn imm12 -> instr } 0b10 0b10 asm_load_store_imm end
+fun: asm_load_off_s32 { Xt Xn imm12 -> instr } 0b10 0b10 asm_load_store_off end
 
 \ str Wt, [Xn, imm12]
-fun: asm_store_off_u32 { Wt Xn imm12 -> instr } 0b10 0b00 asm_load_store_imm end
+fun: asm_store_off_u32 { Wt Xn imm12 -> instr } 0b10 0b00 asm_load_store_off end
 
 \ ldr Xt, [Xn, imm12]
-fun: asm_load_off { Xt Xn imm12 -> instr } 0b11 0b01 asm_load_store_imm end
+fun: asm_load_off { Xt Xn imm12 -> instr } 0b11 0b01 asm_load_store_off end
 
 \ str Xt, [Xn, imm12]
-fun: asm_store_off { Xt Xn imm12 -> instr } 0b11 0b00 asm_load_store_imm end
+fun: asm_store_off { Xt Xn imm12 -> instr } 0b11 0b00 asm_load_store_off end
 
 \ neg Xd, Xd
 fun: asm_neg { Xd -> instr }
@@ -1257,7 +1266,7 @@ fun: comp_mem_load { size opc -- err }
   comp_args_get dec { reg }
   reg comp_realloc_reg
   \ ldr<size> <reg>, [<reg>]
-  reg reg 0 size opc asm_load_store_imm comp_instr
+  reg reg 0 size opc asm_load_store_off comp_instr
 end
 
 \ Generically defines a load word for the given size / type.
@@ -1268,7 +1277,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
   str len define_fun
     1 1 false comp_signature_set ( E: adr -- val )
     0 comp_realloc_reg
-    0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
+    0 0 0 size opc asm_load_store_off comp_instr \ ldr<size> r0, [x0]
     1 comp_args_set
   call_xt'' end
 
@@ -1289,7 +1298,7 @@ fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
   read_word define_fun
     2 0 false comp_signature_set
     \ str<size> r0, [x1]
-    0 1 0 size 0b00 asm_load_store_imm comp_instr
+    0 1 0 size 0b00 asm_load_store_off comp_instr
   call_xt'' end
 
   [ false comp_only ]
@@ -1326,7 +1335,7 @@ end
 0b10      store: !cuint
 
 \ 64 bit (Apple ABI)
-0b11 0b10 load:  @clong
+0b11 0b01 load:  @clong
 0b11      store: !clong
 
 \ 64 bit (Apple ABI)
@@ -2658,7 +2667,7 @@ fun_comp: call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   end
 end
 
-\ ## Assembler continued -- logical immediate
+\ ## Assembler continued -- logical immediates and other stuff
 
 fun: asm_ror64 { val rot -- out }
   rot 63 and { rot }
@@ -2716,6 +2725,43 @@ fun: asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM asm_logical
 fun: asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM asm_logical_imm_instr end
 fun: asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm invert ASM_OP_AND_IMM asm_logical_imm_instr end
 fun: asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM asm_logical_imm_instr end
+
+fun: asm_add_imm_decode { instr -- Xd Xn imm ok }
+  \ `add Xd, Xn, #imm12` with `Xd`, `Xn`, and `imm12` masked out.
+  \ Not bothering to decode `sub`, shifted immediates, or flags ops.
+  0b1_1_1_111111_1_000000000000_00000_00000 { mask }
+
+  instr 0b11111 and { Xd }
+  instr 5 lsr 0b11111 and { Xn }
+  instr 10 lsr 0xfff and { imm }
+
+  instr mask and ASM_OP_ADD_IMM = { ok }
+  Xd Xn imm ok
+end
+
+fun: asm_add_imm_decode_at { instr_adr -- Xd Xn imm ok }
+  instr_adr @u32 asm_add_imm_decode
+end
+
+fun: asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
+  \ Prefer unsigned scaled addressing: it has much larger range.
+  if off >=0 then
+    1 size lsl { width }
+    ifz off width mod then
+      off width / { imm }
+      if imm ASM_MAX_IMM12 <= then
+        Rt Xn imm size opc asm_load_store_off true ret
+      end
+    end
+  end
+
+  \ Fall back to unscaled addressing for small byte-precision offsets.
+  if off -256 >= off 255 <= and then
+    Rt Xn off size opc asm_load_store_unscaled_off true ret
+  end
+
+  0 false
+end
 
 \ ## Constant folding and locals mutation
 \
@@ -3649,6 +3695,76 @@ fun_comp: bit_mask_set: { -- err } ( C: "name" -- ) ( E: inp mask -- )
 end
 
 \ ## More memory stuff
+
+fun: comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
+  \ Peephole: replace immediately preceding `add Xn, Xn, #off` with a
+  \ load/store that has the offset in its addressing mode.
+  here_write ASM_INSTR_SIZE - { instr_adr }
+  instr_adr asm_add_imm_decode_at { Xd Xn0 off ok }
+  ok Xd Xn = and Xn0 Xn = and { ok }
+  ifz ok then false ret end
+
+  Rt Xn off size opc asm_load_store_byte_off { instr -- ok }
+  ifz ok then false ret end
+
+  \ Safe only because this is the most recently emitted instruction.
+  instr instr_adr !32
+  true
+end
+
+fun: comp_mem_load { size opc -- err } [ redefine ]
+  comp_args_get dec { reg }
+  reg comp_realloc_reg
+
+  if reg reg size opc comp_mem_try_fold_offset then ret end
+
+  \ ldr<size> <reg>, [<reg>]
+  reg reg 0 size opc asm_load_store_off comp_instr
+end
+
+fun: comp_mem_store { size -- err }
+  comp_args_get dec { adr }
+  adr dec { val }
+
+  if val adr size 0b00 comp_mem_try_fold_offset then
+    val comp_args_set
+    ret
+  end
+
+  \ str<size> <val>, [<adr>]
+  val adr 0 size 0b00 asm_load_store_off comp_instr
+  val comp_args_set
+end
+
+fun_comp: @u8 { -- err } [ redefine ] 0b00 0b01 comp_mem_load end
+fun_comp: @s8 { -- err } [ redefine ] 0b00 0b10 comp_mem_load end
+fun_comp: !8  { -- err }              0b00      comp_mem_store end
+
+fun_comp: @b { -- err } [ redefine ] 0b00 0b01 comp_mem_load end
+fun_comp: !b { -- err }              0b00      comp_mem_store end
+
+fun_comp: @u16 { -- err } [ redefine ] 0b01 0b01 comp_mem_load end
+fun_comp: @s16 { -- err } [ redefine ] 0b01 0b10 comp_mem_load end
+fun_comp: !16  { -- err }              0b01      comp_mem_store end
+
+fun_comp: @u32 { -- err } [ redefine ] 0b10 0b01 comp_mem_load end
+fun_comp: @s32 { -- err } [ redefine ] 0b10 0b10 comp_mem_load end
+fun_comp: !32  { -- err }              0b10      comp_mem_store end
+
+fun_comp: @ { -- err } [ redefine ] 0b11 0b01 comp_mem_load end
+fun_comp: ! { -- err }              0b11      comp_mem_store end
+
+fun_comp: @cint { -- err } [ redefine ] 0b10 0b10 comp_mem_load end
+fun_comp: !cint { -- err }              0b10      comp_mem_store end
+
+fun_comp: @cuint { -- err } [ redefine ] 0b10 0b01 comp_mem_load end
+fun_comp: !cuint { -- err }              0b10      comp_mem_store end
+
+fun_comp: @clong { -- err } [ redefine ] 0b11 0b01 comp_mem_load end
+fun_comp: !clong { -- err }              0b11      comp_mem_store end
+
+fun_comp: @culong { -- err } [ redefine ] 0b11 0b01 comp_mem_load end
+fun_comp: !culong { -- err }              0b11      comp_mem_store end
 
 \ Some `libc` functions return -1 as 32-bit `0xffff_ffff`, while some others,
 \ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from

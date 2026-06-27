@@ -1096,6 +1096,56 @@ fun: test_load_store { -- err }
 end
 test_load_store
 
+fun: test_load_store_typed { -- err }
+  CELL alloca { ptr }
+
+  0 ptr !
+  0x1234 ptr !8
+  assert= ptr @u8 0x34 end
+  assert= ptr @s8 0x34 end
+  assert= ptr @ 0x34 end
+
+  0 ptr !
+  0xff ptr !8
+  assert= ptr @u8 0xff end
+  assert= ptr @s8 -1 end
+
+  0 ptr !
+  0x12345 ptr !16
+  assert= ptr @u16 0x2345 end
+  assert= ptr @s16 0x2345 end
+  assert= ptr @ 0x2345 end
+
+  0 ptr !
+  0x8001 ptr !16
+  assert= ptr @u16 0x8001 end
+  assert= ptr @s16 -32767 end
+
+  0 ptr !
+  0x123456789 ptr !32
+  assert= ptr @u32 0x23456789 end
+  assert= ptr @s32 0x23456789 end
+  assert= ptr @cuint 0x23456789 end
+  assert= ptr @cint 0x23456789 end
+  assert= ptr @ 0x23456789 end
+
+  0 ptr !
+  0x80000001 ptr !32
+  assert= ptr @u32 0x80000001 end
+  assert= ptr @s32 -2147483647 end
+  assert= ptr @cuint 0x80000001 end
+  assert= ptr @cint -2147483647 end
+
+  0x123456789abcdef0 ptr !
+  assert= ptr @ 0x123456789abcdef0 end
+  assert= ptr @culong 0x123456789abcdef0 end
+
+  0 0x100 - ptr !clong
+  assert= ptr @clong 0 0x100 - end
+  assert= ptr @culong 0 0x100 - end
+end
+test_load_store_typed
+
 fun: test_load_store_pair_swap_fun { one two ptr } one two ptr !swap end
 
 fun: test_load_store_pair_swap { -- err }
@@ -2090,6 +2140,68 @@ fun: test_struct_fields_load_store { -- err }
 end
 test_struct_fields_load_store
 
+struct: Typ_field_peephole
+  U64 1 field: Typ_field_peephole_0
+  U8  1 field: Typ_field_peephole_1
+  U64 1 field: Typ_field_peephole_2
+end
+
+struct: Typ_field_peephole_unscaled
+  U8 1 field: Typ_field_peephole_unscaled_0
+  U8 1 field: Typ_field_peephole_unscaled_1
+end
+
+fun: test_struct_field_load_peephole_fun { ptr -- val }
+  ptr Typ_field_peephole_2 @
+end
+
+fun: test_struct_field_store_peephole_fun { val ptr }
+  val ptr Typ_field_peephole_2 !
+end
+
+fun: test_struct_field_byte_peephole_fun { ptr -- val }
+  ptr Typ_field_peephole_1 @b
+end
+
+fun: test_struct_field_unscaled_peephole_fun { ptr -- val }
+  ptr Typ_field_peephole_unscaled_1 @
+end
+
+fun: test_struct_field_peephole_expect_instr { XT ind exp -- err }
+  XT sym_instr ind 4 * + @u32 { act }
+  if exp act <> then
+    XT Sym_name Sym_word_buf { name }
+    XT Sym_name Sym_word_len @u32 { name_len }
+    " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
+    name_len name ind exp act errf throw
+  end
+end
+
+fun: test_struct_field_peephole { -- err }
+  ifz has_interp then ret end
+
+  xt' test_struct_field_load_peephole_fun { load_xt }
+  0 0 2 0b11 0b01 asm_load_store_off { load_instr }
+  load_xt 0 load_instr test_struct_field_peephole_expect_instr
+  load_xt 1 asm_ret test_struct_field_peephole_expect_instr
+
+  xt' test_struct_field_store_peephole_fun { store_xt }
+  0 1 2 0b11 0b00 asm_load_store_off { store_instr }
+  store_xt 0 store_instr test_struct_field_peephole_expect_instr
+  store_xt 1 asm_ret test_struct_field_peephole_expect_instr
+
+  xt' test_struct_field_byte_peephole_fun { byte_xt }
+  0 0 8 0b00 0b01 asm_load_store_off { byte_instr }
+  byte_xt 0 byte_instr test_struct_field_peephole_expect_instr
+  byte_xt 1 asm_ret test_struct_field_peephole_expect_instr
+
+  xt' test_struct_field_unscaled_peephole_fun { unscaled_xt }
+  0 0 1 asm_load_unscaled_off { unscaled_instr }
+  unscaled_xt 0 unscaled_instr test_struct_field_peephole_expect_instr
+  unscaled_xt 1 asm_ret test_struct_field_peephole_expect_instr
+end
+test_struct_field_peephole
+
 struct: Typ0 end
 
 fun: test_struct_0 { -- err }
@@ -2917,6 +3029,7 @@ fun: main_run { -- err }
   test_again_countdown_manual
   test_cont_meta_loop_inputs
   test_load_store
+  test_load_store_typed
   test_load_store_pair_swap
   test_negate
   test_equal
@@ -2969,6 +3082,7 @@ fun: main_run { -- err }
   test_array_sizes
   test_struct_fields_basic
   test_struct_fields_load_store
+  test_struct_field_peephole
   test_struct_0
   test_struct_1
   test_struct_2

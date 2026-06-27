@@ -367,7 +367,7 @@ In reg-CC:
 - Associate locals with param regs, reuse when possible.
 - Keep track of clobbers, preserve caller-saved registers when possible.
 - Fold comptime constants in most arithmetic words.
-- Some tiny peephole optimizations.
+- Some peephole instruction fusion.
 - ...Other small tricks. Some are word-specific.
 
 ## Register allocation and greediness
