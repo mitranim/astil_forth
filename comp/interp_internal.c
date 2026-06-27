@@ -440,10 +440,12 @@ static const char *get_exec_path() {
 static const char *get_exec_path() { return nullptr; }
 #endif // __APPLE__
 
+static constexpr char EVAL_PATH[] = "<eval>";
+
 static Err interp_eval(Interp *interp, const char *src) {
   const auto len  = (Ind)strlen(src);
   Module_ctx next = {};
-  next.reader     = (Reader){.src = src, .len = len, .path = "<eval>"};
+  next.reader     = (Reader){.src = src, .len = len, .path = EVAL_PATH};
 
   Module_ctx *prev     = interp->module;
   next.slop            = prev ? prev->slop : interp->slop;
@@ -528,7 +530,8 @@ static char *resolve_import_path(const char *prev, const char *next) {
 static Err interp_import_inner(
   Interp *interp, bool prev_tty, const char *prev, const char *next
 ) {
-  if (prev_tty) prev = nullptr;
+  // Special-casing the eval string is a bit weak; TODO better.
+  if (prev_tty || (prev && !strcmp(prev, EVAL_PATH))) prev = nullptr;
 
   deferred(chars_deinit) char *path = resolve_import_path(prev, next);
 
