@@ -771,16 +771,16 @@ fun: test_comp_reg_cmp_keeps_rhs_in_arg { -- err }
 end
 test_comp_reg_cmp_keeps_rhs_in_arg
 
-fun: test_execute_raw_leaf_frame_fun 0 execute_raw end
+fun: test_call_leaf_frame_fun 0 call end
 
-fun: test_execute_raw_non_leaf_frame_fun 0 sleep { -- } 0 execute_raw end
+fun: test_call_non_leaf_frame_fun 0 sleep { -- } 0 call end
 
-fun: test_execute_raw_frame { -- err }
+fun: test_call_frame { -- err }
   ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 asm_store_pair_pre { frame_push }
-  assert= xt' test_execute_raw_leaf_frame_fun frame_push test_word_instr_count 1 end
-  assert= xt' test_execute_raw_non_leaf_frame_fun frame_push test_word_instr_count 1 end
+  assert= xt' test_call_leaf_frame_fun frame_push test_word_instr_count 1 end
+  assert= xt' test_call_non_leaf_frame_fun frame_push test_word_instr_count 1 end
 end
-test_execute_raw_frame
+test_call_frame
 
 fun: test_if_cset_branch_fusion_fun { val -- out }
   0 { out }
@@ -2706,12 +2706,12 @@ fun: test_too_many_comptime_arg_regs { -- err }
 end
 test_too_many_comptime_arg_regs
 
-fun: test_too_many_execute_raw_args { -- err }
-  use' ./fail/test_too_many_execute_raw_args.af
-  " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided"
+fun: test_too_many_call_args { -- err }
+  use' ./fail/test_too_many_call_args.af
+  " unable to compile `call`: 8 param registers available, 9 arguments provided"
   assert_str_has
 end
-test_too_many_execute_raw_args
+test_too_many_call_args
 
 fun: test_comptime_stack_underflow { -- err }
   use' ./fail/test_comptime_stack_underflow.af
@@ -3010,7 +3010,7 @@ fun: main_run { -- err }
   \ test_too_many_output_regs \ interp-only
   \ test_too_many_output_regs_with_err \ interp-only
   \ test_too_many_comptime_arg_regs \ interp-only
-  \ test_too_many_execute_raw_args \ interp-only
+  \ test_too_many_call_args \ interp-only
   \ test_comptime_stack_underflow \ interp-only
   test_arena_alloc
   test_arena_trunc

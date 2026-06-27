@@ -385,7 +385,7 @@ static Err intrin_inline_word(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_execute(Interp *interp) { return intrin_end(interp); }
+static Err intrin_call_xt(Interp *interp) { return intrin_end(interp); }
 
 static Err intrin_comp_local(Interp *interp) {
   const auto ints = &interp->ints;

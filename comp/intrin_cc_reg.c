@@ -497,7 +497,7 @@ static Err intrin_inline_word(Sint ptr, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_execute(Sint ptr, Interp *interp) {
+static Err intrin_call_xt(Sint ptr, Interp *interp) {
   Sym *sym;
   try(interp_sym_by_ptr(interp, ptr, &sym));
   try(interp_call_sym(interp, sym));

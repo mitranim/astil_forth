@@ -550,10 +550,10 @@ fun:      inline_next ( wlist "word" -- ) ( E: <word> ) next_word inline_word en
 fun_comp: inline'  WORDLIST_EXEC inline_next end
 fun_comp: inline'' WORDLIST_COMP inline_next end
 
-\ "execute" is renamed from standard "postpone".
-fun:      execute_next ( wlist "word" -- ) ( E: <word> ) next_word comp_call end
-fun_comp: execute'  WORDLIST_EXEC execute_next end
-fun_comp: execute'' WORDLIST_COMP execute_next end
+\ "call_xt" is renamed from standard "postpone".
+fun:      call_xt_next ( wlist "word" -- ) ( E: <word> ) next_word comp_call end
+fun_comp: call_xt'  WORDLIST_EXEC call_xt_next end
+fun_comp: call_xt'' WORDLIST_COMP call_xt_next end
 
 fun:      compile_next ( wlist "word" -- ) next_word comp_push xt' comp_call comp_call end
 fun_comp: compile'  WORDLIST_EXEC compile_next end
@@ -1134,30 +1134,30 @@ fun: patch_branch_back    ( adr -- ) off_from_pc   asm_branch swap !32 end \ b <
 fun: if_pop ( nop if_adr -- )
   \ cbz x1, <else|end>
   dup off_to_pc 1 swap asm_cbz swap !32
-  execute
+  call_xt
 end
 
 fun: ifn_pop ( nop ifn_adr -- )
   \ cbnz x1, <else|end>
   dup off_to_pc 1 swap asm_cbnz swap !32
-  execute
+  call_xt
 end
 
 fun_comp: if  xt' nop xt' if_pop  end
 fun_comp: ifz xt' nop xt' ifn_pop end
 fun_comp: then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) reserve_cond swap end
 
-fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward execute end
+fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward call_xt end
 
 fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
   reserve_here to: adr
   xt' nop -rot
-  execute
+  call_xt
   adr xt' else_pop
 end
 
-fun_comp: elif  execute'' else xt' if_pop  end
-fun_comp: elifz execute'' else xt' ifn_pop end
+fun_comp: elif  call_xt'' else xt' if_pop  end
+fun_comp: elifz call_xt'' else xt' ifn_pop end
 
 \ ## Loops
 \
@@ -1221,7 +1221,7 @@ fun: loop_aux
 end
 
 fun: loop_end ( C: loop_adr -- ) off_from_pc asm_branch comp_instr end \ b <begin>
-fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end execute'' end end
+fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end call_xt'' end end
 
 \ Implementation note. Each loop frame is "split" into two sub-frames:
 \ the "prev frame", and the "current frame". Auxiliary loop constructs
@@ -1263,7 +1263,7 @@ fun: count_loop_pop ( prev_fun …aux… loop_adr cond_adr cond -- )
   to: adr
   loop_end \ b <beg>
   adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
-  execute \ Pop auxiliaries; restore the previous loop frame.
+  call_xt \ Pop auxiliaries; restore the previous loop frame.
 end
 
 fun: for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr )

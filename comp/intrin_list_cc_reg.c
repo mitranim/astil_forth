@@ -63,7 +63,7 @@ static const USED Sym INTRIN[] = {
   INTRIN_EXTERN_FUN,      // extern_fun
   INTRIN_FIND_WORD,       // find_word
   INTRIN_INLINE_WORD,     // inline_word
-  INTRIN_EXECUTE,         // execute
+  INTRIN_CALL_XT,         // call_xt
   INTRIN_COMP_LOCAL,      // comp_local
   INTRIN_DEBUG_ON,        // debug_on
   INTRIN_DEBUG_OFF,       // debug_off

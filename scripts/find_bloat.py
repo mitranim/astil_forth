@@ -157,7 +157,7 @@ def normalize_word(raw: str, preserve_domain_names: bool = True) -> str:
         return raw
     if preserve_domain_names and (raw.startswith("cf_") or raw.startswith("comp_")):
         return raw
-    if raw.startswith("instr'") or raw.startswith("xt'") or raw.startswith("execute"):
+    if raw.startswith("instr'") or raw.startswith("xt'") or raw.startswith("call"):
         return raw
     return "ID"
 

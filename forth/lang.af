@@ -65,14 +65,14 @@ end
 fun_comp: inline'  { -- err } 1 inline_next end
 fun_comp: inline'' { -- err } 2 inline_next end
 
-\ "execute" is renamed from standard "postpone".
-\ Also see `execute_raw` for raw instruction addresses.
-fun: execute_next { wlist -> err } ( "word" -- ) ( E: <word> )
+\ "call_xt" is renamed from standard "postpone".
+\ Also see `call` for raw instruction addresses.
+fun: call_xt_next { wlist -> err } ( "word" -- ) ( E: <word> )
   next_word comp_call
 end
 
-fun_comp: execute'  { -- err } 1 execute_next end
-fun_comp: execute'' { -- err } 2 execute_next end
+fun_comp: call_xt'  { -- err } 1 call_xt_next end
+fun_comp: call_xt'' { -- err } 2 call_xt_next end
 
 fun: compile_next { wlist -> err } ( "word" -- )
   next_word comp_push xt' comp_call comp_call
@@ -89,13 +89,13 @@ fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   str len define_fun
     0 1 0 comp_signature_set ( -- val )
     val comp_push
-  execute'' end
+  call_xt'' end
 
   \ Compile-time semantics.
   str len define_fun_comp
     0 1 1 comp_signature_set ( -- err )
     val comp_push compile' comp_push
-  execute'' end
+  call_xt'' end
   [ 0 comp_only ]
 end
 
@@ -1270,7 +1270,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     0 comp_realloc_reg
     0 0 0 size opc asm_load_store_imm comp_instr \ ldr<size> r0, [x0]
     1 comp_args_set
-  execute'' end
+  call_xt'' end
 
   \ Compile-time semantics.
   str len define_fun_comp
@@ -1278,7 +1278,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     size     comp_push
     opc      comp_push
     compile' comp_mem_load
-  execute'' end
+  call_xt'' end
 
   [ false comp_only ]
 end
@@ -1290,7 +1290,7 @@ fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
     2 0 false comp_signature_set
     \ str<size> r0, [x1]
     0 1 0 size 0b00 asm_load_store_imm comp_instr
-  execute'' end
+  call_xt'' end
 
   [ false comp_only ]
 end
@@ -1396,12 +1396,12 @@ fun: off! { adr } false adr ! end
 fun: on!  { adr } true  adr ! end
 
 \ Shortcut for allocating a cell-sized slot on the system stack via `alloca`.
-fun_comp: slot { -- err } ( E: -- adr ) execute'' CELL execute'' alloca end
+fun_comp: slot { -- err } ( E: -- adr ) call_xt'' CELL call_xt'' alloca end
 
 \ Shortcut for stack-allocating a slot and immediately setting a value.
 \ Replaces the need for taking references to locals we had before.
 fun_comp: >slot { -- err } ( E: val -- adr )
-  execute'' slot
+  call_xt'' slot
   compile'  !
   0 comp_realloc_reg
   0 1 asm_mov_reg comp_instr \ mov x0, x1
@@ -1541,12 +1541,12 @@ fun: init_data_word { name name_len adr -- err }
   name name_len define_fun
     0 1 false comp_signature_set ( E: -- ptr )
     adr comp_next_page_addr
-  execute'' end
+  call_xt'' end
 
   name name_len define_fun_comp
     0 1 true comp_signature_set
     adr comp_push compile' comp_next_page_addr
-  execute'' end
+  call_xt'' end
 
   [ false comp_only ]
 end
@@ -1580,12 +1580,12 @@ fun: buf_init { adr cap -- err }
   str len define_fun
     0 2 false comp_signature_set ( E: -- ptr cap )
     adr cap comp_buf
-  execute'' end
+  call_xt'' end
 
   str len define_fun_comp
     0 1 true comp_signature_set
     adr comp_push cap comp_push compile' comp_buf
-  execute'' end
+  call_xt'' end
 
   [ false comp_only ]
 end
@@ -1688,8 +1688,8 @@ end
 \ mode, the string is statically allocated, unique, and null-terminated.
 fun: s" { -- str len err } ( E: "str" -- str len ) char' " read_delimited end
 fun: s` { -- str len err } ( E: `str` -- str len ) char' ` read_delimited end
-fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len ) execute' s" comp_str end
-fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) execute' s` comp_str end
+fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len ) call_xt' s" comp_str end
+fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) call_xt' s` comp_str end
 
 4096 buf: ROOT_STR_BUF
 
@@ -1818,15 +1818,15 @@ fun: stdout { -- adr } extern_adr' __stdoutp @ end
 fun: stderr { -- adr } extern_adr' __stderrp @ end
 
 fun_comp: stdin { -- err } ( E: -- adr )
-  comp_extern_adr' __stdinp execute'' @
+  comp_extern_adr' __stdinp call_xt'' @
 end
 
 fun_comp: stdout { -- err } ( E: -- adr )
-  comp_extern_adr' __stdoutp execute'' @
+  comp_extern_adr' __stdoutp call_xt'' @
 end
 
 fun_comp: stderr { -- err } ( E: -- adr )
-  comp_extern_adr' __stderrp execute'' @
+  comp_extern_adr' __stderrp call_xt'' @
 end
 
 4 1 extern: fread            ( buf size len file -- len        )
@@ -1897,12 +1897,12 @@ fun: has_interp { -- bool } interp <>0 [ false interp_only ] end
 184 let: INTERP_COMP_CODE_WRITE_OFF
 
 fun_comp: interp_instrs { -- err } ( E: -- adr )
-  execute'' interp
+  call_xt'' interp
   INTERP_COMP_CODE_WRITE_OFF comp_push
-  execute'' +
-  execute'' @
+  call_xt'' +
+  call_xt'' @
   PAGE_SIZE comp_push
-  execute'' +
+  call_xt'' +
 end
 
 fun: interp_instrs {     -- adr } interp_instrs   end
@@ -1991,17 +1991,17 @@ end
 \
 \ Unlike other Forth systems, we also support chains of "elif",
 \ terminated with a single "end", which is generic: it pops one
-\ XT from the stack and executes it. The XT can pop another one,
+\ XT from the stack and calls it. The XT can pop another one,
 \ popping multiple control frames in a chain.
 \
 \ Conditional chains involving `elif` have two passes.
-\ In the forward pass, every `else elif elifz` executes
+\ In the forward pass, every `else elif elifz` calls
 \ one previous frame, with special flags passed through
 \ the "meta" input. `else` pushes one replacement frame,
 \ `elif elifz` push two replacement frames; the second
-\ frame is configured to also execute the first one.
-\ When `end` executes the last frame, the entire prior
-\ chain executes as a backwards pass, retropatching
+\ frame is configured to also call the first one.
+\ When `end` calls the last frame, the entire prior
+\ chain calls as a backwards pass, retropatching
 \ instructions reserved by each `else elif elifz`.
 
 fun: if_patch { reg meta -- err }
@@ -2066,7 +2066,7 @@ end
 \ Now that we have nullary conditionals, we can redefine
 \ them into full-blown arity-aware condition expressions.
 
-\ Executed either during the forward pass by `else elif elifz`,
+\ Called either during the forward pass by `else elif elifz`,
 \ or during the backward pass by `end`.
 fun: if_end_xt { meta -- err } [ redefine ]
   comp_barrier
@@ -2079,7 +2079,7 @@ fun: if_end_xt { meta -- err } [ redefine ]
   end
 
   \ Only in the backward pass.
-  meta CONT_MASK_EXEC_PREV and then execute'' end end
+  meta CONT_MASK_EXEC_PREV and then call_xt'' end end
 end
 
 fun_comp: if  { -- meta end_xt } nil            xt' if_end_xt end
@@ -2122,7 +2122,7 @@ fun: else_end_xt { meta -- err }
   comp_barrier
   meta else_patch
   meta CONT_MASK_OUT_LEN bit_mask_get " branch outputs" comp_args_valid
-  if meta CONT_MASK_EXEC_PREV and then execute'' end end
+  if meta CONT_MASK_EXEC_PREV and then call_xt'' end end
 end
 
 fun_comp: else { meta end_xt -- meta end_xt err }
@@ -2133,7 +2133,7 @@ fun_comp: else { meta end_xt -- meta end_xt err }
     CONT_MASK_HAS_ELSE or
     CONT_MASK_EXEC_PREV bits_clear
   STACK >s
-  end_xt execute
+  end_xt call_xt
 
   off meta cont_meta_instr_off_set { meta }
   meta CONT_MASK_HAS_OUT and { has }
@@ -2151,13 +2151,13 @@ fun_comp: else { meta end_xt -- meta end_xt err }
 end
 
 fun_comp: elif { meta end_xt -> else_meta else_xt meta end_xt err }
-  execute'' else { meta else_xt }
+  call_xt'' else { meta else_xt }
   meta else_xt
   meta CONT_MASK_EXEC_PREV or xt' if_end_xt
 end
 
 fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
-  execute'' else { meta else_xt }
+  call_xt'' else { meta else_xt }
   meta else_xt
   meta CONT_MASK_EXEC_PREV or CONT_MASK_CBNZ or xt' if_end_xt
 end
@@ -2209,29 +2209,29 @@ end
 fun: sizeof { type -> size } @ end
 
 fun: size' { -- size err } ( C: "type" -- )
-  WORDLIST_EXEC next_word execute STACK s> sizeof
+  WORDLIST_EXEC next_word call_xt STACK s> sizeof
 end
 
 fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
-  execute' size' comp_push
+  call_xt' size' comp_push
 end
 
 fun: alignof { type -> align } +cell @ end
 
 fun: align' { -- align err } ( C: "type" -- )
-  WORDLIST_EXEC next_word execute STACK s> alignof
+  WORDLIST_EXEC next_word call_xt STACK s> alignof
 end
 
 fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
-  execute' align' comp_push
+  call_xt' align' comp_push
 end
 
 fun_comp: is_aligned_to' { -- err } ( C: "type" -- ) ( E: adr -- bool )
-  execute'' align' execute'' is_aligned_to
+  call_xt'' align' call_xt'' is_aligned_to
 end
 
 fun: is_aligned_to' { adr -- bool err }
-  execute' align' { size }
+  call_xt' align' { size }
   adr size is_aligned_to
 end
 
@@ -2370,13 +2370,13 @@ fun: struct_field_define
     1 1 false comp_signature_set ( E: struct_adr -- field_adr )
     1 comp_args_set
     if off then off comp_push compile' + end
-  execute'' end
+  call_xt'' end
 
   \ Compile-time semantics.
   name name_len define_fun_comp
     0 1 true comp_signature_set
     off comp_push compile' struct_field_comp
-  execute'' end
+  call_xt'' end
 
   type sizeof len * off + { off }
   struct_align align max off
@@ -2478,7 +2478,7 @@ end
 
 \ SYNC[sym_fields].
 fun_comp: sym_instr { -- err } ( E: XT -- instr )
-  execute'' Sym_union execute'' @
+  call_xt'' Sym_union call_xt'' @
 end
 
 fun: sym_instr { XT -> instr } sym_instr end
@@ -2486,7 +2486,7 @@ fun: sym_instr { XT -> instr } sym_instr end
 \ For internal use below.
 fun: comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
   next_word comp_push
-  execute'' sym_instr
+  call_xt'' sym_instr
 end
 
 \ Similar to `xt'` and `xt''`, but instead of returning an execution token,
@@ -2495,13 +2495,13 @@ end
 \
 \ Intended use cases:
 \
-\ - Where XT introspection     needed -> `xt'    + execute`.
-\ - Where XT introspection not needed -> `instr' + execute_raw`.
+\ - Where XT introspection     needed -> `xt'    + call_xt`.
+\ - Where XT introspection not needed -> `instr' + call`.
 \
 \ This is the same as a "function pointer" in C. When passing callbacks to
 \ foreign callers such as `pthread_create` or `qsort`, this "just works",
 \ since we use the standard calling convention.
-fun: instr' { -- instr err } execute' xt' sym_instr end
+fun: instr' { -- instr err } call_xt' xt' sym_instr end
 
 fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
   WORDLIST_EXEC comp_word_instr
@@ -2607,7 +2607,7 @@ fun: comp_realloc_regs { -- err }
 end
 
 \ blr x0
-fun: execute_raw { _fun } [ 0 asm_branch_link_reg comp_instr ] end
+fun: call { _fun } [ 0 asm_branch_link_reg comp_instr ] end
 
 \ Takes any amount of args where the last arg is assumed to be a raw
 \ instruction address, known in C as "function pointer". Invokes the
@@ -2618,25 +2618,27 @@ fun: execute_raw { _fun } [ 0 asm_branch_link_reg comp_instr ] end
 \ exactly like regular words. Only execution time differs: they execute at
 \ comptime as soon as the reader parses them while compiling another word.
 \
-\ This behavior stacks. Earlier comptime words execute while compiling later
-\ comptime words. For example, using `execute_raw` inside another `fun_comp`
-\ definition invokes `execute_raw` at comptime, and compiles a runtime call
-\ into the currently-defined `fun_comp` word. For the newly-defined comptime
-\ word, that call runs at the comptime of _another_ word where it's used.
+\ This behavior stacks. Earlier comptime words run immediately when
+\ used inside other words, even when compiling other comptime words.
+\ For example, using this `call` word inside another `fun_comp` word
+\ invokes `call` at comptime, and compiles a runtime call of some
+\ dynamically-provided instruction pointer, usually from `instr'`.
+\ For the newly-defined comptime word, that call runs at comptime
+\ of _other_ words where it's later used.
 \
 \ Many comptime words manipulate compiler state, sometimes appending
 \ or backtracking instructions or affecting argument count. Comptime
 \ words used in other comptime words tend to affect just the current
 \ target word, with some exceptions like `compile'` / `compile''`.
-fun_comp: execute_raw { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
+fun_comp: call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   comp_args_get { len }
 
   ifz len then
-    " unable to compile `execute_raw`: at least 1 argument is required" throw
+    " unable to compile `call`: at least 1 argument is required" throw
   end
 
   if len ASM_PARAM_LEN_MAX inc > then
-    " unable to compile `execute_raw`: 8 param registers available, 9 arguments provided" throw
+    " unable to compile `call`: 8 param registers available, 9 arguments provided" throw
   end
 
   comp_realloc_regs \ Assume full clobber.
@@ -2812,7 +2814,7 @@ fun: cf_addsub_imm12_mag { imm -- mag ok }
 end
 
 fun: cf_validate { imm validate_inp validate -> aux ok err }
-  execute_raw [ 3 comp_args_set ]
+  call [ 3 comp_args_set ]
 end
 
 fun: cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validate emit fallback -- err }
@@ -2822,14 +2824,14 @@ fun: cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validat
     reg1 inc comp_args_set
     if ok then
       reg0 comp_realloc_reg
-      reg0 reg0 imm1 aux emit execute_raw [ 1 comp_args_set ] try
+      reg0 reg0 imm1 aux emit call [ 1 comp_args_set ] try
       reg0 inc comp_args_set
       ret
     end
   end
 
   reg1 imm1 consumed cf_restore_rhs
-  fallback execute
+  fallback call_xt
 end
 
 fun: cf_shift_validate { imm reg_op -- aux ok err }
@@ -2998,7 +3000,7 @@ fun: comp_loc_mut_fold_imm { reg loc imm aux emit -- err }
   loc comp_push_from_local
   comp_args_get dec { loc_reg }
   loc_reg comp_realloc_reg
-  loc_reg loc_reg imm aux emit execute_raw [ 1 comp_args_set ] try
+  loc_reg loc_reg imm aux emit call [ 1 comp_args_set ] try
   loc loc_reg comp_loc_mut_store_prepared
 end
 
@@ -3029,7 +3031,7 @@ end
 fun: comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   \ Mutate local with fixed immediate, e.g. `inc:` / `+cell:`.
   comp_loc_unary_init { reg loc }
-  reg reg imm aux emit execute_raw [ 1 comp_args_set ] try
+  reg reg imm aux emit call [ 1 comp_args_set ] try
   loc reg comp_loc_mut_store_realloc
 end
 
@@ -3186,7 +3188,7 @@ fun_comp: / { -- err } [ redefine ]
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok then reg imm0 imm1 / cf_fold_done ret end
-  reg1 imm1 consumed cf_restore_rhs execute'' /
+  reg1 imm1 consumed cf_restore_rhs call_xt'' /
 end
 
 fun_comp: u/ { -- err } [ redefine ]
@@ -3204,7 +3206,7 @@ fun_comp: mod { -- err } [ redefine ]
   " redundant arithmetic: modulo by 1" { err1 }
   false 0 err0 1 err1 cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok then reg imm0 imm1 mod cf_fold_done ret end
-  reg1 imm1 consumed cf_restore_rhs execute'' mod
+  reg1 imm1 consumed cf_restore_rhs call_xt'' mod
 end
 
 fun_comp: umod { -- err } [ redefine ]
@@ -3222,7 +3224,7 @@ fun_comp: /mod { -- err } [ redefine ]
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
   if ok then reg0 reg1 imm0 imm1 /mod cf_fold_done2 ret end
-  reg1 imm1 consumed cf_restore_rhs execute'' /mod
+  reg1 imm1 consumed cf_restore_rhs call_xt'' /mod
 end
 
 fun_comp: u/mod { -- err } [ redefine ]
@@ -3230,11 +3232,11 @@ fun_comp: u/mod { -- err } [ redefine ]
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
   if ok then reg0 reg1 imm0 imm1 u/mod cf_fold_done2 ret end
-  reg1 imm1 consumed cf_restore_rhs execute'' u/mod
+  reg1 imm1 consumed cf_restore_rhs call_xt'' u/mod
 end
 
 fun_comp: inc { -- err } [ redefine ]
-  if cf_fold_cleared1 then inc cf_fold_done else { -- } execute'' inc end
+  if cf_fold_cleared1 then inc cf_fold_done else { -- } call_xt'' inc end
 end
 
 \ Increment a local: `inc: some_val`.
@@ -3243,7 +3245,7 @@ fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: dec { -- err } [ redefine ]
-  if cf_fold_cleared1 then dec cf_fold_done else { -- } execute'' dec end
+  if cf_fold_cleared1 then dec cf_fold_done else { -- } call_xt'' dec end
 end
 
 \ Decrement a local: `dec: some_val`.
@@ -3252,7 +3254,7 @@ fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: negate { -- err } [ redefine ]
-  if cf_fold_cleared1 then negate cf_fold_done else { -- } execute'' negate end
+  if cf_fold_cleared1 then negate cf_fold_done else { -- } call_xt'' negate end
 end
 
 \ Negate a local: `negate: some_val`.
@@ -3263,7 +3265,7 @@ fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: abs { -- err } [ redefine ]
-  if cf_fold_cleared1 then abs cf_fold_done else { -- } execute'' abs end
+  if cf_fold_cleared1 then abs cf_fold_done else { -- } call_xt'' abs end
 end
 
 \ Absolute-value a local: `abs: some_val`.
@@ -3274,7 +3276,7 @@ fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bit_clz { -- err } [ redefine ]
-  if cf_fold_cleared1 then bit_clz cf_fold_done else { -- } execute'' bit_clz end
+  if cf_fold_cleared1 then bit_clz cf_fold_done else { -- } call_xt'' bit_clz end
 end
 
 \ Count leading zeros in a local: `bit_clz: some_val`.
@@ -3285,7 +3287,7 @@ fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bit_ctz { -- err } [ redefine ]
-  if cf_fold_cleared1 then bit_ctz cf_fold_done else { -- } execute'' bit_ctz end
+  if cf_fold_cleared1 then bit_ctz cf_fold_done else { -- } call_xt'' bit_ctz end
 end
 
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
@@ -3296,7 +3298,7 @@ fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bit_len { -- err } [ redefine ]
-  if cf_fold_cleared1 then bit_len cf_fold_done else { -- } execute'' bit_len end
+  if cf_fold_cleared1 then bit_len cf_fold_done else { -- } call_xt'' bit_len end
 end
 
 \ Compute bit length into a local: `bit_len: some_val`.
@@ -3308,7 +3310,7 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: pow2_ceil { -- err } [ redefine ]
-  if cf_fold_cleared1 then pow2_ceil cf_fold_done else { -- } execute'' pow2_ceil end
+  if cf_fold_cleared1 then pow2_ceil cf_fold_done else { -- } call_xt'' pow2_ceil end
 end
 
 \ Round local up to power of two: `pow2_ceil: some_val`.
@@ -3321,7 +3323,7 @@ end
 
 \ No partial CF: `csel` needs both values in regs; constants still cost `mov`.
 fun_comp: min { -- err } [ redefine ]
-  if cf_fold_cleared2 then min cf_fold_done else { -- } execute'' min end
+  if cf_fold_cleared2 then min cf_fold_done else { -- } call_xt'' min end
 end
 
 \ Minimum into a local: `candidate min: some_val`.
@@ -3330,7 +3332,7 @@ fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: umin { -- err } [ redefine ]
-  if cf_fold_cleared2 then umin cf_fold_done else { -- } execute'' umin end
+  if cf_fold_cleared2 then umin cf_fold_done else { -- } call_xt'' umin end
 end
 
 \ Unsigned minimum into a local: `candidate umin: some_val`.
@@ -3339,7 +3341,7 @@ fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: max { -- err } [ redefine ]
-  if cf_fold_cleared2 then max cf_fold_done else { -- } execute'' max end
+  if cf_fold_cleared2 then max cf_fold_done else { -- } call_xt'' max end
 end
 
 \ Maximum into a local: `candidate max: some_val`.
@@ -3348,7 +3350,7 @@ fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: umax { -- err } [ redefine ]
-  if cf_fold_cleared2 then umax cf_fold_done else { -- } execute'' umax end
+  if cf_fold_cleared2 then umax cf_fold_done else { -- } call_xt'' umax end
 end
 
 \ Unsigned maximum into a local: `candidate umax: some_val`.
@@ -3359,7 +3361,7 @@ end
 \ No partial CF: adopted child of the min/max family.
 fun_comp: fallback { -- err } [ redefine ]
   if cf_fold_cleared2 then fallback cf_fold_done
-  else { -- } execute'' fallback end
+  else { -- } call_xt'' fallback end
 end
 
 \ Fallback into a local: `candidate fallback: some_val`.
@@ -3369,7 +3371,7 @@ end
 
 fun_comp: int_to_cell { -- err } [ redefine ]
   if cf_fold_cleared1 then int_to_cell cf_fold_done
-  else { -- } execute'' int_to_cell end
+  else { -- } call_xt'' int_to_cell end
 end
 
 \ Sign-extend a local from int32 to cell: `int_to_cell: some_val`.
@@ -3380,7 +3382,7 @@ fun_comp: int_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: =0 { -- err } [ redefine ]
-  if cf_fold_cleared1 then =0 cf_fold_done else { -- } execute'' =0 end
+  if cf_fold_cleared1 then =0 cf_fold_done else { -- } call_xt'' =0 end
 end
 
 \ Test local equals zero in place: `=0: some_val`.
@@ -3389,7 +3391,7 @@ fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <>0 { -- err } [ redefine ]
-  if cf_fold_cleared1 then <>0 cf_fold_done else { -- } execute'' <>0 end
+  if cf_fold_cleared1 then <>0 cf_fold_done else { -- } call_xt'' <>0 end
 end
 
 \ Test local not equal zero in place: `<>0: some_val`.
@@ -3398,7 +3400,7 @@ fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <0 { -- err } [ redefine ]
-  if cf_fold_cleared1 then <0 cf_fold_done else { -- } execute'' <0 end
+  if cf_fold_cleared1 then <0 cf_fold_done else { -- } call_xt'' <0 end
 end
 
 \ Test local less than zero in place: `<0: some_val`.
@@ -3407,7 +3409,7 @@ fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >0 { -- err } [ redefine ]
-  if cf_fold_cleared1 then >0 cf_fold_done else { -- } execute'' >0 end
+  if cf_fold_cleared1 then >0 cf_fold_done else { -- } call_xt'' >0 end
 end
 
 \ Test local greater than zero in place: `>0: some_val`.
@@ -3416,7 +3418,7 @@ fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <=0 { -- err } [ redefine ]
-  if cf_fold_cleared1 then <=0 cf_fold_done else { -- } execute'' <=0 end
+  if cf_fold_cleared1 then <=0 cf_fold_done else { -- } call_xt'' <=0 end
 end
 
 \ Test local less than or equal zero in place: `<=0: some_val`.
@@ -3425,7 +3427,7 @@ fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >=0 { -- err } [ redefine ]
-  if cf_fold_cleared1 then >=0 cf_fold_done else { -- } execute'' >=0 end
+  if cf_fold_cleared1 then >=0 cf_fold_done else { -- } call_xt'' >=0 end
 end
 
 \ Test local greater than or equal zero in place: `>=0: some_val`.
@@ -3433,11 +3435,11 @@ fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_GE comp_loc_mut_cset_zero
 end
 
-fun: cf_cmp_fold2_or_execute { raw_xt fallback rhs_cond -- err }
+fun: cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
   cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
 
   if consumed 2 = then
-    imm0 imm1 raw_xt sym_instr execute_raw [ 1 comp_args_set ] { bool }
+    imm0 imm1 raw_xt sym_instr call [ 1 comp_args_set ] { bool }
     reg0 bool cf_fold_done ret
   end
 
@@ -3447,7 +3449,7 @@ fun: cf_cmp_fold2_or_execute { raw_xt fallback rhs_cond -- err }
 end
 
 fun_comp: = { -- err } [ redefine ]
-  xt' = xt'' = ASM_EQ cf_cmp_fold2_or_execute
+  xt' = xt'' = ASM_EQ cf_cmp_fold2_or_call
 end
 
 \ Compare a local for equality in place: `rhs =: some_val`.
@@ -3457,7 +3459,7 @@ fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: <> { -- err } [ redefine ]
-  xt' <> xt'' <> ASM_NE cf_cmp_fold2_or_execute
+  xt' <> xt'' <> ASM_NE cf_cmp_fold2_or_call
 end
 
 \ Compare a local for inequality in place: `rhs <>: some_val`.
@@ -3467,39 +3469,39 @@ fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
 end
 
 fun_comp: > { -- err } [ redefine ]
-  xt' > xt'' > ASM_GT cf_cmp_fold2_or_execute
+  xt' > xt'' > ASM_GT cf_cmp_fold2_or_call
 end
 
 fun_comp: < { -- err } [ redefine ]
-  xt' < xt'' < ASM_LT cf_cmp_fold2_or_execute
+  xt' < xt'' < ASM_LT cf_cmp_fold2_or_call
 end
 
 fun_comp: <= { -- err } [ redefine ]
-  xt' <= xt'' <= ASM_LE cf_cmp_fold2_or_execute
+  xt' <= xt'' <= ASM_LE cf_cmp_fold2_or_call
 end
 
 fun_comp: >= { -- err } [ redefine ]
-  xt' >= xt'' >= ASM_GE cf_cmp_fold2_or_execute
+  xt' >= xt'' >= ASM_GE cf_cmp_fold2_or_call
 end
 
 fun_comp: u> { -- err } [ redefine ]
-  xt' u> xt'' u> ASM_HI cf_cmp_fold2_or_execute
+  xt' u> xt'' u> ASM_HI cf_cmp_fold2_or_call
 end
 
 fun_comp: u< { -- err } [ redefine ]
-  xt' u< xt'' u< ASM_LO cf_cmp_fold2_or_execute
+  xt' u< xt'' u< ASM_LO cf_cmp_fold2_or_call
 end
 
 fun_comp: u<= { -- err } [ redefine ]
-  xt' u<= xt'' u<= ASM_LS cf_cmp_fold2_or_execute
+  xt' u<= xt'' u<= ASM_LS cf_cmp_fold2_or_call
 end
 
 fun_comp: u>= { -- err } [ redefine ]
-  xt' u>= xt'' u>= ASM_HS cf_cmp_fold2_or_execute
+  xt' u>= xt'' u>= ASM_HS cf_cmp_fold2_or_call
 end
 
 fun_comp: cells { -- err } [ redefine ]
-  if cf_fold_cleared1 then cells cf_fold_done else { -- } execute'' cells end
+  if cf_fold_cleared1 then cells cf_fold_done else { -- } call_xt'' cells end
 end
 
 \ Scale a local by cell size: `cells: some_val`.
@@ -3508,7 +3510,7 @@ fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: /cells { -- err } [ redefine ]
-  if cf_fold_cleared1 then /cells cf_fold_done else { -- } execute'' /cells end
+  if cf_fold_cleared1 then /cells cf_fold_done else { -- } call_xt'' /cells end
 end
 
 \ Divide a local by cell size: `/cells: some_val`.
@@ -3517,7 +3519,7 @@ fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: +cell { -- err } [ redefine ]
-  if cf_fold_cleared1 then +cell cf_fold_done else { -- } execute'' +cell end
+  if cf_fold_cleared1 then +cell cf_fold_done else { -- } call_xt'' +cell end
 end
 
 \ Add one cell to a local: `+cell: some_val`.
@@ -3526,7 +3528,7 @@ fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: -cell { -- err } [ redefine ]
-  if cf_fold_cleared1 then -cell cf_fold_done else { -- } execute'' -cell end
+  if cf_fold_cleared1 then -cell cf_fold_done else { -- } call_xt'' -cell end
 end
 
 \ Subtract one cell from a local: `-cell: some_val`.
@@ -3577,7 +3579,7 @@ fun_comp: align_up { -- err } [ redefine ]
 end
 
 fun_comp: invert { -- err } [ redefine ]
-  if cf_fold_cleared1 then invert cf_fold_done else { -- } execute'' invert end
+  if cf_fold_cleared1 then invert cf_fold_done else { -- } call_xt'' invert end
 end
 
 \ Invert a local: `invert: some_val`.
@@ -3588,7 +3590,7 @@ fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: low_bits { -- err } [ redefine ]
-  if cf_fold_cleared1 then low_bits cf_fold_done else { -- } execute'' low_bits end
+  if cf_fold_cleared1 then low_bits cf_fold_done else { -- } call_xt'' low_bits end
 end
 
 \ Set a local to a mask of its low bit count: `low_bits: some_val`.
@@ -3633,7 +3635,7 @@ end
 fun_comp: bit_mask_set { -- err } [ redefine ]
   \ No partial CF: useful for constant masks, but requires ternary partial-CF.
   \ Full CF alone is not worth keeping the ternary-only machinery.
-  execute'' bit_mask_set
+  call_xt'' bit_mask_set
 end
 
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
@@ -3744,7 +3746,7 @@ end
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
   STACK_SIZE malloc { adr }
   size adr stack_init
-  adr execute' let:
+  adr call_xt' let:
 end
 
 \ ## Loops
@@ -3761,7 +3763,7 @@ end
 \
 \ Control stack for auxiliary loop constructs like `leave` and `while`.
 \ Each auxiliary construct pushes `aux_meta aux_pop`, and `loop_frame_end_xt`
-\ repeatedly executes aux pops until it reaches the `nop` terminator installed
+\ repeatedly calls aux pops until it reaches the `nop` terminator installed
 \ by `loop_frame_init`.
 \
 \ TODO: since we never unmap this memory, this is a known leak
@@ -3796,7 +3798,7 @@ end
 
 fun: loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
   comp_barrier
-  LOOP_AUX s> execute \ Pop all auxiliaries until a terminating `nop`.
+  LOOP_AUX s> call_xt \ Pop all auxiliaries until a terminating `nop`.
   prev_loop_ind LOOP_IND !
 end
 
@@ -3820,7 +3822,7 @@ fun: loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- 
   comp_barrier
   meta CONT_MASK_INP_LEN bit_mask_get " arguments before ending `loop`" comp_args_valid
   meta loop_back \ b <beg>
-  execute'' end \ Run `loop_frame_end_xt`.
+  call_xt'' end \ Run `loop_frame_end_xt`.
 end
 
 fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
@@ -3833,7 +3835,7 @@ end
 fun: leave_end_xt { -- err }
   LOOP_AUX s> cont_meta_instr_adr { adr }
   here_write adr - asm_branch adr !32
-  LOOP_AUX s> execute
+  LOOP_AUX s> call_xt
 end
 
 \ Breaks out of any loop.
@@ -3853,7 +3855,7 @@ fun: while_end_xt { -- err }
   LOOP_AUX s> { meta }
   meta CONT_MASK_INP_LEN bit_mask_get { reg }
   reg meta if_patch
-  LOOP_AUX s> execute
+  LOOP_AUX s> call_xt
 end
 
 \ Tests a predicate; if predicate is 0, leaves the loop.
@@ -3891,16 +3893,16 @@ end
 \ ## Memory stuff continued
 
 fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
-  execute'' size' execute'' alloca
+  call_xt'' size' call_xt'' alloca
 end
 
 fun_comp: allocaz' { -- err } ( C: "type" -- ) ( E: -- adr )
-  execute' size' { size }
+  call_xt' size' { size }
   size comp_push
-  execute'' alloca
+  call_xt'' alloca
   size comp_push
   compile' memzero
-  execute'' systack_ptr \ mov x0, sp
+  call_xt'' systack_ptr \ mov x0, sp
 end
 
 \ Count non-nil cells; stop at nil.
@@ -4105,7 +4107,7 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
     dec: reg
     reg 0 >= while
     reg comp_args_set
-    STACK s> execute
+    STACK s> call_xt
   end
 
   arg_len comp_args_set
@@ -4123,7 +4125,7 @@ fun_comp: elogf { -- err } ( E: fmt …vargs… -- )
 
   xt'' stderr STACK >s
   1 comp_args_prepend
-  execute'' systack_ptr
+  call_xt'' systack_ptr
   compile' vfprintf
 
   len comp_va_end
@@ -4139,12 +4141,12 @@ fun_comp: errf { -- err } ( E: fmt …vargs… -- err )
   xt'' ERR_CAP   STACK >s
   2 comp_args_prepend
 
-  execute'' systack_ptr
+  call_xt'' systack_ptr
   compile' vsnprintf
 
   len comp_va_end
   0 comp_args_set
-  execute'' ERR_BUF_0
+  call_xt'' ERR_BUF_0
 end
 
 fun: wrapf_args { err fmt -- buf cap fmt }
@@ -4456,7 +4458,7 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
     123 asm_brk comp_instr \ brk 123 -- unreachable
 
     out comp_args_set
-  execute'' end
+  call_xt'' end
 
   [ false comp_only ]
 end
@@ -4649,7 +4651,7 @@ fun: assert_bin_end_xt { beg cond cmp_xt -- err }
 
   if static then
     reg0 comp_args_set
-    lhs rhs cmp_xt sym_instr execute_raw [ 1 comp_args_set ] { bool }
+    lhs rhs cmp_xt sym_instr call [ 1 comp_args_set ] { bool }
     ifz bool then
       beg assert_body { ctx ctx_len }
       " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"

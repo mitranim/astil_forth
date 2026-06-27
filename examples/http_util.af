@@ -24,7 +24,7 @@ fun: net_accept_loop { sock handler }
     end
 
     " [srv] accepted connection" elog elf
-    conn handler execute_raw
+    conn handler call
   end
 end
 

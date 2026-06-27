@@ -783,10 +783,11 @@ static const USED auto INTRIN_INLINE_WORD = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_EXECUTE = (Sym){
-  .name.buf = "execute",
+// Renamed from standard Forth `execute`.
+static const USED auto INTRIN_CALL_XT = (Sym){
+  .name.buf = "call_xt",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_execute,
+  .intrin   = (void *)intrin_call_xt,
   .inp_len  = 1,
   .out_len  = 1,
   .has_err  = true,

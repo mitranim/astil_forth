@@ -54,7 +54,7 @@ static Err interp_init_syms(Interp *interp) {
   const auto comp = &interp->comp;
 
   // Hidden XT for standard Forth `;`.
-  // Used by defining words that push an XT for `end` to pop and execute.
+  // Used by defining words that push an XT for `end` to pop and call.
   sym_init_intrin(stack_push(
     syms,
     (Sym){

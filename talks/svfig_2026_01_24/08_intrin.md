@@ -45,7 +45,7 @@ extern:
 
 find_word
 inline_word
-execute
+call_xt
 
 get_local
 anon_local
