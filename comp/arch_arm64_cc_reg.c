@@ -315,6 +315,7 @@ pointers appropriately.
 static Err asm_append_call_intrin(
   Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
+  (void)caller;
   assert_fatal(callee->type == SYM_INTRIN);
 
   const U8  inps   = callee->inp_len;
@@ -361,11 +362,10 @@ static Err asm_append_call_intrin(
 
   (void)err_mode;
 
-  asm_register_call(comp, caller);
   return nullptr;
 }
 
-static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
+static void asm_append_call_extern(Comp *comp, const Sym *callee) {
   assert_fatal(callee->type == SYM_EXTERN);
 
   // Free to use because extern calls clobber everything anyway.
@@ -373,7 +373,6 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
 
   asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.externs);
   asm_append_branch_link_to_reg(comp, reg);
-  asm_register_call(comp, caller);
 }
 
 /*

@@ -64,12 +64,6 @@ static void asm_append_local_read(Comp *comp, Ind off) {
   asm_append_stack_push_from(comp, ASM_SCRATCH_REG_8);
 }
 
-// SYNC[asm_local_addressing].
-static void asm_append_local_write(Comp *comp, Ind off) {
-  asm_append_stack_pop_into(comp, ASM_SCRATCH_REG_8);
-  asm_append_store_scaled_offset(comp, ASM_SCRATCH_REG_8, ASM_REG_FP, off);
-}
-
 static S8 asm_sym_err_reg(const Sym *sym) {
   if (!sym->has_err) return -1;
   return ASM_REG_ERR;
@@ -170,13 +164,12 @@ static Err asm_append_call_intrin(
   asm_append_mov_reg(comp, ASM_PARAM_REG_0, ASM_REG_INTERP);
   asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.intrins);
   asm_append_branch_link_to_reg(comp, reg);
-  asm_register_call(comp, caller);
   asm_append_call_intrin_after(comp);
   try(asm_append_try_catch(comp, caller, callee, err_mode));
   return nullptr;
 }
 
-static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
+static void asm_append_call_extern(Comp *comp, const Sym *callee) {
   IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
 
   const auto inp_len = callee->inp_len;
@@ -199,7 +192,6 @@ static void asm_append_call_extern(Comp *comp, Sym *caller, const Sym *callee) {
 
   asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.externs);
   asm_append_branch_link_to_reg(comp, reg);
-  asm_register_call(comp, caller);
   if (out_len) asm_append_stack_push_from(comp, ASM_REG_ERR);
 
   /*

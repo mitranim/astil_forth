@@ -301,13 +301,3 @@ static Err read_until_char(
   if (out_len) *out_len = read->pos - beg;
   return nullptr;
 }
-
-// TODO: expose an intrinsic with this.
-static Err read_until_word(Reader *read, const char *delim) {
-  for (;;) {
-    Word_str word;
-    try(read_valid_word(read, &word));
-    if (str_eq(&word, delim)) break;
-  }
-  return nullptr;
-}

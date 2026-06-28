@@ -1837,26 +1837,6 @@ fun: test_fallback { -- err }
 end
 test_fallback
 
-fun: test_vargs_printf { -- err }
-  10 20 30 vargs{ " numbers (should be 10 20 30): %zd %zd %zd" printf }vargs
-  { printed }
-  lf
-
-  s" numbers (should be 10 20 30): 10 20 30" { __ len }
-  assert= printed len end
-end
-\ test_vargs_printf
-
-fun: test_logf
-  " numbers (should be 40 50 60): %zd %zd %zd" 40 50 60 logf lf
-end
-\ test_logf
-
-fun: test_elogf
-  " numbers (should be 70 80 90): %zd %zd %zd" 70 80 90 elogf elf
-end
-\ test_elogf
-
 fun: test_strf { -- err }
   4096 { cap }
   4096 alloca { buf }
@@ -1878,11 +1858,6 @@ fun: test_errf { -- err }
 
 end
 test_errf
-
-fun: test_errf_throw { -- err }
-  " codes: %zd %zd %zd" 10 20 30 errf
-end
-\ test_errf_throw
 
 \ Our "try" is atypical compared to verbs: instead of consuming all outputs,
 \ it "pops" only the last one, assuming it to be error or nil. By accident,
@@ -3066,12 +3041,8 @@ fun: main_run { -- err }
   test_comptime_arg_stack_mod_scratch
   test_stack_push_9
   test_fallback
-  \ test_vargs_printf
-  \ test_logf
-  \ test_elogf
   test_strf
   test_errf
-  \ test_errf_throw
   test_wrapf
   test_alloca_cell
   test_allocaz

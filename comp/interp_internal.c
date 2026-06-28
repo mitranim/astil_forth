@@ -638,21 +638,7 @@ static Err interp_parse_until(
   Ind        len;
   try(read_until_char(read, (U8)delim, out_buf, &len));
 
-  // IF_DEBUG(eprintf(
-  //   "[system] parsed until delim " FMT_CHAR_QUOTED "; length: " FMT_UINT "\n",
-  //   (int)delim,
-  //   len
-  // ));
-
   if (out_len) *out_len = len;
-
-  // IF_DEBUG({
-  //   const auto ints = &interp->ints;
-  //   eprintf(
-  //     "[system] stack_len(ints) after parsing: " FMT_SINT "\n", stack_len(ints)
-  //   );
-  //   eprintf("[system] stack pointer after parsing: %p\n", ints->top);
-  // });
   return nullptr;
 }
 

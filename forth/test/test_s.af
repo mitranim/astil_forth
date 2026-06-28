@@ -501,22 +501,6 @@ T{ " one" strdup " two" cstr< <T> true }T
 T{ " two" strdup " one" cstr< <T> false }T
 T{ " one" strdup " one" cstr< <T> false }T
 
-fun: test_vargs_printf
-  " numbers (should be 10 20 30): %zd %zd %zd"
-  10 20 30 [ 3 ] vargs{ printf }vargs lf
-end
-\ test_vargs_printf
-
-fun: test_logf
-  " numbers (should be 40 50 60): %zd %zd %zd" 40 50 60 [ 3 ] logf lf
-end
-\ test_logf
-
-fun: test_elogf
-  " numbers (should be 70 80 90): %zd %zd %zd" 70 80 90 [ 3 ] elogf elf
-end
-\ test_elogf
-
 4096 buf: TEST_STRF_BUF
 
 fun: test_strf
@@ -535,11 +519,6 @@ fun: test_errf
   ERR_BUF " codes: 10 20 30" T_str_eq
 end
 test_errf
-
-fun: test_errf_throw
-  " codes: %zd %zd %zd" 10 20 30 [ 3 ] errf throw
-end
-\ test_errf_throw
 
 fun: test_to
   T{ 10 to: one <T> }T

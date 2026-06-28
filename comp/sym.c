@@ -77,12 +77,6 @@ static Err err_inline_pc_rel(const Sym *sym) {
   );
 }
 
-static Err err_inline_early_ret(const Sym *sym) {
-  return errf(
-    "unable to inline word " FMT_QUOTED ": contains early returns", sym->name.buf
-  );
-}
-
 static Err err_inline_not_leaf(const Sym *sym) {
   return errf(
     "unable to inline word " FMT_QUOTED ": not a leaf function", sym->name.buf

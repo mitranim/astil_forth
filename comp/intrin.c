@@ -100,23 +100,8 @@ static Err intrin_semicolon(Interp *interp) {
   IF_DEBUG({
     eputs("[debug] compiled:");
     interp_repr_sym(interp, sym);
-
-    // const auto read = interp_reader(interp);
-    // eprintf(
-    //   "[system] [reader] position " FMT_UINT "; %s:" FMT_UINT ":" FMT_UINT "\n",
-    //   READ_POS_ARGS(read)
-    // );
   });
 
-  // const auto ints = &interp->ints;
-  // if (stack_len(ints)) {
-  //   eprintf(
-  //     "[system] warning: " FMT_SINT " stack items after defining " FMT_QUOTED
-  //     "; this usually indicates a bug\n",
-  //     stack_len(ints),
-  //     name
-  //   );
-  // }
   return nullptr;
 }
 

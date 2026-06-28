@@ -1127,9 +1127,6 @@ fun: reserve_instr ASM_PLACEHOLDER comp_instr end
 fun: reserve_here ( -- adr ) here_write reserve_instr end
 fun: reserve_cond ( -- adr ) asm_pop_x1 comp_instr reserve_here end
 fun: off_to_pc    ( adr -- off ) here_write swap - end \ For forward jumps.
-fun: off_from_pc  ( adr -- off ) here_write      - end \ For backward jumps.
-fun: patch_branch_forward ( adr -- ) dup off_to_pc asm_branch swap !32 end \ b <off>
-fun: patch_branch_back    ( adr -- ) off_from_pc   asm_branch swap !32 end \ b <off>
 
 fun: if_pop ( nop if_adr -- )
   \ cbz x1, <else|end>
@@ -1147,7 +1144,7 @@ fun_comp: if  xt' nop xt' if_pop  end
 fun_comp: ifz xt' nop xt' ifn_pop end
 fun_comp: then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) reserve_cond swap end
 
-fun: else_pop ( prev_fun else_adr -- ) patch_branch_forward call_xt end
+fun: else_pop ( prev_fun else_adr -- ) dup off_to_pc asm_branch swap !32 call_xt end
 
 fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
   reserve_here to: adr
@@ -1220,7 +1217,7 @@ fun: loop_aux
   LOOP_FRAME @ frame_len + LOOP_FRAME !
 end
 
-fun: loop_end ( C: loop_adr -- ) off_from_pc asm_branch comp_instr end \ b <begin>
+fun: loop_end ( C: loop_adr -- ) here_write - asm_branch comp_instr end \ b <begin>
 fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end call_xt'' end end
 
 \ Implementation note. Each loop frame is "split" into two sub-frames:
@@ -1612,18 +1609,6 @@ fun: comp_va_end ( C: len -- )
   end
 end
 
-\ Sets up arguments for a variadic call. Assumes the Apple Arm64 ABI,
-\ where vargs use the systack. Usage example:
-\
-\   fun: some_word
-\     10 20 30 [ 3 ] vargs{ " numbers: %zd %zd %zd" printf }vargs lf
-\   end
-\
-\ Caution: varargs can only be used in direct calls to variadic functions.
-\ Indirect calls DO NOT WORK because stack pointer is changed by calls.
-fun_comp: vargs{ ( C: len -- len ) ( E: <systack_push> ) dup comp_va_beg end
-fun_comp: }vargs ( C: len --     ) ( E: <systack_pop   )     comp_va_end end
-
 \ The given offset is how many non-vargs precede the vargs.
 \ The given function must have exactly that arity.
 fun: comp_varcall ( C: len fun -- ) ( E: …args… …vargs… -- )
@@ -1736,26 +1721,24 @@ fun: errno ( -- err ) __error @32 end \ TODO switch to `ldrsw`.
 2     let: MAP_PRIVATE
 4096  let: MAP_ANON
 
-fun: mem_map_err ( -- )
-  " unable to map memory; code: %zd; message: %s"
-  errno dup strerror [ 2 ] errf
-end
-
 fun: mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE or      to: mflag
   0 size pflag mflag -1 0 mmap to: addr
-  if addr -1 = then mem_map_err throw end
+  if addr -1 = then
+    " unable to map memory; code: %zd; message: %s"
+    errno dup strerror [ 2 ] errf
+    throw
+  end
   addr
-end
-
-fun: mem_unprot_err ( -- )
-  " unable to unprotect memory; code: %zd; message: %s"
-  errno dup strerror [ 2 ] errf
 end
 
 fun: mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE or mprotect
-  if -1 = then mem_unprot_err throw end
+  if -1 = then
+    " unable to unprotect memory; code: %zd; message: %s"
+    errno dup strerror [ 2 ] errf
+    throw
+  end
 end
 
 \ Allocates a guarded buffer: `guard|data|guard`.

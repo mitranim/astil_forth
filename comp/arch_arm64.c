@@ -454,35 +454,11 @@ static Instr asm_instr_load_unscaled_offset(U8 src_reg, U8 addr_reg, Sint off) {
   return asm_instr_load_store_unscaled_offset(true, src_reg, addr_reg, off);
 }
 
-static Instr asm_instr_store_unscaled_offset(U8 out_reg, U8 addr_reg, Sint off) {
-  return asm_instr_load_store_unscaled_offset(false, out_reg, addr_reg, off);
-}
-
 // ldur <val_reg>, [<addr_reg>, <off>]
 static void asm_append_load_unscaled_offset(
   Comp *comp, U8 out_reg, U8 addr_reg, Sint off
 ) {
   asm_append_instr(comp, asm_instr_load_unscaled_offset(out_reg, addr_reg, off));
-}
-
-// stur <val_reg>, [<addr_reg>, <off>]
-static void asm_append_store_unscaled_offset(
-  Comp *comp, U8 src_reg, U8 addr_reg, Sint off
-) {
-  asm_append_instr(comp, asm_instr_store_unscaled_offset(src_reg, addr_reg, off));
-}
-
-static void asm_append_load_literal_offset(Comp *comp, U8 reg, Sint off) {
-  try_fatal(asm_validate_reg(reg));
-
-  Instr imm;
-  try_fatal(imm_signed(off, 19, &imm));
-
-  asm_append_instr(
-    comp,
-    // ldr <reg>, <off>
-    (Instr)0b01'011'0'00'0000000000000000000'00000 | (imm << 5u) | reg
-  );
 }
 
 /*
@@ -589,10 +565,6 @@ static Instr asm_instr_branch_to_offset(Sint off) {
   return (Instr)0b0'00'101'00000000000000000000000000 | imm;
 }
 
-static void asm_append_branch_to_offset(Comp *comp, Sint off) {
-  asm_append_instr(comp, asm_instr_branch_to_offset(off));
-}
-
 /*
 The instruction will contain a PC-relative offset of the instruction it's
 going to "call". "PC" stands for "program counter": memory address of the
@@ -643,29 +615,9 @@ static Instr asm_instr_compare_branch_non_zero(U8 reg, Sint off) {
   return asm_instr_compare_branch(reg, off, true);
 }
 
-static void asm_append_compare_branch(
-  Comp *comp, U8 reg, Sint off, bool non_zero
-) {
-  asm_append_instr(comp, asm_instr_compare_branch(reg, off, non_zero));
-}
-
 static void asm_append_compare_branch_zero(Comp *comp, U8 reg, Sint off) {
   asm_append_instr(comp, asm_instr_compare_branch_zero(reg, off));
 }
-
-static void asm_append_compare_branch_non_zero(Comp *comp, U8 reg, Sint off) {
-  asm_append_instr(comp, asm_instr_compare_branch_non_zero(reg, off));
-}
-
-// static const Instr *asm_sym_epilogue_writable(const Comp *comp, const Sym *sym) {
-//   assert_fatal(sym->type == SYM_NORM);
-//   return list_elem_ptr(&comp->code.code_write, sym->norm.spans.epilogue);
-// }
-
-// static const Instr *asm_sym_epilogue_executable(const Comp *comp, const Sym *sym) {
-//   assert_fatal(sym->type == SYM_NORM);
-//   return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.epilogue);
-// }
 
 static Instr *asm_sym_prologue_writable(const Comp *comp, const Sym *sym) {
   assert_fatal(sym->type == SYM_NORM);
@@ -785,12 +737,6 @@ static Instr asm_instr_add_reg(U8 tar_reg, U8 src_reg, U8 mod_reg) {
     asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
 }
 
-// sub Xd, Xt|xzr, Xm
-static Instr asm_instr_sub_reg_lsl(U8 tar_reg, U8 src_reg, U8 mod_reg) {
-  return (Instr)0b1'1'0'01011'00'0'00000'000000'00000'00000 |
-    asm_pattern_arith_reg(tar_reg, src_reg, mod_reg);
-}
-
 // sub Xd, Xt|sp, Xm
 static Instr asm_instr_sub_reg_ext(U8 tar_reg, U8 src_reg, U8 mod_reg) {
   return (Instr)0b1'1'0'01011'00'1'00000'011'000'00000'00000 |
@@ -799,12 +745,6 @@ static Instr asm_instr_sub_reg_ext(U8 tar_reg, U8 src_reg, U8 mod_reg) {
 
 static void asm_append_add_reg(Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg) {
   asm_append_instr(comp, asm_instr_add_reg(tar_reg, src_reg, mod_reg));
-}
-
-static void asm_append_sub_reg_lsl(
-  Comp *comp, U8 tar_reg, U8 src_reg, U8 mod_reg
-) {
-  asm_append_instr(comp, asm_instr_sub_reg_lsl(tar_reg, src_reg, mod_reg));
 }
 
 static void asm_append_sub_reg_ext(
@@ -1044,21 +984,6 @@ static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
 #endif // CALL_CONV_STACK
 }
 
-/*
-TODO use or drop.
-
-Should be invoked immediately after encoding branch-with-link instructions,
-namely `bl` and `blr`. The address of the next instruction becomes the value
-of the link register `x30` stored in the next frame record. We could store
-metadata for every return address and create backtraces when unwinding.
-
-  static void asm_register_call(Comp *comp, const Sym *caller) {
-    map_set(&comp->cfi, comp_code_next_prog_counter(comp), caller);
-  }
-*/
-
-static void asm_register_call(Comp *, const Sym *) {}
-
 static Instr asm_instr_mov_reg(U8 tar_reg, U8 src_reg) {
   try_fatal(asm_validate_reg(tar_reg));
   try_fatal(asm_validate_reg(src_reg));
@@ -1226,7 +1151,6 @@ static Err asm_append_call_norm(
 
   assert_fatal(comp_code_is_instr_ours(code, fun));
   asm_append_branch_link_to_offset(comp, pc_off);
-  asm_register_call(comp, caller);
 #ifdef CALL_CONV_STACK
   try(asm_append_try_catch(comp, caller, callee, err_mode));
 #else

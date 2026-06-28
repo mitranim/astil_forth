@@ -300,7 +300,6 @@ fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
   Xd Xn Xm asm_pattern_arith_reg cond or
 end
 
-fun: instr_off_pack { off -- packed } off 2 lsl end
 fun: instr_off_unpack { packed -- off } packed 2 lsr end
 
 \ `off19` offset is implicitly times 4 and can be negative.
@@ -1583,22 +1582,6 @@ fun: comp_buf { adr cap -- err } ( E: -- adr cap )
   cap RL comp_load
 end
 
-fun: buf_init { adr cap -- err }
-  read_word { str len }
-
-  str len define_fun
-    0 2 false comp_signature_set ( E: -- ptr cap )
-    adr cap comp_buf
-  call_xt'' end
-
-  str len define_fun_comp
-    0 1 true comp_signature_set
-    adr comp_push cap comp_push compile' comp_buf
-  call_xt'' end
-
-  [ false comp_only ]
-end
-
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
 \ at least the given size in bytes, initialized to zero.
@@ -1615,7 +1598,20 @@ end
 \ stored in another static variable, or used to derive an address
 \ which would be stored in another static variable.
 fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
-  nil cap alloc_data cap buf_init
+  nil cap alloc_data { adr }
+  read_word { str len }
+
+  str len define_fun
+    0 2 false comp_signature_set ( E: -- ptr cap )
+    adr cap comp_buf
+  call_xt'' end
+
+  str len define_fun_comp
+    0 1 true comp_signature_set
+    adr comp_push cap comp_push compile' comp_buf
+  call_xt'' end
+
+  [ false comp_only ]
 end
 
 \ ## Memory
@@ -1961,15 +1957,11 @@ CONT_MASK_CBNZ 1 lsl                   let: CONT_MASK_EXEC_PREV
 CONT_MASK_BRANCH_COND bit_len low_bits invert let: CONT_MASK_INSTR_OFF
 
 fun: cont_meta_instr_off_set { off meta -- meta }
-  off instr_off_pack meta CONT_MASK_INSTR_OFF bit_mask_set
-end
-
-fun: cont_meta_instr_off_get { meta -> off }
-  CONT_MASK_INSTR_OFF bit_mask_get instr_off_unpack
+  off 2 lsl meta CONT_MASK_INSTR_OFF bit_mask_set
 end
 
 fun: cont_meta_instr_adr { meta -> adr }
-  cont_meta_instr_off_get instr_adr
+  CONT_MASK_INSTR_OFF bit_mask_get instr_off_unpack instr_adr
 end
 
 fun: reserve_instr { -- off err }
@@ -4179,17 +4171,6 @@ fun: comp_va_end { len -- err }
     ASM_REG_SP ASM_REG_SP off asm_add_imm comp_instr \ add sp, sp, <off>
   end
 end
-
-\ Sets up variadic arguments following the C ABI. Usage example:
-\
-\   fun: some_word
-\     10 20 30 vargs{ " numbers: %zd %zd %zd" printf }vargs lf
-\   end
-\
-\ Caution: vargs can only be used in direct calls to variadic functions.
-\ Indirect calls DO NOT WORK, because stack pointer is changed by calls.
-fun_comp: vargs{ { -- len err } ( E: <systack_push> ) 0   comp_va_beg end
-fun_comp: }vargs { len -- err } ( E: <systack_pop> )  len comp_va_end end
 
 \ Prepends `pre_len` args to current args. Inputs are passed on the control
 \ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.

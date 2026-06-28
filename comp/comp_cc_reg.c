@@ -789,7 +789,7 @@ static Err comp_append_call_extern(Comp *comp, Sym *callee) {
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  asm_append_call_extern(comp, caller, callee);
+  asm_append_call_extern(comp, callee);
 
   constexpr bool err_mode = false;
   try(comp_after_append_call(comp, caller, callee, err_mode));

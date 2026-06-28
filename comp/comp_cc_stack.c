@@ -100,16 +100,6 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   return nullptr;
 }
 
-/*
-The language bootstrap file implements this on its own.
-
-static Err comp_append_push_into_local(Comp *comp, Local *loc) {
-  const auto off = loc->fp_off;
-  asm_append_local_write(comp, off);
-  return nullptr;
-}
-*/
-
 static Err comp_call_intrin(Interp *interp, const Sym *callee) {
   IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
   typedef Err(Fun)(Interp *);
@@ -162,7 +152,7 @@ static Err comp_append_call_extern(Comp *comp, Sym *callee) {
   IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
-  asm_append_call_extern(comp, caller, callee);
+  asm_append_call_extern(comp, callee);
   comp_add_clobbers(caller, callee);
   sym_register_call(caller, callee);
   return nullptr;
