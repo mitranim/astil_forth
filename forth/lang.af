@@ -1250,8 +1250,9 @@ fun:      <=0 { num   -> bool } <=0                       end
 fun_comp: >=0 {       -- err  } ASM_GE asm_comp_cset_zero end \ Or `PL`.
 fun:      >=0 { num   -> bool } >=0                       end
 
-fun: within  { num one two -- bool } one num  > num two  > or =0 end
-fun: uwithin { num one two -- bool } one num u> num two u> or =0 end
+\ Non-standard and sane: no wraparound semantics.
+fun: within  { num floor ceil -- bool } num floor  >= num ceil  < and end
+fun: uwithin { num floor ceil -- bool } num floor u>= num ceil u< and end
 
 \ ## Memory load / store
 

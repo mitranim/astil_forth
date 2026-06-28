@@ -1319,9 +1319,14 @@ fun: test_unsigned_compare { -- err }
   assert= 0 -1 u>= 0 end
 
   assert= -1 0 10 within 0 end
+  assert= 0 0 10 within 1 end
+  assert= 5 0 10 within 1 end
+  assert= 10 0 10 within 0 end
+  assert= -5 -10 0 within 1 end
   assert= -1 0 10 uwithin 0 end
+  assert= 0 0 10 uwithin 1 end
   assert= 5 0 10 uwithin 1 end
-  assert= 10 0 10 uwithin 1 end
+  assert= 10 0 10 uwithin 0 end
 end
 test_unsigned_compare
 

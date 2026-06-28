@@ -308,6 +308,7 @@ contexts:
       pop: 1
 
   # Convention for word-declaring words.
+  # TODO: scope functions / constants / variables / types differently.
   declaring-word-match:
     - match: '{{word_begin}}({{mod}})?({{declarator}})(:){{word_end}}\s+({{word}}){{word_end}}'
       scope: meta.declaration.astil_forth

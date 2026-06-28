@@ -1533,7 +1533,8 @@ end
 fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
 fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
 
-fun: within { num one two -- bool } one num > num two > or =0 end
+\ Non-standard and sane: no wraparound semantics.
+fun: within { num floor ceil -- bool } num floor >= num ceil < and end
 
 \ ## Varargs and formatting
 
