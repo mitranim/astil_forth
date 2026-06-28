@@ -8,6 +8,7 @@
 -Wunreachable-code-aggressive
 -Werror=return-type
 -Werror=format-insufficient-args
+-Werror=conversion
 -Wno-format-non-iso
 -Wno-pre-c23-compat
 -Wno-pre-c2y-compat
