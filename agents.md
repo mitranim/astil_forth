@@ -51,6 +51,7 @@ When deleting callsites, fold non-reusable auxiliary functions into the last rem
 Some reusability criteria:
 - Already-existing multiple callsites where it saves code.
 - Clear separation of domains; for example: pure "asm" functions return instructions; "comp" functions may take them for side effects. Pure functions in general have slightly more reusability.
+- Lifecycle functions; common case: per-type init/deinit.
 
 ## Codegen tests
 
