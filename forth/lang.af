@@ -3867,16 +3867,15 @@ end
 
 \ ## Loops
 \
-\ Unlike other Forth systems, we implement termination of arbitrary
-\ control structures with a generic `end`. This works for all loops
-\ and eliminates the need to remember many different terminators.
+\ Unlike other Forth impls, our reg-CC dialect provides exactly one
+\ loop form: `loop`, terminated with the same `end` as conditionals,
+\ and compatible with any amount of inner `leave` and `while` words.
 \
-\ Our solution isn't complicated, either. We simply push functions
-\ with their arguments to the control stack and pop the latest one
-\ with `end`. Each function pops its arguments and does something,
-\ then pops the next function in the chain. The cascade terminates
-\ when encountering a function which doesn't pop a preceding one.
-\
+\ Other loop forms got purged as unworthy for many reasons:
+\ impl overhead, mental overhead, unclear hidden semantics,
+\ not really compacting user code, and not taking advantage
+\ of constant-folding optimizations.
+
 \ Control stack for auxiliary loop constructs like `leave` and `while`.
 \ Each auxiliary construct pushes `aux_meta aux_pop`, and `loop_frame_end_xt`
 \ repeatedly calls aux pops until it reaches the `nop` terminator installed

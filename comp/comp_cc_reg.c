@@ -142,10 +142,7 @@ static Comp_arg comp_arg_unknown(void) {
 }
 
 static Comp_arg comp_arg_local(Local *loc) {
-  return (Comp_arg){
-    .type = COMP_ARG_LOC,
-    .loc  = loc,
-  };
+  return (Comp_arg){.type = COMP_ARG_LOC, .loc = loc};
 }
 
 static Local *comp_arg_local_ref(const Comp_arg *arg) {
