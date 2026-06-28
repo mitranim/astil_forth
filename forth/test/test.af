@@ -2346,6 +2346,57 @@ fun: test_struct_11 { -- err }
 end
 test_struct_11
 
+union: Typ_union
+  U8   1 field: Typ_union_byte
+  Cell 1 field: Typ_union_cell
+end
+
+fun: test_union_named_basic { -- err }
+  assert= size' Typ_union 8 end
+  assert= align' Typ_union 8 end
+  assert= 0 Typ_union_byte 0 end
+  assert= 0 Typ_union_cell 0 end
+
+  allocaz' Typ_union { ptr }
+  123 ptr Typ_union_cell !
+  assert= ptr Typ_union_cell @ 123 end
+  45 ptr Typ_union_byte !b
+  assert= ptr Typ_union_byte @b 45 end
+end
+test_union_named_basic
+
+union: Typ_union_small
+  U8  1 field: Typ_union_small_byte
+  U16 1 field: Typ_union_small_short
+end
+
+fun: test_union_named_small { -- err }
+  assert= size' Typ_union_small 2 end
+  assert= align' Typ_union_small 2 end
+  assert= 0 Typ_union_small_byte 0 end
+  assert= 0 Typ_union_small_short 0 end
+end
+test_union_named_small
+
+struct: Typ_union_wrap
+  U8        1 field: Typ_union_wrap_tag
+  Typ_union 1 field: Typ_union_wrap_union
+  U8        1 field: Typ_union_wrap_tail
+end
+
+fun: test_union_named_embedded { -- err }
+  assert= size' Typ_union_wrap 24 end
+  assert= align' Typ_union_wrap 8 end
+  assert= 0 Typ_union_wrap_tag 0 end
+  assert= 0 Typ_union_wrap_union 8 end
+  assert= 0 Typ_union_wrap_tail 16 end
+
+  allocaz' Typ_union_wrap { ptr }
+  123 ptr Typ_union_wrap_union Typ_union_cell !
+  assert= ptr Typ_union_wrap_union Typ_union_cell @ 123 end
+end
+test_union_named_embedded
+
 fun: test_catch_invalid { -- err } [ false try_all ]
   use' ./fail/test_catch_invalid_exec.af
   " unable to `catch`: no hidden `try` to backtrack"
@@ -3066,6 +3117,9 @@ fun: main_run { -- err }
   test_struct_9
   test_struct_10
   test_struct_11
+  test_union_named_basic
+  test_union_named_small
+  test_union_named_embedded
   \ test_catch_invalid \ interp-only
   test_catch_0
   test_catch_1

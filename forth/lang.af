@@ -2168,10 +2168,10 @@ end
 \ We define type descriptors with size and alignment information.
 \ This allows us to provide `struct:` with proper field alignment
 \ compatible with C, for easier libc interop.
-
-\ Internal tool for type definitions. Each type is represented with the
-\ structure listed below. Since we do not yet have `struct:` because it
-\ can only be defined later, we get / set fields via hardcoded offsets.
+\
+\ First: some internal tools for type definitions. Each type is represented
+\ with the structure listed below. We do not yet have `struct:`, because it
+\ requires the utils below first, so we access fields via hardcoded offsets.
 \
 \   struct: Type
 \     Cell 1 field: Type_size
@@ -2179,34 +2179,43 @@ end
 \     U8   0 field: Type_name  \ Variable length; null-terminated.
 \   end
 \
-\ Types are defined with shortcuts `int: arr: struct: opaque:`.
+\ Types are defined with shortcuts `opaque: int: arr: struct:` and so on.
 \
 \ Most of the time size and alignment should be accessed via
 \ `size'` and `align'` shortcuts, which inline the values at
 \ compile time, without loading type descriptors at runtime.
-\
+
 \ SYNC[type_fields].
-fun: define_type { name name_len size align -- err }
-  name_len inc             { name_cap }
-  2 cells name_cap +       { full_size }
-  nil full_size alloc_data { type }
-
-  size type !
-  align type CELL !at
-  2 cells type + name name_cap strlcpy
-  name name_len type init_data_word
-
-  [ false comp_only ]
+fun: type_beg { name len -- type err }
+  len inc             { cap }
+  2 cells cap +       { size }
+  nil size alloc_data { type }
+  2 cells type + name cap strlcpy
+  type
 end
 
-fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
-  read_word size size define_type
+\ SYNC[type_fields].
+fun: type_end { type size align -- err }
+  size type !
+  align type +cell !
+  2 cells type + { name }
+  name strlen    { len }
+  name len type init_data_word
+end
+
+fun: define_type { name name_len size align -- err }
+  name name_len type_beg size align type_end
 end
 
 fun: opaque: { size align -- err } ( C: "name" -- ) ( E: -- type )
   read_word size align define_type
 end
 
+fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
+  read_word size size define_type
+end
+
+\ SYNC[type_fields].
 fun: sizeof { type -> size } @ end
 
 fun: size' { -- size err } ( C: "type" -- )
@@ -2217,6 +2226,7 @@ fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
   call_xt' size' comp_push
 end
 
+\ SYNC[type_fields].
 fun: alignof { type -> align } +cell @ end
 
 fun: align' { -- align err } ( C: "type" -- )
@@ -2320,24 +2330,27 @@ end
 \ Note that load / store is type-specific. Fields which are't cell-sized
 \ must be loaded and stored using dedicated typed operators.
 
+0 let: AGG_STRUCT
+1 let: AGG_UNION
+
 \ For internal use, invoked by `end`.
-fun: struct_end_xt { name name_len align off -- err } ( C: name name_len align off -- )
+fun: agg_end_xt { type _mode align off -- err } ( C: type mode align off -- )
   off align align_up { size }
-  name name_len size align define_type
-  name free
-  [ false comp_only ]
+  type size align type_end
 end
 
-\ Begins a definition; terminate with `end`.
-fun: struct: { -- str len align off fun err } ( C: "name" -- ) ( E: -- size )
-  read_word         { str len }
-  str len strndup   { str } \ Leak if comp error before `struct_end_xt` done.
-  xt' struct_end_xt { fun }
-  str len 0 0 fun
+\ Begins a struct definition; terminate with `end`.
+fun: struct: { -- type mode align off end_xt err } ( C: "name" -- ) ( E: -- size )
+  read_word type_beg AGG_STRUCT 0 0 xt' agg_end_xt
+end
+
+\ Begins a union definition; terminate with `end`.
+fun: union: { -- type mode align off end_xt err } ( C: "name" -- ) ( E: -- size )
+  read_word type_beg AGG_UNION 0 0 xt' agg_end_xt
 end
 
 \ Compile field access, which computes address + offset.
-fun: struct_field_comp { off -- err }
+fun: comp_struct_field { off -- err }
   comp_args_get { len }
   ifz len then " struct field must be preceded by struct pointer" throw end
   ifz off then ret end
@@ -2357,14 +2370,8 @@ fun: struct_field_comp { off -- err }
 end
 
 \ For internal use.
-fun: struct_field_define
-  { name name_len struct_align align off type len -- align off err }
+fun: define_field_word { name name_len off -- err }
   ( E: struct_adr -- field_adr )
-
-  \ Since structs are intended for C interop, alignment of every field
-  \ must match the platform's C ABI. So far, ABI compat seems to hold.
-  \ We still need more comprehensive tests.
-  off align align_up { off }
 
   \ Execution-time semantics.
   name name_len define_fun
@@ -2376,11 +2383,30 @@ fun: struct_field_define
   \ Compile-time semantics.
   name name_len define_fun_comp
     0 1 true comp_signature_set
-    off comp_push compile' struct_field_comp
+    off comp_push compile' comp_struct_field
   call_xt'' end
 
-  type sizeof len * off + { off }
-  struct_align align max off
+  [ false comp_only ]
+end
+
+\ For internal use.
+fun: define_agg_field
+  { name name_len mode agg_align align off type len -- mode align off err }
+  ( E: struct_adr -- field_adr )
+
+  \ Since aggregate types are intended for C interop, alignment of every field
+  \ must match the platform's C ABI. So far, ABI compat seems to hold.
+  \ We still need more comprehensive tests.
+  type sizeof len * { size }
+
+  if mode AGG_UNION = then
+    name name_len 0 define_field_word
+    mode agg_align align max off size max ret
+  end
+
+  off align align_up { off }
+  name name_len off define_field_word
+  mode agg_align align max size off +
 
   [ false comp_only ]
 end
@@ -2394,21 +2420,17 @@ end
 \ their size and type. For example, signed 32-bit integers `S32` must
 \ be stored with `!32` and loaded with `@s32`, which sign-extends the
 \ upper bits when loading. Unsigned `U32` must be loaded with `@u32`.
-fun: field: { struct_align off fun type len -- align off fun err }
+fun: field: { mode agg_align off fun type len -- mode align off fun err }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
-
   type alignof { align }
-  read_word struct_align align off type len
-  struct_field_define fun
+  read_word mode agg_align align off type len define_agg_field fun
 end
 
-fun: field_aligned: { struct_align off fun type len align -- align off fun err }
+fun: field_aligned: { mode agg_align off fun type len align -- mode align off fun err }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
-
-  read_word struct_align align off type len
-  struct_field_define fun
+  read_word mode agg_align align off type len define_agg_field fun
 end
 
 \ Can finally define the type layout officially.
