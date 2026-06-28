@@ -738,8 +738,8 @@ static void intrin_debug_ctx(Interp *interp) {
             break;
           }
 
-          case COMP_ARG_LOCAL: {
-            const auto loc  = arg->local;
+          case COMP_ARG_LOC: {
+            const auto loc  = arg->loc;
             const auto name = comp_local_name(loc);
 
             eprintf("[debug]     %d -- local: %s\n", ind, name);

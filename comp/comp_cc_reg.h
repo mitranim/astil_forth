@@ -145,13 +145,13 @@ typedef struct {
   enum {
     COMP_ARG_UNKNOWN,
     COMP_ARG_IMM,
-    COMP_ARG_LOCAL,
+    COMP_ARG_LOC,
     COMP_ARG_ERR,
   } type;
 
   union {
     Comp_arg_imm imm;
-    Local       *local;
+    Local       *loc;
     Comp_arg_err err;
   };
 } Comp_arg;

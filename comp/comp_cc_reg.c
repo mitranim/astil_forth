@@ -143,8 +143,8 @@ static Comp_arg comp_arg_unknown(void) {
 
 static Comp_arg comp_arg_local(Local *loc) {
   return (Comp_arg){
-    .type  = COMP_ARG_LOCAL,
-    .local = loc,
+    .type = COMP_ARG_LOC,
+    .loc  = loc,
   };
 }
 
@@ -153,7 +153,7 @@ static Local *comp_arg_local_ref(const Comp_arg *arg) {
     case COMP_ARG_UNKNOWN: [[fallthrough]];
     case COMP_ARG_IMM:     [[fallthrough]];
     case COMP_ARG_ERR:     return nullptr;
-    case COMP_ARG_LOCAL:   return arg->local;
+    case COMP_ARG_LOC:     return arg->loc;
     default:               unreachable();
   }
   return nullptr;
