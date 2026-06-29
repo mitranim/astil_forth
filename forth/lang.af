@@ -300,7 +300,7 @@ fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
   Xd Xn Xm asm_pattern_arith_reg cond or
 end
 
-fun: instr_off_unpack { packed -- off } packed 2 lsr end
+fun: instr_off_unpack { packed -> off } 2 lsr end
 
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }

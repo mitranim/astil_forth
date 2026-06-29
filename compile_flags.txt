@@ -9,6 +9,7 @@
 -Werror=return-type
 -Werror=format-insufficient-args
 -Werror=conversion
+-Werror=gnu-pointer-arith
 -Wno-format-non-iso
 -Wno-pre-c23-compat
 -Wno-pre-c2y-compat
