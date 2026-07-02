@@ -367,40 +367,20 @@ static Err interp_loop(Interp *interp) {
 
   while (reader_has_more(read)) {
     const auto next = read_char_at(read, read->pos);
-    try(validate_ascii_printable(next));
 
-    switch (HEAD_CHAR_KIND[next]) {
-      case CHAR_EOF: return nullptr;
+    if (is_char_end(next)) return nullptr;
 
-      case CHAR_WHITESPACE: {
-        read->pos++;
-        continue;
-      }
-
-      case CHAR_DECIMAL: {
-        try(read_interp_num(interp));
-        continue;
-      }
-
-      // `+` and `-` are ambiguous: may begin a number or a word.
-      case CHAR_ARITH: {
-        if (HEAD_CHAR_KIND[read_char_at(read, read->pos + 1)] == CHAR_DECIMAL) {
-          try(read_interp_num(interp));
-          continue;
-        }
-
-        try(read_interp_word(interp));
-        continue;
-      }
-
-      case CHAR_WORD: {
-        try(read_interp_word(interp));
-        continue;
-      }
-
-      case CHAR_UNPRINTABLE: [[fallthrough]];
-      default:               return err_unsupported_char(next);
+    if (is_char_space(next)) {
+      read->pos++;
+      continue;
     }
+
+    if (is_num_begin(next, read_char_at(read, read->pos + 1))) {
+      try(read_interp_num(interp));
+      continue;
+    }
+
+    try(read_interp_word(interp));
   }
   return nullptr;
 }

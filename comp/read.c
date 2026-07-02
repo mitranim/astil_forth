@@ -3,9 +3,7 @@
 #include "../clib/err.c" // IWYU pragma: export
 #include "../clib/fmt.h"
 #include "../clib/mem.h"
-#include "./read_char_to_digit.h"
-#include "./read_head_char_kind.h"
-#include "./read_word_char_kind.h"
+#include "./read_char.c"
 #include <execinfo.h>
 #include <string.h>
 
@@ -61,39 +59,59 @@ static U8 read_char_at(const Reader *read, Ind pos) {
   return pos < read->len ? normalize_char((U8)read->src[pos]) : 0u;
 }
 
+static constexpr U8 DIGIT_INVALID = 255;
+static constexpr U8 DIGIT_BREAK   = 254;
+
+static U8 char_to_digit(U8 val) {
+  if (is_char_end(val)) return DIGIT_BREAK;
+  if (is_char_space(val)) return DIGIT_BREAK;
+  if (is_char_decimal(val)) return val - '0';
+  if (is_char_letter_upper(val)) return 10 + val - 'A';
+  if (is_char_letter_lower(val)) return 10 + val - 'a';
+  return DIGIT_INVALID;
+}
+
 static Err err_unsupported_char(Sint code) {
   return errf("unsupported character code " FMT_SINT, code);
 }
 
-// 0 is a special case; caller must check for it.
 static Err validate_ascii_printable(Sint code) {
   if (!(code >= 0 && code < 256)) return err_unsupported_char(code);
-  switch (HEAD_CHAR_KIND[code]) {
-    case CHAR_WHITESPACE:  [[fallthrough]];
-    case CHAR_DECIMAL:     [[fallthrough]];
-    case CHAR_ARITH:       [[fallthrough]];
-    case CHAR_WORD:        return nullptr;
-    case CHAR_EOF:         return nullptr;
-    case CHAR_UNPRINTABLE: [[fallthrough]];
-    default:               return err_unsupported_char(code);
-  }
+  const auto val = (U8)code;
+  if (is_char_end(val)) return nullptr;
+  if (is_char_space(val)) return nullptr;
+  if (is_char_glyph(val)) return nullptr;
+  return err_unsupported_char(code);
 }
 
-static Err err_not_digit(U8 val) {
+static Err err_num_not_terminated(U8 val) {
   return errf(
-    "unexpected non-digit character " FMT_CHAR_QUOTED " after numeric literal",
+    "numeric literal must be terminated with whitespace, got " FMT_CHAR_QUOTED,
     val
   );
 }
 
-static Err err_digit_radix(U8 dig, U8 val, Sint radix) {
+static Err err_num_digit_radix(
+  const char *prefix, U8 dig, U8 val, Sint radix
+) {
   return errf(
-    "malformed numeric literal: digit %d from character " FMT_CHAR_QUOTED
+    "%s: digit %d from character " FMT_CHAR_QUOTED
     " is outside radix " FMT_SINT,
+    prefix,
     dig,
     val,
     radix
   );
+}
+
+static Err err_num_not_terminated_digit(U8 dig, U8 val, Sint radix) {
+  return err_num_digit_radix(
+    "numeric literal must be terminated with whitespace", dig, val, radix
+  );
+}
+
+static Err err_digit_radix(U8 dig, U8 val, Sint radix) {
+  return err_num_digit_radix("malformed numeric literal", dig, val, radix);
 }
 
 static Err err_overflow(U8 radix, const char *mode) {
@@ -106,11 +124,19 @@ static Err err_overflow(U8 radix, const char *mode) {
   );
 }
 
-static Err err_minus_unsigned(Sint radix) {
+static Err err_minus_unsigned(const char *src, Ind len) {
   return errf(
-    "unsupported minus sign before an unsigned numeric literal in radix " FMT_SINT
-    "; only decimals may be signed",
-    radix
+    "unsupported minus sign in `%.*s`; only decimals may be signed",
+    (int)len,
+    src
+  );
+}
+
+static Err err_radix_prefix_no_digit(const char *src, Ind len) {
+  return errf(
+    "unexpected bare `%.*s`; requires at least one digit",
+    (int)len,
+    src
   );
 }
 
@@ -128,6 +154,7 @@ what its semantics should be: either `~num + 1` as with signed
 multiplication by -1, or simply set the sign bit to 1.
 */
 static Err read_num(Reader *read, Sint *out) {
+  const auto beg = read->pos;
   auto head = read_char_at(read, read->pos);
 
   S8 sign = 1;
@@ -138,47 +165,37 @@ static Err read_num(Reader *read, Sint *out) {
     try(validate_ascii_printable(head));
   }
   else {
-    IF_DEBUG(assert_fatal(HEAD_CHAR_KIND[head] == CHAR_DECIMAL));
+    IF_DEBUG(assert_fatal(is_char_decimal(head)));
   }
 
   read->pos++;
 
-  if (HEAD_CHAR_KIND[head] != CHAR_DECIMAL) return err_not_digit(head);
+  if (!is_char_decimal(head)) return err_num_not_terminated(head);
 
-  Sint num       = CHAR_TO_DIGIT[head];
+  Sint num       = char_to_digit(head);
   U8   radix     = 10;
-  bool is_signed = true;
+  bool has_digit = false;
 
   if (!num) {
     head = read_char_at(read, read->pos);
     try(validate_ascii_printable(head));
 
     switch (head) {
-      case 'b': {
-        if (sign < 0) return err_minus_unsigned(radix);
-        radix     = 2;
-        is_signed = false;
-        read->pos++;
-        break;
-      }
-      case 'o': {
-        if (sign < 0) return err_minus_unsigned(radix);
-        radix     = 8;
-        is_signed = false;
-        read->pos++;
-        break;
-      }
-      case 'x': {
-        if (sign < 0) return err_minus_unsigned(radix);
-        radix     = 16;
-        is_signed = false;
-        read->pos++;
-        break;
-      }
+      case 'b': radix = 2;  break;
+      case 'o': radix = 8;  break;
+      case 'x': radix = 16; break;
       default: break;
+    }
+
+    if (radix != 10) {
+      if (sign < 0) {
+        return err_minus_unsigned(read->src + beg, read->pos - beg + 1);
+      }
+      read->pos++;
     }
   }
 
+  const bool is_signed = radix == 10;
   num *= sign;
 
   for (;;) {
@@ -191,20 +208,24 @@ static Err read_num(Reader *read, Sint *out) {
       continue;
     }
 
-    const auto dig = CHAR_TO_DIGIT[head];
+    const auto dig = char_to_digit(head);
 
     switch (dig) {
       case DIGIT_BREAK: goto done;
 
-      // Unlike other Forths, we don't allow numeric literals to be immediately
-      // followed by non-digit printable characters. Anything that begins with
-      // a digit or `+`/`-` and a digit must be a number, not a word.
-      case DIGIT_INVALID: return err_not_digit(head);
+      // Numeric syntax owns the whole whitespace-delimited token.
+      case DIGIT_INVALID: return err_num_not_terminated(head);
 
       default: {
+        if (is_signed && dig >= 10) {
+          return err_num_not_terminated_digit(dig, head, radix);
+        }
+
         if (dig >= radix) {
           return err_digit_radix(dig, head, radix);
         }
+
+        has_digit = true;
 
         if (is_signed) {
           Sint next;
@@ -227,6 +248,9 @@ static Err read_num(Reader *read, Sint *out) {
   }
 
 done:
+  if (radix != 10 && !has_digit) {
+    return err_radix_prefix_no_digit(read->src + beg, read->pos - beg);
+  }
   *out = num;
   return nullptr;
 }
@@ -234,7 +258,7 @@ done:
 static void read_skip_whitespace(Reader *read) {
   for (;;) {
     const auto next = read_char_at(read, read->pos);
-    if (HEAD_CHAR_KIND[next] != CHAR_WHITESPACE) break;
+    if (!is_char_space(next)) break;
     read->pos++;
   }
 }
@@ -260,7 +284,7 @@ static Err read_word(Reader *read, const char **out_buf, Ind *out_len) {
   for (;;) {
     const auto head = read_char_at(read, read->pos);
     try(validate_ascii_printable(head));
-    if (WORD_CHAR_KIND[head] != CHAR_WORD) break;
+    if (!is_char_glyph(head)) break;
     read->pos++;
   }
 

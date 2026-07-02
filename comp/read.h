@@ -25,12 +25,3 @@ typedef struct {
 // TODO avoid double parsing.
 #define READ_POS_ARGS(read) \
   (read)->path, reader_pos(read).row, reader_pos(read).col
-
-typedef enum : U8 {
-  CHAR_EOF = 1,
-  CHAR_UNPRINTABLE,
-  CHAR_WHITESPACE,
-  CHAR_DECIMAL,
-  CHAR_ARITH,
-  CHAR_WORD,
-} Char_kind;
