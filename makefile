@@ -103,12 +103,12 @@ run_boxed:
 
 # Register-CC version.
 .PHONY: run
-run:
+run: $(MAIN)
 	$(MAKE) run_boxed file=$(MAIN)
 
 # Stack-CC version.
 .PHONY: run_s
-run_s:
+run_s: $(MAIN_S)
 	$(MAKE) run_boxed file=$(MAIN_S)
 
 # Usage example:
@@ -149,7 +149,7 @@ repl_s:
 
 .PHONY: test
 test:
-	make run args='./forth/test/test.af --build=$(TEST_EXE)'
+	$(MAKE) run args='./forth/test/test.af --build=$(TEST_EXE)'
 	./$(TEST_EXE)
 
 # 	$(MAKE) test_repl
@@ -164,7 +164,7 @@ test_w:
 
 .PHONY: test_s
 test_s:
-	make run_s args=forth/test/test_s.af
+	$(MAKE) run_s args=forth/test/test_s.af
 
 .PHONY: test_s_w
 test_s_w:
