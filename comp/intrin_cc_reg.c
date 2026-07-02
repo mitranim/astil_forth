@@ -68,7 +68,7 @@ static Err interp_parse_params(Interp *interp) {
   for (;;) {
     try(read_valid_word(read, &word));
     if (str_eq(&word, "}")) break;
-    try(comp_add_output_param(comp, word, nullptr));
+    try(comp_add_output_param(comp, nullptr));
     has_err = str_eq(&word, "err");
   }
 
@@ -130,6 +130,8 @@ static Err intrin_brace(Interp *interp) {
 
     if (str_eq(&word, "}")) break;
 
+    try(comp_validate_local_name(word));
+
     if (loc_len >= arg_max) {
       return errf(
         "unable to assign to `%.*s`: requires %d arguments, but only %d are available",
@@ -187,9 +189,16 @@ static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
   return nullptr;
 }
 
-static Err interp_fun_begin(Interp *interp, Wordlist wordlist, Word_str name) {
+static Err interp_fun_begin_raw(
+  Interp *interp, Wordlist wordlist, Word_str name
+) {
   try(interp_begin_definition(interp));
   try(interp_word_begin(interp, wordlist, name));
+  return nullptr;
+}
+
+static Err interp_fun_begin(Interp *interp, Wordlist wordlist, Word_str name) {
+  try(interp_fun_begin_raw(interp, wordlist, name));
   try(interp_parse_params(interp));
   return nullptr;
 }
@@ -214,7 +223,7 @@ static Err intrin_fun_comp(Interp *interp, Sint *out) {
 static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
-  try(interp_fun_begin(interp, WORDLIST_EXEC, name));
+  try(interp_fun_begin_raw(interp, WORDLIST_EXEC, name));
   interp->comp.ctx.try_all = false;
 
   const auto sym = interp_semicolon_sym(interp);
@@ -226,7 +235,7 @@ static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
 static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
-  try(interp_fun_begin(interp, WORDLIST_COMP, name));
+  try(interp_fun_begin_raw(interp, WORDLIST_COMP, name));
   interp->comp.ctx.try_all = false;
 
   const auto sym = interp_semicolon_sym(interp);
@@ -279,11 +288,11 @@ static Err intrin_throw(Interp *interp) {
 }
 
 static Err err_catch_no_implicit_try() {
-  return err_str("unable to `catch`: no hidden `try` to backtrack");
+  return err_str("unable to `.catch`: no hidden `.try` to backtrack");
 }
 
 static Err err_catch_stale() {
-  return err_str("unable to `catch`: implicit `try` no longer current");
+  return err_str("unable to `.catch`: implicit `.try` no longer current");
 }
 
 static Err intrin_catch(Interp *interp) {
@@ -338,6 +347,22 @@ static Err intrin_comp_only(bool val, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   sym->comp_only = val;
+  return nullptr;
+}
+
+static Err err_plain_call_name(const char *name) {
+  return errf(
+    "invalid plain-call name " FMT_QUOTED
+    ": plain-call names must be ident-like",
+    name
+  );
+}
+
+static Err intrin_plain_call(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  if (!is_word_ident_like(sym->name)) return err_plain_call_name(sym->name.buf);
+  sym->plain_call = true;
   return nullptr;
 }
 
@@ -811,11 +836,12 @@ static const USED auto INTRIN_TRY_ALL = (Sym){
 };
 
 static const USED auto INTRIN_CATCH = (Sym){
-  .name.buf = "catch",
-  .wordlist = WORDLIST_COMP,
-  .intrin   = (void *)intrin_catch,
-  .out_len  = 1,
-  .has_err  = true,
+  .name.buf   = "catch",
+  .wordlist   = WORDLIST_COMP,
+  .intrin     = (void *)intrin_catch,
+  .out_len    = 1,
+  .has_err    = true,
+  .comp_only  = true,
 };
 
 static const USED auto INTRIN_BRACE = (Sym){

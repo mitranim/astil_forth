@@ -1,0 +1,2 @@
+\ Must fail to compile.
+fun: +1bad_name { -- err } end

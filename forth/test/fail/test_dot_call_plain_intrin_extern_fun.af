@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_plain_intrin_extern_fun_fail { -- err }
+  0 0 0 0 extern_fun
+end

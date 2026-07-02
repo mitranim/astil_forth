@@ -58,6 +58,7 @@ typedef struct Sym {
   bool    has_err;     // Last output is an error, or intrinsic returns `Err`.
   bool    comp_only;   // Can only be used between `:` and `;`.
   bool    interp_only; // Forbidden in AOT executables.
+  bool    plain_call;  // Allows ident-like callable name without dot; reg-CC only.
 } Sym;
 
 typedef stack_of(Sym)  Sym_stack;

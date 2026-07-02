@@ -1,0 +1,6 @@
+\ Must fail to compile.
+fun: test_dot_call_local_fail { -- err }
+  1 { val }
+  .val
+  nil
+end

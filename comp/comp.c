@@ -6,6 +6,7 @@
 #include "../clib/stack.c"
 #include "../clib/str.c"
 #include "./arch.c"
+#include "./read_char.c"
 #include "./sym.c"
 
 static Err err_current_sym_not_defining() {
@@ -31,6 +32,39 @@ static Err err_discard_local(const char *name) {
   return errf("unable to create discard local " FMT_QUOTED, name);
 }
 
+#ifndef CALL_CONV_STACK
+static Err err_name_dotted(const char *name) {
+  return errf("invalid name " FMT_QUOTED ": leading `.` is call syntax", name);
+}
+
+static Err err_name_numeric(const char *name) {
+  return errf(
+    "invalid name " FMT_QUOTED
+    ": names which begin like numeric literals are reserved",
+    name
+  );
+}
+
+static Err comp_validate_word_name(const char *name) {
+  if (name[0] == '.') return err_name_dotted(name);
+  if (is_num_begin((U8)name[0], (U8)name[1])) {
+    return err_name_numeric(name);
+  }
+  return nullptr;
+}
+
+static Err err_local_name_not_ident(const char *name) {
+  return errf(
+    "invalid local name " FMT_QUOTED ": local names must be ident-like", name
+  );
+}
+
+static Err comp_validate_local_name(Word_str name) {
+  if (!is_word_ident_like(name)) return err_local_name_not_ident(name.buf);
+  return nullptr;
+}
+#endif // CALL_CONV_STACK
+
 static Err comp_local_add(Comp *comp, Word_str word, Local **out) {
   const auto dict = &comp->ctx.local_dict;
   const auto name = word.buf;
@@ -48,6 +82,9 @@ static Local *comp_local_get(Comp *comp, const char *name) {
 }
 
 static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
+#ifndef CALL_CONV_STACK
+  try(comp_validate_local_name(name));
+#endif // CALL_CONV_STACK
   if (comp_name_discards(name)) return err_discard_local(name.buf);
 
   auto loc = comp_local_get(comp, name.buf);

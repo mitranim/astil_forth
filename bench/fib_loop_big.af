@@ -16,8 +16,8 @@ fun: fib { depth -- lo hi }
   depth { ind }
   loop
     dec: ind
-    ind >=0 while
-    prev_lo prev_hi next_lo next_hi int128_add { sum_lo sum_hi }
+    ind >=0 .while
+    prev_lo prev_hi next_lo next_hi .int128_add { sum_lo sum_hi }
     next_lo next_hi { prev_lo prev_hi }
     sum_lo sum_hi { next_lo next_hi }
   end
@@ -25,9 +25,9 @@ fun: fib { depth -- lo hi }
 end
 
 fun: bigint_divmod10_step { quo bit rem -- quo rem }
-  rem 1 lsl bit + { rem }
-  quo 1 lsl { quo }
-  if rem 10 >= then
+  rem 1 .lsl bit + { rem }
+  quo 1 .lsl { quo }
+  if rem 10 >= .then
     rem 10 - { rem }
     inc: quo
   end
@@ -40,61 +40,58 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   64 { ind }
   loop
     dec: ind
-    ind >=0 while
-    qhi word 63 lsr rem bigint_divmod10_step { qhi rem }
-    word 1 lsl { word }
+    ind >=0 .while
+    qhi word 63 .lsr rem .bigint_divmod10_step { qhi rem }
+    word 1 .lsl { word }
   end
 
   lo { word }
   64 { ind }
   loop
     dec: ind
-    ind >=0 while
-    qlo word 63 lsr rem bigint_divmod10_step { qlo rem }
-    word 1 lsl { word }
+    ind >=0 .while
+    qlo word 63 .lsr rem .bigint_divmod10_step { qlo rem }
+    word 1 .lsl { word }
   end
 
   qlo qhi rem
 end
 
 fun: bigint_log_decimal { lo hi }
-  40 alloca { buf }
+  40 .alloca { buf }
   buf 40 +  { ptr }
 
-  ifz lo hi or then
-    48 logc
-    ret
+  ifz lo hi .or .then
+    48 .logc
+    .ret
   end
 
   loop
-    lo hi bigint_divmod10 { qlo qhi rem }
+    lo hi .bigint_divmod10 { qlo qhi rem }
     dec: ptr
     rem 48 + ptr !8
     qlo { lo }
     qhi { hi }
-    ifz lo hi or then leave end
+    ifz lo hi .or .then leave end
   end
 
   ptr { pos }
   loop
-    pos buf 40 + < while
-    pos @u8 logc
+    pos buf 40 + < .while
+    pos @u8 .logc
     inc: pos
   end
 end
 
 fun: run
-  1 18 lsl { ind }
+  1 18 .lsl { ind }
   loop
     dec: ind
-    ind >=0 while
-    184 fib { -- }
+    ind >=0 .while
+    184 .fib { -- }
   end
-  \ 184 fib bigint_log_decimal lf
+  \ 184 .fib .bigint_log_decimal .lf
 end
+.run
 
-fun: main { -- exit }
-  run
-  0
-end
-run
+fun: main { -- exit } .run 0 end

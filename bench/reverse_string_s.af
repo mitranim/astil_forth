@@ -6,9 +6,7 @@ fun: reverse { str len -- }
 
   loop
     low high < while
-    low c@ { tmp }
-    high c@ low c!
-    tmp high c!
+    low c@ high c@ low c! high c!
     inc: low
     dec: high
   end

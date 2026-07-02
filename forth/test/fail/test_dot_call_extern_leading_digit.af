@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_extern_leading_digit_fail { -- err }
+  [ s" 1bad_ext" 0 0 .extern_fun ]
+end

@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_redundant_fail { -- out }
+  29 1 .u/
+end

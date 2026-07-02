@@ -1,3 +1,3 @@
-\ Must fail to compile: redefinition needs `[ redefine ]`.
+\ Must fail to compile: redefinition needs `[ .redefine ]`.
 fun: test_redefine_missing_marker_word { -- out } 1 end
 fun: test_redefine_missing_marker_word { -- out } 2 end

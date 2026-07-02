@@ -1,5 +1,5 @@
 use' ../../lang.af
 
 fun: test_cond_arity_else_mismatch_fail { -- out }
-  if true then 10 20 else 30 end
+  if true .then 10 20 else 30 end
 end

@@ -7,7 +7,7 @@ LEN cells mem: LIST
 
 fun: list_ceil ( list len -- ceil ) cells + end
 
-fun: pseudo_random { seed -- val } seed 1309 * 13849 + 65535 and end
+fun: pseudo_random ( seed -- val ) 1309 * 13849 + 65535 and end
 
 fun: list_init { list len -- }
   74755 { seed }

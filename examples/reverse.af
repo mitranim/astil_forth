@@ -1,14 +1,12 @@
 use' lang.af
 
 fun: reverse { str len }
-  str           { low }
-  str len + dec { high }
+  str            { low }
+  str len + .dec { high }
 
   loop
-    low high < while
-    low @b { tmp }
-    high @b low !b
-    tmp high !b
+    low high < .while
+    low @b high @b low !b high !b
     inc: low
     dec: high
   end
@@ -16,10 +14,10 @@ end
 
 fun: main
   s" 0123456789abcdef" { str len }
-  str log lf
-  str len reverse
-  str log lf
+  str .log .lf
+  str len .reverse
+  str .log .lf
 end
 
-main
+.main
 \ fedcba9876543210

@@ -678,7 +678,7 @@ test_dropped_intrinsics_hidden
 
 s" ./test_import_empty.af" use
 
-T{ s" ./test_interp_ret.af" use <T> 123 }T
+T{ s" ./test_interp_ret_s.af" use <T> 123 }T
 
 s" testing_s.af" use
 

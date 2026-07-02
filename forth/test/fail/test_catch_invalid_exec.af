@@ -1,4 +1,4 @@
-\ Must fail to compile: `nop` doesn't throw.
+\ Must fail to compile: `nop` doesn't .throw.
 fun: test_catch_invalid_exec
-  nop catch
+  .nop .catch
 end

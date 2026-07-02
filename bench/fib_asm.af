@@ -1,44 +1,41 @@
 use' lang.af
 
 fun: fib { _src -- _out } [
-  0 comp_realloc_reg
-  0 1        asm_cmp_imm     comp_instr \ cmp x0, 1
-  12  ASM_GT asm_branch_cond comp_instr \ b.gt <init>
-  0 1        asm_mov_imm     comp_instr \ mov x0, 1
-             asm_ret         comp_instr \ ret
-  2 0        asm_mov_reg     comp_instr \ mov x2, x0 -- <init>
-  1 1        asm_mov_imm     comp_instr \ mov x1, 1
-  0 1        asm_mov_imm     comp_instr \ mov x0, 1
-  3 1        asm_mov_reg     comp_instr \ mov x3, x1 -- <loop>
-  1 0        asm_mov_reg     comp_instr \ mov x1, x0
-  0 0 3      asm_add_reg     comp_instr \ add x0, x0, x3
-  2 2 1      asm_sub_imm     comp_instr \ sub x2, x2, 1
-  2 1        asm_cmp_imm     comp_instr \ cmp x2, 1
-  -20 ASM_GT asm_branch_cond comp_instr \ b.gt <loop>
-  1 comp_args_set
+  0 .comp_realloc_reg
+  0 1        .asm_cmp_imm     .comp_instr \ cmp x0, 1
+  12  ASM_GT .asm_branch_cond .comp_instr \ b.gt <init>
+  0 1        .asm_mov_imm     .comp_instr \ mov x0, 1
+             asm_ret          .comp_instr \ ret
+  2 0        .asm_mov_reg     .comp_instr \ mov x2, x0 -- <init>
+  1 1        .asm_mov_imm     .comp_instr \ mov x1, 1
+  0 1        .asm_mov_imm     .comp_instr \ mov x0, 1
+  3 1        .asm_mov_reg     .comp_instr \ mov x3, x1 -- <loop>
+  1 0        .asm_mov_reg     .comp_instr \ mov x1, x0
+  0 0 3      .asm_add_reg     .comp_instr \ add x0, x0, x3
+  2 2 1      .asm_sub_imm     .comp_instr \ sub x2, x2, 1
+  2 1        .asm_cmp_imm     .comp_instr \ cmp x2, 1
+  -20 ASM_GT .asm_branch_cond .comp_instr \ b.gt <loop>
+  1 .comp_args_set
 ] end
 
 fun: run_loop { _count }
   [
-    9 comp_realloc_reg
-    9 0 asm_mov_reg comp_instr \ mov x9, x0
+    9 .comp_realloc_reg
+    9 0 .asm_mov_reg .comp_instr \ mov x9, x0
   ]
   91     \ mov x0, 91 -- <loop_beg>
-  fib    \ bl <off>
+  .fib   \ bl <off>
   { -- } \ drop result
   [
-    9 9 1 asm_sub_imm comp_instr \ sub x9, x9, 1
-    9 -12 asm_cbnz    comp_instr \ cbnz x9, <loop_beg>
+    9 9 1 .asm_sub_imm .comp_instr \ sub x9, x9, 1
+    9 -12 .asm_cbnz    .comp_instr \ cbnz x9, <loop_beg>
   ]
 end
 
 fun: run
-  1 20 lsl run_loop
-  \ 91 fib log_int lf
+  1 20 .lsl .run_loop
+  \ 91 .fib .log_int .lf
 end
+.run
 
-fun: main { -- exit }
-  run
-  0
-end
-run
+fun: main { -- exit } .run 0 end

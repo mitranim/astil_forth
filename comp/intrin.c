@@ -39,6 +39,10 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
     wordlist
   ));
 
+#ifndef CALL_CONV_STACK
+  try(comp_validate_word_name(name.buf));
+#endif // CALL_CONV_STACK
+
   const auto syms = &interp->syms;
 
   if (stack_rem(syms) <= 0) {
@@ -113,6 +117,10 @@ static Err intrin_end(Interp *interp) {
     return intrin_semicolon(interp);
   }
 #endif
+
+  if (!stack_len(&interp->ints)) {
+    return err_str("unexpected `end`: no structure to close");
+  }
 
   Sint ptr;
   Sym *sym;
@@ -273,6 +281,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   clobber:         0b%s\n"
         "[debug]   inp_len:         %d\n"
         "[debug]   out_len:         %d\n"
+        "[debug]   plain_call:      %s\n"
 #endif
         "[debug]   has_err:         %s\n"
         "[debug]   comp_only:       %s\n"
@@ -295,6 +304,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         uint32_to_bit_str((U32)sym->clobber),
         sym->inp_len,
         sym->out_len,
+        bool_str(sym->plain_call),
 #endif
         bool_str(sym->has_err),
         bool_str(sym->comp_only),
@@ -325,6 +335,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   wordlist:           %d (%s)\n"
         "[debug]   inp_len:            %d\n"
         "[debug]   out_len:            %d\n"
+        "[debug]   plain_call:         %s\n"
         "[debug]   has_err:            %s\n"
         "[debug]   execution token:    %p\n"
         "[debug]   executable address: %p\n",
@@ -334,6 +345,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         list_name,
         sym->inp_len,
         sym->out_len,
+        bool_str(sym->plain_call),
         bool_str(sym->has_err),
         sym,
         sym->intrin
@@ -348,11 +360,13 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
         "[debug]   addr:               %p\n"
         "[debug]   name:               %s\n"
         "[debug]   wordlist:           %d (%s)\n"
+        "[debug]   plain_call:         %s\n"
         "[debug]   executable address: %p\n",
         sym,
         sym->name.buf,
         sym->wordlist,
         list_name,
+        bool_str(sym->plain_call),
         sym->exter
       );
       return;
@@ -464,11 +478,12 @@ Some fields are used only in the register-based callvention:
 */
 
 static const USED auto INTRIN_END = (Sym){
-  .name.buf = "end",
-  .wordlist = WORDLIST_COMP,
-  .intrin   = (void *)intrin_end,
-  .out_len  = 1,
-  .has_err  = true,
+  .name.buf   = "end",
+  .wordlist   = WORDLIST_COMP,
+  .intrin     = (void *)intrin_end,
+  .out_len    = 1,
+  .has_err    = true,
+  .plain_call = true,
 };
 
 static const USED auto INTRIN_FUN = (Sym){
@@ -550,6 +565,9 @@ static const USED auto INTRIN_TRY = (Sym){
   .intrin   = (void *)intrin_try,
   .out_len  = 1,
   .has_err  = true,
+#ifndef CALL_CONV_STACK
+  .comp_only = true,
+#endif // CALL_CONV_STACK
 };
 
 static const USED auto INTRIN_THROW = (Sym){
@@ -570,6 +588,17 @@ static const USED auto INTRIN_COMP_ONLY = (Sym){
   .has_err   = true,
   .comp_only = true,
 };
+
+#ifndef CALL_CONV_STACK
+static const USED auto INTRIN_PLAIN_CALL = (Sym){
+  .name.buf  = "plain_call",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_plain_call,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+#endif // CALL_CONV_STACK
 
 static const USED auto INTRIN_INTERP_ONLY = (Sym){
   .name.buf  = "interp_only",

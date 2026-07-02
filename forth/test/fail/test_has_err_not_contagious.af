@@ -2,6 +2,6 @@
 fun: test_has_err_not_contagious_callee { -- err } end
 
 fun: test_has_err_not_contagious_fail
-  [ true try_all ]
-  test_has_err_not_contagious_callee
+  [ true .try_all ]
+  .test_has_err_not_contagious_callee
 end

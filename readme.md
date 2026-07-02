@@ -16,6 +16,7 @@
 - [Register allocation and greediness](#register-allocation-and-greediness)
 - [Performance](#performance)
 - [Limitations](#limitations)
+- [Call syntax](#call-syntax)
 - [Non-standard](#non-standard)
 - [Bot policies](#bot-policies)
 - [Why so much C code](#why-so-much-c-code)
@@ -64,25 +65,25 @@ IO and conditionals:
 use' lang.af
 
 fun: main
-  " hello world!" log lf
+  " hello world!" .log .lf
 
-  if 10 then
-    " branch 0" log lf
-  elif 20 then
-    " branch 1" log lf
+  if 10 .then
+    " branch 0" .log .lf
+  elif 20 .then
+    " branch 1" .log .lf
   else
-    " branch 2" log lf
+    " branch 2" .log .lf
   end
 
   0 { ind }
   loop
-    ind 12 < while
-    " current number: %zd" ind logf lf
+    ind 12 < .while
+    " current number: %zd" ind .logf .lf
     inc: ind
   end
 end
 
-main
+.main
 ```
 
 Easy self-assembly (Arm64):
@@ -90,23 +91,23 @@ Easy self-assembly (Arm64):
 ```forth
 \ add Xd, Xn, Xm
 fun: asm_add_reg { Xd Xn Xm -- instr }
-  Xd Xn Xm asm_pattern_arith_reg
-  0b1_0_0_01011_00_0_00000_000000_00000_00000 or
+  Xd Xn Xm .asm_pattern_arith_reg
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 .or
 end
 
 \ add x0, x0, x1
 fun: + { i0 i1 -- i2 }
   [
-    0                 comp_realloc_reg
-    0 0 1 asm_add_reg comp_instr
-    1                 comp_args_set
+    0                  .comp_realloc_reg
+    0 0 1 .asm_add_reg .comp_instr
+    1                  .comp_args_set
   ]
 end
 
 \ brk 666
 fun: abort
   [
-    0b110_101_00_001_0000001010011010_000_00 comp_instr
+    0b110_101_00_001_0000001010011010_000_00 .comp_instr
   ]
 end
 ```
@@ -115,13 +116,13 @@ Easy AOT compilation; can be used from inside a program, or via CLI flags:
 
 ```forth
 fun: main { -- exit }
-  " hello world!" log lf
+  " hello world!" .log .lf
   0
 end
 
 xt' main           \ Reference to the entry point.
 " out.exe"         \ Where to put the executable.
-compile_executable
+.compile_executable
 
 \ Run `./out.exe` in your shell to print the message.
 ```
@@ -176,10 +177,10 @@ The reg-CC version of Astil Forth, the default one, uses the native calling conv
 2 1 extern: strcmp
 
 fun: main
-  " hello world!" puts
-  " one" " two" strcmp .
+  " hello world!" .puts
+  " one" " two" .strcmp .show
 end
-main
+.main
 ```
 
 ## Errors done right: ergonomics and ABI
@@ -187,9 +188,9 @@ main
 In reg-CC, our error handling combines ergonomics and ABI compatibility:
 - An error is just a C-style string pointer.
 - An error is the last output param (Go-style).
-- Shortcuts `try throw` for local control (Swift-style).
-- `try_all` for opting into implicit "try".
-- Callers receive errors as values, even if callees "throw".
+- Shortcuts `.try` and `.throw` for local control (Swift-style).
+- `.try_all` for opting into implicit `.try`.
+- Callers receive errors as values, even if callees `.throw`.
 - Works across ABI boundaries between languages.
 - No unwinder; all control is local.
 
@@ -197,8 +198,8 @@ By convention, if the last output parameter is named _exactly_ `err`, the compil
 
 ```forth
 fun: word { -- err }
-  word0 { err }           if err then err ret end
-  word1 { val0 err }      if err then err ret end
+  word0 { err }           if err .then err .ret end
+  word1 { val0 err }      if err .then err .ret end
   word2 { val1 val2 err } err
 end
 ```
@@ -207,28 +208,28 @@ For ergonomics, the compiler automatically zeroes the error register if you don'
 
 ```forth
 fun: word { -- err }
-  word0 { val }           if val then     ret end
-  word1 { val0 err }      if err then err ret end
+  word0 { val }           if val .then     .ret end
+  word1 { val0 err }      if err .then err .ret end
   word2 { val1 val2 err } err
 end
 ```
 
-`try` consumes errors and returns early:
+`.try` consumes errors and returns early:
 
 ```forth
 fun: word { -- err }
-  word0 try
-  word1 try { val0 }
-  word2 try { val1 val2 }
+  word0 .try
+  word1 .try { val0 }
+  word2 .try { val1 val2 }
 end
 ```
 
-`try` checks current top arg, moves non-nil error to current word's `err`, and returns. Doesn't zero current word's non-error outputs; they're undefined on total failure.
+`.try` checks current top arg, moves non-nil error to current word's `err`, and returns. Doesn't zero current word's non-error outputs; they're undefined on total failure.
 
-`try_all` makes this implicit, allowing even shorter code. `try_all` in file root affects the current file (and no other). `try_all` inside a word affects _only_ that word. However, it does _not_ remove errors from signatures. The signature of every word precisely describes its ABI.
+`.try_all` makes this implicit, allowing even shorter code. `.try_all` in file root affects the current file (and no other). `.try_all` inside a word affects _only_ that word. However, it does _not_ remove errors from signatures. The signature of every word precisely describes its ABI.
 
 ```forth
-true try_all
+true .try_all
 
 fun: word { -- err }
   word0
@@ -236,13 +237,13 @@ fun: word { -- err }
   word2 { val1 val2 }
 end
 
-fun: word [ false try_all ] end \ Only inside this word.
+fun: word [ false .try_all ] end \ Only inside this word.
 ```
 
 Failure outputs:
 - Success: return non-error outputs; nil `err` is implicit.
 - Partial failure: return useful non-error outputs and non-nil `err`.
-- Total failure: use `throw` / `try`; non-error outputs are undefined.
+- Total failure: use `.throw` / `.try`; non-error outputs are undefined.
 
 Callers, including C/FFI callers, must check `err` before using other outputs, unless callee documents partial-failure contract.
 
@@ -273,8 +274,8 @@ astil_s <file>      # One-shot run.
 astil_s <file> -    # Run file, then REPL.
 
 # One-off scripts via CLI arg or stdin pipe; example for reg-CC:
-astil lang.af --eval='10 20 + . lf'
-printf '10 20 + . lf\n' | astil lang.af -
+astil lang.af --eval='10 20 + .show'
+printf '10 20 + .show\n' | astil lang.af -
 ```
 
 Don't forget to import `lang.af` via `use' lang.af` (or `use' lang_s.af` for stack-CC) inside your program, or via CLI args.
@@ -357,7 +358,7 @@ In both reg-CC and stack-CC:
 - Avoid emitting unnecessary prologue and epilogue.
 - Inline small leaf functions.
 - Delay undecidable instructions, patch them in a fixup pass.
-  - Used for prologue, `ret try throw recur`, and more.
+  - Used for prologue, `.ret`, `.try`, `.throw`, `.recur`, and more.
 
 In reg-CC:
 - Place inputs and outputs in registers, matching the native call ABI.
@@ -406,13 +407,60 @@ I had a go, and bounced off the complexity. How to keep an optimizing compiler s
 - Currently only Apple Silicon (MacOS + Arm64).
 - Top-level exceptions print only C traces, not Forth traces. (Opt-in via `--trace`.)
 
+## Call syntax
+
+Source code consists of whitespace-separated words. Aside from numeric literals, source words have two spelling classes:
+
+- Value-like spelling: `[A-Za-z_][A-Za-z0-9_]*`.
+- Call-like spelling: every other non-numeric word.
+
+Locals and global values use value-like spelling:
+
+```forth
+123 let: SOME_GLOB
+
+fun: some_fun
+  SOME_GLOB { some_loc }
+  some_loc { -- }
+end
+```
+
+Calls use call-like spelling. Names such as `+`, `!b`, `u/mod`, `fun:`, and `xt'` are automatically call-like. Ident-like names become call-like via dot prefix: `.logf` calls `logf`. The dot is special and not part of actual names:
+
+```forth
+fun: log_num { val }
+  " %zd" val .logf .lf
+end
+
+1 0 extern: exit
+0 .exit
+```
+
+Control words which don't deal with runtime args stay plain. Control words which use or affect args use dot-call:
+
+```forth
+if 123 .then 234 else 345 end
+loop predicate .while body again end
+err .try
+err .throw
+val .ret
+.recur
+.catch
+```
+
+Examples of control-only words: `if ifz elif elifz else loop leave again assert end`. `leave` and `again` validate loop arity, but stay plain.
+
+In file root, `.ret` simply quits the current file. Inside a compiled word, `.ret` returns current args as outputs. Nullary return still requires a dot.
+
+The call syntax rules apply only to reg-CC (default/main language). Stack-CC doesn't have these nuances.
+
 ## Non-standard
 
 For the sake of my sanity and ergonomics, Astil Forth does _not_ follow the ANS Forth standard. It improves upon it.
 
 Words are case-sensitive.
 
-Numeric literals are unambiguous: anything that begins with `[+-]?\d` must be a valid number followed by whitespace or EOF.
+Numeric literals are unambiguous: anything that begins with `[+-]?\d` goes through the numeric parser and must be followed by whitespace or EOF. Only decimals may use `-`.
 
 Non-decimal numeric literals are denoted with `0b 0o 0x`. Radix prefixes are case-sensitive. Numbers may contain cosmetic `_` separators. There is no `hex` mode. There is no support for `& # % $` prefixes.
 
@@ -428,19 +476,19 @@ Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
 - All conditionals and loops are terminated with `end`. No need to remember other terminators.
-- Conditionals take the form `if then else end`, which reads much nicer.
+- Conditionals take the form `if .then else end`, which reads much nicer.
 - `elif` is supported.
 - Any amount of conditional branches is terminated with a single `end`.
-- Any amount of `leave` or `while` is terminated with the same `end` as the loop.
+- Any amount of `leave` or `.while` is terminated with the same `end` as the loop.
 
-Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave while again` auxiliaries. Other loop forms don't buy anything.
+Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave .while again` auxiliaries. Other loop forms don't buy anything.
 
 ```forth
 loop
-  predicate while
+  predicate .while
   body
-  if done then leave end
-  if skip then again end
+  if done .then leave end
+  if skip .then again end
 end
 ```
 
@@ -454,19 +502,17 @@ Errors are strings (error messages) rather than numeric codes.
 
 Booleans are `0 1` rather than `0 -1`.
 
-Word-modifiers like `comp_only` are used inside definitions, not outside. Modifiers executed in file scope (`try_all`) affect an entire file.
+Word-modifiers like `.comp_only` are used inside definitions, not outside. Modifiers executed in file scope (`.try_all`) affect an entire file.
 
 Special _semantic_ roles get special _syntactic_ roles:
-- Word-parsing words which declare end with `:`.
-- Word-parsing words which don't declare end with `'`.
-- Unusual control-related words begin with `#`.
-
-Examples:
 - Words which declare: `fun: let: var: to:` and more.
   - Syntax highlighters are encouraged to scope the next word like a declaration.
 - Parsing words: `use' xt' postpone' compile'`.
   - Syntax highlighters are encouraged to scope the next word like a string.
-- Well-known control words don't use special characters: `if then else elif end ret assert` and several more. Syntax highlighters should hardcode them.
+- Calls use call-like spelling; see [call syntax](#call-syntax).
+  - Syntax highlighters are encouraged to scope calls differently from values.
+- Modifier-style comptime words may begin with `#`; like `#debug_ctx`.
+- Structural control words may stay plain; syntax highlighters may hardcode common names such as `if ifz else elif elifz end loop leave again assert`.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names.
 

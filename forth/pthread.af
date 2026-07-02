@@ -10,7 +10,7 @@ use' ./lang.af
 \ Should always be followed by error check:
 \
 \   some_fun " unable to do X" ?posix_err { err }
-\   some_fun " unable to do X" ?posix_err try
+\   some_fun " unable to do X" ?posix_err .try
 
 \ ## Types
 
@@ -207,9 +207,9 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 \ If error, caller owns `inp`. Otherwise, thread owns `inp`.
 fun: thread_spawn { fun inp -- thread err }
   nil { attr }
-  slot { thread }
+  .slot { thread }
 
-  thread attr fun inp pthread_create
+  thread attr fun inp .pthread_create
   " unable to spawn thread" ?posix_err { err }
   thread @ err
 end
@@ -219,29 +219,29 @@ end
 \ If error, caller owns `inp`. Otherwise, thread owns `inp`.
 fun: thread_spawn_detached { fun inp -- thread err }
   alloca' Pthread_attr { attr   }
-  slot                 { thread }
+  .slot                { thread }
 
-  attr pthread_attr_init
-  " unable to init thread attributes" ?posix_err try
+  attr .pthread_attr_init
+  " unable to init thread attributes" ?posix_err .try
 
-  attr PTHREAD_CREATE_DETACHED pthread_attr_setdetachstate
+  attr PTHREAD_CREATE_DETACHED .pthread_attr_setdetachstate
   " unable to mark thread as detached" ?posix_err { err }
 
-  ifz err then
-    thread attr fun inp pthread_create
+  ifz err .then
+    thread attr fun inp .pthread_create
     " unable to spawn detached thread" ?posix_err { err }
   end
 
   \ After successful spawn, returning attr cleanup failure
   \ would lie about thread state and input ownership.
-  attr pthread_attr_destroy { -- }
+  attr .pthread_attr_destroy { -- }
   thread @ err
 end
 
 \ Wraps `pthread_join`, throwing a descriptive error on failure.
 fun: thread_join { thread -- out err }
-  slot { out }
-  thread out pthread_join
+  .slot { out }
+  thread out .pthread_join
   " unable to join with thread" ?posix_err { err }
   out @ err
 end

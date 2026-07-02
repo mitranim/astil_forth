@@ -36,12 +36,13 @@ static const USED Sym INTRIN[] = {
   INTRIN_BRACKET_BEG,     // [
   INTRIN_BRACKET_END,     // ]
   INTRIN_RET_EXEC,        // ret
-  INTRIN_RET,             // #ret
-  INTRIN_RECUR,           // #recur
+  INTRIN_RET,             // ret
+  INTRIN_RECUR,           // recur
   INTRIN_TRY,             // try
   INTRIN_THROW,           // throw
   INTRIN_CATCH,           // catch
   INTRIN_COMP_ONLY,       // comp_only
+  INTRIN_PLAIN_CALL,      // plain_call
   INTRIN_INTERP_ONLY,     // interp_only
   INTRIN_INLINE,          // inline
   INTRIN_REDEFINE,        // redefine

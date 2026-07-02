@@ -641,6 +641,7 @@ static Err err_dup_param(const char *name) {
 }
 
 static Err comp_add_input_param(Comp *comp, Word_str name) {
+  try(comp_validate_local_name(name));
   if (comp_local_get(comp, name.buf)) return err_dup_param(name.buf);
 
   U8 reg;
@@ -664,8 +665,7 @@ We don't immediately declare output parameters by name, because they're not
 initialized. To be used, they have to be assigned, which also automatically
 declares them. However, we keep their count, for the call signature.
 */
-static Err comp_add_output_param(Comp *comp, Word_str name, U8 *reg) {
-  (void)name;
+static Err comp_add_output_param(Comp *comp, U8 *reg) {
   try(comp_next_out_param_reg(comp, reg));
   return nullptr;
 }
@@ -738,10 +738,11 @@ static Err comp_after_append_call(
   }
 
   /*
-  An error, if any, is returned in the last output GPR. By default errors are
-  visible. We also support blanket implicit "try" via "try_all". In that case,
-  `comp_append_auto_try` inserts the "try" and records it for postfix `catch`.
-  Here we hide the error since it's been checked already.
+  An error, if any, is returned in the last output GPR. By default, errors are
+  visible. We also support blanket implicit "try" via `.try_all`. In that case,
+  `comp_append_auto_try` inserts the implicit "try", and makes the error value
+  invisible, while still associating it with the corresponding `Comp_arg` val,
+  for the purpose or backtracking via `.catch` if any.
   */
   ctx->arg_len = callee->out_len - auto_try_err;
   for (U8 ind = 0; ind < callee->out_len; ind++) {
@@ -897,7 +898,7 @@ static Err comp_alloca(Comp *comp) {
 }
 
 /*
-Examples without and with `try`:
+Examples without and with `.try`:
 
   fun: word0 { -- err }              err end
   fun: word1 { -- val err }    10    err end
@@ -907,15 +908,15 @@ Examples without and with `try`:
   word1 { val err }
   word2 { val val err }
 
-  err   try
-  word0 try
-  word1 try { val }
-  word2 try { val val }
+  err   .try
+  word0 .try
+  word1 .try { val }
+  word2 .try { val val }
 */
 static Err comp_append_try(Comp *comp, const Sym *sym) {
   if (!sym->has_err) {
     return errf(
-      "in " FMT_QUOTED ": unable to `try`: current word has no error output",
+      "in " FMT_QUOTED ": unable to `.try`: current word has no error output",
       sym->name.buf
     );
   }
@@ -926,7 +927,7 @@ static Err comp_append_try(Comp *comp, const Sym *sym) {
 
   if (!arg_len) {
     return errf(
-      "in " FMT_QUOTED ": unable to `try`: need at least one argument", name
+      "in " FMT_QUOTED ": unable to `.try`: need at least one argument", name
     );
   }
 
@@ -943,12 +944,12 @@ static Err comp_append_try(Comp *comp, const Sym *sym) {
 static Err comp_append_throw(Comp *comp, const Sym *sym) {
   if (!sym->has_err) {
     return errf(
-      "in " FMT_QUOTED ": unable to `throw`: current word has no error output",
+      "in " FMT_QUOTED ": unable to `.throw`: current word has no error output",
       sym->name.buf
     );
   }
 
-  try(comp_validate_args(comp, "unable to `throw`", 1, 1));
+  try(comp_validate_args(comp, "unable to `.throw`", 1, 1));
   comp->ctx.arg_len = 0;
 
   const auto src_reg = ASM_PARAM_REG_0;

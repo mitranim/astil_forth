@@ -1,0 +1,2 @@
+\ Must fail to compile.
+123 let: BAD-VALUE

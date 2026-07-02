@@ -11,20 +11,20 @@ fun: net_accept_loop { sock handler }
   alloca' Cuint            { size }
 
   loop
-    addr size' Sockaddr_storage memzero
+    addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
-    sock addr size accept { conn }
+    sock addr size .accept { conn }
 
-    if conn is_err_flag then
-      errno { code }
-      if code EINTR = then again end
-      code strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg elogf elf
+    if conn .is_err_flag .then
+      .errno { code }
+      if code EINTR = .then again end
+      code .strerror { msg }
+      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg .elogf .elf
       again
     end
 
-    " [srv] accepted connection" elog elf
-    conn handler call
+    " [srv] accepted connection" .elog .elf
+    conn handler .call
   end
 end
 
@@ -36,27 +36,27 @@ fun: net_accept_loop_threaded { sock handler }
   alloca' Cuint            { size }
 
   loop
-    addr size' Sockaddr_storage memzero
+    addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
-    sock addr size accept { conn }
+    sock addr size .accept { conn }
 
-    if conn is_err_flag then
-      errno { code }
-      if code EINTR = then again end
-      code strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg elogf elf
+    if conn .is_err_flag .then
+      .errno { code }
+      if code EINTR = .then again end
+      code .strerror { msg }
+      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg .elogf .elf
       again
     end
 
-    " [srv] accepted connection" elog elf
+    " [srv] accepted connection" .elog .elf
 
-    handler conn thread_spawn_detached { _ err }
+    handler conn .thread_spawn_detached { _ err }
 
-    if err then
-      " [srv] unable to spawn worker: %s" err elogf elf
-      conn sock_close { err }
-      if err then
-        " [srv] unable to close connection %zd: %s" conn err elogf elf
+    if err .then
+      " [srv] unable to spawn worker: %s" err .elogf .elf
+      conn .sock_close { err }
+      if err .then
+        " [srv] unable to close connection %zd: %s" conn err .elogf .elf
       end
     end
   end

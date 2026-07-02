@@ -5,35 +5,35 @@ use' lang.af
 \ AOT-compiled programs receive args straight from the OS.
 
 fun: main { argc argv envp -- exit }
-  if has_interp then
-    " [main] mode: JIT" log lf
+  if .has_interp .then
+    " [main] mode: JIT" .log .lf
   else
-    " [main] mode: AOT" log lf
+    " [main] mode: AOT" .log .lf
   end
 
-  if argc then
-    " [main] args (%zd):" argc logf lf
+  if argc .then
+    " [main] args (%zd):" argc .logf .lf
 
     0 { ind }
     loop
-      ind argc < while
-      ind cells argv + @ { arg }
-      " arg %zd: %s" ind arg logf lf
+      ind argc < .while
+      ind .cells argv + @ { arg }
+      " arg %zd: %s" ind arg .logf .lf
       inc: ind
     end
   else
-    " [main] args: empty" log lf
+    " [main] args: empty" .log .lf
   end
 
   \ Optional: dump env.
-  if false then
-    if envp then
-      " [main] env:" log lf
+  if false .then
+    if envp .then
+      " [main] env:" .log .lf
 
       loop
         envp @ { pair }
-        pair while
-        " pair: %s" pair logf lf
+        pair .while
+        " pair: %s" pair .logf .lf
         +cell: envp
       end
     end
@@ -44,7 +44,7 @@ end
 
 \ In JIT mode, pass arbitrary args yourself.
 \ Note that you don't _have_ to call `main`.
-0 nil nil main
+0 nil nil .main
 
 \ Usage:
 \

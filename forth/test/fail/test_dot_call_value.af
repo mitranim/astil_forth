@@ -1,0 +1,3 @@
+\ Must fail to compile.
+123 let: TEST_DOT_CALL_VALUE
+.TEST_DOT_CALL_VALUE

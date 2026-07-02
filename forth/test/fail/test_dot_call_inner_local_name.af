@@ -1,0 +1,3 @@
+\ Must fail to compile.
+fun: test_dot_call_inner_local_name_fail { val-name -- err }
+end

@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_plain_intrin_comp_only_fail { -- err }
+  [ false comp_only ]
+end

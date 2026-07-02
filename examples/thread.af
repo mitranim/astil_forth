@@ -5,19 +5,19 @@ use' pthread.af
 \ Passed to `pthread_spawn` by raw instruction address.
 \ We have no hidden adapters between Forth and libc.
 fun: callback { _ignored -- err }
-  " [child] running; returning error" log lf
+  " [child] running; returning error" .log .lf
   " mock_error"
 end
 
 fun: main { -- err }
   instr' callback { instr } \ Raw instruction address.
 
-  " [main] spawning..." log lf
-  instr nil thread_spawn try { thread }
+  " [main] spawning..." .log .lf
+  instr nil .thread_spawn .try { thread }
 
-  " [main] joining..." log lf
-  thread thread_join try { err }
+  " [main] joining..." .log .lf
+  thread .thread_join .try { err }
 
-  " [main] received error: %s" err logf lf
+  " [main] received error: %s" err .logf .lf
 end
-main
+.main

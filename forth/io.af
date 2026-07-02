@@ -18,7 +18,7 @@ use' ./time.af \ Defines `Timespec`.
 \ manually, use the test `is_err_flag`.
 \
 \   some_word " unable to blah" ?os_err { err }
-\   some_word " unable to blah" ?os_err try
+\   some_word " unable to blah" ?os_err .try
 
 \ `struct stat`. Used by reference.
 struct: Fstat
@@ -75,11 +75,11 @@ end
 
 \ Exactly one of these must be `or`d into flags in `open`.
 \ Note that `fopen` and `fdopen` take a STRING as mode!
-0                     let: O_RDONLY  \ open for reading only
-1                     let: O_WRONLY  \ open for writing only
-2                     let: O_RDWR    \ open for reading and writing
-0x40000000            let: O_EXEC    \ open file for execute only
-O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
+0                      let: O_RDONLY  \ open for reading only
+1                      let: O_WRONLY  \ open for writing only
+2                      let: O_RDWR    \ open for reading and writing
+0x40000000             let: O_EXEC    \ open file for execute only
+O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 
 \ In all definitions below, `flag` means `(Cint)-1` on failure;
 \ should be tested with `?os_err` or `is_err_flag`.
@@ -132,93 +132,93 @@ O_EXEC O_DIRECTORY or let: O_SEARCH  \ open directory for search only
 \ TODO: translate `<unistd.h>`.
 
 fun: io_err { action path -- err_str }
-  errno { code }
-  code strerror { msg }
-  if msg then
+  .errno { code }
+  code .strerror { msg }
+  if msg .then
     action " unable to %s `%s`; code: %d; msg: %s"
-    action path code msg wrapf
+    action path code msg .wrapf
   else
-    action " unable to %s `%s`; code: %s" action path code wrapf
+    action " unable to %s `%s`; code: %s" action path code .wrapf
   end
 end
 
 fun: file_err { action file -- err_str }
   nil nil { code msg }
 
-  if file ferror then
-    errno { code }
-    code strerror { msg }
+  if file .ferror .then
+    .errno { code }
+    code .strerror { msg }
   end
 
-  if msg then
+  if msg .then
     msg " file error: %s; code: %zd; msg: %s"
-    action code msg wrapf ret
+    action code msg .wrapf .ret
   end
 
-  if code then
+  if code .then
     msg " file error: %s; code: %zd"
-    action code msg wrapf ret
+    action code msg .wrapf .ret
   end
 
-  msg " file error: %s" msg wrapf
+  msg " file error: %s" msg .wrapf
 end
 
 fun: fd_stat { fdes path stat_adr -- err }
-  if fdes stat_adr fstat is_err_flag then " stat" path io_err throw end
+  if fdes stat_adr .fstat .is_err_flag .then " stat" path .io_err .throw end
 end
 
 fun: path_stat { path stat_adr -> err }
-  if stat is_err_flag then " stat" path io_err throw end
+  if .stat .is_err_flag .then " stat" path .io_err .throw end
 end
 
 fun: fd_open { path mode -> fdes err }
-  open { out }
-  if out is_err_flag then " open" path io_err throw end
+  .open { out }
+  if out .is_err_flag .then " open" path .io_err .throw end
   out
 end
 
 fun: file_open { path mode -> file err }
-  fopen { file }
-  ifz file then " open" path io_err throw end
+  .fopen { file }
+  ifz file .then " open" path .io_err .throw end
   file
 end
 
 fun: file_write_char { char file -> err }
-  if fputc is_err_flag then " failed to write char" file file_err throw end
+  if .fputc .is_err_flag .then " failed to write char" file .file_err .throw end
 end
 
 fun: file_write_bytes { buf len file -- err }
-  buf 1 len file fwrite { out }
-  if out len = then ret end
-  " wrote %zd instead of %zd bytes" out len errf file file_err
+  buf 1 len file .fwrite { out }
+  if out len = .then .ret end
+  " wrote %zd instead of %zd bytes" out len .errf file .file_err
 end
 
 \ Best-effort logging/diagnostic write. Intentionally ignores short writes
 \ and OS errors. Prefer `write_all` for protocol/data output.
-fun: write_opt { fdes buf len -> } write { -- } end
+fun: write_opt { fdes buf len -> } .write { -- } end
 
 fun: write_once { fdes buf len -- wrote err }
-  fdes buf len write { wrote }
-  if wrote is_err_flag then
-    errno " unable to write" os_err { err }
-    0 err ret
+  fdes buf len .write { wrote }
+  if wrote .is_err_flag .then
+    .errno " unable to write" .os_err { err }
+    0 err .ret
   end
   wrote
 end
 
 fun: write_all { fdes buf len -- err }
   loop
-    ifz len then ret end
+    ifz len .then .ret end
 
-    fdes buf len write { wrote }
+    fdes buf len .write { wrote }
 
-    if wrote is_err_flag then
-      errno { code }
-      if code EINTR = then again end
-      code " unable to write" os_err throw
+    if wrote .is_err_flag .then
+      .errno { code }
+      if code EINTR = .then again end
+      code " unable to write" .os_err .throw
     end
 
-    ifz wrote then " unable to write: wrote zero bytes" throw end
+    ifz wrote .then " unable to write: wrote zero bytes" .throw end
 
     wrote +: buf
     len wrote - { len }
@@ -226,4 +226,4 @@ fun: write_all { fdes buf len -- err }
 end
 
 \ Writes `\r\n`; for use in HTTP.
-fun: write_eol { fdes -- err } fdes CRLF 2 write_all end
+fun: write_eol { fdes -- err } fdes CRLF 2 .write_all end

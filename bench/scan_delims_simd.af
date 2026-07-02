@@ -3,7 +3,7 @@ use' simd.af
 
 \ BOT-ASSISTED
 
-true try_all
+true .try_all
 
 65536 let: CAP
 4096  let: RUNS
@@ -33,70 +33,70 @@ fun: init
   BUF { ptr }
   0 { ind }
   loop
-    ptr BUF CAP + < while
-    PAT ind 15 and + @u8 ptr !8
+    ptr BUF CAP + < .while
+    PAT ind 15 .and + @u8 ptr !8
     inc: ptr
     inc: ind
   end
 end
 
 fun: scan_delim_consts { -- err }
-  4          asm_movi_2d_zero comp_instr \ movi v4.2d, #0
-  5          asm_movi_2d_zero comp_instr \ movi v5.2d, #0
-  6  223     asm_movi_16b     comp_instr \ movi v6.16b, #223
-  7  char' [ asm_movi_16b     comp_instr \ movi v7.16b, #'['
-  8  char' ] asm_movi_16b     comp_instr \ movi v8.16b, #']'
-  9  char' : asm_movi_16b     comp_instr \ movi v9.16b, #':'
-  10 char' , asm_movi_16b     comp_instr \ movi v10.16b, #','
-  11 SPACE   asm_movi_16b     comp_instr \ movi v11.16b, #' '
-  12 247     asm_movi_16b     comp_instr \ movi v12.16b, #-9
-  13 2       asm_movi_16b     comp_instr \ movi v13.16b, #2
-  14 1       asm_movi_16b     comp_instr \ movi v14.16b, #1
+  4          .asm_movi_2d_zero .comp_instr \ movi v4.2d, #0
+  5          .asm_movi_2d_zero .comp_instr \ movi v5.2d, #0
+  6  223     .asm_movi_16b     .comp_instr \ movi v6.16b, #223
+  7  char' [ .asm_movi_16b     .comp_instr \ movi v7.16b, #'['
+  8  char' ] .asm_movi_16b     .comp_instr \ movi v8.16b, #']'
+  9  char' : .asm_movi_16b     .comp_instr \ movi v9.16b, #':'
+  10 char' , .asm_movi_16b     .comp_instr \ movi v10.16b, #','
+  11 SPACE   .asm_movi_16b     .comp_instr \ movi v11.16b, #' '
+  12 247     .asm_movi_16b     .comp_instr \ movi v12.16b, #-9
+  13 2       .asm_movi_16b     .comp_instr \ movi v13.16b, #2
+  14 1       .asm_movi_16b     .comp_instr \ movi v14.16b, #1
 end
 
 fun: scan_delim_mask { -- err }
-  2 0 6     asm_and_16b comp_instr \ and  v2.16b, v0.16b, v6.16b
-  2 3 2 7 8 comp_cmeq_pair_mask_16b
-  2 3 0 9   comp_cmeq_or_mask_16b
-  2 3 0 10  comp_cmeq_or_mask_16b
-  2 3 0 11  comp_cmeq_or_mask_16b
-  3 0 12 13 comp_u8_range_mask_16b
-  2 2 3     asm_orr_16b comp_instr \ orr  v2.16b, v2.16b, v3.16b
-  2 14      comp_mask_to_u8_lanes_16b
+  2 0 6     .asm_and_16b .comp_instr \ and  v2.16b, v0.16b, v6.16b
+  2 3 2 7 8 .comp_cmeq_pair_mask_16b
+  2 3 0 9   .comp_cmeq_or_mask_16b
+  2 3 0 10  .comp_cmeq_or_mask_16b
+  2 3 0 11  .comp_cmeq_or_mask_16b
+  3 0 12 13 .comp_u8_range_mask_16b
+  2 2 3     .asm_orr_16b .comp_instr \ orr  v2.16b, v2.16b, v3.16b
+  2 14      .comp_mask_to_u8_lanes_16b
 end
 
 fun: scan { pat len -- count }
-  [ scan_delim_consts ]
+  [ .scan_delim_consts ]
   pat { ptr }
   loop
-    ptr pat len + < while
+    ptr pat len + < .while
     ptr [
-      0 comp_realloc_reg
-      0 0 asm_ld1_16b comp_instr \ ld1  {v0.16b}, [x0]
-      scan_delim_mask
-      4 5 2 comp_u8x16_counts_accum
-      0 comp_args_set
+      0 .comp_realloc_reg
+      0 0 .asm_ld1_16b .comp_instr \ ld1  {v0.16b}, [x0]
+      .scan_delim_mask
+      4 5 2 .comp_u8x16_counts_accum
+      0 .comp_args_set
     ]
     16 +: ptr
   end
-  [ 0 4 5 comp_u16x8_pair_sum_umov_d0 1 comp_args_set ]
+  [ 0 4 5 .comp_u16x8_pair_sum_umov_d0 1 .comp_args_set ]
 end
 
 fun: run { -- err }
-  init
+  .init
   0 { out }
   RUNS { run }
   loop
     dec: run
-    run >=0 while
-    BUF CAP scan +: out
+    run >=0 .while
+    BUF CAP .scan +: out
   end
-  " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
+  " SCAN_DELIMS_PRINT" .getenv if .then out .log_int .lf end
   assert out WANT = end
 end
+.run
 
-fun: main { -- exit } [ false try_all ]
-  run { err }
-  ifz err then 0 else " error: %s" err elogf elf 1 end
+fun: main { -- exit } [ false .try_all ]
+  .run { err }
+  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end
-run

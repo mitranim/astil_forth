@@ -43,8 +43,8 @@ fun: init
   BUF { ptr }
   0 { ind }
   loop
-    ptr BUF CAP + < while
-    PAT ind 15 and + @b ptr !b
+    ptr BUF CAP + < .while
+    PAT ind 15 .and + @b ptr !b
     inc: ptr
     inc: ind
   end
@@ -55,27 +55,27 @@ fun: scan { buf len dels -- out }
   buf len + { ceil }
   0
   loop
-    ptr ceil < while
+    ptr ceil < .while
     ptr @u8 dels + @u8 +
     inc: ptr
   end
 end
 
 fun: run { -- err }
-  init
+  .init
   0 { out }
   RUNS { run }
   loop
     dec: run
-    run >=0 while
-    BUF CAP DELS scan +: out
+    run >=0 .while
+    BUF CAP DELS .scan +: out
   end
-  " SCAN_DELIMS_PRINT" getenv if then out log_int lf end
+  " SCAN_DELIMS_PRINT" .getenv if .then out .log_int .lf end
   assert out WANT = end
 end
+.run
 
 fun: main { -- exit }
-  run { err }
-  ifz err then 0 else " error: %s" err elogf elf 1 end
+  .run { err }
+  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end
-run

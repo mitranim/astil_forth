@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_digit_assign_local_name_fail { val -- err }
+  val { 1tmp }
+end

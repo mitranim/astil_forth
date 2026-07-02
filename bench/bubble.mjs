@@ -37,7 +37,7 @@ function bubble(list) {
 function bubbleSort(list) {
   listInit(list)
   bubble(list)
-  listDump(list)
+  // listDump(list)
   listVerify(list)
 }
 

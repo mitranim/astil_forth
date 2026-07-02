@@ -1,10 +1,10 @@
 use' lang.af
 
 \ Simple arena allocator. Maps memory pages on demand.
-\ Supports truncating while keeping full capacity.
+\ Supports truncating .while keeping full capacity.
 \ Pages are NOT contiguous with each other.
 
-1 22 lsl let: ARENA_PAGE_MIN
+1 22 .lsl let: ARENA_PAGE_MIN
 4096     let: ARENA_PAGES
 
 struct: Arena
@@ -12,72 +12,72 @@ struct: Arena
   Adr   1 field: Arena_low   \ `Stack*` of active page
 end
 
-fun: arena_init { arn -> } size' Arena memzero end
+fun: arena_init { arn -> } size' Arena .memzero end
 
 fun: arena_deinit { arn -> err }
-  ifz then ret end
+  ifz .then .ret end
 
-  arn Stack_floor @ { floor }
-  arn Stack_top   @ { ceil }
-  nil               { err }
+  arn .Stack_floor @ { floor }
+  arn .Stack_top   @ { ceil }
+  nil                { err }
 
   floor { page }
   loop
-    page ceil < while
-    page stack_deinit fallback: err
+    page ceil < .while
+    page .stack_deinit fallback: err
     size' Stack +: page
   end
 
-  arn arena_init
+  arn .arena_init
   err
 end
 
-\ Truncate every page and reset to first page if any, while keeping capacity.
+\ Truncate every page and reset to first page if any, .while keeping capacity.
 fun: arena_trunc { arn -> }
-  ifz then ret end
+  ifz .then .ret end
 
-  arn Stack_floor @ { floor }
-  arn Stack_top   @ { ceil }
+  arn .Stack_floor @ { floor }
+  arn .Stack_top   @ { ceil }
 
   floor { page }
   loop
-    page ceil < while
-    page stack_trunc
+    page ceil < .while
+    page .stack_trunc
     size' Stack +: page
   end
 
-  floor arn Arena_low !
+  floor arn .Arena_low !
 end
 
 fun: arena_alloc { size arn -- adr err }
-  ifz size then " unable to allocate: size is zero" throw end
+  ifz size .then " unable to allocate: size is zero" .throw end
 
-  arn Arena_low @ { low }
-  arn Stack_top @ { ceil }
-  nil             { page }
-  nil             { adr }
+  arn .Arena_low @ { low }
+  arn .Stack_top @ { ceil }
+  nil              { page }
+  nil              { adr }
 
-  ifz arn stack? then
-    ARENA_PAGES size' Stack * arn stack_init try
+  ifz arn stack? .then
+    ARENA_PAGES size' Stack * arn .stack_init .try
   end
 
   low { page }
   loop
-    page ceil < while
-    page Stack_ceil @ { page_ceil }
-    page Stack_top  @ FUND_ALIGN align_up { top }
-    if page_ceil top - size >= then top { adr } leave end
+    page ceil < .while
+    page .Stack_ceil @ { page_ceil }
+    page .Stack_top  @ FUND_ALIGN .align_up { top }
+    if page_ceil top - size >= .then top { adr } leave end
     size' Stack +: page
   end
 
-  ifz adr then
-    arn Stack_top @ { page }
-    size ARENA_PAGE_MIN max page stack_init try
-    page size' Stack + arn Stack_top !
-    page Stack_top @ { adr }
+  ifz adr .then
+    arn .Stack_top @ { page }
+    size ARENA_PAGE_MIN .max page .stack_init .try
+    page size' Stack + arn .Stack_top !
+    page .Stack_top @ { adr }
   end
 
-  adr size + page Stack_top !
-  page arn Arena_low !
+  adr size + page .Stack_top !
+  page arn .Arena_low !
   adr
 end

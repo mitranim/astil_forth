@@ -5,7 +5,7 @@ use' ../lang.af
 \ those should be covered in `./test.af`. It should not bother
 \ testing pessimizations either; no locking down poor codegen.
 
-true try_all
+true .try_all
 
 128 mem: CF_EXPECT_INSTRS
 0 var: CF_EXPECT_LEN
@@ -15,105 +15,105 @@ fun: cf_expect_clear 0 CF_EXPECT_LEN ! end
 fun: cf_expect_instr { instr }
   CF_EXPECT_LEN @ { ind }
   instr CF_EXPECT_INSTRS ind 4 * + !32
-  ind inc CF_EXPECT_LEN !
+  ind .inc CF_EXPECT_LEN !
 end
 
 fun: cf_expect_word { XT -- err }
   CF_EXPECT_LEN @ { exp_len }
-  XT Sym_union Sym_norm_spans { spans }
-  spans Sym_instrs_ret @u32 inc spans Sym_instrs_prologue @u32 - { act_len }
-  if exp_len act_len <> then
-    XT Sym_name Sym_word_buf { name }
-    XT Sym_name Sym_word_len @u32 { name_len }
+  XT .Sym_union .Sym_norm_spans { spans }
+  spans .Sym_instrs_ret @u32 .inc spans .Sym_instrs_prologue @u32 - { act_len }
+  if exp_len act_len <> .then
+    XT .Sym_name .Sym_word_buf { name }
+    XT .Sym_name .Sym_word_len @u32 { name_len }
     " [test] `%.*s` instruction length mismatch: expected %zd, actual %zd"
-    name_len name exp_len act_len errf throw
+    name_len name exp_len act_len .errf .throw
   end
 
   0 { ind }
   loop
-    ind exp_len < while
+    ind exp_len < .while
     CF_EXPECT_INSTRS ind 4 * + @u32 { exp }
-    XT sym_instr ind 4 * + @u32 { act }
-    if exp act <> then
-      XT Sym_name Sym_word_buf { name }
-      XT Sym_name Sym_word_len @u32 { name_len }
+    XT .sym_instr ind 4 * + @u32 { act }
+    if exp act <> .then
+      XT .Sym_name .Sym_word_buf { name }
+      XT .Sym_name .Sym_word_len @u32 { name_len }
       " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
-      name_len name ind exp act errf throw
+      name_len name ind exp act .errf .throw
     end
     inc: ind
   end
 end
 
 fun: cf_imm_lane { imm hw -- lane }
-  imm hw 16 * lsr 0xffff and
+  imm hw 16 * .lsr 0xffff .and
 end
 
 fun: cf_base_hw { bits -- hw }
-  if bits 0 cf_imm_lane then 0 ret end
-  if bits 1 cf_imm_lane then 1 ret end
-  if bits 2 cf_imm_lane then 2 ret end
-  if bits 3 cf_imm_lane then 3 ret end
+  if bits 0 .cf_imm_lane .then 0 .ret end
+  if bits 1 .cf_imm_lane .then 1 .ret end
+  if bits 2 .cf_imm_lane .then 2 .ret end
+  if bits 3 .cf_imm_lane .then 3 .ret end
   0
 end
 
 fun: cf_expect_movk_if { reg neg base_hw hw bits }
-  bits hw cf_imm_lane { lane }
-  if hw base_hw <> then
-    if lane then
-      if neg then lane invert 0xffff and else lane end { imm16 }
-      reg 0b11 hw imm16 asm_mov_wide cf_expect_instr
+  bits hw .cf_imm_lane { lane }
+  if hw base_hw <> .then
+    if lane .then
+      if neg .then lane .invert 0xffff .and else lane end { imm16 }
+      reg 0b11 hw imm16 .asm_mov_wide .cf_expect_instr
     end
   end
 end
 
 fun: cf_expect_load { reg imm }
   imm <0 { neg }
-  if neg then imm invert else imm end { bits }
-  if neg then 0b00 else 0b10 end { opc }
+  if neg .then imm .invert else imm end { bits }
+  if neg .then 0b00 else 0b10 end { opc }
 
-  bits cf_base_hw { hw }
-  bits hw cf_imm_lane { imm16 }
-  reg opc hw imm16 asm_mov_wide cf_expect_instr
+  bits .cf_base_hw { hw }
+  bits hw .cf_imm_lane { imm16 }
+  reg opc hw imm16 .asm_mov_wide .cf_expect_instr
 
-  reg neg hw 0 bits cf_expect_movk_if
-  reg neg hw 1 bits cf_expect_movk_if
-  reg neg hw 2 bits cf_expect_movk_if
-  reg neg hw 3 bits cf_expect_movk_if
+  reg neg hw 0 bits .cf_expect_movk_if
+  reg neg hw 1 bits .cf_expect_movk_if
+  reg neg hw 2 bits .cf_expect_movk_if
+  reg neg hw 3 bits .cf_expect_movk_if
 end
 
-fun: cf_expect_ret asm_ret cf_expect_instr end
+fun: cf_expect_ret asm_ret .cf_expect_instr end
 
 fun: cf_expect_load_word { imm XT -- err }
-  cf_expect_clear
-  0 imm cf_expect_load
-  cf_expect_ret
-  XT cf_expect_word
+  .cf_expect_clear
+  0 imm .cf_expect_load
+  .cf_expect_ret
+  XT .cf_expect_word
 end
 
 fun: cf_expect_word1 { instr XT -- err }
-  cf_expect_clear
-  instr cf_expect_instr
-  cf_expect_ret
-  XT cf_expect_word
+  .cf_expect_clear
+  instr .cf_expect_instr
+  .cf_expect_ret
+  XT .cf_expect_word
 end
 
 fun: cf_expect_word2 { instr0 instr1 XT -- err }
-  cf_expect_clear
-  instr0 cf_expect_instr
-  instr1 cf_expect_instr
-  cf_expect_ret
-  XT cf_expect_word
+  .cf_expect_clear
+  instr0 .cf_expect_instr
+  instr1 .cf_expect_instr
+  .cf_expect_ret
+  XT .cf_expect_word
 end
 
 fun: const_fold_arith_fun { -- val } 10 20 30 40 + - * end
 
 fun: test_const_fold_arith { -- err }
-  assert= const_fold_arith_fun -500 end
-  ifz has_interp then ret end
+  assert= .const_fold_arith_fun -500 end
+  ifz .has_interp .then .ret end
 
-  -500 xt' const_fold_arith_fun cf_expect_load_word
+  -500 xt' const_fold_arith_fun .cf_expect_load_word
 end
-test_const_fold_arith
+.test_const_fold_arith
 
 fun: const_fold_large_imm_fun { -- out0 out1 out2 }
   1 0x123456789 +
@@ -122,20 +122,20 @@ fun: const_fold_large_imm_fun { -- out0 out1 out2 }
 end
 
 fun: test_const_fold_large_imm { -- err }
-  const_fold_large_imm_fun { out0 out1 out2 }
+  .const_fold_large_imm_fun { out0 out1 out2 }
   assert= out0 0x12345678a end
   assert= out1 0x12345678a end
   assert= out2 0xaaaaaaaaa end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 0x12345678a cf_expect_load
-  1 0x12345678a cf_expect_load
-  2 0xaaaaaaaaa cf_expect_load
-  cf_expect_ret
-  xt' const_fold_large_imm_fun cf_expect_word
+  .cf_expect_clear
+  0 0x12345678a .cf_expect_load
+  1 0x12345678a .cf_expect_load
+  2 0xaaaaaaaaa .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_large_imm_fun .cf_expect_word
 end
-test_const_fold_large_imm
+.test_const_fold_large_imm
 
 fun: const_fold_ugly_imm_fun { -- out0 out1 }
   0x123456789abcdef0
@@ -143,47 +143,47 @@ fun: const_fold_ugly_imm_fun { -- out0 out1 }
 end
 
 fun: test_const_fold_ugly_imm { -- err }
-  const_fold_ugly_imm_fun { out0 out1 }
+  .const_fold_ugly_imm_fun { out0 out1 }
   assert= out0 0x123456789abcdef0 end
   assert= out1 0 0x123456789abc - end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 0x123456789abcdef0 cf_expect_load
-  1 0 0x123456789abc - cf_expect_load
-  cf_expect_ret
-  xt' const_fold_ugly_imm_fun cf_expect_word
+  .cf_expect_clear
+  0 0x123456789abcdef0 .cf_expect_load
+  1 0 0x123456789abc - .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_ugly_imm_fun .cf_expect_word
 end
-test_const_fold_ugly_imm
+.test_const_fold_ugly_imm
 
 fun: const_fold_negative_lane_imm_fun { -- out }
   0 0x100020003 -
 end
 
 fun: test_const_fold_negative_lane_imm { -- err }
-  assert= const_fold_negative_lane_imm_fun 0 0x100020003 - end
-  ifz has_interp then ret end
+  assert= .const_fold_negative_lane_imm_fun 0 0x100020003 - end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
+  .cf_expect_clear
   0 0x100020003 - { imm }
-  0 imm cf_expect_load
-  cf_expect_ret
-  xt' const_fold_negative_lane_imm_fun cf_expect_word
+  0 imm .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_negative_lane_imm_fun .cf_expect_word
 end
-test_const_fold_negative_lane_imm
+.test_const_fold_negative_lane_imm
 
 fun: const_fold_multi_out_fun { -- out0 out1 out2 out3 out4 out5 out6 }
-  41 inc
-  43 dec
-  42 negate
-  0 invert
-  -42 abs
-  0 bit_len
-  255 bit_len
+  41 .inc
+  43 .dec
+  42 .negate
+  0 .invert
+  -42 .abs
+  0 .bit_len
+  255 .bit_len
 end
 
 fun: test_const_fold_unary { -- err }
-  const_fold_multi_out_fun { out0 out1 out2 out3 out4 out5 out6 }
+  .const_fold_multi_out_fun { out0 out1 out2 out3 out4 out5 out6 }
   assert= out0 42 end
   assert= out1 42 end
   assert= out2 -42 end
@@ -191,64 +191,64 @@ fun: test_const_fold_unary { -- err }
   assert= out4 42 end
   assert= out5 0 end
   assert= out6 8 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 42 cf_expect_load
-  1 42 cf_expect_load
-  2 -42 cf_expect_load
-  3 -1 cf_expect_load
-  4 42 cf_expect_load
-  5 0 cf_expect_load
-  6 8 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_multi_out_fun cf_expect_word
+  .cf_expect_clear
+  0 42 .cf_expect_load
+  1 42 .cf_expect_load
+  2 -42 .cf_expect_load
+  3 -1 .cf_expect_load
+  4 42 .cf_expect_load
+  5 0 .cf_expect_load
+  6 8 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_multi_out_fun .cf_expect_word
 end
-test_const_fold_unary
+.test_const_fold_unary
 
 fun: const_fold_pow2_ceil_fun { -- out0 out1 out2 out3 }
-  0 pow2_ceil
-  1 pow2_ceil
-  4096 pow2_ceil
-  4097 pow2_ceil
+  0 .pow2_ceil
+  1 .pow2_ceil
+  4096 .pow2_ceil
+  4097 .pow2_ceil
 end
 
 fun: test_const_fold_pow2_ceil { -- err }
-  const_fold_pow2_ceil_fun { out0 out1 out2 out3 }
+  .const_fold_pow2_ceil_fun { out0 out1 out2 out3 }
   assert= out0 1 end
   assert= out1 1 end
   assert= out2 4096 end
   assert= out3 8192 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 1 cf_expect_load
-  1 1 cf_expect_load
-  2 4096 cf_expect_load
-  3 8192 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_pow2_ceil_fun cf_expect_word
+  .cf_expect_clear
+  0 1 .cf_expect_load
+  1 1 .cf_expect_load
+  2 4096 .cf_expect_load
+  3 8192 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_pow2_ceil_fun .cf_expect_word
 end
-test_const_fold_pow2_ceil
+.test_const_fold_pow2_ceil
 
 fun: const_fold_bit_count_fun { -- out0 out1 }
-  0 bit_clz
-  8 bit_ctz
+  0 .bit_clz
+  8 .bit_ctz
 end
 
 fun: test_const_fold_bit_count { -- err }
-  const_fold_bit_count_fun { out0 out1 }
+  .const_fold_bit_count_fun { out0 out1 }
   assert= out0 64 end
   assert= out1 3 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 64 cf_expect_load
-  1 3 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_bit_count_fun cf_expect_word
+  .cf_expect_clear
+  0 64 .cf_expect_load
+  1 3 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_bit_count_fun .cf_expect_word
 end
-test_const_fold_bit_count
+.test_const_fold_bit_count
 
 fun: const_fold_multi_zero_cmp_fun { -- out0 out1 out2 out3 out4 out5 }
   0 =0
@@ -260,257 +260,257 @@ fun: const_fold_multi_zero_cmp_fun { -- out0 out1 out2 out3 out4 out5 }
 end
 
 fun: test_const_fold_zero_cmp { -- err }
-  const_fold_multi_zero_cmp_fun { out0 out1 out2 out3 out4 out5 }
+  .const_fold_multi_zero_cmp_fun { out0 out1 out2 out3 out4 out5 }
   assert= out0 1 end
   assert= out1 1 end
   assert= out2 1 end
   assert= out3 1 end
   assert= out4 1 end
   assert= out5 1 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 1 cf_expect_load
-  1 1 cf_expect_load
-  2 1 cf_expect_load
-  3 1 cf_expect_load
-  4 1 cf_expect_load
-  5 1 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_multi_zero_cmp_fun cf_expect_word
+  .cf_expect_clear
+  0 1 .cf_expect_load
+  1 1 .cf_expect_load
+  2 1 .cf_expect_load
+  3 1 .cf_expect_load
+  4 1 .cf_expect_load
+  5 1 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_multi_zero_cmp_fun .cf_expect_word
 end
-test_const_fold_zero_cmp
+.test_const_fold_zero_cmp
 
 fun: const_fold_bit_shift_fun { -- out0 out1 out2 out3 out4 out5 }
-  0b1010 0b1100 or
-  0b1010 0b1100 and
-  0b1010 0b1100 xor
-  3 4 lsl
-  64 3 lsr
-  -64 2 asr
+  0b1010 0b1100 .or
+  0b1010 0b1100 .and
+  0b1010 0b1100 .xor
+  3 4 .lsl
+  64 3 .lsr
+  -64 2 .asr
 end
 
-fun: const_fold_lsl_imm_fun { val -- out } val 3 lsl end
-fun: const_fold_lsr_imm_fun { val -- out } val 3 lsr end
-fun: const_fold_asr_imm_fun { val -- out } val 2 asr end
-fun: const_fold_or_rhs_imm_fun { val -- out } val 0xff or end
-fun: const_fold_and_rhs_imm_fun { val -- out } val 0xff and end
-fun: const_fold_xor_rhs_imm_fun { val -- out } val 0xff xor end
-fun: const_fold_is_aligned_rhs_imm_fun { val -- out } val 8 is_aligned_to end
-fun: const_fold_align_down_rhs_imm_fun { val -- out } val 16 align_down end
-fun: const_fold_align_up_rhs_imm_fun { val -- out } val 16 align_up end
-fun: const_fold_bits_trunc_rhs_imm_fun { val -- out } val 8 bits_trunc end
-fun: const_fold_bit_mask_get_rhs_imm_fun { val -- out } val 0b111111110000 bit_mask_get end
+fun: const_fold_lsl_imm_fun { val -- out } val 3 .lsl end
+fun: const_fold_lsr_imm_fun { val -- out } val 3 .lsr end
+fun: const_fold_asr_imm_fun { val -- out } val 2 .asr end
+fun: const_fold_or_rhs_imm_fun { val -- out } val 0xff .or end
+fun: const_fold_and_rhs_imm_fun { val -- out } val 0xff .and end
+fun: const_fold_xor_rhs_imm_fun { val -- out } val 0xff .xor end
+fun: const_fold_is_aligned_rhs_imm_fun { val -- out } val 8 .is_aligned_to end
+fun: const_fold_align_down_rhs_imm_fun { val -- out } val 16 .align_down end
+fun: const_fold_align_up_rhs_imm_fun { val -- out } val 16 .align_up end
+fun: const_fold_bits_trunc_rhs_imm_fun { val -- out } val 8 .bits_trunc end
+fun: const_fold_bit_mask_get_rhs_imm_fun { val -- out } val 0b111111110000 .bit_mask_get end
 
 fun: test_const_fold_bit_shift { -- err }
-  const_fold_bit_shift_fun { out0 out1 out2 out3 out4 out5 }
+  .const_fold_bit_shift_fun { out0 out1 out2 out3 out4 out5 }
   assert= out0 14 end
   assert= out1 8 end
   assert= out2 6 end
   assert= out3 48 end
   assert= out4 8 end
   assert= out5 -16 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 14 cf_expect_load
-  1 8 cf_expect_load
-  2 6 cf_expect_load
-  3 48 cf_expect_load
-  4 8 cf_expect_load
-  5 -16 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_bit_shift_fun cf_expect_word
+  .cf_expect_clear
+  0 14 .cf_expect_load
+  1 8 .cf_expect_load
+  2 6 .cf_expect_load
+  3 48 .cf_expect_load
+  4 8 .cf_expect_load
+  5 -16 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_bit_shift_fun .cf_expect_word
 
-  0 0 3 asm_lsl_imm xt' const_fold_lsl_imm_fun cf_expect_word1
-  0 0 3 asm_lsr_imm xt' const_fold_lsr_imm_fun cf_expect_word1
-  0 0 2 asm_asr_imm xt' const_fold_asr_imm_fun cf_expect_word1
+  0 0 3 .asm_lsl_imm xt' const_fold_lsl_imm_fun .cf_expect_word1
+  0 0 3 .asm_lsr_imm xt' const_fold_lsr_imm_fun .cf_expect_word1
+  0 0 2 .asm_asr_imm xt' const_fold_asr_imm_fun .cf_expect_word1
 
-  0 0 0xff asm_orr_imm xt' const_fold_or_rhs_imm_fun cf_expect_word1
-  0 0 0xff asm_and_imm xt' const_fold_and_rhs_imm_fun cf_expect_word1
-  0 0 0xff asm_eor_imm xt' const_fold_xor_rhs_imm_fun cf_expect_word1
+  0 0 0xff .asm_orr_imm xt' const_fold_or_rhs_imm_fun .cf_expect_word1
+  0 0 0xff .asm_and_imm xt' const_fold_and_rhs_imm_fun .cf_expect_word1
+  0 0 0xff .asm_eor_imm xt' const_fold_xor_rhs_imm_fun .cf_expect_word1
 
-  0 7 asm_tst_imm { instr0 }
-  0 ASM_EQ asm_cset { instr1 }
-  instr0 instr1 xt' const_fold_is_aligned_rhs_imm_fun cf_expect_word2
+  0 7 .asm_tst_imm { instr0 }
+  0 ASM_EQ .asm_cset { instr1 }
+  instr0 instr1 xt' const_fold_is_aligned_rhs_imm_fun .cf_expect_word2
 
-  0 0 -16 asm_and_imm xt' const_fold_align_down_rhs_imm_fun cf_expect_word1
-  0 0 15 asm_add_imm { instr0 }
-  0 0 -16 asm_and_imm { instr1 }
-  instr0 instr1 xt' const_fold_align_up_rhs_imm_fun cf_expect_word2
-  0 0 0xff asm_and_imm xt' const_fold_bits_trunc_rhs_imm_fun cf_expect_word1
-  0 0 0b111111110000 asm_and_imm { instr0 }
-  0 0 4 asm_lsr_imm { instr1 }
-  instr0 instr1 xt' const_fold_bit_mask_get_rhs_imm_fun cf_expect_word2
+  0 0 -16 .asm_and_imm xt' const_fold_align_down_rhs_imm_fun .cf_expect_word1
+  0 0 15 .asm_add_imm { instr0 }
+  0 0 -16 .asm_and_imm { instr1 }
+  instr0 instr1 xt' const_fold_align_up_rhs_imm_fun .cf_expect_word2
+  0 0 0xff .asm_and_imm xt' const_fold_bits_trunc_rhs_imm_fun .cf_expect_word1
+  0 0 0b111111110000 .asm_and_imm { instr0 }
+  0 0 4 .asm_lsr_imm { instr1 }
+  instr0 instr1 xt' const_fold_bit_mask_get_rhs_imm_fun .cf_expect_word2
 end
-test_const_fold_bit_shift
+.test_const_fold_bit_shift
 
 fun: test_const_fold_bit_mask_errors { -- err }
-  use' ./fail/test_const_fold_bit_mask_get_bad.af catch
-  " invalid bit mask: expected nonzero contiguous mask" assert_str_has
+  use' ./fail/test_const_fold_bit_mask_get_bad.af .catch
+  " invalid bit mask: expected nonzero contiguous mask" .assert_str_has
 end
-test_const_fold_bit_mask_errors
+.test_const_fold_bit_mask_errors
 
 fun: test_const_fold_redundant_arith_errors { -- err }
-  use' ./fail/test_const_fold_redundant_logical.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_logical.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_addsub.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_addsub.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_shift.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_shift.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_const_shift.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_const_shift.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_mul_zero.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_mul_zero.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_div_one.af catch
-  " redundant arithmetic: division by 1" assert_str_has
+  use' ./fail/test_const_fold_redundant_div_one.af .catch
+  " redundant arithmetic: division by 1" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_udiv_one.af catch
-  " redundant arithmetic: division by 1" assert_str_has
+  use' ./fail/test_const_fold_redundant_udiv_one.af .catch
+  " redundant arithmetic: division by 1" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_mod_one.af catch
-  " redundant arithmetic: modulo by 1" assert_str_has
+  use' ./fail/test_const_fold_redundant_mod_one.af .catch
+  " redundant arithmetic: modulo by 1" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_umod_one.af catch
-  " redundant arithmetic: modulo by 1" assert_str_has
+  use' ./fail/test_const_fold_redundant_umod_one.af .catch
+  " redundant arithmetic: modulo by 1" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_divmod_one.af catch
-  " redundant arithmetic: division by 1" assert_str_has
+  use' ./fail/test_const_fold_redundant_divmod_one.af .catch
+  " redundant arithmetic: division by 1" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_udivmod_one.af catch
-  " redundant arithmetic: division by 1" assert_str_has
+  use' ./fail/test_const_fold_redundant_udivmod_one.af .catch
+  " redundant arithmetic: division by 1" .assert_str_has
 
-  use' ./fail/test_const_fold_div_zero.af catch
-  " redundant arithmetic: division by 0 -> 0" assert_str_has
+  use' ./fail/test_const_fold_div_zero.af .catch
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has
 
-  use' ./fail/test_const_fold_udiv_zero.af catch
-  " redundant arithmetic: division by 0 -> 0" assert_str_has
+  use' ./fail/test_const_fold_udiv_zero.af .catch
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has
 
-  use' ./fail/test_const_fold_mod_zero.af catch
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
+  use' ./fail/test_const_fold_mod_zero.af .catch
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_umod_zero.af catch
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
+  use' ./fail/test_const_fold_umod_zero.af .catch
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_divmod_zero.af catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
+  use' ./fail/test_const_fold_divmod_zero.af .catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_udivmod_zero.af catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
+  use' ./fail/test_const_fold_udivmod_zero.af .catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_rhs_div_zero.af catch
-  " redundant arithmetic: division by 0 -> 0" assert_str_has
+  use' ./fail/test_const_fold_rhs_div_zero.af .catch
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has
 
-  use' ./fail/test_const_fold_rhs_udiv_zero.af catch
-  " redundant arithmetic: division by 0 -> 0" assert_str_has
+  use' ./fail/test_const_fold_rhs_udiv_zero.af .catch
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has
 
-  use' ./fail/test_const_fold_rhs_mod_zero.af catch
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
+  use' ./fail/test_const_fold_rhs_mod_zero.af .catch
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_rhs_umod_zero.af catch
-  " redundant arithmetic: modulo by 0 -> dividend" assert_str_has
+  use' ./fail/test_const_fold_rhs_umod_zero.af .catch
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_rhs_divmod_zero.af catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
+  use' ./fail/test_const_fold_rhs_divmod_zero.af .catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_rhs_udivmod_zero.af catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" assert_str_has
+  use' ./fail/test_const_fold_rhs_udivmod_zero.af .catch
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_align_down.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_align_down.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_align_up.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_align_up.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_is_aligned.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_is_aligned.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_bits_trunc.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_bits_trunc.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_bits_clear.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_bits_clear.af .catch
+  " redundant arithmetic" .assert_str_has
 
-  use' ./fail/test_const_fold_redundant_bit_mask_get.af catch
-  " redundant arithmetic" assert_str_has
+  use' ./fail/test_const_fold_redundant_bit_mask_get.af .catch
+  " redundant arithmetic" .assert_str_has
 end
-test_const_fold_redundant_arith_errors
+.test_const_fold_redundant_arith_errors
 
 fun: test_const_fold_assert_static_errors { -- err }
-  use' ./fail/test_assert_static_fail.af catch
-  " assertion failed: 10 20 =" assert_str_has
+  use' ./fail/test_assert_static_fail.af .catch
+  " assertion failed: 10 20 =" .assert_str_has
 
-  use' ./fail/test_assert_static_fail_after_drop_with_err.af catch
-  " assertion failed: 123 234 =" assert_str_has
+  use' ./fail/test_assert_static_fail_after_drop_with_err.af .catch
+  " assertion failed: 123 234 =" .assert_str_has
 end
-test_const_fold_assert_static_errors
+.test_const_fold_assert_static_errors
 
 fun: const_fold_div_mod_fun { -- out0 out1 out2 out3 out4 }
   29 5 /
   29 5 u/
-  29 5 mod
+  29 5 .mod
   29 5 /mod
 end
 
 fun: const_fold_udiv_mod_fun { -- out0 out1 out2 out3 }
   -1 -2 u/
-  -1 -2 umod
+  -1 -2 .umod
   -1 -2 u/mod
 end
 
 fun: const_fold_mul_pow2_rhs_imm_fun { val -- out } val -8 * end
 fun: const_fold_udiv_pow2_rhs_imm_fun { val -- out } val 8 u/ end
-fun: const_fold_umod_pow2_rhs_imm_fun { val -- out } val 8 umod end
+fun: const_fold_umod_pow2_rhs_imm_fun { val -- out } val 8 .umod end
 
 fun: test_const_fold_div_mod { -- err }
-  const_fold_div_mod_fun { out0 out1 out2 out3 out4 }
+  .const_fold_div_mod_fun { out0 out1 out2 out3 out4 }
   assert= out0 5 end
   assert= out1 5 end
   assert= out2 4 end
   assert= out3 4 end
   assert= out4 5 end
-  const_fold_udiv_mod_fun { out5 out6 out7 out8 }
+  .const_fold_udiv_mod_fun { out5 out6 out7 out8 }
   assert= out5 1 end
   assert= out6 1 end
   assert= out7 1 end
   assert= out8 1 end
 
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 5 cf_expect_load
-  1 5 cf_expect_load
-  2 4 cf_expect_load
-  3 4 cf_expect_load
-  4 5 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_div_mod_fun cf_expect_word
+  .cf_expect_clear
+  0 5 .cf_expect_load
+  1 5 .cf_expect_load
+  2 4 .cf_expect_load
+  3 4 .cf_expect_load
+  4 5 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_div_mod_fun .cf_expect_word
 
-  cf_expect_clear
-  0 1 cf_expect_load
-  1 1 cf_expect_load
-  2 1 cf_expect_load
-  3 1 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_udiv_mod_fun cf_expect_word
+  .cf_expect_clear
+  0 1 .cf_expect_load
+  1 1 .cf_expect_load
+  2 1 .cf_expect_load
+  3 1 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_udiv_mod_fun .cf_expect_word
 
-  0 0 3 asm_lsl_imm { instr0 }
-  0 asm_neg { instr1 }
-  instr0 instr1 xt' const_fold_mul_pow2_rhs_imm_fun cf_expect_word2
+  0 0 3 .asm_lsl_imm { instr0 }
+  0 .asm_neg { instr1 }
+  instr0 instr1 xt' const_fold_mul_pow2_rhs_imm_fun .cf_expect_word2
 
-  0 0 3 asm_lsr_imm xt' const_fold_udiv_pow2_rhs_imm_fun cf_expect_word1
-  0 0 7 asm_and_imm xt' const_fold_umod_pow2_rhs_imm_fun cf_expect_word1
+  0 0 3 .asm_lsr_imm xt' const_fold_udiv_pow2_rhs_imm_fun .cf_expect_word1
+  0 0 7 .asm_and_imm xt' const_fold_umod_pow2_rhs_imm_fun .cf_expect_word1
 end
-test_const_fold_div_mod
+.test_const_fold_div_mod
 
 fun: const_fold_compare2_fun { -- out0 out1 out2 out3 out4 out5 out6 out7 }
-  7 3 min
-  7 3 max
+  7 3 .min
+  7 3 .max
   7 7 =
   7 3 <>
   7 3 >
@@ -531,13 +531,13 @@ fun: const_fold_ule_rhs_imm_fun { val -- out } val 20 u<= end
 fun: const_fold_uge_rhs_imm_fun { val -- out } val 20 u>= end
 
 fun: cf_expect_cmp_rhs_imm { XT cond -- err }
-  0 20 asm_cmp_imm { instr0 }
-  0 cond asm_cset { instr1 }
-  instr0 instr1 XT cf_expect_word2
+  0 20 .asm_cmp_imm { instr0 }
+  0 cond .asm_cset { instr1 }
+  instr0 instr1 XT .cf_expect_word2
 end
 
 fun: test_const_fold_compare2 { -- err }
-  const_fold_compare2_fun { out0 out1 out2 out3 out4 out5 out6 out7 }
+  .const_fold_compare2_fun { out0 out1 out2 out3 out4 out5 out6 out7 }
   assert= out0 3 end
   assert= out1 7 end
   assert= out2 1 end
@@ -546,32 +546,32 @@ fun: test_const_fold_compare2 { -- err }
   assert= out5 1 end
   assert= out6 1 end
   assert= out7 1 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 3 cf_expect_load
-  1 7 cf_expect_load
-  2 1 cf_expect_load
-  3 1 cf_expect_load
-  4 1 cf_expect_load
-  5 1 cf_expect_load
-  6 1 cf_expect_load
-  7 1 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_compare2_fun cf_expect_word
+  .cf_expect_clear
+  0 3 .cf_expect_load
+  1 7 .cf_expect_load
+  2 1 .cf_expect_load
+  3 1 .cf_expect_load
+  4 1 .cf_expect_load
+  5 1 .cf_expect_load
+  6 1 .cf_expect_load
+  7 1 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_compare2_fun .cf_expect_word
 
-  xt' const_fold_eq_rhs_imm_fun ASM_EQ cf_expect_cmp_rhs_imm
-  xt' const_fold_ne_rhs_imm_fun ASM_NE cf_expect_cmp_rhs_imm
-  xt' const_fold_gt_rhs_imm_fun ASM_GT cf_expect_cmp_rhs_imm
-  xt' const_fold_lt_rhs_imm_fun ASM_LT cf_expect_cmp_rhs_imm
-  xt' const_fold_le_rhs_imm_fun ASM_LE cf_expect_cmp_rhs_imm
-  xt' const_fold_ge_rhs_imm_fun ASM_GE cf_expect_cmp_rhs_imm
-  xt' const_fold_ugt_rhs_imm_fun ASM_HI cf_expect_cmp_rhs_imm
-  xt' const_fold_ult_rhs_imm_fun ASM_LO cf_expect_cmp_rhs_imm
-  xt' const_fold_ule_rhs_imm_fun ASM_LS cf_expect_cmp_rhs_imm
-  xt' const_fold_uge_rhs_imm_fun ASM_HS cf_expect_cmp_rhs_imm
+  xt' const_fold_eq_rhs_imm_fun ASM_EQ .cf_expect_cmp_rhs_imm
+  xt' const_fold_ne_rhs_imm_fun ASM_NE .cf_expect_cmp_rhs_imm
+  xt' const_fold_gt_rhs_imm_fun ASM_GT .cf_expect_cmp_rhs_imm
+  xt' const_fold_lt_rhs_imm_fun ASM_LT .cf_expect_cmp_rhs_imm
+  xt' const_fold_le_rhs_imm_fun ASM_LE .cf_expect_cmp_rhs_imm
+  xt' const_fold_ge_rhs_imm_fun ASM_GE .cf_expect_cmp_rhs_imm
+  xt' const_fold_ugt_rhs_imm_fun ASM_HI .cf_expect_cmp_rhs_imm
+  xt' const_fold_ult_rhs_imm_fun ASM_LO .cf_expect_cmp_rhs_imm
+  xt' const_fold_ule_rhs_imm_fun ASM_LS .cf_expect_cmp_rhs_imm
+  xt' const_fold_uge_rhs_imm_fun ASM_HS .cf_expect_cmp_rhs_imm
 end
-test_const_fold_compare2
+.test_const_fold_compare2
 
 fun: const_fold_assert_static_pass_fun
   assert<> 10 20 end
@@ -582,18 +582,18 @@ fun: const_fold_assert_static_pass_fun
 end
 
 fun: test_const_fold_assert_static_pass { -- err }
-  const_fold_assert_static_pass_fun
-  ifz has_interp then ret end
+  .const_fold_assert_static_pass_fun
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  cf_expect_ret
-  xt' const_fold_assert_static_pass_fun cf_expect_word
+  .cf_expect_clear
+  .cf_expect_ret
+  xt' const_fold_assert_static_pass_fun .cf_expect_word
 end
-test_const_fold_assert_static_pass
+.test_const_fold_assert_static_pass
 
 fun: const_fold_ucompare2_fun { -- out0 out1 out2 out3 out4 out5 }
-  -1 0 umin
-  -1 0 umax
+  -1 0 .umin
+  -1 0 .umax
   -1 0 u>
   0 -1 u<
   0 -1 u<=
@@ -601,40 +601,40 @@ fun: const_fold_ucompare2_fun { -- out0 out1 out2 out3 out4 out5 }
 end
 
 fun: test_const_fold_ucompare2 { -- err }
-  const_fold_ucompare2_fun { out0 out1 out2 out3 out4 out5 }
+  .const_fold_ucompare2_fun { out0 out1 out2 out3 out4 out5 }
   assert= out0 0 end
   assert= out1 -1 end
   assert= out2 1 end
   assert= out3 1 end
   assert= out4 1 end
   assert= out5 1 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 0 cf_expect_load
-  1 -1 cf_expect_load
-  2 1 cf_expect_load
-  3 1 cf_expect_load
-  4 1 cf_expect_load
-  5 1 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_ucompare2_fun cf_expect_word
+  .cf_expect_clear
+  0 0 .cf_expect_load
+  1 -1 .cf_expect_load
+  2 1 .cf_expect_load
+  3 1 .cf_expect_load
+  4 1 .cf_expect_load
+  5 1 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_ucompare2_fun .cf_expect_word
 end
-test_const_fold_ucompare2
+.test_const_fold_ucompare2
 
 fun: const_fold_derived_fun { -- out0 out1 out2 out3 out4 out5 out6 out7 }
-  5 cells
+  5 .cells
   40 /cells
   100 +cell
   100 -cell
-  5 odd
-  37 8 align_down
-  37 8 align_up
-  0 42 fallback
+  5 .odd
+  37 8 .align_down
+  37 8 .align_up
+  0 42 .fallback
 end
 
 fun: test_const_fold_derived { -- err }
-  const_fold_derived_fun { out0 out1 out2 out3 out4 out5 out6 out7 }
+  .const_fold_derived_fun { out0 out1 out2 out3 out4 out5 out6 out7 }
   assert= out0 40 end
   assert= out1 5 end
   assert= out2 108 end
@@ -643,80 +643,80 @@ fun: test_const_fold_derived { -- err }
   assert= out5 32 end
   assert= out6 40 end
   assert= out7 42 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 40 cf_expect_load
-  1 5 cf_expect_load
-  2 108 cf_expect_load
-  3 92 cf_expect_load
-  4 1 cf_expect_load
-  5 32 cf_expect_load
-  6 40 cf_expect_load
-  7 42 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_derived_fun cf_expect_word
+  .cf_expect_clear
+  0 40 .cf_expect_load
+  1 5 .cf_expect_load
+  2 108 .cf_expect_load
+  3 92 .cf_expect_load
+  4 1 .cf_expect_load
+  5 32 .cf_expect_load
+  6 40 .cf_expect_load
+  7 42 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_derived_fun .cf_expect_word
 end
-test_const_fold_derived
+.test_const_fold_derived
 
 
-fun: const_fold_low_bits_fun { -- out } 5 low_bits end
-fun: const_fold_bits_trunc_fun { -- out } 0b10110101 4 bits_trunc end
-fun: const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 bits_clear end
-fun: const_fold_bits_clear_imm_fun { val -- out } val 0xff bits_clear end
+fun: const_fold_low_bits_fun { -- out } 5 .low_bits end
+fun: const_fold_bits_trunc_fun { -- out } 0b10110101 4 .bits_trunc end
+fun: const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 .bits_clear end
+fun: const_fold_bits_clear_imm_fun { val -- out } val 0xff .bits_clear end
 fun: const_fold_bit_mask_get_fun { -- out }
-  0b1001000110100 0b111111110000 bit_mask_get
+  0b1001000110100 0b111111110000 .bit_mask_get
 end
 
 fun: test_const_fold_bits { -- err }
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  31 xt' const_fold_low_bits_fun cf_expect_load_word
-  5 xt' const_fold_bits_trunc_fun cf_expect_load_word
-  0b11000011 xt' const_fold_bits_clear_fun cf_expect_load_word
-  0b100011 xt' const_fold_bit_mask_get_fun cf_expect_load_word
+  31 xt' const_fold_low_bits_fun .cf_expect_load_word
+  5 xt' const_fold_bits_trunc_fun .cf_expect_load_word
+  0b11000011 xt' const_fold_bits_clear_fun .cf_expect_load_word
+  0b100011 xt' const_fold_bit_mask_get_fun .cf_expect_load_word
 
-  0 0 0xff asm_bic_imm xt' const_fold_bits_clear_imm_fun cf_expect_word1
+  0 0 0xff .asm_bic_imm xt' const_fold_bits_clear_imm_fun .cf_expect_word1
 end
-test_const_fold_bits
+.test_const_fold_bits
 
 fun: const_fold_int_to_cell_fun { -- out0 out1 }
-  -1 int_to_cell
-  123 int_to_cell
+  -1 .int_to_cell
+  123 .int_to_cell
 end
 
 fun: test_const_fold_int_to_cell { -- err }
-  const_fold_int_to_cell_fun { out0 out1 }
+  .const_fold_int_to_cell_fun { out0 out1 }
   assert= out0 -1 end
   assert= out1 123 end
-  ifz has_interp then ret end
+  ifz .has_interp .then .ret end
 
-  cf_expect_clear
-  0 -1 cf_expect_load
-  1 123 cf_expect_load
-  cf_expect_ret
-  xt' const_fold_int_to_cell_fun cf_expect_word
+  .cf_expect_clear
+  0 -1 .cf_expect_load
+  1 123 .cf_expect_load
+  .cf_expect_ret
+  xt' const_fold_int_to_cell_fun .cf_expect_word
 end
-test_const_fold_int_to_cell
+.test_const_fold_int_to_cell
 
 \ For AOT testing.
 fun: test_const_fold_all { -- err }
-  test_const_fold_arith
-  test_const_fold_large_imm
-  test_const_fold_ugly_imm
-  test_const_fold_negative_lane_imm
-  test_const_fold_unary
-  test_const_fold_pow2_ceil
-  test_const_fold_bit_count
-  test_const_fold_zero_cmp
-  test_const_fold_bit_shift
-  test_const_fold_div_mod
-  test_const_fold_compare2
-  test_const_fold_assert_static_pass
-  test_const_fold_ucompare2
-  test_const_fold_derived
-  test_const_fold_bits
-  test_const_fold_int_to_cell
+  .test_const_fold_arith
+  .test_const_fold_large_imm
+  .test_const_fold_ugly_imm
+  .test_const_fold_negative_lane_imm
+  .test_const_fold_unary
+  .test_const_fold_pow2_ceil
+  .test_const_fold_bit_count
+  .test_const_fold_zero_cmp
+  .test_const_fold_bit_shift
+  .test_const_fold_div_mod
+  .test_const_fold_compare2
+  .test_const_fold_assert_static_pass
+  .test_const_fold_ucompare2
+  .test_const_fold_derived
+  .test_const_fold_bits
+  .test_const_fold_int_to_cell
 end
 
-" [test] [cf] ok" log lf
+" [test] [cf] ok" .log .lf

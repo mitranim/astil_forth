@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_plain_str_prnf_fail { -- err }
+  ERR_BUF_0 ERR_CAP " bad" str_prnf
+end

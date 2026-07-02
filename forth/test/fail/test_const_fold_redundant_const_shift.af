@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_redundant_const_shift { -- out } 10 0 lsl end
+fun: test_const_fold_redundant_const_shift { -- out } 10 0 .lsl end

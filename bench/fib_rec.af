@@ -1,19 +1,16 @@
 use' lang.af
 
 fun: fib { ind -- out }
-  if ind 1 <= then 1 ret end
-  ind 1 - recur { prev }
-  ind 2 - recur
+  if ind 1 <= .then 1 .ret end
+  ind 1 - .recur { prev }
+  ind 2 - .recur
   prev +
 end
 
 fun: run
-  36 fib { -- }
-  \ 36 fib log_int lf
+  36 .fib { -- }
+  \ 36 .fib .log_int .lf
 end
+.run
 
-fun: main { -- exit }
-  run
-  0
-end
-run
+fun: main { -- exit } .run 0 end

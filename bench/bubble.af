@@ -2,74 +2,68 @@ use' lang.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-8192      let: LEN
-LEN cells mem: LIST
+8192       let: LEN
+LEN .cells mem: LIST
 
-fun: list_ceil { list len -> adr } cells + end
+fun: list_ceil { list len -> adr } .cells + end
 
-fun: pseudo_random { seed -- val } seed 1309 * 13849 + 65535 and end
+fun: pseudo_random { seed -> val } 1309 * 13849 + 65535 .and end
 
-fun: list_init { list len }
+fun: list_init { list len -> }
+  .list_ceil { ceil }
   74755 { seed }
-  list len list_ceil { ceil }
-  list { ptr }
   loop
-    ptr ceil < while
-    seed pseudo_random { seed }
-    seed ptr !
-    +cell: ptr
+    list ceil < .while
+    seed .pseudo_random { seed }
+    seed list !
+    +cell: list
   end
 end
 
-fun: list_dump { list len }
-  list len list_ceil { ceil }
-  list { ptr }
+fun: list_dump { list len -> }
+  .list_ceil { ceil }
   loop
-    ptr ceil < while
-    ptr @ log_int space
-    +cell: ptr
+    list ceil < .while
+    list @ .log_int .space
+    +cell: list
   end
-  lf
+  .lf
 end
 
-fun: list_verify { list len -- err }
-  len cells list + -cell { ceil }
-  list { ptr }
+fun: list_verify { list len -> err }
+  .cells + -cell { ceil }
   loop
-    ptr ceil < while
-    if ptr @2 > then " [bubble] not sorted" throw end
-    +cell: ptr
+    list ceil < .while
+    if list @2 > .then " [bubble] not sorted" .throw end
+    +cell: list
   end
 end
 
 fun: bubble { list len }
-  list len list_ceil { ceil_ptr }
+  list len .list_ceil { ceil_ptr }
   loop
     -cell: ceil_ptr
-    list ceil_ptr <= while
+    list ceil_ptr <= .while
     list { ptr }
     loop
-      ptr ceil_ptr < while
-      if ptr @2 > then ptr @2 ptr !swap end
+      ptr ceil_ptr < .while
+      if ptr @2 > .then ptr @2 ptr !swap end
       +cell: ptr
     end
   end
 end
 
 fun: bubble_sort { list len -- err }
-  list len list_init
-  list len bubble
-  \ list len list_dump
-  list len list_verify
+  list len .list_init
+  list len .bubble
+  \ list len .list_dump
+  list len .list_verify
 end
 
-fun: run { -- err }
-  LIST LEN bubble_sort { err }
-  if err then err throw end
-end
+fun: run { -- err } LIST LEN .bubble_sort end
+.run
 
 fun: main { -- exit }
-  run { err }
-  ifz err then 0 else " error: %s" err elogf elf 1 end
+  .run { err }
+  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end
-run

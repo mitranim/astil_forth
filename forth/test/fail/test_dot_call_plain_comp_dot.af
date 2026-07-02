@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_plain_comp_dot_fail { -- err }
+  " bad %zd" 123 logf
+end

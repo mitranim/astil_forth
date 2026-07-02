@@ -17,13 +17,13 @@ fun: read_req { conn buf cap -- len err }
   0 { len }
 
   loop
-    conn buf cap read { wrote }
-    ifz wrote then len ret end
+    conn buf cap .read { wrote }
+    ifz wrote .then len .ret end
 
-    if wrote is_err_flag then
-      errno { code }
-      if code EINTR = then again end
-      code " unable to read request" os_err throw
+    if wrote .is_err_flag .then
+      .errno { code }
+      if code EINTR = .then again end
+      code " unable to read request" .os_err .throw
     end
 
     wrote +: len
@@ -34,50 +34,50 @@ fun: read_req { conn buf cap -- len err }
 end
 
 fun: respond_conn { conn -- err }
-  BUF_CAP alloca { buf }
-  conn buf BUF_CAP read_req try { len }
+  BUF_CAP .alloca { buf }
+  conn buf BUF_CAP .read_req .try { len }
 
-  " [srv] incoming request:" elog elf elf
-  STDERR buf len write_opt elf
+  " [srv] incoming request:" .elog .elf .elf
+  STDERR buf len .write_opt .elf
 
-  conn s" HTTP/1.1 200 OK"   write_all try conn write_eol try
-  conn s" Connection: close" write_all try conn write_eol try
-  conn                                          write_eol try
-  conn s" request echo:"     write_all try conn write_eol try conn write_eol try
-  conn buf len               write_all try conn write_eol try
+  conn s" HTTP/1.1 200 OK"   .write_all .try conn .write_eol .try
+  conn s" Connection: close" .write_all .try conn .write_eol .try
+  conn                                            .write_eol .try
+  conn s" request echo:"     .write_all .try conn .write_eol .try conn .write_eol .try
+  conn buf len               .write_all .try conn .write_eol .try
 
-  " [srv] echoed request back to client" elog elf
+  " [srv] echoed request back to client" .elog .elf
 end
 
 fun: handle_conn { conn -> }
-  respond_conn { err }
+  .respond_conn { err }
 
-  if err then
-    " [srv] unable to respond; error: %s" err elogf elf
+  if err .then
+    " [srv] unable to respond; error: %s" err .elogf .elf
   end
 
-  " [srv] closing connection" elog elf elf
+  " [srv] closing connection" .elog .elf .elf
 
-  if conn close is_err_flag then
-    errno " [srv] unable to close connection" os_err elog elf
+  if conn .close .is_err_flag .then
+    .errno " [srv] unable to close connection" .os_err .elog .elf
   end
 end
 
 fun: run { -- err }
-  " 2345"                     { port }
-  128                         { backlog }
-  instr' handle_conn          { handler }
-  port backlog net_listen try { sock }
+  " 2345"                       { port }
+  128                           { backlog }
+  instr' handle_conn            { handler }
+  port backlog .net_listen .try { sock }
 
-  " [srv] listening on http://localhost:%s" port elogf elf
+  " [srv] listening on http://localhost:%s" port .elogf .elf
 
-  sock handler net_accept_loop_threaded
-  sock sock_close \ Unreachable.
+  sock handler .net_accept_loop_threaded
+  sock .sock_close \ Unreachable.
 end
 
 fun: main { -- exit }
-  run { err }
-  ifz err then 0 else " error: %s" err elogf elf 1 end
+  .run { err }
+  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end
 
-main
+.run

@@ -3,7 +3,7 @@
 <dict>
   <key>scope</key>
   <string>
-    variable.declaration.astil_forth - meta.colon
+    variable.declaration.astil_forth
   </string>
   <key>settings</key>
   <dict>

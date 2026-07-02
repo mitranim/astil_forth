@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: test_dot_call_plain_fmtf_fail { -- err }
+  stdout " bad" fmtf
+end

@@ -4,24 +4,21 @@ fun: fib { ind -- out }
   0 1 { prev next }
   loop
     dec: ind
-    ind >=0 while
+    ind >=0 .while
     prev next + next { next prev }
   end
   next
 end
 
 fun: run
-  1 20 lsl { ind }
+  1 20 .lsl { ind }
   loop
     dec: ind
-    ind >=0 while
-    91 fib { -- }
+    ind >=0 .while
+    91 .fib { -- }
   end
-  \ 91 fib log_int lf
+  \ 91 .fib .log_int .lf
 end
+.run
 
-fun: main { -- exit }
-  run
-  0
-end
-run
+fun: main { -- exit } .run 0 end

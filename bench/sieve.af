@@ -7,17 +7,17 @@ use' lang.af
 CAP  mem: FLAGS
 
 fun: find_prime { flags cap -- num }
-  flags cap 1 memfill
+  flags cap 1 .memfill
   flags cap + 0 3 { ceil num step }
   flags { ptr0 }
 
   loop
-    ptr0 ceil < while
-    if ptr0 @u8 then
+    ptr0 ceil < .while
+    if ptr0 @u8 .then
       ptr0 step + { ptr1 }
 
       loop
-        ptr1 ceil < while
+        ptr1 ceil < .while
         0 ptr1 !8
         step +: ptr1
       end
@@ -33,19 +33,15 @@ fun: find_prime { flags cap -- num }
 end
 
 fun: run
-  \ FLAGS CAP find_prime log_int lf
+  \ FLAGS CAP .find_prime .log_int .lf
 
   RUNS { ind }
   loop
     dec: ind
-    ind >=0 while
-    FLAGS CAP find_prime { -- }
+    ind >=0 .while
+    FLAGS CAP .find_prime { -- }
   end
-
 end
+.run
 
-fun: main { -- exit }
-  run
-  0
-end
-run
+fun: main { -- exit } .run 0 end

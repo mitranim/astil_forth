@@ -1155,6 +1155,7 @@ static Err asm_append_call_norm(
   try(asm_append_try_catch(comp, caller, callee, err_mode));
 #else
   (void)err_mode;
+  (void)caller;
 #endif
 
   IF_DEBUG(eprintf(

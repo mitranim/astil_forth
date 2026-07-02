@@ -166,7 +166,7 @@ static Err interp_validate_redefinition(
   if (had) {
     return errf(
       "word " FMT_QUOTED
-      " already defined in wordlist %d (%s); hint: use `[ redefine ]` to replace it",
+      " already defined in wordlist %d (%s); hint: use `[ .redefine ]` to replace it",
       name,
       wordlist,
       wordlist_name(wordlist)
@@ -174,8 +174,8 @@ static Err interp_validate_redefinition(
   }
 
   return errf(
-    "redundant `redefine` marker in word " FMT_QUOTED
-    " which is not previously defined in wordlist %d (%s)",
+    "redundant `.redefine` marker in word " FMT_QUOTED
+    " which is not currently defined in wordlist %d (%s)",
     name,
     wordlist,
     wordlist_name(wordlist)
@@ -294,6 +294,17 @@ static Err err_word_undefined(const char *name) {
   return errf("undefined word " FMT_QUOTED, name);
 }
 
+static Err err_dot_call_undefined(
+  const char *source_name, const char *lookup_name
+) {
+  return errf(
+    "undefined dot-call " FMT_QUOTED ": lookup name " FMT_QUOTED
+    " was not found",
+    source_name,
+    lookup_name
+  );
+}
+
 static Err err_word_undefined_in_wordlist(const char *name, Wordlist list) {
   return errf(
     "word " FMT_QUOTED " not found in wordlist %d (%s)",
@@ -311,12 +322,71 @@ static Err err_word_comp_only(const char *name) {
   return errf("word " FMT_QUOTED " is compile-time only", name);
 }
 
+static Err err_dot_call_local(const char *source_name, const char *lookup_name) {
+  return errf(
+    "invalid dot-call " FMT_QUOTED ": " FMT_QUOTED
+    " is a local, and locals are ident-like; use " FMT_QUOTED,
+    source_name,
+    lookup_name,
+    lookup_name
+  );
+}
+
+static Err err_dot_call_empty() {
+  return errf(
+    "invalid empty dot-call `.`: missing name; hint: use `.show` to print a number"
+  );
+}
+
+static Err err_plain_call_dot(const char *source_name, const char *lookup_name) {
+  return errf(
+    "invalid plain call " FMT_QUOTED ": use `.%s`", source_name, lookup_name
+  );
+}
+
+static Err err_dot_call_plain(const char *source_name, const char *lookup_name) {
+  return errf(
+    "invalid dot-call " FMT_QUOTED ": use " FMT_QUOTED, source_name, lookup_name
+  );
+}
+
+static Err err_dot_call_redundant(
+  const char *source_name, const char *lookup_name
+) {
+  return errf(
+    "invalid dot-call " FMT_QUOTED ": " FMT_QUOTED
+    " is already call-like; use " FMT_QUOTED,
+    source_name,
+    lookup_name,
+    lookup_name
+  );
+}
+
+static Err interp_validate_call_syntax(
+  const char *source_name, const char *lookup_name, bool dot_call, const Sym *sym
+) {
+  if (!is_word_ident_like(sym->name)) {
+    if (dot_call) return err_dot_call_redundant(source_name, lookup_name);
+    return nullptr;
+  }
+
+  if (dot_call) {
+    if (sym->plain_call) return err_dot_call_plain(source_name, lookup_name);
+    return nullptr;
+  }
+
+  if (!sym->plain_call) return err_plain_call_dot(source_name, lookup_name);
+  return nullptr;
+}
+
 static Err interp_word(Interp *interp, Word_str word) {
   const auto dict_exec = &interp->dict_exec;
   const auto dict_comp = &interp->dict_comp;
   const auto comp      = &interp->comp;
   const auto ctx       = &comp->ctx;
-  const auto name      = word.buf;
+
+#ifdef CALL_CONV_STACK
+  const auto name = word.buf;
 
   if (ctx->compiling) {
     const auto loc = comp_local_get(comp, name);
@@ -341,6 +411,51 @@ static Err interp_word(Interp *interp, Word_str word) {
   }
 
   return err_word_undefined(name);
+#else
+  const auto source_name = word.buf;
+  const auto dot_call    = source_name[0] == '.';
+  const auto lookup_name = dot_call ? source_name + 1 : source_name;
+  if (dot_call && !lookup_name[0]) return err_dot_call_empty();
+
+  if (ctx->compiling) {
+    const auto loc = comp_local_get(comp, lookup_name);
+    if (loc) {
+      if (dot_call) return err_dot_call_local(source_name, lookup_name);
+      return comp_append_push_from_local(comp, loc);
+    }
+
+    auto sym = dict_get(dict_comp, lookup_name);
+    if (sym) {
+      try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
+      return interp_call_sym(interp, sym);
+    }
+
+    sym = dict_get(dict_exec, lookup_name);
+    if (sym) {
+      try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
+      return comp_append_call_sym(comp, sym);
+    }
+
+    if (dot_call) return err_dot_call_undefined(source_name, lookup_name);
+    return err_word_undefined(lookup_name);
+  }
+
+  auto sym = dict_get(dict_exec, lookup_name);
+  if (sym) {
+    try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
+    return interp_call_sym(interp, sym);
+  }
+
+  sym = dict_get(dict_comp, lookup_name);
+  if (sym) {
+    try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
+    if (sym->comp_only && !ctx->sym) return err_word_comp_only(lookup_name);
+    return interp_call_sym(interp, sym);
+  }
+
+  if (dot_call) return err_dot_call_undefined(source_name, lookup_name);
+  return err_word_undefined(lookup_name);
+#endif // CALL_CONV_STACK
 }
 
 static Err read_interp_word(Interp *interp) {
@@ -584,19 +699,16 @@ static Err interp_read_word(Interp *interp, Word_str *out) {
   return nullptr;
 }
 
-static Err err_sym_out_bounds(const Sym *floor, const Sym *ceil, const Sym *val) {
+static Err err_sym_invalid(const Sym *floor, const Sym *top, const Sym *val) {
   return errf(
-    "expected a word address between %p and %p; got an out of bounds value: %p",
-    floor,
-    ceil,
-    val
+    "invalid word address %p: expected address in range [%p, %p)", val, floor, top
   );
 }
 
 static Err interp_validate_sym_ptr(Interp *interp, Sym *sym) {
   const auto syms = &interp->syms;
-  if (sym >= syms->floor && sym < syms->ceil) return nullptr;
-  return err_sym_out_bounds(syms->floor, syms->ceil, sym);
+  if (is_stack_elem(syms, sym)) return nullptr;
+  return err_sym_invalid(syms->floor, syms->top, sym);
 }
 
 static Err interp_sym_by_ptr(Interp *interp, Sint ptr, Sym **out) {
@@ -654,6 +766,10 @@ static Err interp_extern_adr(Interp *interp, const char *name) {
 static Err interp_extern_fun(
   Interp *interp, const char *name, Sint inp_len, Sint out_len
 ) {
+#ifndef CALL_CONV_STACK
+  try(comp_validate_word_name(name));
+#endif // CALL_CONV_STACK
+
   void *ext_adr;
   try(find_extern(name, &ext_adr));
 

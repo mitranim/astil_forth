@@ -6,40 +6,40 @@ use' lang.af
 
 \ adc Xd, Xn, Xm
 fun: asm_adc_reg { Xd Xn Xm -- instr }
-  Xd Xn Xm asm_pattern_arith_reg
-  0b1_0_0_11010000_00000_000000_00000_00000 or
+  Xd Xn Xm .asm_pattern_arith_reg
+  0b1_0_0_11010000_00000_000000_00000_00000 .or
 end
 
 fun: fib { _depth -- lo hi } [
-  0 comp_realloc_reg
-  1 comp_realloc_reg
-  2 comp_realloc_reg
-  3 comp_realloc_reg
-  4 comp_realloc_reg
-  5 comp_realloc_reg
-  6 comp_realloc_reg
+  0 .comp_realloc_reg
+  1 .comp_realloc_reg
+  2 .comp_realloc_reg
+  3 .comp_realloc_reg
+  4 .comp_realloc_reg
+  5 .comp_realloc_reg
+  6 .comp_realloc_reg
 
-  4 0   asm_mov_reg  comp_instr \ mov  x4, x0
-  0 1   asm_mov_imm  comp_instr \ mov  x0, 1
-  1     asm_zero_reg comp_instr \ eor  x1, x1, x1
-  2     asm_zero_reg comp_instr \ eor  x2, x2, x2
-  3     asm_zero_reg comp_instr \ eor  x3, x3, x3
-  5 0   asm_mov_reg  comp_instr \ mov  x5, x0 -- <loop>
-  6 1   asm_mov_reg  comp_instr \ mov  x6, x1
-  0 0 2 asm_adds_reg comp_instr \ adds x0, x0, x2
-  1 1 3 asm_adc_reg  comp_instr \ adc  x1, x1, x3
-  2 5   asm_mov_reg  comp_instr \ mov  x2, x5
-  3 6   asm_mov_reg  comp_instr \ mov  x3, x6
-  4 4 1 asm_sub_imm  comp_instr \ sub  x4, x4, 1
-  4 -28 asm_cbnz     comp_instr \ cbnz x4, <loop>
+  4 0   .asm_mov_reg  .comp_instr \ mov  x4, x0
+  0 1   .asm_mov_imm  .comp_instr \ mov  x0, 1
+  1     .asm_zero_reg .comp_instr \ eor  x1, x1, x1
+  2     .asm_zero_reg .comp_instr \ eor  x2, x2, x2
+  3     .asm_zero_reg .comp_instr \ eor  x3, x3, x3
+  5 0   .asm_mov_reg  .comp_instr \ mov  x5, x0 -- <loop>
+  6 1   .asm_mov_reg  .comp_instr \ mov  x6, x1
+  0 0 2 .asm_adds_reg .comp_instr \ adds x0, x0, x2
+  1 1 3 .asm_adc_reg  .comp_instr \ adc  x1, x1, x3
+  2 5   .asm_mov_reg  .comp_instr \ mov  x2, x5
+  3 6   .asm_mov_reg  .comp_instr \ mov  x3, x6
+  4 4 1 .asm_sub_imm  .comp_instr \ sub  x4, x4, 1
+  4 -28 .asm_cbnz     .comp_instr \ cbnz x4, <loop>
 
-  2 comp_args_set
+  2 .comp_args_set
 ] end
 
 fun: bigint_divmod10_step { quo bit rem -- quo rem }
-  rem 1 lsl bit + { rem }
-  quo 1 lsl { quo }
-  if rem 10 >= then
+  rem 1 .lsl bit + { rem }
+  quo 1 .lsl { quo }
+  if rem 10 >= .then
     rem 10 - { rem }
     inc: quo
   end
@@ -48,66 +48,61 @@ end
 
 fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   0 0 0 { qlo qhi rem }
-
   hi { word }
   64 { ind }
   loop
     dec: ind
-    ind >=0 while
-    qhi word 63 lsr rem bigint_divmod10_step { qhi rem }
-    word 1 lsl { word }
+    ind >=0 .while
+    qhi word 63 .lsr rem .bigint_divmod10_step { qhi rem }
+    word 1 .lsl { word }
   end
 
   lo { word }
   64 { ind }
   loop
     dec: ind
-    ind >=0 while
-    qlo word 63 lsr rem bigint_divmod10_step { qlo rem }
-    word 1 lsl { word }
+    ind >=0 .while
+    qlo word 63 .lsr rem .bigint_divmod10_step { qlo rem }
+    word 1 .lsl { word }
   end
 
   qlo qhi rem
 end
 
 fun: bigint_log_decimal { lo hi }
-  40 alloca { buf }
+  40 .alloca { buf }
   buf 40 +  { ptr }
-
-  ifz lo hi or then
-    48 logc
-    ret
+  ifz lo hi .or .then
+    48 .logc
+    .ret
   end
 
   loop
-    lo hi bigint_divmod10 { qlo qhi rem }
+    lo hi .bigint_divmod10 { qlo qhi rem }
     dec: ptr
     rem 48 + ptr !8
     qlo { lo }
     qhi { hi }
-    ifz lo hi or then leave end
+    ifz lo hi .or .then leave end
   end
 
   ptr { pos }
   loop
-    pos buf 40 + < while
-    pos @u8 logc
+    pos buf 40 + < .while
+    pos @u8 .logc
     inc: pos
   end
 end
 
 fun: run
-  1 18 lsl { ind }
+  1 18 .lsl { ind }
   loop
     dec: ind
-    ind >=0 while
-    184 fib { -- }
+    ind >=0 .while
+    184 .fib { -- }
   end
-  \ 184 fib bigint_log_decimal lf
+  \ 184 .fib .bigint_log_decimal .lf
 end
+.run
 
-fun: main { -- exit }
-  run
-  0
-end
-run
+fun: main { -- exit } .run 0 end

@@ -1,5 +1,5 @@
 use' ../../lang.af
 
 fun: test_cond_arity_no_else_fail { -- out }
-  if false then 10 elif true then 20 end
+  if false .then 10 elif true .then 20 end
 end

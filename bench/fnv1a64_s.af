@@ -38,7 +38,7 @@ fun: run
     BUF CAP fnv1a64
   end
   { hash }
-  " FNV1A64_PRINT" getenv if then " 0x%zx" hash [ 1 ] logf lf end
+  if " FNV1A64_PRINT" getenv then " 0x%zx" hash [ 1 ] logf lf end
   if hash WANT <> then " assertion failed: hash WANT =" throw end
 end
 run

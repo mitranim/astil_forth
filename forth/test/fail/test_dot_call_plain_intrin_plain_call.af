@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun_comp: test_dot_call_plain_intrin_plain_call_fail { -- err }
+  [ plain_call ]
+end

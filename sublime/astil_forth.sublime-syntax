@@ -10,32 +10,32 @@ variables:
   comment_block_begin: \(
   comment_block_end: \)
   md_heading: (?:\s*((#+)\s+.*?)(?={{eol}}))
-  delim: \(\)\[\]\{\}
   num_begin: '{{word_begin}}'
   num_end: '{{word_end}}'
   int_bin: '[0-1][0-1_]*'
   int_oct: '[0-7][0-7_]*'
   int_dec: '[0-9][0-9_]*'
-  int_hex: '[0-9a-f][0-9a-f_]*'
-  exponent: 'e[+-]?'
-  mod: \# # Conventional modifier prefix for custom control words.
+  int_hex: '[0-9A-Fa-f][0-9A-Fa-f_]*'
+  exponent: '[eE][+-]?'
+  mod: \# # Conventional modifier prefix for non-well-known comptime words.
   tick: \'
+  punct_chars: \.\,\;
+  delim_chars: \(\)\[\]\{\}
+  edge_chars: '{{punct_chars}}{{delim_chars}}'
   word_begin: '(?<=^|\s)'
   word_end: '(?=\s|$)'
   word: '(?:\S+)'
-  param: '[^\s"{{tick}}]+'
+  call_body: '[^{{edge_chars}}\s](?:\S*?[^{{edge_chars}}\s])?'
   parens_param: '(?:[^\s()]+)'
   braces_param: '(?:[^\s{}]+)'
   brace_params_pre: (?:stack)
-  declarator: '[^\s"{{tick}}{{delim}}]+'
+  declarator: '[^\s"{{tick}}{{delim_chars}}]+'
   keyword: |-
     (?x:
-      ret|recur|
-      if|ifz|then|else|elif|elifz|do|end|
-      loop|for|while|leave|again|
-      throw|throwf|throw[_]{{word}}|{{word}}[_]throw|
-      try|try[_]{{word}}|{{word}}[_]try|catch|
-      assert|assert{{word}}|abort|unreachable|fatal|quit|exit
+      if|ifz|elif|elifz|else|
+      loop|leave|again|
+      assert|
+      end
     )
 
 contexts:
@@ -45,16 +45,18 @@ contexts:
   main:
     - include: number-match
     - include: string-match
-    - include: semi-match
-    - include: colon-match
     - include: braces-params-match
     - include: declaring-word-match
-    - include: parsing-word-match
-    - include: delimited-word-match
+    - include: parsing-word-ticked-match
     - include: modified-word-match
     - include: constant-match
     - include: keyword-match
-    - include: any-word-match
+    - include: edge-word-empty-match
+    - include: edge-word-mixed-match
+    - include: edge-word-punct-match
+    - include: edge-word-delim-match
+    - include: ident-like-word-match
+    - include: call-like-word-match
 
   comment-match:
     - include: comment-line-match
@@ -107,7 +109,7 @@ contexts:
     - include: number-hex
 
   number-bin:
-    - match: '{{num_begin}}(?i)([+-])?(0b){{int_bin}}(?:(\.){{int_bin}})?(?:({{exponent}}){{int_bin}})?{{num_end}}'
+    - match: '{{num_begin}}(\+)?(0b)_*{{int_bin}}(?:(\.){{int_bin}})?(?:({{exponent}}){{int_bin}})?{{num_end}}'
       scope: constant.numeric.binary.astil_forth
       captures:
         1: keyword.operator.arithmetic.astil_forth
@@ -116,7 +118,7 @@ contexts:
         4: punctuation.separator.exponent.astil_forth
 
   number-oct:
-    - match: '{{num_begin}}(?i)([+-])?(0o)(?:{{int_oct}}(?:(\.){{int_oct}})?)?(?:({{exponent}}){{int_oct}})?{{num_end}}'
+    - match: '{{num_begin}}(\+)?(0o)_*{{int_oct}}(?:(\.){{int_oct}})?(?:({{exponent}}){{int_oct}})?{{num_end}}'
       scope: constant.numeric.octal.astil_forth
       captures:
         1: keyword.operator.arithmetic.astil_forth
@@ -125,7 +127,7 @@ contexts:
         4: punctuation.separator.exponent.astil_forth
 
   number-dec:
-    - match: '{{num_begin}}(?i)([+-])?{{int_dec}}(?:(\.){{int_dec}})?(?:({{exponent}}){{int_dec}})?{{num_end}}'
+    - match: '{{num_begin}}([+-])?{{int_dec}}(?:(\.){{int_dec}})?(?:({{exponent}}){{int_dec}})?{{num_end}}'
       scope: constant.numeric.astil_forth
       captures:
         1: keyword.operator.arithmetic.astil_forth
@@ -133,7 +135,7 @@ contexts:
         3: punctuation.separator.exponent.astil_forth
 
   number-hex:
-    - match: '{{num_begin}}(?i)([+-])?(0x)(?:{{int_hex}}(?:(\.){{int_hex}})?)?{{num_end}}'
+    - match: '{{num_begin}}(\+)?(0x)_*{{int_hex}}(?:(\.){{int_hex}})?{{num_end}}'
       scope: constant.numeric.hexadecimal.astil_forth
       captures:
         1: keyword.operator.arithmetic.astil_forth
@@ -150,28 +152,10 @@ contexts:
   #   <beg>""  <string content>""<end>
   #   <beg>""" <string content>"""<end>
   string-double-match:
-    - include: string-double-keyword-match
-    - include: string-double-other-match
-
-  string-double-keyword-match:
-    - match: '{{word_begin}}({{mod}})([^\s"]*)("+){{word_end}}(?:\s)'
-      captures:
-        1: storage.modifier.astil_forth
-        2: variable.function.astil_forth
-        3: punctuation.definition.string.begin.astil_forth
-      push: string-pop
-    - match: '{{word_begin}}({{mod}})?({{keyword}})("+){{word_end}}(?:\s)'
-      captures:
-        1: storage.modifier.astil_forth
-        2: variable.function.astil_forth
-        3: punctuation.definition.string.begin.astil_forth
-      push: string-pop
-
-  string-double-other-match:
     - match: '{{word_begin}}({{mod}})?([^\s"]*)("+){{word_end}}(?:\s)'
       captures:
         1: storage.modifier.astil_forth
-        2: variable.other.astil_forth
+        2: variable.function.astil_forth
         3: punctuation.definition.string.begin.astil_forth
       push: string-pop
 
@@ -184,7 +168,7 @@ contexts:
     - match: '{{word_begin}}({{mod}})?([^\s`]*)(`+){{word_end}}(?:\s)'
       captures:
         1: storage.modifier.astil_forth
-        2: variable.other.astil_forth
+        2: variable.function.astil_forth
         3: punctuation.definition.string.begin.astil_forth
       push: string-pop
 
@@ -196,58 +180,6 @@ contexts:
         1: punctuation.definition.string.end.astil_forth
         2: variable.other.astil_forth
       pop: 1
-    # - include: str-escape-match
-
-  # str-escape-match:
-  #   - match: \\(?:.|\n)
-  #     scope: constant.character.escape.mox
-
-  semi-match:
-    - match: '{{word_begin}};{{word_end}}'
-      scope: punctuation.terminator.astil_forth
-
-  # Somewhat deprecated. TODO consider removing all "colon" stuff.
-  colon-match:
-    - match: '{{word_begin}}:+{{word_end}}'
-      scope: keyword.declaration.function.astil_forth
-      push: [colon-meta-pop, colon-body-pop, colon-params-pop, colon-name-pop]
-
-  colon-name-pop:
-    - meta_include_prototype: false
-    - meta_scope: meta.declaration.astil_forth
-    - match: '{{word_begin}}{{word}}{{word_end}}'
-      scope: entity.name.function.astil_forth
-      pop: 1
-    # When typing new definitions, this prevents an opening colon
-    # from "declaring" an unrelated word on a subsequent line.
-    - match: '{{eol}}'
-      pop: 3
-
-  colon-params-pop:
-    - meta_include_prototype: false
-    - include: comment-line-match
-    # - include: params-match
-    - include: nonblank-pop
-
-  colon-body-pop:
-    - match: '{{word_begin}};{{word_end}}'
-      scope: punctuation.terminator.astil_forth
-      pop: 1
-    - include: main
-
-  # The meta scope makes it so that `expand_selection {"to": "scope"}`
-  # can select the entire colon definition. Unfortunately we're unable
-  # to use this trick for `fun: name end` definitions because we can't
-  # special-case all openers which are terminated by `end`.
-  colon-meta-pop:
-    - meta_scope: meta.colon.astil_forth
-    - match: ''
-      pop: 1
-
-  # Redundant, TODO cleanup.
-  # params-match:
-  #   - include: parens-params-match
-  #   - include: braces-params-match
 
   parens-params-match:
     - match: '{{word_begin}}\({{word_end}}'
@@ -321,19 +253,6 @@ contexts:
   # Support the convention where immediate words with a trailing apostrophe are
   # expected to read the very next word in the source text, and do something
   # with it. We scope the next word as a string to clarify its semantic role.
-  parsing-word-match:
-    - include: parsing-word-bracketed-ticked-match
-    - include: parsing-word-ticked-match
-
-  parsing-word-bracketed-ticked-match:
-    - match: '{{word_begin}}(\[+)[^\s"]*?({{tick}}+)(\]+){{word_end}}'
-      scope: variable.function.astil_forth
-      captures:
-        1: storage.modifier.astil_forth
-        2: storage.modifier.astil_forth
-        3: storage.modifier.astil_forth
-      push: parse-word-pop
-
   parsing-word-ticked-match:
     - match: '{{word_begin}}({{mod}})?[^\s{{tick}}"]*?({{tick}}+){{word_end}}'
       scope: variable.function.astil_forth
@@ -350,26 +269,6 @@ contexts:
       scope: string.other.astil_forth
       pop: 1
 
-  delimited-word-match:
-    - include: bracketed-word-match
-    - match: '{{word_begin}}([{{delim}}]+)([^\s{{delim}}]*){{word_end}}'
-      captures:
-        1: punctuation.section.astil_forth
-        2: variable.other.astil_forth
-    - match: '{{word_begin}}([{{delim}}]*)([^\s{{delim}}]*?)([{{delim}}]+){{word_end}}'
-      captures:
-        1: punctuation.section.astil_forth
-        2: variable.other.astil_forth
-        3: punctuation.section.astil_forth
-
-  # Support the common convention of `[bracketed]` words.
-  bracketed-word-match:
-    - match: '{{word_begin}}(\[+)\S*(\]+){{word_end}}'
-      scope: variable.function.astil_forth
-      captures:
-        1: storage.modifier.astil_forth
-        2: storage.modifier.astil_forth
-
   modified-word-match:
     - match: '{{word_begin}}({{mod}})\S+{{word_end}}'
       scope: variable.function.astil_forth
@@ -384,9 +283,57 @@ contexts:
     - match: '{{word_begin}}{{keyword}}{{word_end}}'
       scope: variable.function.astil_forth
 
-  any-word-match:
-    - match: '{{word_begin}}{{word}}{{word_end}}'
+  edge-word-empty-match:
+    - match: '{{word_begin}}[{{punct_chars}}]+{{word_end}}'
+      scope: punctuation.terminator.astil_forth
+    - match: '{{word_begin}}[{{delim_chars}}]+{{word_end}}'
+      scope: punctuation.section.astil_forth
+    - match: '{{word_begin}}[{{edge_chars}}]+{{word_end}}'
+      scope: punctuation.section.astil_forth
+
+  edge-word-mixed-match:
+    - match: '{{word_begin}}([{{punct_chars}}]+)({{call_body}})([{{delim_chars}}]+){{word_end}}'
+      captures:
+        1: punctuation.terminator.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.section.astil_forth
+    - match: '{{word_begin}}([{{delim_chars}}]+)({{call_body}})([{{punct_chars}}]+){{word_end}}'
+      captures:
+        1: punctuation.section.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.terminator.astil_forth
+
+  edge-word-punct-match:
+    - match: '{{word_begin}}([{{punct_chars}}]+)({{call_body}})([{{punct_chars}}]*){{word_end}}'
+      captures:
+        1: punctuation.terminator.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.terminator.astil_forth
+    - match: '{{word_begin}}([{{punct_chars}}]*)({{call_body}})([{{punct_chars}}]+){{word_end}}'
+      captures:
+        1: punctuation.terminator.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.terminator.astil_forth
+
+  edge-word-delim-match:
+    - match: '{{word_begin}}([{{delim_chars}}]+)({{call_body}})([{{delim_chars}}]*){{word_end}}'
+      captures:
+        1: punctuation.section.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.section.astil_forth
+    - match: '{{word_begin}}([{{delim_chars}}]*)({{call_body}})([{{delim_chars}}]+){{word_end}}'
+      captures:
+        1: punctuation.section.astil_forth
+        2: variable.function.astil_forth
+        3: punctuation.section.astil_forth
+
+  ident-like-word-match:
+    - match: '{{word_begin}}[A-Za-z_][A-Za-z0-9_]*{{word_end}}'
       scope: variable.other.astil_forth
+
+  call-like-word-match:
+    - match: '{{word_begin}}{{word}}{{word_end}}'
+      scope: variable.function.astil_forth
 
   now-pop:
     - match: ''
@@ -394,8 +341,4 @@ contexts:
 
   nonblank-pop:
     - match: (?=\S)
-      pop: 1
-
-  eol-pop:
-    - match: '{{eol}}'
       pop: 1

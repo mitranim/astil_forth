@@ -231,12 +231,12 @@ We can pass callbacks to `libc` and they just work. A C program could declare
 a function type such as, for example, `Err Func(intptr_t)`, obtain a pointer
 to a Forth word with that signature, and call it as-is, without glue.
 
-We also provide shortcuts `try throw` for returning an error locally,
-very similar to Swift, and our own unique setting `try_all` setting,
-causes the compiler to implicitly insert "try" for errors, reducing
-error-handling noise; it's opt-in and keeps errors in signatures.
+We also provide shortcuts `.try` / `.throw` for returning an error locally,
+very similar to Swift. We also provide an opt-in `.try_all` setting, which
+causes the compiler to implicitly insert `.try` for errors, reducing noise.
+It still keeps errors in word signatures, which always reflect word ABI.
 
-The cost of "try" here is between 1 and 3 instructions on Arm64.
+The cost of `.try` here is between 1 and 3 instructions on Arm64.
 */
 static void asm_append_try(
   Comp *comp,
@@ -250,7 +250,7 @@ static void asm_append_try(
   }
 
   /*
-  Most of the time, "try" happens against multiple outputs,
+  Most of the time, `.try` happens against multiple outputs,
   where the last output is an error. When testing an error,
   we are not allowed to clobber any prior outputs. However,
   if the target error register is higher, we can renumerate

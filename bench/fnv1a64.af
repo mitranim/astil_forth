@@ -11,43 +11,43 @@ CAP   mem: BUF
 
 1 1 extern: getenv
 
-fun: init
-  s" 0123456789abcdef" { chunk len }
-  BUF { ptr }
+fun: init { buf cap }
+  s" 0123456789abcdef" { src len }
+  buf cap + { ceil }
   0 { ind }
   loop
-    ptr BUF CAP + < while
-    chunk ind len mod + @u8 ptr !8
-    inc: ptr
+    buf ceil < .while
+    src ind len .mod + @b buf !b
+    inc: buf
     inc: ind
   end
 end
 
-fun: fnv1a64 { hash buf len -- out }
-  buf { ptr }
-  loop
-    ptr buf len + < while
-    hash ptr @u8 xor PRIME * { hash }
-    inc: ptr
-  end
+fun: fnv1a64 { hash buf len -- hash }
+  buf len + { ceil }
   hash
+  loop
+    buf ceil < .while
+    buf @b .xor PRIME *
+    inc: buf
+  end
 end
 
 fun: run { -- err }
-  init
+  BUF CAP .init
   OFFSET { hash }
   RUNS { runs }
   loop
     dec: runs
-    runs >=0 while
-    hash BUF CAP fnv1a64 { hash }
+    runs >=0 .while
+    hash BUF CAP .fnv1a64 { hash }
   end
-  " FNV1A64_PRINT" getenv if then " 0x%zx" hash logf lf end
-  assert hash WANT = end
+  if " FNV1A64_PRINT" .getenv .then " 0x%zx" hash .logf .lf end
+  assert= hash WANT end
 end
+.run
 
 fun: main { -- exit }
-  run { err }
-  ifz err then 0 else " error: %s" err elogf elf 1 end
+  .run { err }
+  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end
-run
