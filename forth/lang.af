@@ -260,6 +260,11 @@ fun: =0 { int -> bool } [
 
 \ ## Assembler: instruction patterns
 
+\ Arm64 instructions are 32-bit; PC-relative offsets tend
+\ to be encoded in packed form: implicitly times 4.
+fun: instr_off_pack   { off -> packed } 2 .lsr end
+fun: instr_off_unpack { packed -> off } 2 .lsl end
+
 \ Shared by a lot of load and store instructions. 64-bit only.
 fun: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
   Xt2 10 .lsl { Xt2 }
@@ -301,16 +306,14 @@ fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
   Xd Xn Xm .asm_pattern_arith_reg cond .or
 end
 
-fun: instr_off_unpack { packed -> off } 2 .lsr end
-
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
-  off19 .instr_off_unpack 19 .bits_trunc 5 .lsl Xt .or
+  off19 .instr_off_pack 19 .bits_trunc 5 .lsl Xt .or
 end
 
 \ `off9` offset is implicitly times 4 and can be negative.
 fun: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
-  off9 .instr_off_unpack 9 .bits_trunc 5 .lsl { off9 }
+  off9 .instr_off_pack 9 .bits_trunc 5 .lsl { off9 }
   cond 21 .lsl Xt .or off9 .or
 end
 
@@ -629,14 +632,14 @@ end
 
 \ b <off>
 fun: asm_branch { off26 -> instr }
-  .instr_off_unpack \ Offset is implicitly times 4.
-  26 .bits_trunc    \ Offset may be negative.
+  .instr_off_pack \ Offset is implicitly times 4.
+  26 .bits_trunc  \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 .or
 end
 
 \ b.<cond> <off>
 fun: asm_branch_cond { off19 cond -- instr }
-  off19 .instr_off_unpack 19 .bits_trunc 5 .lsl \ Implicitly times 4.
+  off19 .instr_off_pack 19 .bits_trunc 5 .lsl
   cond .or 0b010_101_00_0000000000000000000_0_0000 .or
 end
 
@@ -1134,7 +1137,7 @@ fun: -cell { adr -> adr } -cell end
 
 \ tbz Xt, #bit, #imm14
 fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
-  imm14 .instr_off_unpack 14 .bits_trunc 5 .lsl { imm14 } \ Implicitly times 4.
+  imm14 .instr_off_pack 14 .bits_trunc 5 .lsl { imm14 }
   bit 5 .lsr 31 .lsl { b5 }
   bit 5 .bits_trunc 19 .lsl \ b40
   Xt .or imm14 .or b5 .or
@@ -1144,7 +1147,7 @@ end
 \ adr Xd, #imm21
 fun: asm_adr { Xd imm21 -- instr }
   imm21 0b11 .and { low }
-  imm21 .instr_off_unpack 19 .bits_trunc 5 .lsl { high }
+  imm21 .instr_off_pack 19 .bits_trunc 5 .lsl { high }
   high low .or Xd .or
   0b0_00_100_00_0000000000000000000_00000 .or
 end
@@ -1157,7 +1160,7 @@ end
 \
 \ Requires caution to avoid messing up the link register.
 fun: asm_branch_link_off { imm26 -> instr }
-  .instr_off_unpack 26 .bits_trunc \ Implicitly times 4.
+  .instr_off_pack 26 .bits_trunc
   0b100_101_00000000000000000000000000 .or
 end
 
@@ -1958,7 +1961,7 @@ CONT_MASK_CBNZ 1 .lsl                    let: CONT_MASK_EXEC_PREV
 CONT_MASK_BRANCH_COND .bit_len .low_bits .invert let: CONT_MASK_INSTR_OFF
 
 fun: cont_meta_instr_off_set { off meta -- meta }
-  off 2 .lsl meta CONT_MASK_INSTR_OFF .bit_mask_set
+  off .instr_off_pack meta CONT_MASK_INSTR_OFF .bit_mask_set
 end
 
 fun: cont_meta_instr_adr { meta -> adr }
