@@ -409,6 +409,10 @@ I had a go, and bounced off the complexity. How to keep an optimizing compiler s
 
 ## Call syntax
 
+TLDR: nouns and verbs look distinct and the compiler enforces that.
+
+Longer version:
+
 Source code consists of whitespace-separated words. Aside from numeric literals, source words have two spelling classes:
 
 - Value-like spelling: `[A-Za-z_][A-Za-z0-9_]*`.
@@ -450,7 +454,7 @@ val .ret
 
 Examples of control-only words: `if ifz elif elifz else loop leave again assert end`. `leave` and `again` validate loop arity, but stay plain.
 
-In file root, `.ret` simply quits the current file. Inside a compiled word, `.ret` returns current args as outputs. Nullary return still requires a dot.
+In file root, `.ret` simply quits the current file. Inside a compiled word, `.ret` returns current args as outputs. Even nullary `.ret` requires a dot.
 
 The call syntax rules apply only to reg-CC (default/main language). Stack-CC doesn't have these nuances.
 

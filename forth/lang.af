@@ -807,7 +807,7 @@ fun: dec { i0 -> i1 } [ .redefine ] .dec end
 
 fun_comp: + { -- err } ASM_OP_ADD_REG .comp_args2_arith_reg end
 
-fun: + { i0 i1 -> i2 } [ .redefine ] + end
+\ fun: + { i0 i1 -> i2 } [ .redefine ] + end
 
 fun_comp: - { -- err } ASM_OP_SUB_REG .comp_args2_arith_reg end
 
@@ -2280,7 +2280,7 @@ end
 8 int: U64
 8 int: S64
 8 int: Adr
-8 int: Cell \ Classic Forth name for machine word. Interpreted as signed.
+8 int: Cell \ Forth name for machine word. Neither signed nor unsigned.
 8 int: Cstr \ char*
 4 int: Cint
 4 int: Cuint
@@ -3143,7 +3143,7 @@ fun_comp: or { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise or into a local: `mask or: some_val`.
+\ Bitwise `or` into a local: `mask or: some_val`.
 fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_ORR_REG ASM_OP_ORR_IMM
   instr' cf_logical_validate instr' cf_logical_emit
@@ -3159,7 +3159,7 @@ fun_comp: and { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise and into a local: `mask and: some_val`.
+\ Bitwise `and` into a local: `mask and: some_val`.
 fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_AND_REG ASM_OP_AND_IMM
   instr' cf_logical_validate instr' cf_logical_emit
@@ -3174,7 +3174,7 @@ fun_comp: xor { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise xor into a local: `mask xor: some_val`.
+\ Bitwise `xor` into a local: `mask xor: some_val`.
 fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_EOR_REG ASM_OP_EOR_IMM
   instr' cf_logical_validate instr' cf_logical_emit
@@ -3213,7 +3213,7 @@ fun_comp: + { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-\ Add a step to a local: `step +: some_val`.
+\ Add a value to a local: `val +: some_val`.
 fun_comp: +: { -- err } ( C: "name" -- ) ( E: imm -- )
   ASM_OP_ADD_REG true
   instr' cf_addsub_validate instr' cf_addsub_emit
@@ -3377,7 +3377,7 @@ fun_comp: pow2_ceil { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call_xt'' pow2_ceil end
 end
 
-\ Round local up to power of two: `pow2_ceil: some_val`.
+\ Round-up a local to a power of two: `pow2_ceil: some_val`.
 fun_comp: pow2_ceil: { -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_unary_init { reg loc }
   .comp_alloc_next_reg { tmp }
@@ -3449,7 +3449,7 @@ fun_comp: =0 { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then =0 .cf_fold_done else { -- } call_xt'' =0 end
 end
 
-\ Test local equals zero in place: `=0: some_val`.
+\ In-place local test: `=0: some_val`.
 fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_EQ .comp_loc_mut_cset_zero
 end
@@ -3458,7 +3458,7 @@ fun_comp: <>0 { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then <>0 .cf_fold_done else { -- } call_xt'' <>0 end
 end
 
-\ Test local not equal zero in place: `<>0: some_val`.
+\ In-place local test: `<>0: some_val`.
 fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_NE .comp_loc_mut_cset_zero
 end
@@ -3467,7 +3467,7 @@ fun_comp: <0 { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then <0 .cf_fold_done else { -- } call_xt'' <0 end
 end
 
-\ Test local less than zero in place: `<0: some_val`.
+\ In-place local test: `<0: some_val`.
 fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_LT .comp_loc_mut_cset_zero
 end
@@ -3476,7 +3476,7 @@ fun_comp: >0 { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then >0 .cf_fold_done else { -- } call_xt'' >0 end
 end
 
-\ Test local greater than zero in place: `>0: some_val`.
+\ In-place local test: `>0: some_val`.
 fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_GT .comp_loc_mut_cset_zero
 end
@@ -3485,7 +3485,7 @@ fun_comp: <=0 { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then <=0 .cf_fold_done else { -- } call_xt'' <=0 end
 end
 
-\ Test local less than or equal zero in place: `<=0: some_val`.
+\ In-place local test: `<=0: some_val`.
 fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_LE .comp_loc_mut_cset_zero
 end
@@ -3494,7 +3494,7 @@ fun_comp: >=0 { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then >=0 .cf_fold_done else { -- } call_xt'' >=0 end
 end
 
-\ Test local greater than or equal zero in place: `>=0: some_val`.
+\ In-place local test: `>=0: some_val`.
 fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_GE .comp_loc_mut_cset_zero
 end
@@ -3516,7 +3516,7 @@ fun_comp: = { -- err } [ .redefine ]
   xt' = xt'' = ASM_EQ .cf_cmp_fold2_or_call
 end
 
-\ Compare a local for equality in place: `rhs =: some_val`.
+\ In-place local test: `rhs =: some_val`.
 fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
   ASM_EQ instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
   .comp_loc_mut_cmp_imm
@@ -3526,7 +3526,7 @@ fun_comp: <> { -- err } [ .redefine ]
   xt' <> xt'' <> ASM_NE .cf_cmp_fold2_or_call
 end
 
-\ Compare a local for inequality in place: `rhs <>: some_val`.
+\ In-place local test: `rhs <>: some_val`.
 fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
   ASM_NE instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
   .comp_loc_mut_cmp_imm
@@ -3611,7 +3611,7 @@ end
 
 fun: odd { val -> bool } .odd end
 
-\ Test local oddness in place: `odd: some_val`.
+\ In-place local test: `odd: some_val`.
 fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_unary_init { reg loc }
   reg reg 1 .asm_and_imm .comp_instr \ and Xd, Xd, #1
@@ -3715,8 +3715,8 @@ end
 \ ## More memory stuff
 
 fun: comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
-  \ Peephole: replace immediately preceding `add Xn, Xn, #off` with a
-  \ load/store that has the offset in its addressing mode.
+  \ Peephole: replace immediately preceding `add Xn, Xn, #off`
+  \ with a load/store with an inline offset when it fits.
   .here_write ASM_INSTR_SIZE - { instr_adr }
   instr_adr .asm_add_imm_decode_at { Xd Xn0 off ok }
   ok Xd Xn = .and Xn0 Xn = .and { ok }
