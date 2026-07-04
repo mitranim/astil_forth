@@ -345,7 +345,7 @@ static Err comp_forget_reg(Comp *comp, U8 reg) {
   }
 
   comp_append_local_reloc_from_reg(comp, loc, reg);
-  IF_DEBUG(assert_fatal(loc->stable));
+  IF_DEBUG(try_assert(loc->stable));
   return nullptr;
 }
 
@@ -579,7 +579,7 @@ Also available as a compiler intrinsic, and is used
 by control flow structures in self-compilation.
 */
 static Err comp_append_push_from_local(Comp *comp, Local *loc) {
-  IF_DEBUG(assert_fatal(!!loc));
+  IF_DEBUG(try_assert(!!loc));
 
   const auto ctx = &comp->ctx;
   try(asm_validate_arg_reg(ctx->arg_len));
@@ -652,7 +652,7 @@ static Err comp_add_input_param(Comp *comp, Word_str name) {
   const auto ctx = &comp->ctx;
   const auto arg = &ctx->args[reg];
 
-  IF_DEBUG(assert_fatal(arg->type == COMP_ARG_UNKNOWN));
+  IF_DEBUG(try_assert(arg->type == COMP_ARG_UNKNOWN));
 
   *arg = comp_arg_local(loc);
   return nullptr;
@@ -730,7 +730,7 @@ static Err comp_after_append_call(
 }
 
 static Err comp_append_call_norm(Comp *comp, Sym *callee, bool auto_try) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_NORM));
+  IF_DEBUG(try_assert(callee->type == SYM_NORM));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -749,7 +749,7 @@ static Err comp_append_call_norm(Comp *comp, Sym *callee, bool auto_try) {
 }
 
 static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool auto_try) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
+  IF_DEBUG(try_assert(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
@@ -760,7 +760,7 @@ static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool auto_try) {
 }
 
 static Err comp_append_call_extern(Comp *comp, Sym *callee) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
+  IF_DEBUG(try_assert(callee->type == SYM_EXTERN));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -929,7 +929,7 @@ static Err comp_append_throw(Comp *comp, const Sym *sym) {
 
   const auto src_reg = ASM_PARAM_REG_0;
   const auto tar_reg = asm_sym_err_reg(sym);
-  assert_fatal(tar_reg >= 0);
+  try_assert(tar_reg >= 0);
 
   if (tar_reg != src_reg) {
     try(comp_register_clobber(comp, (U8)tar_reg));
@@ -949,7 +949,7 @@ static Err comp_check_unused_locals(Comp_ctx *ctx) {
   if (ctx->slop) return nullptr;
 
   const auto sym = ctx->sym;
-  assert_fatal(!!sym);
+  try_assert(!!sym);
 
   for (stack_range(auto, loc, &ctx->locals)) {
     if (loc->used) continue;

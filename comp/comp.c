@@ -451,7 +451,7 @@ static Err comp_sym_instr_range(
   const auto spans  = &sym->norm.spans;
 
   try(comp_code_ensure_sym_ready(code, sym));
-  assert_fatal(spans->ret >= spans->prologue);
+  try_assert(spans->ret >= spans->prologue);
 
   if (floor) *floor = &instrs->dat[spans->prologue];
   if (ceil) *ceil = &instrs->dat[spans->ret + 1];

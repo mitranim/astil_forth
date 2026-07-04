@@ -156,7 +156,7 @@ We detect these calls and set `Sym.interp_only` for later use.
 static Err asm_append_call_intrin(
   Comp *comp, Sym *caller, const Sym *callee, bool err_mode
 ) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
+  IF_DEBUG(try_assert(callee->type == SYM_INTRIN));
 
   constexpr auto reg = ASM_SCRATCH_REG_8;
 

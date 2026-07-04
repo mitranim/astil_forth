@@ -101,7 +101,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
 }
 
 static Err comp_call_intrin(Interp *interp, const Sym *callee) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
+  IF_DEBUG(try_assert(callee->type == SYM_INTRIN));
   typedef Err(Fun)(Interp *);
   const auto fun = (Fun *)callee->intrin;
   const auto err = fun(interp);
@@ -129,7 +129,7 @@ static Err comp_inline_sym(
 }
 
 static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_NORM));
+  IF_DEBUG(try_assert(callee->type == SYM_NORM));
 
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -147,7 +147,7 @@ static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
 }
 
 static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
+  IF_DEBUG(try_assert(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(asm_append_call_intrin(comp, caller, callee, err_mode));
@@ -157,7 +157,7 @@ static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
 }
 
 static Err comp_append_call_extern(Comp *comp, Sym *callee) {
-  IF_DEBUG(assert_fatal(callee->type == SYM_EXTERN));
+  IF_DEBUG(try_assert(callee->type == SYM_EXTERN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   asm_append_call_extern(comp, callee);

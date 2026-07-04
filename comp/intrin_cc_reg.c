@@ -114,7 +114,7 @@ static Err intrin_brace(Interp *interp) {
 
   const auto arg_max = ctx->arg_len;
 
-  IF_DEBUG(assert_fatal(arg_max <= ASM_VOLATILE_REG_LEN));
+  IF_DEBUG(try_assert(arg_max <= ASM_VOLATILE_REG_LEN));
 
   Word_str names[ASM_VOLATILE_REG_LEN];
 

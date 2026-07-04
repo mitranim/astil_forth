@@ -156,7 +156,7 @@ static Err read_num(Reader *read, Sint *out) {
     try(validate_ascii_printable(head));
   }
   else {
-    IF_DEBUG(assert_fatal(is_char_decimal(head)));
+    IF_DEBUG(try_assert(is_char_decimal(head)));
   }
 
   read->pos++;

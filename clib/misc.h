@@ -71,14 +71,15 @@ sentinel value for their type; usually `{}`.
 
 #define span(max) range(auto, tmp_ind, max)
 
-#define either_inner(tmp, A, B) \
-  ({                            \
-    const auto tmp = A;         \
-    tmp ? tmp : B;              \
+#define either_inner(tmp_A, tmp_B, A, B) \
+  ({                                     \
+    const auto tmp_A = A;                \
+    const auto tmp_B = B;                \
+    tmp_A ? tmp_A : tmp_B;               \
   })
 
 // Non-lazy "or" which doesn't convert operands to 0 or 1.
-#define either(...) either_inner(UNIQ_IDENT, __VA_ARGS__)
+#define either(...) either_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)
 
 #define assign_cast(tar, src) *(tar) = (typeof(*(tar)))(src)
 

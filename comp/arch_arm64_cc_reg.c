@@ -35,8 +35,8 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  assert_fatal(inp_len <= ASM_INP_PARAM_REG_LEN);
-  assert_fatal(out_len <= ASM_OUT_PARAM_REG_LEN);
+  try_assert(inp_len <= ASM_INP_PARAM_REG_LEN);
+  try_assert(out_len <= ASM_OUT_PARAM_REG_LEN);
 
   const auto ints     = &interp->ints;
   const auto ints_len = stack_len(ints);
@@ -159,15 +159,15 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
 
 // See `asm_append_call_intrin` for the explanation of the calling convention.
 TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
-  assert_fatal(sym->type == SYM_INTRIN);
+  try_assert(sym->type == SYM_INTRIN);
 
   const auto ints = &interp->ints;
 
   Sint inps[ASM_INP_PARAM_REG_LEN] = {};
   Sint outs[ASM_OUT_PARAM_REG_LEN] = {};
 
-  assert_fatal(sym->inp_len < ASM_INP_PARAM_REG_LEN);
-  assert_fatal(sym->out_len < ASM_OUT_PARAM_REG_LEN);
+  try_assert(sym->inp_len < ASM_INP_PARAM_REG_LEN);
+  try_assert(sym->out_len < ASM_OUT_PARAM_REG_LEN);
 
   Ind inp = 0;
   while (inp < sym->inp_len) {
@@ -177,14 +177,14 @@ TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
     inp++;
   }
 
-  assert_fatal(inp < ASM_INP_PARAM_REG_LEN);
+  try_assert(inp < ASM_INP_PARAM_REG_LEN);
   inps[inp++] = (Sint)interp;
 
   const U8 reg_out_len = sym->has_err ? sym->out_len - 1 : sym->out_len;
 
   Ind out = 0;
   while (out < reg_out_len) {
-    assert_fatal((inp + out) < ASM_INP_PARAM_REG_LEN);
+    try_assert((inp + out) < ASM_INP_PARAM_REG_LEN);
     inps[inp + out] = (Sint)&outs[out];
     out++;
   }
@@ -314,7 +314,7 @@ pointers appropriately.
 */
 static Err asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
   (void)caller;
-  assert_fatal(callee->type == SYM_INTRIN);
+  try_assert(callee->type == SYM_INTRIN);
 
   const U8  inps   = callee->inp_len;
   const U8  outs   = callee->has_err ? callee->out_len - 1 : callee->out_len;
@@ -329,7 +329,7 @@ static Err asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
     U8 out = 0;
     while (out < outs) {
       U8 reg = inps + 1 + out;
-      assert_fatal(reg < ASM_INP_PARAM_REG_LEN);
+      try_assert(reg < ASM_INP_PARAM_REG_LEN);
       asm_append_add_imm(comp, reg, ASM_REG_SP, MUL(out, size));
       out++;
     }
@@ -343,7 +343,7 @@ static Err asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
   if (sp_off) asm_append_add_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);
 
   if (callee->has_err && outs) {
-    assert_fatal(outs < ASM_OUT_PARAM_REG_LEN);
+    try_assert(outs < ASM_OUT_PARAM_REG_LEN);
     asm_append_mov_reg(comp, outs, ASM_PARAM_REG_0);
   }
 
@@ -351,8 +351,8 @@ static Err asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
     U8 reg = 0;
     while (reg < outs) {
       const auto out_off = (Sint)(reg * size) - (Sint)sp_off;
-      assert_fatal(reg < ASM_OUT_PARAM_REG_LEN);
-      assert_fatal(out_off < 0);
+      try_assert(reg < ASM_OUT_PARAM_REG_LEN);
+      try_assert(out_off < 0);
       asm_append_load_unscaled_offset(comp, reg, ASM_REG_SP, out_off);
       reg++;
     }

@@ -93,20 +93,20 @@ static Err comp_code_sync(Comp_code *code) {
   const auto beg = &exec->dat[exec_len];
   const auto end = beg + diff;
   const auto len = (U8 *)end - (U8 *)beg;
-  assert_fatal(len > 0 && len < IND_MAX);
+  try_assert(len > 0 && len < IND_MAX);
 
   // This alignment is only needed when `../clib/jit.c` uses `mprotect`.
   const auto page_beg = __builtin_align_down(beg, MEM_PAGE);
   const auto page_end = __builtin_align_up(end, MEM_PAGE);
   const auto page_len = (U8 *)page_end - (U8 *)page_beg;
-  assert_fatal(page_len > 0 && page_len < IND_MAX);
+  try_assert(page_len > 0 && page_len < IND_MAX);
 
   IF_DEBUG({
-    assert_fatal(page_beg >= exec->dat);
-    assert_fatal(page_end <= exec->dat + exec->cap);
-    assert_fatal(page_len > 0);
-    assert_fatal(page_beg <= beg);
-    assert_fatal(end <= page_end);
+    try_assert(page_beg >= exec->dat);
+    try_assert(page_end <= exec->dat + exec->cap);
+    try_assert(page_len > 0);
+    try_assert(page_beg <= beg);
+    try_assert(end <= page_end);
   });
 
   try(jit_before_write(page_beg, (Ind)page_len));
@@ -249,7 +249,7 @@ where a signed `imm6` is expected, the CPU will interpret it as -32:
 Assumptions: `width < 32`, `sizeof(Sint) >= 32/8`.
 */
 static Err imm_signed(Sint src, U8 wid, Instr *out) {
-  IF_DEBUG(assert_fatal(wid));
+  IF_DEBUG(try_assert(wid));
 
   // Comments show example bit patterns with `wid = 6` within `U8`.
   // Some redundant casts were a concession to `clang-tidy` checks.
@@ -275,14 +275,14 @@ any functions with multiple outputs.
 Note: this works identically for both of our callventions.
 */
 static Err asm_call_extern(Sint_stack *stack, const Sym *sym) {
-  assert_fatal(sym->type == SYM_EXTERN);
+  try_assert(sym->type == SYM_EXTERN);
 
   const auto fun     = (Extern_fun *)sym->exter;
   const auto inp_len = sym->inp_len;
   const auto out_len = sym->out_len;
 
-  assert_fatal(inp_len <= ASM_INP_PARAM_REG_LEN);
-  assert_fatal(out_len <= 1);
+  try_assert(inp_len <= ASM_INP_PARAM_REG_LEN);
+  try_assert(out_len <= 1);
 
   Sint x0 = 0;
   Sint x1 = 0;
@@ -1146,7 +1146,7 @@ static Err asm_append_call_norm(
   const auto fun    = comp_sym_exec_instr(comp, callee);
   const auto pc_off = fun - comp_code_next_prog_counter(code);
 
-  assert_fatal(comp_code_is_instr_ours(code, fun));
+  try_assert(comp_code_is_instr_ours(code, fun));
   asm_append_branch_link_to_offset(comp, pc_off);
 #ifdef CALL_CONV_STACK
   try(asm_append_try_catch(comp, caller, callee, err_mode));

@@ -130,7 +130,7 @@ static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
   try(fd_stat(path, file, &info));
 
   if (!S_ISREG(info.st_mode)) return err_file_not_regular(path);
-  assert_fatal(info.st_size >= 0);
+  try_assert(info.st_size >= 0);
 
   const auto file_len = (Uint)info.st_size;
   const auto buf_len  = ADD(file_len, 1);
@@ -260,6 +260,7 @@ static Err err_file_write(Uint exp, Uint act) {
 static Err file_write(
   FILE *restrict file, const void *restrict vals, Uint val_size, Uint vals_len
 ) {
+  try_assert(!!file);
   const auto out = fwrite(vals, val_size, vals_len, file);
   if (out == vals_len) return nullptr;
   return err_file_write(vals_len, out);
@@ -271,7 +272,7 @@ static Err write_all(int file, const U8 *buf, Uint len, int *out_err) {
 
     if (wrote > 0) {
       const auto val = (Uint)wrote;
-      assert_fatal(val <= len);
+      try_assert(val <= len);
       buf += val;
       len -= val;
       continue;
