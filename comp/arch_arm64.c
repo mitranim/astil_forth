@@ -478,20 +478,17 @@ static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
   const auto     prog      = (Uint)(comp_code_next_prog_counter(&comp->code));
   const auto     pc_page   = prog & ~mask;
   const auto     addr_page = addr & ~mask;
-  const auto     page_diff = (addr_page >> bits) - (pc_page >> bits);
+  const auto     page_diff = (Sint)(addr_page >> bits) - (Sint)(pc_page >> bits);
   const auto     pageoff   = addr - addr_page;
 
-  assert_fatal(addr > prog);
-  assert_fatal(addr_page > pc_page);
-  assert_fatal(page_diff > 0);
   assert_fatal(addr >= addr_page);
   assert_fatal(pageoff < (1u << bits));
 
-  // The immediate can be 21-bit signed, but ours is always positive.
-  try_fatal(imm_unsigned(page_diff, 20));
+  Instr imm;
+  try_fatal(imm_signed(page_diff, 21, &imm));
 
-  const Instr high = (Instr)page_diff >> 2u;
-  const Instr low  = (Instr)page_diff & 0b11u;
+  const Instr high = imm >> 2u;
+  const Instr low  = imm & 0b11u;
 
   asm_append_instr(
     comp,

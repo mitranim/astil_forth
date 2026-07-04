@@ -77,7 +77,7 @@ end
 
 .run
 
-\ For AOT builds only. Requires commenting out root `.run`.
+\ For AOT builds. Requires commenting out root `.run`.
 fun: main { -- exit }
   .run { err }
   ifz err .then 0 else " error: %s" err .elogf .elf 1 end

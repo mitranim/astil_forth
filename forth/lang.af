@@ -2500,8 +2500,7 @@ fun: sym_instr { XT -> instr } .sym_instr end
 
 \ For internal use below.
 fun: comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
-  .next_word .comp_push
-  call_xt'' sym_instr
+  .next_word .sym_instr .comp_next_page_addr
 end
 
 \ Similar to `xt'` and `xt''`, but instead of returning an execution token,
