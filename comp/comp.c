@@ -114,14 +114,6 @@ static Err comp_validate_local(Comp *comp, Sint num, Local **out) {
   return nullptr;
 }
 
-static Err comp_inline_sym(
-  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
-) {
-  try(comp_require_current_sym(comp, nullptr));
-  try(asm_inline_sym(comp, caller, callee, err_mode));
-  return nullptr;
-}
-
 #ifndef CALL_CONV_STACK
 #include "./comp_cc_reg.c"
 #else
@@ -343,16 +335,6 @@ static void *comp_find_extern(Comp *comp, const char *name) {
   return list_elem_ptr(&syms->addrs, ind);
 }
 
-static Err err_no_output_for_try(const Sym *caller, const Sym *callee) {
-  return errf(
-    "in " FMT_QUOTED " (%s): unable to compile call to " FMT_QUOTED
-    ": caller has no error output for implicit `try_all`",
-    caller->name.buf,
-    wordlist_name(caller->wordlist),
-    callee->name.buf
-  );
-}
-
 static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
@@ -360,12 +342,12 @@ static Err comp_append_call_sym(Comp *comp, Sym *callee) {
   sym_auto_interp_only(caller, callee);
 
 #ifdef CALL_CONV_STACK
-  bool err_mode = false; // no catch
+  constexpr bool err_mode = false; // No catch.
 #else
-  bool err_mode = false; // no auto-try
-  if (callee->has_err && comp->ctx.try_all) {
-    if (!caller->has_err) return err_no_output_for_try(caller, callee);
-    err_mode = true; // yes auto-try
+  bool err_mode = false;
+  if (comp->ctx.auto_try) {
+    try_assert(caller->has_err);
+    err_mode = callee->has_err;
   }
 #endif // CALL_CONV_STACK
 

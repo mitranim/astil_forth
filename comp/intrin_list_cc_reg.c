@@ -20,7 +20,6 @@ static const USED Sym INTRIN[] = {
   INTRIN_COMP_PUSH_FROM_LOCAL,       // comp_push_from_local
   INTRIN_COMP_POP_INTO_LOCAL,        // comp_pop_into_local
   INTRIN_COMP_ASSIGN_LOCAL_FROM_REG, // comp_assign_local_from_reg
-  INTRIN_TRY_ALL,                    // try_all
   INTRIN_ALLOCA,                     // alloca
   INTRIN_COMPILE_EXECUTABLE,         // compile_executable
   INTRIN_DEBUG_CTX,                  // debug_ctx
@@ -40,11 +39,9 @@ static const USED Sym INTRIN[] = {
   INTRIN_RECUR,           // recur
   INTRIN_TRY,             // try
   INTRIN_THROW,           // throw
-  INTRIN_CATCH,           // catch
   INTRIN_COMP_ONLY,       // comp_only
   INTRIN_PLAIN_CALL,      // plain_call
   INTRIN_INTERP_ONLY,     // interp_only
-  INTRIN_INLINE,          // inline
   INTRIN_REDEFINE,        // redefine
   INTRIN_HERE_WRITE,      // here_write
   INTRIN_HERE_EXEC,       // here_exec
@@ -63,7 +60,6 @@ static const USED Sym INTRIN[] = {
   INTRIN_EXTERN_ADR,      // extern_adr
   INTRIN_EXTERN_FUN,      // extern_fun
   INTRIN_FIND_WORD,       // find_word
-  INTRIN_INLINE_WORD,     // inline_word
   INTRIN_CALL_XT,         // call_xt
   INTRIN_COMP_LOCAL,      // comp_local
   INTRIN_DEBUG_ON,        // debug_on

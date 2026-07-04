@@ -1,4 +1,0 @@
-\ Must fail to compile: `.catch` requires hidden error metadata, not stale value metadata.
-fun: test_catch_invalid_after_value { -- err }
-  123 { -- } .catch
-end

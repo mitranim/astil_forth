@@ -9,8 +9,8 @@ use' ./lang.af
 \ Posix words directly return an OS error code on failure.
 \ Should always be followed by error check:
 \
-\   some_fun " unable to do X" ?posix_err { err }
-\   some_fun " unable to do X" ?posix_err .try
+\   .some_fun " unable to do X" ?posix_err { err }
+\   .some_fun " unable to do X" ?posix_err .try
 
 \ ## Types
 
@@ -217,7 +217,7 @@ end
 \ Wraps `pthread_create` with `PTHREAD_CREATE_DETACHED`.
 \ The caller must not `thread_join` or `pthread_detach`.
 \ If error, caller owns `inp`. Otherwise, thread owns `inp`.
-fun: thread_spawn_detached { fun inp -- thread err }
+fun: thread_spawn_detached { fun inp -- thread Err }
   alloca' Pthread_attr { attr   }
   .slot                { thread }
 

@@ -228,7 +228,7 @@ contexts:
   braces-params-output-pop:
     - match: '{{word_begin}}(?:--|->){{word_end}}'
       scope: punctuation.separator.astil_forth
-    - match: '{{word_begin}}err{{word_end}}(?=\s+})'
+    - match: '{{word_begin}}(?:err|Err){{word_end}}(?=\s+})'
       scope: variable.parameter.astil_forth storage.modifier.astil_forth
     - match: '{{word_begin}}{{braces_param}}{{word_end}}'
       scope: variable.parameter.astil_forth

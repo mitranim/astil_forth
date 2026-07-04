@@ -1,4 +1,3 @@
-1 .try_all
 fun_comp: \ { -- err } 10 .read_until_char { -- } .read_char { -- } end
 fun_comp: ( { -- err } 41 .read_until_char { -- } .read_char { -- } end
 
@@ -57,13 +56,6 @@ fun: xt'' { -- XT err } ( "word" -- ) 2 .next_word end \ WORDLIST_COMP
 
 fun_comp: xt'  { -- err } ( E: -- XT ) ( C: "word" -- ) 1 .xt_next end \ WORDLIST_EXEC
 fun_comp: xt'' { -- err } ( E: -- XT ) ( C: "word" -- ) 2 .xt_next end \ WORDLIST_COMP
-
-fun: inline_next { wlist -> err } ( "word" -- ) ( E: <word> )
-  .next_word .inline_word
-end
-
-fun_comp: inline'  { -- err } 1 .inline_next end
-fun_comp: inline'' { -- err } 2 .inline_next end
 
 \ `call_xt` is renamed from standard "postpone".
 \ Also see `call` for raw instruction addresses.
@@ -1756,42 +1748,38 @@ end
 \ The compiler provides the following error-related intrinsics:
 \ - `.try`
 \ - `.throw`
-\ - `.catch`
-\ - `.try_all`
 \
 \ Errors are plain outputs, always explicitly declared in signatures.
-\ By convention, if the last output parameter is named exactly `err`,
-\ the compiler marks that word as having an error; see `Sym_has_err`.
+\ By convention, if the last output parameter is named exactly `err`
+\ or `Err`, the compiler marks the current word as having an error
+\ in its last output. This enables `.try` and `.throw` inside the
+\ current word, and informs callers that last output is an error.
 \
-\ By default, all control flow is explicit. Errors are visible,
-\ handled just like other outputs. We also support Swift-style
-\ `.try` and `.throw` which are entirely local. They're nearly
-\ as `.ret`, but without having to list the non-error outputs.
+\ Naming the last output parameter exactly `err` opts into implicit "try".
+\ Inside that word, when calling other "erroring" words, the compiler auto
+\ inserts "try" for their errors, propagating them upwards. This style is
+\ preferred for code which doesn't deal with resource cleanup. Naming the
+\ last output `Err` does not enable implicit "try", and is preferred for
+\ code which deals with resource cleanup.
 \
 \ Error may be partial or total. Each word decides its contract.
 \ On partial failure, non-error outputs are defined.
 \ On total failure, non-error outputs are undefined.
 \
-\ We also support `.try_all`, which is a blanket auto-try, where
-\ a `.try` is implicitly inserted when calling "erroring" words.
-\ It's opt-in and opt-out per-file and per-word.
-\
-\ Under `.try_all`, postfix `.catch` restores the error output
-\ from the preceding call by backtracking the implicit `.try`.
-\
 \ Examples:
 \
 \   fun: inner { -- one two err }
 \     " some_error" .throw
-\     10 20 nil
+\     10 20
 \   end
 \
-\   fun: outer
+\   fun: outer { -- Err }
 \     inner { one two err }
 \     inner .try { one two }
-\     [ true .try_all ]
+\   end
+\
+\   fun: outer_auto { -- err }
 \     inner { one two } \ Implicit `.try`.
-\     inner .catch { one two err }
 \   end
 
 \ ## IO
@@ -2643,7 +2631,7 @@ fun: call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
 \
 \ Important comptime semantics: words defined with `fun_comp` are compiled
 \ exactly like regular words. Only execution time differs: they execute at
-\ comptime as soon as the reader parses them .while compiling another word.
+\ comptime as soon as the reader parses them while compiling another word.
 \
 \ This behavior stacks. Earlier comptime words run immediately when
 \ used inside other words, even when compiling other comptime words.
@@ -2916,22 +2904,22 @@ fun: cf_shift_emit { reg0 reg1 imm reg_op -- err }
   reg0 reg1 immr 63 bitfield_op .asm_bitfield .comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
-fun: cf_logical_validate { imm aux -- aux ok err }
+fun: cf_logical_validate { imm aux -- aux ok Err }
   aux 1 .and { inv }
   aux inv - { op }
   imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .and .or { edge }
   imm inv ?invert { imm }
   if edge .then " redundant arithmetic" .throw end
-  imm op .asm_logical_imm_mask .catch =0
+  imm op .asm_logical_imm_mask =0
 end
 
 fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
   mask reg1 5 .lsl .or reg0 .or .comp_instr \ and|orr|eor Xd, Xn, #imm
 end
 
-fun: cf_align_validate { size _ -- aux ok err }
+fun: cf_align_validate { size _ -- aux ok Err }
   if size 1 = .then " redundant arithmetic" .throw end
-  size .dec ASM_OP_ANDS_IMM .asm_logical_imm_mask .catch =0
+  size .dec ASM_OP_ANDS_IMM .asm_logical_imm_mask =0
 end
 
 fun: cf_align_emit { out adr _size mask -- err }
@@ -2939,19 +2927,19 @@ fun: cf_align_emit { out adr _size mask -- err }
   out ASM_EQ .asm_cset .comp_instr      \ cset Xd, eq
 end
 
-fun: cf_align_down_validate { size _ -- aux ok err }
+fun: cf_align_down_validate { size _ -- aux ok Err }
   if size 1 = .then " redundant arithmetic" .throw end
-  size .negate ASM_OP_AND_IMM .asm_logical_imm_mask .catch =0
+  size .negate ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
 fun: cf_align_down_emit { out len _size mask -- err }
   mask len 5 .lsl .or out .or .comp_instr \ and Xd, Xn, #imm
 end
 
-fun: cf_align_up_validate { size _ -- aux ok err }
+fun: cf_align_up_validate { size _ -- aux ok Err }
   if size 1 = .then " redundant arithmetic" .throw end
   size .dec .cf_imm_u12 { add_ok }
-  size .negate ASM_OP_AND_IMM .asm_logical_imm_mask .catch { mask mask_err }
+  size .negate ASM_OP_AND_IMM .asm_logical_imm_mask { mask mask_err }
   mask add_ok mask_err =0 .and
 end
 
@@ -2960,9 +2948,9 @@ fun: cf_align_up_emit { out len size mask -- err }
   mask out 5 .lsl .or out .or .comp_instr  \ and Xd, Xn, #imm
 end
 
-fun: cf_bits_trunc_validate { len _ -- aux ok err }
+fun: cf_bits_trunc_validate { len _ -- aux ok Err }
   if len 0 <= len 64 >= .or .then " redundant arithmetic" .throw end
-  len .low_bits ASM_OP_AND_IMM .asm_logical_imm_mask .catch =0
+  len .low_bits ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
 fun: cf_bit_mask_validate { mask -- err }
@@ -2973,10 +2961,10 @@ fun: cf_bit_mask_validate { mask -- err }
   " invalid bit mask: expected nonzero contiguous mask" .throw
 end
 
-fun: cf_bit_mask_get_validate { mask _ -- aux ok err }
+fun: cf_bit_mask_get_validate { mask _ -- aux ok Err }
   if mask -1 = .then " redundant arithmetic" .throw end
-  mask .cf_bit_mask_validate
-  mask ASM_OP_AND_IMM .asm_logical_imm_mask .catch { instr_mask err }
+  mask .cf_bit_mask_validate .try
+  mask ASM_OP_AND_IMM .asm_logical_imm_mask { instr_mask err }
   if err .then nil false .ret end
   mask .bit_ctz 32 .lsl instr_mask .or true
 end
@@ -3245,7 +3233,7 @@ fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
 end
 
 \ No partial CF: signed pow2 division needs several biasing instructions,
-\ because `asr` rounds negative values down, .while signed division rounds
+\ because `asr` rounds negative values down, while signed division rounds
 \ toward zero. Not worth the code size for now.
 fun_comp: / { -- err } [ .redefine ]
   " redundant arithmetic: division by 0 -> 0" { err0 }
@@ -3786,7 +3774,7 @@ fun_comp: !clong { -- err }              0b11      .comp_mem_store end
 fun_comp: @culong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
 fun_comp: !culong { -- err }              0b11      .comp_mem_store end
 
-\ Some `libc` functions return -1 as 32-bit `0xffff_ffff`, .while some others,
+\ Some `libc` functions return -1 as 32-bit `0xffff_ffff`, while some others,
 \ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
 \ the kernel. Since there's no way to know this generically, we must always
 \ sign-extend `int` before testing for -1.

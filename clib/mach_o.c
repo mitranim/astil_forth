@@ -108,7 +108,7 @@ static void Mach_load_cmd_dyld_repr(Mach_load_cmd_dyld *val) {
   print_struct_end();
 
   const auto str_len = val->head.cmdsize - val->name_offset;
-  printf("Mach_load_cmd_dyld->name: %.*s\n", (int)str_len, val->name);
+  printf("Mach_load_cmd_dyld->name: %.*s\n", str_len, val->name);
 }
 
 static void Mach_load_cmd_uuid_repr(Mach_load_cmd_uuid *val) {
@@ -191,5 +191,5 @@ static void Mach_load_cmd_dylib_repr(Mach_load_cmd_dylib *val) {
   print_struct_end();
 
   const auto str_len = val->head.cmdsize - val->name_offset;
-  printf("Mach_load_cmd_dyld->name: %.*s\n", (int)str_len, val->name);
+  printf("Mach_load_cmd_dyld->name: %.*s\n", str_len, val->name);
 }

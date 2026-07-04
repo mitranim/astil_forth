@@ -63,13 +63,15 @@ static Err interp_parse_params(Interp *interp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
 
-  bool has_err = false;
+  bool auto_try = false;
+  bool has_err  = false;
 
   for (;;) {
     try(read_valid_word(read, &word));
     if (str_eq(&word, "}")) break;
     try(comp_add_output_param(comp, nullptr));
-    has_err = str_eq(&word, "err");
+    auto_try = str_eq(&word, "err");
+    has_err  = auto_try || str_eq(&word, "Err");
   }
 
   if (has_err) {
@@ -77,6 +79,7 @@ static Err interp_parse_params(Interp *interp) {
     try(interp_require_current_sym(interp, &sym));
     sym->has_err = true;
   }
+  ctx->auto_try = auto_try;
 
   if (push_inps) {
     if (trailing_discard_len < 0) {
@@ -189,9 +192,7 @@ static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
   return nullptr;
 }
 
-static Err interp_fun_begin_raw(
-  Interp *interp, Wordlist wordlist, Word_str name
-) {
+static Err interp_fun_begin_raw(Interp *interp, Wordlist wordlist, Word_str name) {
   try(interp_begin_definition(interp));
   try(interp_word_begin(interp, wordlist, name));
   return nullptr;
@@ -224,7 +225,6 @@ static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin_raw(interp, WORDLIST_EXEC, name));
-  interp->comp.ctx.try_all = false;
 
   const auto sym = interp_semicolon_sym(interp);
   try(int_stack_push(&interp->ints, (Sint)sym));
@@ -236,7 +236,6 @@ static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin_raw(interp, WORDLIST_COMP, name));
-  interp->comp.ctx.try_all = false;
 
   const auto sym = interp_semicolon_sym(interp);
   try(int_stack_push(&interp->ints, (Sint)sym));
@@ -267,7 +266,7 @@ static Err intrin_recur(Interp *interp) {
   try(comp_forget_regs(comp, ASM_REGS_VOLATILE));
   bits_add_all_to(&sym->clobber, ASM_REGS_VOLATILE);
   try(comp_append_recur(comp));
-  try(comp_after_append_call(comp, sym, sym, comp->ctx.try_all));
+  try(comp_after_append_call(comp, sym, sym, comp->ctx.auto_try));
 
   sym->norm.has_recur = true;
   return nullptr;
@@ -284,62 +283,6 @@ static Err intrin_throw(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   try(comp_append_throw(&interp->comp, sym));
-  return nullptr;
-}
-
-static Err err_catch_no_implicit_try() {
-  return err_str("unable to `.catch`: no hidden `.try` to backtrack");
-}
-
-static Err err_catch_stale() {
-  return err_str("unable to `.catch`: implicit `.try` no longer current");
-}
-
-static Err intrin_catch(Interp *interp) {
-  const auto comp = &interp->comp;
-  try(comp_require_current_sym(comp, nullptr));
-
-  const auto ctx = &comp->ctx;
-  if (ctx->arg_len >= arr_cap(ctx->args)) return err_catch_no_implicit_try();
-
-  const auto arg = &ctx->args[ctx->arg_len];
-  if (arg->type != COMP_ARG_ERR) return err_catch_no_implicit_try();
-
-  const auto err    = &arg->err;
-  const auto instrs = &comp->code.code_write;
-  if (instrs->len != err->try_instr_ceil) return err_catch_stale();
-
-  if (stack_len(&ctx->asm_fix) != err->try_fix_ind + 1) {
-    return err_catch_stale();
-  }
-
-  instrs->len = err->try_instr_floor;
-  stack_trunc_to(&ctx->asm_fix, err->try_fix_ind);
-  *arg = comp_arg_unknown();
-  ctx->arg_len++;
-  return nullptr;
-}
-
-static Err err_try_all_redundant(bool val) {
-  return errf("redundant `try_all`: already %s", bool_str(val));
-}
-
-static Err intrin_try_all(bool val, Interp *interp) {
-  const auto ctx    = &interp->comp.ctx;
-  const auto module = interp->module;
-  if (ctx->sym) {
-    if (!ctx->slop && ctx->try_all == val) {
-      return err_try_all_redundant(val);
-    }
-    ctx->try_all = val;
-    return nullptr;
-  }
-  if (module) {
-    if (!module->slop && module->try_all == val) {
-      return err_try_all_redundant(val);
-    }
-    module->try_all = val;
-  }
   return nullptr;
 }
 
@@ -508,17 +451,6 @@ static Err intrin_find_word(
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_find_word(interp, name.buf, wordlist, sym));
-  return nullptr;
-}
-
-static Err intrin_inline_word(Sint ptr, Interp *interp) {
-  constexpr bool err_mode = false;
-  Sym           *caller;
-  Sym           *callee;
-
-  try(interp_require_current_sym(interp, &caller));
-  try(interp_sym_by_ptr(interp, ptr, &callee));
-  try(comp_inline_sym(&interp->comp, caller, callee, err_mode));
   return nullptr;
 }
 
@@ -708,7 +640,7 @@ static void intrin_debug_ctx(Interp *interp) {
     "[debug]   redefining:         %s\n"
     "[debug]   compiling:          %s\n"
     "[debug]   has_alloca:         %s\n"
-    "[debug]   try_all:            %s\n",
+    "[debug]   auto_try:           %s\n",
     name,
     sym,
     inp_len,
@@ -718,8 +650,8 @@ static void intrin_debug_ctx(Interp *interp) {
     uint32_to_bit_str((U32)sym->clobber),
     bool_str(ctx->redefining),
     bool_str(ctx->compiling),
-    bool_str(ctx->has_alloca),
-    bool_str(ctx->try_all)
+    bool_str(sym->norm.has_alloca),
+    bool_str(ctx->auto_try)
   );
 
   if (loc_len) {
@@ -768,11 +700,6 @@ static void intrin_debug_ctx(Interp *interp) {
             const auto name = comp_local_name(loc);
 
             eprintf("[debug]     %d -- local: %s\n", ind, name);
-            break;
-          }
-
-          case COMP_ARG_ERR: {
-            eprintf("[debug]     %d -- error\n", ind);
             break;
           }
 
@@ -825,24 +752,6 @@ static void intrin_debug_arg(Sint val, Interp *) {
 }
 
 // The "missing" fields are set in `sym_init_intrin`.
-
-static const USED auto INTRIN_TRY_ALL = (Sym){
-  .name.buf = "try_all",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_try_all,
-  .inp_len  = 1,
-  .out_len  = 1,
-  .has_err  = true,
-};
-
-static const USED auto INTRIN_CATCH = (Sym){
-  .name.buf   = "catch",
-  .wordlist   = WORDLIST_COMP,
-  .intrin     = (void *)intrin_catch,
-  .out_len    = 1,
-  .has_err    = true,
-  .comp_only  = true,
-};
 
 static const USED auto INTRIN_BRACE = (Sym){
   .name.buf  = "{",

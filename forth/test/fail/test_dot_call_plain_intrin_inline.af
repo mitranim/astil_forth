@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_plain_intrin_inline_fail { -- err }
-  [ inline ]
-end

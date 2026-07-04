@@ -91,12 +91,9 @@ static Err err_num_not_terminated(U8 val) {
   );
 }
 
-static Err err_num_digit_radix(
-  const char *prefix, U8 dig, U8 val, Sint radix
-) {
+static Err err_num_digit_radix(const char *prefix, U8 dig, U8 val, Sint radix) {
   return errf(
-    "%s: digit %d from character " FMT_CHAR_QUOTED
-    " is outside radix " FMT_SINT,
+    "%s: digit %d from character " FMT_CHAR_QUOTED " is outside radix " FMT_SINT,
     prefix,
     dig,
     val,
@@ -126,18 +123,12 @@ static Err err_overflow(U8 radix, const char *mode) {
 
 static Err err_minus_unsigned(const char *src, Ind len) {
   return errf(
-    "unsupported minus sign in `%.*s`; only decimals may be signed",
-    (int)len,
-    src
+    "unsupported minus sign in `%.*s`; only decimals may be signed", len, src
   );
 }
 
 static Err err_radix_prefix_no_digit(const char *src, Ind len) {
-  return errf(
-    "unexpected bare `%.*s`; requires at least one digit",
-    (int)len,
-    src
-  );
+  return errf("unexpected bare `%.*s`; requires at least one digit", len, src);
 }
 
 /*
@@ -154,8 +145,8 @@ what its semantics should be: either `~num + 1` as with signed
 multiplication by -1, or simply set the sign bit to 1.
 */
 static Err read_num(Reader *read, Sint *out) {
-  const auto beg = read->pos;
-  auto head = read_char_at(read, read->pos);
+  const auto beg  = read->pos;
+  auto       head = read_char_at(read, read->pos);
 
   S8 sign = 1;
 
@@ -181,10 +172,10 @@ static Err read_num(Reader *read, Sint *out) {
     try(validate_ascii_printable(head));
 
     switch (head) {
-      case 'b': radix = 2;  break;
-      case 'o': radix = 8;  break;
+      case 'b': radix = 2; break;
+      case 'o': radix = 8; break;
       case 'x': radix = 16; break;
-      default: break;
+      default:  break;
     }
 
     if (radix != 10) {

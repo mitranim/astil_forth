@@ -189,67 +189,65 @@ In reg-CC, our error handling combines ergonomics and ABI compatibility:
 - An error is just a C-style string pointer.
 - An error is the last output param (Go-style).
 - Shortcuts `.try` and `.throw` for local control (Swift-style).
-- `.try_all` for opting into implicit `.try`.
+- Trailing `err` enables local implicit `.try` (exceptions-style).
 - Callers receive errors as values, even if callees `.throw`.
 - Works across ABI boundaries between languages.
 - No unwinder; all control is local.
+- No need for "catch".
 
-By convention, if the last output parameter is named _exactly_ `err`, the compiler knows it's an error; this is similar to Swift's `throws` annotation. Either way, by default, errors are explicit values. They can be simply returned.
+By convention, if the last output parameter is named _exactly_ `err` or `Err`, the compiler knows it's an error; this is similar to Swift's `throws` annotation. However, errors are just values and can be returned:
 
 ```forth
-fun: word { -- err }
-  word0 { err }           if err .then err .ret end
-  word1 { val0 err }      if err .then err .ret end
-  word2 { val1 val2 err } err
+fun: word { -- Err }
+  .word0 { err }           if err .then err .ret end
+  .word1 { val0 err }      if err .then err .ret end
+  .word2 { val1 val2 err } err
 end
 ```
 
 For ergonomics, the compiler automatically zeroes the error register if you don't explicitly return it:
 
 ```forth
-fun: word { -- err }
-  word0 { val }           if val .then     .ret end
-  word1 { val0 err }      if err .then err .ret end
-  word2 { val1 val2 err } err
+fun: word { -- out Err }
+  .some_word { some_val }
+  some_val \ Local error output is implicitly zeroed.
 end
 ```
 
-`.try` consumes errors and returns early:
+`.try` consumes errors, returning non-nil errors early:
 
 ```forth
-fun: word { -- err }
-  word0 .try
-  word1 .try { val0 }
-  word2 .try { val1 val2 }
+fun: word { -- Err }
+  .word0 .try
+  .word1 .try { val0 }
+  .word2 .try { val1 val2 }
 end
 ```
 
-`.try` checks current top arg, moves non-nil error to current word's `err`, and returns. Doesn't zero current word's non-error outputs; they're undefined on total failure.
-
-`.try_all` makes this implicit, allowing even shorter code. `.try_all` in file root affects the current file (and no other). `.try_all` inside a word affects _only_ that word. However, it does _not_ remove errors from signatures. The signature of every word precisely describes its ABI.
+By convention, naming the last output parameter _exactly_ `err` enables local auto-"try" inside the current word; this style is preferred in non-resource code. The external ABI is identical to `Err`:
 
 ```forth
-true .try_all
-
-fun: word { -- err }
-  word0
-  word1 { val0 }
-  word2 { val1 val2 }
+fun: word_auto_try { -- err }
+  .word0
+  .word1 { val0 }
+  .word2 { val1 val2 }
 end
-
-fun: word [ false .try_all ] end \ Only inside this word.
 ```
+
+- Callee decides whether to return an error via `err|Err`; this is external ABI.
+- Caller decides whether to auto-try internally via `err`; this is local convenience.
+- No need for "catch": error-sensitive code simply doesn't "try".
 
 Failure outputs:
 - Success: return non-error outputs; nil `err` is implicit.
 - Partial failure: return useful non-error outputs and non-nil `err`.
 - Total failure: use `.throw` / `.try`; non-error outputs are undefined.
 
-Callers, including C/FFI callers, must check `err` before using other outputs, unless callee documents partial-failure contract.
+Callers, including C/FFI callers, must check errors before using other outputs, unless callee documents partial-failure contract.
 
-The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally), and make nil errors implicit. Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
+The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally), and make nil errors implicit. Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we provide less-noisy exception-like auto-try, while at the same time we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
 
-The above doesn't quite apply to stack-CC, which still treats errors as "exceptions".
+The above doesn't quite apply to stack-CC, which always treats errors as "exceptions" and provides `catch'` instead of `.try`.
 
 ## CLI
 
@@ -380,8 +378,8 @@ This matches the platform call ABI (Arm64 only for now). Runtime calls are greed
 To keep values between runtime calls, stash them into locals:
 
 ```forth
-runtime_word_0 { one two three }
-runtime_word_1 one + two + three +
+.runtime_word_0 { one two three }
+.runtime_word_1 one + two + three +
 ```
 
 Comptime words operate at the top of the stack. That enables true concatenative compiled code; in `10 20 + 30 40 - *`, `+ - *` consume/replace top registers and fold constants when possible.
@@ -449,7 +447,6 @@ err .try
 err .throw
 val .ret
 .recur
-.catch
 ```
 
 Examples of control-only words: `if ifz elif elifz else loop leave again assert end`. `leave` and `again` validate loop arity, but stay plain.
@@ -506,7 +503,7 @@ Errors are strings (error messages) rather than numeric codes.
 
 Booleans are `0 1` rather than `0 -1`.
 
-Word-modifiers like `.comp_only` are used inside definitions, not outside. Modifiers executed in file scope (`.try_all`) affect an entire file.
+Word-modifiers like `.comp_only` are used inside definitions, not outside.
 
 Special _semantic_ roles get special _syntactic_ roles:
 - Words which declare: `fun: let: var: to:` and more.

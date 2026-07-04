@@ -5,8 +5,6 @@ use' ../lang.af
 \ those should be covered in `./test.af`. It should not bother
 \ testing pessimizations either; no locking down poor codegen.
 
-true .try_all
-
 128 mem: CF_WANT_INSTRS
 0 var: CF_WANT_LEN
 
@@ -345,108 +343,108 @@ fun: test_const_fold_bit_shift { -- err }
 end
 .test_const_fold_bit_shift
 
-fun: test_const_fold_bit_mask_errors { -- err }
-  use' ./fail/test_const_fold_bit_mask_get_bad.af .catch
-  " invalid bit mask: expected nonzero contiguous mask" .assert_str_has
+fun: test_const_fold_bit_mask_errors { -- Err }
+  use' ./fail/test_const_fold_bit_mask_get_bad.af
+  " invalid bit mask: expected nonzero contiguous mask" .assert_str_has .try
 end
 .test_const_fold_bit_mask_errors
 
-fun: test_const_fold_redundant_arith_errors { -- err }
-  use' ./fail/test_const_fold_redundant_logical.af .catch
-  " redundant arithmetic" .assert_str_has
+fun: test_const_fold_redundant_arith_errors { -- Err }
+  use' ./fail/test_const_fold_redundant_logical.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_addsub.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_addsub.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_shift.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_shift.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_const_shift.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_const_shift.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_mul_zero.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_mul_zero.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_div_one.af .catch
-  " redundant arithmetic: division by 1" .assert_str_has
+  use' ./fail/test_const_fold_redundant_div_one.af
+  " redundant arithmetic: division by 1" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_udiv_one.af .catch
-  " redundant arithmetic: division by 1" .assert_str_has
+  use' ./fail/test_const_fold_redundant_udiv_one.af
+  " redundant arithmetic: division by 1" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_mod_one.af .catch
-  " redundant arithmetic: modulo by 1" .assert_str_has
+  use' ./fail/test_const_fold_redundant_mod_one.af
+  " redundant arithmetic: modulo by 1" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_umod_one.af .catch
-  " redundant arithmetic: modulo by 1" .assert_str_has
+  use' ./fail/test_const_fold_redundant_umod_one.af
+  " redundant arithmetic: modulo by 1" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_divmod_one.af .catch
-  " redundant arithmetic: division by 1" .assert_str_has
+  use' ./fail/test_const_fold_redundant_divmod_one.af
+  " redundant arithmetic: division by 1" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_udivmod_one.af .catch
-  " redundant arithmetic: division by 1" .assert_str_has
+  use' ./fail/test_const_fold_redundant_udivmod_one.af
+  " redundant arithmetic: division by 1" .assert_str_has .try
 
-  use' ./fail/test_const_fold_div_zero.af .catch
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has
+  use' ./fail/test_const_fold_div_zero.af
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
 
-  use' ./fail/test_const_fold_udiv_zero.af .catch
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has
+  use' ./fail/test_const_fold_udiv_zero.af
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
 
-  use' ./fail/test_const_fold_mod_zero.af .catch
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
+  use' ./fail/test_const_fold_mod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_umod_zero.af .catch
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
+  use' ./fail/test_const_fold_umod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_divmod_zero.af .catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
+  use' ./fail/test_const_fold_divmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_udivmod_zero.af .catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
+  use' ./fail/test_const_fold_udivmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_rhs_div_zero.af .catch
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has
+  use' ./fail/test_const_fold_rhs_div_zero.af
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
 
-  use' ./fail/test_const_fold_rhs_udiv_zero.af .catch
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has
+  use' ./fail/test_const_fold_rhs_udiv_zero.af
+  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
 
-  use' ./fail/test_const_fold_rhs_mod_zero.af .catch
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
+  use' ./fail/test_const_fold_rhs_mod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_rhs_umod_zero.af .catch
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has
+  use' ./fail/test_const_fold_rhs_umod_zero.af
+  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_rhs_divmod_zero.af .catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
+  use' ./fail/test_const_fold_rhs_divmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_rhs_udivmod_zero.af .catch
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has
+  use' ./fail/test_const_fold_rhs_udivmod_zero.af
+  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_align_down.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_align_down.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_align_up.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_align_up.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_is_aligned.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_is_aligned.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_bits_trunc.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_bits_trunc.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_bits_clear.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_bits_clear.af
+  " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_bit_mask_get.af .catch
-  " redundant arithmetic" .assert_str_has
+  use' ./fail/test_const_fold_redundant_bit_mask_get.af
+  " redundant arithmetic" .assert_str_has .try
 end
 .test_const_fold_redundant_arith_errors
 
-fun: test_const_fold_assert_static_errors { -- err }
-  use' ./fail/test_assert_static_fail.af .catch
-  " assertion failed: 10 20 =" .assert_str_has
+fun: test_const_fold_assert_static_errors { -- Err }
+  use' ./fail/test_assert_static_fail.af
+  " assertion failed: 10 20 =" .assert_str_has .try
 
-  use' ./fail/test_assert_static_fail_after_drop_with_err.af .catch
-  " assertion failed: 123 234 =" .assert_str_has
+  use' ./fail/test_assert_static_fail_after_drop_with_err.af
+  " assertion failed: 123 234 =" .assert_str_has .try
 end
 .test_const_fold_assert_static_errors
 

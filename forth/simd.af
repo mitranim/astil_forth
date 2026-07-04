@@ -2,8 +2,6 @@ use' ./lang.af
 
 \ BOT-ASSISTED
 
-true .try_all
-
 \ ld1 {Vt.16b}, [Xn]
 fun: asm_ld1_16b { Vt Xn -> instr }
   5 .lsl .or 0b01001100010_00000_011100_00000_00000 .or

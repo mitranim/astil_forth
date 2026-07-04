@@ -4,11 +4,11 @@ use' pthread.af
 
 \ Passed to `pthread_spawn` by raw instruction address.
 \ We have no hidden adapters between Forth and libc.
-fun: callback { inout -- err }
+fun: callback { inout -- Err }
   inout @ { path }
   " [child] checking length of `%s`..." path .logf .lf
 
-  alloca' Fstat       { stat }
+  alloca' Fstat { stat }
   path stat .path_stat { err }
 
   ifz err .then

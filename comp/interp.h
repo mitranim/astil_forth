@@ -19,7 +19,6 @@ SYNC[interp_module_fields].
 */
 typedef struct {
   Reader reader;
-  bool   try_all;
   bool   slop;
 } Module_ctx;
 

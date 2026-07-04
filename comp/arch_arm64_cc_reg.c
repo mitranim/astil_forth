@@ -232,9 +232,9 @@ a function type such as, for example, `Err Func(intptr_t)`, obtain a pointer
 to a Forth word with that signature, and call it as-is, without glue.
 
 We also provide shortcuts `.try` / `.throw` for returning an error locally,
-very similar to Swift. We also provide an opt-in `.try_all` setting, which
-causes the compiler to implicitly insert `.try` for errors, reducing noise.
-It still keeps errors in word signatures, which always reflect word ABI.
+very similar to Swift. A trailing output named `err` enables implicit `.try`
+inside the current word, reducing noise. A trailing output named `Err` keeps
+errors visible for manual handling. Both spellings use the same ABI.
 
 The cost of `.try` here is between 1 and 3 instructions on Arm64.
 */
@@ -312,9 +312,7 @@ address (under little endian) to be garbage. We need ALL stores of output
 values to be word-sized. Intrinsic functions must define their output
 pointers appropriately.
 */
-static Err asm_append_call_intrin(
-  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
-) {
+static Err asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
   (void)caller;
   assert_fatal(callee->type == SYM_INTRIN);
 
@@ -359,8 +357,6 @@ static Err asm_append_call_intrin(
       reg++;
     }
   }
-
-  (void)err_mode;
 
   return nullptr;
 }

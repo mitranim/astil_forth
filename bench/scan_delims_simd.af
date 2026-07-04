@@ -3,8 +3,6 @@ use' simd.af
 
 \ BOT-ASSISTED
 
-true .try_all
-
 65536     let: CAP
 4096      let: RUNS
 150994944 let: WANT
@@ -101,7 +99,7 @@ fun: run { -- err }
 end
 .run
 
-fun: main { -- exit } [ false .try_all ]
+fun: main { -- exit }
   .run { err }
   ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end

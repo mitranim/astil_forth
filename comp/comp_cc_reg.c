@@ -86,7 +86,7 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ptr_clear(&ctx->arg_len);
   ptr_clear(&ctx->compiling);
   ptr_clear(&ctx->redefining);
-  ptr_clear(&ctx->try_all);
+  ptr_clear(&ctx->auto_try);
   ptr_clear(&ctx->slop);
 }
 
@@ -116,8 +116,7 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->arg_len    = prev->arg_len;
   next->redefining = prev->redefining;
   next->compiling  = prev->compiling;
-  next->has_alloca = prev->has_alloca;
-  next->try_all    = prev->try_all;
+  next->auto_try   = prev->auto_try;
   next->slop       = prev->slop;
 
   stack_rewind(&prev->locals, &next->locals);
@@ -147,9 +146,8 @@ static Comp_arg comp_arg_local(Local *loc) {
 
 static Local *comp_arg_local_ref(const Comp_arg *arg) {
   switch (arg->type) {
-    case COMP_ARG_UNKNOWN: [[fallthrough]];
-    case COMP_ARG_IMM:     [[fallthrough]];
-    case COMP_ARG_ERR:     return nullptr;
+    case COMP_ARG_UNKNOWN:
+    case COMP_ARG_IMM:     return nullptr;
     case COMP_ARG_LOC:     return arg->loc;
     default:               unreachable();
   }
@@ -610,7 +608,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   Search for another register already associated with this local. This lets us
   immediately compile a mov instruction and avoid emitting a fixup.
   */
-  for (S8 src_reg = (int)arr_cap(ctx->args) - 1; src_reg >= 0; src_reg--) {
+  for (S8 src_reg = arr_cap(ctx->args) - 1; src_reg >= 0; src_reg--) {
     const auto src_arg = &ctx->args[src_reg];
 
     if (comp_arg_local_ref(src_arg) != loc) continue;
@@ -697,64 +695,41 @@ static Err comp_before_append_call(Comp *comp, const Sym *callee) {
   return nullptr;
 }
 
-static Err comp_append_auto_try(
-  Comp *comp, const Sym *caller, const Sym *callee, Comp_arg_err *out
-) {
+static Err comp_append_auto_try(Comp *comp, const Sym *caller, const Sym *callee) {
   try_assert(callee->has_err);
 
   const U8 caller_reg = caller->out_len - 1;
   const S8 callee_reg = asm_sym_err_reg(callee);
   try_assert(callee_reg >= 0);
 
-  const auto ctx         = &comp->ctx;
-  const auto instrs      = &comp->code.code_write;
-  const Ind  instr_floor = instrs->len;
-  const Sint fix_len     = stack_len(&ctx->asm_fix);
-  try_assert(fix_len >= 0 && fix_len <= IND_MAX);
-  const Ind fix_ind = (Ind)fix_len;
-
   asm_append_try(comp, caller_reg, (U8)callee_reg);
-
-  try_assert(instrs->len > instr_floor);
-  try_assert(stack_len(&ctx->asm_fix) == fix_ind + 1);
-
-  *out = (Comp_arg_err){
-    .try_instr_floor = instr_floor,
-    .try_instr_ceil  = instrs->len,
-    .try_fix_ind     = fix_ind,
-  };
   return nullptr;
 }
 
 static Err comp_after_append_call(
   Comp *comp, const Sym *caller, const Sym *callee, bool auto_try
 ) {
-  const auto ctx          = &comp->ctx;
-  const bool auto_try_err = auto_try && callee->has_err;
+  const auto ctx = &comp->ctx;
 
-  Comp_arg_err err = {};
-  if (auto_try_err) {
-    try(comp_append_auto_try(comp, caller, callee, &err));
+  if (auto_try) {
+    try(comp_append_auto_try(comp, caller, callee));
   }
 
   /*
-  An error, if any, is returned in the last output GPR. By default, errors are
-  visible. We also support blanket implicit "try" via `.try_all`. In that case,
-  `comp_append_auto_try` inserts the implicit "try", and makes the error value
-  invisible, while still associating it with the corresponding `Comp_arg` val,
-  for the purpose or backtracking via `.catch` if any.
+  An error if any is returned in the last output GPR. By default errors are
+  visible. In functions whose last output parameter is named exactly `err`,
+  the compiler implicitly inserts "try" which propagates errors to callers.
+  In all other functions, including ones with a trailing `Err` output param,
+  errors remain visible for manual handling.
   */
-  ctx->arg_len = callee->out_len - auto_try_err;
+  ctx->arg_len = callee->out_len - auto_try;
   for (U8 ind = 0; ind < callee->out_len; ind++) {
     ctx->args[ind] = comp_arg_unknown();
-  }
-  if (auto_try_err) {
-    ctx->args[callee->out_len - 1] = (Comp_arg){.type = COMP_ARG_ERR, .err = err};
   }
   return nullptr;
 }
 
-static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
+static Err comp_append_call_norm(Comp *comp, Sym *callee, bool auto_try) {
   IF_DEBUG(assert_fatal(callee->type == SYM_NORM));
 
   Sym *caller;
@@ -762,24 +737,24 @@ static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
   try(comp_before_append_call(comp, callee));
 
   if (callee->norm.inlinable) {
-    try(asm_inline_sym(comp, caller, callee, err_mode));
+    try(asm_inline_sym(comp, caller, callee, auto_try));
   }
   else {
-    try(asm_append_call_norm(comp, caller, callee, err_mode));
+    try(asm_append_call_norm(comp, caller, callee, auto_try));
     sym_register_call(caller, callee);
   }
 
-  try(comp_after_append_call(comp, caller, callee, err_mode));
+  try(comp_after_append_call(comp, caller, callee, auto_try));
   return nullptr;
 }
 
-static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool err_mode) {
+static Err comp_append_call_intrin(Comp *comp, Sym *callee, bool auto_try) {
   IF_DEBUG(assert_fatal(callee->type == SYM_INTRIN));
   Sym *caller;
   try(comp_require_current_sym(comp, &caller));
   try(comp_before_append_call(comp, callee));
-  try(asm_append_call_intrin(comp, caller, callee, err_mode));
-  try(comp_after_append_call(comp, caller, callee, err_mode));
+  try(asm_append_call_intrin(comp, caller, callee));
+  try(comp_after_append_call(comp, caller, callee, auto_try));
   sym_register_call(caller, callee);
   return nullptr;
 }
@@ -792,8 +767,8 @@ static Err comp_append_call_extern(Comp *comp, Sym *callee) {
   try(comp_before_append_call(comp, callee));
   asm_append_call_extern(comp, callee);
 
-  constexpr bool err_mode = false;
-  try(comp_after_append_call(comp, caller, callee, err_mode));
+  constexpr bool auto_try = false;
+  try(comp_after_append_call(comp, caller, callee, auto_try));
   sym_register_call(caller, callee);
   return nullptr;
 }

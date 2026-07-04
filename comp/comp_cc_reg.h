@@ -130,12 +130,6 @@ typedef struct {
   Ind  ceil;  // For backtracking: just above last instruction.
 } Comp_arg_imm;
 
-typedef struct {
-  Ind try_instr_floor;
-  Ind try_instr_ceil;
-  Ind try_fix_ind;
-} Comp_arg_err;
-
 /*
 Value associated with a register.
 
@@ -146,13 +140,11 @@ typedef struct {
     COMP_ARG_UNKNOWN,
     COMP_ARG_IMM,
     COMP_ARG_LOC,
-    COMP_ARG_ERR,
   } type;
 
   union {
     Comp_arg_imm imm;
     Local       *loc;
-    Comp_arg_err err;
   };
 } Comp_arg;
 
@@ -182,7 +174,6 @@ typedef struct {
   Loc_fixups loc_fix;    // For resolving stable locations for locals.
   bool       redefining; // Temporarily suppress "redefined" diagnostic.
   bool       compiling;  // Turned on by `:` and `]`, turned off by `[`.
-  bool       has_alloca; // True if SP is dynamically adjusted in the body.
-  bool       try_all;    // Auto-"try" when calling words with `.has_err`.
+  bool       auto_try;   // Current word auto-returns callee errors.
   bool       slop;       // Disable rejection of sloppy code.
 } Comp_ctx;

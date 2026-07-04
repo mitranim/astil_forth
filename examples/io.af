@@ -11,7 +11,7 @@ fun: example_file_stat { -- err }
   " examples/io.af" { path }
   alloca' Fstat     { stat }
 
-  path stat .path_stat .try
+  path stat .path_stat
 
   stat .Fstat_size @    { size }
   stat .Fstat_mtimespec { mtime }
@@ -31,10 +31,9 @@ end
 
 128 mem: BUF
 
-fun: example_seek_and_thou_shall_find { -- err }
-  " examples/io.af"       { path }
+fun: example_seek_and_thou_shall_find { -- Err }
+  " examples/io.af" { path }
   path " r" .file_open .try { file }
-
   37 91 { off cap }
 
   if file off 0 .fseek .is_err_flag .then

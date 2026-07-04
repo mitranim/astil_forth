@@ -9,8 +9,8 @@ use' ./io.af
 \ Procedures which return -1 on error should usually
 \ be followed by the test `is_err_flag` or `?os_err`:
 \
-\   some_word " unable to blah" ?os_err { err }
-\   some_word " unable to blah" ?os_err .try
+\   .some_word " unable to blah" ?os_err { err }
+\   .some_word " unable to blah" ?os_err .try
 \
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
@@ -83,7 +83,7 @@ fun: sock_close { sock -> err }
   .close .is_err_flag " unable to close socket" ?os_err
 end
 
-fun: sock_bind { info backlog -- sock err }
+fun: sock_bind { info backlog -- sock Err }
   info .Addrinfo_family   @ { fam  }
   info .Addrinfo_socktype @ { type }
   info .Addrinfo_protocol @ { prot }
@@ -112,7 +112,7 @@ fun: sock_bind { info backlog -- sock err }
   sock err
 end
 
-fun: net_listen { port backlog -- sock err }
+fun: net_listen { port backlog -- sock Err }
   port .net_addr_info .try { ainf }
   -1   { sock }
   ainf { next }

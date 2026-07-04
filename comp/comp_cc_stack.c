@@ -120,6 +120,14 @@ static void comp_add_clobbers(Sym *caller, const Sym *callee) {
   if (bits_has(callee->clobber, reg)) bits_add_to(&caller->clobber, reg);
 }
 
+static Err comp_inline_sym(
+  Comp *comp, Sym *caller, const Sym *callee, bool err_mode
+) {
+  try(comp_require_current_sym(comp, nullptr));
+  try(asm_inline_sym(comp, caller, callee, err_mode));
+  return nullptr;
+}
+
 static Err comp_append_call_norm(Comp *comp, Sym *callee, bool err_mode) {
   IF_DEBUG(assert_fatal(callee->type == SYM_NORM));
 

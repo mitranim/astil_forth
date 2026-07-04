@@ -13,10 +13,10 @@ fun: main { -- err }
   instr' callback { instr } \ Raw instruction address.
 
   " [main] spawning..." .log .lf
-  instr nil .thread_spawn .try { thread }
+  instr nil .thread_spawn { thread }
 
   " [main] joining..." .log .lf
-  thread .thread_join .try { err }
+  thread .thread_join { err }
 
   " [main] received error: %s" err .logf .lf
 end

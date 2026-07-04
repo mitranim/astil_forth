@@ -193,6 +193,13 @@ static Err intrin_interp_only(Interp *interp) {
   return nullptr;
 }
 
+static Err intrin_inline(Interp *interp) {
+  Sym *sym;
+  try(interp_require_current_sym(interp, &sym));
+  sym->norm.inlinable = true;
+  return nullptr;
+}
+
 /*
 Caution: unlike most Forth systems, because of Apple's W^X restrictions,
 we use two code heaps: writable and executable. Control structures often
@@ -457,6 +464,25 @@ static const USED auto INTRIN_CATCH = (Sym){
   .inp_len  = 1,
   .out_len  = 1,
   .has_err  = true,
+};
+
+static const USED auto INTRIN_INLINE = (Sym){
+  .name.buf  = "inline",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_inline,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_INLINE_WORD = (Sym){
+  .name.buf  = "inline_word",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_inline_word,
+  .inp_len   = 1,
+  .out_len   = 1,
+  .has_err   = true,
+  .comp_only = true,
 };
 
 static const USED auto INTRIN_DEBUG_WORD = (Sym){

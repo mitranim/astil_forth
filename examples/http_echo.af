@@ -35,16 +35,16 @@ end
 
 fun: respond_conn { conn -- err }
   BUF_CAP .alloca { buf }
-  conn buf BUF_CAP .read_req .try { len }
+  conn buf BUF_CAP .read_req { len }
 
   " [srv] incoming request:" .elog .elf .elf
   STDERR buf len .write_opt .elf
 
-  conn s" HTTP/1.1 200 OK"   .write_all .try conn .write_eol .try
-  conn s" Connection: close" .write_all .try conn .write_eol .try
-  conn                                            .write_eol .try
-  conn s" request echo:"     .write_all .try conn .write_eol .try conn .write_eol .try
-  conn buf len               .write_all .try conn .write_eol .try
+  conn s" HTTP/1.1 200 OK"   .write_all conn .write_eol
+  conn s" Connection: close" .write_all conn .write_eol
+  conn                                       .write_eol
+  conn s" request echo:"     .write_all conn .write_eol conn .write_eol
+  conn buf len               .write_all conn .write_eol
 
   " [srv] echoed request back to client" .elog .elf
 end
@@ -64,10 +64,10 @@ fun: handle_conn { conn -> }
 end
 
 fun: run { -- err }
-  " 2345"                       { port }
-  128                           { backlog }
-  instr' handle_conn            { handler }
-  port backlog .net_listen .try { sock }
+  " 2345"                  { port }
+  128                      { backlog }
+  instr' handle_conn       { handler }
+  port backlog .net_listen { sock }
 
   " [srv] listening on http://localhost:%s" port .elogf .elf
 
@@ -75,9 +75,10 @@ fun: run { -- err }
   sock .sock_close \ Unreachable.
 end
 
+.run
+
+\ For AOT builds only. Requires commenting out root `.run`.
 fun: main { -- exit }
   .run { err }
   ifz err .then 0 else " error: %s" err .elogf .elf 1 end
 end
-
-.run

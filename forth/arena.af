@@ -1,11 +1,11 @@
 use' lang.af
 
 \ Simple arena allocator. Maps memory pages on demand.
-\ Supports truncating .while keeping full capacity.
+\ Supports truncating while keeping full capacity.
 \ Pages are NOT contiguous with each other.
 
 1 22 .lsl let: ARENA_PAGE_MIN
-4096     let: ARENA_PAGES
+4096      let: ARENA_PAGES
 
 struct: Arena
   Stack 1 field: Arena_pages \ `stack_of(Stack)`
@@ -14,7 +14,7 @@ end
 
 fun: arena_init { arn -> } size' Arena .memzero end
 
-fun: arena_deinit { arn -> err }
+fun: arena_deinit { arn -> Err }
   ifz .then .ret end
 
   arn .Stack_floor @ { floor }
@@ -32,7 +32,7 @@ fun: arena_deinit { arn -> err }
   err
 end
 
-\ Truncate every page and reset to first page if any, .while keeping capacity.
+\ Truncate every page and reset to first page if any, while keeping capacity.
 fun: arena_trunc { arn -> }
   ifz .then .ret end
 
@@ -54,11 +54,11 @@ fun: arena_alloc { size arn -- adr err }
 
   arn .Arena_low @ { low }
   arn .Stack_top @ { ceil }
-  nil              { page }
-  nil              { adr }
+  nil { page }
+  nil { adr }
 
   ifz arn stack? .then
-    ARENA_PAGES size' Stack * arn .stack_init .try
+    ARENA_PAGES size' Stack * arn .stack_init
   end
 
   low { page }
@@ -72,7 +72,7 @@ fun: arena_alloc { size arn -- adr err }
 
   ifz adr .then
     arn .Stack_top @ { page }
-    size ARENA_PAGE_MIN .max page .stack_init .try
+    size ARENA_PAGE_MIN .max page .stack_init
     page size' Stack + arn .Stack_top !
     page .Stack_top @ { adr }
   end

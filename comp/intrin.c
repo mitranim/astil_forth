@@ -66,7 +66,6 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
 
 #ifndef CALL_CONV_STACK
   interp->comp.ctx.slop = interp->module ? interp->module->slop : interp->slop;
-  interp->comp.ctx.try_all = interp->module ? interp->module->try_all : false;
 #endif
   return nullptr;
 }
@@ -136,13 +135,6 @@ static void intrin_bracket_beg(Interp *interp) {
 
 static void intrin_bracket_end(Interp *interp) {
   interp->comp.ctx.compiling = true;
-}
-
-static Err intrin_inline(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  sym->norm.inlinable = true;
-  return nullptr;
 }
 
 static Err intrin_redefine(Interp *interp) {
@@ -610,15 +602,6 @@ static const USED auto INTRIN_INTERP_ONLY = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_INLINE = (Sym){
-  .name.buf  = "inline",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_inline,
-  .out_len   = 1,
-  .has_err   = true,
-  .comp_only = true,
-};
-
 static const USED auto INTRIN_REDEFINE = (Sym){
   .name.buf  = "redefine",
   .wordlist  = WORDLIST_EXEC,
@@ -785,16 +768,6 @@ static const USED auto INTRIN_FIND_WORD = (Sym){
   .inp_len  = 3,
   .out_len  = 2,
   .has_err  = true,
-};
-
-static const USED auto INTRIN_INLINE_WORD = (Sym){
-  .name.buf  = "inline_word",
-  .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_inline_word,
-  .inp_len   = 1,
-  .out_len   = 1,
-  .has_err   = true,
-  .comp_only = true,
 };
 
 // Renamed from standard Forth `execute`.

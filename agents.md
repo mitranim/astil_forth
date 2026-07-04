@@ -6,15 +6,15 @@ Stack-CC legacy: errors are exceptions.
 
 Reg-CC variant:
 
-Default: errors are regular outputs. Compiler doesn't care whether an output semantically represents an error, unless `.try`, `.throw`, or `.try_all` is used. By convention, we use C-strings as errors.
+Default: errors are regular outputs. Compiler doesn't care whether an output semantically represents an error, unless `.try`, `.throw`, or the trailing `err`/`Err` output convention is used. By convention, we use C-strings as errors.
 
 Callsites use `.try` to check visible error value from call; `.try` consumes last output register; requires current word to have its own error output.
 
-By convention, when last output param is named exactly `err`, current word gets `Sym.has_err = true`. This lets current word use explicit `.try` / `.throw`, and lets callers compiled under `.try_all` auto-insert `.try` when calling this word.
+By convention, when last output param is named exactly `err` or `Err`, current word gets `Sym.has_err = true`. This lets current word use explicit `.try` / `.throw`; callers with trailing `err` auto-insert `.try` when calling this word.
 
 `.throw` requires 1 arg; requires current word to have its own error output; unconditionally moves input to error output register and returns.
 
-`true .try_all` enables implicit `.try`; non-IO code prefers this style. Code which involves resource cleanup prefers `false .try_all`, which is the default. This setting is file-scoped and function-scoped.
+Trailing `err` enables implicit `.try` inside the current word; non-resource code prefers this style. Trailing `Err` keeps errors locally visible; code which involves resource cleanup prefers this style. This policy is function-local and not part of ABI.
 
 How to return:
 
@@ -75,6 +75,6 @@ When editing `.af` under reg-CC:
 - Regular functions, intrinsics, and externs follow the same call-like rule.
 - Non-ident callable names are already call-like; do not add dot to `+`, `!b`, `u/mod`, `fun:`, or `xt'`.
 - Control-only words are plain by design: `if ifz else elif elifz end loop leave again assert`.
-- Control words which operate on runtime args use call-like spelling. Example control words which require dot-call: `.then .while .try .throw .ret .recur .catch`.
+- Control words which operate on runtime args use call-like spelling. Example control words which require dot-call: `.then .while .try .throw .ret .recur`.
 - At file/eval root, `.ret` stops interpreting current input and leaves interpreter stack as-is; inside a compiled word, `.ret` returns current outputs.
 - Stored names cannot begin with `.` or look like numeric literals.
