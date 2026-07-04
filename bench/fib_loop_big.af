@@ -15,8 +15,8 @@ fun: fib { depth -- lo hi }
   0 0 1 0 { prev_lo prev_hi next_lo next_hi }
   depth { ind }
   loop
+    ind .while
     dec: ind
-    ind >=0 .while
     prev_lo prev_hi next_lo next_hi .int128_add { sum_lo sum_hi }
     next_lo next_hi { prev_lo prev_hi }
     sum_lo sum_hi { next_lo next_hi }
@@ -39,8 +39,8 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   hi { word }
   64 { ind }
   loop
+    ind .while
     dec: ind
-    ind >=0 .while
     qhi word 63 .lsr rem .bigint_divmod10_step { qhi rem }
     word 1 .lsl { word }
   end
@@ -48,8 +48,8 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   lo { word }
   64 { ind }
   loop
+    ind .while
     dec: ind
-    ind >=0 .while
     qlo word 63 .lsr rem .bigint_divmod10_step { qlo rem }
     word 1 .lsl { word }
   end
@@ -84,10 +84,10 @@ fun: bigint_log_decimal { lo hi }
 end
 
 fun: run
-  1 18 .lsl { ind }
+  1 18 .lsl { runs }
   loop
-    dec: ind
-    ind >=0 .while
+    runs .while
+    dec: runs
     184 .fib { -- }
   end
   \ 184 .fib .bigint_log_decimal .lf

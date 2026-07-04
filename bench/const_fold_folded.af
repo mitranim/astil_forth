@@ -3,7 +3,7 @@ use' lang.af
 \ BOT-GENERATED
 
 1 24 .lsl let: RUNS
-214 RUNS * let: EXPECT
+214 RUNS * let: WANT
 
 fun: folded_step { acc -- out }
   acc
@@ -14,15 +14,15 @@ end
 
 fun: run { -- err }
   0 { acc }
+  RUNS { runs }
 
-  RUNS { ind }
   loop
-    dec: ind
-    ind >=0 .while
+    runs .while
+    dec: runs
     acc .folded_step { acc }
   end
 
-  assert acc EXPECT = end
+  assert= acc WANT end
 end
 .run
 

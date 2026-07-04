@@ -2,10 +2,6 @@ use' lang.af
 
 \ Adapted from Gforth's `sieve.fs`.
 
-4096 let: RUNS
-8192 let: CAP
-CAP  mem: FLAGS
-
 fun: find_prime { flags cap -- num }
   flags cap 1 .memfill
   flags cap + 0 3 { ceil num step }
@@ -33,13 +29,16 @@ fun: find_prime { flags cap -- num }
 end
 
 fun: run
-  \ FLAGS CAP .find_prime .log_int .lf
+  8192 { cap }
+  cap .alloca { flags }
+  4096 { runs }
 
-  RUNS { ind }
+  \ flags cap .find_prime .log_int .lf
+
   loop
-    dec: ind
-    ind >=0 .while
-    FLAGS CAP .find_prime { -- }
+    runs .while
+    dec: runs
+    flags cap .find_prime { -- }
   end
 end
 .run

@@ -17,13 +17,12 @@ fun: run
 
   1 22 .lsl .inc { ind }
   loop
+    ind .while
     dec: ind
-    ind >=0 .while
     str len .reverse
   end
 
-  \ str .log .lf
-  \ fedcba9876543210
+  \ str .log .lf \ fedcba9876543210
 end
 .run
 

@@ -5,37 +5,39 @@ use' simd.af
 
 true .try_all
 
-65536 let: CAP
-4096  let: RUNS
+65536     let: CAP
+4096      let: RUNS
 150994944 let: WANT
-CAP mem: BUF
-16  mem: PAT
+16        let: SRC_LEN
+SRC_LEN   mem: SRC
+256       mem: DELS
+
 1 1 extern: getenv
 
-char' { PAT 0  + !b
-char' a PAT 1  + !b
-char' , PAT 2  + !b
-char' b PAT 3  + !b
-char' : PAT 4  + !b
-char' c PAT 5  + !b
-char' [ PAT 6  + !b
-char' d PAT 7  + !b
-char' ] PAT 8  + !b
-char' e PAT 9  + !b
-char' } PAT 10 + !b
-SPACE   PAT 11 + !b
-LF      PAT 12 + !b
-TAB     PAT 13 + !b
-char' f PAT 14 + !b
-char' g PAT 15 + !b
+char' { SRC 0  + !b
+char' a SRC 1  + !b
+char' , SRC 2  + !b
+char' b SRC 3  + !b
+char' : SRC 4  + !b
+char' c SRC 5  + !b
+char' [ SRC 6  + !b
+char' d SRC 7  + !b
+char' ] SRC 8  + !b
+char' e SRC 9  + !b
+char' } SRC 10 + !b
+SPACE   SRC 11 + !b
+LF      SRC 12 + !b
+TAB     SRC 13 + !b
+char' f SRC 14 + !b
+char' g SRC 15 + !b
 
-fun: init
-  BUF { ptr }
+fun: init { buf len }
+  buf len + { ceil }
   0 { ind }
   loop
-    ptr BUF CAP + < .while
-    PAT ind 15 .and + @u8 ptr !8
-    inc: ptr
+    buf ceil < .while
+    ind SRC_LEN .mod SRC + @b buf !b
+    inc: buf
     inc: ind
   end
 end
@@ -83,16 +85,19 @@ fun: scan { pat len -- count }
 end
 
 fun: run { -- err }
-  .init
+  CAP .alloca { buf }
+  buf CAP .init
   0 { out }
-  RUNS { run }
+  RUNS { runs }
+
   loop
-    dec: run
-    run >=0 .while
-    BUF CAP .scan +: out
+    runs .while
+    dec: runs
+    buf CAP .scan +: out
   end
+
   " SCAN_DELIMS_PRINT" .getenv if .then out .log_int .lf end
-  assert out WANT = end
+  assert= out WANT end
 end
 .run
 

@@ -3,18 +3,18 @@ use' lang.af
 fun: fib { ind -- out }
   0 1 { prev next }
   loop
+    ind .while
     dec: ind
-    ind >=0 .while
     prev next + next { next prev }
   end
   next
 end
 
 fun: run
-  1 20 .lsl { ind }
+  1 20 .lsl { runs }
   loop
-    dec: ind
-    ind >=0 .while
+    runs .while
+    dec: runs
     91 .fib { -- }
   end
   \ 91 .fib .log_int .lf

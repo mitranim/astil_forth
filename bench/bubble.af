@@ -1,9 +1,6 @@
 use' lang.af
 
-\ Translated from Gforth's `bubble.fs`.
-
-8192       let: LEN
-LEN .cells mem: LIST
+\ Adapted from Gforth's `bubble.fs`.
 
 fun: list_ceil { list len -> adr } .cells + end
 
@@ -60,7 +57,10 @@ fun: bubble_sort { list len -- err }
   list len .list_verify
 end
 
-fun: run { -- err } LIST LEN .bubble_sort end
+fun: run { -- err }
+  8192 { len }
+  len .cells .alloca len .bubble_sort
+end
 .run
 
 fun: main { -- exit }

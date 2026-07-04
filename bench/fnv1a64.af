@@ -2,12 +2,11 @@ use' lang.af
 
 \ BOT-ASSISTED
 
-0xcbf29ce484222325 let: OFFSET
-0x100000001b3      let: PRIME
+0xcbf29ce484222325 let: FNV_OFFSET_BASIS
+0x100000001b3      let: FNV_PRIME
 0x8d8a704cbb222325 let: WANT
-512   let: RUNS
-65536 let: CAP
-CAP   mem: BUF
+65536              let: CAP
+512                let: RUNS
 
 1 1 extern: getenv
 
@@ -28,20 +27,25 @@ fun: fnv1a64 { hash buf len -- hash }
   hash
   loop
     buf ceil < .while
-    buf @b .xor PRIME *
+    buf @b .xor FNV_PRIME *
     inc: buf
   end
 end
 
 fun: run { -- err }
-  BUF CAP .init
-  OFFSET { hash }
+  65536 { cap }
+  cap .alloca { buf }
+  buf cap .init
+
   RUNS { runs }
+  FNV_OFFSET_BASIS { hash }
+
   loop
+    runs .while
     dec: runs
-    runs >=0 .while
-    hash BUF CAP .fnv1a64 { hash }
+    hash buf cap .fnv1a64 { hash }
   end
+
   if " FNV1A64_PRINT" .getenv .then " 0x%zx" hash .logf .lf end
   assert= hash WANT end
 end

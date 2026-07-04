@@ -4401,7 +4401,7 @@ end
 
 \ ## Stack manipulation continued
 
-\ Variadic assignment of locals from the stack:
+\ Variadic assignment of locals from a stack. Example:
 \
 \   10 some_stack >s 20 some_stack >s 30 some_stack >s
 \   some_stack stack{ ten twenty thirty }
@@ -4437,8 +4437,8 @@ fun_comp: stack{ { -- err } ( E: stack -- )
 
   locs { ind }
   loop
+    ind .while
     dec: ind
-    ind >=0 .while
     STACK s> { loc }
     .comp_alloc_next_reg { val_reg }
     val_reg top_reg -8 .asm_load_pre .comp_instr \ ldr <val>, [<top>, -8]!
