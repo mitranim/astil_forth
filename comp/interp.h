@@ -35,16 +35,18 @@ must be kept in sync.
 SYNC[interp_fields].
 */
 typedef struct {
-  Sint_stack  ints;      // Forth integer stack.
-  Sym_dict    dict_exec; // Wordlist `WORDLIST_EXEC`.
-  Sym_dict    dict_comp; // Wordlist `WORDLIST_COMP`.
-  Sym_stack   syms;      // Defined symbols.
-  Module_ctx *module;    // Context of the foremost module being read.
-  Str_set     imports;   // Realpaths of already-imported files.
-  Comp        comp;      // Code and compilation context.
-  Interp_snap snap;      // Stable snapshot for rewinding.
-  bool        welcomed;  // Already printed REPL help.
-  bool        slop;      // Disable validation of sloppy code in reg-CC.
+  Sint_stack   ints;      // Forth integer stack.
+  Uint         argc;      // Interpreter CLI arg count.
+  const char **argv;      // Interpreter CLI args.
+  Sym_dict     dict_exec; // Wordlist `WORDLIST_EXEC`.
+  Sym_dict     dict_comp; // Wordlist `WORDLIST_COMP`.
+  Sym_stack    syms;      // Defined symbols.
+  Module_ctx  *module;    // Context of the foremost module being read.
+  Str_set      imports;   // Realpaths of already-imported files.
+  Comp         comp;      // Code and compilation context.
+  Interp_snap  snap;      // Stable snapshot for rewinding.
+  bool         welcomed;  // Already printed REPL help.
+  bool         slop;      // Disable validation of sloppy code in reg-CC.
 } Interp;
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);

@@ -1890,7 +1890,7 @@ fun: has_interp { -- bool } interp <>0 [ false .interp_only ] end
 \
 \ This looks ridiculously unsafe and it is, but I'm a firm believer
 \ that the best API is a stable ABI. Just don't break your offsets.
-184 let: INTERP_COMP_CODE_WRITE_OFF
+200 let: INTERP_COMP_CODE_WRITE_OFF
 
 fun_comp: interp_instrs { -- err } ( E: -- adr )
   [ .plain_call ]
@@ -2579,18 +2579,21 @@ struct: Interp_comp
   Interp_comp_ctx  1 field: Interp_comp_ctx_field
 end
 
-\ Partial mirror of the outer C-based interpreter. Only fields actually read by
-\ Forth are defined; omitted tail fields are intentionally inaccessible.
+\ Partial mirror of the outer C-based interpreter. Caution: only fields actually
+\ read from Forth are defined; unused tail fields are omitted.
 \
 \ SYNC[interp_fields].
 struct: Interp
   Stack       1 field: Interp_ints
+  Cell        1 field: Interp_argc
+  Adr         1 field: Interp_argv
   Interp_dict 1 field: Interp_dict_exec
   Interp_dict 1 field: Interp_dict_comp
   Stack       1 field: Interp_sym
   Adr         1 field: Interp_module \ Interp_module_ctx*
   Interp_dict 1 field: Interp_imports
   Interp_comp 1 field: Interp_comp_field
+  \ ... other fields ...
 end
 
 \ ## Compiler context
@@ -4794,3 +4797,29 @@ fun_comp: assertu>  { -- beg cond cmp_xt end_xt err } ASM_HI xt' u>  .assert_bin
 fun_comp: assertu<  { -- beg cond cmp_xt end_xt err } ASM_LO xt' u<  .assert_bin_init end
 fun_comp: assertu<= { -- beg cond cmp_xt end_xt err } ASM_LS xt' u<= .assert_bin_init end
 fun_comp: assertu>= { -- beg cond cmp_xt end_xt err } ASM_HS xt' u>= .assert_bin_init end
+
+\ ## CLI args
+
+\ Interp/JIT-only shortcut for accessing extra CLI args.
+\ The outer interpreter uses CLI args up to `--` if any.
+\ This word returns the leftover args, starting at `--`.
+\
+\ Note: AOT-compiled programs just use args received in `main`.
+fun: interp_args { -- argc argv err }
+  ifz interp .then
+    " `interp_args` available only in interpretation; hint: in AOT, pass argc/argv from `main`"
+    .throw
+  end
+
+  interp .Interp_argv @ { argv }
+  interp .Interp_argc @ .cells argv + { ceil }
+
+  loop
+    argv ceil < .while
+    argv @ " --" cstr<> .while
+    +cell: argv
+  end
+
+  ceil argv - /cells { argc }
+  if argc .then argc argv else 0 nil end
+end

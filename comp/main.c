@@ -33,6 +33,7 @@ static void print_help() {
     "  --debug  -- extremely verbose debug logging\n"
     "  --trace  -- enable C stack traces on errors\n"
     "  --timing -- print per-import execution time\n"
+    "  --       -- stop interpreting CLI arguments\n"
     "\n"
     "Env vars:\n"
     "\n"
@@ -87,6 +88,9 @@ static Err main_run(int argc, const char *argv[]) {
 
   Interp interp = {};
   try(interp_init(&interp));
+  interp.argc = (Uint)argc;
+  interp.argv = argv;
+
   try(env_bool("SLOP", &interp.slop));
   try(init_exception_handling());
 
@@ -121,6 +125,9 @@ static Err main_run(int argc, const char *argv[]) {
       if (timing) timing_end(&time);
       continue;
     }
+
+    // Conventional args terminator. The program is free to use the rest.
+    if (!strcmp(key, "--")) break;
 
     bool ok;
 
