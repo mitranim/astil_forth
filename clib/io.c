@@ -279,7 +279,13 @@ static Err write_all(int file, const U8 *buf, Uint len, int *out_err) {
 
     const auto err = errno;
     if (err == EINTR) continue;
-    if (err == EPIPE) return nullptr; // File closed early.
+
+    /*
+    File closed early. This branch is reached only if `SIGPIPE` is ignored,
+    blocked, or caught; otherwise our process is terminated via `SIGPIPE`
+    before `write` returns. Opt-out example: `signal(SIGPIPE, SIG_IGN);`.
+    */
+    if (err == EPIPE) return nullptr;
 
     if (out_err) *out_err = err;
     const auto msg = strerror(err);

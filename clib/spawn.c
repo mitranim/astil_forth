@@ -9,47 +9,41 @@ static Err spawn_with_stdin(
   char *const argv[], const U8 *buf, Ind len, pid_t *pid
 ) {
   int pipes[2] = {-1, -1};
-  try_errno_posix(pipe(pipes));
+  try_errno(pipe(pipes));
 
-  const auto fd_read  = pipes[0];
-  const auto fd_write = pipes[1];
+  deferred(fd_deinit) int fd_read  = pipes[0];
+  deferred(fd_deinit) int fd_write = pipes[1];
 
   posix_spawn_file_actions_t act;
-  auto err = err_errno_posix(posix_spawn_file_actions_init(&act));
-
-  if (err) {
-    close(fd_read);
-    close(fd_write);
-    return err;
-  }
+  try_errno_posix(posix_spawn_file_actions_init(&act));
+  defer posix_spawn_file_actions_destroy(&act);
 
   // Replace the child's stdin with our pipe.
   // Stdout and stderr are inherited by default.
-  posix_spawn_file_actions_adddup2(&act, fd_read, STDIN_FILENO);
+  try_errno_posix(posix_spawn_file_actions_adddup2(&act, fd_read, STDIN_FILENO));
 
   // Closing the read pipe is optional.
   // Closing the write pipe in the child allows to deliver EOF.
-  posix_spawn_file_actions_addclose(&act, fd_read);
-  posix_spawn_file_actions_addclose(&act, fd_write);
+  try_errno_posix(posix_spawn_file_actions_addclose(&act, fd_read));
+  try_errno_posix(posix_spawn_file_actions_addclose(&act, fd_write));
 
   const auto               cmd  = argv[0];
   const posix_spawnattr_t *attr = nullptr;
   char *const             *env  = nullptr;
 
-  err = err_errno_posix(posix_spawnp(pid, cmd, &act, attr, argv, env));
-  posix_spawn_file_actions_destroy(&act);
+  const auto err = err_errno_posix(posix_spawnp(pid, cmd, &act, attr, argv, env));
+  if (err) return err_wrapf("unable to spawn `%2$s`: %1$s", err, cmd);
 
-  // Parent doesn't need the read pipe.
-  close(fd_read);
+  /*
+  If the child closes stdin early, closing our read end prevents our own fd from
+  masking the broken pipe. `write` then raises `SIGPIPE` by default, or returns
+  `EPIPE` if `SIGPIPE` is ignored, blocked, or caught.
+  */
+  fd_deinit(&fd_read);
 
-  if (err) {
-    close(fd_write);
-    return err_wrapf("unable to spawn `%2$s`: %1$s", err, cmd);
-  }
-
-  err = write_all(fd_write, buf, len, nullptr);
-  close(fd_write); // Deliver EOF to child process.
-  return err;
+  try(write_all(fd_write, buf, len, nullptr));
+  fd_deinit(&fd_write); // Deliver EOF to child process.
+  return nullptr;
 }
 
 static Err wait_pid(pid_t pid, int *status) {
