@@ -149,7 +149,7 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 \ call, then invoke this.
 fun: io_err { code action path -- err_str }
   code .strerror { msg }
-  action " unable to %s `%s`; code: %zd; msg: %s" action path code msg .wrapf
+  " unable to %s `%s`; code: %zd; msg: %s" action path code msg .errf
 end
 
 fun: fd_stat { fdes path stat_adr -- err }
@@ -233,7 +233,7 @@ end
 fun: file_err { code action -- err_str }
   ifz code .then " file error without error code: %s" action .errf .ret end
   code .strerror { msg }
-  action " file error: %s; code: %zd; msg: %s" action code msg .wrapf
+  " file error: %s; code: %zd; msg: %s" action code msg .errf
 end
 
 fun: file_open { path mode -> file err }

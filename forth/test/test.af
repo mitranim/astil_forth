@@ -2029,13 +2029,17 @@ end
 .test_strf
 
 fun: test_errf { -- err }
-  ERR_BUF_0 { buf }
+  " codes: %zd %zd %zd" 10 20 30 .errf { buf0 }
+  buf0 " codes: 10 20 30" .assert_str_eq
 
-  assert= " codes: %zd %zd %zd" 10 20 30 .errf buf end
-  buf " codes: 10 20 30" .assert_str_eq
+  " codes: %zd %zd %zd" 40 50 60 .errf { buf1 }
+  buf1 " codes: 40 50 60" .assert_str_eq
 
-  assert= " codes: %zd %zd %zd" 40 50 60 .errf buf end
-  buf " codes: 40 50 60" .assert_str_eq
+  " codes: %zd %zd %zd" 70 80 90 .errf { buf2 }
+  buf2 " codes: 70 80 90" .assert_str_eq
+
+  assert<> buf0 buf1 end
+  assert=  buf0 buf2 end
 end
 .test_errf
 
@@ -2067,9 +2071,9 @@ fun: test_try_multiple { -- err }
 end
 .test_try_multiple
 
-fun: test_wrapf { -- err }
-  nil " one" .wrapf { err0 }
-  err0 " two: %s" err0 .wrapf { err1 }
+fun: test_errf_wrap { -- err }
+  " one" .errf { err0 }
+  " two: %s" err0 .errf { err1 }
 
   \ err0 .logf .lf
   \ err1 .logf .lf
@@ -2077,15 +2081,15 @@ fun: test_wrapf { -- err }
   err0 " one" .assert_str_eq
   err1 " two: one" .assert_str_eq
 
-  err1 " three: %s" err1 .wrapf { err2 }
+  " three: %s" err1 .errf { err2 }
 
-  \ `wrapf` rotates two string buffers.
+  \ `errf` rotates two string buffers.
   assert= err0 err2 end
   assert<> err0 err1 end
 
   err2 " three: two: one" .assert_str_eq
 
-  err2 " four: %zd: %s" 123 err2 .wrapf { err3 }
+  " four: %zd: %s" 123 err2 .errf { err3 }
 
   assert<> err3 err0 end
   assert= err3 err1 end
@@ -2093,7 +2097,7 @@ fun: test_wrapf { -- err }
 
   err3 " four: 123: three: two: one" .assert_str_eq
 end
-.test_wrapf
+.test_errf_wrap
 
 fun: test_alloca { ptr -- err }
   ptr @ { -- } \ Should not segfault. The value is undefined.
@@ -3196,7 +3200,7 @@ fun: main_run { -- err }
   .test_fallback
   .test_strf
   .test_errf
-  .test_wrapf
+  .test_errf_wrap
   .test_alloca_cell
   .test_allocaz
   .test_alloca_align

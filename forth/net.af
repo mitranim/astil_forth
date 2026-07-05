@@ -130,7 +130,7 @@ fun: net_listen { port backlog -- sock Err }
   ainf .freeaddrinfo
 
   if err .then
-    err " unable to listen on port %s: socket error: %s" port err .wrapf { err }
+    " unable to listen on port %s: socket error: %s" port err .errf { err }
   elif sock <0 .then
     " unable to listen on port %s: no sockets available" port .errf { err }
   end

@@ -4141,10 +4141,6 @@ fun: cstr<> { cstr0 cstr1 -> bool } .ccompare <>0 end
 
 \ ## Vargs and formatting
 
-4096    let: ERR_CAP
-ERR_CAP mem: ERR_BUF_0
-ERR_CAP mem: ERR_BUF_1
-
 \ Short for "compile variadic arguments begin". Assumes the Apple Arm64 ABI
 \ where vargs always use the systack. Modifies the SP, which must be later
 \ restored with `comp_va_end`. Doesn't clobber any registers.
@@ -4159,13 +4155,13 @@ ERR_CAP mem: ERR_BUF_1
 fun: comp_va_beg { floor -- diff err }
   .comp_args_get           { ceil }
   ceil floor - 2 .align_up { diff }
-  diff floor +            { ceil }
+  diff floor +             { ceil }
 
   ceil { ind }
   loop
     ind 2 - { ind }
     floor ind <= .while
-    ind     { Xd }
+    ind      { Xd }
     ind .inc { Xt }
     Xd Xt ASM_REG_SP -16 .asm_store_pair_pre .comp_instr \ stp Xd, Xt, [sp, -16]!
   end
@@ -4182,8 +4178,9 @@ fun: comp_va_end { len -- err }
   end
 end
 
-\ Prepends `pre_len` args to current args. Inputs are passed on the control
-\ stack. EVERY input MUST be an execution token from `WORDLIST_COMP`.
+\ Prepends `pre_len` args to current args. Each arg is represented with an XT.
+\ Exactly `pre_len` XTs must be on top of the control stack. XTs may be either
+\ `WORDLIST_EXEC` or `WORDLIST_COMP`.
 fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
   ifz pre_len .then .ret end
 
@@ -4213,7 +4210,17 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
     dec: reg
     reg 0 >= .while
     reg .comp_args_set
-    STACK s> .call_xt
+
+    STACK s> { XT }
+    XT .Sym_wordlist @b { wlist }
+
+    if wlist WORDLIST_EXEC = .then
+      XT .comp_call
+    elif wlist WORDLIST_COMP = .then
+      XT .call_xt
+    else
+      " internal error: unrecognized wordlist in XT" .throw
+    end
   end
 
   arg_len .comp_args_set
@@ -4240,47 +4247,33 @@ end
 
 \ ## Error formatting
 
+\ Global error buffers assume a single-threaded program.
+\ TODO: support thread-local buffers.
+4096    let: ERR_CAP
+ERR_CAP mem: ERR_BUF_0
+ERR_CAP mem: ERR_BUF_1
+CELL    mem: ERR_BUF_NEXT
+
+fun: errf_buf_next { -- buf }
+  ERR_BUF_NEXT @ .inc .odd { val }
+  val ERR_BUF_NEXT !
+  if val .then ERR_BUF_0 else ERR_BUF_1 end
+end
+
 fun_comp: errf { -- err } ( E: fmt …vargs… -- err )
+  nil 0 .comp_local { buf }
   1 .comp_va_beg { len }
 
-  xt'' ERR_BUF_0 STACK >s
-  xt'' ERR_CAP   STACK >s
+  xt'  errf_buf_next STACK >s
+  xt'' ERR_CAP       STACK >s
   2 .comp_args_prepend
+  0 buf .comp_assign_local_from_reg \ Stash x0 so we can return the buffer.
 
   call_xt'' systack_ptr
   compile' vsnprintf
 
   len .comp_va_end
-  0 .comp_args_set
-  call_xt'' ERR_BUF_0
-end
-
-fun: wrapf_args { err fmt -- buf cap fmt }
-  if err ERR_BUF_0 = .then ERR_BUF_1 ERR_CAP fmt .ret end
-  ERR_BUF_0 ERR_CAP fmt
-end
-
-\ Wraps a prior error with an additional message.
-\ The prior error must always be provided as the
-\ first argument before the format, and should
-\ usually ALSO be provided in the format vargs.
-\ Usage example:
-\
-\   err " unable to blah (error code: %zd): %s" code err wrapf .throw
-\
-\ Passing the error as the first argument allows us
-\ to rotate error format buffers. You can create an
-\ error with `errf` and wrap it repeatedly.
-fun_comp: wrapf { -- err } ( C: err fmt …vargs… -- str )
-  nil 0 .comp_local { buf }
-  2 .comp_va_beg    { len }
-
-  compile' wrapf_args
-  0 buf .comp_assign_local_from_reg \ Stash x0 so we can return the buffer.
-  compile' snprintf
-
-  len .comp_va_end
-  0 .comp_args_set
+  0   .comp_args_set
   buf .comp_push_from_local \ mov xN, <buf> | ldr xN, [FP, <buf>]
 end
 
