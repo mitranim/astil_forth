@@ -45,7 +45,7 @@ contexts:
   main:
     - include: number-match
     - include: string-match
-    - include: braces-params-match
+    - include: braces-assign-match
     - include: declaring-word-match
     - include: parsing-word-ticked-match
     - include: modified-word-match
@@ -214,10 +214,23 @@ contexts:
       scope: punctuation.section.parens.end.astil_forth
       pop: 1
 
-  braces-params-match:
-    - match: '{{word_begin}}(?:{{brace_params_pre}})?(\{){{word_end}}'
+  braces-assign-match:
+    - match: '{{word_begin}}({{brace_params_pre}})?(\{){{word_end}}'
       captures:
-        1: punctuation.section.braces.begin.astil_forth
+        1: variable.function.astil_forth
+        2: punctuation.section.braces.begin.astil_forth
+      push: braces-assign-inner-pop
+
+  braces-assign-inner-pop:
+    - include: braces-end-pop
+    - match: '{{word_begin}}--{{word_end}}'
+      scope: punctuation.separator.astil_forth
+    - include: braces-param-match
+    - include: nonblank-pop
+
+  braces-params-match:
+    - match: '{{word_begin}}\{{{word_end}}'
+      scope: punctuation.section.braces.begin.astil_forth
       push: braces-params-inner-pop
 
   braces-params-inner-pop:
@@ -230,13 +243,15 @@ contexts:
     - include: nonblank-pop
 
   braces-params-output-pop:
-    - match: '{{word_begin}}(?:--|->){{word_end}}'
-      scope: punctuation.separator.astil_forth
+    - include: braces-end-pop
     - match: '{{word_begin}}(?:err|Err){{word_end}}(?=\s+})'
       scope: variable.parameter.astil_forth storage.modifier.astil_forth
+    - include: braces-param-match
+    - include: nonblank-pop
+
+  braces-param-match:
     - match: '{{word_begin}}{{braces_param}}{{word_end}}'
       scope: variable.parameter.astil_forth
-    - include: nonblank-pop
 
   braces-end-pop:
     - match: \}
@@ -253,6 +268,9 @@ contexts:
         2: keyword.declaration.astil_forth
         3: storage.modifier.astil_forth
         4: variable.declaration.astil_forth
+      push:
+        - include: braces-params-match
+        - include: nonblank-pop
 
   # Support the convention where immediate words with a trailing apostrophe are
   # expected to read the very next word in the source text, and do something
