@@ -1202,12 +1202,12 @@ fun: asm_sign_extend_32 { Xd Xn -> instr } 0 31 .asm_bitfield_move end
 \ when converting between types. Sometimes it has to be
 \ done manually, particularly when dealing with C words
 \ which return `(int)-1` which ends up being 0xffffffff.
-fun_comp: int_to_cell { -- err }
+fun_comp: cint_to_cell { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_sign_extend_32 .comp_instr \ sxtw Xd, Wn
 end
 
-fun: int_to_cell { int32 -> cell } .int_to_cell end
+fun: cint_to_cell { int32 -> cell } .cint_to_cell end
 
 \ ## Numeric comparison
 
@@ -1630,12 +1630,13 @@ end
 3 0 extern: memset  ( buf char len -- )
 3 0 extern: memcpy  ( out src len -- )
 3 0 extern: memmove ( out src len -- )
+3 1 extern: memcmp  ( adr0 adr1 len -- cmp :Cint )
 
 1 1 extern: strdup  ( cstr -- cstr )
 2 1 extern: strndup ( cstr len -- cstr )
 1 1 extern: strlen  ( cstr -- len )
-2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
-3 1 extern: strncmp ( str0 str1 len -- cmp )
+2 1 extern: strcmp  ( cstr0 cstr1 -- cmp :Cint )
+3 1 extern: strncmp ( str0 str1 len -- cmp :Cint )
 3 0 extern: strncpy ( out src str_len -- )
 3 0 extern: strlcpy ( out src buf_len -- )
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
@@ -1824,27 +1825,27 @@ fun_comp: stderr { -- err } ( E: -- adr )
   comp_extern_adr' __stderrp call_xt'' @
 end
 
-4 1 extern: fread            ( buf size len file -- len        )
-4 1 extern: fwrite           ( buf size len file -- len        )
-2 1 extern: fputs            ( buf file          -- junk|eof32 )
-2 1 extern: fputc            ( char file         -- char|eof32 )
-2 1 extern: putc             ( char file         -- char|eof32 )
-2 1 extern: putc_unlocked    ( char file         -- char|eof32 )
-1 1 extern: putchar          ( char              -- char|eof32 )
-1 1 extern: putchar_unlocked ( char              -- char|eof32 )
-2 1 extern: putw             ( char file         -- zero|eof32 )
-1 1 extern: fflush           ( file              -- err        )
-1 1 extern: fpurge           ( file              -- err        )
+4 1 extern: fread            ( buf size len file -- len           )
+4 1 extern: fwrite           ( buf size len file -- len           )
+2 1 extern: fputs            ( buf file          -- junk|-1 :Cint )
+2 1 extern: fputc            ( char file         -- char|-1 :Cint )
+2 1 extern: putc             ( char file         -- char|-1 :Cint )
+2 1 extern: putc_unlocked    ( char file         -- char|-1 :Cint )
+1 1 extern: putchar          ( char              -- char|-1 :Cint )
+1 1 extern: putchar_unlocked ( char              -- char|-1 :Cint )
+2 1 extern: putw             ( char file         -- 0|-1    :Cint )
+1 1 extern: fflush           ( file              -- 0|-1    :Cint )
+1 1 extern: fpurge           ( file              -- 0|-1    :Cint )
 
 \ Variadic formatting words; see varg support below.
-1 1 extern: printf    ( fmt               … -- len|err )
-2 1 extern: fprintf   ( file fmt          … -- len|err )
-2 1 extern: sprintf   ( buf fmt           … -- len|err )
-3 1 extern: snprintf  ( buf cap fmt       … -- len|err )
-2 1 extern: asprintf  ( buf_adr fmt       … -- len|err )
-2 1 extern: dprintf   ( fdes fmt          … -- len|err )
-3 1 extern: vfprintf  ( file fmt vlist    … -- len|err )
-4 1 extern: vsnprintf ( buf cap fmt vlist … -- len|err )
+1 1 extern: printf    ( fmt               … -- len|-1 :Cint )
+2 1 extern: fprintf   ( file fmt          … -- len|-1 :Cint )
+2 1 extern: sprintf   ( buf fmt           … -- len|-1 :Cint )
+3 1 extern: snprintf  ( buf cap fmt       … -- len|-1 :Cint )
+2 1 extern: asprintf  ( buf_adr fmt       … -- len|-1 :Cint )
+2 1 extern: dprintf   ( fdes fmt          … -- len|-1 :Cint )
+3 1 extern: vfprintf  ( file fmt vlist    … -- len|-1 :Cint )
+4 1 extern: vsnprintf ( buf cap fmt vlist … -- len|-1 :Cint )
 
 fun: eputchar { char -> flag } stderr .fputc end \ Symmetry with `putchar`.
 fun: logc     { char -> }      .putchar                 { -- } end \ Renamed from `emit`.
@@ -2253,7 +2254,7 @@ end
 \ "S" stands for "signed integer", "U" for "unsigned integer".
 \
 \ When converting shorter signed integers to wider ones,
-\ they must be sign-extended. See `int_to_cell` for `S32`.
+\ they must be sign-extended. See `cint_to_cell` for `S32`.
 \
 \ When accessing memory, use the appropriately sized/typed memory operators.
 \ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
@@ -3423,13 +3424,13 @@ fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
   true ASM_NE .comp_loc_mut_csel
 end
 
-fun_comp: int_to_cell { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .int_to_cell .cf_fold_done
-  else { -- } call_xt'' int_to_cell end
+fun_comp: cint_to_cell { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .cint_to_cell .cf_fold_done
+  else { -- } call_xt'' cint_to_cell end
 end
 
-\ Sign-extend a local from int32 to cell: `int_to_cell: some_val`.
-fun_comp: int_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
+\ Sign-extend a local from int32 to cell: `cint_to_cell: some_val`.
+fun_comp: cint_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_unary_init { reg loc }
   reg reg .asm_sign_extend_32 .comp_instr \ sxtw Xd, Wn
   loc reg .comp_loc_mut_store_realloc
@@ -3776,19 +3777,9 @@ fun_comp: !clong { -- err }              0b11      .comp_mem_store end
 fun_comp: @culong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
 fun_comp: !culong { -- err }              0b11      .comp_mem_store end
 
-\ Some `libc` functions return -1 as 32-bit `0xffff_ffff`, while some others,
-\ like `stat`, return 64-bit `0xffff_ffff_ffff_ffff`, sometimes straight from
-\ the kernel. Since there's no way to know this generically, we must always
-\ sign-extend `int` before testing for -1.
-\
-\ Should NOT be used for addresses returned by the `mmap`.
-\ Its error sentinel is 64-bit -1. The returned address
-\ may accidentally have the `int32` sign bit set.
-fun: is_err_flag { int -> bool } .int_to_cell .invert =0 end
-
-6 1 extern: mmap     ( adr size pflag mflag fdes off -- adr )
-2 1 extern: munmap   ( adr size )
-3 1 extern: mprotect ( adr size pflag -- err )
+6 1 extern: mmap     ( adr size pflag mflag fdes off -- adr|-1 )
+2 1 extern: munmap   ( adr size -- 0|-1 :Cint )
+3 1 extern: mprotect ( adr size pflag -- 0|-1 :Cint )
 
 0 let: PROT_NONE
 1 let: PROT_READ
@@ -3808,11 +3799,11 @@ fun: mem_map { size pflag -- addr err }
 end
 
 fun: mem_unmap { addr size -> err }
-  .munmap if .is_err_flag .then " unable to munmap" .throw end
+  if .munmap .then " unable to munmap" .throw end
 end
 
 fun: mem_prot { addr size pflag -> err }
-  .mprotect if .is_err_flag .then " unable to mprotect" .throw end
+  if .mprotect .then " unable to mprotect" .throw end
 end
 
 fun: mem_unprot { addr size -> err } PROT_RW .mem_prot end
@@ -4125,21 +4116,19 @@ end
 
 \ ## String comparison continued
 
-\ `strncmp` doesn't like null string pointers.
-fun: compare { str0 len0 str1 len1 -- direction }
-  ifz   str0 str1 .or .then 0
-  elifz str0         .then -1
-  elifz str1         .then +1
-  else  str0 str1 len0 len1 .max .strncmp
-  end
+fun: compare { str0 len0 str1 len1 -- cmp }
+  0 { cmp }
+  len0 len1 .min { len }
+  if len .then str0 str1 len .memcmp .cint_to_cell { cmp } end
+  len0 len1 - cmp .fallback
 end
 
 \ `strcmp` doesn't like null string pointers.
 fun: ccompare { cstr0 cstr1 -- cmp }
   ifz   cstr0 cstr1 .or .then 0
-  elifz cstr0          .then -1
-  elifz cstr1          .then +1
-  else  cstr0 cstr1 .strcmp
+  elifz cstr0           .then -1
+  elifz cstr1           .then +1
+  else  cstr0 cstr1 .strcmp .cint_to_cell
   end
 end
 
@@ -4311,26 +4300,14 @@ fun: fatal { err } " fatal: %s" err .elogf .elf .abort end
 fun: errno { -- code } .__error @s32 end
 
 \ `code` comes from `errno`, `ferror`, Posix functions, etc.
-\ See `is_err_flag` earlier for detection of -1 error codes.
 fun: os_err { code ctx -- err_str }
   code .strerror { msg }
-  if msg .then
-    " %s; code: %zd; msg: %s" ctx code msg .errf .ret
-  end
-  " %s; code: %zd" ctx code .errf
+  " %s; code: %zd; msg: %s" ctx code msg .errf
 end
 
-\ Shortcut for calling `libc` functions which return
-\ `-1` and set `errno` on failure. Usage:
-\
-\   0 1 extern: some_fun
-\   some_fun " unable to do X" ?os_err .try
-fun: ?os_err { int ctx -- err_str }
-  if int .is_err_flag .then .errno ctx .os_err else nil end
-end
-
-\ Like `?os_err`, but for Posix functions which directly
-\ return an `errno` code on failure, and zero on success.
+\ For Posix functions which directly return an `errno`-like
+\ code on failure, and zero on success. No sign extension:
+\ Posix error codes are expected to be positive.
 fun: ?posix_err { code ctx -- err_str }
   if code .then code ctx .os_err else nil end
 end
@@ -4340,17 +4317,12 @@ end
 \ For functions like `snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
 fun: validate_format_len { len -- len err }
-  if len >=0 .then len .ret end
-
-  .errno { code }
-  code .strerror { msg }
-  if msg .then
-    " unable to format string; code: %d; msg: %s" code msg .errf .throw
-  else
-    " unable to format string; code: %s" code .errf .throw
+  if len <0 .then
+    .errno { code }
+    code .strerror { msg }
+    " unable to format string; code: %zd; msg: %s" code msg .errf .throw
   end
-
-  nil
+  len
 end
 
 \ Formats into a given buffer, with null-termination. Usage:
@@ -4360,7 +4332,7 @@ fun_comp: str_prnf { -- err } ( E: buf cap fmt …vargs… -- len|err )
   3 .comp_va_beg { len }
   compile' snprintf
   len .comp_va_end
-  compile' int_to_cell
+  compile' cint_to_cell
   compile' validate_format_len
 end
 
@@ -4374,7 +4346,7 @@ fun_comp: strf { -- err } ( E: buf cap fmt …vargs… -- buf )
   compile' snprintf
 
   len .comp_va_end
-  compile' int_to_cell
+  compile' cint_to_cell
   compile' validate_format_len
   0 .comp_args_set
   buf .comp_push_from_local \ mov xN, <buf> | ldr xN, [FP, <buf>]
@@ -4384,7 +4356,7 @@ fun_comp: fmtf { -- err } ( E: file fmt …vargs… )
   2 .comp_va_beg { len }
   compile' fprintf
   len .comp_va_end
-  compile' int_to_cell
+  compile' cint_to_cell
   compile' validate_format_len
   0 .comp_args_set
 end

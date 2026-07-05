@@ -36,17 +36,19 @@ fun: example_seek_and_thou_shall_find { -- Err }
   path " r" .file_open .try { file }
   37 91 { off cap }
 
-  if file off 0 .fseek .is_err_flag .then
+  if file off 0 .fseek .then
+    .errno { code }
     file .fclose { -- }
-    " seek file" path .io_err .ret
+    code " seek file" path .io_err .ret
   end
 
   BUF size' U8 cap file .fread { len }
-  file .ferror { code }
+  file .file_err_code { code }
   file .fclose { -- } \ Read-only close errors are noise.
 
   if len cap <> .then
-    code " unable to read file" .os_err .ret
+    if code .then code " unable to read file" .os_err .ret end
+    " unable to read file: unexpected EOF" .ret
   end
 
   .lf

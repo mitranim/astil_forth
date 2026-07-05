@@ -13,13 +13,13 @@ fun: net_accept_loop { sock handler }
   loop
     addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
-    sock addr size .accept { conn }
+    sock addr size .accept .cint_to_cell { conn }
 
-    if conn .is_err_flag .then
+    if conn <0 .then
       .errno { code }
       if code EINTR = .then again end
       code .strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg .elogf .elf
+      " [srv] unable to accept connection; code: %zd; msg: %s" code msg .elogf .elf
       again
     end
 
@@ -38,13 +38,13 @@ fun: net_accept_loop_threaded { sock handler }
   loop
     addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
-    sock addr size .accept { conn }
+    sock addr size .accept .cint_to_cell { conn }
 
-    if conn .is_err_flag .then
+    if conn <0 .then
       .errno { code }
       if code EINTR = .then again end
       code .strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s" sock code msg .elogf .elf
+      " [srv] unable to accept connection; code: %zd; msg: %s" code msg .elogf .elf
       again
     end
 

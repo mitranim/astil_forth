@@ -1652,7 +1652,7 @@ fun: test_local_mutators { -- err }
   40 { val } bit_ctz: val assert= val 3 end
   40 { val } bit_len: val assert= val 6 end
   4097 { val } pow2_ceil: val assert= val 8192 end
-  0xffffffff { val } int_to_cell: val assert= val -1 end
+  0xffffffff { val } cint_to_cell: val assert= val -1 end
   7 { val } cells: val assert= val 56 end
   56 { val } /cells: val assert= val 7 end
   100 { val } +cell: val assert= val 108 end
@@ -1751,6 +1751,13 @@ end
 
 fun: test_str_slice { -- err }
   assert= s" one" s" two" str= false end
+  assert= nil 0 " one" 0 str= true end
+  assert= nil 0 " one" 1 str< true end
+  assert= " one" 1 nil 0 str< false end
+  s" ab" { str len }
+  assert= str 1 str len str= false end
+  assert= str 1 str len str< true end
+  assert= str len str 1 str< false end
 end
 .test_str_slice
 
@@ -1758,6 +1765,8 @@ fun: test_cstr_less { -- err }
   assert= nil nil cstr< false end
   assert= nil " one" cstr< true end
   assert= " one" nil cstr< false end
+  assert " one" .strdup " two" .ccompare <0 end
+  assert " two" .strdup " one" .ccompare >0 end
   assert= " one" .strdup " two" cstr< true end
   assert= " two" .strdup " one" cstr< false end
   assert= " one" .strdup " one" cstr< false end
@@ -1928,21 +1937,12 @@ fun: int32_negative { -- val } [
   1 .comp_args_set
 ] end
 
-fun: test_int_to_cell { -- err }
+fun: test_cint_to_cell { -- err }
   assert= .int32_negative 0xffff_ffff end
-  assert= .int32_negative .int_to_cell 0xffff_ffff_ffff_ffff end
-  assert= .int32_negative .int_to_cell -1 end
+  assert= .int32_negative .cint_to_cell 0xffff_ffff_ffff_ffff end
+  assert= .int32_negative .cint_to_cell -1 end
 end
-.test_int_to_cell
-
-fun: test_is_err_flag_regression { -- err }
-  assert -1 .invert =0 end
-  assert= +1 1 end
-  assert= 1024 .cells 8192 end
-  assert= -1 .is_err_flag true end
-  assert= 0 .is_err_flag false end
-end
-.test_is_err_flag_regression
+.test_cint_to_cell
 
 fun: test_comptime_arg_stack_sum16_fun { -- val }
   100 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
@@ -3189,8 +3189,7 @@ fun: main_run { -- err }
   .test_asm_append_imm_to_reg
   .test_cstr_eq
   .test_cstr_less
-  .test_int_to_cell
-  .test_is_err_flag_regression
+  .test_cint_to_cell
   .test_comptime_arg_stack_sum16
   .test_comptime_arg_stack_mod_scratch
   .test_stack_push_9

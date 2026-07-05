@@ -150,6 +150,19 @@ fun: asm_cset ( Xd cond -- instr )
                     or \ Xd
 end
 
+\ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
+fun: asm_sign_extend_32 ( Xd Xn -- instr )
+  5 lsl or
+  31 10 lsl or
+  0b1_00_100110_1_000000_000000_00000_00000 or
+end
+
+fun: cint_to_cell ( int32 -- cell ) [
+  asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
+  1 1 asm_sign_extend_32 comp_instr \ sxtw x1, w1
+  asm_push_x1            comp_instr \ str x1, [x27], 8
+] end
+
 fun: <>0 ( int -- bool ) [
            asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
   1        asm_cmp_zero comp_instr \ cmp x1, 0
@@ -744,6 +757,14 @@ fun: max ( i1 i2 -- i1|i2 ) [
                asm_push_x1   comp_instr \ str x1, [x27], 8
 ] end
 
+\ Chooses a non-zero value, preferring the second input.
+fun: fallback ( one two -- out ) [
+               asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
+    2          asm_cmp_zero  comp_instr \ cmp x2, 0
+  1 2 1 ASM_NE asm_csel      comp_instr \ csel x1, x2, x1, ne
+               asm_push_x1   comp_instr \ str x1, [x27], 8
+] end
+
 fun: CELL 8 end
 fun: cells  ( len  -- size ) 3 lsl end
 fun: /cells ( size -- len  ) 3 asr end
@@ -1004,11 +1025,12 @@ end
 3 0 extern: memset  ( buf char len -- )
 3 0 extern: memcpy  ( dst src len -- )
 3 0 extern: memmove ( dst src len -- )
+3 1 extern: memcmp  ( adr0 adr1 len -- cmp :Cint )
 
 1 1 extern: strdup  ( cstr -- cstr )
 1 1 extern: strlen  ( cstr -- len )
-2 1 extern: strcmp  ( cstr0 cstr1 -- cmp )
-3 1 extern: strncmp ( str0 str1 len -- cmp )
+2 1 extern: strcmp  ( cstr0 cstr1 -- cmp :Cint )
+3 1 extern: strncmp ( str0 str1 len -- cmp :Cint )
 3 0 extern: strncpy ( dst src str_len -- )
 3 0 extern: strlcpy ( dst src buf_len -- )
 2 1 extern: strstr  ( cstr0 cstr0 -- adr )
@@ -1018,10 +1040,18 @@ fun: memfill ( buf len char -- ) swap memset end
 fun: memzero ( buf len      -- ) 0 memfill end
 
 \ See `ccompare` below for null-terminated strings.
-fun: compare ( str0 len0 str1 len1 -- direction ) rot max strncmp end
-fun: str=    ( str0 len0 str1 len1 -- bool      ) compare =0 end
-fun: str<    ( str0 len0 str1 len1 -- bool      ) compare <0 end
-fun: str<>   ( str0 len0 str1 len1 -- bool      ) compare <>0 end
+fun: compare ( str0 len0 str1 len1 -- direction )
+  to: len1
+  to: str1
+  to: len0
+  to: str0
+  len0 len1 -
+  str0 str1 len0 len1 min memcmp cint_to_cell
+  fallback
+end
+fun: str=  ( str0 len0 str1 len1 -- bool ) compare =0 end
+fun: str<  ( str0 len0 str1 len1 -- bool ) compare <0 end
+fun: str<> ( str0 len0 str1 len1 -- bool ) compare <>0 end
 
 \ ## Characters and strings
 
@@ -1439,7 +1469,7 @@ fun: ccompare ( cstr0 cstr1 -- cmp )
   ifz cstr0 cstr1 or then 0 ret end
   ifz cstr0 then -1 ret end
   ifz cstr1 then +1 ret end
-  cstr0 cstr1 strcmp
+  cstr0 cstr1 strcmp cint_to_cell
 end
 
 fun: cstr=  ( cstr0 cstr1 -- bool ) ccompare =0 end
@@ -1712,8 +1742,8 @@ fun: .sc .s stack_trunc end
 
 fun: errno ( -- err ) __error @32 end \ TODO switch to `ldrsw`.
 
-6 1 extern: mmap     ( adr len pflag mflag fdes off -- adr )
-3 1 extern: mprotect ( adr len pflag                -- err )
+6 1 extern: mmap     ( adr len pflag mflag fdes off -- adr|-1 )
+3 1 extern: mprotect ( adr len pflag -- 0|-1 :Cint )
 
 16384 let: PAGE_SIZE
 0     let: PROT_NONE
@@ -1735,7 +1765,7 @@ end
 
 fun: mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE or mprotect
-  if -1 = then
+  if then
     " unable to unprotect memory; code: %zd; message: %s"
     errno dup strerror [ 2 ] errf
     throw

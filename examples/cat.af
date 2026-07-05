@@ -9,7 +9,7 @@ use' io.af
 \
 \ AOT usage:
 \
-\   astil examples/cat.af --build=cat.exe
+\   printf "" | astil examples/cat.af --build=cat.exe
 \   ./cat.exe file0 file1
 
 fun: echo_stdin { -- err }
@@ -22,8 +22,6 @@ fun: echo_stdin { -- err }
       STDOUT_FILENO buf len .fd_write_all
       again
     end
-    if .errno EINTR = .then again end
-    .errno " unable to echo stdin" .os_err .throw
   end
 end
 

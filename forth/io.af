@@ -13,19 +13,22 @@ use' ./time.af \ Defines `Timespec`.
 \ This file defines a bunch of missing declarations,
 \ and some wrappers which throw descriptive errors.
 \
-\ Many C functions return `int` which may be either something useful,
-\ like a file descriptor, or a 32-bit "-1" value where the upper bits
-\ are zero on 64-bit systems. When calling C functions which return
-\ only an error indicator, use the `?os_err` shortcut:
+\ Caution: C `int` outputs from C words tend to have zeroes in the top 32 bits.
+\ For pure `0|-1` words, branching directly on the result is fine. For C words
+\ whose `int` result may also be an actual useful value, sign-extend the value
+\ before testing or using it, via `.cint_to_cell`. Examples:
 \
-\   .some_word " unable to blah" ?os_err { err }
-\   .some_word " unable to blah" ?os_err .try
+\   if .libc_word .then .errno " unable to blah" .os_err .throw end
 \
-\ When calling C functions which return `int` which may be either an error
-\ indicator or something useful, like a file descriptor, sign-extend the
-\ output before testing it for negativeness:
+\   .libc_word .cint_to_cell { val }
+\   if val <0 .then .errno "unable to blah" .os_err .throw end
 \
-\   .some_word .int_to_cell { len }
+\ We prefer to annotate all extern words which return such
+\ a "gotcha" value with `:Cint`. Many examples below.
+\
+\ Machine-word returns such as `ssize_t` don't need width repair:
+\
+\   .some_word { len }
 \   if len <0 .then ... end
 
 \ `struct stat`. Used by reference.
@@ -93,107 +96,80 @@ end
 0x40000000             let: O_EXEC    \ open file for execute only
 O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 
-\ In all definitions below, `flag` means `(Cint)-1` on failure;
-\ should be tested with `?os_err` / `.is_err_flag`, or extended
-\ via `.int_to_cell` before testing with regular `<0`.
-2 1 extern: open  ( path flag -- fdes|flag )
-1 1 extern: close ( fdes      -- flag      )
-2 1 extern: fstat ( fdes stat -- flag      )
-2 1 extern: lstat ( path stat -- flag      )
-2 1 extern: stat  ( path stat -- flag      )
+2 1 extern: open  ( path flag -- fdes|-1 :Cint )
+1 1 extern: close ( fdes      -- 0|-1    :Cint )
+2 1 extern: fstat ( fdes stat -- 0|-1    :Cint )
+2 1 extern: lstat ( path stat -- 0|-1    :Cint )
+2 1 extern: stat  ( path stat -- 0|-1    :Cint )
 
-1 1 extern: fgetc            ( file -- char|eof32 )
-1 1 extern: getc_unlocked    ( file -- char|eof32 )
-1 1 extern: getchar          ( file -- char|eof32 )
-1 1 extern: getchar_unlocked ( file -- char|eof32 )
-1 1 extern: getw             ( file -- char|eof32 )
+1 1 extern: fgetc            ( file -- char|-1 :Cint )
+1 1 extern: getc_unlocked    ( file -- char|-1 :Cint )
+1 1 extern: getchar          ( file -- char|-1 :Cint )
+1 1 extern: getchar_unlocked ( file -- char|-1 :Cint )
+1 1 extern: getw             ( file -- char|-1 :Cint )
 
-3 1 extern: read   ( fdes buf len         -- len )
-4 1 extern: pread  ( fdes buf len off     -- len )
-3 1 extern: readv  ( fdes iov iov_len     -- len )
-4 1 extern: preadv ( fdes iov iov_len off -- len )
+3 1 extern: read   ( fdes buf len         -- len|-1 )
+4 1 extern: pread  ( fdes buf len off     -- len|-1 )
+3 1 extern: readv  ( fdes iov iov_len     -- len|-1 )
+4 1 extern: preadv ( fdes iov iov_len off -- len|-1 )
 
-3 1 extern: write   ( fdes buf len         -- len )
-4 1 extern: pwrite  ( fdes buf len off     -- len )
-3 1 extern: writev  ( fdes iov iov_len     -- len )
-4 1 extern: pwritev ( fdes iov iov_len off -- len )
+3 1 extern: write   ( fdes buf len         -- len|-1 )
+4 1 extern: pwrite  ( fdes buf len off     -- len|-1 )
+3 1 extern: writev  ( fdes iov iov_len     -- len|-1 )
+4 1 extern: pwritev ( fdes iov iov_len off -- len|-1 )
 
 \ Note: `fread`, `fwrite` and some other funcs are defined in `lang.af`.
 2 1 extern: fopen    ( path mode      -- file )
 2 1 extern: fdopen   ( fdes mode      -- file )
 3 1 extern: freopen  ( path mode file -- file )
 3 1 extern: fmemopen ( buf cap mode   -- file )
-1 1 extern: fclose   ( file           -- flag )
+1 1 extern: fclose   ( file           -- 0|-1 :Cint )
 
-2 1 extern: fgetpos ( file pos_adr    -- flag     )
-2 1 extern: fsetpos ( file pos_adr    -- flag     )
-3 1 extern: fseek   ( file off whence -- flag     )
-3 1 extern: fseeko  ( file off whence -- flag     )
-1 1 extern: ftell   ( file            -- off|flag )
-1 1 extern: ftello  ( file            -- off|flag )
-1 0 extern: rewind  ( file            --          )
+2 1 extern: fgetpos ( file pos_adr    -- 0|-1 :Cint )
+2 1 extern: fsetpos ( file pos_adr    -- 0|-1 :Cint )
+3 1 extern: fseek   ( file off whence -- 0|-1 :Cint )
+3 1 extern: fseeko  ( file off whence -- 0|-1 :Cint )
+1 1 extern: ftell   ( file            -- off|-1     )
+1 1 extern: ftello  ( file            -- off|-1     )
+1 0 extern: rewind  ( file            --            )
 
-1 0 extern: clearerr          ( file --      )
-1 0 extern: clearerr_unlocked ( file --      )
-1 1 extern: feof              ( file -- flag )
-1 1 extern: feof_unlocked     ( file -- flag )
-1 1 extern: ferror            ( file -- flag )
-1 1 extern: ferror_unlocked   ( file -- flag )
-1 1 extern: fileno            ( file -- flag )
-1 1 extern: fileno_unlocked   ( file -- flag )
+1 0 extern: clearerr          ( file --               )
+1 0 extern: clearerr_unlocked ( file --               )
+1 1 extern: feof              ( file -- bool          )
+1 1 extern: feof_unlocked     ( file -- bool          )
+1 1 extern: ferror            ( file -- bool          )
+1 1 extern: ferror_unlocked   ( file -- bool          )
+1 1 extern: fileno            ( file -- fdes|-1 :Cint )
+1 1 extern: fileno_unlocked   ( file -- fdes|-1 :Cint )
 
 \ TODO: translate `<unistd.h>`.
 
-fun: io_err { action path -- err_str }
-  .errno { code }
+\ `code` usually comes from `.errno`. Sometimes the caller
+\ has to save it before some intermediary errno-clobbering
+\ call, then invoke this.
+fun: io_err { code action path -- err_str }
   code .strerror { msg }
-  if msg .then
-    action " unable to %s `%s`; code: %d; msg: %s"
-    action path code msg .wrapf
-  else
-    action " unable to %s `%s`; code: %s" action path code .wrapf
-  end
-end
-
-fun: file_err { action file -- err_str }
-  nil nil { code msg }
-
-  if file .ferror .then
-    .errno { code }
-    code .strerror { msg }
-  end
-
-  if msg .then
-    msg " file error: %s; code: %zd; msg: %s"
-    action code msg .wrapf .ret
-  end
-
-  if code .then
-    msg " file error: %s; code: %zd"
-    action code msg .wrapf .ret
-  end
-
-  msg " file error: %s" msg .wrapf
+  action " unable to %s `%s`; code: %zd; msg: %s" action path code msg .wrapf
 end
 
 fun: fd_stat { fdes path stat_adr -- err }
-  if fdes stat_adr .fstat .is_err_flag .then " stat" path .io_err .throw end
+  if fdes stat_adr .fstat .then .errno " stat" path .io_err .throw end
 end
 
 fun: path_stat { path stat_adr -> err }
-  if .stat .is_err_flag .then " stat" path .io_err .throw end
+  if .stat .then .errno " stat" path .io_err .throw end
 end
 
 fun: fd_open { path mode -> fdes err }
-  .open { out }
-  if out .is_err_flag .then " open" path .io_err .throw end
+  .open .cint_to_cell { out }
+  if out <0 .then .errno " open" path .io_err .throw end
   out
 end
 
 \ TODO dedup with `fd_write`.
 fun: fd_read { fdes buf cap -- len err }
   loop
-    fdes buf cap .read .int_to_cell { len }
+    fdes buf cap .read { len }
     if len >=0 .then leave end
     .errno { code }
     if code EINTR = .then again end
@@ -205,8 +181,8 @@ end
 \ TODO dedup with `fd_read`.
 fun: fd_write { fdes buf cap -- len err }
   loop
-    fdes buf cap .write .int_to_cell { len }
-    if len >0 .then leave end
+    fdes buf cap .write { len }
+    if len >=0 .then leave end
     .errno { code }
     if code EINTR = .then again end
     code " unable to write" .os_err .throw
@@ -218,9 +194,10 @@ end
 \ and OS errors. Prefer `fd_write_all` for real connections.
 fun: fd_write_opt { fdes buf len -> } .write { -- } end
 
+\ Wraps `write` with an error without retrying `EINTR`.
 fun: fd_write_once { fdes buf len -- wrote err }
   fdes buf len .write { wrote }
-  if wrote .is_err_flag .then
+  if wrote <0 .then
     .errno " unable to write" .os_err { err }
     0 err .ret
   end
@@ -233,7 +210,7 @@ fun: fd_write_all { fdes buf len -- err }
 
     fdes buf len .write { wrote }
 
-    if wrote .is_err_flag .then
+    if wrote <0 .then
       .errno { code }
       if code EINTR = .then again end
       code " unable to write" .os_err .throw
@@ -249,18 +226,32 @@ end
 \ Writes `\r\n`; for use in HTTP.
 fun: fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
 
+fun: file_err_code { file -- code }
+  if file .ferror .then .errno else 0 end
+end
+
+fun: file_err { code action -- err_str }
+  ifz code .then " file error without error code: %s" action .errf .ret end
+  code .strerror { msg }
+  action " file error: %s; code: %zd; msg: %s" action code msg .wrapf
+end
+
 fun: file_open { path mode -> file err }
   .fopen { file }
-  ifz file .then " open" path .io_err .throw end
+  ifz file .then .errno " open" path .io_err .throw end
   file
 end
 
 fun: file_write_char { char file -> err }
-  if .fputc .is_err_flag .then " failed to write char" file .file_err .throw end
+  if .fputc .cint_to_cell <0 .then
+    .errno " failed to write char" .file_err .throw
+  end
 end
 
 fun: file_write_bytes { buf len file -- err }
   buf 1 len file .fwrite { out }
   if out len = .then .ret end
-  " wrote %zd instead of %zd bytes" out len .errf file .file_err
+  file .file_err_code { code } \ Must be called before `.errf`.
+  " wrote %zd instead of %zd bytes" out len .errf { action }
+  if code .then code action .file_err else action end
 end

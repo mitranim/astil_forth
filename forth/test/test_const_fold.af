@@ -678,13 +678,13 @@ fun: test_const_fold_bits { -- err }
 end
 .test_const_fold_bits
 
-fun: const_fold_int_to_cell_fun { -- out0 out1 }
-  -1 .int_to_cell
-  123 .int_to_cell
+fun: const_fold_cint_to_cell_fun { -- out0 out1 }
+  -1 .cint_to_cell
+  123 .cint_to_cell
 end
 
-fun: test_const_fold_int_to_cell { -- err }
-  .const_fold_int_to_cell_fun { out0 out1 }
+fun: test_const_fold_cint_to_cell { -- err }
+  .const_fold_cint_to_cell_fun { out0 out1 }
   assert= out0 -1 end
   assert= out1 123 end
   ifz .has_interp .then .ret end
@@ -693,9 +693,9 @@ fun: test_const_fold_int_to_cell { -- err }
   0 -1 .cf_want_load
   1 123 .cf_want_load
   .cf_want_ret
-  xt' const_fold_int_to_cell_fun .cf_want_word
+  xt' const_fold_cint_to_cell_fun .cf_want_word
 end
-.test_const_fold_int_to_cell
+.test_const_fold_cint_to_cell
 
 \ For AOT testing.
 fun: test_const_fold_all { -- err }
@@ -714,7 +714,7 @@ fun: test_const_fold_all { -- err }
   .test_const_fold_ucompare2
   .test_const_fold_derived
   .test_const_fold_bits
-  .test_const_fold_int_to_cell
+  .test_const_fold_cint_to_cell
 end
 
 " [test] [cf] ok" .log .lf

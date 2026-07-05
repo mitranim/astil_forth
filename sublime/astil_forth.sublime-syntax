@@ -198,6 +198,10 @@ contexts:
       scope: storage.modifier.astil_forth
       captures:
         1: punctuation.separator.astil_forth
+    - match: '{{word_begin}}(:){{word}}{{word_end}}'
+      scope: storage.modifier.astil_forth
+      captures:
+        1: punctuation.separator.astil_forth
     - match: '{{word_begin}}(?:--|->){{word_end}}'
       scope: punctuation.separator.astil_forth
 

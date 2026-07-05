@@ -6,13 +6,10 @@ use' ./io.af
 \ Incomplete declarations of `libc` network interfaces
 \ translated from C definitions on MacOS 15.3 (24D60).
 \
-\ Procedures which return -1 on error should usually
-\ be followed by the test `is_err_flag` or `?os_err`:
-\
-\   .some_word " unable to blah" ?os_err { err }
-\   .some_word " unable to blah" ?os_err .try
-\
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
+\
+\ Caution: see notes in `./io.af` about normalizing
+\ C `int` outputs to machine words before using them.
 
 1      let: AI_PASSIVE   \ Any host IP is fine.
 0      let: AF_UNSPEC    \ Both IPv4 and IPv6.
@@ -21,20 +18,20 @@ use' ./io.af
 4      let: SO_REUSEADDR \ Enables local address reuse.
 
 \ Flags for `recv`.
-1       let: MSG_OOB
+1        let: MSG_OOB
 1 1 .lsl let: MSG_PEEK
 1 6 .lsl let: MSG_WAITALL
 
-4 1 extern: getaddrinfo
+4 1 extern: getaddrinfo  ( node service hints res -- code :Cint )
 1 0 extern: freeaddrinfo
 1 1 extern: gai_strerror
-5 1 extern: setsockopt
-3 1 extern: socket
-3 1 extern: bind
-2 1 extern: listen
-3 1 extern: accept
-4 1 extern: send
-4 1 extern: recv
+5 1 extern: setsockopt   ( sock lvl opt val len -- 0|-1    :Cint )
+3 1 extern: socket       ( fam type prot        -- sock|-1 :Cint )
+3 1 extern: bind         ( sock addr len        -- 0|-1    :Cint )
+2 1 extern: listen       ( sock backlog         -- 0|-1    :Cint )
+3 1 extern: accept       ( sock addr len_adr    -- sock|-1 :Cint )
+4 1 extern: send         ( sock buf len flags   -- len|-1        )
+4 1 extern: recv         ( sock buf len flags   -- len|-1        )
 
 struct: Sockaddr
   U8 1  field: Sockaddr_len
@@ -64,7 +61,7 @@ fun: net_addr_info { port -- ainf err }
   AI_PASSIVE  hint .Addrinfo_flags    !
 
   .slot { ainf }
-  nil port hint ainf .getaddrinfo { code }
+  nil port hint ainf .getaddrinfo .cint_to_cell { code }
 
   if code .then
     code .gai_strerror { msg }
@@ -80,30 +77,34 @@ fun: net_addr_info { port -- ainf err }
 end
 
 fun: sock_close { sock -> err }
-  .close .is_err_flag " unable to close socket" ?os_err
+  if .close .then .errno " unable to close socket" .os_err else nil end
 end
 
 fun: sock_bind { info backlog -- sock Err }
   info .Addrinfo_family   @ { fam  }
   info .Addrinfo_socktype @ { type }
   info .Addrinfo_protocol @ { prot }
-  fam type prot .socket     { sock }
+  fam type prot .socket .cint_to_cell { sock }
 
-  sock " unable to create network socket" ?os_err .try
+  if sock <0 .then .errno " unable to create network socket" .os_err .throw end
 
   alloca' Cint { opt } \ `setsockopt` requires non-nil option address.
   true opt !cint       \ Enable options like `SO_REUSEADDR`.
 
-  sock SOL_SOCKET SO_REUSEADDR opt size' Cint .setsockopt
-  " unable to `setsockopt`" ?os_err { err }
+  nil { err }
+  if sock SOL_SOCKET SO_REUSEADDR opt size' Cint .setsockopt .then
+    .errno " unable to `setsockopt`" .os_err { err }
+  end
 
   ifz err .then
-    sock info .Addrinfo_addr @ info .Addrinfo_addrlen @ .bind
-    " unable to bind socket" ?os_err { err }
+    if sock info .Addrinfo_addr @ info .Addrinfo_addrlen @ .bind .then
+      .errno " unable to bind socket" .os_err { err }
+    end
 
     ifz err .then
-      sock backlog .listen
-      " unable to listen on socket" ?os_err { err }
+      if sock backlog .listen .then
+        .errno " unable to listen on socket" .os_err { err }
+      end
     end
   end
 

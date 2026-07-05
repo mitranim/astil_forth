@@ -482,6 +482,8 @@ T{ 234 -123 max <T> 234 }T
 
 T{ 10 20 30 swap_over <T> 20 10 30 }T
 
+T{ 0xffffffff cint_to_cell <T> -1 }T
+
 T{ 123 0 ?dup <T> 123 }T
 T{ 234 1 ?dup <T> 234 234 }T
 
@@ -493,10 +495,32 @@ T{ " two" strdup " one" cstr= <T> false }T
 T{ " one" strdup " one" cstr= <T> true }T
 
 T{ s" one" s" two" str= <T> false }T
+T{ nil 0 " one" 0 str= <T> true }T
+
+fun: test_str_slice_prefix_eq ( -- bool )
+  s" ab" to: len to: str
+  str 1 str len str=
+end
+
+fun: test_str_slice_prefix_lt ( -- bool )
+  s" ab" to: len to: str
+  str 1 str len str<
+end
+
+fun: test_str_slice_full_lt ( -- bool )
+  s" ab" to: len to: str
+  str len str 1 str<
+end
+
+T{ test_str_slice_prefix_eq <T> false }T
+T{ test_str_slice_prefix_lt <T> true }T
+T{ test_str_slice_full_lt <T> false }T
 
 T{ nil nil cstr< <T> false }T
 T{ nil " one" cstr< <T> true }T
 T{ " one" nil cstr< <T> false }T
+T{ " one" strdup " two" ccompare <0 <T> true }T
+T{ " two" strdup " one" ccompare >0 <T> true }T
 T{ " one" strdup " two" cstr< <T> true }T
 T{ " two" strdup " one" cstr< <T> false }T
 T{ " one" strdup " one" cstr< <T> false }T
@@ -505,7 +529,7 @@ T{ " one" strdup " one" cstr< <T> false }T
 
 fun: test_strf
   TEST_STRF_BUF " numbers: %zd %zd %zd" 10 20 30 [ 3 ] strf
-  T{ TEST_STRF_BUF s" numbers: 10 20 30" str= <T> true }T
+  TEST_STRF_BUF drop " numbers: 10 20 30" T_str_eq
 end
 test_strf
 

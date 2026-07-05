@@ -20,7 +20,7 @@ fun: read_req { conn buf cap -- len err }
     conn buf cap .read { wrote }
     ifz wrote .then len .ret end
 
-    if wrote .is_err_flag .then
+    if wrote <0 .then
       .errno { code }
       if code EINTR = .then again end
       code " unable to read request" .os_err .throw
@@ -58,7 +58,7 @@ fun: handle_conn { conn -> }
 
   " [srv] closing connection" .elog .elf .elf
 
-  if conn .close .is_err_flag .then
+  if conn .close .then
     .errno " [srv] unable to close connection" .os_err .elog .elf
   end
 end
