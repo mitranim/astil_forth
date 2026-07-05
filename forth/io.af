@@ -13,12 +13,20 @@ use' ./time.af \ Defines `Timespec`.
 \ This file defines a bunch of missing declarations,
 \ and some wrappers which throw descriptive errors.
 \
-\ Procedures which return -1 on error should usually
-\ be followed by `?os_err`. When testing the output
-\ manually, use the test `is_err_flag`.
+\ Many C functions return `int` which may be either something useful,
+\ like a file descriptor, or a 32-bit "-1" value where the upper bits
+\ are zero on 64-bit systems. When calling C functions which return
+\ only an error indicator, use the `?os_err` shortcut:
 \
-\   some_word " unable to blah" ?os_err { err }
-\   some_word " unable to blah" ?os_err .try
+\   .some_word " unable to blah" ?os_err { err }
+\   .some_word " unable to blah" ?os_err .try
+\
+\ When calling C functions which return `int` which may be either an error
+\ indicator or something useful, like a file descriptor, sign-extend the
+\ output before testing it for negativeness:
+\
+\   .some_word .int_to_cell { len }
+\   if len <0 .then ... end
 
 \ `struct stat`. Used by reference.
 struct: Fstat
@@ -48,13 +56,17 @@ struct: Iov
   Cell 1 field: Iov_len  \ [XSI] Size of region iov_base points to
 end
 
-\ When C _thinks_ it returns `-1`, the actual register content
+\ When C _thinks_ it returns `-1`, the actual output register
 \ sometimes contains zeros in upper bits, depending on how the
 \ result was produced. Sometimes we may have to compare with a
 \ type-specific value or sign-extend. TODO consistent solution.
 -1         let: EOF
 0xff       let: EOF8
 0xffffffff let: EOF32
+
+0 let: STDIN_FILENO
+1 let: STDOUT_FILENO
+2 let: STDERR_FILENO
 
 0x00000004 let: O_NONBLOCK        \ do not block on open or for data to become available
 0x00000008 let: O_APPEND          \ append on each write
@@ -82,7 +94,8 @@ end
 O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 
 \ In all definitions below, `flag` means `(Cint)-1` on failure;
-\ should be tested with `?os_err` or `is_err_flag`.
+\ should be tested with `?os_err` / `.is_err_flag`, or extended
+\ via `.int_to_cell` before testing with regular `<0`.
 2 1 extern: open  ( path flag -- fdes|flag )
 1 1 extern: close ( fdes      -- flag      )
 2 1 extern: fstat ( fdes stat -- flag      )
@@ -177,27 +190,35 @@ fun: fd_open { path mode -> fdes err }
   out
 end
 
-fun: file_open { path mode -> file err }
-  .fopen { file }
-  ifz file .then " open" path .io_err .throw end
-  file
+\ TODO dedup with `fd_write`.
+fun: fd_read { fdes buf cap -- len err }
+  loop
+    fdes buf cap .read .int_to_cell { len }
+    if len >=0 .then leave end
+    .errno { code }
+    if code EINTR = .then again end
+    code " unable to read" .os_err .throw
+  end
+  len
 end
 
-fun: file_write_char { char file -> err }
-  if .fputc .is_err_flag .then " failed to write char" file .file_err .throw end
+\ TODO dedup with `fd_read`.
+fun: fd_write { fdes buf cap -- len err }
+  loop
+    fdes buf cap .write .int_to_cell { len }
+    if len >0 .then leave end
+    .errno { code }
+    if code EINTR = .then again end
+    code " unable to write" .os_err .throw
+  end
+  len
 end
 
-fun: file_write_bytes { buf len file -- err }
-  buf 1 len file .fwrite { out }
-  if out len = .then .ret end
-  " wrote %zd instead of %zd bytes" out len .errf file .file_err
-end
+\ Best-effort logging/diagnostic write. Ignores short writes
+\ and OS errors. Prefer `fd_write_all` for real connections.
+fun: fd_write_opt { fdes buf len -> } .write { -- } end
 
-\ Best-effort logging/diagnostic write. Intentionally ignores short writes
-\ and OS errors. Prefer `write_all` for protocol/data output.
-fun: write_opt { fdes buf len -> } .write { -- } end
-
-fun: write_once { fdes buf len -- wrote err }
+fun: fd_write_once { fdes buf len -- wrote err }
   fdes buf len .write { wrote }
   if wrote .is_err_flag .then
     .errno " unable to write" .os_err { err }
@@ -206,7 +227,7 @@ fun: write_once { fdes buf len -- wrote err }
   wrote
 end
 
-fun: write_all { fdes buf len -- err }
+fun: fd_write_all { fdes buf len -- err }
   loop
     ifz len .then .ret end
 
@@ -226,4 +247,20 @@ fun: write_all { fdes buf len -- err }
 end
 
 \ Writes `\r\n`; for use in HTTP.
-fun: write_eol { fdes -- err } fdes CRLF 2 .write_all end
+fun: fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
+
+fun: file_open { path mode -> file err }
+  .fopen { file }
+  ifz file .then " open" path .io_err .throw end
+  file
+end
+
+fun: file_write_char { char file -> err }
+  if .fputc .is_err_flag .then " failed to write char" file .file_err .throw end
+end
+
+fun: file_write_bytes { buf len file -- err }
+  buf 1 len file .fwrite { out }
+  if out len = .then .ret end
+  " wrote %zd instead of %zd bytes" out len .errf file .file_err
+end

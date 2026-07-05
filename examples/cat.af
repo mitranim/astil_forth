@@ -1,0 +1,71 @@
+use' lang.af
+use' io.af
+
+\ Simple `cat`-like program.
+\
+\ JIT usage:
+\
+\   astil examples/cat.af -- file0 file1
+\
+\ AOT usage:
+\
+\   astil examples/cat.af --build=cat.exe
+\   ./cat.exe file0 file1
+
+fun: echo_stdin { -- err }
+  0xffff { cap }
+  cap .alloca { buf }
+  loop
+    STDIN_FILENO buf cap .fd_read { len }
+    if len =0 .then leave end
+    if len >0 .then
+      STDOUT_FILENO buf len .fd_write_all
+      again
+    end
+    if .errno EINTR = .then again end
+    .errno " unable to echo stdin" .os_err .throw
+  end
+end
+
+fun: echo_file_loop { fdes -- err }
+  0xffff { cap }
+  cap .alloca { buf }
+  loop
+    fdes buf cap .fd_read { len }
+    ifz len .then leave end
+    STDOUT_FILENO buf len .fd_write_all
+  end
+end
+
+fun: echo_file { path -- Err }
+  path O_RDONLY .fd_open .try { fdes }
+  fdes .echo_file_loop { err }
+  fdes .close { -- }
+  err
+end
+
+fun: cat { argc argv -- err }
+  if argc 1 <= .then .echo_stdin .ret end
+  argc .cells argv + { ceil }
+
+  loop
+    +cell: argv
+    argv ceil < .while
+    argv @ { arg }
+
+    if arg " -" cstr= .then
+      .echo_stdin
+    else
+      arg .echo_file
+    end
+  end
+end
+
+\ JIT entry.
+.interp_args .cat
+
+\ AOT entry.
+fun: main { argc argv -> exit }
+  .cat { err }
+  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
+end

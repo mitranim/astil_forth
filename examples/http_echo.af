@@ -38,13 +38,13 @@ fun: respond_conn { conn -- err }
   conn buf BUF_CAP .read_req { len }
 
   " [srv] incoming request:" .elog .elf .elf
-  STDERR buf len .write_opt .elf
+  STDERR buf len .fd_write_opt .elf
 
-  conn s" HTTP/1.1 200 OK"   .write_all conn .write_eol
-  conn s" Connection: close" .write_all conn .write_eol
-  conn                                       .write_eol
-  conn s" request echo:"     .write_all conn .write_eol conn .write_eol
-  conn buf len               .write_all conn .write_eol
+  conn s" HTTP/1.1 200 OK"   .fd_write_all conn .fd_write_eol
+  conn s" Connection: close" .fd_write_all conn .fd_write_eol
+  conn                                          .fd_write_eol
+  conn s" request echo:"     .fd_write_all conn .fd_write_eol conn .fd_write_eol
+  conn buf len               .fd_write_all conn .fd_write_eol
 
   " [srv] echoed request back to client" .elog .elf
 end
