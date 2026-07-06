@@ -3749,33 +3749,33 @@ end
 
 fun_comp: @u8 { -- err } [ .redefine ] 0b00 0b01 .comp_mem_load end
 fun_comp: @s8 { -- err } [ .redefine ] 0b00 0b10 .comp_mem_load end
-fun_comp: !8  { -- err }              0b00      .comp_mem_store end
+fun_comp: !8  { -- err }               0b00      .comp_mem_store end
 
 fun_comp: @b { -- err } [ .redefine ] 0b00 0b01 .comp_mem_load end
-fun_comp: !b { -- err }              0b00      .comp_mem_store end
+fun_comp: !b { -- err }               0b00      .comp_mem_store end
 
 fun_comp: @u16 { -- err } [ .redefine ] 0b01 0b01 .comp_mem_load end
 fun_comp: @s16 { -- err } [ .redefine ] 0b01 0b10 .comp_mem_load end
-fun_comp: !16  { -- err }              0b01      .comp_mem_store end
+fun_comp: !16  { -- err }               0b01      .comp_mem_store end
 
 fun_comp: @u32 { -- err } [ .redefine ] 0b10 0b01 .comp_mem_load end
 fun_comp: @s32 { -- err } [ .redefine ] 0b10 0b10 .comp_mem_load end
-fun_comp: !32  { -- err }              0b10      .comp_mem_store end
+fun_comp: !32  { -- err }               0b10      .comp_mem_store end
 
 fun_comp: @ { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: ! { -- err }              0b11      .comp_mem_store end
+fun_comp: ! { -- err }               0b11      .comp_mem_store end
 
 fun_comp: @cint { -- err } [ .redefine ] 0b10 0b10 .comp_mem_load end
-fun_comp: !cint { -- err }              0b10      .comp_mem_store end
+fun_comp: !cint { -- err }               0b10      .comp_mem_store end
 
 fun_comp: @cuint { -- err } [ .redefine ] 0b10 0b01 .comp_mem_load end
-fun_comp: !cuint { -- err }              0b10      .comp_mem_store end
+fun_comp: !cuint { -- err }               0b10      .comp_mem_store end
 
 fun_comp: @clong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: !clong { -- err }              0b11      .comp_mem_store end
+fun_comp: !clong { -- err }               0b11      .comp_mem_store end
 
 fun_comp: @culong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: !culong { -- err }              0b11      .comp_mem_store end
+fun_comp: !culong { -- err }               0b11      .comp_mem_store end
 
 6 1 extern: mmap     ( adr size pflag mflag fdes off -- adr|-1 )
 2 1 extern: munmap   ( adr size -- 0|-1 :Cint )
