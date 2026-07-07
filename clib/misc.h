@@ -21,16 +21,17 @@ typedef void Void_fun(void);
 
 #define USED __attribute((used))
 
-// Requires Clang 22.1 or higher and `-fdefer-ts`.
-#if !defined(defer) && defined(__is_identifier) && !__is_identifier(_Defer)
-#define defer _Defer
-#endif
-
 /*
-Alternative to the "real" `defer` which, at the time of writing,
-requires very recent compiler versions.
+Limited alternative to the "real defer" which, at the time of writing,
+requires very recent versions of Clang or GCC.
 
-Usage:
+"Real defer" looks like this:
+
+  #include <stddefer.h>
+  type name = {};
+  defer type_deinit(&name);
+
+This alternative is used like this:
 
   deferred(type_deinit) type name = {};
 

@@ -7,6 +7,7 @@
 #include "./read.c"
 #include "./sym.c"
 #include <dlfcn.h>
+#include <stddefer.h>
 #include <stdio.h>
 
 static Err comp_snapshot(const Comp *prev, Comp *next) {

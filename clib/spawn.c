@@ -4,6 +4,7 @@
 #include "./io.c"
 #include "./mem.c"
 #include <spawn.h>
+#include <stddefer.h>
 
 static Err spawn_with_stdin(
   char *const argv[], const U8 *buf, Ind len, pid_t *pid
