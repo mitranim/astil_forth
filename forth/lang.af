@@ -1446,10 +1446,7 @@ end
 \ All our stacks are empty-ascending.
 
 \ SYNC[stack_field_offsets].
-16 let: STACK_OFF_FLOOR
 24 let: STACK_OFF_TOP
-32 let: STACK_OFF_CEIL
-40 let: STACK_SIZE
 
 \ Default Forth stack provided by the interpreter.
 \ Not available when running in AOT-compiled mode.
@@ -1464,16 +1461,13 @@ end
 
 fun: STACK { -- adr } [ .plain_call ] STACK end
 
-\ Note: `stack_top` is the top EMPTY cell, not a full one.
-fun: stack? { stack -> bool  } @ <>0 end
-
-\ ldur <out>, [<stack>, STACK_OFF_TOP]
-fun: asm_stack_top_load { out stack -> instr }
+\ ldur <out>, [<stk>, STACK_OFF_TOP]
+fun: asm_stack_top_load { out stk -> instr }
   STACK_OFF_TOP .asm_load_unscaled_off
 end
 
-\ stur <out>, [<stack>, STACK_OFF_TOP]
-fun: asm_stack_top_store { out stack -> instr }
+\ stur <out>, [<stk>, STACK_OFF_TOP]
+fun: asm_stack_top_store { out stk -> instr }
   STACK_OFF_TOP .asm_store_unscaled_off
 end
 
@@ -1489,7 +1483,7 @@ end
 \   stack s> .show \ 10
 \
 \ Also see `stack{` which is more convenient and less error-prone.
-fun: s> { _stack -> val } [
+fun: s> { _stk -> val } [
   0 .comp_realloc_reg
   1 .comp_realloc_reg
   1 0      .asm_mov_reg         .comp_instr \ mov x1, x0
@@ -1501,7 +1495,7 @@ fun: s> { _stack -> val } [
 ] end
 
 \ Pushes a cell to a stack.
-fun: >s { _val _stack } [
+fun: >s { _val _stk } [
   2 .comp_realloc_reg
   2 1      .asm_stack_top_load  .comp_instr \ ldur x2, [x1, STACK_OFF_TOP]
   0 2 0    .asm_store_off       .comp_instr \ str x0, [x2]
@@ -1535,8 +1529,8 @@ fun: sysstack_frame_ptr { -- fp } [ .plain_call ] sysstack_frame_ptr end
 \   adrp <reg>, <page>
 \   add <reg>, <reg>, <pageoff>
 \
-\ Used for taking an address of a data entry
-\ in the code heap allocated via `.alloc_data`.
+\ Used for taking an address of a data entry allocated
+\ via `.comp_alloc_data` in the compiler-managed heap.
 fun: comp_next_page_addr { adr -- err } ( E: -- adr )
   .comp_alloc_next_reg { reg }
   adr reg .comp_page_addr
@@ -1559,7 +1553,7 @@ end
 
 \ Similar to standard `variable`, but takes an initial value like `let:`.
 fun: var: { val -- err } ( C: "name" -- ) ( E: -- ptr )
-  nil CELL .alloc_data { adr }
+  nil CELL .comp_alloc_data { adr }
   val adr !
   .read_word adr .init_data_word
 end
@@ -1569,7 +1563,7 @@ end
 \ Like `buf:` but doesn't return capacity.
 \ Also see `buf:` for warnings about AOT.
 fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- adr )
-  nil cap .alloc_data { adr }
+  nil cap .comp_alloc_data { adr }
   .read_word adr .init_data_word
 end
 
@@ -1596,7 +1590,7 @@ end
 \ stored in another static variable, or used to derive an address
 \ which would be stored in another static variable.
 fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
-  nil cap .alloc_data { adr }
+  nil cap .comp_alloc_data { adr }
   .read_word { str len }
 
   str len .define_fun .plain_call
@@ -1665,9 +1659,9 @@ fun: read_delimited { delim -- str len err }
 end
 
 fun: comp_alloc_cstr { buf len -- cstr err }
-  len .inc            { cap } \ Reserve terminating null byte.
-  buf cap .alloc_data { adr }
-  adr len +          { ceil }
+  len .inc { cap } \ Reserve terminating null byte.
+  buf cap .comp_alloc_data { adr }
+  adr len + { ceil }
   nil ceil !b
   adr
 end
@@ -1728,7 +1722,7 @@ fun_comp: ` { -- err } ( C: `str` -- ) ( E: -- cstr ) char' ` .read_comp_cstr en
 \ They always refer to the start of the reader buffer.
 fun: str: { str -> err }
   .strlen .inc { cap }
-  str cap .alloc_data { adr }
+  str cap .comp_alloc_data { adr }
   .read_word adr .init_data_word
 end
 
@@ -2188,9 +2182,9 @@ end
 
 \ SYNC[type_fields].
 fun: type_beg { name len -- type err }
-  len .inc             { cap }
-  2 .cells cap +       { size }
-  nil size .alloc_data { type }
+  len .inc { cap }
+  2 .cells cap + { size }
+  nil size .comp_alloc_data { type }
   2 .cells type + name cap .strlcpy
   type
 end
@@ -3816,52 +3810,57 @@ fun: mem_unprot { addr size -> err } PROT_RW .mem_prot end
 \
 \ This is the preferred way to acquire memory pages from the OS.
 \ Size is counted in bytes; to allocate cells, use `size cells`.
-fun: stack_init { size stack -- err }
-  size PAGE_SIZE .align_up { size }
+fun: stack_init { size stk -- err }
+  size PAGE_SIZE .align_up   { size }
   PAGE_SIZE 1 .lsl size +    { bytelen } \ + space for 2 guards
   bytelen PROT_NONE .mem_map { cellar }
-  cellar PAGE_SIZE +        { floor }
-  floor size +              { ceil }
+  cellar PAGE_SIZE +         { floor }
+  floor size +               { ceil }
   floor size .mem_unprot
 
-  bytelen stack !
-  cellar  stack +cell !
-  floor   stack STACK_OFF_FLOOR + !
-  floor   stack STACK_OFF_TOP   + !
-  ceil    stack STACK_OFF_CEIL  + !
+  bytelen stk !
+  cellar  stk +cell !
+  floor   stk .Stack_floor !
+  floor   stk .Stack_top   !
+  ceil    stk .Stack_ceil  !
 end
 
-fun: stack_deinit { stack -- err }
-  ifz stack .then .ret end
+fun: stack_deinit { stk -- err }
+  ifz stk .then .ret end
 
-  stack       @ { bytelen }
-  stack +cell @ { cellar }
+  stk       @ { bytelen }
+  stk +cell @ { cellar }
 
   if cellar .then cellar bytelen .mem_unmap end
 
-  nil stack !
-  nil stack +cell !
-  nil stack STACK_OFF_FLOOR + !
-  nil stack STACK_OFF_TOP   + !
-  nil stack STACK_OFF_CEIL  + !
+  nil stk !
+  nil stk +cell !
+  nil stk .Stack_floor !
+  nil stk .Stack_top   !
+  nil stk .Stack_ceil  !
 end
 
-fun: stack_trunc { stack } if stack .then stack .Stack_floor @ stack .Stack_top ! end end
+fun: stack? { stk -> bool } @ <>0 end
 
-fun: stack_repr { stack }
-  ifz stack .then " [debug] stack is nil" .elog .elf .ret end
+\ Length in BYTES, not cells.
+fun: stack_len { stk -- len } stk .Stack_top @ stk .Stack_floor @ - end
 
-  " [debug] stack           " .elog stack                 .debug_arg
-  " [debug] Stack_bytelen @ " .elog stack @ .debug_arg
-  " [debug] Stack_cellar  @ " .elog stack +cell @ .debug_arg
-  " [debug] Stack_floor   @ " .elog stack STACK_OFF_FLOOR + @ .debug_arg
-  " [debug] Stack_top     @ " .elog stack STACK_OFF_TOP   + @ .debug_arg
-  " [debug] Stack_ceil    @ " .elog stack STACK_OFF_CEIL  + @ .debug_arg
+fun: stack_trunc { stk } if stk .then stk .Stack_floor @ stk .Stack_top ! end end
+
+fun: stack_repr { stk }
+  ifz stk .then " [debug] stack is nil" .elog .elf .ret end
+
+  " [debug] stack           " .elog stk .debug_arg
+  " [debug] Stack_bytelen @ " .elog stk @ .debug_arg
+  " [debug] Stack_cellar  @ " .elog stk +cell @ .debug_arg
+  " [debug] Stack_floor   @ " .elog stk .Stack_floor @ .debug_arg
+  " [debug] Stack_top     @ " .elog stk .Stack_top   @ .debug_arg
+  " [debug] Stack_ceil    @ " .elog stk .Stack_ceil  @ .debug_arg
 end
 
 \ For JIT use only. TODO: AOT compatibility.
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
-  STACK_SIZE .malloc { adr }
+  nil 40 .comp_alloc_data { adr } \ SYNC[stack_field_offsets].
   size adr .stack_init
   adr call_xt' let:
 end
@@ -4508,7 +4507,7 @@ struct: Indir_decl
 end
 
 fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
-  nil size' Indir_decl .alloc_data { decl }
+  nil size' Indir_decl .comp_alloc_data { decl }
 
   inp     decl .Indir_decl_inp     !b
   out     decl .Indir_decl_out     !b

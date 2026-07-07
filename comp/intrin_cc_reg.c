@@ -354,7 +354,9 @@ static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_alloc_data(Sint buf, Sint len, Interp *interp, const U8 **adr) {
+static Err intrin_comp_alloc_data(
+  Sint buf, Sint len, Interp *interp, const U8 **adr
+) {
   if (buf) try(interp_validate_data_ptr(buf));
   try(interp_validate_data_len(len));
   try(comp_alloc_data(&interp->comp, (const U8 *)buf, (Ind)len, adr));

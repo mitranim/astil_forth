@@ -245,7 +245,7 @@ static Err intrin_comp_load(Interp *interp) {
   return nullptr;
 }
 
-static Err intrin_alloc_data(Interp *interp) {
+static Err intrin_comp_alloc_data(Interp *interp) {
   const U8 *buf;
   Ind       len;
   const U8 *adr;

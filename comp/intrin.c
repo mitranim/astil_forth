@@ -650,10 +650,10 @@ static const USED auto INTRIN_COMP_LOAD = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_ALLOC_DATA = (Sym){
-  .name.buf = "alloc_data",
+static const USED auto INTRIN_COMP_ALLOC_DATA = (Sym){
+  .name.buf = "comp_alloc_data",
   .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_alloc_data,
+  .intrin   = (void *)intrin_comp_alloc_data,
   .inp_len  = 2, // ( buf len -- addr ) ; buffer address may be nil
   .out_len  = 2,
   .has_err  = true,

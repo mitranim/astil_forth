@@ -27,7 +27,7 @@ static const USED Sym INTRIN[] = {
   INTRIN_HERE_EXEC,       // here_exec
   INTRIN_COMP_INSTR,      // comp_instr
   INTRIN_COMP_LOAD,       // comp_load
-  INTRIN_ALLOC_DATA,      // alloc_data
+  INTRIN_COMP_ALLOC_DATA, // comp_alloc_data
   INTRIN_COMP_PAGE_ADDR,  // comp_page_addr
   INTRIN_COMP_PAGE_LOAD,  // comp_page_load
   INTRIN_COMP_CALL,       // comp_call
