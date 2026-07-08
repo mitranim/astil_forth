@@ -90,7 +90,7 @@ static void encode_linkedit_section(
   const auto base_len     = buf->len;
 
   constexpr U32 img_off = sizeof(Mach_fixup_head);
-  constexpr U32 seg_off = img_off + sizeof(Mach_fixup_img_5);
+  constexpr U32 seg_off = img_off + sizeof(Mach_fixup_img_4);
   constexpr U32 imp_off = seg_off + sizeof(Mach_fixup_seg);
   const U32     sym_off = imp_off + (sizeof(Mach_fixup_import) * extern_count);
 
@@ -109,13 +109,13 @@ static void encode_linkedit_section(
 
   buf_append(
     buf,
-    (Mach_fixup_img_5){
-      .seg_count          = 5,
+    (Mach_fixup_img_4){
+      .seg_count          = 4,
       .seg_info_offset[0] = 0,       // __PAGEZERO   → no fixup
       .seg_info_offset[1] = 0,       // __TEXT       → no fixup
       .seg_info_offset[2] = 0,       // __DATA       → no fixup
       .seg_info_offset[3] = got_off, // __DATA_CONST → __got
-      .seg_info_offset[4] = 0,       // __LINKEDIT   → no fixup
+      // ... skipping segments without fixups ...
     }
   );
 
@@ -179,16 +179,11 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
 
   /*
   We build the image piece-by-piece, but some of the sizes and offsets have to
-  be calculated in advance, because they're specified in the headers upfront.
-
-  `cmd_count` must match the sections, and the sections must match what we
-  specify in `encode_linkedit_section`. Currently it hardcodes the sections
-  so they must all be present, even if empty.
+  be calculated in advance because they're specified in the header structs.
   */
 
   // Must match the commands below.
-
-  constexpr U8 cmd_count = 11;
+  constexpr U8 cmd_count = 12;
 
   // Must match the commands below.
   constexpr U32 cmd_size = 0 +                      //
@@ -196,6 +191,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __TEXT
     sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __DATA
     sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __DATA_CONST
+    sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __ARENA
     sizeof(Mach_load_cmd_seg) +                     // __LINKEDIT
     sizeof(Mach_load_cmd_dylinker) +                // MLC_LOAD_DYLINKER
     sizeof(Mach_cmd_dylib) +                        // MLC_LOAD_DYLIB
@@ -245,10 +241,11 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   of the executable easier; inserting a code signature is a notable example.
   In our case, `__text` needs page alignment because of `Comp_heap` mapping:
 
-    Mach-O headers        -> __TEXT (0x320)
-    Comp_heap.exec.instrs -> __text (0x100000)
-    Comp_heap.data        -> __data (0x40000)
-    Comp_heap.externs     -> __got  (0x4000)
+    Mach-O headers        -> __TEXT  (0x320)
+    Comp_heap.exec.instrs -> __text  (0x100000)
+    Comp_heap.data        -> __data  (0x40000)
+    Comp_heap.externs     -> __got   (0x4000)
+    Comp_heap.arena       -> __arena (1 GiB, zero-filled)
 
   Mach-O seems to require the body of each segment load command to be padded
   to memory page size in the file too, not just in virtual memory, likely for
@@ -402,13 +399,51 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     }
   );
 
+  constexpr auto arena_vm_off = text_code_vm_off + offsetof(Comp_heap, arena) -
+    offsetof(Comp_heap, exec.instrs);
+  constexpr auto arena_real_size = MAIN_ARENA_LEN;
+  constexpr auto arena_vm_size   = mem_align_page(arena_real_size);
+
+  try_assert(got_vm_off + got_vm_size <= arena_vm_off);
+  try_assert(is_aligned_to(arena_vm_off, MEM_PAGE));
+  try_assert(is_aligned_to(arena_vm_size, MEM_PAGE));
+
+  buf_append(
+    buf,
+    (Mach_load_cmd_seg){
+      .head.cmd     = MLC_SEGMENT_64,
+      .head.cmdsize = sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect),
+      .segname      = "__ARENA",
+      .vmaddr       = arena_vm_off,
+      .vmsize       = arena_vm_size,
+      .fileoff      = file_off,
+      .filesize     = 0,
+      .maxprot      = MP_READ | MP_WRITE,
+      .initprot     = MP_READ | MP_WRITE,
+      .nsects       = 1,
+    }
+  );
+
+  buf_append(
+    buf,
+    (Mach_sect){
+      .sectname = "__arena",
+      .segname  = "__ARENA",
+      .addr     = arena_vm_off,
+      .size     = arena_real_size,
+      .offset   = 0,
+      .align    = 3, // 2^3
+      .flags    = MST_ZEROFILL,
+    }
+  );
+
   deferred(buf_deinit) Buf linkedit = {};
   encode_linkedit_section(comp, text_seg_vm_off, got_vm_off, &linkedit);
 
   const auto linkedit_file_off  = file_off;
   const auto linkedit_real_size = linkedit.len;
   const auto linkedit_file_size = mem_align_page(linkedit_real_size);
-  const auto linkedit_vm_off    = got_vm_off + got_vm_size;
+  const auto linkedit_vm_off    = arena_vm_off + arena_vm_size;
   const auto linkedit_vm_size   = linkedit_file_size;
 
   file_off += linkedit_file_size;

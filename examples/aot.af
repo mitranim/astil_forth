@@ -9,7 +9,7 @@ use' lang.af
 \
 \ See `./aot_cli.af` for compiling from outside the program.
 
-fun: main { -- exit }
+fun: run { -- exit }
   if .has_interp .then
     " hello world (JIT mode)!" .log .lf
   else
@@ -21,7 +21,9 @@ fun: main { -- exit }
 end
 
 \ Run immediately in JIT mode.
-.main
+.run
+
+fun: main { -- exit } .with_main_ctx .run end end
 
 xt' main " out.exe" .compile_executable
 
@@ -36,7 +38,8 @@ xt' main " out.exe" .compile_executable
 \
 \ In the Forth REPL:
 \
-\   fun: main { -- exit } " hello world!" .log .lf 0 end
+\   fun: run { -- exit } " hello world!" .log .lf 0 end
+\   fun: main { -- exit } .with_main_ctx .run end end
 \   xt' main " out.exe" .compile_executable
 \   \ Then hit Ctrl+D (not Ctrl+C) to exit.
 \
@@ -59,11 +62,16 @@ xt' main " out.exe" .compile_executable
 \
 \ Forth:
 \
-\   fun: main { -- exit } " hello world! (first)" .log .lf 0 end
+\   fun: run { -- exit } " hello world! (first)" .log .lf 0 end
+\   fun: main { -- exit } .with_main_ctx .run end end
+\
 \   xt' main " out0.exe" .compile_executable
-\   fun: main { -- exit } " hello world! (second)" .log .lf 0 end
-\   \ [system] redefined word `main` in wordlist 1
+\
+\   fun: run { -- exit } " hello world! (second)" .log .lf 0 end
+\   fun: main { -- exit } .with_main_ctx .run end end
+\
 \   xt' main " out1.exe" .compile_executable
+\
 \   \ Hit Ctrl+D to exit.
 \
 \ Shell:

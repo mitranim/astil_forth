@@ -104,8 +104,11 @@ static constexpr U8 ASM_REG_SP = 31;
 // Extremely primitive heuristic. 4 seems enough.
 static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 
-// SYNC[asm_reg_interp].
-static constexpr U8 ASM_REG_INTERP = 28;
+// SYNC[asm_reg_ctx].
+static constexpr U8 ASM_REG_CTX = 28;
+
+// Legacy alias for stack-CC.
+static constexpr U8 ASM_REG_INTERP = ASM_REG_CTX;
 
 // clang-format off
 #ifdef CALL_CONV_STACK
@@ -123,7 +126,7 @@ static constexpr U8 ASM_REG_INTERP = 28;
 
 #else // CALL_CONV_STACK
 
-  static constexpr U8 ASM_STABLE_REG_LAST = ASM_REG_INTERP - 1;
+  static constexpr U8 ASM_STABLE_REG_LAST = ASM_REG_CTX - 1;
   static constexpr Bits ASM_REGS_STABLE   = 0b111111111'0000000000000000000;
 
 #endif // CALL_CONV_STACK

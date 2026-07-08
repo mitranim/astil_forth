@@ -65,6 +65,8 @@ static char *path_join(const char *base, const char *suf, bool is_dir) {
   const auto buf_cap = buf_len + 1;
   const auto buf     = (char *)calloc(buf_cap, sizeof(char));
 
+  if (!buf) return nullptr;
+
   auto rem = buf_len;
   auto ptr = buf;
 

@@ -71,12 +71,12 @@ fun: run { -- err }
     buf CAP DELS .scan +: out
   end
 
-  " SCAN_DELIMS_PRINT" .getenv if .then out .log_int .lf end
+  if " SCAN_DELIMS_PRINT" .getenv .then out .log_int .lf end
   assert= out WANT end
 end
 .run
 
 fun: main { -- exit }
-  .run { err }
-  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
+  .with_main_ctx .run end { err }
+  if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

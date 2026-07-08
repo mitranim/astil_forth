@@ -4,8 +4,11 @@ of our Forth system which uses the native procedure call ABI.
 
 Compare `./arch_arm64_cc_stack.c` which uses a stack-based callvention.
 
-Special registers:
-- `x28` = pointer to interpreter / compiler.
+Reserved registers:
+- `x28` -- ambient context.
+
+On the interpreter thread, the context is `Interp`, starting with `Ctx`.
+On other threads and in AOT, context content is determined by user code.
 
 The special registers must be kept in sync with `lang.af`.
 */
@@ -45,21 +48,21 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
     return err_call_arity_mismatch(sym->name.buf, inp_len, ints_len);
   }
 
-  Sint register x7 __asm__("x7")          = inp_len > 7 ? stack_pop(ints) : 0;
-  Sint register x6 __asm__("x6")          = inp_len > 6 ? stack_pop(ints) : 0;
-  Sint register x5 __asm__("x5")          = inp_len > 5 ? stack_pop(ints) : 0;
-  Sint register x4 __asm__("x4")          = inp_len > 4 ? stack_pop(ints) : 0;
-  Sint register x3 __asm__("x3")          = inp_len > 3 ? stack_pop(ints) : 0;
-  Sint register x2 __asm__("x2")          = inp_len > 2 ? stack_pop(ints) : 0;
-  Sint register x1 __asm__("x1")          = inp_len > 1 ? stack_pop(ints) : 0;
-  Sint register x0 __asm__("x0")          = inp_len > 0 ? stack_pop(ints) : 0;
-  auto register interp_reg __asm__("x28") = interp;
+  Sint register x7 __asm__("x7")       = inp_len > 7 ? stack_pop(ints) : 0;
+  Sint register x6 __asm__("x6")       = inp_len > 6 ? stack_pop(ints) : 0;
+  Sint register x5 __asm__("x5")       = inp_len > 5 ? stack_pop(ints) : 0;
+  Sint register x4 __asm__("x4")       = inp_len > 4 ? stack_pop(ints) : 0;
+  Sint register x3 __asm__("x3")       = inp_len > 3 ? stack_pop(ints) : 0;
+  Sint register x2 __asm__("x2")       = inp_len > 2 ? stack_pop(ints) : 0;
+  Sint register x1 __asm__("x1")       = inp_len > 1 ? stack_pop(ints) : 0;
+  Sint register x0 __asm__("x0")       = inp_len > 0 ? stack_pop(ints) : 0;
+  auto register ctx_reg __asm__("x28") = interp;
 
   /*
   This construct lets us support:
 
   - Multiple output parameters.
-  - Special interpreter register.
+  - Special context register.
 
   Our alternative stack-based calling convention uses an additional
   trampoline written in assembly, but we don't need one here yet.
@@ -78,7 +81,7 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
                      "+r"(x5),
                      "+r"(x6),
                      "+r"(x7)
-                   : [fun] "r"(fun), "r"(interp_reg)
+                   : [fun] "r"(fun), "r"(ctx_reg)
                    : "x8",
                      "x9",
                      "x10",
@@ -222,21 +225,11 @@ static void asm_append_sym_epilogue_ok(Comp *comp, Sym *sym) {
 }
 
 /*
-In the reg-CC version of our system, an error is a regular output,
-always explicitly declared and returned in the next GPR after the
-non-error outputs.
+In the reg-CC version of our system, an error is a regular output.
+The shortcut "try" tests the top value for being zero, and returns
+non-zero as the error output parameter of the current function.
 
-This approach wins on simplicity and ABI interop. Signatures reflect the ABI.
-We can pass callbacks to `libc` and they just work. A C program could declare
-a function type such as, for example, `Err Func(intptr_t)`, obtain a pointer
-to a Forth word with that signature, and call it as-is, without glue.
-
-We also provide shortcuts `.try` / `.throw` for returning an error locally,
-very similar to Swift. A trailing output named `err` enables implicit `.try`
-inside the current word, reducing noise. A trailing output named `Err` keeps
-errors visible for manual handling. Both spellings use the same ABI.
-
-The cost of `.try` here is between 1 and 3 instructions on Arm64.
+Costs between 1 and 3 instructions on Arm64.
 */
 static void asm_append_try(
   Comp *comp,
@@ -288,12 +281,12 @@ this means 1 output and 1 error. We have intrinsics with 2 outputs and 1
 error, which doesn't fit into the C ABI.
 
 So instead, we stack-allocate outputs and pass pointers to them.
-The interpreter pointer is placed between inputs and outputs.
+The interpreter / context pointer is placed between inputs and outputs.
 
 Example call of `intrin_read_until_char`:
 
   mov x0, <char>           -- input
-  mov x1, x28              -- interp
+  mov x1, x28              -- interp/context
   sub sp, sp, 16
   add x2, sp, 0            -- out_buf
   add x3, sp, 8            -- out_len
@@ -321,7 +314,7 @@ static Err asm_append_call_intrin(Comp *comp, Sym *caller, const Sym *callee) {
   const Ind size   = sizeof(Sint);
   const Ind sp_off = asm_align_sp_off(MUL(size, outs));
 
-  asm_append_mov_reg(comp, callee->inp_len, ASM_REG_INTERP);
+  asm_append_mov_reg(comp, callee->inp_len, ASM_REG_CTX);
 
   if (sp_off) {
     asm_append_sub_imm(comp, ASM_REG_SP, ASM_REG_SP, sp_off);

@@ -85,8 +85,8 @@ static void Mach_thread_state_repr(const Mach_thread_state *val) {
 
 #endif // CALL_CONV_STACK
 
-  // SYNC[asm_reg_interp].
-  eprint_struct_field_hint(val, x[28], " // interpreter register");
+  // SYNC[asm_reg_ctx].
+  eprint_struct_field_hint(val, x[28], " // context register");
   eprint_struct_field(val, fp);
   eprint_struct_field(val, lr);
   eprint_struct_field(val, sp);
@@ -99,6 +99,7 @@ static void Mach_thread_state_repr(const Mach_thread_state *val) {
 static void recovery_log_ctx(const Interp *interp) {
   if (!interp_valid(interp)) return;
   const auto read = interp_reader_const(interp);
+
   if (!reader_valid(read)) return;
   eprintf(SYS_REC_FMT "position: " READ_POS_FMT "\n", READ_POS_ARGS(read));
 
@@ -144,15 +145,15 @@ kern_return_t catch_mach_exception_raise_state(
   if (*flavor != ARM_THREAD_STATE64) return KERN_FAILURE;
   if (state_prev_len != state_len) return MIG_BAD_ARGUMENTS;
 
-  const auto state  = (Mach_thread_state *)state_prev_ptr;
-  const auto interp = (Interp *)state->x[ASM_REG_INTERP];
+  const auto state = (Mach_thread_state *)state_prev_ptr;
+  const auto ctx   = (Ctx *)state->x[ASM_REG_CTX];
 
   if (DEBUG) {
     eprintf(SYS_REC_FMT "bad thread state: ");
     Mach_thread_state_repr(state);
     eprintf(SYS_REC_FMT "code[0]: %p\n", (void *)code[0]);
     eprintf(SYS_REC_FMT "code[1]: %p (bad address)\n", (void *)code[1]);
-    eprintf(SYS_REC_FMT "interpreter address: %p\n", interp);
+    eprintf(SYS_REC_FMT "context address: %p\n", ctx);
 
     /*
     Would be nice if this worked, but sadly `backtrace_from_fp` seems to look
@@ -171,18 +172,20 @@ kern_return_t catch_mach_exception_raise_state(
     fflush(stderr);
   }
 
-  if (!interp_valid(interp)) {
+  if (!interp_valid((Interp *)ctx)) {
     IF_DEBUG({
       eprintf(
         SYS_REC_FMT
         "address %p recovered from register %d does not appear to reference valid interpreter state\n",
-        interp,
-        ASM_REG_INTERP
+        ctx,
+        ASM_REG_CTX
       );
       fflush(stderr);
     });
     return KERN_FAILURE;
   }
+
+  const auto interp = (Interp *)ctx;
 
   if (exception != EXC_BAD_ACCESS) return KERN_FAILURE;
 

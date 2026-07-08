@@ -149,7 +149,7 @@ static Err interp_validate_redefinition(
   try(interp_wordlist(interp, wordlist, &dict));
 
   const auto had = dict_has(dict, name);
-  if (had == redefining) return nullptr;
+  if (!had || redefining) return nullptr;
 
   const auto read = interp_reader_const(interp);
   if (read && read->tty) {
@@ -164,19 +164,9 @@ static Err interp_validate_redefinition(
     return nullptr;
   }
 
-  if (had) {
-    return errf(
-      "word " FMT_QUOTED
-      " already defined in wordlist %d (%s); hint: use `[ .redefine ]` to replace it",
-      name,
-      wordlist,
-      wordlist_name(wordlist)
-    );
-  }
-
   return errf(
-    "redundant `.redefine` marker in word " FMT_QUOTED
-    " which is not currently defined in wordlist %d (%s)",
+    "word " FMT_QUOTED
+    " already defined in wordlist %d (%s); hint: use `[ .redefine ]` to replace it",
     name,
     wordlist,
     wordlist_name(wordlist)
@@ -590,32 +580,37 @@ static Err interp_import_stdin(Interp *interp) {
 
 static char *resolve_local_import_path(const char *prev, const char *next) {
   deferred(chars_deinit) char *path = path_join(prev, next, false);
+  if (!path) return nullptr;
   return realpath(path, nullptr);
 }
 
 static char *resolve_std_import_path(const char *next) {
   // Try relative to the interpreter executable.
   const auto exec = get_exec_path();
+
   if (exec && is_path_abs(exec)) {
     deferred(chars_deinit) char *base = path_join(exec, "forth", false);
+    if (!base) return nullptr;
+
     deferred(chars_deinit) char *full = path_join(base, next, true);
-    const auto                   path = realpath(full, nullptr);
+    if (!full) return nullptr;
+
+    const auto path = realpath(full, nullptr);
     if (path) return path;
   }
 
   // Try in `~/.local/share/astil`.
   // SYNC[install_path].
   const auto home = getenv("HOME");
-  if (home) {
-    deferred(chars_deinit) char *base = path_join(
-      home, ".local/share/astil", true
-    );
-    deferred(chars_deinit) char *full = path_join(base, next, false);
-    const auto                   path = realpath(full, nullptr);
-    if (path) return path;
-  }
+  if (!home) return nullptr;
 
-  return nullptr;
+  deferred(chars_deinit) char *base = path_join(home, ".local/share/astil", true);
+  if (!base) return nullptr;
+
+  deferred(chars_deinit) char *full = path_join(base, next, false);
+  if (!full) return nullptr;
+
+  return realpath(full, nullptr);
 }
 
 static char *resolve_import_path(const char *prev, const char *next) {
@@ -665,7 +660,12 @@ static Err interp_import_inner(
 
   // Registering the import before interpreting the file
   // enables partial cyclic imports and reduces surprise.
-  dict_set(imports, strdup(path), EMPTY); // The dict owns the key copy.
+  char *const import_path = strdup(path);
+  if (!import_path) {
+    return errf("unable to allocate import path " FMT_QUOTED, path);
+  }
+
+  dict_set(imports, import_path, EMPTY); // The dict owns the key copy.
 
   IF_DEBUG(eprintf("[system] importing file: " FMT_QUOTED "\n", path));
   try(interp_err(read, interp_loop(interp)));

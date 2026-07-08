@@ -23,18 +23,33 @@ typedef struct {
 } Module_ctx;
 
 /*
+Ambient execution context; address is kept in `ASM_REG_CTX`.
+
+Minimum required roles:
+- Indicate if interpreter is available and we're on its thread.
+- Provide a memory arena. Caller owns and frees; callees "allocate" within.
+
+The `Interp*` object begins with `Ctx`, and its `.self` is self-referencing:
+the value is the self-address of `Interp*` / `Ctx*`. In all other contexts,
+the value of `.self` must not self-reference, and is otherwise undefined.
+
+SYNC[ctx_fields].
+*/
+typedef struct {
+  void *self; // Self-address / `Interp*` in interpreter mode.
+  U8   *top;  // Borrowed bump-memory top.
+  U8   *ceil; // Borrowed bump-memory ceiling.
+} Ctx;
+
+/*
 Every compiler is an interpreter.
 Every Forth interpreter is a compiler.
 Would be nice to have a name describing both.
 
-The Forth code which uses the register-based calling convention
-accesses the data stack via the interpreter object, rather than
-via a dedicated register, and hardcodes the field offsets which
-must be kept in sync.
-
 SYNC[interp_fields].
 */
 typedef struct {
+  Ctx          ctx;       // Ambient Forth context; must be first.
   Sint_stack   ints;      // Forth integer stack.
   Uint         argc;      // Interpreter CLI arg count.
   const char **argv;      // Interpreter CLI args.
@@ -48,6 +63,8 @@ typedef struct {
   bool         welcomed;  // Already printed REPL help.
   bool         slop;      // Disable validation of sloppy code in reg-CC.
 } Interp;
+
+static_assert(!offsetof(Interp, ctx));
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);
 static constexpr auto INTERP_INTS_TOP   = offsetof(Interp, ints.top);

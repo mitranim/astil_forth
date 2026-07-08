@@ -77,6 +77,9 @@ static Err print_disasm(const void *src, Ind len) {
   raw bytes, so we have to convert them to hex first.
   */
   deferred(chars_deinit) char *buf = malloc(buf_cap);
+
+  if (!buf) return errf("unable to allocate " FMT_IND " bytes", buf_cap);
+
   fmt_bytes_hex_into(buf, buf_cap, src, len);
 
   const auto  exe    = "llvm-mc";

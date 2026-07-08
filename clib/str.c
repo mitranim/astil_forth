@@ -25,7 +25,7 @@ a questionable tool anyway. TODO disambiguate better.
 */
 static Err cstr_set(char *out_buf, Ind out_cap, const char *src, Ind src_len) {
   try_assert(out_cap);
-  if (src_len > out_cap) return err_str_buf_over(src, src_len, out_cap);
+  if (src_len >= out_cap) return err_str_buf_over(src, src_len, out_cap);
   memcpy(out_buf, src, src_len);
   out_buf[src_len] = '\0';
   return nullptr;

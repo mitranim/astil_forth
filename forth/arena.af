@@ -14,8 +14,8 @@ end
 
 fun: arena_init { arn -> } size' Arena .memzero end
 
-fun: arena_deinit { arn -> Err }
-  ifz .then .ret end
+fun: arena_deinit { arn -- Err }
+  ifz arn .then .ret end
 
   arn .Stack_floor @ { floor }
   arn .Stack_top   @ { ceil }
@@ -28,13 +28,14 @@ fun: arena_deinit { arn -> Err }
     size' Stack +: page
   end
 
+  arn .stack_deinit fallback: err
   arn .arena_init
   err
 end
 
 \ Truncate every page and reset to first page if any, while keeping capacity.
-fun: arena_trunc { arn -> }
-  ifz .then .ret end
+fun: arena_trunc { arn }
+  ifz arn .then .ret end
 
   arn .Stack_floor @ { floor }
   arn .Stack_top   @ { ceil }

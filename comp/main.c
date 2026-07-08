@@ -86,7 +86,7 @@ static Err main_run(int argc, const char *argv[]) {
   try(env_bool("TRACE", &TRACE));
   try(env_bool("timing", &timing));
 
-  Interp interp = {};
+  deferred(interp_deinit) Interp interp = {};
   try(interp_init(&interp));
   interp.argc = (Uint)argc;
   interp.argv = argv;

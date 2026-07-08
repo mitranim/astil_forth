@@ -65,19 +65,15 @@ fun: net_addr_info { port -- ainf err }
 
   if code .then
     code .gai_strerror { msg }
-    " unable to listen on port %s; code: %zd; msg: %s" port code msg .errf .throw
+    " unable to listen on port %s; code: %zd; msg: %s" port code msg .strf .throw
   end
 
   ifz ainf @ .then
     \ This line should not be reached on Posix-conforming systems.
-    " unable to listen on port %s: no addrinfo available" port .errf .throw
+    " unable to listen on port %s: no addrinfo available" port .strf .throw
   end
 
   ainf @
-end
-
-fun: sock_close { sock -> err }
-  if .close .then .errno " unable to close socket" .os_err else nil end
 end
 
 fun: sock_bind { info backlog -- sock Err }
@@ -109,7 +105,7 @@ fun: sock_bind { info backlog -- sock Err }
   end
 
   \ Best-effort cleanup; keep the primary setup error.
-  if err .then sock .sock_close { -- } end
+  if err .then sock .close { -- } end
   sock err
 end
 
@@ -130,9 +126,9 @@ fun: net_listen { port backlog -- sock Err }
   ainf .freeaddrinfo
 
   if err .then
-    " unable to listen on port %s: socket error: %s" port err .errf { err }
+    " unable to listen on port %s: socket error: %s" port err .strf { err }
   elif sock <0 .then
-    " unable to listen on port %s: no sockets available" port .errf { err }
+    " unable to listen on port %s: no sockets available" port .strf { err }
   end
 
   sock err

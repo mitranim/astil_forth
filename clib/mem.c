@@ -54,10 +54,13 @@ static Ind mem_size(Ind len, Ind size) {
 }
 
 // Overflow-safe counterpart of `malloc(len * size)`.
-static void *memalloc(Ind len, Ind size) { return malloc(mem_size(len, size)); }
+static void *memalloc(Ind len, Ind size) {
+  size = mem_size(len, size);
+  return size ? malloc(size) : nullptr;
+}
 
 static void *ptr_at(void *src, Ind ind, Ind size) {
-  return (U8 *)src + mem_size(ind, size);
+  return size ? (U8 *)src + mem_size(ind, size) : nullptr;
 }
 
 static Err err_mmap() {
@@ -274,6 +277,8 @@ Also see `./stack.c` and `./stack.h` for a more specialized analogue,
 intended for generic stacks of values of any one type.
 */
 static Err mpage_init(void **page, Ind cap) {
+  *page = nullptr;
+
   const auto data_size = __builtin_align_up(cap, MEM_PAGE);
   const auto full_size = MEM_PAGE + MEM_PAGE + data_size + MEM_PAGE;
   const auto base      = mem_map(full_size, 0);
@@ -283,18 +288,26 @@ static Err mpage_init(void **page, Ind cap) {
   const auto meta = (Mpage *)base;
   const auto data = (void *)((U8 *)base + MEM_PAGE + MEM_PAGE);
 
-  try(mem_protect(meta, MEM_PAGE, PROT_READ | PROT_WRITE));
-  try(mem_protect(data, data_size, PROT_READ | PROT_WRITE));
+  Err err = mem_protect(meta, MEM_PAGE, PROT_READ | PROT_WRITE);
+  if (!err) {
+    err = mem_protect(data, data_size, PROT_READ | PROT_WRITE);
+    if (!err) {
+      *meta = (Mpage){
+        .head[0] = MPAGE_MAGIC[0],
+        .head[1] = MPAGE_MAGIC[1],
+        .size    = full_size,
+      };
 
-  *meta = (Mpage){
-    .head[0] = MPAGE_MAGIC[0],
-    .head[1] = MPAGE_MAGIC[1],
-    .size    = full_size,
-  };
+      err = mem_protect(meta, MEM_PAGE, PROT_READ);
+      if (!err) {
+        *page = data;
+        return nullptr;
+      }
+    }
+  }
 
-  try(mem_protect(meta, MEM_PAGE, PROT_READ));
-  *page = data;
-  return nullptr;
+  munmap(base, full_size);
+  return err;
 }
 
 /*
@@ -321,7 +334,7 @@ int main() {
 
 /*
 int main() {
-  deferred(mpage_deinit) void *page;
+  deferred(mpage_deinit) void *page = nullptr;
   try_main(mpage_init(&page, 0x10000));
 
   static constexpr char msg[] = "test";

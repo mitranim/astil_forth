@@ -25,6 +25,7 @@ static Fnv_hash mem_hash(const void *key, Ind len) {
 
 // Conforms to `Eq_fun`.
 static bool mem_eq(const void *one, const void *two, Ind len) {
+  if (!len) return true;
   return !memcmp(one, two, len);
 }
 
@@ -46,21 +47,27 @@ static Ind hash_table_bits_arr_len(Ind cap) {
 }
 
 static void hash_table_init(Hash_table *out, Ind cap, Ind key_size, Ind val_size) {
-  if (!cap) {
-    *out = (Hash_table){};
-    return;
-  }
+  *out = (Hash_table){};
+  if (!cap) return;
 
   // Power of 2, or 0. Assumed by `hash_table_loaded` and `hash_table_probe_ind`.
   IF_DEBUG(assert_fatal(!(cap & (cap - 1))));
 
   auto bits_len = hash_table_bits_arr_len(cap);
 
+  const auto bits = calloc(bits_len, HASH_TABLE_BITS_SIZE);
+  const auto keys = memalloc(cap, key_size);
+  const auto vals = memalloc(cap, val_size);
+
+  assert_fatal(bits);
+  if (key_size) assert_fatal(keys);
+  if (val_size) assert_fatal(vals);
+
   *out = (Hash_table){
     .cap  = cap,
-    .bits = calloc(bits_len, HASH_TABLE_BITS_SIZE),
-    .keys = memalloc(cap, key_size),
-    .vals = memalloc(cap, val_size),
+    .bits = bits,
+    .keys = keys,
+    .vals = vals,
   };
 }
 
@@ -85,9 +92,7 @@ static bool hash_table_valid(const Hash_table *tab) {
     (
         tab->cap > 0 &&
         tab->len < tab->cap &&
-        tab->bits &&
-        tab->keys &&
-        tab->vals
+        tab->bits
     ))
   );
 }
@@ -160,8 +165,8 @@ static Ind hash_table_matching_ind(
 }
 
 /*
-Must have capacity. Immediately stores the key and updates the bits
-and the length. The caller is responsible for updating the value.
+Must have capacity. If key is new, stores it and reports `new`.
+The caller is responsible for updating bits, length, and value.
 */
 static Ind hash_table_available_ind(
   const Hash_table *tab,
@@ -179,7 +184,7 @@ static Ind hash_table_available_ind(
     const auto key_ptr = ptr_at(tab->keys, ind, key_size);
 
     if (!hash_table_bits_get_at(tab->bits, ind)) {
-      memcpy(key_ptr, key, key_size);
+      if (key_size) memcpy(key_ptr, key, key_size);
       if (new) *new = true;
       return ind;
     }
@@ -222,16 +227,19 @@ static void hash_table_rehash(
 
     bool       new;
     const auto key_prev = ptr_at(prev->keys, ind_prev, key_size);
-    const auto val_prev = ptr_at(prev->vals, ind_prev, val_size);
     const auto ind_next = hash_table_available_ind(
       &next, key_prev, key_size, hash_fun, eq_fun, &new
     );
-    const auto key_next = ptr_at(next.keys, ind_next, key_size);
-    const auto val_next = ptr_at(next.vals, ind_next, val_size);
     assert_fatal(new);
 
-    memcpy(key_next, key_prev, key_size);
-    memcpy(val_next, val_prev, val_size);
+    // `hash_table_available_ind` already copied the key.
+    // Only non-zero-sized values are allocated or copied; see `Str_set`.
+    if (val_size) {
+      const auto val_prev = ptr_at(prev->vals, ind_prev, val_size);
+      const auto val_next = ptr_at(next.vals, ind_next, val_size);
+      memcpy(val_next, val_prev, val_size);
+    }
+
     hash_table_bits_set_at(next.bits, ind_next);
     next.len++;
   }
@@ -262,15 +270,17 @@ static void *hash_table_set(
   );
 
   if (new) {
-    const auto key_ptr = ptr_at(tab->keys, ind, key_size);
-    memcpy(key_ptr, key, key_size);
+    // `hash_table_available_ind` already copied the key.
     hash_table_bits_set_at(tab->bits, ind);
     tab->len++;
   }
 
-  const auto val_ptr = ptr_at(tab->vals, ind, val_size);
-  memcpy(val_ptr, val, val_size);
-  return val_ptr;
+  // Only non-zero-sized values are allocated or copied; see `Str_set`.
+  if (!val_size) return nullptr;
+
+  const auto out = ptr_at(tab->vals, ind, val_size);
+  memcpy(out, val, val_size);
+  return out;
 }
 
 static void hash_table_eprint_repr(const Hash_table *tab) {

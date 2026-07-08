@@ -42,6 +42,19 @@ values, typically 0 / nil, but sometimes a type-specific value
 such as `-1` for file descriptors. This means that variables
 used with `deferred` must always be initialized with the right
 sentinel value for their type; usually `{}`.
+
+General lifecycle contract for complex C values:
+
+- `Type_init(&val)` initializes undefined storage and clears `val` first.
+- `Type_init` may leave `val` partially initialized on error.
+- Callers must defer cleanup: `deferred(Type_deinit) Type val = {};`.
+- `Type_deinit(&val)` must tolerate zero and partially-inited values,
+  perform best-effort cleanup, and leave `val` in its sentinel state.
+- Calling `Type_init` on a live value without deiniting is a bug.
+
+Simple values without `Type_init` rely on caller-provided sentinel init.
+Many structures, such as stack / list / dict, are valid after zero-init.
+Some values, such as file descriptors, require special sentinel like -1.
 */
 #define deferred(fun) __attribute__((cleanup(fun)))
 

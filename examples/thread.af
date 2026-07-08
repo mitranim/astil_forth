@@ -2,22 +2,52 @@ use' lang.af
 use' io.af
 use' pthread.af
 
-\ Passed to `pthread_spawn` by raw instruction address.
-\ We have no hidden adapters between Forth and libc.
-fun: callback { _ignored -- err }
-  " [child] running; returning error" .log .lf
-  " mock_error"
+\ Basic example of spawning a thread with its own memory context.
+
+fun: child { msg -- str }
+  " [child] running..." .log .lf
+  " child msg: %s" msg .strf
 end
 
-fun: main { -- err }
-  instr' callback { instr } \ Raw instruction address.
+fun: parent { -- Err }
+  alloca' Stack { mem } \ Child thread memory.
+  instr' child  { fun } \ Child thread function.
+  " parent msg" { inp } \ Child thread input.
+  nil           { out } \ Child thread output.
 
-  " [main] spawning..." .log .lf
-  instr nil .thread_spawn { thread }
+  CTX_CAP Ctx mem .stack_init_ctx { ctx err }
+  if err .then
+    " [parent] unable to init child thread memory: %s" err .strf .throw
+  end
 
-  " [main] joining..." .log .lf
-  thread .thread_join { err }
+  " [parent] spawning..." .log .lf
+  fun inp ctx .thread_spawn_ctx { thread err }
 
-  " [main] received error: %s" err .logf .lf
+  if err .then
+    " [parent] spawn error: %s" err .strf { err }
+
+    mem .stack_deinit { ctx_err }
+
+    if ctx_err .then
+      " [parent] unable to deinit child thread memory: %s" ctx_err .logf .lf
+    end
+
+    err .throw
+  end
+
+  " [parent] joining..." .log .lf
+  thread .thread_join { out err }
+
+  \ If join fails, child thread might still be running and using memory.
+  \ Grudgingly leak the mapping instead of unmapping it under the child.
+  if err .then " [parent] join error: %s" err .strf .throw end
+
+  \ Output needs to be used before deiniting child memory.
+  " [parent] output: %s" out .logf .lf
+
+  mem .stack_deinit { err }
+  if err .then
+    " [parent] unable to deinit child thread memory: %s" err .strf .throw
+  end
 end
-.main
+.parent

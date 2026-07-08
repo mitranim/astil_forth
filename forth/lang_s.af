@@ -31,7 +31,7 @@ fun: ASM_INSTR_SIZE       4      end
 fun: ASM_REG_ERR          0      end
 fun: ASM_REG_DAT_SP_FLOOR 26     end \ SYNC[asm_arm64_cc_stack_special_regs].
 fun: ASM_REG_DAT_SP       27     end \ SYNC[asm_arm64_cc_stack_special_regs].
-fun: ASM_REG_INTERP       28     end \ SYNC[asm_reg_interp].
+fun: ASM_REG_INTERP       28     end \ SYNC[asm_reg_ctx].
 fun: ASM_REG_FP           29     end
 fun: ASM_REG_LR           30     end
 fun: ASM_REG_SP           31     end
@@ -563,10 +563,10 @@ fun:      inline_next ( wlist "word" -- ) ( E: <word> ) next_word inline_word en
 fun_comp: inline'  WORDLIST_EXEC inline_next end
 fun_comp: inline'' WORDLIST_COMP inline_next end
 
-\ "call_xt" is renamed from standard "postpone".
+\ Renamed from standard "postpone".
 fun:      call_xt_next ( wlist "word" -- ) ( E: <word> ) next_word comp_call end
-fun_comp: call_xt'  WORDLIST_EXEC call_xt_next end
-fun_comp: call_xt'' WORDLIST_COMP call_xt_next end
+fun_comp: call'  WORDLIST_EXEC call_xt_next end
+fun_comp: call'' WORDLIST_COMP call_xt_next end
 
 fun:      compile_next ( wlist "word" -- ) next_word comp_push xt' comp_call comp_call end
 fun_comp: compile'  WORDLIST_EXEC compile_next end
@@ -1184,8 +1184,8 @@ fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
   adr xt' else_pop
 end
 
-fun_comp: elif  call_xt'' else xt' if_pop  end
-fun_comp: elifz call_xt'' else xt' ifn_pop end
+fun_comp: elif  call'' else xt' if_pop  end
+fun_comp: elifz call'' else xt' ifn_pop end
 
 \ ## Loops
 \
@@ -1249,7 +1249,7 @@ fun: loop_aux
 end
 
 fun: loop_end ( C: loop_adr -- ) here_write - asm_branch comp_instr end \ b <begin>
-fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end call_xt'' end end
+fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end call'' end end
 
 \ Implementation note. Each loop frame is "split" into two sub-frames:
 \ the "prev frame", and the "current frame". Auxiliary loop constructs

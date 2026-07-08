@@ -113,6 +113,11 @@ static void *mach_on_exceptions(void *) {
   return nullptr;
 }
 
+/*
+Set up AF-specific Mach exception handling for entire current process.
+Should be followed by `mach_exception_server_init` or some equivalent.
+Failure is non-lethal; caller may continue without exception handling.
+*/
 static Err mach_exception_init(exception_mask_t exception_types) {
   const auto task_port = mach_task_self(); // Current process.
 
@@ -149,6 +154,10 @@ static Err mach_exception_init(exception_mask_t exception_types) {
   );
 }
 
+/*
+Spawns a long-lived process-wide "server" thread for Mach exceptions.
+Caller may pass nil to skip the thread handle; process exit kills it.
+*/
 static Err mach_exception_server_init(pthread_t *out) {
   pthread_t tmp;
   if (!out) out = &tmp;

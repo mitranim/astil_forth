@@ -52,12 +52,13 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
 // clang-format on
 
 static Err comp_ctx_deinit(Comp_ctx *ctx) {
-  try(stack_deinit(&ctx->loc_fix));
-  try(stack_deinit(&ctx->asm_fix));
-  try(stack_deinit(&ctx->locals));
+  Err err = nullptr;
+  err     = either(err, stack_deinit(&ctx->loc_fix));
+  err     = either(err, stack_deinit(&ctx->asm_fix));
+  err     = either(err, stack_deinit(&ctx->locals));
   dict_deinit(&ctx->local_dict);
   ptr_clear(ctx);
-  return nullptr;
+  return err;
 }
 
 static Err comp_ctx_init(Comp_ctx *ctx) {

@@ -49,6 +49,9 @@ typedef stack_of(Asm_fixup) Asm_fixups;
 // SYNC[instr_heap_len].
 static constexpr Uint INSTR_HEAP_LEN = (1u << 22u) / sizeof(Instr);
 
+// SYNC[main_arena_len].
+static constexpr Uint MAIN_ARENA_LEN = 1u << 30u;
+
 /*
 Fixed-size code heap. Stupid, simple solution.
 
@@ -81,7 +84,13 @@ typedef struct {
   U8         guard_1[MEM_PAGE];               // PROT_NONE
   U64        intrins[MEM_PAGE / sizeof(U64)]; // Addresses of intrinsic procs.
   U8         guard_2[MEM_PAGE];               // PROT_NONE
+  U8         arena[MAIN_ARENA_LEN];           // Main arena for ambient context.
+  U8         guard_3[MEM_PAGE];               // PROT_NONE
 } Comp_heap;
+
+// SYNC[main_arena_off].
+static constexpr Uint MAIN_ARENA_OFF = offsetof(Comp_heap, arena);
+static_assert(MAIN_ARENA_OFF == 0x45C000);
 
 // Invariants: `.addrs.len == stack_len(.names) == .inds.len`.
 //

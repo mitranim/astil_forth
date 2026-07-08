@@ -54,17 +54,16 @@ end
 fun: xt'  { -- XT err } ( "word" -- ) 1 .next_word end \ WORDLIST_EXEC
 fun: xt'' { -- XT err } ( "word" -- ) 2 .next_word end \ WORDLIST_COMP
 
-fun_comp: xt'  { -- err } ( E: -- XT ) ( C: "word" -- ) 1 .xt_next end \ WORDLIST_EXEC
-fun_comp: xt'' { -- err } ( E: -- XT ) ( C: "word" -- ) 2 .xt_next end \ WORDLIST_COMP
+fun_comp: xt'  { -- err } ( C: "word" -- ) ( E: -- XT ) 1 .xt_next end \ WORDLIST_EXEC
+fun_comp: xt'' { -- err } ( C: "word" -- ) ( E: -- XT ) 2 .xt_next end \ WORDLIST_COMP
 
-\ `call_xt` is renamed from standard "postpone".
-\ Also see `call` for raw instruction addresses.
-fun: call_xt_next { wlist -> err } ( "word" -- ) ( E: <word> )
-  .next_word .comp_call
+\ Renamed from standard "postpone". Also see `call` for raw calls.
+fun_comp: call' { -- err } ( C: "word" -- ) ( E: <word> )
+  1 .next_word .comp_call
 end
-
-fun_comp: call_xt'  { -- err } 1 .call_xt_next end
-fun_comp: call_xt'' { -- err } 2 .call_xt_next end
+fun_comp: call'' { -- err } ( C: "word" -- ) ( E: <word> )
+  2 .next_word .comp_call
+end
 
 fun: compile_next { wlist -> err } ( "word" -- )
   .next_word .comp_push xt' comp_call .comp_call
@@ -81,13 +80,13 @@ fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   str len .define_fun .plain_call
     0 1 0 .comp_signature_set ( -- val )
     val .comp_push
-  call_xt'' end
+  call'' end
 
   \ Compile-time semantics.
   str len .define_fun_comp .plain_call
     0 1 1 .comp_signature_set ( -- err )
     val .comp_push compile' comp_push
-  call_xt'' end
+  call'' end
   [ 0 .comp_only ]
 end
 
@@ -133,13 +132,13 @@ end
 
 16384 let: PAGE_SIZE
 
-\ SYNC[asm_reg_interp].
-fun: ASM_REG_INTERP { -- reg } [ .plain_call ] 28 end
+\ SYNC[asm_reg_ctx].
+fun: ASM_REG_CTX { -- reg } [ .plain_call ] 28 end
 
-fun_comp: ASM_REG_INTERP { -- err }
+fun_comp: ASM_REG_CTX { -- err }
   [ .plain_call ]
   true .interp_only
-  ASM_REG_INTERP .comp_push
+  ASM_REG_CTX .comp_push
 end
 
 \ ## Early arithmetic
@@ -1272,7 +1271,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     0 .comp_realloc_reg
     0 0 0 size opc .asm_load_store_off .comp_instr \ ldr<size> r0, [x0]
     1 .comp_args_set
-  call_xt'' end
+  call'' end
 
   \ Compile-time semantics.
   str len .define_fun_comp
@@ -1280,7 +1279,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     size     .comp_push
     opc      .comp_push
     compile' comp_mem_load
-  call_xt'' end
+  call'' end
 
   [ false .comp_only ]
 end
@@ -1292,7 +1291,7 @@ fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
     2 0 false .comp_signature_set
     \ str<size> r0, [x1]
     0 1 0 size 0b00 .asm_load_store_off .comp_instr
-  call_xt'' end
+  call'' end
 
   [ false .comp_only ]
 end
@@ -1398,12 +1397,12 @@ fun: off! { adr } false adr ! end
 fun: on!  { adr } true  adr ! end
 
 \ Shortcut for allocating a cell-sized slot on the system stack via `alloca`.
-fun_comp: slot { -- err } ( E: -- adr ) call_xt'' CELL call_xt'' alloca end
+fun_comp: slot { -- err } ( E: -- adr ) call'' CELL call'' alloca end
 
 \ Shortcut for stack-allocating a slot and immediately setting a value.
 \ Replaces the need for taking references to locals we had before.
 fun_comp: >slot { -- err } ( E: val -- adr )
-  call_xt'' slot
+  call'' slot
   compile'  !
   0 .comp_realloc_reg
   0 1 .asm_mov_reg .comp_instr \ mov x0, x1
@@ -1447,6 +1446,7 @@ end
 
 \ SYNC[stack_field_offsets].
 24 let: STACK_OFF_TOP
+24 let: INTERP_INTS_OFF
 
 \ Default Forth stack provided by the interpreter.
 \ Not available when running in AOT-compiled mode.
@@ -1454,8 +1454,10 @@ end
 \ SYNC[interp_fields].
 fun_comp: STACK { -- err } ( E: -- adr )
   [ .plain_call ]
-  \ mov <arg>, x28
-  .comp_alloc_next_reg ASM_REG_INTERP .asm_mov_reg .comp_instr
+  \ mov <arg>, x28; add <arg>, <arg>, offsetof(Interp, ints)
+  .comp_alloc_next_reg { reg }
+  reg ASM_REG_CTX .asm_mov_reg .comp_instr
+  reg reg INTERP_INTS_OFF .asm_add_imm .comp_instr
   true .interp_only
 end
 
@@ -1540,13 +1542,13 @@ fun: init_data_word { name name_len adr -- err }
   name name_len .define_fun .plain_call
     0 1 false .comp_signature_set ( E: -- ptr )
     adr .comp_next_page_addr
-  call_xt'' end
+  call'' end
 
   name name_len .define_fun_comp
     .plain_call
     0 1 true .comp_signature_set
     adr .comp_push compile' comp_next_page_addr
-  call_xt'' end
+  call'' end
 
   [ false .comp_only ]
 end
@@ -1596,13 +1598,13 @@ fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
   str len .define_fun .plain_call
     0 2 false .comp_signature_set ( E: -- ptr cap )
     adr cap .comp_buf
-  call_xt'' end
+  call'' end
 
   str len .define_fun_comp
     .plain_call
     0 1 true .comp_signature_set
     adr .comp_push cap .comp_push compile' comp_buf
-  call_xt'' end
+  call'' end
 
   [ false .comp_only ]
 end
@@ -1687,8 +1689,8 @@ end
 \ mode, the string is statically allocated, unique, and null-terminated.
 fun: s" { -- str len err } ( E: "str" -- str len ) char' " .read_delimited end
 fun: s` { -- str len err } ( E: `str` -- str len ) char' ` .read_delimited end
-fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len ) call_xt' s" .comp_str end
-fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) call_xt' s` .comp_str end
+fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len ) call' s" .comp_str end
+fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) call' s` .comp_str end
 
 4096 buf: ROOT_STR_BUF
 
@@ -1806,17 +1808,17 @@ fun: stderr { -- adr } [ .plain_call ] extern_adr' __stderrp @ end
 
 fun_comp: stdin { -- err } ( E: -- adr )
   [ .plain_call ]
-  comp_extern_adr' __stdinp call_xt'' @
+  comp_extern_adr' __stdinp call'' @
 end
 
 fun_comp: stdout { -- err } ( E: -- adr )
   [ .plain_call ]
-  comp_extern_adr' __stdoutp call_xt'' @
+  comp_extern_adr' __stdoutp call'' @
 end
 
 fun_comp: stderr { -- err } ( E: -- adr )
   [ .plain_call ]
-  comp_extern_adr' __stderrp call_xt'' @
+  comp_extern_adr' __stderrp call'' @
 end
 
 4 1 extern: fread            ( buf size len file -- len           )
@@ -1858,22 +1860,24 @@ fun: fprint { str len file }   str 1 len file .fwrite   { -- } end
 
 \ ## Interpreter internals (basic)
 
-\ True if running in JIT mode (interpreter available).
-\ False if running in AOT-compiled mode.
-\
-\ In JIT mode, the outer interpreter (in C) always stores its address in the
-\ `ASM_REG_INTERP` register just before calling into Forth. in AOT mode, the
-\ reg starts as zero when the OS runs the process, none of our compiled code
-\ modifies it, and locals are never assigned to this register.
-fun_comp: interp { -- err } ( E: -- adr )
+\ Ambient Forth context. In interpreter / JIT mode
+\ this is also `Interp*`, which begins with `Ctx`.
+fun_comp: context { -- err } ( E: -- adr )
   [ .plain_call ]
   .comp_alloc_next_reg { reg }
-  reg ASM_REG_INTERP .asm_mov_reg .comp_instr \ mov <arg>, x28
+  reg ASM_REG_CTX .asm_mov_reg .comp_instr \ mov <arg>, x28
+end
+
+fun: context { -- adr } [ .plain_call ] context end
+
+\ Interpreter context. Automatically forbidden in AOT-compiled code.
+fun_comp: interp { -- err } ( E: -- adr )
+  [ .plain_call ]
+  call'' context
   true .interp_only
 end
 
 fun: interp { -- adr } [ .plain_call ] interp end
-fun: has_interp { -- bool } interp <>0 [ false .interp_only ] end
 
 \ SYNC[interp_fields].
 \ SYNC[comp_code_fields].
@@ -1885,21 +1889,28 @@ fun: has_interp { -- bool } interp <>0 [ false .interp_only ] end
 \
 \ This looks ridiculously unsafe and it is, but I'm a firm believer
 \ that the best API is a stable ABI. Just don't break your offsets.
-200 let: INTERP_COMP_CODE_WRITE_OFF
+224 let: INTERP_COMP_CODE_WRITE_OFF
 
 fun_comp: interp_instrs { -- err } ( E: -- adr )
   [ .plain_call ]
-  call_xt'' interp
+  call'' interp
   INTERP_COMP_CODE_WRITE_OFF .comp_push
-  call_xt'' +
-  call_xt'' @
+  call'' +
+  call'' @
   PAGE_SIZE .comp_push
-  call_xt'' +
+  call'' +
 end
 
 fun: interp_instrs {     -- adr } [ .plain_call ] interp_instrs end
 fun: instr_off     { adr -> off } interp_instrs - end
 fun: instr_adr     { off -> adr } interp_instrs + end
+
+\ SYNC[main_arena_off].
+\ Offset from `Comp_heap` to `Comp_heap.arena`.
+0x45c000 let: MAIN_ARENA_OFF
+
+\ SYNC[main_arena_len].
+1 30 .lsl let: MAIN_ARENA_LEN
 
 \ ## Control flow metadata
 \
@@ -2067,7 +2078,7 @@ fun: if_end_xt { meta -- err } [ .redefine ]
   end
 
   \ Only in the backward pass.
-  meta CONT_MASK_EXEC_PREV .and .then call_xt'' end end
+  meta CONT_MASK_EXEC_PREV .and .then call'' end end
 end
 
 fun_comp: if  { -- meta end_xt } [ .plain_call true .comp_only ]
@@ -2082,16 +2093,16 @@ end
 \ and bare `.then` is invalid. Shape: `if pred .then end`.
 fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ .redefine ]
   .comp_barrier
-  " arguments before `.then`" { ctx }
+  " arguments before `.then`" { msg }
   meta CONT_MASK_HAS_INP .and { has }
 
   has .then
     meta CONT_MASK_INP_LEN .bit_mask_get { len }
-    len .inc ctx .comp_args_valid
+    len .inc msg .comp_args_valid
   end
 
   has =0 .then
-    1 ctx .comp_args_min
+    1 msg .comp_args_min
     .comp_args_get .dec { len }
     len meta CONT_MASK_INP_LEN .bit_mask_set CONT_MASK_HAS_INP .or { meta }
   end
@@ -2115,7 +2126,7 @@ fun: else_end_xt { meta -- err }
   .comp_barrier
   meta .else_patch
   meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
-  if meta CONT_MASK_EXEC_PREV .and .then call_xt'' end end
+  if meta CONT_MASK_EXEC_PREV .and .then call'' end end
 end
 
 fun_comp: else { meta end_xt -- meta end_xt err }
@@ -2146,14 +2157,14 @@ end
 
 fun_comp: elif { meta end_xt -> else_meta else_xt meta end_xt err }
   [ .plain_call ]
-  call_xt'' else { meta else_xt }
+  call'' else { meta else_xt }
   meta else_xt
   meta CONT_MASK_EXEC_PREV .or xt' if_end_xt
 end
 
 fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
   [ .plain_call ]
-  call_xt'' else { meta else_xt }
+  call'' else { meta else_xt }
   meta else_xt
   meta CONT_MASK_EXEC_PREV .or CONT_MASK_CBNZ .or xt' if_end_xt
 end
@@ -2218,7 +2229,7 @@ fun: size' { -- size err } ( C: "type" -- )
 end
 
 fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
-  call_xt' size' .comp_push
+  call' size' .comp_push
 end
 
 \ SYNC[type_fields].
@@ -2229,15 +2240,15 @@ fun: align' { -- align err } ( C: "type" -- )
 end
 
 fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
-  call_xt' align' .comp_push
+  call' align' .comp_push
 end
 
 fun_comp: is_aligned_to' { -- err } ( C: "type" -- ) ( E: adr -- bool )
-  call_xt'' align' call_xt'' is_aligned_to
+  call'' align' call'' is_aligned_to
 end
 
 fun: is_aligned_to' { adr -- bool err }
-  call_xt' align' { size }
+  call' align' { size }
   adr size .is_aligned_to
 end
 
@@ -2364,13 +2375,13 @@ fun: define_field_word { name name_len off -- err }
     1 1 false .comp_signature_set ( E: struct_adr -- field_adr )
     1 .comp_args_set
     if off .then off .comp_push compile' + end
-  call_xt'' end
+  call'' end
 
   \ Compile-time semantics.
   name name_len .define_fun_comp
     0 1 true .comp_signature_set
     off .comp_push compile' comp_struct_field
-  call_xt'' end
+  call'' end
 
   [ false .comp_only ]
 end
@@ -2426,9 +2437,23 @@ struct: Type
   U8   0 field: Type_name  \ Variable width; null-terminated.
 end
 
-\ ## Interpreter internals continued
+\ ## Interpreter / compiler internals continued
 \
-\ Internal stuff not exposed via intrinsics.
+\ We use C-mirror structs to access the state of the running compiler.
+\ This requires keeping definitions in sync, but gives us an automatic
+\ ABI without the need for an API such as intrinsics.
+
+\ This definition is assumed by stack operations defined earlier,
+\ and shared with the interpreter C code. See `## Stacks` above.
+\
+\ SYNC[stack_field_offsets].
+struct: Stack
+  Cell 1 field: Stack_bytelen
+  Adr  1 field: Stack_cellar
+  Adr  1 field: Stack_floor
+  Adr  1 field: Stack_top
+  Adr  1 field: Stack_ceil
+end
 
 \ SYNC[set_fields].
 struct: Interp_set
@@ -2487,9 +2512,7 @@ struct: Sym
 end
 
 \ SYNC[sym_fields].
-fun_comp: sym_instr { -- err } ( E: XT -- instr )
-  call_xt'' Sym_union call_xt'' @
-end
+fun_comp: sym_instr { -- err } ( E: XT -- instr ) call'' Sym_union call'' @ end
 
 fun: sym_instr { XT -> instr } .sym_instr end
 
@@ -2498,19 +2521,22 @@ fun: comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
   .next_word .sym_instr .comp_next_page_addr
 end
 
-\ Similar to `xt'` and `xt''`, but instead of returning an execution token,
-\ which is `Sym *`, returns the address of the first executable instruction
-\ of the next word.
+\ Address of first executable instruction of next runtime word in source code.
+\ For comptime words, use `instr''`. This is the same as C "function pointer".
 \
-\ Intended use cases:
+\ Resulting address can be passed to `call` or foreign code as a callback.
 \
-\ - Where XT introspection     needed -> `xt'    + `.call_xt`.
-\ - Where XT introspection not needed -> `instr' + call`.
+\ Some of our words, such as `strf`, directly use ambient memory context.
+\ Their callers depend on ambient context indirectly. When passing words
+\ to foreign callers, ensure one of:
 \
-\ This is the same as a "function pointer" in C. When passing callbacks to
-\ foreign callers such as `pthread_create` or `qsort`, this "just works",
-\ since we use the standard calling convention.
-fun: instr' { -- instr err } call_xt' xt' .sym_instr end
+\ - Callback doesn't use ambient context.
+\ - Callback is wrapped in `.with_ctx ... end` or equivalent,
+\   which pushes and pops context register state around call,
+\   avoiding ABI breakage and program crash.
+\
+\ See readme on memory management; threading examples; HTTP examples.
+fun: instr' { -- instr err } call' xt' .sym_instr end
 
 fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
   WORDLIST_EXEC .comp_word_instr
@@ -2518,18 +2544,6 @@ end
 
 fun_comp: instr'' { -- err } ( C: "name" -- ) ( E: -- instr )
   WORDLIST_COMP .comp_word_instr
-end
-
-\ This definition is assumed by stack operations defined earlier,
-\ and shared with the interpreter C code. See `## Stacks` above.
-\
-\ SYNC[stack_field_offsets].
-struct: Stack
-  Cell 1 field: Stack_bytelen
-  Adr  1 field: Stack_cellar
-  Adr  1 field: Stack_floor
-  Adr  1 field: Stack_top
-  Adr  1 field: Stack_ceil
 end
 
 \ SYNC[hash_table_structure].
@@ -2555,11 +2569,14 @@ struct: Interp_module_ctx
   \ ... other fields ...
 end
 
-\ Used as prefix padding before `Comp.ctx`.
+\ Partial mirror of C `Comp_code`.
+\
 \ SYNC[comp_code_fields].
-\ Partial mirror of C `Comp_code`. Forth only needs its size to reach
-\ `Comp.ctx`; fields are intentionally inaccessible.
-248 8 opaque: Interp_comp_code
+struct: Interp_comp_code
+  Adr 1   field: Interp_comp_code_write
+  Adr 1   field: Interp_comp_code_heap
+  U8  232 field: Interp_comp_code_tail_field \ ... other fields ...
+end
 
 \ Partial mirror of C `Comp_ctx`. Defines only what we use.
 \ SYNC[comp_ctx_fields].
@@ -2574,11 +2591,19 @@ struct: Interp_comp
   Interp_comp_ctx  1 field: Interp_comp_ctx_field
 end
 
+\ SYNC[ctx_fields].
+struct: Ctx
+  Adr 1 field: Ctx_self
+  Adr 1 field: Ctx_top
+  Adr 1 field: Ctx_ceil
+end
+
 \ Partial mirror of the outer C-based interpreter. Caution: only fields actually
 \ read from Forth are defined; unused tail fields are omitted.
 \
 \ SYNC[interp_fields].
 struct: Interp
+  Ctx         1 field: Interp_ctx
   Stack       1 field: Interp_ints
   Cell        1 field: Interp_argc
   Adr         1 field: Interp_argv
@@ -2591,10 +2616,17 @@ struct: Interp
   \ ... other fields ...
 end
 
-\ ## Compiler context
-\ We use C-mirror structs to access the state of the running compiler.
-\ This requires keeping definitions in sync, but gives us an automatic
-\ ABI without the need for an API.
+\ True if currently running on the interpreter thread.
+\
+\ Using this on the default AOT thread requires `.with_main_ctx`
+\ or equivalent. Using this on child threads requires additional
+\ context setup. See the various IO and threading examples.
+\
+\ The interpreter-context is self-referential.
+\ In other contexts, the value of `.Ctx_self`
+\ should not refer to the context, and is
+\ otherwise undefined.
+fun: has_interp { -- bool } context .Ctx_self @ context = end
 
 \ ## Raw callbacks
 
@@ -3237,7 +3269,7 @@ fun_comp: / { -- err } [ .redefine ]
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 / .cf_fold_done .ret end
-  reg1 imm1 consumed .cf_restore_rhs call_xt'' /
+  reg1 imm1 consumed .cf_restore_rhs call'' /
 end
 
 fun_comp: u/ { -- err } [ .redefine ]
@@ -3255,7 +3287,7 @@ fun_comp: mod { -- err } [ .redefine ]
   " redundant arithmetic: modulo by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .mod .cf_fold_done .ret end
-  reg1 imm1 consumed .cf_restore_rhs call_xt'' mod
+  reg1 imm1 consumed .cf_restore_rhs call'' mod
 end
 
 fun_comp: umod { -- err } [ .redefine ]
@@ -3273,7 +3305,7 @@ fun_comp: /mod { -- err } [ .redefine ]
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
   if ok .then reg0 reg1 imm0 imm1 /mod .cf_fold_done2 .ret end
-  reg1 imm1 consumed .cf_restore_rhs call_xt'' /mod
+  reg1 imm1 consumed .cf_restore_rhs call'' /mod
 end
 
 fun_comp: u/mod { -- err } [ .redefine ]
@@ -3281,11 +3313,11 @@ fun_comp: u/mod { -- err } [ .redefine ]
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
   if ok .then reg0 reg1 imm0 imm1 u/mod .cf_fold_done2 .ret end
-  reg1 imm1 consumed .cf_restore_rhs call_xt'' u/mod
+  reg1 imm1 consumed .cf_restore_rhs call'' u/mod
 end
 
 fun_comp: inc { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call_xt'' inc end
+  if .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call'' inc end
 end
 
 \ Increment a local: `inc: some_val`.
@@ -3294,7 +3326,7 @@ fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: dec { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call_xt'' dec end
+  if .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call'' dec end
 end
 
 \ Decrement a local: `dec: some_val`.
@@ -3303,7 +3335,7 @@ fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: negate { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call_xt'' negate end
+  if .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call'' negate end
 end
 
 \ Negate a local: `negate: some_val`.
@@ -3314,7 +3346,7 @@ fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: abs { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call_xt'' abs end
+  if .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call'' abs end
 end
 
 \ Absolute-value a local: `abs: some_val`.
@@ -3325,7 +3357,7 @@ fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bit_clz { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call_xt'' bit_clz end
+  if .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call'' bit_clz end
 end
 
 \ Count leading zeros in a local: `bit_clz: some_val`.
@@ -3336,7 +3368,7 @@ fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bit_ctz { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call_xt'' bit_ctz end
+  if .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call'' bit_ctz end
 end
 
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
@@ -3347,7 +3379,7 @@ fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: bit_len { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call_xt'' bit_len end
+  if .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call'' bit_len end
 end
 
 \ Compute bit length into a local: `bit_len: some_val`.
@@ -3359,7 +3391,7 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: pow2_ceil { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call_xt'' pow2_ceil end
+  if .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call'' pow2_ceil end
 end
 
 \ Round-up a local to a power of two: `pow2_ceil: some_val`.
@@ -3372,7 +3404,7 @@ end
 
 \ No partial CF: `csel` needs both values in regs; constants still cost `mov`.
 fun_comp: min { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call_xt'' min end
+  if .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call'' min end
 end
 
 \ Minimum into a local: `candidate min: some_val`.
@@ -3381,7 +3413,7 @@ fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: umin { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call_xt'' umin end
+  if .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call'' umin end
 end
 
 \ Unsigned minimum into a local: `candidate umin: some_val`.
@@ -3390,7 +3422,7 @@ fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: max { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call_xt'' max end
+  if .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call'' max end
 end
 
 \ Maximum into a local: `candidate max: some_val`.
@@ -3399,7 +3431,7 @@ fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: umax { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call_xt'' umax end
+  if .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call'' umax end
 end
 
 \ Unsigned maximum into a local: `candidate umax: some_val`.
@@ -3410,7 +3442,7 @@ end
 \ No partial CF: adopted child of the min/max family.
 fun_comp: fallback { -- err } [ .redefine ]
   if .cf_fold_cleared2 .then .fallback .cf_fold_done
-  else { -- } call_xt'' fallback end
+  else { -- } call'' fallback end
 end
 
 \ Fallback into a local: `candidate fallback: some_val`.
@@ -3420,7 +3452,7 @@ end
 
 fun_comp: cint_to_cell { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then .cint_to_cell .cf_fold_done
-  else { -- } call_xt'' cint_to_cell end
+  else { -- } call'' cint_to_cell end
 end
 
 \ Sign-extend a local from int32 to cell: `cint_to_cell: some_val`.
@@ -3431,7 +3463,7 @@ fun_comp: cint_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: =0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then =0 .cf_fold_done else { -- } call_xt'' =0 end
+  if .cf_fold_cleared1 .then =0 .cf_fold_done else { -- } call'' =0 end
 end
 
 \ In-place local test: `=0: some_val`.
@@ -3440,7 +3472,7 @@ fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <>0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then <>0 .cf_fold_done else { -- } call_xt'' <>0 end
+  if .cf_fold_cleared1 .then <>0 .cf_fold_done else { -- } call'' <>0 end
 end
 
 \ In-place local test: `<>0: some_val`.
@@ -3449,7 +3481,7 @@ fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then <0 .cf_fold_done else { -- } call_xt'' <0 end
+  if .cf_fold_cleared1 .then <0 .cf_fold_done else { -- } call'' <0 end
 end
 
 \ In-place local test: `<0: some_val`.
@@ -3458,7 +3490,7 @@ fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then >0 .cf_fold_done else { -- } call_xt'' >0 end
+  if .cf_fold_cleared1 .then >0 .cf_fold_done else { -- } call'' >0 end
 end
 
 \ In-place local test: `>0: some_val`.
@@ -3467,7 +3499,7 @@ fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <=0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then <=0 .cf_fold_done else { -- } call_xt'' <=0 end
+  if .cf_fold_cleared1 .then <=0 .cf_fold_done else { -- } call'' <=0 end
 end
 
 \ In-place local test: `<=0: some_val`.
@@ -3476,7 +3508,7 @@ fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >=0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then >=0 .cf_fold_done else { -- } call_xt'' >=0 end
+  if .cf_fold_cleared1 .then >=0 .cf_fold_done else { -- } call'' >=0 end
 end
 
 \ In-place local test: `>=0: some_val`.
@@ -3550,7 +3582,7 @@ fun_comp: u>= { -- err } [ .redefine ]
 end
 
 fun_comp: cells { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call_xt'' cells end
+  if .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call'' cells end
 end
 
 \ Scale a local by cell size: `cells: some_val`.
@@ -3559,7 +3591,7 @@ fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: /cells { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then /cells .cf_fold_done else { -- } call_xt'' /cells end
+  if .cf_fold_cleared1 .then /cells .cf_fold_done else { -- } call'' /cells end
 end
 
 \ Divide a local by cell size: `/cells: some_val`.
@@ -3568,7 +3600,7 @@ fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: +cell { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then +cell .cf_fold_done else { -- } call_xt'' +cell end
+  if .cf_fold_cleared1 .then +cell .cf_fold_done else { -- } call'' +cell end
 end
 
 \ Add one cell to a local: `+cell: some_val`.
@@ -3577,7 +3609,7 @@ fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: -cell { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then -cell .cf_fold_done else { -- } call_xt'' -cell end
+  if .cf_fold_cleared1 .then -cell .cf_fold_done else { -- } call'' -cell end
 end
 
 \ Subtract one cell from a local: `-cell: some_val`.
@@ -3628,7 +3660,7 @@ fun_comp: align_up { -- err } [ .redefine ]
 end
 
 fun_comp: invert { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call_xt'' invert end
+  if .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call'' invert end
 end
 
 \ Invert a local: `invert: some_val`.
@@ -3639,7 +3671,7 @@ fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: low_bits { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call_xt'' low_bits end
+  if .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call'' low_bits end
 end
 
 \ Set a local to a mask of its low bit count: `low_bits: some_val`.
@@ -3684,7 +3716,7 @@ end
 fun_comp: bit_mask_set { -- err } [ .redefine ]
   \ No partial CF: useful for constant masks, but requires ternary partial-CF.
   \ Full CF alone is not worth keeping the ternary-only machinery.
-  call_xt'' bit_mask_set
+  call'' bit_mask_set
 end
 
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
@@ -3810,34 +3842,44 @@ fun: mem_unprot { addr size -> err } PROT_RW .mem_prot end
 \
 \ This is the preferred way to acquire memory pages from the OS.
 \ Size is counted in bytes; to allocate cells, use `size cells`.
-fun: stack_init { size stk -- err }
-  size PAGE_SIZE .align_up   { size }
-  PAGE_SIZE 1 .lsl size +    { bytelen } \ + space for 2 guards
-  bytelen PROT_NONE .mem_map { cellar }
-  cellar PAGE_SIZE +         { floor }
-  floor size +               { ceil }
-  floor size .mem_unprot
+fun: stack_init { size stk -- Err }
+  stk size' Stack .memzero \ Ensure deinit-safe.
+
+  size PAGE_SIZE .align_up        { size }
+  PAGE_SIZE 1 .lsl size +         { bytelen } \ + space for 2 guards
+  bytelen PROT_NONE .mem_map .try { cellar }
+  cellar PAGE_SIZE +              { floor }
+  floor size +                    { ceil }
+
+  floor size .mem_unprot { err }
+
+  if err .then
+    cellar bytelen .mem_unmap { -- }
+    err .ret
+  end
 
   bytelen stk !
-  cellar  stk +cell !
+  cellar  stk .Stack_cellar !
   floor   stk .Stack_floor !
-  floor   stk .Stack_top   !
-  ceil    stk .Stack_ceil  !
+  floor   stk .Stack_top !
+  ceil    stk .Stack_ceil !
 end
 
+\ Returned error, if any, must come from static storage.
+\ Caller may unmap memory before reporting this error.
 fun: stack_deinit { stk -- err }
   ifz stk .then .ret end
 
-  stk       @ { bytelen }
-  stk +cell @ { cellar }
-
-  if cellar .then cellar bytelen .mem_unmap end
+  stk @ { bytelen }
+  stk .Stack_cellar @ { cellar }
 
   nil stk !
-  nil stk +cell !
+  nil stk .Stack_cellar !
   nil stk .Stack_floor !
-  nil stk .Stack_top   !
-  nil stk .Stack_ceil  !
+  nil stk .Stack_top !
+  nil stk .Stack_ceil !
+
+  if cellar .then cellar bytelen .mem_unmap end
 end
 
 fun: stack? { stk -> bool } @ <>0 end
@@ -3852,17 +3894,105 @@ fun: stack_repr { stk }
 
   " [debug] stack           " .elog stk .debug_arg
   " [debug] Stack_bytelen @ " .elog stk @ .debug_arg
-  " [debug] Stack_cellar  @ " .elog stk +cell @ .debug_arg
+  " [debug] Stack_cellar  @ " .elog stk .Stack_cellar @ .debug_arg
   " [debug] Stack_floor   @ " .elog stk .Stack_floor @ .debug_arg
-  " [debug] Stack_top     @ " .elog stk .Stack_top   @ .debug_arg
-  " [debug] Stack_ceil    @ " .elog stk .Stack_ceil  @ .debug_arg
+  " [debug] Stack_top     @ " .elog stk .Stack_top @ .debug_arg
+  " [debug] Stack_ceil    @ " .elog stk .Stack_ceil @ .debug_arg
 end
 
 \ For JIT use only. TODO: AOT compatibility.
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
   nil 40 .comp_alloc_data { adr } \ SYNC[stack_field_offsets].
   size adr .stack_init
-  adr call_xt' let:
+  adr call' let:
+end
+
+\ ## Context
+\
+\ Our system reserves one register (`x28` on Arm64) for the address
+\ of the current context which references available memory, and may
+\ also contain additional arbitrary fields. In interpretation / JIT
+\ mode, the context is also the address of the current interpreter.
+\
+\ See earlier `context` and `Ctx` for definitions.
+\
+\ In JIT mode, the outer interpreter pre-allocates a context.
+\ In AOT mode, the entry `main` is responsible for this.
+
+\ Default per-arena memory capacity we use internally.
+\ Apps are free to choose their own arena capacities.
+1 30 .lsl let: CTX_CAP
+
+\ Initialize context with borrowed memory.
+fun: ctx_init { buf len ctx }
+  nil       ctx .Ctx_self !
+  buf       ctx .Ctx_top !
+  buf len + ctx .Ctx_ceil !
+end
+
+\ Shortcut which combines `stack_init` with context header allocation.
+\ Size + align of context `type` is included into total mapped `size`.
+\
+\ Type must begin with `Ctx`; otherwise undefined behavior.
+fun: stack_init_ctx { size type stk -- ctx Err }
+  size stk .stack_init .try
+
+  stk .Stack_floor @ { ctx }
+  type .sizeof { size }
+  ctx size + { top }
+  stk .Stack_ceil @ { ceil }
+
+  if top ceil > .then
+    stk .stack_deinit { -- }
+    " unable to initialize context: out of space" .throw
+  end
+
+  top ceil top - ctx .ctx_init
+  ctx
+end
+
+\ stp x28, xzr, [sp, #-16]!
+\ mov x28, x0
+fun_comp: ctx_push { -- err } ( E: ctx -- )
+  1 " context before `ctx_push`" .comp_args_valid
+  ASM_REG_CTX ASM_REG_ZR ASM_REG_SP 0 FUND_ALIGN - .asm_store_pair_pre .comp_instr
+  ASM_REG_CTX 0 .asm_mov_reg .comp_instr
+  0 .comp_args_set
+end
+
+\ ldp x28, xzr, [sp], #16
+fun_comp: ctx_pop { -- err } ( E: -- )
+  ASM_REG_CTX ASM_REG_ZR ASM_REG_SP FUND_ALIGN .asm_load_pair_post .comp_instr
+end
+
+\ Runs body with supplied ambient context, restoring prior context at `end`.
+\ Body must reach `end`: no `.ret .try .throw` or local auto-try.
+fun_comp: with_ctx { -- end_xt err } ( E: ctx -- )
+  call'' ctx_push
+  xt'' ctx_pop
+end
+
+fun: ctx_top { -- top } context .Ctx_top @ end
+fun: ctx_top_set { top } top context .Ctx_top ! end
+
+\ Allocates memory in the current ambient context.
+fun: ctx_alloc { size align -- adr err }
+  context { ctx }
+  ctx .Ctx_top @ align .align_up { adr }
+  adr size + { top }
+  if top ctx .Ctx_ceil @ > .then
+    nil " unable to allocate context memory: out of space" .ret
+  end
+  top ctx .Ctx_top !
+  adr
+end
+
+\ Available memory in the current ambient context.
+fun: ctx_avail { align -- buf cap }
+  context { ctx }
+  ctx .Ctx_top @ align .align_up { buf }
+  ctx .Ctx_ceil @ buf - 0 .max { cap }
+  buf cap
 end
 
 \ ## Loops
@@ -3937,7 +4067,7 @@ fun: loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- 
   .comp_barrier
   meta CONT_MASK_INP_LEN .bit_mask_get " arguments before ending `loop`" .comp_args_valid
   meta .loop_back \ b <beg>
-  call_xt'' end \ Run `loop_frame_end_xt`.
+  call'' end \ Run `loop_frame_end_xt`.
 end
 
 fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
@@ -3980,12 +4110,12 @@ fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
   .loop_frame_adr @ { meta }
   meta CONT_MASK_INP_LEN .bit_mask_get { inp_len }
 
-  " arguments before `.while`" { ctx }
-  1 ctx .comp_args_min
+  " arguments before `.while`" { msg }
+  1 msg .comp_args_min
   .comp_args_get .dec { out_len }
   out_len .comp_args_set
 
-  out_len ctx .comp_args_valid
+  out_len msg .comp_args_valid
   .comp_barrier
   inp_len .comp_args_set
 
@@ -4011,16 +4141,16 @@ end
 \ ## Memory stuff continued
 
 fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
-  call_xt'' size' call_xt'' alloca
+  call'' size' call'' alloca
 end
 
 fun_comp: allocaz' { -- err } ( C: "type" -- ) ( E: -- adr )
-  call_xt' size' { size }
+  call' size' { size }
   size .comp_push
-  call_xt'' alloca
+  call'' alloca
   size .comp_push
   compile' memzero
-  call_xt'' systack_ptr \ mov x0, sp
+  call'' systack_ptr \ mov x0, sp
 end
 
 \ Count non-nil cells; stop at nil.
@@ -4237,48 +4367,14 @@ fun_comp: elogf { -- err } ( E: fmt …vargs… -- )
 
   xt'' stderr STACK >s
   1 .comp_args_prepend
-  call_xt'' systack_ptr
+  call'' systack_ptr
   compile' vfprintf
 
   len .comp_va_end
   0 .comp_args_set
 end
 
-\ ## Error formatting
-
-\ Global error buffers assume a single-threaded program.
-\ TODO: support thread-local buffers.
-4096    let: ERR_CAP
-ERR_CAP mem: ERR_BUF_0
-ERR_CAP mem: ERR_BUF_1
-CELL    mem: ERR_BUF_NEXT
-
-fun: errf_buf_next { -- buf }
-  ERR_BUF_NEXT @ .inc .odd { val }
-  val ERR_BUF_NEXT !
-  if val .then ERR_BUF_0 else ERR_BUF_1 end
-end
-
-fun_comp: errf { -- err } ( E: fmt …vargs… -- err )
-  nil 0 .comp_local { buf }
-  1 .comp_va_beg { len }
-
-  xt'  errf_buf_next STACK >s
-  xt'' ERR_CAP       STACK >s
-  2 .comp_args_prepend
-  0 buf .comp_assign_local_from_reg \ Stash x0 so we can return the buffer.
-
-  call_xt'' systack_ptr
-  compile' vsnprintf
-
-  len .comp_va_end
-  0   .comp_args_set
-  buf .comp_push_from_local \ mov xN, <buf> | ldr xN, [FP, <buf>]
-end
-
-fun: fatal { err } " fatal: %s" err .elogf .elf .abort end
-
-\ ## OS error stuff
+\ ## OS error basics
 \
 \ Also see `./errno.af`.
 
@@ -4291,20 +4387,28 @@ fun: fatal { err } " fatal: %s" err .elogf .elf .abort end
 \ This makes it call-like.
 fun: errno { -- code } .__error @s32 end
 
-\ `code` comes from `errno`, `ferror`, Posix functions, etc.
-fun: os_err { code ctx -- err_str }
-  code .strerror { msg }
-  " %s; code: %zd; msg: %s" ctx code msg .errf
+\ ## String formatting continued
+
+\ Formats a string, `snprintf`-style, into the remaining memory in the
+\ current ambient context; see `## Context`.
+fun: strf { fmt vlist -- str }
+  1 .ctx_avail { buf cap }
+  ifz cap .then " <unable to format string: out of space>" .ret end
+
+  buf cap fmt vlist .vsnprintf .cint_to_cell { len }
+  if len <0 .then " <unable to format string>" .ret end
+
+  cap len .inc .min { len } \ Include terminating nil byte.
+  buf len + .ctx_top_set
+  buf
 end
 
-\ For Posix functions which directly return an `errno`-like
-\ code on failure, and zero on success. No sign extension:
-\ Posix error codes are expected to be positive.
-fun: ?posix_err { code ctx -- err_str }
-  if code .then code ctx .os_err else nil end
+fun_comp: strf { -- err } ( E: fmt …vargs… -- err )
+  1 .comp_va_beg { len }
+  call'' systack_ptr
+  compile' strf
+  len .comp_va_end
 end
-
-\ ## Formatting continued
 
 \ For functions like `snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
@@ -4312,7 +4416,7 @@ fun: validate_format_len { len -- len err }
   if len <0 .then
     .errno { code }
     code .strerror { msg }
-    " unable to format string; code: %zd; msg: %s" code msg .errf .throw
+    " unable to format string; code: %zd; msg: %s" code msg .strf .throw
   end
   len
 end
@@ -4328,22 +4432,6 @@ fun_comp: str_prnf { -- err } ( E: buf cap fmt …vargs… -- len|err )
   compile' validate_format_len
 end
 
-\ Like `str_prnf`, but returns the given buffer,
-\ instead of formatted length or error sentinel.
-fun_comp: strf { -- err } ( E: buf cap fmt …vargs… -- buf )
-  nil 0 .comp_local { buf }
-  3 .comp_va_beg    { len }
-
-  0 buf .comp_assign_local_from_reg \ Stash x0 so we can return the buffer.
-  compile' snprintf
-
-  len .comp_va_end
-  compile' cint_to_cell
-  compile' validate_format_len
-  0 .comp_args_set
-  buf .comp_push_from_local \ mov xN, <buf> | ldr xN, [FP, <buf>]
-end
-
 fun_comp: fmtf { -- err } ( E: file fmt …vargs… )
   2 .comp_va_beg { len }
   compile' fprintf
@@ -4352,6 +4440,23 @@ fun_comp: fmtf { -- err } ( E: file fmt …vargs… )
   compile' validate_format_len
   0 .comp_args_set
 end
+
+\ ## OS errors continued
+
+\ `code` comes from `errno`, `ferror`, Posix functions, etc.
+fun: os_err { code text -- err_str }
+  code .strerror { msg }
+  " %s; code: %zd; msg: %s" text code msg .strf
+end
+
+\ For Posix functions which directly return an `errno`-like
+\ code on failure, and zero on success. No sign extension:
+\ Posix error codes are expected to be positive.
+fun: ?posix_err { code text -- err_str }
+  if code .then code text .os_err else nil end
+end
+
+fun: fatal { err } " fatal: %s" err .elogf .elf .abort end
 
 \ ## Stack manipulation continued
 
@@ -4534,7 +4639,7 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
     123 .asm_brk .comp_instr \ brk 123 -- unreachable
 
     out .comp_args_set
-  call_xt'' end
+  call'' end
 
   [ false .comp_only ]
 end
@@ -4547,7 +4652,7 @@ fun: indirect_to { decl xt_to -- err }
 
   if decl_inp sym_inp <> .then
     " unable to indirect to `%s`: input count: %zd <> %zd"
-    name decl_inp sym_inp .errf .throw
+    name decl_inp sym_inp .strf .throw
   end
 
   decl .Indir_decl_out @b { decl_out }
@@ -4555,7 +4660,7 @@ fun: indirect_to { decl xt_to -- err }
 
   if decl_out sym_out <> .then
     " unable to indirect to `%s`: output count: %zd <> %zd"
-    name decl_out sym_out .errf .throw
+    name decl_out sym_out .strf .throw
   end
 
   decl .Indir_decl_has_err @b { decl_has_err }
@@ -4563,7 +4668,7 @@ fun: indirect_to { decl xt_to -- err }
 
   if decl_has_err sym_has_err <> .then
     " unable to indirect to `%s`: has_err: %zd <> %zd"
-    name decl_has_err sym_has_err .errf .throw
+    name decl_has_err sym_has_err .strf .throw
   end
 
   decl .Indir_decl_instr @ { instr_adr }
@@ -4589,7 +4694,7 @@ fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
   .comp_args_get { len }
 
   if len 3 < .then
-    " `%s` requires at least 3 inputs: value to test, and predicates" name .errf .throw
+    " `%s` requires at least 3 inputs: value to test, and predicates" name .strf .throw
   end
 
   0 1 .asm_cmp_reg .comp_instr \ cmp x0, x1
@@ -4645,42 +4750,42 @@ fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT .comp_cmp_m
 
 fun: is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
 
-fun: assert_cond { cond ctx -- err }
+fun: assert_cond { cond text -- err }
   if cond .then .ret end
-  " assertion failed: %s" ctx .errf
+  " assertion failed: %s" text .strf
 end
 
-fun: assert_bin_cond { lhs rhs cond ctx op -- err }
+fun: assert_bin_cond { lhs rhs cond text op -- err }
   if cond .then .ret end
-  " assertion failed: %s%s (0x%zx 0x%zx %s)" ctx op lhs rhs op .errf
+  " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .strf
 end
 
 fun: assert_str_eq { act exp -- err }
   ifz exp .then
     ifz act .then .ret end
-    " expected string to be nil; got: %s" act .errf .throw
+    " expected string to be nil; got: %s" act .strf .throw
   end
 
   ifz act .then
-    " unexpected nil string; expected: %s" exp .errf .throw
+    " unexpected nil string; expected: %s" exp .strf .throw
   end
 
   if act exp cstr= .then .ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
-  " expected string: %s; actual string: %s" exp act .errf
+  " expected string: %s; actual string: %s" exp act .strf
 end
 
 fun: assert_str_has { act exp -- err }
   ifz act .then
     " missing string; expected string to have: %s"
-    exp .errf .throw
+    exp .strf .throw
   end
 
   if act exp .strstr .then .ret end
 
   " expected string to have: %s; actual string: %s"
-  exp act .errf .throw
+  exp act .strf .throw
 end
 
 fun: assert_beg { -- beg }
@@ -4730,9 +4835,9 @@ fun: assert_bin_end_xt { beg cond cmp_xt -- err }
     reg0 .comp_args_set
     lhs rhs cmp_xt .sym_instr .call [ 1 .comp_args_set ] { bool }
     ifz bool .then
-      beg .assert_body { ctx ctx_len }
+      beg .assert_body { text text_len }
       " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"
-      ctx_len ctx op_len op lhs rhs op_len op .errf .ret
+      text_len text op_len op lhs rhs op_len op .strf .ret
     end
     .ret
   end
@@ -4786,4 +4891,60 @@ fun: interp_args { -- argc argv err }
 
   ceil argv - /cells { argc }
   if argc .then argc argv else 0 nil end
+end
+
+\ ## Context continued
+
+fun_comp: main_arena { -- err } ( E: -- adr len )
+  [ .plain_call ]
+  interp .Interp_comp_field .Interp_comp_code_field .Interp_comp_code_heap @
+  MAIN_ARENA_OFF + .comp_next_page_addr
+  MAIN_ARENA_LEN .comp_push
+end
+
+fun: main_arena { -- adr len } [ .plain_call ] main_arena end
+
+\ ldp x28, xzr, [sp], #16
+\ add sp, sp, #frame
+fun: with_main_ctx_end { -- err }
+  call'' ctx_pop
+  ASM_REG_SP ASM_REG_SP size' Ctx FUND_ALIGN .align_up .asm_add_imm .comp_instr
+end
+
+\ Recommended wrapper for AOT-compiled programs.
+\
+\ Example usage:
+\
+\   fun: main { -- exit }
+\     .with_main_ctx .run end { err }
+\     if err .then " error: %s" err .elogf .elf 1 else 0 end
+\   end
+\
+\ Runtime effects:
+\ - Inner code sees default / main ambient context.
+\ - Outer code doesn't get its registers clobbered.
+\ - Words like `strf` can allocate memory for text.
+\
+\ Code inside `.with_main_ctx ... end` must run to completion.
+\ This means no `.ret .try .throw`, and no `-- err` in caller,
+\ meaning no implicit `.try`. Otherwise the SP and the context
+\ register get corrupted, and program crashes in obscure ways.
+\
+\ Programs are also free to replace this default with their own context.
+\ Since context memory is caller-owned, all allocated outputs, including
+\ error messages, must be handled / printed before freeing owner memory.
+\
+\ Does not record how much memory was actually used.
+\ Each invocation restarts at floor of memory arena.
+\
+\ Capture and handle outputs / errors after `end`.
+\ Main arena's memory remains valid after `end`;
+\ we have no way to relinquish it to the OS.
+fun_comp: with_main_ctx { -- end_xt err }
+  size' Ctx FUND_ALIGN .align_up { size }
+  ASM_REG_SP ASM_REG_SP size .asm_sub_imm .comp_instr \ sub sp, sp, #frame
+  call'' main_arena call'' systack_ptr compile' ctx_init
+  call'' systack_ptr \ mov x0, sp
+  call'' ctx_push    \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
+  xt' with_main_ctx_end
 end

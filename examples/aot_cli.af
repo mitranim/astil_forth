@@ -4,12 +4,12 @@ use' lang.af
 \
 \ Specify `--build=<out_path>` AFTER the input paths:
 \
-\   astil examples/aot.af --build=out.exe
+\   astil examples/aot_cli.af --build=out.exe
 \   ./out.exe
 \
 \ See `./aot.af` for compiling from INSIDE the program.
 
-fun: main { -- exit }
+fun: run { -- exit }
   if .has_interp .then
     " hello world (JIT mode)!" .log .lf
   else
@@ -21,7 +21,9 @@ fun: main { -- exit }
 end
 
 \ Run immediately in JIT mode.
-.main
+.run
+
+fun: main { -- exit } .with_main_ctx .run end end
 
 
 
@@ -34,7 +36,8 @@ end
 \
 \ In the Forth REPL:
 \
-\   fun: main { -- exit } " hello world!" .log .lf 0 end
+\   fun: run { -- exit } " hello world!" .log .lf 0 end
+\   fun: main { -- exit } .with_main_ctx .run end end
 \   \ Then hit Ctrl+D (not Ctrl+C) to terminate stdin.
 \
 \ In your shell:

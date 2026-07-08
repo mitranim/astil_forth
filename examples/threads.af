@@ -2,9 +2,10 @@ use' lang.af
 use' io.af
 use' pthread.af
 
-\ Passed to `pthread_spawn` by raw instruction address.
-\ We have no hidden adapters between Forth and libc.
-fun: callback { inout -- Err }
+\ Basic example of spawning and joining with multiple threads.
+\ Each thread uses a dedicated region of parent-owned memory.
+
+fun: child { inout -- Err }
   inout @ { path }
   " [child] checking length of `%s`..." path .logf .lf
 
@@ -16,59 +17,86 @@ fun: callback { inout -- Err }
     stat .Fstat_size @ inout !
   end
 
-  \ `main` will check this.
+  \ Parent checks this.
   err
 end
 
-fun: main
-  instr' callback  { instr } \ Raw instruction address.
-  " missing/none"  { path0 } \ Input for `thread0`: missing file.
-  " forth/lang.af" { path1 } \ Input for `thread1`: existing file.
-  path0 >slot      { val0  } \ Input-output for `thread0`.
-  path1 >slot      { val1  } \ Input-output for `thread1`.
-
-  " [main] spawning thread 0..." .log .lf
-  instr val0 .thread_spawn { thread0 err0 }
-
-  " [main] spawning thread 1..." .log .lf
-  instr val1 .thread_spawn { thread1 err1 }
-
-  if err0 .then
-    " [main] unable to spawn thread 0: %s" err0 .logf .lf
-  end
-
-  if err1 .then
-    " [main] unable to spawn thread 1: %s" err1 .logf .lf
-  end
-
-  \ After spawning a thread, we must either join or detach it.
-  \ Since this word handles thread creation errors explicitly,
-  \ it won't terminate until done with both thread handles.
-
-  ifz err0 .then
-    " [main] waiting on thread 0..." .log .lf
-    thread0 .thread_join { err0 join_err }
-
-    if join_err .then
-      " [main] when joining with thread 0: %s" join_err .logf .lf
-    elif err0 .then
-      " [main] error from thread 0: %s" err0 .logf .lf
-    else
-      " [main] result from thread 0: length of `%s`: %zd" path0 val0 @ .logf .lf
-    end
-  end
-
-  ifz err1 .then
-    " [main] waiting on thread 1..." .log .lf
-    thread1 .thread_join { err1 join_err }
-
-    if join_err .then
-      " [main] when joining with thread 1: %s" join_err .logf .lf
-    elif err1 .then
-      " [main] error from thread 1: %s" err1 .logf .lf
-    else
-      " [main] result from thread 1: length of `%s`: %zd" path1 val1 @ .logf .lf
-    end
+fun: cleanup { id mem }
+  mem .stack_deinit { err }
+  if err .then
+    " [parent] unable to deinit memory for child thread %zd: %s" id err .logf .lf
   end
 end
-.main
+
+struct: Child_ctx
+  Ctx  1 field: Child_ctx_ctx
+  Cell 1 field: Child_ctx_inout
+end
+
+fun: spawn { id inp mem -- thread inout ok }
+  " [parent] spawning thread %zd..." id .logf .lf
+
+  CTX_CAP Child_ctx mem .stack_init_ctx { ctx err }
+
+  if err .then
+    " [parent] unable to init memory for child thread %zd: %s" id err .logf .lf
+    nil nil false .ret
+  end
+
+  \ Child-reachable mutable state must outlive unsuccessful join.
+  \ Store in child memory rather than parent thread system stack.
+  ctx .Child_ctx_inout { inout }
+  inp inout !
+
+  instr' child inout ctx .thread_spawn_ctx { thread err }
+
+  if err .then
+    " [parent] unable to spawn thread %zd: %s" id err .logf .lf
+    id mem .cleanup
+    nil nil false .ret
+  end
+
+  thread inout true
+end
+
+fun: wait { id path out thread -- ok }
+  " [parent] waiting on thread %zd..." id .logf .lf
+  thread .thread_join { err join_err }
+
+  if join_err .then
+    " [parent] unable to join with thread %zd: %s" id join_err .logf .lf
+    false .ret
+  end
+
+  if err .then
+    " [parent] error from thread %zd: %s" id err .logf .lf
+  else
+    " [parent] result from thread %zd: length of `%s`: %zd" id path out @ .logf .lf
+  end
+
+  true
+end
+
+fun: parent
+  " missing/none"  { path0 } \ Input for `thread0`: missing file.
+  " forth/lang.af" { path1 } \ Input for `thread1`: existing file.
+  alloca' Stack    { mem0  } \ Backing memory of `thread0`.
+  alloca' Stack    { mem1  } \ Backing memory of `thread1`.
+
+  0 path0 mem0 .spawn { thread0 val0 ok0 }
+  1 path1 mem1 .spawn { thread1 val1 ok1 }
+
+  \ After spawning a thread, we must either join or detach it.
+
+  if ok0 .then 0 path0 val0 thread0 .wait { ok0 } end
+  if ok1 .then 1 path1 val1 thread1 .wait { ok1 } end
+
+  \ Unmap child thread memory on join success.
+  \
+  \ On join failure, thread might still be running and using memory.
+  \ In those cases, we leak child thread memory to avoid corruption.
+
+  if ok0 .then 0 mem0 .cleanup end
+  if ok1 .then 1 mem1 .cleanup end
+end
+.parent

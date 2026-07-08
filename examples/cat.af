@@ -63,7 +63,7 @@ end
 .interp_args .cat
 
 \ AOT entry.
-fun: main { argc argv -> exit }
-  .cat { err }
-  ifz err .then 0 else " error: %s" err .elogf .elf 1 end
+fun: main { argc argv -- exit }
+  .with_main_ctx argc argv .cat { err } end
+  if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

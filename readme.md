@@ -7,8 +7,9 @@
   - [Always extensible](#always-extensible)
   - [Always fast](#always-fast)
 - [Easy C interop](#easy-c-interop)
-- [Errors done right: ergonomics and ABI](#errors-done-right-ergonomics-and-abi)
+- [Errors done right: simplicity with ergonomics](#errors-done-right-simplicity-with-ergonomics)
 - [CLI](#cli)
+- [Memory management](#memory-management)
 - [Structure](#structure)
 - [Sublime Text](#sublime-text)
 - [Library](#library)
@@ -64,7 +65,7 @@ IO and conditionals:
 ```forth
 use' lang.af
 
-fun: main
+fun: run
   " hello world!" .log .lf
 
   if 10 .then
@@ -83,7 +84,7 @@ fun: main
   end
 end
 
-.main
+.run
 ```
 
 Easy self-assembly (Arm64):
@@ -115,10 +116,12 @@ end
 Easy AOT compilation; can be used from inside a program, or via CLI flags:
 
 ```forth
-fun: main { -- exit }
+fun: run { -- exit }
   " hello world!" .log .lf
   0
 end
+
+fun: main { -- exit } .with_main_ctx .run end end
 
 xt' main           \ Reference to the entry point.
 " out.exe"         \ Where to put the executable.
@@ -169,85 +172,145 @@ Fun note. AOT compilation in Astil Forth might be the "fastest" of any language,
 
 It's trivial to declare and call external functions, such as dynamically linked `libc` stuff. Examples can be found in the core files [`./forth/lang.af`](./forth/lang.af) and [`./forth/lang_s.af`](./forth/lang_s.af).
 
-The reg-CC version of Astil Forth, the default one, uses the native calling convention of the target platform, matching C. Its words can be passed to C by raw instruction addresses, and just work. In addition, it lets you define structs which match the C ABI. This allows perfect interop. See [`./examples`](./examples).
+The reg-CC version of Astil Forth (the default) uses the native calling convention of the target platform, matching C. Extern functions can be called directly, and just work.
+
+AF words can be passed to C by raw instruction addresses, and in many cases, they just work. See [Memory management](#memory-management) for the edge cases involving ambient context.
+
+AF also lets you define structs which match the C ABI. See [`./examples`](./examples) using that.
 
 ```forth
 \ The numbers describe input and output parameters.
 1 0 extern: puts
 2 1 extern: strcmp
 
-fun: main
+fun: run
   " hello world!" .puts
   " one" " two" .strcmp .show
 end
-.main
+.run
 ```
 
-## Errors done right: ergonomics and ABI
+## Errors done right: simplicity with ergonomics
 
-In reg-CC, our error handling combines ergonomics and ABI compatibility:
-- An error is just a C-style string pointer.
-- An error is the last output param (Go-style).
-- Shortcuts `.try` and `.throw` for local control (Swift-style).
-- Trailing `err` enables local implicit `.try` (exceptions-style).
-- Callers receive errors as values, even if callees `.throw`.
-- Works across ABI boundaries between languages.
-- No unwinder; all control is local.
+Astil Forth uses plain error outputs while making them as ergonomic as exceptions.
+
+- Errors are plain outputs.
+- Local shortcuts "try" and "throw" inside functions.
+- Opt-in auto-"try" inside functions.
 - No need for "catch".
+- Errors are part of regular call ABI.
+- Interoperable between languages.
+- No unwinder; all control is local.
 
-By convention, if the last output parameter is named _exactly_ `err` or `Err`, the compiler knows it's an error; this is similar to Swift's `throws` annotation. However, errors are just values and can be returned:
+By convention, errors are C-strings, but there's no type restriction:
 
 ```forth
-fun: word { -- Err }
-  .word0 { err }           if err .then err .ret end
-  .word1 { val0 err }      if err .then err .ret end
-  .word2 { val1 val2 err } err
+" err_msg" { err } \ Error as message.
+123        { err } \ Error as code.
+```
+
+Naming a trailing output exactly `err` or `Err` tells the compiler it's an error:
+
+```forth
+fun: always_fails { -- err } " err_msg" end
+```
+
+For ergonomics, compiler auto-zeroes the error output if you don't explicitly return it:
+
+```forth
+fun: always_succeeds { -- val err } 234 end \ implicit nil error
+```
+
+`.throw` returns an error; other outputs are undefined. Handy in multi-output functions. "Throw" is _entirely local_; it's just a variant of "return":
+
+```forth
+fun: some_word { -- out0 out1 err }
+  if fail .then
+    " err_msg" .throw \ x0 x1 x2 = junk junk err
+  end
+  123 234 \ x0 x1 x2 = 123 234 nil
 end
 ```
 
-For ergonomics, the compiler automatically zeroes the error register if you don't explicitly return it:
+When all outputs must be defined, just return instead:
 
 ```forth
-fun: word { -- out Err }
-  .some_word { some_val }
-  some_val \ Local error output is implicitly zeroed.
+fun: some_word { -- out0 out1 err }
+  if fail .then
+    nil nil " err_msg" .ret
+  end
+  123 234 \ implicit nil
 end
 ```
 
-`.try` consumes errors, returning non-nil errors early:
+Returned errors are visible by default:
 
 ```forth
-fun: word { -- Err }
+fun: caller
+  .always_fails { err }
+  err .elogf .elf
+end
+```
+
+Forwarding trailing errors just works:
+
+```forth
+fun: caller { -- Err } .always_fails end
+```
+
+`.try` consumes and tests errors, returning non-nils early:
+
+```forth
+\ Worse:
+fun: some_word { -- out Err }
+  .word0 { err }           if err .then nil err .ret end
+  .word1 { val0 err }      if err .then nil err .ret end
+  .word2 { val1 val2 err } if err .then nil err .ret end
+  val0 val1 val2 + *
+end
+
+\ Better:
+fun: some_word { -- out Err }
   .word0 .try
   .word1 .try { val0 }
   .word2 .try { val1 val2 }
+  val0 val1 val2 + *
 end
 ```
 
-By convention, naming the last output parameter _exactly_ `err` enables local auto-"try" inside the current word; this style is preferred in non-resource code. The external ABI is identical to `Err`:
+Naming trailing output _exactly_ lowercase `err` enables local auto-try within current function, eliminating all visible error handling. The external behavior is identical to `Err`:
 
 ```forth
-fun: word_auto_try { -- err }
+fun: some_word { -- out err }
   .word0
   .word1 { val0 }
   .word2 { val1 val2 }
+  val0 val1 val2 + *
 end
 ```
 
 - Callee decides whether to return an error via `err|Err`; this is external ABI.
 - Caller decides whether to auto-try internally via `err`; this is local convenience.
-- No need for "catch": error-sensitive code simply doesn't "try".
+- No "catch"; in error-sensitive code, simply don't auto-try.
 
-Failure outputs:
+Return states:
 - Success: return non-error outputs; nil `err` is implicit.
-- Partial failure: return useful non-error outputs and non-nil `err`.
+- Partial failure: return non-error outputs and non-nil `err`.
 - Total failure: use `.throw` / `.try`; non-error outputs are undefined.
 
-Callers, including C/FFI callers, must check errors before using other outputs, unless callee documents partial-failure contract.
+Callers, including C/FFI callers, must check errors before using regular outputs, unless callee documents partial-failure contract.
 
-The resulting system is a hybrid between C/Go/Swift styles. Like Swift, we provide shortcuts to make errors behave more like exceptions (locally), and make nil errors implicit. Like Go, we use multiple output parameters, and prefer errors to be strings with useful messages. Unlike Go, we provide less-noisy exception-like auto-try, while at the same time we don't have panics, so control is always local, making cross-language calls worry-free. We can pass callbacks to `libc` without any surprises.
+The resulting system is a hybrid between C/Go/Swift/exception styles:
+- Like C: control is always local; FFI-compatible ABI.
+- Like Go: multi-outputs; error is last; prefer strings with useful context.
+- Like Swift: implicit nil errors; `try throw` shortcuts.
+- Like exceptions: opt-in auto-try.
 
-The above doesn't quite apply to stack-CC, which always treats errors as "exceptions" and provides `catch'` instead of `.try`.
+Special note on ABI. Astil Forth uses an FFI-compatible multi-output call ABI with defined error lifetimes. Error strings are allocated either statically, or in the current ambient memory context; see [Memory management](#memory-management).
+
+AF functions which don't depend on ambient memory context can be passed as callbacks to `libc`, and just work. `qsort` callbacks are a good example.
+
+All of the above is reg-CC only, and doesn't quite apply to stack-CC, which always treats errors as exceptions and provides `catch'`.
 
 ## CLI
 
@@ -280,6 +343,15 @@ Don't forget to import `lang.af` via `use' lang.af` (or `use' lang_s.af` for sta
 
 Note on "use": absolute or explicitly-relative paths are resolved against the current file (PWD in REPL); unprefixed paths are "standard library" only.
 
+Compile executables via `--build`:
+
+```sh
+astil <file> --build=out.exe
+./out.exe
+```
+
+The file must define an AOT entry `main`; code which needs ambient context should use `.with_main_ctx` as shown in [Memory management](#memory-management).
+
 The REPL is barebones. For a better experience, using `rlwrap` is recommended:
 
 ```sh
@@ -287,13 +359,6 @@ rlwrap astil lang.af -
 
 # Or use this shortcut from repo root:
 make repl
-```
-
-Compile executables via `--build`:
-
-```sh
-astil <file> --build=out.exe
-./out.exe
 ```
 
 Local-only usage inside this repo:
@@ -318,6 +383,71 @@ make debug_run '<file>' DEBUG=true
 make debug_run '<file>' TRACE=true
 make debug_run '<file>' RECOVERY=false
 ```
+
+## Memory management
+
+Astil Forth doesn't have GC or memory-related compiler magic. Technically, memory is managed manually.
+
+AF simplifies MM in two ways:
+- Caller-owned arenas.
+- Ambient memory context.
+
+AF dedicates one register (`x28`) to the ambient context, available anywhere via the word `context`. See the type `Ctx` for the structure's definition.
+
+The context acts as a bump-allocator over borrowed caller-owned memory. It's used by words like `strf`, which need thread-specific scratch memory.
+
+The outer compiler automatically sets up the main arena. In JIT, it also sets up the main context. In AOT, the main arena is memory-mapped automatically, but the context requires extra setup. General AOT pattern:
+
+```forth
+fun: run { -- exit }
+  " hello %s" " world" .strf .log .lf
+  0
+end
+
+fun: main { -- exit }
+  .with_main_ctx .run end
+end
+```
+
+The main arena can't be freed, but may be rewound by saving `ctx_top` and restoring it via `ctx_top_set`. Other arenas are caller-owned; callees may allocate, or restore a prior top; caller frees the whole thing:
+
+```forth
+fun: callee { -- str } " code: %zd" 123 .strf end
+
+fun: caller { -- Err }
+  alloca' Stack { mem } \ Locally-owned scratch memory.
+
+  CTX_CAP Ctx mem .stack_init_ctx .try { ctx }
+
+  ctx .with_ctx         \ x28 = inner scratch context.
+    .callee .log .lf    \ Use scratch memory before freeing.
+  end                   \ x28 = outer context.
+
+  mem .stack_deinit     \ Unmap scratch memory.
+end
+```
+
+`with_ctx` is structural, not unwind-safe. Its body must reach `end`; don't use `.ret`, `.try`, `.throw`, or local auto-try inside it. Call an inner function and capture its outputs outside the scope when early return is possible.
+
+Every context object begins with `Ctx`, and may contain arbitrary extra fields. In JIT mode, the default ambient context is `Interp*`, which begins with the default `Ctx`. User code may define its own context types.
+
+The shortcut `stack_init_ctx` maps a guarded `Stack`, allocates an arbitrarily-sized context struct at its floor, initializes its `Ctx` header, and returns its address. The context struct is owned by its own backing memory and shares the same lifetime.
+
+When passing AF callbacks to foreign code, mind the context:
+
+For callbacks which don't need the context (like `qsort` comparator), no special action; they just work.
+
+Callbacks which use context require additional setup:
+- Either receive memory from parent, or map/unmap it locally.
+- Run the inner callback inside `with_ctx ... end`.
+
+Joinable child threads require parent-owned memory for their context. Our [`forth/pthread.af`](./forth/pthread.af) provides the shortcut `thread_spawn_ctx` for joinable threads, and shows the needed closure + trampoline pattern for thread context setup.
+
+Thread memory use is exclusive: while a child is running, parent is not allowed to use or unmap its memory.
+
+Detached child threads set up the context internally. Our [`examples/http_echo.af`](examples/http_echo.af) shows the needed pattern for internal context setup; see `handle_conn`.
+
+We currently don't support thread-local storage. Ambient contexts provide a similar-enough solution, designed for parent-owned memory which outlives the child. The differences between our approach and TLS are mostly in the implementation; the current solution is simpler and requires less OS-specific machinery. We may bridge this gap in the future.
 
 ## Structure
 

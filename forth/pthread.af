@@ -202,9 +202,32 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 \ Not found via `dlsym`.
 \ 2 1 extern: pthread_jit_write_with_callback_np
 
-\ Wraps `pthread_create`, throwing a descriptive error on failure.
-\ The caller must either `thread_join` or `pthread_detach`.
-\ If error, caller owns `inp`. Otherwise, thread owns `inp`.
+\ Internal closure used by `thread_run_with_ctx`.
+struct: Thread_run
+  Cell 1 field: Thread_run_inp
+  Adr  1 field: Thread_run_fun
+  Adr  1 field: Thread_run_ctx
+end
+
+\ Internal trampoline for joinable threads which
+\ receive context backed by parent-owned memory.
+fun: thread_run_with_ctx { run -- out }
+  run .Thread_run_inp @ { inp }
+  run .Thread_run_fun @ { fun }
+  run .Thread_run_ctx @ .with_ctx
+    inp fun .call [ 1 .comp_args_set ]
+  end
+end
+
+\ Wraps `pthread_create` with descriptive error on failure.
+\ The parent must either `thread_join` or `pthread_detach`.
+\ If error, parent owns `inp`. Otherwise thread owns `inp`.
+\
+\ Caution: this doesn't set up memory context for the child thread.
+\ If the callback depends on context either directly or indirectly,
+\ such as by calling `os_err` / `?posix_err` / `strf` / etc., then
+\ caller must allocate an arena and use `thread_spawn_ctx` instead.
+\ See `../examples/thread.af`.
 fun: thread_spawn { fun inp -- thread err }
   nil { attr }
   .slot { thread }
@@ -214,9 +237,53 @@ fun: thread_spawn { fun inp -- thread err }
   thread @ err
 end
 
+\ Spawns joinable thread with parent-created memory context.
+\
+\ Structure referenced by `ctx` must be allocated in its own
+\ backing memory. Most parents should use `stack_init_ctx`.
+\
+\ Backing memory is parent-owned and should outlive the child
+\ in case of successful join, but must not be stack-allocated
+\ in parent memory, because when join fails, the child memory
+\ might still be in use when the parent terminates.
+\
+\ Memory usage rights are exclusive: either child or parent.
+\ After spawn, only child uses the backing memory. Only join
+\ allows parent to access that memory. Join failure requires
+\ parent to leak memory; reuse might cause memory corruption.
+\
+\ If the input is a memory address, the memory it references
+\ must survive for at least as long as the child thread.
+\
+\ See directory `examples` for usage.
+fun: thread_spawn_ctx { fun inp ctx -- thread Err }
+  ctx .Ctx_top @ align' Thread_run .align_up { run }
+  run size' Thread_run +                     { top }
+
+  if top ctx .Ctx_ceil @ > .then
+    " unable to allocate thread closure: context out of space" .throw
+  end
+
+  top ctx .Ctx_top !
+  inp run .Thread_run_inp !
+  fun run .Thread_run_fun !
+  ctx run .Thread_run_ctx !
+
+  instr' thread_run_with_ctx run .thread_spawn
+
+  \ Internal note. Keep the closure allocated on spawn failure for simplicity,
+  \ and because of the edge case where parent passes its own context to child.
+  \ If spawning fails, `thread_spawn` formats error message into memory backed
+  \ by parent's context. Rewind could invalidate error before parent reads it.
+end
+
 \ Wraps `pthread_create` with `PTHREAD_CREATE_DETACHED`.
-\ The caller must not `thread_join` or `pthread_detach`.
-\ If error, caller owns `inp`. Otherwise, thread owns `inp`.
+\ The parent must not `thread_join` or `pthread_detach`.
+\ If error, parent owns `inp`. Otherwise thread owns it.
+\
+\ Doesn't set up memory context for child thread.
+\ Detached threads tend to use their own context.
+\ See `../examples/http_echo.af`.
 fun: thread_spawn_detached { fun inp -- thread Err }
   alloca' Pthread_attr { attr   }
   .slot                { thread }

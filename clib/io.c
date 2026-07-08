@@ -36,7 +36,7 @@ static Err err_file_unable_to_open(const char *path) {
   const auto msg = strerror(errno);
 
   if (!msg) {
-    return errf("unable to open file " FMT_QUOTED, path, errno);
+    return errf("unable to open file " FMT_QUOTED "; code: %d", path, errno);
   }
 
   return errf(
@@ -135,7 +135,12 @@ static Err file_read(const char *path, U8 **out_body, Uint *out_len) {
   const auto file_len = (Uint)info.st_size;
   const auto buf_len  = ADD(file_len, 1);
   U8        *buf      = malloc(buf_len);
-  const auto err      = fd_read_all(path, file, buf, file_len);
+
+  if (!buf) {
+    return errf("unable to allocate " FMT_UINT " bytes for %s", buf_len, path);
+  }
+
+  const auto err = fd_read_all(path, file, buf, file_len);
 
   if (err) {
     free(buf);

@@ -17,19 +17,22 @@ static void set_deinit(void *set) {
 }
 
 static void set_init_impl(Set *set, Ind cap, Ind size) {
-  if (!cap) {
-    *set = (Set){};
-    return;
-  }
+  *set = (Set){};
+  if (!cap) return;
 
   // Power of 2, or 0. Assumed by `set_loaded` and `set_probe_ind`.
   IF_DEBUG(assert_fatal(!(cap & (cap - 1))));
 
   const auto bits_len = hash_table_bits_arr_len(cap);
+  const auto bits     = calloc(bits_len, sizeof(set->bits[0]));
+  const auto vals     = memalloc(cap, size);
+
+  assert_fatal(bits);
+  if (size) assert_fatal(vals);
 
   *set = (Set){
-    .bits = calloc(bits_len, sizeof(set->bits[0])),
-    .vals = memalloc(cap, size),
+    .bits = bits,
+    .vals = vals,
     .cap  = cap,
   };
 }
@@ -53,8 +56,7 @@ static bool set_valid(Set const *set) {
     (
       set->cap > 0 &&
       set->len < set->cap &&
-      set->bits &&
-      set->vals
+      set->bits
     ))
   );
 }
@@ -74,6 +76,10 @@ static Ind set_matching_ind(const Set *set, const void *val, Ind size) {
 static Ind set_available_ind(
   const Set *set, const void *val, Ind size, bool *new
 ) {
+  /*
+  `Set.vals` lines up with `Hash_table.keys`. For a new slot, shared code
+  copies `val` into `Set.vals`; callers must only update bits and length.
+  */
   return hash_table_available_ind(
     (const Hash_table *)set, val, size, mem_hash, mem_eq, new
   );
@@ -89,9 +95,7 @@ static void set_rehash(Set *prev, Ind cap, Ind size) {
     bool       new;
     const auto val_prev = ptr_at(prev->vals, ind_prev, size);
     const auto ind_next = set_available_ind(&next, val_prev, size, &new);
-    const auto val_next = ptr_at(next.vals, ind_next, size);
-
-    memcpy(val_next, val_prev, size);
+    assert_fatal(new);
     hash_table_bits_set_at(next.bits, ind_next);
     next.len++;
   }
@@ -113,7 +117,6 @@ static void *set_add_impl(Set *set, const void *val, Ind size) {
   const auto out = ptr_at(set->vals, ind, size);
 
   if (new) {
-    memcpy(out, val, size);
     hash_table_bits_set_at(set->bits, ind);
     set->len++;
   }

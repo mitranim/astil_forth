@@ -63,7 +63,9 @@ static constexpr auto  EMPTY = (Empty){};
   ({                                                                  \
     const auto tmp_dict = dict;                                       \
     const auto tmp_ind  = dict_ind_impl((const Dict *)tmp_dict, key); \
-    (tmp_ind == INVALID_IND) ? val : tmp_dict->vals[tmp_ind];         \
+    (!dict_val_size(tmp_dict) || tmp_ind == INVALID_IND)              \
+      ? val                                                           \
+      : tmp_dict->vals[tmp_ind];                                      \
   })
 
 #define dict_get_or(...) dict_get_or_inner(UNIQ_IDENT, UNIQ_IDENT, __VA_ARGS__)

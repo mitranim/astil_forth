@@ -706,4 +706,4 @@ T{ s" ./test_interp_ret_s.af" use <T> 123 }T
 
 s" testing_s.af" use
 
-" [test] ok" log lf
+" [test] ok" elog elf

@@ -24,7 +24,7 @@ fun: cf_want_word { XT -- err }
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
     " [test] `%.*s` instruction length mismatch: expected %zd, actual %zd"
-    name_len name exp_len act_len .errf .throw
+    name_len name exp_len act_len .strf .throw
   end
 
   0 { ind }
@@ -36,7 +36,7 @@ fun: cf_want_word { XT -- err }
       XT .Sym_name .Sym_word_buf { name }
       XT .Sym_name .Sym_word_len @u32 { name_len }
       " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
-      name_len name ind exp act .errf .throw
+      name_len name ind exp act .strf .throw
     end
     inc: ind
   end
@@ -717,4 +717,4 @@ fun: test_const_fold_all { -- err }
   .test_const_fold_cint_to_cell
 end
 
-" [test] [cf] ok" .log .lf
+" [test] [cf] ok" .elog .elf

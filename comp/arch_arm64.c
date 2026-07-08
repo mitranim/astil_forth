@@ -473,13 +473,14 @@ The immediate has a unique encoding: its lowest 2 bits are placed
 separately in the high bits of the instruction in the opcode region.
 */
 static U16 asm_append_adrp(Comp *comp, U8 reg, Uint addr) {
-  constexpr Uint bits      = 12;
-  constexpr Uint mask      = (1u << bits) - 1u; // 0b111111111111 = 4095
-  const auto     prog      = (Uint)(comp_code_next_prog_counter(&comp->code));
-  const auto     pc_page   = prog & ~mask;
-  const auto     addr_page = addr & ~mask;
-  const auto     page_diff = (Sint)(addr_page >> bits) - (Sint)(pc_page >> bits);
-  const auto     pageoff   = addr - addr_page;
+  constexpr Uint bits = 12;
+  constexpr Uint mask = (1u << bits) - 1u; // 0b111111111111 = 4095
+
+  const auto prog      = (Uint)(comp_code_next_prog_counter(&comp->code));
+  const auto pc_page   = prog & ~mask;
+  const auto addr_page = addr & ~mask;
+  const auto page_diff = (Sint)(addr_page >> bits) - (Sint)(pc_page >> bits);
+  const auto pageoff   = addr - addr_page;
 
   assert_fatal(addr >= addr_page);
   assert_fatal(pageoff < (1u << bits));

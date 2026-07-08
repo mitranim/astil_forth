@@ -415,8 +415,12 @@ static Err intrin_read_word(Interp *interp, const char **buf, Sint *len) {
 
 static Err intrin_import(Sint buf, Sint len, Interp *interp) {
   try(interp_validate_buf_len(buf, len));
+  if (!len) return "unable to import: missing path";
+
   const auto path = str_alloc_copy((const char *)buf, (Ind)len);
-  const auto err  = interp_import(interp, path);
+  if (!path) return "unable to copy import path";
+
+  const auto err = interp_import(interp, path);
   free(path);
   return err;
 }

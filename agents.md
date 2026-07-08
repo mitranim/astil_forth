@@ -6,15 +6,24 @@ Stack-CC legacy: errors are exceptions.
 
 Reg-CC variant:
 
-Default: errors are regular outputs. Compiler doesn't care whether an output semantically represents an error, unless `.try`, `.throw`, or the trailing `err`/`Err` output convention is used. By convention, we use C-strings as errors.
+ABI-wise, errors are regular outputs, explicitly declared.
 
-Callsites use `.try` to check visible error value from call; `.try` consumes last output register; requires current word to have its own error output.
+By convention, we use C-strings as errors.
 
-By convention, when last output param is named exactly `err` or `Err`, current word gets `Sym.has_err = true`. This lets current word use explicit `.try` / `.throw`; callers with trailing `err` auto-insert `.try` when calling this word.
+Explicitly returning a nil error is redundant; compiler forbids it.
 
-`.throw` requires 1 arg; requires current word to have its own error output; unconditionally moves input to error output register and returns.
+Naming the last output parameter exactly `err` or `Err` enables use of `.throw` and `.try` inside the current word. Also marks `Sym.has_err = true`, telling callers that this word has a trailing error; makes callers auto-try when their own trailing output is named exactly `err`.
 
-Trailing `err` enables implicit `.try` inside the current word; non-resource code prefers this style. Trailing `Err` keeps errors locally visible; code which involves resource cleanup prefers this style. This policy is function-local and not part of ABI.
+`.throw` returns its input in the current word's error output register; other outputs are undefined; requires current `Sym.has_err = true`.
+
+`.try` is like `.throw` but conditional: consume top argument; test and return as error if non-zero.
+
+Trailing `err` output (unlike `Err`) also enables local auto-try. Inside a word whose trailing output is named exactly `err`, when calling words with `Sym.has_err = true`, compiler inserts an equivalent of `.try` after each call.
+
+Callers don't care whether callee uses `err` or `Err`; both are just "callee has trailing error output".
+
+Input params, locals, and non-trailing outputs named `err` / `Err` have no
+special compiler behavior.
 
 How to return:
 

@@ -13,6 +13,11 @@ static bool interp_valid(const Interp *interp) {
   return (
     interp &&
     is_aligned(interp) &&
+    // Must precede reads beyond `Ctx`; x28 may hold a regular runtime context.
+    interp->ctx.self == interp &&
+    is_aligned(&interp->ctx) &&
+    is_aligned(&interp->ctx.top) &&
+    is_aligned(&interp->ctx.ceil) &&
     is_aligned(&interp->comp) &&
     is_aligned(&interp->ints) &&
     is_aligned(&interp->syms) &&
@@ -22,6 +27,9 @@ static bool interp_valid(const Interp *interp) {
     is_aligned(&interp->snap) &&
     comp_valid(&interp->comp) &&
     reader_valid(interp_reader_const(interp)) &&
+    interp->ctx.top &&
+    interp->ctx.ceil &&
+    interp->ctx.top <= interp->ctx.ceil &&
     stack_valid((const Stack *)&interp->ints) &&
     stack_valid((const Stack *)&interp->syms) &&
     dict_valid((const Dict *)&interp->dict_exec) &&
@@ -32,10 +40,13 @@ static bool interp_valid(const Interp *interp) {
 // clang-format on
 
 static Err interp_deinit(Interp *interp) {
+  if (!interp) return nullptr;
+
   const auto syms = &interp->syms;
 
-  for (stack_range(auto, sym, syms)) sym_deinit(sym);
-  list_deinit(&interp->syms);
+  if (syms->floor) { // Bot-insisted redundant guard for C UB semantics.
+    for (stack_range(auto, sym, syms)) sym_deinit(sym);
+  }
   dict_deinit(&interp->dict_exec);
   dict_deinit(&interp->dict_comp);
   dict_deinit_with_keys((Dict *)&interp->imports);
@@ -100,6 +111,14 @@ static Err interp_init(Interp *interp) {
   try(stack_init(&interp->syms, &opt));
   try(comp_init(&interp->comp));
   try(interp_init_syms(interp)); // Requires `comp_init` first.
+
+  const auto heap = interp->comp.code.heap;
+
+  ptr_set(
+    &interp->ctx,
+    {.self = interp, .top = heap->arena, .ceil = arr_ceil(heap->arena)}
+  );
+
   try(interp_snapshot(interp));
 
   IF_DEBUG({

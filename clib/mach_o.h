@@ -491,9 +491,9 @@ and only the `__got` section needs fixups, so we can
 specialize the linkedit structure for convenience:
 
   [0]                   Mach_fixup_head  (28)
-  [28 = starts_offset]  Mach_fixup_img_5 (24) -- where `Mach_fixup_seg` for `__got`
-  [52]                  Mach_fixup_seg   (24) -- where `__got`
-  [76 = imports_offset] Mach_fixup_import[]
+  [28 = starts_offset]  Mach_fixup_img_4 (20) -- where `Mach_fixup_seg` for `__got`
+  [48]                  Mach_fixup_seg   (24) -- where `__got`
+  [72 = imports_offset] Mach_fixup_import[]
   [symbols_offset]      name[]
 */
 typedef struct {
@@ -510,9 +510,9 @@ typedef struct {
 `dyld_chained_starts_in_image` in Apple `cctools` `fixup-chains.h`.
 Placed immediately after `Mach_fixup_head`.
 
-`.seg_count` must match the count of `MLC_SEGMENT_64` load commands in the
-executable file. `.seg_info_offset` after the struct must contain exactly
-that many entries, matching the order of the segment load commands.
+`.seg_count` covers segment load commands in order, but may omit trailing
+segments which don't need fixups. `.seg_info_offset` after the struct must
+contain exactly that many entries.
 
 For segments which need fixups, the corresponding `.seg_info_offset[N]` has
 the offset of the `Mach_fixup_seg` struct which describes where to find its
@@ -526,8 +526,7 @@ typedef struct {
 
 /*
 Fixed-size specialized variant of `Mach_fixup_img` for easier encoding.
-Used by `../comp/mach_o.c`; segment count must match how many segments
-are created by all our load commands.
+Used by `../comp/mach_o.c`; ends with the last segment which needs fixups.
 
 Segments:
 
@@ -535,14 +534,13 @@ Segments:
     __TEXT       -- offset 0
     __DATA       -- offset 0
     __DATA_CONST -- need fixup
-    __LINKEDIT   -- offset 0
-
+The trailing `__ARENA` and `__LINKEDIT` segments need no entries.
 The `__DATA_CONST` offset is from the start of this struct.
 */
 typedef struct {
-  U32 seg_count;          // 5
-  U32 seg_info_offset[5]; // `__got` gets fixups, other segments get offset 0.
-} Mach_fixup_img_5;
+  U32 seg_count;          // 4
+  U32 seg_info_offset[4]; // `__got` gets fixups, other segments get offset 0.
+} Mach_fixup_img_4;
 
 // Values for `Mach_fixup_seg.pointer_format`.
 typedef enum : U16 {

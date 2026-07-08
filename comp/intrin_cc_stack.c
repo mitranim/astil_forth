@@ -329,8 +329,12 @@ static Err intrin_import(Interp *interp) {
   const char *path;
   Ind         len;
   try(interp_pop_str(interp, &path, &len));
+  if (!len) return "unable to import: missing path";
+
   const auto copy = str_alloc_copy(path, len);
-  const auto err  = interp_import(interp, copy);
+  if (!copy) return "unable to copy import path";
+
+  const auto err = interp_import(interp, copy);
   free(copy);
   return err;
 }

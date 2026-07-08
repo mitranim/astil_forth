@@ -21,10 +21,10 @@ static Err stack_deinit(void *stack) {
   if (!tar) return nullptr;
 
   const auto addr = tar->cellar;
-  if (addr) try_errno(munmap(addr, tar->bytelen));
+  const auto err  = addr ? err_errno(munmap(addr, tar->bytelen)) : nullptr;
 
   *tar = (Stack){};
-  return nullptr;
+  return err;
 }
 
 static Err err_stack_no_len() {
@@ -45,6 +45,8 @@ Underflow or overflow triggers a segfault.
   guard    stack            guard
 */
 static Err stack_init_impl(void *out, Stack_opt *opt, Ind val_size) {
+  *(Stack *)out = (Stack){};
+
   const auto len = opt ? opt->len : 0;
   if (!len) return err_stack_no_len();
 
@@ -59,7 +61,11 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Ind val_size) {
   if (cellar == MAP_FAILED) return err_mmap();
 
   const auto floor = (U8 *)cellar + page_size;
-  try(mem_protect(floor, data_size, PROT_READ | PROT_WRITE));
+  const auto err   = mem_protect(floor, data_size, PROT_READ | PROT_WRITE);
+  if (err) {
+    munmap(cellar, total_size);
+    return err;
+  }
 
   *(Stack *)out = (Stack){
     .bytelen = total_size,

@@ -4,7 +4,7 @@ use' lang.af
 \ Our compiler doesn't validate the input signature of `main`.
 \ AOT-compiled programs receive args straight from the OS.
 
-fun: main { argc argv envp -- exit }
+fun: run { argc argv envp -- exit }
   if .has_interp .then
     " [main] mode: JIT" .log .lf
   else
@@ -43,8 +43,10 @@ fun: main { argc argv envp -- exit }
 end
 
 \ In JIT mode, pass arbitrary args yourself.
-\ Note that you don't _have_ to call `main`.
-0 nil nil .main
+\ Note that you don't _have_ to call this.
+0 nil nil .run
+
+fun: main { argc argv envp -- exit } .with_main_ctx argc argv envp .run end end
 
 \ Usage:
 \

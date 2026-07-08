@@ -5,6 +5,17 @@ use' pthread.af
 
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
+fun: conn_close { conn }
+  " [srv] closing connection %zd" conn .elogf .elf
+
+  if conn .close .then
+    .errno { code }
+    code .strerror { msg }
+    " [srv] unable to close connection %zd; code: %zd; msg: %s"
+    conn code msg .elogf .elf
+  end
+end
+
 \ Single-threaded accept loop. Convenient for examples/tests.
 fun: net_accept_loop { sock handler }
   alloca' Sockaddr_storage { addr }
@@ -19,23 +30,27 @@ fun: net_accept_loop { sock handler }
       .errno { code }
       if code EINTR = .then again end
       code .strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s" code msg .elogf .elf
+      " [srv] unable to accept connection %zd; code: %zd; msg: %s"
+      conn code msg .elogf .elf
       again
     end
 
-    " [srv] accepted connection" .elog .elf
+    " [srv] accepted connection %zd" conn .elogf .elf
     conn handler .call
   end
 end
 
 \ Multi-threaded accept loop. Spawns one detached worker per accepted conn.
-\ The handler receives one input: `conn`. On spawn failure, closes `conn`.
+\ The handler receives one input: `conn`. Closes connection on spawn fail.
 \ No cancellation support. No thread limit.
 fun: net_accept_loop_threaded { sock handler }
   alloca' Sockaddr_storage { addr }
   alloca' Cuint            { size }
+  .ctx_top                 { top }
 
   loop
+    top .ctx_top_set
+
     addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
     sock addr size .accept .cint_to_cell { conn }
@@ -48,16 +63,13 @@ fun: net_accept_loop_threaded { sock handler }
       again
     end
 
-    " [srv] accepted connection" .elog .elf
+    " [srv] accepted connection %zd" conn .elogf .elf
 
     handler conn .thread_spawn_detached { _ err }
 
     if err .then
       " [srv] unable to spawn worker: %s" err .elogf .elf
-      conn .sock_close { err }
-      if err .then
-        " [srv] unable to close connection %zd: %s" conn err .elogf .elf
-      end
+      conn .conn_close
     end
   end
 end

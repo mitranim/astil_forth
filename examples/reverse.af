@@ -12,12 +12,12 @@ fun: reverse { str len }
   end
 end
 
-fun: main
+fun: run
   s" 0123456789abcdef" { str len }
   str .log .lf
   str len .reverse
   str .log .lf
 end
 
-.main
+.run
 \ fedcba9876543210

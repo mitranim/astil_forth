@@ -134,7 +134,11 @@ static bool comp_heap_valid(const Comp_heap *val) {
     is_aligned(&val->exec) &&
     instr_heap_valid(&val->exec) &&
     is_aligned(&val->externs) &&
-    is_aligned(&val->intrins)
+    is_aligned(&val->intrins) &&
+    is_aligned_to(val->data, MEM_PAGE) &&
+    is_aligned_to(val->externs, MEM_PAGE) &&
+    is_aligned_to(val->intrins, MEM_PAGE) &&
+    is_aligned_to(val->arena, MEM_PAGE)
   );
 }
 
@@ -175,12 +179,14 @@ static bool comp_valid(const Comp *comp) {
 
 static Err instr_heap_deinit(Instr_heap **out) {
   if (!out || !*out) return nullptr;
-  try(err_errno(munmap(*out, sizeof(**out))));
-  *out = nullptr;
-  return nullptr;
+  const auto err = err_errno(munmap(*out, sizeof(**out)));
+  *out           = nullptr;
+  return err;
 }
 
 static Err instr_heap_init(Instr_heap **out) {
+  *out = nullptr;
+
   const auto ptr = mem_map(sizeof(Instr_heap), 0);
   if (ptr == MAP_FAILED) return err_mmap();
 
@@ -191,12 +197,14 @@ static Err instr_heap_init(Instr_heap **out) {
 
 static Err comp_heap_deinit(Comp_heap **out) {
   if (!out || !*out) return nullptr;
-  try(err_errno(munmap(*out, sizeof(**out))));
-  *out = nullptr;
-  return nullptr;
+  const auto err = err_errno(munmap(*out, sizeof(**out)));
+  *out           = nullptr;
+  return err;
 }
 
 static Err comp_heap_init(Comp_heap **out) {
+  *out = nullptr;
+
   void *ptr;
   try(mem_map_jit(sizeof(Comp_heap), &ptr));
 
@@ -207,6 +215,7 @@ static Err comp_heap_init(Comp_heap **out) {
   try(mem_protect(heap->data, sizeof(heap->data), PROT_READ | PROT_WRITE));
   try(mem_protect(heap->externs, sizeof(heap->externs), PROT_READ | PROT_WRITE));
   try(mem_protect(heap->intrins, sizeof(heap->intrins), PROT_READ | PROT_WRITE));
+  try(mem_protect(heap->arena, sizeof(heap->arena), PROT_READ | PROT_WRITE));
   return nullptr;
 }
 
@@ -287,15 +296,18 @@ static Err comp_code_init(Comp_code *code) {
 }
 
 static Err comp_init(Comp *comp) {
+  *comp = (Comp){};
   try(comp_code_init(&comp->code));
   try(comp_ctx_init(&comp->ctx));
   return nullptr;
 }
 
 static Err comp_deinit(Comp *comp) {
-  try(comp_ctx_deinit(&comp->ctx));
-  try(comp_code_deinit(&comp->code));
-  return nullptr;
+  Err err = nullptr;
+  err     = either(err, comp_ctx_deinit(&comp->ctx));
+  err     = either(err, comp_code_deinit(&comp->code));
+  *comp   = (Comp){};
+  return err;
 }
 
 static void comp_rewind(const Comp *prev, Comp *next) {
