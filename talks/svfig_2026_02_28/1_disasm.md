@@ -3,10 +3,10 @@ The interpreter makes it easy to disassemble words; under the hood, it shells ou
 See `./1_disasm.af`.
 
 ```forth
-: example_arith
+: .example_arith
   10 20 + 30 * { -- }
 ;
-dis' example_arith
+dis' .example_arith
 ```
 
 Result:
@@ -25,7 +25,7 @@ ret
 This amateur system is _parsecs_ behind optimizing C compilers. A full comparison is _way_ out of scope here. But here's a tiny example.
 
 ```forth
-: word { one two three -- four }
+: .word { one two three -- four }
   one two + three *
 ;
 ```

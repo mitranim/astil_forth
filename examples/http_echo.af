@@ -13,7 +13,7 @@ use' ./http_util.af
 4096 let: BUF_CAP
 
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
-fun: read_req { conn buf cap -- len err }
+fun: .read_req { conn buf cap -- len err }
   0 { len }
 
   loop
@@ -33,7 +33,7 @@ fun: read_req { conn buf cap -- len err }
   len
 end
 
-fun: respond_conn { conn -- err }
+fun: .respond_conn { conn -- err }
   BUF_CAP .alloca { buf }
   conn buf BUF_CAP .read_req { len }
 
@@ -49,7 +49,7 @@ fun: respond_conn { conn -- err }
   " [srv] echoed request back to client" .elog .elf
 end
 
-fun: handle_conn { conn }
+fun: .handle_conn { conn }
   alloca' Stack { mem }
   CTX_CAP Ctx mem .stack_init_ctx { ctx err }
 
@@ -71,10 +71,10 @@ fun: handle_conn { conn }
   end
 end
 
-fun: run { -- err }
+fun: .run { -- err }
   " 2345"                  { port }
   128                      { backlog }
-  instr' handle_conn       { handler }
+  instr' .handle_conn       { handler }
   port backlog .net_listen { sock }
 
   " [srv] listening on http://localhost:%s" port .elogf .elf
@@ -84,7 +84,7 @@ fun: run { -- err }
 end
 
 \ For AOT builds. Requires dropping / commenting the root `.run`.
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end { err }
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

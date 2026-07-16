@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_undefined_fail { -- err }
-  .TEST_DOT_CALL_MISSING
-end

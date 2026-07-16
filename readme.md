@@ -65,7 +65,7 @@ IO and conditionals:
 ```forth
 use' lang.af
 
-fun: run
+fun: .run
   " hello world!" .log .lf
 
   if 10 .then
@@ -91,7 +91,7 @@ Easy self-assembly (Arm64):
 
 ```forth
 \ add Xd, Xn, Xm
-fun: asm_add_reg { Xd Xn Xm -- instr }
+fun: .asm_add_reg { Xd Xn Xm -- instr }
   Xd Xn Xm .asm_pattern_arith_reg
   0b1_0_0_01011_00_0_00000_000000_00000_00000 .or
 end
@@ -106,7 +106,7 @@ fun: + { i0 i1 -- i2 }
 end
 
 \ brk 666
-fun: abort
+fun: .abort
   [
     0b110_101_00_001_0000001010011010_000_00 .comp_instr
   ]
@@ -116,21 +116,19 @@ end
 Easy AOT compilation; can be used from inside a program, or via CLI flags:
 
 ```forth
-fun: run { -- exit }
+fun: .run { -- exit }
   " hello world!" .log .lf
   0
 end
 
-fun: main { -- exit } .with_main_ctx .run end end
+fun: .main { -- exit } .with_main_ctx .run end end
 
-xt' main           \ Reference to the entry point.
+xt' .main           \ Reference to the entry point.
 " out.exe"         \ Where to put the executable.
 .compile_executable
 
 \ Run `./out.exe` in your shell to print the message.
 ```
-
-Traditional style `: word ;` is also availble, but `fun: word end` is preferred for stylistic reasons and consistency with control structures, which are also terminated with `end`.
 
 ## Why
 
@@ -180,10 +178,10 @@ AF also lets you define structs which match the C ABI. See [`./examples`](./exam
 
 ```forth
 \ The numbers describe input and output parameters.
-1 0 extern: puts
-2 1 extern: strcmp
+1 0 extern: .puts puts
+2 1 extern: .strcmp strcmp
 
-fun: run
+fun: .run
   " hello world!" .puts
   " one" " two" .strcmp .show
 end
@@ -212,19 +210,19 @@ By convention, errors are C-strings, but there's no type restriction:
 Naming a trailing output exactly `err` or `Err` tells the compiler it's an error:
 
 ```forth
-fun: always_fails { -- err } " err_msg" end
+fun: .always_fails { -- err } " err_msg" end
 ```
 
 For ergonomics, compiler auto-zeroes the error output if you don't explicitly return it:
 
 ```forth
-fun: always_succeeds { -- val err } 234 end \ implicit nil error
+fun: .always_succeeds { -- val err } 234 end \ implicit nil error
 ```
 
 `.throw` returns an error; other outputs are undefined. Handy in multi-output functions. "Throw" is _entirely local_; it's just a variant of "return":
 
 ```forth
-fun: some_word { -- out0 out1 err }
+fun: .some_word { -- out0 out1 err }
   if fail .then
     " err_msg" .throw \ x0 x1 x2 = junk junk err
   end
@@ -235,7 +233,7 @@ end
 When all outputs must be defined, just return instead:
 
 ```forth
-fun: some_word { -- out0 out1 err }
+fun: .some_word { -- out0 out1 err }
   if fail .then
     nil nil " err_msg" .ret
   end
@@ -246,7 +244,7 @@ end
 Returned errors are visible by default:
 
 ```forth
-fun: caller
+fun: .caller
   .always_fails { err }
   err .elogf .elf
 end
@@ -255,14 +253,14 @@ end
 Forwarding trailing errors just works:
 
 ```forth
-fun: caller { -- Err } .always_fails end
+fun: .caller { -- Err } .always_fails end
 ```
 
 `.try` consumes and tests errors, returning non-nils early:
 
 ```forth
 \ Worse:
-fun: some_word { -- out Err }
+fun: .some_word { -- out Err }
   .word0 { err }           if err .then nil err .ret end
   .word1 { val0 err }      if err .then nil err .ret end
   .word2 { val1 val2 err } if err .then nil err .ret end
@@ -270,7 +268,7 @@ fun: some_word { -- out Err }
 end
 
 \ Better:
-fun: some_word { -- out Err }
+fun: .some_word { -- out Err }
   .word0 .try
   .word1 .try { val0 }
   .word2 .try { val1 val2 }
@@ -281,7 +279,7 @@ end
 Naming trailing output _exactly_ lowercase `err` enables local auto-try within current function, eliminating all visible error handling. The external behavior is identical to `Err`:
 
 ```forth
-fun: some_word { -- out err }
+fun: .some_word { -- out err }
   .word0
   .word1 { val0 }
   .word2 { val1 val2 }
@@ -350,7 +348,7 @@ astil <file> --build=out.exe
 ./out.exe
 ```
 
-The file must define an AOT entry `main`; code which needs ambient context should use `.with_main_ctx` as shown in [Memory management](#memory-management).
+The file must define an AOT entry `.main`; code which needs ambient context should use `.with_main_ctx` as shown in [Memory management](#memory-management).
 
 The REPL is barebones. For a better experience, using `rlwrap` is recommended:
 
@@ -394,27 +392,27 @@ AF simplifies MM in two ways:
 
 AF dedicates one register (`x28`) to the ambient context, available anywhere via the word `context`. See the type `Ctx` for the structure's definition.
 
-The context acts as a bump-allocator over borrowed caller-owned memory. It's used by words like `strf`, which need thread-specific scratch memory.
+The context acts as a bump-allocator over borrowed caller-owned memory. It's used by words like `.strf`, which need thread-specific scratch memory.
 
 The outer compiler automatically sets up the main arena. In JIT, it also sets up the main context. In AOT, the main arena is memory-mapped automatically, but the context requires extra setup. General AOT pattern:
 
 ```forth
-fun: run { -- exit }
+fun: .run { -- exit }
   " hello %s" " world" .strf .log .lf
   0
 end
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end
 end
 ```
 
-The main arena can't be freed, but may be rewound by saving `ctx_top` and restoring it via `ctx_top_set`. Other arenas are caller-owned; callees may allocate, or restore a prior top; caller frees the whole thing:
+The main arena can't be freed, but may be rewound by saving `.ctx_top` and restoring it via `.ctx_top_set`. Other arenas are caller-owned; callees may allocate, or restore a prior top; caller frees the whole thing:
 
 ```forth
-fun: callee { -- str } " code: %zd" 123 .strf end
+fun: .callee { -- str } " code: %zd" 123 .strf end
 
-fun: caller { -- Err }
+fun: .caller { -- Err }
   alloca' Stack { mem } \ Locally-owned scratch memory.
 
   CTX_CAP Ctx mem .stack_init_ctx .try { ctx }
@@ -427,11 +425,11 @@ fun: caller { -- Err }
 end
 ```
 
-`with_ctx` is structural, not unwind-safe. Its body must reach `end`; don't use `.ret`, `.try`, `.throw`, or local auto-try inside it. Call an inner function and capture its outputs outside the scope when early return is possible.
+`.with_ctx` is structural, not unwind-safe. Its body must reach `end`; don't use `.ret`, `.try`, `.throw`, or local auto-try inside it. Call an inner function and capture its outputs outside the scope when early return is possible.
 
 Every context object begins with `Ctx`, and may contain arbitrary extra fields. In JIT mode, the default ambient context is `Interp*`, which begins with the default `Ctx`. User code may define its own context types.
 
-The shortcut `stack_init_ctx` maps a guarded `Stack`, allocates an arbitrarily-sized context struct at its floor, initializes its `Ctx` header, and returns its address. The context struct is owned by its own backing memory and shares the same lifetime.
+The shortcut `.stack_init_ctx` maps a guarded `Stack`, allocates an arbitrarily-sized context struct at its floor, initializes its `Ctx` header, and returns its address. The context struct is owned by its own backing memory and shares the same lifetime.
 
 When passing AF callbacks to foreign code, mind the context:
 
@@ -439,13 +437,13 @@ For callbacks which don't need the context (like `qsort` comparator), no special
 
 Callbacks which use context require additional setup:
 - Either receive memory from parent, or map/unmap it locally.
-- Run the inner callback inside `with_ctx ... end`.
+- Run the inner callback inside `.with_ctx ... end`.
 
-Joinable child threads require parent-owned memory for their context. Our [`forth/pthread.af`](./forth/pthread.af) provides the shortcut `thread_spawn_ctx` for joinable threads, and shows the needed closure + trampoline pattern for thread context setup.
+Joinable child threads require parent-owned memory for their context. Our [`forth/pthread.af`](./forth/pthread.af) provides the shortcut `.thread_spawn_ctx` for joinable threads, and shows the needed closure + trampoline pattern for context setup.
 
 Thread memory use is exclusive: while a child is running, parent is not allowed to use or unmap its memory.
 
-Detached child threads set up the context internally. Our [`examples/http_echo.af`](examples/http_echo.af) shows the needed pattern for internal context setup; see `handle_conn`.
+Detached child threads set up the context internally. Our [`examples/http_echo.af`](examples/http_echo.af) shows the needed pattern for internal context setup; see `.handle_conn`.
 
 We currently don't support thread-local storage. Ambient contexts provide a similar-enough solution, designed for parent-owned memory which outlives the child. The differences between our approach and TLS are mostly in the implementation; the current solution is simpler and requires less OS-specific machinery. We may bridge this gap in the future.
 
@@ -551,24 +549,24 @@ Locals and global values use value-like spelling:
 ```forth
 123 let: SOME_GLOB
 
-fun: some_fun
+fun: .some_fun
   SOME_GLOB { some_loc }
   some_loc { -- }
 end
 ```
 
-Calls use call-like spelling. Names such as `+`, `!b`, `u/mod`, `fun:`, and `xt'` are automatically call-like. Ident-like names become call-like via dot prefix: `.logf` calls `logf`. The dot is special and not part of actual names:
+Calls use call-like spelling. Names such as `+`, `!b`, `u/mod`, `fun:`, and `xt'` are already call-like. A leading dot makes an otherwise ident-like name call-like, and is stored as part of the name: `.logf` looks up the symbol named `.logf`.
 
 ```forth
-fun: log_num { val }
+fun: .log_num { val }
   " %zd" val .logf .lf
 end
 
-1 0 extern: exit
+1 0 extern: .exit exit
 0 .exit
 ```
 
-Control words which don't deal with runtime args stay plain. Control words which use or affect args use dot-call:
+Control words which don't deal with runtime args stay plain. Control words which use or affect args have call-like names:
 
 ```forth
 if 123 .then 234 else 345 end
@@ -583,7 +581,7 @@ Examples of control-only words: `if ifz elif elifz else loop leave again assert 
 
 In file root, `.ret` simply quits the current file. Inside a compiled word, `.ret` returns current args as outputs. Even nullary `.ret` requires a dot.
 
-The call syntax rules apply only to reg-CC (default/main language). Stack-CC doesn't have these nuances.
+These name rules apply to both calling conventions.
 
 ## Non-standard
 

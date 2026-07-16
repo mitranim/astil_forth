@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: .test_call_missing_dot_control { -- err }
+  try
+end

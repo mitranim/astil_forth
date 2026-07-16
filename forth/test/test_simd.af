@@ -2,7 +2,7 @@ use' ../simd.af
 
 \ BOT-GENERATED
 
-fun: test_simd_asm { -- err }
+fun: .test_simd_asm { -- err }
   assert= 0 0 .asm_ld1_16b 0b01001100010_00000_011100_00000_00000 end \ ld1 {v0.16b}, [x0]
   assert= 1 123 .asm_movi_16b 0b01001111000_00011_111001_11011_00001 end \ movi v1.16b, #123
   assert=

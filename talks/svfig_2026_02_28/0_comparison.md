@@ -8,13 +8,13 @@ Equivalent definitions:
 
 ```forth
 \ Stack-CC:
-: word ( -- out ) 10 20 30 + * ;
+: .word ( -- out ) 10 20 30 + * ;
 
 \ Reg-CC:
-: word { -- out } 20 30 + 10 * ;
+: .word { -- out } 20 30 + 10 * ;
 
 \ Printing disassembly:
-dis' word
+dis' .word
 ```
 
 Generated code:
@@ -45,27 +45,27 @@ The resulting register allocator is trivial, and does _not_ rely on intrinsic kn
 
 ```forth
 \ Stack-CC:
-: example_loop
+: .example_loop
   0 { ind }
   loop
-    ind 12 < while
-    123 ind * drop
+    ind 12 < .while
+    123 ind * .drop
     inc: ind
   end
 ;
 
 \ Reg-CC:
-: example_loop
+: .example_loop
   0 { ind }
   loop
-    ind 12 < while
+    ind 12 < .while
     123 ind * { -- } \ Ignores the value.
     inc: ind
   end
 ;
 
 \ Printing disassembly:
-dis' example_loop
+dis' .example_loop
 ```
 
 stack-CC                   | reg-CC

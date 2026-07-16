@@ -1,6 +1,6 @@
 use' lang.af
 
-fun: reverse { str len }
+fun: .reverse { str len }
   str            { low }
   str len + .dec { high }
 
@@ -12,7 +12,7 @@ fun: reverse { str len }
   end
 end
 
-fun: run
+fun: .run
   s" 0123456789abcdef" { str len }
 
   1 22 .lsl .inc { ind }
@@ -26,4 +26,4 @@ fun: run
 end
 .run
 
-fun: main { -- exit } .run 0 end
+fun: .main { -- exit } .run 0 end

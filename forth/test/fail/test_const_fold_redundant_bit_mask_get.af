@@ -1,4 +1,4 @@
 use' ../../lang.af
-fun: test_const_fold_redundant_bit_mask_get { val -- out }
+fun: .test_const_fold_redundant_bit_mask_get { val -- out }
   val -1 .bit_mask_get
 end

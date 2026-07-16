@@ -14,46 +14,46 @@ use' ./io.af
 1      let: AI_PASSIVE   \ Any host IP is fine.
 0      let: AF_UNSPEC    \ Both IPv4 and IPv6.
 1      let: SOCK_STREAM  \ TCP.
-0xffff let: SOL_SOCKET   \ Tells `setsockopt` to configure socket itself.
+0xffff let: SOL_SOCKET   \ Tells `.setsockopt` to configure socket itself.
 4      let: SO_REUSEADDR \ Enables local address reuse.
 
-\ Flags for `recv`.
+\ Flags for `.recv`.
 1        let: MSG_OOB
 1 1 .lsl let: MSG_PEEK
 1 6 .lsl let: MSG_WAITALL
 
-4 1 extern: getaddrinfo  ( node service hints res -- code :Cint )
-1 0 extern: freeaddrinfo
-1 1 extern: gai_strerror
-5 1 extern: setsockopt   ( sock lvl opt val len -- 0|-1    :Cint )
-3 1 extern: socket       ( fam type prot        -- sock|-1 :Cint )
-3 1 extern: bind         ( sock addr len        -- 0|-1    :Cint )
-2 1 extern: listen       ( sock backlog         -- 0|-1    :Cint )
-3 1 extern: accept       ( sock addr len_adr    -- sock|-1 :Cint )
-4 1 extern: send         ( sock buf len flags   -- len|-1        )
-4 1 extern: recv         ( sock buf len flags   -- len|-1        )
+4 1 extern: .getaddrinfo  getaddrinfo  ( node service hints res -- code :Cint )
+1 0 extern: .freeaddrinfo freeaddrinfo
+1 1 extern: .gai_strerror gai_strerror
+5 1 extern: .setsockopt   setsockopt   ( sock lvl opt val len -- 0|-1    :Cint )
+3 1 extern: .socket       socket       ( fam type prot        -- sock|-1 :Cint )
+3 1 extern: .bind         bind         ( sock addr len        -- 0|-1    :Cint )
+2 1 extern: .listen       listen       ( sock backlog         -- 0|-1    :Cint )
+3 1 extern: .accept       accept       ( sock addr len_adr    -- sock|-1 :Cint )
+4 1 extern: .send         send         ( sock buf len flags   -- len|-1        )
+4 1 extern: .recv         recv         ( sock buf len flags   -- len|-1        )
 
 struct: Sockaddr
-  U8 1  field: Sockaddr_len
-  U8 1  field: Sockaddr_family
-  U8 14 field: Sockaddr_data
+  U8 1  field: .Sockaddr_len
+  U8 1  field: .Sockaddr_family
+  U8 14 field: .Sockaddr_data
 end
 
 struct: Addrinfo
-  Cint  1 field: Addrinfo_flags
-  Cint  1 field: Addrinfo_family
-  Cint  1 field: Addrinfo_socktype
-  Cint  1 field: Addrinfo_protocol
-  Cuint 1 field: Addrinfo_addrlen
-  Cstr  1 field: Addrinfo_canonname
-  Adr   1 field: Addrinfo_addr      \ Sockaddr *
-  Adr   1 field: Addrinfo_next      \ Addrinfo *
+  Cint  1 field: .Addrinfo_flags
+  Cint  1 field: .Addrinfo_family
+  Cint  1 field: .Addrinfo_socktype
+  Cint  1 field: .Addrinfo_protocol
+  Cuint 1 field: .Addrinfo_addrlen
+  Cstr  1 field: .Addrinfo_canonname
+  Adr   1 field: .Addrinfo_addr      \ Sockaddr *
+  Adr   1 field: .Addrinfo_next      \ Addrinfo *
 end
 
 U8 128 arr: Sockaddr_storage
 
-\ Result is `Addrinfo *` and should be freed with `freeaddrinfo`.
-fun: net_addr_info { port -- ainf err }
+\ Result is `Addrinfo *` and should be freed with `.freeaddrinfo`.
+fun: .net_addr_info { port -- ainf err }
   alloca' Addrinfo { hint }
   hint size' Addrinfo .memzero
   AF_UNSPEC   hint .Addrinfo_family   !
@@ -76,7 +76,7 @@ fun: net_addr_info { port -- ainf err }
   ainf @
 end
 
-fun: sock_bind { info backlog -- sock Err }
+fun: .sock_bind { info backlog -- sock Err }
   info .Addrinfo_family   @ { fam  }
   info .Addrinfo_socktype @ { type }
   info .Addrinfo_protocol @ { prot }
@@ -84,12 +84,12 @@ fun: sock_bind { info backlog -- sock Err }
 
   if sock <0 .then .errno " unable to create network socket" .os_err .throw end
 
-  alloca' Cint { opt } \ `setsockopt` requires non-nil option address.
+  alloca' Cint { opt } \ `.setsockopt` requires non-nil option address.
   true opt !cint       \ Enable options like `SO_REUSEADDR`.
 
   nil { err }
   if sock SOL_SOCKET SO_REUSEADDR opt size' Cint .setsockopt .then
-    .errno " unable to `setsockopt`" .os_err { err }
+    .errno " unable to `.setsockopt`" .os_err { err }
   end
 
   ifz err .then
@@ -109,7 +109,7 @@ fun: sock_bind { info backlog -- sock Err }
   sock err
 end
 
-fun: net_listen { port backlog -- sock Err }
+fun: .net_listen { port backlog -- sock Err }
   port .net_addr_info .try { ainf }
   -1   { sock }
   ainf { next }

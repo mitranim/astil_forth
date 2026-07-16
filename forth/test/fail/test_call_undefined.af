@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: .test_call_undefined { -- err }
+  .MISSING_WORD
+end

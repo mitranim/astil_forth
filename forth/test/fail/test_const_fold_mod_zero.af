@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_mod_zero { -- out } 29 0 .mod end
+fun: .test_const_fold_mod_zero { -- out } 29 0 .mod end

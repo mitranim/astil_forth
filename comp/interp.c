@@ -85,6 +85,7 @@ static Err interp_init_syms(Interp *interp) {
     try(interp_wordlist(interp, sym->wordlist, &dict));
 
     sym_init_intrin(sym);
+    try(sym_validate_name(sym));
     IF_DEBUG(try_assert(!dict_has(dict, sym->name.buf)));
     dict_set(dict, sym->name.buf, sym);
 

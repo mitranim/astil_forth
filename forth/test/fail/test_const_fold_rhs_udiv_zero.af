@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_rhs_udiv_zero { val -- out } val 0 u/ end
+fun: .test_const_fold_rhs_udiv_zero { val -- out } val 0 u/ end

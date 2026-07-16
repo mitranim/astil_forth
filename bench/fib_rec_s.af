@@ -1,14 +1,14 @@
 use' lang_s.af
 
-fun: fib { ind -- out }
-  if ind 1 <= then 1 ret end
-  ind 1 - recur
-  ind 2 - recur
+fun: .fib { ind -- out }
+  if ind 1 <= .then 1 .ret end
+  ind 1 - .recur
+  ind 2 - .recur
   +
 end
 
-fun: run
-  36 fib
+fun: .run
+  36 .fib
   \ " fib(36): " log log_int lf
 end
-run
+.run

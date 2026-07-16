@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_udivmod_zero { -- rem quo } 29 0 u/mod end
+fun: .test_const_fold_udivmod_zero { -- rem quo } 29 0 u/mod end

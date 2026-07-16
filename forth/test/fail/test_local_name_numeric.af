@@ -1,0 +1,3 @@
+\ Must fail to compile.
+fun: .test_local_name_numeric { 1val -- err }
+end

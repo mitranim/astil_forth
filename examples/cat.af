@@ -1,7 +1,7 @@
 use' lang.af
 use' io.af
 
-\ Simple `cat`-like program.
+\ Simple `.cat`-like program.
 \
 \ JIT usage:
 \
@@ -12,7 +12,7 @@ use' io.af
 \   printf "" | astil examples/cat.af --build=cat.exe
 \   ./cat.exe file0 file1
 
-fun: echo_stdin { -- err }
+fun: .echo_stdin { -- err }
   0xffff { cap }
   cap .alloca { buf }
   loop
@@ -25,7 +25,7 @@ fun: echo_stdin { -- err }
   end
 end
 
-fun: echo_file_loop { fdes -- err }
+fun: .echo_file_loop { fdes -- err }
   0xffff { cap }
   cap .alloca { buf }
   loop
@@ -35,14 +35,14 @@ fun: echo_file_loop { fdes -- err }
   end
 end
 
-fun: echo_file { path -- Err }
+fun: .echo_file { path -- Err }
   path O_RDONLY .fd_open .try { fdes }
   fdes .echo_file_loop { err }
   fdes .close { -- }
   err
 end
 
-fun: cat { argc argv -- err }
+fun: .cat { argc argv -- err }
   if argc 1 <= .then .echo_stdin .ret end
   argc .cells argv + { ceil }
 
@@ -63,7 +63,7 @@ end
 .interp_args .cat
 
 \ AOT entry.
-fun: main { argc argv -- exit }
+fun: .main { argc argv -- exit }
   .with_main_ctx argc argv .cat { err } end
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

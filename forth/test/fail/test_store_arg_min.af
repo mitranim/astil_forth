@@ -1,4 +1,4 @@
 \ Must fail to compile.
-fun: test_store_arg_min_fail { val -- err }
+fun: .test_store_arg_min_fail { val -- err }
   val !
 end

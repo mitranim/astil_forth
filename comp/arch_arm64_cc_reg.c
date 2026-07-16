@@ -360,7 +360,7 @@ static void asm_append_call_extern(Comp *comp, const Sym *callee) {
   // Free to use because extern calls clobber everything anyway.
   constexpr auto reg = ASM_SCRATCH_REG_8;
 
-  asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.externs);
+  asm_append_dysym_load(comp, callee->link_name, reg, &comp->code.externs);
   asm_append_branch_link_to_reg(comp, reg);
 }
 

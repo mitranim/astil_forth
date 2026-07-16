@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: .test_local_assignment_non_ident { val -- err }
+  val { tmp.name }
+end

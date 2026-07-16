@@ -13,9 +13,9 @@ fun_comp: ( { -- err } 41 .read_until_char { -- } .read_char { -- } end
 \ file `./lang_s.af` for the stack-based calling convention.
 
 \ brk 666
-fun: abort [ 0b110_101_00_001_0000001010011010_000_00 .comp_instr ] end
-fun: unreachable .abort end
-fun: nop end
+fun: .abort [ 0b110_101_00_001_0000001010011010_000_00 .comp_instr ] end
+fun: .unreachable .abort end
+fun: .nop end
 
 \ ## Compilation-related words
 \
@@ -29,25 +29,27 @@ fun: nop end
 \ one tick seeks in the regular wordlist, and double tick
 \ seeks in the compile-time wordlist.
 
-\ Finds an extern symbol by name and declares it as a function.
-fun: extern: { inp_len out_len -- err } ( C: "name" -- ) ( E: …inps -- …outs )
-  .read_word inp_len out_len .extern_fun
+\ Declares a Forth function with a separate native link name.
+fun: extern: { inp_len out_len -- err } ( C: "name" "link_name" -- ) ( E: …inps -- …outs )
+  .read_word { name name_len }
+  .read_word { link_name link_name_len }
+  name name_len link_name link_name_len inp_len out_len .extern_fun
 end
 
 \ Non-immediate replacement for standard `literal`.
-fun: comp_push { val -- err } ( E: -- val )
+fun: .comp_push { val -- err } ( E: -- val )
   .comp_alloc_next_reg { reg }
   val reg .comp_load
 end
 
-fun: next_word { wlist -- XT err } ( "word" -- XT )
+fun: .next_word { wlist -- XT err } ( "word" -- XT )
   .read_word wlist .find_word
 end
 
 \ "XT" is short for "execution token".
 \ `xt'` is renamed from standard `'`.
 \ Each execution token is a `Sym*`.
-fun: xt_next { wlist -> err } ( "word" -- ) ( E: -- XT )
+fun: .xt_next { wlist -> err } ( "word" -- ) ( E: -- XT )
   .next_word .comp_push
 end
 
@@ -57,7 +59,7 @@ fun: xt'' { -- XT err } ( "word" -- ) 2 .next_word end \ WORDLIST_COMP
 fun_comp: xt'  { -- err } ( C: "word" -- ) ( E: -- XT ) 1 .xt_next end \ WORDLIST_EXEC
 fun_comp: xt'' { -- err } ( C: "word" -- ) ( E: -- XT ) 2 .xt_next end \ WORDLIST_COMP
 
-\ Renamed from standard "postpone". Also see `call` for raw calls.
+\ Renamed from standard "postpone". Also see `.call` for raw calls.
 fun_comp: call' { -- err } ( C: "word" -- ) ( E: <word> )
   1 .next_word .comp_call
 end
@@ -65,8 +67,8 @@ fun_comp: call'' { -- err } ( C: "word" -- ) ( E: <word> )
   2 .next_word .comp_call
 end
 
-fun: compile_next { wlist -> err } ( "word" -- )
-  .next_word .comp_push xt' comp_call .comp_call
+fun: .compile_next { wlist -> err } ( "word" -- )
+  .next_word .comp_push xt' .comp_call .comp_call
 end
 
 fun_comp: compile'  { -- err } 1 .compile_next end
@@ -85,8 +87,9 @@ fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   \ Compile-time semantics.
   str len .define_fun_comp .plain_call
     0 1 1 .comp_signature_set ( -- err )
-    val .comp_push compile' comp_push
+    val .comp_push compile' .comp_push
   call'' end
+
   [ 0 .comp_only ]
 end
 
@@ -145,54 +148,54 @@ end
 \
 \ Bitwise ops needed for the early stages of the self-assembler.
 
-fun: comp_out0 { instr -- err }
+fun: .comp_out0 { instr -- err }
   0 .comp_realloc_reg
   instr .comp_instr
   1 .comp_args_set
 end
 
-fun: comp_out0_2 { instr0 instr1 -- err }
+fun: .comp_out0_2 { instr0 instr1 -- err }
   0 .comp_realloc_reg
   instr0 .comp_instr
   instr1 .comp_instr
   1 .comp_args_set
 end
 
-fun: or { i0 i1 -> i2 } [
+fun: .or { i0 i1 -> i2 } [
   0b1_01_01010_00_0_00001_000000_00000_00000 .comp_out0 \ orr x0, x0, x1
 ] end
 
-fun: and { i0 i1 -> i2 } [
+fun: .and { i0 i1 -> i2 } [
   0b1_00_01010_00_0_00001_000000_00000_00000 .comp_out0 \ and x0, x0, x1
 ] end
 
-fun: xor { i0 i1 -> i2 } [
+fun: .xor { i0 i1 -> i2 } [
   0b1_10_01010_00_0_00001_000000_00000_00000 .comp_out0 \ eor x0, x0, x1
 ] end
 
-fun: lsl { i0 bits -> i1 } [
+fun: .lsl { i0 bits -> i1 } [
   0b1_0_0_11010110_00001_0010_00_00000_00000 .comp_out0 \ lsl x0, x0, x1
 ] end
 
-fun: lsr { i0 bits -> i1 } [
+fun: .lsr { i0 bits -> i1 } [
   0b1_0_0_11010110_00001_0010_01_00000_00000 .comp_out0 \ lsr x0, x0, x1
 ] end
 
-fun: invert { i0 -> i1 } [
+fun: .invert { i0 -> i1 } [
   0b1_01_01010_00_1_00000_000000_11111_00000 .comp_out0 \ mvn x0, x0
 ] end
 
-fun: negate { i0 -> i1 } [
+fun: .negate { i0 -> i1 } [
   0b1_1_0_01011_00_0_00000_000000_11111_00000 .comp_out0 \ neg x0, x0
 ] end
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
-fun: inc { i0 -> i1 } [
+fun: .inc { i0 -> i1 } [
   0b1_0_0_100010_0_000000000001_00000_00000 .comp_out0 \ add x0, x0, 1
 ] end
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
-fun: dec { i0 -> i1 } [
+fun: .dec { i0 -> i1 } [
   0b1_1_0_100010_0_000000000001_00000_00000 .comp_out0 \ sub x0, x0, 1
 ] end
 
@@ -204,38 +207,38 @@ fun: - { i0 i1 -> i2 } [
   0b1_1_0_01011_00_0_00001_000000_00000_00000 .comp_out0 \ sub x0, x0, x1
 ] end
 
-fun: low_bits   { len     -- bits } 1 len .lsl .dec end
-fun: bits_trunc { imm len -- imm  } len .low_bits imm .and end
+fun: .low_bits   { len     -- bits } 1 len .lsl .dec end
+fun: .bits_trunc { imm len -- imm  } len .low_bits imm .and end
 
 \ ## Early assembler
 
 \ cmp Xn, #imm12
-fun: asm_cmp_imm { Xn imm12 -- instr }
+fun: .asm_cmp_imm { Xn imm12 -- instr }
   imm12  10 .lsl { imm12 }
   Xn     5  .lsl
   imm12 .or 0b1_1_1_100010_0_000000000000_00000_11111 .or
 end
 
 \ cmp Xn, 0
-fun: asm_cmp_zero { Xn -> instr } 0 .asm_cmp_imm end
+fun: .asm_cmp_zero { Xn -> instr } 0 .asm_cmp_imm end
 
 \ cset Xd, <cond>
 0b1_0_0_11010100_11111_0000_0_1_11111_00000 let: ASM_OP_CSET
 
-fun: asm_cset { Xd cond -- instr }
+fun: .asm_cset { Xd cond -- instr }
   cond 1 .xor 12 .lsl { cond }
   Xd cond .or ASM_OP_CSET .or
 end
 
 \ ccmp Xd, Xm, <nzcv>, <cond>
-fun: asm_ccmp_reg { Xn Xm nzcv cond -- instr }
+fun: .asm_ccmp_reg { Xn Xm nzcv cond -- instr }
   Xm   16 .lsl { Xm }
   cond 12 .lsl { cond }
   Xn 5 .lsl Xm .or cond .or nzcv .or 0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 .or
 end
 
 \ brk #imm16
-fun: asm_brk { imm16 -> instr }
+fun: .asm_brk { imm16 -> instr }
   5 .lsl 0b110_101_00_001_0000000000000000_000_00 .or
 end
 
@@ -253,11 +256,11 @@ fun: =0 { int -> bool } [
 
 \ Arm64 instructions are 32-bit; PC-relative offsets tend
 \ to be encoded in packed form: implicitly times 4.
-fun: instr_off_pack   { off -> packed } 2 .lsr end
-fun: instr_off_unpack { packed -> off } 2 .lsl end
+fun: .instr_off_pack   { off -> packed } 2 .lsr end
+fun: .instr_off_unpack { packed -> off } 2 .lsl end
 
 \ Shared by a lot of load and store instructions. 64-bit only.
-fun: asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
+fun: .asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
   Xt2 10 .lsl { Xt2 }
   Xn  5  .lsl { Xn }
   imm7 3 .lsr 7 .bits_trunc 15 .lsl Xt1 .or Xt2 .or Xn .or
@@ -266,14 +269,14 @@ end
 \ Shared by a lot of load and store instructions.
 \ Patches the X bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
-fun: asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
+fun: .asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
   Xn 5 .lsl { Xn }
   imm9 9 .bits_trunc 12 .lsl Xt .or Xn .or
 end
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
-fun: asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
+fun: .asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
   Xn        5  .lsl { Xn }
   Xm        16 .lsl { Xm }
   scale <>0 12 .lsl \ lsl 3
@@ -281,29 +284,29 @@ fun: asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
 end
 
 \ Shared by some integer arithmetic instructions.
-fun: asm_pattern_arith_reg { Xd Xn Xm -- instr_mask }
+fun: .asm_pattern_arith_reg { Xd Xn Xm -- instr_mask }
   Xn 5  .lsl { Xn }
   Xm 16 .lsl Xd .or Xn .or
 end
 
 \ Shared by some integer arithmetic and load/store instructions.
-fun: asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
+fun: .asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
   Xn 5 .lsl { Xn }
   imm12 12 .bits_trunc 10 .lsl Xd .or Xn .or
 end
 
-fun: asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
+fun: .asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
   cond 12 .lsl { cond }
   Xd Xn Xm .asm_pattern_arith_reg cond .or
 end
 
 \ `off19` offset is implicitly times 4 and can be negative.
-fun: asm_pattern_cmp_branch { Xt off19 -- instr_mask }
+fun: .asm_pattern_cmp_branch { Xt off19 -- instr_mask }
   off19 .instr_off_pack 19 .bits_trunc 5 .lsl Xt .or
 end
 
 \ `off9` offset is implicitly times 4 and can be negative.
-fun: asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
+fun: .asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
   off9 .instr_off_pack 9 .bits_trunc 5 .lsl { off9 }
   cond 21 .lsl Xt .or off9 .or
 end
@@ -311,73 +314,73 @@ end
 \ ## Assembler: memory ops
 
 \ ldp Xt1, Xt2, [Xn, #imm7]!
-fun: asm_load_pair_pre { Xt1 Xt2 Xn imm7 -> instr }
+fun: .asm_load_pair_pre { Xt1 Xt2 Xn imm7 -> instr }
   .asm_pattern_load_store_pair 0b10_101_0_011_1_0000000_00000_00000_00000 .or
 end
 
 \ ldp Xt1, Xt2, [Xn], #imm7
-fun: asm_load_pair_post { Xt1 Xt2 Xn imm7 -> instr }
+fun: .asm_load_pair_post { Xt1 Xt2 Xn imm7 -> instr }
   .asm_pattern_load_store_pair 0b10_101_0_001_1_0000000_00000_00000_00000 .or
 end
 
 \ ldp Xt1, Xt2, [Xn, #imm7]
-fun: asm_load_pair_off { Xt1 Xt2 Xn imm7 -> instr }
+fun: .asm_load_pair_off { Xt1 Xt2 Xn imm7 -> instr }
   .asm_pattern_load_store_pair 0b10_101_0_010_1_0000000_00000_00000_00000 .or
 end
 
 \ stp Xt1, Xt2, [Xn, #imm7]!
-fun: asm_store_pair_pre { Xt1 Xt2 Xn imm7 -> instr }
+fun: .asm_store_pair_pre { Xt1 Xt2 Xn imm7 -> instr }
   .asm_pattern_load_store_pair 0b10_101_0_011_0_0000000_00000_00000_00000 .or
 end
 
 \ stp Xt1, Xt2, [Xn], #imm7
-fun: asm_store_pair_post { Xt1 Xt2 Xn imm7 -> instr }
+fun: .asm_store_pair_post { Xt1 Xt2 Xn imm7 -> instr }
   .asm_pattern_load_store_pair 0b10_101_0_001_0_0000000_00000_00000_00000 .or
 end
 
 \ stp Xt1, Xt2, [Xn, #imm7]
-fun: asm_store_pair_off { Xt1 Xt2 Xn imm7 -> instr }
+fun: .asm_store_pair_off { Xt1 Xt2 Xn imm7 -> instr }
   .asm_pattern_load_store_pair 0b10_101_0_010_0_0000000_00000_00000_00000 .or
 end
 
 \ ldr Xt, [Xn, #imm9]!
-fun: asm_load_pre { Xt Xn imm9 -> instr }
+fun: .asm_load_pre { Xt Xn imm9 -> instr }
   .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_11_00000_00000 .or
 end
 
 \ ldr Xt, [Xn], #imm9
-fun: asm_load_post { Xt Xn imm9 -> instr }
+fun: .asm_load_post { Xt Xn imm9 -> instr }
   .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_01_00000_00000 .or
 end
 
 \ str Xt, [Xn, #imm9]!
-fun: asm_store_pre { Xt Xn imm9 -> instr }
+fun: .asm_store_pre { Xt Xn imm9 -> instr }
   .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_11_00000_00000 .or
 end
 
 \ str Xt, [Xn], #imm9
-fun: asm_store_post { Xt Xn imm9 -> instr }
+fun: .asm_store_post { Xt Xn imm9 -> instr }
   .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_01_00000_00000 .or
 end
 
 \ ldur Xt, [Xn, #imm9]
-fun: asm_load_unscaled_off { Xt Xn imm9 -> instr }
+fun: .asm_load_unscaled_off { Xt Xn imm9 -> instr }
   .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_00_00000_00000 .or
 end
 
 \ stur Xt, [Xn, #imm9]
-fun: asm_store_unscaled_off { Xt Xn imm9 -> instr }
+fun: .asm_store_unscaled_off { Xt Xn imm9 -> instr }
   .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_00_00000_00000 .or
 end
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
-fun: asm_load_with_register_off { Xt Xn Xm scale -> instr }
+fun: .asm_load_with_register_off { Xt Xn Xm scale -> instr }
   .asm_pattern_load_store_with_register_off
   0b11_111_0_00_01_1_00000_011_0_10_00000_00000 .or
 end
 
 \ str Xt, [Xn, Xm, lsl <scale>]
-fun: asm_store_with_register_off { Xt Xn Xm scale -> instr }
+fun: .asm_store_with_register_off { Xt Xn Xm scale -> instr }
   .asm_pattern_load_store_with_register_off
   0b11_111_0_00_00_1_00000_011_0_10_00000_00000 .or
 end
@@ -398,7 +401,7 @@ end
 \
 \ Base instruction variant: "immediate, unsigned offset". The Arm field is
 \ scaled by access width: for 64-bit loads, imm12 = 2 means byte offset 16.
-fun: asm_load_store_off { Rt Xn imm12 size opc -- instr }
+fun: .asm_load_store_off { Rt Xn imm12 size opc -- instr }
   size 30 .lsl          { size }
   opc  22 .lsl size .or { mask }
   Rt Xn imm12 .asm_pattern_arith_imm
@@ -406,7 +409,7 @@ fun: asm_load_store_off { Rt Xn imm12 size opc -- instr }
 end
 
 \ Generic unscaled load/store. Offset is a signed 9-bit byte offset.
-fun: asm_load_store_unscaled_off { Rt Xn imm9 size opc -- instr }
+fun: .asm_load_store_unscaled_off { Rt Xn imm9 size opc -- instr }
   size 30 .lsl          { size }
   opc  22 .lsl size .or { mask }
   Rt Xn imm9 .asm_pattern_load_store
@@ -416,44 +419,44 @@ end
 \ Unsigned 8-bit.
 \
 \ ldrb Wt, [Xn, imm12]
-fun: asm_load_off_u8 { Wt Xn imm12 -> instr } 0b00 0b01 .asm_load_store_off end
+fun: .asm_load_off_u8 { Wt Xn imm12 -> instr } 0b00 0b01 .asm_load_store_off end
 
 \ Signed 8-bit.
 \
 \ ldrsb Xt, [Xn, imm12]
-fun: asm_load_off_s8 { Xt Xn imm12 -> instr } 0b00 0b10 .asm_load_store_off end
+fun: .asm_load_off_s8 { Xt Xn imm12 -> instr } 0b00 0b10 .asm_load_store_off end
 
 \ Either unsigned or signed 8-bit.
 \
 \ strb Wt, [Xn, imm12]
-fun: asm_store_off_u8 { Wt Xn imm12 -> instr } 0b00 0b00 .asm_load_store_off end
+fun: .asm_store_off_u8 { Wt Xn imm12 -> instr } 0b00 0b00 .asm_load_store_off end
 
 \ ldrh Wt, [Xn, imm12]
-fun: asm_load_off_u16 { Wt Xn imm12 -> instr } 0b01 0b01 .asm_load_store_off end
+fun: .asm_load_off_u16 { Wt Xn imm12 -> instr } 0b01 0b01 .asm_load_store_off end
 
 \ ldrsh Xt, [Xn, imm12]
-fun: asm_load_off_s16 { Xt Xn imm12 -> instr } 0b01 0b10 .asm_load_store_off end
+fun: .asm_load_off_s16 { Xt Xn imm12 -> instr } 0b01 0b10 .asm_load_store_off end
 
 \ strh Wt, [Xn, imm12]
-fun: asm_store_off_u16 { Wt Xn imm12 -> instr } 0b01 0b00 .asm_load_store_off end
+fun: .asm_store_off_u16 { Wt Xn imm12 -> instr } 0b01 0b00 .asm_load_store_off end
 
 \ ldr Wt, [Xn, imm12]
-fun: asm_load_off_u32 { Wt Xn imm12 -> instr } 0b10 0b01 .asm_load_store_off end
+fun: .asm_load_off_u32 { Wt Xn imm12 -> instr } 0b10 0b01 .asm_load_store_off end
 
 \ ldrsw Xt, [Xn, imm12]
-fun: asm_load_off_s32 { Xt Xn imm12 -> instr } 0b10 0b10 .asm_load_store_off end
+fun: .asm_load_off_s32 { Xt Xn imm12 -> instr } 0b10 0b10 .asm_load_store_off end
 
 \ str Wt, [Xn, imm12]
-fun: asm_store_off_u32 { Wt Xn imm12 -> instr } 0b10 0b00 .asm_load_store_off end
+fun: .asm_store_off_u32 { Wt Xn imm12 -> instr } 0b10 0b00 .asm_load_store_off end
 
 \ ldr Xt, [Xn, imm12]
-fun: asm_load_off { Xt Xn imm12 -> instr } 0b11 0b01 .asm_load_store_off end
+fun: .asm_load_off { Xt Xn imm12 -> instr } 0b11 0b01 .asm_load_store_off end
 
 \ str Xt, [Xn, imm12]
-fun: asm_store_off { Xt Xn imm12 -> instr } 0b11 0b00 .asm_load_store_off end
+fun: .asm_store_off { Xt Xn imm12 -> instr } 0b11 0b00 .asm_load_store_off end
 
 \ neg Xd, Xd
-fun: asm_neg { Xd -> instr }
+fun: .asm_neg { Xd -> instr }
   16 .lsl Xd .or 0b1_1_0_01011_00_0_00000_000000_11111_00000 .or
 end
 
@@ -462,92 +465,92 @@ end
 
 \ add Xd, Xn, Xm
 0b1_0_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_ADD_REG
-fun: asm_add_reg { Xd Xn Xm -> instr }
+fun: .asm_add_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_ADD_REG .or
 end
 
 \ adds Xd, Xn, Xm
-fun: asm_adds_reg { Xd Xn Xm -> instr }
+fun: .asm_adds_reg { Xd Xn Xm -> instr }
   .asm_add_reg 0b0_0_1_00000000000000000000000000000 .or
 end
 
 \ sub Xd, Xn, #imm12
 0b1_1_0_100010_0_000000000000_00000_00000 let: ASM_OP_SUB_IMM
-fun: asm_addsub_imm { Xd Xn imm12 imm add -- instr }
+fun: .asm_addsub_imm { Xd Xn imm12 imm add -- instr }
   \ Select `add` when `(imm >= 0) == add`, else `sub`.
   imm 63 .lsr add .xor .negate { sel }
   ASM_OP_ADD_IMM ASM_OP_SUB_IMM .xor sel .and ASM_OP_SUB_IMM .xor { op }
   Xd Xn imm12 .asm_pattern_arith_imm op .or
 end
 
-fun: asm_add_imm { Xd Xn imm12 -> instr } imm12 true  .asm_addsub_imm end
-fun: asm_sub_imm { Xd Xn imm12 -> instr } imm12 false .asm_addsub_imm end
+fun: .asm_add_imm { Xd Xn imm12 -> instr } imm12 true  .asm_addsub_imm end
+fun: .asm_sub_imm { Xd Xn imm12 -> instr } imm12 false .asm_addsub_imm end
 
 \ sub Xd, Xn, Xm
 0b1_1_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_SUB_REG
-fun: asm_sub_reg { Xd Xn Xm -> instr }
+fun: .asm_sub_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_SUB_REG .or
 end
 
 \ subs Xd, Xn, #imm12
-fun: asm_subs_imm { Xd Xn imm12 -> instr }
+fun: .asm_subs_imm { Xd Xn imm12 -> instr }
   .asm_sub_imm 0b0_0_1_00000000000000000000000000000 .or
 end
 
 \ subs Xd, Xn, Xm
-fun: asm_subs_reg { Xd Xn Xm -> instr }
+fun: .asm_subs_reg { Xd Xn Xm -> instr }
   .asm_sub_reg 0b0_0_1_00000000000000000000000000000 .or
 end
 
 \ sub Xd, Xn, Xm, lsl 3
-fun: asm_sub_reg_words { Xd Xn Xm -> instr }
+fun: .asm_sub_reg_words { Xd Xn Xm -> instr }
   .asm_sub_reg 0b0_0_0_00000_00_0_00000_000011_00000_00000 .or
 end
 
 \ orr Xd, Xn, Xm
 0b1_01_01010_00_0_00000_000000_00000_00000 let: ASM_OP_ORR_REG
-fun: asm_orr_reg { Xd Xn Xm -> instr }
+fun: .asm_orr_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_ORR_REG .or
 end
 
 \ eor Xd, Xn, Xm
 0b1_10_01010_00_0_00000_000000_00000_00000 let: ASM_OP_EOR_REG
-fun: asm_eor_reg { Xd Xn Xm -> instr }
+fun: .asm_eor_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_EOR_REG .or
 end
 
 \ and Xd, Xn, Xm
 0b1_00_01010_00_0_00000_000000_00000_00000 let: ASM_OP_AND_REG
-fun: asm_and_reg { Xd Xn Xm -> instr }
+fun: .asm_and_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_AND_REG .or
 end
 
 \ bic Xd, Xn, Xm
 0b1_00_01010_00_1_00000_000000_00000_00000 let: ASM_OP_BIC_REG
-fun: asm_bic { Xd Xn Xm -> instr }
+fun: .asm_bic { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_BIC_REG .or
 end
 
 \ mul Xd, Xn, Xm
 0b1_00_11011_000_00000_0_11111_00000_00000 let: ASM_OP_MUL_REG
-fun: asm_mul { Xd Xn Xm -> instr }
+fun: .asm_mul { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_MUL_REG .or
 end
 
 \ udiv Xd, Xn, Xm
 0b1_0_0_11010110_00000_00001_0_00000_00000 let: ASM_OP_UDIV_REG
-fun: asm_udiv { Xd Xn Xm -> instr }
+fun: .asm_udiv { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_UDIV_REG .or
 end
 
 \ sdiv Xd, Xn, Xm
 0b1_0_0_11010110_00000_00001_1_00000_00000 let: ASM_OP_SDIV_REG
-fun: asm_sdiv { Xd Xn Xm -> instr }
+fun: .asm_sdiv { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_SDIV_REG .or
 end
 
 \ msub Xd, Xn, Xm, Xa
-fun: asm_msub { Xd Xn Xm Xa -- instr }
+fun: .asm_msub { Xd Xn Xm Xa -- instr }
   Xn  5 .lsl { Xn }
   Xm 16 .lsl { Xm }
   Xa 10 .lsl
@@ -556,19 +559,19 @@ fun: asm_msub { Xd Xn Xm Xa -- instr }
 end
 
 \ csel Xd, Xn, Xm, <cond>
-fun: asm_csel { Xd Xn Xm cond -> instr }
+fun: .asm_csel { Xd Xn Xm cond -> instr }
   .asm_pattern_arith_csel 0b1_0_0_11010100_00000_0000_0_0_00000_00000 .or
 end
 
 \ csneg Xd, Xn, Xm, <cond>
-fun: asm_csneg { Xd Xn Xm cond -> instr }
+fun: .asm_csneg { Xd Xn Xm cond -> instr }
   .asm_pattern_arith_csel 0b1_1_0_11010100_00000_0000_0_1_00000_00000 .or
 end
 
 0b1_00_100110_1_000000_000000_00000_00000 let: ASM_OP_SBFM
 0b1_10_100110_1_000000_000000_00000_00000 let: ASM_OP_UBFM
 
-fun: asm_bitfield { Xd Xn immr imms op -- instr }
+fun: .asm_bitfield { Xd Xn immr imms op -- instr }
   imms 10 .lsl { imms }
   immr 16 .lsl { immr }
   Xn   5  .lsl { Xn }
@@ -576,99 +579,99 @@ fun: asm_bitfield { Xd Xn immr imms op -- instr }
 end
 
 \ asr Xd, Xn, #imm6
-fun: asm_asr_imm { Xd Xn imm6 -- instr }
+fun: .asm_asr_imm { Xd Xn imm6 -- instr }
   imm6 6 .bits_trunc { immr }
   Xd Xn immr 63 ASM_OP_SBFM .asm_bitfield
 end
 
 \ asr Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_10_00000_00000 let: ASM_OP_ASR_REG
-fun: asm_asr_reg { Xd Xn Xm -> instr }
+fun: .asm_asr_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_ASR_REG .or
 end
 
 \ Arithmetic (sign-preserving) right shift.
-fun: asr { i0 bits -> i1 } [ 0 0 1 .asm_asr_reg .comp_out0 ] end \ asr x0, x0, x1
+fun: .asr { i0 bits -> i1 } [ 0 0 1 .asm_asr_reg .comp_out0 ] end \ asr x0, x0, x1
 
 \ lsl Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_00_00000_00000 let: ASM_OP_LSL_REG
-fun: asm_lsl_reg { Xd Xn Xm -> instr }
+fun: .asm_lsl_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_LSL_REG .or
 end
 
 \ lsl Xd, Xn, #imm6
-fun: asm_lsl_imm { Xd Xn imm6 -- instr }
+fun: .asm_lsl_imm { Xd Xn imm6 -- instr }
   64 imm6 - 6 .bits_trunc { immr }
   63 imm6 - 6 .bits_trunc { imms }
   Xd Xn immr imms ASM_OP_UBFM .asm_bitfield
 end
 
 \ lsr Xd, Xn, #imm6
-fun: asm_lsr_imm { Xd Xn imm6 -- instr }
+fun: .asm_lsr_imm { Xd Xn imm6 -- instr }
   imm6 6 .bits_trunc { immr }
   Xd Xn immr 63 ASM_OP_UBFM .asm_bitfield
 end
 
 \ lsr Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_01_00000_00000 let: ASM_OP_LSR_REG
-fun: asm_lsr_reg { Xd Xn Xm -> instr }
+fun: .asm_lsr_reg { Xd Xn Xm -> instr }
   .asm_pattern_arith_reg ASM_OP_LSR_REG .or
 end
 
 \ cmp Xn, Xm
-fun: asm_cmp_reg { Xn Xm -- instr }
+fun: .asm_cmp_reg { Xn Xm -- instr }
   Xn  5 .lsl { Xn }
   Xm 16 .lsl Xn .or 0b1_1_1_01011_00_0_00000_000_000_00000_11111 .or
 end
 
 \ b <off>
-fun: asm_branch { off26 -> instr }
+fun: .asm_branch { off26 -> instr }
   .instr_off_pack \ Offset is implicitly times 4.
   26 .bits_trunc  \ Offset may be negative.
   0b0_00_101_00000000000000000000000000 .or
 end
 
 \ b.<cond> <off>
-fun: asm_branch_cond { off19 cond -- instr }
+fun: .asm_branch_cond { off19 cond -- instr }
   off19 .instr_off_pack 19 .bits_trunc 5 .lsl
   cond .or 0b010_101_00_0000000000000000000_0_0000 .or
 end
 
-fun: asm_cmp_branch { Xt off19 not_zero -- instr }
+fun: .asm_cmp_branch { Xt off19 not_zero -- instr }
   not_zero <>0 24 .lsl { op_mask }
   Xt off19 .asm_pattern_cmp_branch op_mask .or
   0b1_011010_0_0000000000000000000_00000 .or
 end
 
 \ cbz x1, <off>
-fun: asm_cbz { Xt off19 -> instr } 0 .asm_cmp_branch end
+fun: .asm_cbz { Xt off19 -> instr } 0 .asm_cmp_branch end
 
 \ cbnz x1, <off>
-fun: asm_cbnz { Xt off19 -> instr } 1 .asm_cmp_branch end
+fun: .asm_cbnz { Xt off19 -> instr } 1 .asm_cmp_branch end
 
 \ Not supported on M3 Pro.
 \ cb.<cond> Xt, #imm6, #off9
-fun: asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
+fun: .asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
   Xt off9 cond .asm_pattern_cmp_branch_cond { mask }
   imm6 15 .lsl mask .or 0b1_1110101_000_000000_0_000000000_00000 .or
 end
 
 \ Not supported on M3 Pro.
 \ cb.<cond> Xt, Xm, #off9
-fun: asm_cmp_reg_branch { Xt Xm off9 cond -- instr }
+fun: .asm_cmp_reg_branch { Xt Xm off9 cond -- instr }
   Xt off9 cond .asm_pattern_cmp_branch_cond { mask }
   Xm 16 .lsl mask .or 0b1_1110100_000_00000_00_000000000_00000 .or
 end
 
 \ eor Xd, Xd, Xd
-fun: asm_zero_reg { Xd -- instr } Xd Xd Xd .asm_eor_reg end
+fun: .asm_zero_reg { Xd -- instr } Xd Xd Xd .asm_eor_reg end
 
-fun: asm_mov_reg { Xd Xm -- instr }
+fun: .asm_mov_reg { Xd Xm -- instr }
   Xm 16 .lsl Xd .or 0b1_01_01010_00_0_00000_000000_11111_00000 .or
 end
 
 \ movn/movz/movk Xd, #imm16, lsl #hw*16
-fun: asm_mov_wide { Xd opc hw imm16 -- instr }
+fun: .asm_mov_wide { Xd opc hw imm16 -- instr }
   opc   29 .lsl { opc }
   hw    21 .lsl { hw }
   imm16 5  .lsl
@@ -679,31 +682,31 @@ fun: asm_mov_wide { Xd opc hw imm16 -- instr }
 end
 
 \ Immediate must be unsigned and within range.
-fun: asm_mov_imm { Xd imm -- instr } Xd 0b10 0 imm .asm_mov_wide end
+fun: .asm_mov_imm { Xd imm -- instr } Xd 0b10 0 imm .asm_mov_wide end
 
 \ mvn Xd, Xm
-fun: asm_mvn { Xd Xm -- instr }
+fun: .asm_mvn { Xd Xm -- instr }
   Xm 16 .lsl Xd .or 0b1_01_01010_00_1_00000_000000_11111_00000 .or
 end
 
 \ clz Xd, Xn
-fun: asm_clz { Xd Xn -- instr }
+fun: .asm_clz { Xd Xn -- instr }
   Xn 5 .lsl Xd .or 0b1_1_0_11010110_00000_00010_0_00000_00000 .or
 end
 
 \ Requires Arm64 `FEAT_CSSC`; not supported on M3 Pro.
 \ ctz Xd, Xn
-fun: asm_ctz { Xd Xn -- instr }
+fun: .asm_ctz { Xd Xn -- instr }
   Xn 5 .lsl Xd .or 0b1_1_0_11010110_00000_000110_00000_00000 .or
 end
 
 \ rbit Xd, Xn
-fun: asm_rbit { Xd Xn -- instr }
+fun: .asm_rbit { Xd Xn -- instr }
   Xn 5 .lsl Xd .or 0b1_1_0_11010110_00000_00000_0_00000_00000 .or
 end
 
 \ TODO: support shift.
-fun: asm_tst { Xn Xm -- instr }
+fun: .asm_tst { Xn Xm -- instr }
   Xm 16 .lsl { Xm }
   Xn 5 .lsl Xm .or 0b1_11_01010_00_0_00000_000000_00000_11111 .or
 end
@@ -718,14 +721,14 @@ end
 
 \ ## Assembler: register selection
 
-fun: comp_args1_reg { -- reg err }
+fun: .comp_args1_reg { -- reg err }
   1 nil .comp_args_min
   .comp_args_get .dec { reg }
   reg .comp_realloc_reg
   reg
 end
 
-fun: comp_args2_regs { -- reg0 reg1 err }
+fun: .comp_args2_regs { -- reg0 reg1 err }
   2 nil .comp_args_min
   .comp_args_get .dec { reg1 }
   reg1 .dec { reg0 }
@@ -733,13 +736,13 @@ fun: comp_args2_regs { -- reg0 reg1 err }
   reg0 reg1
 end
 
-fun: comp_args2_arith_reg { op -- err }
+fun: .comp_args2_arith_reg { op -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 .asm_pattern_arith_reg op .or .comp_instr \ <op> Xd, Xn, Xm
   reg1 .comp_args_set
 end
 
-fun: comp_args2_regs2 { -- reg0 reg1 err }
+fun: .comp_args2_regs2 { -- reg0 reg1 err }
   .comp_args2_regs { reg0 reg1 }
   reg1 .comp_realloc_reg
   reg0 reg1
@@ -754,47 +757,47 @@ end
 \ Some runtime redefinitions here are redundant with earlier versions,
 \ but tracking the redundancies is effort. Redefining all is easier.
 
-fun_comp: or { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
+fun_comp: .or { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
 
-fun: or { i0 i1 -> i2 } [ .redefine ] .or end
+fun: .or { i0 i1 -> i2 } [ .redefine ] .or end
 
-fun_comp: and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
+fun_comp: .and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
 
-fun: and { i0 i1 -> i2 } [ .redefine ] .and end
+fun: .and { i0 i1 -> i2 } [ .redefine ] .and end
 
-fun_comp: xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
+fun_comp: .xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
 
-fun: xor { i0 i1 -> i2 } [ .redefine ] .xor end
+fun: .xor { i0 i1 -> i2 } [ .redefine ] .xor end
 
-fun_comp: lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
+fun_comp: .lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
 
-fun: lsl { i0 bits -> i1 } [ .redefine ] .lsl end
+fun: .lsl { i0 bits -> i1 } [ .redefine ] .lsl end
 
-fun_comp: lsr { -- err } ASM_OP_LSR_REG .comp_args2_arith_reg end
+fun_comp: .lsr { -- err } ASM_OP_LSR_REG .comp_args2_arith_reg end
 
-fun: lsr { i0 bits -> i1 } [ .redefine ] .lsr end
+fun: .lsr { i0 bits -> i1 } [ .redefine ] .lsr end
 
-fun_comp: negate { -- err }
+fun_comp: .negate { -- err }
   .comp_args1_reg .asm_neg .comp_instr \ neg Xd, Xn
 end
 
-fun: negate { i0 -> i1 } [ .redefine ] .negate end
+fun: .negate { i0 -> i1 } [ .redefine ] .negate end
 
 fun: ?invert { val cond -> out } .negate .xor end
 
-fun_comp: inc { -- err }
+fun_comp: .inc { -- err }
   .comp_args1_reg { reg }
   reg reg 1 .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
 end
 
-fun: inc { i0 -> i1 } [ .redefine ] .inc end
+fun: .inc { i0 -> i1 } [ .redefine ] .inc end
 
-fun_comp: dec { -- err }
+fun_comp: .dec { -- err }
   .comp_args1_reg { reg }
   reg reg 1 .asm_sub_imm .comp_instr \ sub Xd, Xn, #imm12
 end
 
-fun: dec { i0 -> i1 } [ .redefine ] .dec end
+fun: .dec { i0 -> i1 } [ .redefine ] .dec end
 
 fun_comp: + { -- err } ASM_OP_ADD_REG .comp_args2_arith_reg end
 
@@ -816,33 +819,33 @@ fun_comp: u/ { -- err } ASM_OP_UDIV_REG .comp_args2_arith_reg end
 
 fun: u/ { i0 i1 -> i2 } u/ end
 
-fun_comp: asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
+fun_comp: .asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
 
-fun: asr { i0 bits -> i1 } [ .redefine ] .asr end
+fun: .asr { i0 bits -> i1 } [ .redefine ] .asr end
 
-fun: comp_emit_mod { out dividend divisor div_op -- err }
+fun: .comp_emit_mod { out dividend divisor div_op -- err }
   .comp_alloc_next_reg { quotient }
   quotient dividend divisor .asm_pattern_arith_reg div_op .or .comp_instr \ sdiv|udiv Xd, Xn, Xm
   out quotient divisor dividend .asm_msub .comp_instr \ msub Xd, Xn, Xm, Xa
 end
 
-fun_comp: mod { -- err }
+fun_comp: .mod { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 ASM_OP_SDIV_REG .comp_emit_mod
   reg1 .comp_args_set
 end
 
-fun: mod { i0 i1 -> i2 } .mod end
+fun: .mod { i0 i1 -> i2 } .mod end
 
-fun_comp: umod { -- err }
+fun_comp: .umod { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 ASM_OP_UDIV_REG .comp_emit_mod
   reg1 .comp_args_set
 end
 
-fun: umod { i0 i1 -> i2 } .umod end
+fun: .umod { i0 i1 -> i2 } .umod end
 
-fun: comp_emit_divmod { reg0 reg1 div_op -- tmp err }
+fun: .comp_emit_divmod { reg0 reg1 div_op -- tmp err }
   reg0 reg1 reg0 reg1 { rem quo dividend divisor }
   .comp_alloc_next_reg { tmp }
   tmp divisor .asm_mov_reg .comp_instr \ mov Xd, Xm
@@ -865,66 +868,66 @@ end
 
 fun: u/mod { dividend divisor -> rem quo } u/mod end
 
-fun: comp_emit_abs { reg -- err }
+fun: .comp_emit_abs { reg -- err }
   reg                .asm_cmp_zero .comp_instr \ cmp Xn, #0
   reg reg reg ASM_PL .asm_csneg    .comp_instr \ cneg Xd, Xn, cond
 end
 
-fun_comp: abs { -- err } .comp_args1_reg .comp_emit_abs end
-fun: abs { int -> +int } .abs end
+fun_comp: .abs { -- err } .comp_args1_reg .comp_emit_abs end
+fun: .abs { int -> +int } .abs end
 
-fun: comp_emit_csel_reg { out cmp_lhs cmp_rhs lhs rhs cond -- err }
+fun: .comp_emit_csel_reg { out cmp_lhs cmp_rhs lhs rhs cond -- err }
   cmp_lhs cmp_rhs  .asm_cmp_reg .comp_instr \ cmp Xn, Xm
   out lhs rhs cond .asm_csel    .comp_instr \ csel Xd, Xn, Xm, cond
 end
 
-fun: comp_emit_csel_nonzero { out nonzero zero cond -- err }
+fun: .comp_emit_csel_nonzero { out nonzero zero cond -- err }
   nonzero 0             .asm_cmp_imm .comp_instr \ cmp Xn, #0
   out nonzero zero cond .asm_csel    .comp_instr \ csel Xd, Xn, Xm, cond
 end
 
-fun_comp: min { -- err }
+fun_comp: .min { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 reg0 reg1 ASM_LT .comp_emit_csel_reg
   reg1 .comp_args_set
 end
 
-fun: min { i0 i1 -> i0|i1 } .min end
+fun: .min { i0 i1 -> i0|i1 } .min end
 
-fun_comp: umin { -- err }
+fun_comp: .umin { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 reg0 reg1 ASM_LO .comp_emit_csel_reg
   reg1 .comp_args_set
 end
 
-fun: umin { i0 i1 -> i0|i1 } .umin end
+fun: .umin { i0 i1 -> i0|i1 } .umin end
 
-fun_comp: max { -- err }
+fun_comp: .max { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 reg0 reg1 ASM_GT .comp_emit_csel_reg
   reg1 .comp_args_set
 end
 
-fun: max { i0 i1 -> i0|i1 } .max end
+fun: .max { i0 i1 -> i0|i1 } .max end
 
-fun_comp: umax { -- err }
+fun_comp: .umax { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 reg0 reg1 ASM_HI .comp_emit_csel_reg
   reg1 .comp_args_set
 end
 
-fun: umax { i0 i1 -> i0|i1 } .umax end
+fun: .umax { i0 i1 -> i0|i1 } .umax end
 
-fun_comp: fallback { -- err }
+fun_comp: .fallback { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg1 reg0 ASM_NE .comp_emit_csel_nonzero
   reg1 .comp_args_set
 end
 
 \ Chooses a non-zero value, preferring the second input.
-fun: fallback { one two -> out } .fallback end
+fun: .fallback { one two -> out } .fallback end
 
-fun_comp: is_aligned_to { -- err }
+fun_comp: .is_aligned_to { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg1 reg1 1 .asm_sub_imm .comp_instr \ sub Xd, Xn, 1
   reg0 reg1   .asm_tst     .comp_instr \ tst Xn, Xm
@@ -932,23 +935,23 @@ fun_comp: is_aligned_to { -- err }
   reg1 .comp_args_set
 end
 
-fun: is_aligned_to { adr size -> bool } .is_aligned_to end
+fun: .is_aligned_to { adr size -> bool } .is_aligned_to end
 
-fun: comp_emit_align_down { out len wid -- err }
+fun: .comp_emit_align_down { out len wid -- err }
   wid         .asm_neg     .comp_instr \ neg Xd, Xd
   out len wid .asm_and_reg .comp_instr \ and Xd, Xn, Xm
 end
 
-fun_comp: align_down { -- err }
+fun_comp: .align_down { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 .comp_emit_align_down
   reg1 .comp_args_set
 end
 
-fun: align_down { len wid -> len } .align_down end
+fun: .align_down { len wid -> len } .align_down end
 
 \ Assumes power of two.
-fun_comp: align_up { -- err }
+fun_comp: .align_up { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 .asm_add_reg .comp_instr \ add Xd, Xn, Xm
   reg0 reg0 1    .asm_sub_imm .comp_instr \ sub Xd, Xn, #1
@@ -956,33 +959,33 @@ fun_comp: align_up { -- err }
   reg1 .comp_args_set
 end
 
-fun: align_up { len wid -> len } .align_up end
+fun: .align_up { len wid -> len } .align_up end
 
 \ Flip all the bits.
-fun_comp: invert { -- err }
+fun_comp: .invert { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
 end
 
-fun: invert { i0 -> i1 } [ .redefine ] .invert end
+fun: .invert { i0 -> i1 } [ .redefine ] .invert end
 
 \ 1-based index of the highest bit.
-fun: comp_emit_bit_len { reg tmp -- err }
+fun: .comp_emit_bit_len { reg tmp -- err }
   reg reg     .asm_clz     .comp_instr \ clz Xd, Xn
   64  tmp                  .comp_load  \ mov Xd, #imm
   reg tmp reg .asm_sub_reg .comp_instr \ sub Xd, Xn, Xm
 end
 
-fun_comp: bit_len { -- err }
+fun_comp: .bit_len { -- err }
   .comp_args1_reg      { reg }
   .comp_alloc_next_reg { tmp }
   reg tmp .comp_emit_bit_len
   tmp .comp_args_set
 end
 
-fun: bit_len { val -> len } .bit_len end
+fun: .bit_len { val -> len } .bit_len end
 
-fun: comp_emit_pow2_ceil { reg tmp -- err }
+fun: .comp_emit_pow2_ceil { reg tmp -- err }
   1 tmp .comp_load
   reg reg tmp reg tmp ASM_HI .comp_emit_csel_reg \ csel Xd, Xn, Xm, hi
   reg reg 1 .asm_sub_imm     .comp_instr         \ sub Xd, Xn, #1
@@ -992,50 +995,50 @@ fun: comp_emit_pow2_ceil { reg tmp -- err }
   reg tmp reg .asm_lsl_reg   .comp_instr         \ lsl Xd, Xn, Xm
 end
 
-fun_comp: pow2_ceil { -- err }
+fun_comp: .pow2_ceil { -- err }
   .comp_args1_reg      { reg }
   .comp_alloc_next_reg { tmp }
   reg tmp .comp_emit_pow2_ceil
   reg .inc .comp_args_set
 end
 
-fun: pow2_ceil { val -- pow2 } 1 val 1 .umax .dec .bit_len .lsl end
+fun: .pow2_ceil { val -- pow2 } 1 val 1 .umax .dec .bit_len .lsl end
 
 \ "count leading zeros" (in high bits)
-fun_comp: bit_clz { -- err }
+fun_comp: .bit_clz { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_clz .comp_instr \ clz Xd, Xn
 end
 
-fun: bit_clz { num -> bool } .bit_clz end
+fun: .bit_clz { num -> bool } .bit_clz end
 
 \ "count trailing zeros" (in low bits)
 \
 \ Fallback version of `ctz Xd, Xn` for chips without `ctz`.
-fun: comp_emit_bit_ctz { reg -- err }
+fun: .comp_emit_bit_ctz { reg -- err }
   reg reg .asm_rbit .comp_instr \ rbit Xd, Xn
   reg reg .asm_clz  .comp_instr \ clz Xd, Xd
 end
 
-fun_comp: bit_ctz { -- err } .comp_args1_reg .comp_emit_bit_ctz end
-fun: bit_ctz { num -> bool } .bit_ctz end
+fun_comp: .bit_ctz { -- err } .comp_args1_reg .comp_emit_bit_ctz end
+fun: .bit_ctz { num -> bool } .bit_ctz end
 
-fun: comp_emit_low_bits { reg tmp -- err }
+fun: .comp_emit_low_bits { reg tmp -- err }
   1 tmp .comp_load
   tmp tmp reg .asm_lsl_reg .comp_instr \ lsl Xt, Xt, Xn
   reg tmp 1 .asm_sub_imm .comp_instr   \ sub Xn, Xt, #1
 end
 
-fun_comp: low_bits { -- err }
+fun_comp: .low_bits { -- err }
   .comp_args1_reg        { reg }
   .comp_alloc_next_reg   { tmp }
   reg tmp .comp_emit_low_bits
   reg .inc .comp_args_set
 end
 
-fun: low_bits { len -> bits } [ .redefine ] .low_bits end
+fun: .low_bits { len -> bits } [ .redefine ] .low_bits end
 
-fun_comp: bits_trunc { -- err }
+fun_comp: .bits_trunc { -- err }
   .comp_args2_regs     { imm len }
   .comp_alloc_next_reg { tmp }
   1 tmp .comp_load
@@ -1045,17 +1048,17 @@ fun_comp: bits_trunc { -- err }
   len .comp_args_set
 end
 
-fun: bits_trunc { imm len -> imm } [ .redefine ] .bits_trunc end
+fun: .bits_trunc { imm len -> imm } [ .redefine ] .bits_trunc end
 
-fun_comp: bits_clear { -- err }
+fun_comp: .bits_clear { -- err }
   .comp_args2_regs { imm mask }
   imm imm mask .asm_bic .comp_instr \ bic Ximm, Ximm, Xmask
   mask .comp_args_set
 end
 
-fun: bits_clear { imm mask -> out } .bits_clear end
+fun: .bits_clear { imm mask -> out } .bits_clear end
 
-fun_comp: bit_mask_get { -- err }
+fun_comp: .bit_mask_get { -- err }
   .comp_args2_regs { reg0 reg1 }
   \ Get bits according to a nonzero contiguous mask and return them in low bits.
   reg0 reg0 reg1 .asm_and_reg .comp_instr \ and Xd, Xn, Xm
@@ -1065,12 +1068,12 @@ fun_comp: bit_mask_get { -- err }
   reg1 .comp_args_set
 end
 
-fun: bit_mask_get { src mask -> out } .bit_mask_get end
+fun: .bit_mask_get { src mask -> out } .bit_mask_get end
 
 \ Sets bits according to the mask.
 \ The input value must be in low bits.
 \ The mask must be nonzero and contiguous.
-fun: comp_emit_bit_mask_set { inp src mask -- err }
+fun: .comp_emit_bit_mask_set { inp src mask -- err }
   .comp_alloc_next_reg { shift }
   src   src   mask  .asm_bic     .comp_instr \ bic Xd, Xn, Xm
   shift mask        .asm_rbit    .comp_instr \ rbit Xd, Xn
@@ -1080,7 +1083,7 @@ fun: comp_emit_bit_mask_set { inp src mask -- err }
   inp   inp   src   .asm_orr_reg .comp_instr \ orr Xd, Xn, Xm
 end
 
-fun_comp: bit_mask_set { -- err }
+fun_comp: .bit_mask_set { -- err }
   3 nil .comp_args_min
   .comp_args_get .dec { mask }
   mask .dec { src }
@@ -1092,16 +1095,16 @@ fun_comp: bit_mask_set { -- err }
   inp .inc .comp_args_set
 end
 
-fun: bit_mask_set { inp src mask -> out } .bit_mask_set end
+fun: .bit_mask_set { inp src mask -> out } .bit_mask_set end
 
 8 let: CELL
 
-fun_comp: cells { -- err }
+fun_comp: .cells { -- err }
   .comp_args1_reg { reg }
   reg reg 3 .asm_lsl_imm .comp_instr \ lsl Xd, Xd, #shift
 end
 
-fun: cells { len -> size } .cells end
+fun: .cells { len -> size } .cells end
 
 fun_comp: /cells { -- err }
   .comp_args1_reg { reg }
@@ -1127,7 +1130,7 @@ fun: -cell { adr -> adr } -cell end
 \ ## Assembler continued
 
 \ tbz Xt, #bit, #imm14
-fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
+fun: .asm_test_bit_branch_zero { Xt bit imm14 -- instr }
   imm14 .instr_off_pack 14 .bits_trunc 5 .lsl { imm14 }
   bit 5 .lsr 31 .lsl { b5 }
   bit 5 .bits_trunc 19 .lsl \ b40
@@ -1136,77 +1139,77 @@ fun: asm_test_bit_branch_zero { Xt bit imm14 -- instr }
 end
 
 \ adr Xd, #imm21
-fun: asm_adr { Xd imm21 -- instr }
+fun: .asm_adr { Xd imm21 -- instr }
   imm21 0b11 .and { low }
   imm21 .instr_off_pack 19 .bits_trunc 5 .lsl { high }
   high low .or Xd .or
   0b0_00_100_00_0000000000000000000_00000 .or
 end
 
-fun: asm_branch_to_reg { Xn -> instr }
+fun: .asm_branch_to_reg { Xn -> instr }
   5 .lsl 0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 .or \ br Xn
 end
 
 \ bl imm26
 \
 \ Requires caution to avoid messing up the link register.
-fun: asm_branch_link_off { imm26 -> instr }
+fun: .asm_branch_link_off { imm26 -> instr }
   .instr_off_pack 26 .bits_trunc
   0b100_101_00000000000000000000000000 .or
 end
 
 \ Requires caution to avoid messing up the link register.
-fun: asm_branch_link_reg { Xn -> instr }
+fun: .asm_branch_link_reg { Xn -> instr }
   5 .lsl 0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 .or \ blr Xn
 end
 
 \ orr Xd, Xn, #(1 << bit)
-fun: asm_orr_bit { Xd Xn bit -- instr }
+fun: .asm_orr_bit { Xd Xn bit -- instr }
   64 bit - 16 .lsl { immr }
   Xn 5 .lsl
   Xd .or immr .or
   0b1_01_100100_1_000000_000000_00000_00000 .or
 end
 
-fun: comp_emit_cmp_cset_reg { out lhs rhs cond -- err }
+fun: .comp_emit_cmp_cset_reg { out lhs rhs cond -- err }
   lhs rhs  .asm_cmp_reg .comp_instr \ cmp Xn, Xm
   out cond .asm_cset    .comp_instr \ cset Xd, cond
 end
 
-fun: comp_emit_cset_zero { reg cond -- err }
+fun: .comp_emit_cset_zero { reg cond -- err }
   reg      .asm_cmp_zero .comp_instr \ cmp Xn, #0
   reg cond .asm_cset     .comp_instr \ cset Xd, cond
 end
 
-fun: asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
+fun: .asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
   .comp_args2_regs { reg0 reg1 }
   reg0 reg0 reg1 cond .comp_emit_cmp_cset_reg
   reg1 .comp_args_set
 end
 
-fun: asm_comp_cset_zero { cond -- err } ( E: num -- bool )
+fun: .asm_comp_cset_zero { cond -- err } ( E: num -- bool )
   .comp_args1_reg cond .comp_emit_cset_zero
 end
 
 \ sbfm Xd, Xn, immr, imms
-fun: asm_bitfield_move { Xd Xn immr imms -- instr }
+fun: .asm_bitfield_move { Xd Xn immr imms -- instr }
   Xd Xn immr imms ASM_OP_SBFM .asm_bitfield
 end
 
 \ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
-fun: asm_sign_extend_32 { Xd Xn -> instr } 0 31 .asm_bitfield_move end
+fun: .asm_sign_extend_32 { Xd Xn -> instr } 0 31 .asm_bitfield_move end
 
 \ Since we don't have a real type system, the compiler
 \ doesn't support automatically sign-extending integers
 \ when converting between types. Sometimes it has to be
 \ done manually, particularly when dealing with C words
 \ which return `(int)-1` which ends up being 0xffffffff.
-fun_comp: cint_to_cell { -- err }
+fun_comp: .cint_to_cell { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_sign_extend_32 .comp_instr \ sxtw Xd, Wn
 end
 
-fun: cint_to_cell { int32 -> cell } .cint_to_cell end
+fun: .cint_to_cell { int32 -> cell } .cint_to_cell end
 
 \ ## Numeric comparison
 
@@ -1245,15 +1248,15 @@ fun_comp: >=0 {       -- err  } ASM_GE .asm_comp_cset_zero end \ Or `PL`.
 fun:      >=0 { num   -> bool } >=0                        end
 
 \ Non-standard and sane: no wraparound semantics.
-fun: within  { num floor ceil -- bool } num floor  >= num ceil  < .and end
-fun: uwithin { num floor ceil -- bool } num floor u>= num ceil u< .and end
+fun: .within  { num floor ceil -- bool } num floor  >= num ceil  < .and end
+fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .and end
 
 \ ## Memory load / store
 
 \ Loads replace the latest argument, which should be an address, with a value.
 \ Like arithmetic words, they respect the argument stack, preserving the other
 \ prior arguments.
-fun: comp_mem_load { size opc -- err }
+fun: .comp_mem_load { size opc -- err }
   1 nil .comp_args_min
   .comp_args_get .dec { reg }
   reg .comp_realloc_reg
@@ -1278,7 +1281,7 @@ fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
     0 1 true .comp_signature_set
     size     .comp_push
     opc      .comp_push
-    compile' comp_mem_load
+    compile' .comp_mem_load
   call'' end
 
   [ false .comp_only ]
@@ -1396,13 +1399,13 @@ fun: !at { val adr off -> } !at end
 fun: off! { adr } false adr ! end
 fun: on!  { adr } true  adr ! end
 
-\ Shortcut for allocating a cell-sized slot on the system stack via `alloca`.
-fun_comp: slot { -- err } ( E: -- adr ) call'' CELL call'' alloca end
+\ Shortcut for allocating a cell-sized slot on the system stack via `.alloca`.
+fun_comp: .slot { -- err } ( E: -- adr ) call'' CELL call'' .alloca end
 
 \ Shortcut for stack-allocating a slot and immediately setting a value.
 \ Replaces the need for taking references to locals we had before.
 fun_comp: >slot { -- err } ( E: val -- adr )
-  call'' slot
+  call'' .slot
   compile'  !
   0 .comp_realloc_reg
   0 1 .asm_mov_reg .comp_instr \ mov x0, x1
@@ -1422,14 +1425,14 @@ end
 \
 \   \ SYNC[stack_field_offsets].
 \   struct: Stack
-\     Cell 1 field: Stack_bytelen \ Total size with guards.
-\     Adr  1 field: Stack_cellar  \ Lower guard.
-\     Adr  1 field: Stack_floor   \ First data cell.
-\     Adr  1 field: Stack_top     \ Next data cell.
-\     Adr  1 field: Stack_ceil    \ After last data cell.
+\     Cell 1 field: .Stack_bytelen \ Total size with guards.
+\     Adr  1 field: .Stack_cellar  \ Lower guard.
+\     Adr  1 field: .Stack_floor   \ First data cell.
+\     Adr  1 field: .Stack_top     \ Next data cell.
+\     Adr  1 field: .Stack_ceil    \ After last data cell.
 \   end
 \
-\ See `stack_init` for guarded allocation via memory mapping.
+\ See `.stack_init` for guarded allocation via memory mapping.
 \ A stack can also be allocated without guards if so desired.
 \
 \ The stack operations below have somewhat suboptimal performance.
@@ -1464,12 +1467,12 @@ end
 fun: STACK { -- adr } [ .plain_call ] STACK end
 
 \ ldur <out>, [<stk>, STACK_OFF_TOP]
-fun: asm_stack_top_load { out stk -> instr }
+fun: .asm_stack_top_load { out stk -> instr }
   STACK_OFF_TOP .asm_load_unscaled_off
 end
 
 \ stur <out>, [<stk>, STACK_OFF_TOP]
-fun: asm_stack_top_store { out stk -> instr }
+fun: .asm_stack_top_store { out stk -> instr }
   STACK_OFF_TOP .asm_store_unscaled_off
 end
 
@@ -1533,12 +1536,12 @@ fun: sysstack_frame_ptr { -- fp } [ .plain_call ] sysstack_frame_ptr end
 \
 \ Used for taking an address of a data entry allocated
 \ via `.comp_alloc_data` in the compiler-managed heap.
-fun: comp_next_page_addr { adr -- err } ( E: -- adr )
+fun: .comp_next_page_addr { adr -- err } ( E: -- adr )
   .comp_alloc_next_reg { reg }
   adr reg .comp_page_addr
 end
 
-fun: init_data_word { name name_len adr -- err }
+fun: .init_data_word { name name_len adr -- err }
   name name_len .define_fun .plain_call
     0 1 false .comp_signature_set ( E: -- ptr )
     adr .comp_next_page_addr
@@ -1547,7 +1550,7 @@ fun: init_data_word { name name_len adr -- err }
   name name_len .define_fun_comp
     .plain_call
     0 1 true .comp_signature_set
-    adr .comp_push compile' comp_next_page_addr
+    adr .comp_push compile' .comp_next_page_addr
   call'' end
 
   [ false .comp_only ]
@@ -1569,7 +1572,7 @@ fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- adr )
   .read_word adr .init_data_word
 end
 
-fun: comp_buf { adr cap -- err } ( E: -- adr cap )
+fun: .comp_buf { adr cap -- err } ( E: -- adr cap )
   .comp_alloc_next_reg { RA }
   .comp_alloc_next_reg { RL }
   adr RA .comp_page_addr
@@ -1580,7 +1583,7 @@ end
 \ Creates a global variable which refers to a buffer of
 \ at least the given size in bytes, initialized to zero.
 \
-\ TODO dedup code with `init_data_word`.
+\ TODO dedup code with `.init_data_word`.
 \
 \ The buffer is allocated in the compiler-managed data region,
 \ which is preserved in AOT compilation. Changes to this data
@@ -1603,7 +1606,7 @@ fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
   str len .define_fun_comp
     .plain_call
     0 1 true .comp_signature_set
-    adr .comp_push cap .comp_push compile' comp_buf
+    adr .comp_push cap .comp_push compile' .comp_buf
   call'' end
 
   [ false .comp_only ]
@@ -1614,36 +1617,36 @@ end
 \ The program is implicitly linked with `libc`,
 \ so we get to use C stdlib functions.
 \
-\ Compiler also provides `alloca` intrinsically.
+\ Compiler also provides `.alloca` intrinsically.
 
 \ Maximum alignment needed for any value on Arm64.
 16 let: FUND_ALIGN
 
-2 1 extern: calloc  ( len size -- addr )
-1 1 extern: malloc  ( size -- addr )
-2 1 extern: realloc ( addr size -- addr )
-1 0 extern: free    ( addr -- )
-3 0 extern: memset  ( buf char len -- )
-3 0 extern: memcpy  ( out src len -- )
-3 0 extern: memmove ( out src len -- )
-3 1 extern: memcmp  ( adr0 adr1 len -- cmp :Cint )
+2 1 extern: .calloc  calloc  ( len size -- addr )
+1 1 extern: .malloc  malloc  ( size -- addr )
+2 1 extern: .realloc realloc ( addr size -- addr )
+1 0 extern: .free    free    ( addr -- )
+3 0 extern: .memset  memset  ( buf char len -- )
+3 0 extern: .memcpy  memcpy  ( out src len -- )
+3 0 extern: .memmove memmove ( out src len -- )
+3 1 extern: .memcmp  memcmp  ( adr0 adr1 len -- cmp :Cint )
 
-1 1 extern: strdup  ( cstr -- cstr )
-2 1 extern: strndup ( cstr len -- cstr )
-1 1 extern: strlen  ( cstr -- len )
-2 1 extern: strcmp  ( cstr0 cstr1 -- cmp :Cint )
-3 1 extern: strncmp ( str0 str1 len -- cmp :Cint )
-3 0 extern: strncpy ( out src str_len -- )
-3 0 extern: strlcpy ( out src buf_len -- )
-2 1 extern: strstr  ( cstr0 cstr0 -- adr )
+1 1 extern: .strdup  strdup  ( cstr -- cstr )
+2 1 extern: .strndup strndup ( cstr len -- cstr )
+1 1 extern: .strlen  strlen  ( cstr -- len )
+2 1 extern: .strcmp  strcmp  ( cstr0 cstr1 -- cmp :Cint )
+3 1 extern: .strncmp strncmp ( str0 str1 len -- cmp :Cint )
+3 0 extern: .strncpy strncpy ( out src str_len -- )
+3 0 extern: .strlcpy strlcpy ( out src buf_len -- )
+2 1 extern: .strstr  strstr  ( cstr0 cstr0 -- adr )
 
-fun: move    { src out len  } out src len .strncpy end
-fun: memfill { buf len char } buf char len .memset end
-fun: memzero { buf len ->   } 0 .memfill end
+fun: .move    { src out len  } out src len .strncpy end
+fun: .memfill { buf len char } buf char len .memset end
+fun: .memzero { buf len ->   } 0 .memfill end
 
 \ ## Characters and strings
 
-fun: read_word_char { -- char err } .read_word { buf -- } buf @u8 end
+fun: .read_word_char { -- char err } .read_word { buf -- } buf @u8 end
 
 fun: char' { -- char err } ( E: "str" -- char ) .read_word_char end
 
@@ -1653,14 +1656,14 @@ fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
   char reg .comp_load
 end
 
-fun: read_delimited { delim -- str len err }
+fun: .read_delimited { delim -- str len err }
   .read_char { -- }
   delim .read_until_char { str len }
   .read_char { -- }
   str len
 end
 
-fun: comp_alloc_cstr { buf len -- cstr err }
+fun: .comp_alloc_cstr { buf len -- cstr err }
   len .inc { cap } \ Reserve terminating null byte.
   buf cap .comp_alloc_data { adr }
   adr len + { ceil }
@@ -1669,7 +1672,7 @@ fun: comp_alloc_cstr { buf len -- cstr err }
 end
 
 \ Copies a string and appends a terminating null byte.
-fun: comp_str { buf len -> err } ( E: -- cstr len )
+fun: .comp_str { buf len -> err } ( E: -- cstr len )
   .comp_alloc_cstr     { adr }
   .comp_alloc_next_reg { RS }
   .comp_alloc_next_reg { RL }
@@ -1677,7 +1680,7 @@ fun: comp_str { buf len -> err } ( E: -- cstr len )
   len RL .comp_load      \ ldr RL, <len>
 end
 
-fun: comp_cstr { buf len -- err } ( E: -- cstr )
+fun: .comp_cstr { buf len -- err } ( E: -- cstr )
   .comp_alloc_next_reg { reg }
   buf len .comp_alloc_cstr
   reg .comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
@@ -1694,7 +1697,7 @@ fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) call' s` .comp_str end
 
 4096 buf: ROOT_STR_BUF
 
-fun: read_interp_cstr { delim -> cstr err }
+fun: .read_interp_cstr { delim -> cstr err }
   .read_delimited { src len }
   ROOT_STR_BUF { buf cap }
   len cap .min { len }
@@ -1710,7 +1713,7 @@ fun: ` { -- cstr err } ( E: `str` -- cstr ) char' ` .read_interp_cstr end
 
 \ Reads a string, copies it to compiler-managed data,
 \ and compiles a PC-relative reference to it.
-fun: read_comp_cstr { delim -> err } .read_delimited .comp_cstr end
+fun: .read_comp_cstr { delim -> err } .read_delimited .comp_cstr end
 
 fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr ) char' " .read_comp_cstr end
 fun_comp: ` { -- err } ( C: `str` -- ) ( E: -- cstr ) char' ` .read_comp_cstr end
@@ -1737,7 +1740,7 @@ end
 
 \ Indirect version of `extern_adr'`: compiles its usage into another word.
 fun_comp: comp_extern_adr' { -- err } ( C: "name" -- ) ( E: -- adr )
-  .read_word .comp_str compile' comp_extern_adr
+  .read_word .comp_str compile' .comp_extern_adr
 end
 
 \ ## Errors
@@ -1765,18 +1768,18 @@ end
 \
 \ Examples:
 \
-\   fun: inner { -- one two err }
+\   fun: .inner { -- one two err }
 \     " some_error" .throw
 \     10 20
 \   end
 \
-\   fun: outer { -- Err }
-\     inner { one two err }
-\     inner .try { one two }
+\   fun: .outer { -- Err }
+\     .inner { one two err }
+\     .inner .try { one two }
 \   end
 \
-\   fun: outer_auto { -- err }
-\     inner { one two } \ Implicit `.try`.
+\   fun: .outer_auto { -- err }
+\     .inner { one two } \ Implicit `.try`.
 \   end
 
 \ ## IO
@@ -1821,42 +1824,42 @@ fun_comp: stderr { -- err } ( E: -- adr )
   comp_extern_adr' __stderrp call'' @
 end
 
-4 1 extern: fread            ( buf size len file -- len           )
-4 1 extern: fwrite           ( buf size len file -- len           )
-2 1 extern: fputs            ( buf file          -- junk|-1 :Cint )
-2 1 extern: fputc            ( char file         -- char|-1 :Cint )
-2 1 extern: putc             ( char file         -- char|-1 :Cint )
-2 1 extern: putc_unlocked    ( char file         -- char|-1 :Cint )
-1 1 extern: putchar          ( char              -- char|-1 :Cint )
-1 1 extern: putchar_unlocked ( char              -- char|-1 :Cint )
-2 1 extern: putw             ( char file         -- 0|-1    :Cint )
-1 1 extern: fflush           ( file              -- 0|-1    :Cint )
-1 1 extern: fpurge           ( file              -- 0|-1    :Cint )
+4 1 extern: .fread            fread            ( buf size len file -- len           )
+4 1 extern: .fwrite           fwrite           ( buf size len file -- len           )
+2 1 extern: .fputs            fputs            ( buf file          -- junk|-1 :Cint )
+2 1 extern: .fputc            fputc            ( char file         -- char|-1 :Cint )
+2 1 extern: .putc             putc             ( char file         -- char|-1 :Cint )
+2 1 extern: .putc_unlocked    putc_unlocked    ( char file         -- char|-1 :Cint )
+1 1 extern: .putchar          putchar          ( char              -- char|-1 :Cint )
+1 1 extern: .putchar_unlocked putchar_unlocked ( char              -- char|-1 :Cint )
+2 1 extern: .putw             putw             ( char file         -- 0|-1    :Cint )
+1 1 extern: .fflush           fflush           ( file              -- 0|-1    :Cint )
+1 1 extern: .fpurge           fpurge           ( file              -- 0|-1    :Cint )
 
 \ Variadic formatting words; see varg support below.
-1 1 extern: printf    ( fmt               … -- len|-1 :Cint )
-2 1 extern: fprintf   ( file fmt          … -- len|-1 :Cint )
-2 1 extern: sprintf   ( buf fmt           … -- len|-1 :Cint )
-3 1 extern: snprintf  ( buf cap fmt       … -- len|-1 :Cint )
-2 1 extern: asprintf  ( buf_adr fmt       … -- len|-1 :Cint )
-2 1 extern: dprintf   ( fdes fmt          … -- len|-1 :Cint )
-3 1 extern: vfprintf  ( file fmt vlist    … -- len|-1 :Cint )
-4 1 extern: vsnprintf ( buf cap fmt vlist … -- len|-1 :Cint )
+1 1 extern: .printf    printf    ( fmt               … -- len|-1 :Cint )
+2 1 extern: .fprintf   fprintf   ( file fmt          … -- len|-1 :Cint )
+2 1 extern: .sprintf   sprintf   ( buf fmt           … -- len|-1 :Cint )
+3 1 extern: .snprintf  snprintf  ( buf cap fmt       … -- len|-1 :Cint )
+2 1 extern: .asprintf  asprintf  ( buf_adr fmt       … -- len|-1 :Cint )
+2 1 extern: .dprintf   dprintf   ( fdes fmt          … -- len|-1 :Cint )
+3 1 extern: .vfprintf  vfprintf  ( file fmt vlist    … -- len|-1 :Cint )
+4 1 extern: .vsnprintf vsnprintf ( buf cap fmt vlist … -- len|-1 :Cint )
 
-fun: eputchar { char -> flag } stderr .fputc end \ Symmetry with `putchar`.
-fun: logc     { char -> }      .putchar                 { -- } end \ Renamed from `emit`.
-fun: elogc    { char -> }      stderr .fputc            { -- } end
-fun: log      { cstr -> }      stdout .fputs            { -- } end
-fun: elog     { cstr -> }      stderr .fputs            { -- } end
-fun: logs     { str len }      str 1 len stdout .fwrite { -- } end \ Renamed from `type`.
-fun: elogs    { str len }      str 1 len stderr .fwrite { -- } end
-fun: flush                     stdout .fflush           { -- } end
-fun: eflush                    stderr .fflush           { -- } end
-fun: lf                        LF .putchar              { -- } end \ Renamed from `cr`.
-fun: elf                       LF .eputchar             { -- } end
-fun: space                     SPACE .putchar           { -- } end
-fun: espace                    SPACE .eputchar          { -- } end
-fun: fprint { str len file }   str 1 len file .fwrite   { -- } end
+fun: .eputchar { char -> flag } stderr .fputc end \ Symmetry with `.putchar`.
+fun: .logc     { char -> }      .putchar                 { -- } end \ Renamed from `emit`.
+fun: .elogc    { char -> }      stderr .fputc            { -- } end
+fun: .log      { cstr -> }      stdout .fputs            { -- } end
+fun: .elog     { cstr -> }      stderr .fputs            { -- } end
+fun: .logs     { str len }      str 1 len stdout .fwrite { -- } end \ Renamed from `type`.
+fun: .elogs    { str len }      str 1 len stderr .fwrite { -- } end
+fun: .flush                     stdout .fflush           { -- } end
+fun: .eflush                    stderr .fflush           { -- } end
+fun: .lf                        LF .putchar              { -- } end \ Renamed from `cr`.
+fun: .elf                       LF .eputchar             { -- } end
+fun: .space                     SPACE .putchar           { -- } end
+fun: .espace                    SPACE .eputchar          { -- } end
+fun: .fprint { str len file }   str 1 len file .fwrite   { -- } end
 
 \ ## Interpreter internals (basic)
 
@@ -1902,8 +1905,8 @@ fun_comp: interp_instrs { -- err } ( E: -- adr )
 end
 
 fun: interp_instrs {     -- adr } [ .plain_call ] interp_instrs end
-fun: instr_off     { adr -> off } interp_instrs - end
-fun: instr_adr     { off -> adr } interp_instrs + end
+fun: .instr_off     { adr -> off } interp_instrs - end
+fun: .instr_adr     { off -> adr } interp_instrs + end
 
 \ SYNC[main_arena_off].
 \ Offset from `Comp_heap` to `Comp_heap.arena`.
@@ -1954,15 +1957,15 @@ CONT_MASK_CBNZ 1 .lsl                    let: CONT_MASK_EXEC_PREV
 
 CONT_MASK_BRANCH_COND .bit_len .low_bits .invert let: CONT_MASK_INSTR_OFF
 
-fun: cont_meta_instr_off_set { off meta -- meta }
+fun: .cont_meta_instr_off_set { off meta -- meta }
   off .instr_off_pack meta CONT_MASK_INSTR_OFF .bit_mask_set
 end
 
-fun: cont_meta_instr_adr { meta -> adr }
+fun: .cont_meta_instr_adr { meta -> adr }
   CONT_MASK_INSTR_OFF .bit_mask_get .instr_off_unpack .instr_adr
 end
 
-fun: reserve_instr { -- off err }
+fun: .reserve_instr { -- off err }
   .here_write .instr_off { off }
   ASM_PLACEHOLDER .comp_instr
   off
@@ -2003,28 +2006,28 @@ end
 \ chain calls as a backwards pass, retropatching
 \ instructions reserved by each `else elif elifz`.
 
-fun: if_patch { reg meta -- err }
+fun: .if_patch { reg meta -- err }
   meta .cont_meta_instr_adr { adr }
   .here_write adr - { off }
   meta CONT_MASK_CBNZ .and { cbnz }
   reg off cbnz .asm_cmp_branch adr !32 \ cbz/cbnz Xn, <target>
 end
 
-fun: if_end_xt { meta -- err }
+fun: .if_end_xt { meta -- err }
   .comp_barrier
   0 " branch outputs" .comp_args_valid
   meta CONT_MASK_INP_LEN .bit_mask_get meta .if_patch
 end
 
 \ Early definition; used in bare form: `pred .then end`.
-fun_comp: then { -- meta end_xt err } ( E: pred -- )
+fun_comp: .then { -- meta end_xt err } ( E: pred -- )
   .comp_barrier
   1 " arguments before `.then`" .comp_args_valid
   0 .comp_args_set
-  .reserve_instr 0 .cont_meta_instr_off_set xt' if_end_xt
+  .reserve_instr 0 .cont_meta_instr_off_set xt' .if_end_xt
 end
 
-fun: asm_cset_decode { instr -- reg cond ok }
+fun: .asm_cset_decode { instr -- reg cond ok }
   \ `cset` with `Rd` and `cond` masked out.
   0b1_1_1_11111111_11111_0000_1_1_11111_00000 { mask }
 
@@ -2038,7 +2041,7 @@ fun: asm_cset_decode { instr -- reg cond ok }
   reg cond ok
 end
 
-fun: control_try_cset_branch { pred_reg branch_on_true meta -- meta fused err }
+fun: .control_try_cset_branch { pred_reg branch_on_true meta -- meta fused err }
   .here_write ASM_INSTR_SIZE - { adr }
   adr @u32 .asm_cset_decode { cset_reg cond ok }
   ok cset_reg pred_reg = .and { fused }
@@ -2050,7 +2053,7 @@ fun: control_try_cset_branch { pred_reg branch_on_true meta -- meta fused err }
   meta fused
 end
 
-fun: if_patch { reg meta -- err } [ .redefine ]
+fun: .if_patch { reg meta -- err } [ .redefine ]
   meta CONT_MASK_BRANCH_COND .bit_mask_get { cond }
   cond .then
     meta .cont_meta_instr_adr { adr }
@@ -2067,7 +2070,7 @@ end
 
 \ Called either during the forward pass by `else elif elifz`,
 \ or during the backward pass by `end`.
-fun: if_end_xt { meta -- err } [ .redefine ]
+fun: .if_end_xt { meta -- err } [ .redefine ]
   .comp_barrier
   meta CONT_MASK_INP_LEN .bit_mask_get meta .if_patch
 
@@ -2082,16 +2085,16 @@ fun: if_end_xt { meta -- err } [ .redefine ]
 end
 
 fun_comp: if  { -- meta end_xt } [ .plain_call true .comp_only ]
-  nil xt' if_end_xt
+  nil xt' .if_end_xt
 end
 
 fun_comp: ifz { -- meta end_xt } [ .plain_call true .comp_only ]
-  CONT_MASK_CBNZ xt' if_end_xt
+  CONT_MASK_CBNZ xt' .if_end_xt
 end
 
 \ Caution: after this definition, `if ifz` are required,
 \ and bare `.then` is invalid. Shape: `if pred .then end`.
-fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ .redefine ]
+fun_comp: .then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ .redefine ]
   .comp_barrier
   " arguments before `.then`" { msg }
   meta CONT_MASK_HAS_INP .and { has }
@@ -2117,12 +2120,12 @@ fun_comp: then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ .redefine ]
   meta end_xt
 end
 
-fun: else_patch { meta -- err }
+fun: .else_patch { meta -- err }
   meta .cont_meta_instr_adr { adr }
   .here_write adr - .asm_branch adr !32
 end
 
-fun: else_end_xt { meta -- err }
+fun: .else_end_xt { meta -- err }
   .comp_barrier
   meta .else_patch
   meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
@@ -2152,21 +2155,21 @@ fun_comp: else { meta end_xt -- meta end_xt err }
   end
 
   meta CONT_MASK_INP_LEN .bit_mask_get .comp_args_set
-  meta xt' else_end_xt
+  meta xt' .else_end_xt
 end
 
 fun_comp: elif { meta end_xt -> else_meta else_xt meta end_xt err }
   [ .plain_call ]
   call'' else { meta else_xt }
   meta else_xt
-  meta CONT_MASK_EXEC_PREV .or xt' if_end_xt
+  meta CONT_MASK_EXEC_PREV .or xt' .if_end_xt
 end
 
 fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
   [ .plain_call ]
   call'' else { meta else_xt }
   meta else_xt
-  meta CONT_MASK_EXEC_PREV .or CONT_MASK_CBNZ .or xt' if_end_xt
+  meta CONT_MASK_EXEC_PREV .or CONT_MASK_CBNZ .or xt' .if_end_xt
 end
 
 \ ## Types
@@ -2180,9 +2183,9 @@ end
 \ requires the utils below first, so we access fields via hardcoded offsets.
 \
 \   struct: Type
-\     Cell 1 field: Type_size
-\     Cell 1 field: Type_align
-\     U8   0 field: Type_name  \ Variable length; null-terminated.
+\     Cell 1 field: .Type_size
+\     Cell 1 field: .Type_align
+\     U8   0 field: .Type_name  \ Variable length; null-terminated.
 \   end
 \
 \ Types are defined with shortcuts `opaque: int: arr: struct:` and so on.
@@ -2192,7 +2195,7 @@ end
 \ compile time, without loading type descriptors at runtime.
 
 \ SYNC[type_fields].
-fun: type_beg { name len -- type err }
+fun: .type_beg { name len -- type err }
   len .inc { cap }
   2 .cells cap + { size }
   nil size .comp_alloc_data { type }
@@ -2201,7 +2204,7 @@ fun: type_beg { name len -- type err }
 end
 
 \ SYNC[type_fields].
-fun: type_end { type size align -- err }
+fun: .type_end { type size align -- err }
   size type !
   align type +cell !
   2 .cells type + { name }
@@ -2209,7 +2212,7 @@ fun: type_end { type size align -- err }
   name len type .init_data_word
 end
 
-fun: define_type { name name_len size align -- err }
+fun: .define_type { name name_len size align -- err }
   name name_len .type_beg size align .type_end
 end
 
@@ -2222,7 +2225,7 @@ fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
 end
 
 \ SYNC[type_fields].
-fun: sizeof { type -> size } @ end
+fun: .sizeof { type -> size } @ end
 
 fun: size' { -- size err } ( C: "type" -- )
   WORDLIST_EXEC .next_word .call_xt STACK s> .sizeof
@@ -2233,7 +2236,7 @@ fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
 end
 
 \ SYNC[type_fields].
-fun: alignof { type -> align } +cell @ end
+fun: .alignof { type -> align } +cell @ end
 
 fun: align' { -- align err } ( C: "type" -- )
   WORDLIST_EXEC .next_word .call_xt STACK s> .alignof
@@ -2244,7 +2247,7 @@ fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
 end
 
 fun_comp: is_aligned_to' { -- err } ( C: "type" -- ) ( E: adr -- bool )
-  call'' align' call'' is_aligned_to
+  call'' align' call'' .is_aligned_to
 end
 
 fun: is_aligned_to' { adr -- bool err }
@@ -2259,7 +2262,7 @@ end
 \ "S" stands for "signed integer", "U" for "unsigned integer".
 \
 \ When converting shorter signed integers to wider ones,
-\ they must be sign-extended. See `cint_to_cell` for `S32`.
+\ they must be sign-extended. See `.cint_to_cell` for `S32`.
 \
 \ When accessing memory, use the appropriately sized/typed memory operators.
 \ For example, `U32` is loaded with `@u32`, but `S32` is loaded with `@s32`.
@@ -2294,8 +2297,8 @@ end
 \ way as an array type:
 \
 \   Elem_type 32 arr:   Some_arr
-\   Elem_type 32 field: Some_field
-\   Some_arr  1  field: Some_field
+\   Elem_type 32 field: .Some_field
+\   Some_arr  1  field: .Some_field
 fun: arr: { type len -- err } ( C: "name" -- ) ( E: -- type )
   type .sizeof len * { size }
   type .alignof      { align }
@@ -2308,8 +2311,8 @@ end
 \ and padded to match the C ABI. Basic usage:
 \
 \   struct: Type
-\     S32 1  field: Type_field0
-\     U8  32 field: Type_field1
+\     S32 1  field: .Type_field0
+\     U8  32 field: .Type_field1
 \   end
 \
 \   size' Type .alloca { adr }
@@ -2331,23 +2334,23 @@ end
 1 let: AGG_UNION
 
 \ For internal use, invoked by `end`.
-fun: agg_end_xt { type _mode align off -- err } ( C: type mode align off -- )
+fun: .agg_end_xt { type _mode align off -- err } ( C: type mode align off -- )
   off align .align_up { size }
   type size align .type_end
 end
 
 \ Begins a struct definition; terminate with `end`.
 fun: struct: { -- type mode align off end_xt err } ( C: "name" -- ) ( E: -- size )
-  .read_word .type_beg AGG_STRUCT 0 0 xt' agg_end_xt
+  .read_word .type_beg AGG_STRUCT 0 0 xt' .agg_end_xt
 end
 
 \ Begins a union definition; terminate with `end`.
 fun: union: { -- type mode align off end_xt err } ( C: "name" -- ) ( E: -- size )
-  .read_word .type_beg AGG_UNION 0 0 xt' agg_end_xt
+  .read_word .type_beg AGG_UNION 0 0 xt' .agg_end_xt
 end
 
 \ Compile field access, which computes address + offset.
-fun: comp_struct_field { off -- err }
+fun: .comp_struct_field { off -- err }
   .comp_args_get { len }
   ifz len .then " struct field must be preceded by struct pointer" .throw end
   ifz off .then .ret end
@@ -2367,7 +2370,7 @@ fun: comp_struct_field { off -- err }
 end
 
 \ For internal use.
-fun: define_field_word { name name_len off -- err }
+fun: .define_field_word { name name_len off -- err }
   ( E: struct_adr -- field_adr )
 
   \ Execution-time semantics.
@@ -2380,14 +2383,14 @@ fun: define_field_word { name name_len off -- err }
   \ Compile-time semantics.
   name name_len .define_fun_comp
     0 1 true .comp_signature_set
-    off .comp_push compile' comp_struct_field
+    off .comp_push compile' .comp_struct_field
   call'' end
 
   [ false .comp_only ]
 end
 
 \ For internal use.
-fun: define_agg_field
+fun: .define_agg_field
   { name name_len mode agg_align align off type len -- mode align off err }
   ( E: struct_adr -- field_adr )
 
@@ -2432,9 +2435,9 @@ end
 
 \ Can finally define the type layout officially.
 struct: Type
-  Cell 1 field: Type_size
-  Cell 1 field: Type_align
-  U8   0 field: Type_name  \ Variable width; null-terminated.
+  Cell 1 field: .Type_size
+  Cell 1 field: .Type_align
+  U8   0 field: .Type_name  \ Variable width; null-terminated.
 end
 
 \ ## Interpreter / compiler internals continued
@@ -2448,47 +2451,47 @@ end
 \
 \ SYNC[stack_field_offsets].
 struct: Stack
-  Cell 1 field: Stack_bytelen
-  Adr  1 field: Stack_cellar
-  Adr  1 field: Stack_floor
-  Adr  1 field: Stack_top
-  Adr  1 field: Stack_ceil
+  Cell 1 field: .Stack_bytelen
+  Adr  1 field: .Stack_cellar
+  Adr  1 field: .Stack_floor
+  Adr  1 field: .Stack_top
+  Adr  1 field: .Stack_ceil
 end
 
 \ SYNC[set_fields].
 struct: Interp_set
-  U32 1 field: Interp_set_len
-  U32 1 field: Interp_set_cap
-  Adr 1 field: Interp_set_bits \ Cell*
-  Adr 1 field: Interp_set_vals \ Sym**
+  U32 1 field: .Interp_set_len
+  U32 1 field: .Interp_set_cap
+  Adr 1 field: .Interp_set_bits \ Cell*
+  Adr 1 field: .Interp_set_vals \ Sym**
 end
 
 \ SYNC[word_str].
 struct: Sym_word
-  U32 1   field: Sym_word_len
-  U8  128 field: Sym_word_buf
+  U32 1   field: .Sym_word_len
+  U8  128 field: .Sym_word_buf
 end
 
 \ SYNC[sym_fields].
 struct: Sym_instrs
-  U32 1 field: Sym_instrs_floor
-  U32 1 field: Sym_instrs_prologue
-  U32 1 field: Sym_instrs_inner
-  U32 1 field: Sym_instrs_epi_ok
-  U32 1 field: Sym_instrs_epi_err
-  U32 1 field: Sym_instrs_ret
-  U32 1 field: Sym_instrs_data
-  U32 1 field: Sym_instrs_ceil
+  U32 1 field: .Sym_instrs_floor
+  U32 1 field: .Sym_instrs_prologue
+  U32 1 field: .Sym_instrs_inner
+  U32 1 field: .Sym_instrs_epi_ok
+  U32 1 field: .Sym_instrs_epi_err
+  U32 1 field: .Sym_instrs_ret
+  U32 1 field: .Sym_instrs_data
+  U32 1 field: .Sym_instrs_ceil
 end
 
 \ SYNC[sym_fields].
 struct: Sym_norm
-  Adr        1 field: Sym_norm_exec
-  Sym_instrs 1 field: Sym_norm_spans
-  U8         1 field: Sym_norm_inlinable
-  U8         1 field: Sym_norm_has_loads
-  U8         1 field: Sym_norm_has_recur
-  U8         1 field: Sym_norm_has_alloca
+  Adr        1 field: .Sym_norm_exec
+  Sym_instrs 1 field: .Sym_norm_spans
+  U8         1 field: .Sym_norm_inlinable
+  U8         1 field: .Sym_norm_has_loads
+  U8         1 field: .Sym_norm_has_recur
+  U8         1 field: .Sym_norm_has_alloca
 end
 
 \ Word metadata defined internally by the interpreter.
@@ -2496,37 +2499,37 @@ end
 \
 \ SYNC[sym_fields].
 struct: Sym
-  Cint       1 field: Sym_type
-  Sym_word   1 field: Sym_name
-  U8         1 field: Sym_wordlist
-  Sym_norm   1 field: Sym_union   \ Begins with executable instruction address.
-  Interp_set 1 field: Sym_callees \ set_of(Sym*)
-  Interp_set 1 field: Sym_callers \ set_of(Sym*)
-  Cell       1 field: Sym_clobber \ `Bits`
-  U8         1 field: Sym_inp_len
-  U8         1 field: Sym_out_len
-  U8         1 field: Sym_has_err
-  U8         1 field: Sym_comp_only
-  U8         1 field: Sym_interp_only
-  U8         1 field: Sym_plain_call
+  Cint       1 field: .Sym_type
+  Sym_word   1 field: .Sym_name
+  U8         1 field: .Sym_wordlist
+  Sym_norm   1 field: .Sym_union   \ Begins with executable instruction address.
+  Interp_set 1 field: .Sym_callees \ set_of(Sym*)
+  Interp_set 1 field: .Sym_callers \ set_of(Sym*)
+  Cell       1 field: .Sym_clobber \ `Bits`
+  U8         1 field: .Sym_inp_len
+  U8         1 field: .Sym_out_len
+  U8         1 field: .Sym_has_err
+  U8         1 field: .Sym_comp_only
+  U8         1 field: .Sym_interp_only
+  U8         1 field: .Sym_plain_call
 end
 
 \ SYNC[sym_fields].
-fun_comp: sym_instr { -- err } ( E: XT -- instr ) call'' Sym_union call'' @ end
+fun_comp: .sym_instr { -- err } ( E: XT -- instr ) call'' .Sym_union call'' @ end
 
-fun: sym_instr { XT -> instr } .sym_instr end
+fun: .sym_instr { XT -> instr } .sym_instr end
 
 \ For internal use below.
-fun: comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
+fun: .comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
   .next_word .sym_instr .comp_next_page_addr
 end
 
 \ Address of first executable instruction of next runtime word in source code.
 \ For comptime words, use `instr''`. This is the same as C "function pointer".
 \
-\ Resulting address can be passed to `call` or foreign code as a callback.
+\ Resulting address can be passed to `.call` or foreign code as a callback.
 \
-\ Some of our words, such as `strf`, directly use ambient memory context.
+\ Some of our words, such as `.strf`, directly use ambient memory context.
 \ Their callers depend on ambient context indirectly. When passing words
 \ to foreign callers, ensure one of:
 \
@@ -2548,24 +2551,24 @@ end
 
 \ SYNC[hash_table_structure].
 struct: Interp_dict
-  U32 1 field: Interp_dict_len
-  U32 1 field: Interp_dict_cap
-  Adr 1 field: Interp_dict_bits \ Cell*
-  Adr 1 field: Interp_dict_keys \ char**
-  Adr 1 field: Interp_dict_vals \ Sym**
+  U32 1 field: .Interp_dict_len
+  U32 1 field: .Interp_dict_cap
+  Adr 1 field: .Interp_dict_bits \ Cell*
+  Adr 1 field: .Interp_dict_keys \ char**
+  Adr 1 field: .Interp_dict_vals \ Sym**
 end
 
 \ SYNC[interp_reader_fields].
 struct: Interp_reader
-  Cstr 1 field: Interp_reader_src
-  U32  1 field: Interp_reader_len
-  U32  1 field: Interp_reader_pos
+  Cstr 1 field: .Interp_reader_src
+  U32  1 field: .Interp_reader_len
+  U32  1 field: .Interp_reader_pos
   \ ... other fields ...
 end
 
 \ SYNC[interp_module_fields].
 struct: Interp_module_ctx
-  Interp_reader 1 field: Interp_module_reader
+  Interp_reader 1 field: .Interp_module_reader
   \ ... other fields ...
 end
 
@@ -2573,29 +2576,29 @@ end
 \
 \ SYNC[comp_code_fields].
 struct: Interp_comp_code
-  Adr 1   field: Interp_comp_code_write
-  Adr 1   field: Interp_comp_code_heap
-  U8  232 field: Interp_comp_code_tail_field \ ... other fields ...
+  Adr 1   field: .Interp_comp_code_write
+  Adr 1   field: .Interp_comp_code_heap
+  U8  232 field: .Interp_comp_code_tail_field \ ... other fields ...
 end
 
 \ Partial mirror of C `Comp_ctx`. Defines only what we use.
 \ SYNC[comp_ctx_fields].
 struct: Interp_comp_ctx
-  Adr 1 field: Interp_comp_ctx_sym
+  Adr 1 field: .Interp_comp_ctx_sym
   \ ... other fields ...
 end
 
 \ SYNC[comp_fields].
 struct: Interp_comp
-  Interp_comp_code 1 field: Interp_comp_code_field
-  Interp_comp_ctx  1 field: Interp_comp_ctx_field
+  Interp_comp_code 1 field: .Interp_comp_code_field
+  Interp_comp_ctx  1 field: .Interp_comp_ctx_field
 end
 
 \ SYNC[ctx_fields].
 struct: Ctx
-  Adr 1 field: Ctx_self
-  Adr 1 field: Ctx_top
-  Adr 1 field: Ctx_ceil
+  Adr 1 field: .Ctx_self
+  Adr 1 field: .Ctx_top
+  Adr 1 field: .Ctx_ceil
 end
 
 \ Partial mirror of the outer C-based interpreter. Caution: only fields actually
@@ -2603,16 +2606,16 @@ end
 \
 \ SYNC[interp_fields].
 struct: Interp
-  Ctx         1 field: Interp_ctx
-  Stack       1 field: Interp_ints
-  Cell        1 field: Interp_argc
-  Adr         1 field: Interp_argv
-  Interp_dict 1 field: Interp_dict_exec
-  Interp_dict 1 field: Interp_dict_comp
-  Stack       1 field: Interp_sym
-  Adr         1 field: Interp_module \ Interp_module_ctx*
-  Interp_dict 1 field: Interp_imports
-  Interp_comp 1 field: Interp_comp_field
+  Ctx         1 field: .Interp_ctx
+  Stack       1 field: .Interp_ints
+  Cell        1 field: .Interp_argc
+  Adr         1 field: .Interp_argv
+  Interp_dict 1 field: .Interp_dict_exec
+  Interp_dict 1 field: .Interp_dict_comp
+  Stack       1 field: .Interp_sym
+  Adr         1 field: .Interp_module \ Interp_module_ctx*
+  Interp_dict 1 field: .Interp_imports
+  Interp_comp 1 field: .Interp_comp_field
   \ ... other fields ...
 end
 
@@ -2626,12 +2629,12 @@ end
 \ In other contexts, the value of `.Ctx_self`
 \ should not refer to the context, and is
 \ otherwise undefined.
-fun: has_interp { -- bool } context .Ctx_self @ context = end
+fun: .has_interp { -- bool } context .Ctx_self @ context = end
 
 \ ## Raw callbacks
 
 \ Used when calling words with unknown clobbers.
-fun: comp_realloc_regs { -- err }
+fun: .comp_realloc_regs { -- err }
   0  .comp_realloc_reg \ x0
   1  .comp_realloc_reg \ x1
   2  .comp_realloc_reg \ x2
@@ -2651,7 +2654,7 @@ fun: comp_realloc_regs { -- err }
 end
 
 \ blr x0
-fun: call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
+fun: .call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
 
 \ Takes any amount of args where the last arg is assumed to be a raw
 \ instruction address, known in C as "function pointer". Invokes the
@@ -2664,8 +2667,8 @@ fun: call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
 \
 \ This behavior stacks. Earlier comptime words run immediately when
 \ used inside other words, even when compiling other comptime words.
-\ For example, using this `call` word inside another `fun_comp` word
-\ invokes `call` at comptime, and compiles a runtime call of some
+\ For example, using this `.call` word inside another `fun_comp` word
+\ invokes `.call` at comptime, and compiles a runtime call of some
 \ dynamically-provided instruction pointer, usually from `instr'`.
 \ For the newly-defined comptime word, that call runs at comptime
 \ of _other_ words where it's later used.
@@ -2674,15 +2677,15 @@ fun: call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
 \ or backtracking instructions or affecting argument count. Comptime
 \ words used in other comptime words tend to affect just the current
 \ target word, with some exceptions like `compile'` / `compile''`.
-fun_comp: call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
+fun_comp: .call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   .comp_args_get { len }
 
   ifz len .then
-    " unable to compile `call`: at least 1 argument is required" .throw
+    " unable to compile `.call`: at least 1 argument is required" .throw
   end
 
   if len ASM_PARAM_LEN_MAX .inc > .then
-    " unable to compile `call`: 8 param registers available, 9 arguments provided" .throw
+    " unable to compile `.call`: 8 param registers available, 9 arguments provided" .throw
   end
 
   .comp_realloc_regs \ Assume full clobber.
@@ -2704,7 +2707,7 @@ end
 
 \ ## Assembler continued -- logical immediates and other stuff
 
-fun: asm_ror64 { val rot -- out }
+fun: .asm_ror64 { val rot -- out }
   rot 63 .and { rot }
   ifz rot .then val .ret end
 
@@ -2713,7 +2716,7 @@ fun: asm_ror64 { val rot -- out }
   .or
 end
 
-fun: asm_logical_imm_enc { imm -- N immr imms err }
+fun: .asm_logical_imm_enc { imm -- N immr imms err }
   if imm 0 = .then
     " unable to encode logical immediate: 0 is reserved" .throw
   end
@@ -2736,7 +2739,7 @@ fun: asm_logical_imm_enc { imm -- N immr imms err }
   size 1 .lsl .negate ones .dec .or 0x3f .and
 end
 
-fun: asm_logical_imm_mask { imm op -- mask err }
+fun: .asm_logical_imm_mask { imm op -- mask err }
   imm .asm_logical_imm_enc { N immr imms }
   op
   N    22 .lsl .or
@@ -2744,7 +2747,7 @@ fun: asm_logical_imm_mask { imm op -- mask err }
   imms 10 .lsl .or
 end
 
-fun: asm_logical_imm_instr { Xd Xn imm op -- instr err }
+fun: .asm_logical_imm_instr { Xd Xn imm op -- instr err }
   imm op .asm_logical_imm_mask
   Xn 5 .lsl .or
   Xd .or
@@ -2755,13 +2758,13 @@ end
 0b1_10_100100_0_000000_000000_00000_00000 let: ASM_OP_EOR_IMM
 0b1_11_100100_0_000000_000000_00000_00000 let: ASM_OP_ANDS_IMM
 
-fun: asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM .asm_logical_imm_instr end
-fun: asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM .asm_logical_imm_instr end
-fun: asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM .asm_logical_imm_instr end
-fun: asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .invert ASM_OP_AND_IMM .asm_logical_imm_instr end
-fun: asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM .asm_logical_imm_instr end
+fun: .asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM .asm_logical_imm_instr end
+fun: .asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM .asm_logical_imm_instr end
+fun: .asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM .asm_logical_imm_instr end
+fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .invert ASM_OP_AND_IMM .asm_logical_imm_instr end
+fun: .asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM .asm_logical_imm_instr end
 
-fun: asm_add_imm_decode { instr -- Xd Xn imm ok }
+fun: .asm_add_imm_decode { instr -- Xd Xn imm ok }
   \ `add Xd, Xn, #imm12` with `Xd`, `Xn`, and `imm12` masked out.
   \ Not bothering to decode `sub`, shifted immediates, or flags ops.
   0b1_1_1_111111_1_000000000000_00000_00000 { mask }
@@ -2774,11 +2777,11 @@ fun: asm_add_imm_decode { instr -- Xd Xn imm ok }
   Xd Xn imm ok
 end
 
-fun: asm_add_imm_decode_at { instr_adr -- Xd Xn imm ok }
+fun: .asm_add_imm_decode_at { instr_adr -- Xd Xn imm ok }
   instr_adr @u32 .asm_add_imm_decode
 end
 
-fun: asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
+fun: .asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
   \ Prefer unsigned scaled addressing: it has much larger range.
   if off >=0 .then
     1 size .lsl { width }
@@ -2809,34 +2812,34 @@ end
 \ the instructions whenever possible, and fold them at comptime, avoiding new
 \ runtime arithmetic. When not possible, they fallback at runtime operations.
 
-fun: cf_imm_u12 { imm -- ok }
+fun: .cf_imm_u12 { imm -- ok }
   imm 0 >= imm ASM_MAX_IMM12 <= .and
 end
 
-fun: cf_emit_cmp_imm_cset { reg0 reg1 imm cond -- err }
+fun: .cf_emit_cmp_imm_cset { reg0 reg1 imm cond -- err }
   reg1 imm  .asm_cmp_imm .comp_instr \ cmp Xn, #imm12
   reg0 cond .asm_cset    .comp_instr \ cset Xd, cond
 end
 
-fun: cf_cmp_validate { imm cond -- aux ok err }
+fun: .cf_cmp_validate { imm cond -- aux ok err }
   imm .cf_imm_u12 { ok }
   cond ok
 end
 
-fun: cf_args_fold1 { -- reg imm consumed err }
+fun: .cf_args_fold1 { -- reg imm consumed err }
   1 nil .comp_args_min
   .comp_args_get .dec { reg }
   1 .comp_args_fold { imm _imm1 _known consumed }
   reg imm consumed
 end
 
-fun: cf_fold_cleared1 { -- reg imm ok err }
+fun: .cf_fold_cleared1 { -- reg imm ok err }
   .cf_args_fold1 { reg imm consumed }
   ifz consumed .then reg 0 false .ret end
   reg imm true
 end
 
-fun: cf_args_fold2 { -- reg0 reg1 imm0 imm1 known consumed err }
+fun: .cf_args_fold2 { -- reg0 reg1 imm0 imm1 known consumed err }
   2 nil .comp_args_min
   .comp_args_get .dec { reg1 }
   reg1 .dec { reg0 }
@@ -2844,7 +2847,7 @@ fun: cf_args_fold2 { -- reg0 reg1 imm0 imm1 known consumed err }
   reg0 reg1 imm0 imm1 known consumed
 end
 
-fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
+fun: .cf_fold_cleared2 { -- reg imm0 imm1 ok err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
   if consumed 2 <> .then
     if consumed 1 = .then imm1 reg1 .comp_load end
@@ -2853,22 +2856,22 @@ fun: cf_fold_cleared2 { -- reg imm0 imm1 ok err }
   reg0 imm0 imm1 true
 end
 
-fun: cf_fold_done { reg imm -- err }
+fun: .cf_fold_done { reg imm -- err }
   imm reg .comp_load
   reg .inc .comp_args_set
 end
 
-fun: cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
+fun: .cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
   imm0 reg0 .comp_load
   imm1 reg1 .comp_load
   reg1 .inc .comp_args_set
 end
 
-fun: cf_restore_rhs { reg1 imm1 consumed -- err }
+fun: .cf_restore_rhs { reg1 imm1 consumed -- err }
   if consumed 1 = .then imm1 reg1 .comp_load end
 end
 
-fun: cf_fold2_valid { lhs bad0 msg0 bad1 msg1 -- reg0 reg1 imm0 imm1 consumed ok err }
+fun: .cf_fold2_valid { lhs bad0 msg0 bad1 msg1 -- reg0 reg1 imm0 imm1 consumed ok err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 known consumed }
 
   if known .then
@@ -2888,17 +2891,17 @@ fun: cf_fold2_valid { lhs bad0 msg0 bad1 msg1 -- reg0 reg1 imm0 imm1 consumed ok
 end
 
 \ Fits the unsigned immediate accepted by our `add/sub #imm12` utils.
-fun: cf_addsub_imm12_mag { imm -- mag ok }
+fun: .cf_addsub_imm12_mag { imm -- mag ok }
   if imm >=0 .then imm imm ASM_MAX_IMM12 <= .ret end
   if imm ASM_MAX_IMM12 .negate >= .then imm .negate true .ret end
   0 false
 end
 
-fun: cf_validate { imm validate_inp validate -> aux ok err }
+fun: .cf_validate { imm validate_inp validate -> aux ok err }
   .call [ 3 .comp_args_set ]
 end
 
-fun: cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validate emit fallback -- err }
+fun: .cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validate emit fallback -- err }
   if consumed 1 >= .then
     \ RHS constant: `num 10 +`.
     imm1 validate_inp validate .cf_validate { aux ok }
@@ -2915,12 +2918,12 @@ fun: cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validat
   fallback .call_xt
 end
 
-fun: cf_shift_validate { imm reg_op -- aux ok err }
+fun: .cf_shift_validate { imm reg_op -- aux ok err }
   ifz imm .then " redundant arithmetic" .throw end
   reg_op imm 0 >= imm 63 <= .and
 end
 
-fun: cf_shift_emit { reg0 reg1 imm reg_op -- err }
+fun: .cf_shift_emit { reg0 reg1 imm reg_op -- err }
   if reg_op ASM_OP_LSL_REG = .then
     64 imm - 6 .bits_trunc { immr }
     63 imm - 6 .bits_trunc { imms }
@@ -2933,7 +2936,7 @@ fun: cf_shift_emit { reg0 reg1 imm reg_op -- err }
   reg0 reg1 immr 63 bitfield_op .asm_bitfield .comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
-fun: cf_logical_validate { imm aux -- aux ok Err }
+fun: .cf_logical_validate { imm aux -- aux ok Err }
   aux 1 .and { inv }
   aux inv - { op }
   imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .and .or { edge }
@@ -2942,47 +2945,47 @@ fun: cf_logical_validate { imm aux -- aux ok Err }
   imm op .asm_logical_imm_mask =0
 end
 
-fun: cf_logical_emit { reg0 reg1 _imm mask -- err }
+fun: .cf_logical_emit { reg0 reg1 _imm mask -- err }
   mask reg1 5 .lsl .or reg0 .or .comp_instr \ and|orr|eor Xd, Xn, #imm
 end
 
-fun: cf_align_validate { size _ -- aux ok Err }
+fun: .cf_align_validate { size _ -- aux ok Err }
   if size 1 = .then " redundant arithmetic" .throw end
   size .dec ASM_OP_ANDS_IMM .asm_logical_imm_mask =0
 end
 
-fun: cf_align_emit { out adr _size mask -- err }
+fun: .cf_align_emit { out adr _size mask -- err }
   mask adr 5 .lsl .or 31 .or .comp_instr \ tst Xn, #imm
   out ASM_EQ .asm_cset .comp_instr      \ cset Xd, eq
 end
 
-fun: cf_align_down_validate { size _ -- aux ok Err }
+fun: .cf_align_down_validate { size _ -- aux ok Err }
   if size 1 = .then " redundant arithmetic" .throw end
   size .negate ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
-fun: cf_align_down_emit { out len _size mask -- err }
+fun: .cf_align_down_emit { out len _size mask -- err }
   mask len 5 .lsl .or out .or .comp_instr \ and Xd, Xn, #imm
 end
 
-fun: cf_align_up_validate { size _ -- aux ok Err }
+fun: .cf_align_up_validate { size _ -- aux ok Err }
   if size 1 = .then " redundant arithmetic" .throw end
   size .dec .cf_imm_u12 { add_ok }
   size .negate ASM_OP_AND_IMM .asm_logical_imm_mask { mask mask_err }
   mask add_ok mask_err =0 .and
 end
 
-fun: cf_align_up_emit { out len size mask -- err }
+fun: .cf_align_up_emit { out len size mask -- err }
   out len size .dec .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
   mask out 5 .lsl .or out .or .comp_instr  \ and Xd, Xn, #imm
 end
 
-fun: cf_bits_trunc_validate { len _ -- aux ok Err }
+fun: .cf_bits_trunc_validate { len _ -- aux ok Err }
   if len 0 <= len 64 >= .or .then " redundant arithmetic" .throw end
   len .low_bits ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
-fun: cf_bit_mask_validate { mask -- err }
+fun: .cf_bit_mask_validate { mask -- err }
   if mask .then
     mask mask .bit_ctz .lsr { packed }
     if packed packed .inc .and =0 .then .ret end
@@ -2990,7 +2993,7 @@ fun: cf_bit_mask_validate { mask -- err }
   " invalid bit mask: expected nonzero contiguous mask" .throw
 end
 
-fun: cf_bit_mask_get_validate { mask _ -- aux ok Err }
+fun: .cf_bit_mask_get_validate { mask _ -- aux ok Err }
   if mask -1 = .then " redundant arithmetic" .throw end
   mask .cf_bit_mask_validate .try
   mask ASM_OP_AND_IMM .asm_logical_imm_mask { instr_mask err }
@@ -2998,25 +3001,25 @@ fun: cf_bit_mask_get_validate { mask _ -- aux ok Err }
   mask .bit_ctz 32 .lsl instr_mask .or true
 end
 
-fun: cf_bit_mask_get_emit { out src _mask aux -- err }
+fun: .cf_bit_mask_get_emit { out src _mask aux -- err }
   aux 32 .bits_trunc { instr_mask }
   aux 32 .lsr        { shift      }
   instr_mask src 5 .lsl .or out .or .comp_instr \ and Xd, Xn, #imm
   out out shift .asm_lsr_imm .comp_instr      \ lsr Xd, Xn, #imm6
 end
 
-fun: cf_addsub_validate { imm add -- aux ok err }
+fun: .cf_addsub_validate { imm add -- aux ok err }
   ifz imm .then " redundant arithmetic" .throw end
   imm .cf_addsub_imm12_mag { -- ok }
   add ok
 end
 
-fun: cf_addsub_emit { reg0 reg1 imm add -- err }
+fun: .cf_addsub_emit { reg0 reg1 imm add -- err }
   imm .cf_addsub_imm12_mag { mag -- }
   reg0 reg1 mag imm add .asm_addsub_imm .comp_instr \ add|sub Xd, Xn, #imm12
 end
 
-fun: cf_pow2_validate { imm flags -- aux ok err }
+fun: .cf_pow2_validate { imm flags -- aux ok err }
   " redundant arithmetic" { err }
   ifz imm .then
     if flags 1 .and .then err .throw end
@@ -3033,22 +3036,22 @@ fun: cf_pow2_validate { imm flags -- aux ok err }
   aux true
 end
 
-fun: cf_pow2_validate_reject_1 { imm msg -- aux ok err }
+fun: .cf_pow2_validate_reject_1 { imm msg -- aux ok err }
   if imm 1 = .then msg .throw end
   imm nil .cf_pow2_validate
 end
 
-fun: cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
+fun: .cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
   aux 0x3f .and { shift }
   reg0 reg1 shift .asm_lsr_imm .comp_instr \ lsr Xd, Xn, #imm6
 end
 
-fun: cf_umod_pow2_emit { reg0 reg1 _imm aux -- err }
+fun: .cf_umod_pow2_emit { reg0 reg1 _imm aux -- err }
   aux 0x3f .and .low_bits { mask }
   reg0 reg1 mask .asm_and_imm .comp_instr \ and Xd, Xn, #imm
 end
 
-fun: cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
+fun: .cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
   aux 0x3f .and { shift }
   reg0 reg1 shift .asm_lsl_imm .comp_instr \ lsl Xd, Xn, #imm6
   if aux 0x40 .and .then
@@ -3056,26 +3059,26 @@ fun: cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
   end
 end
 
-fun: comp_loc_mut_arg_prepare { -- reg loc imm consumed err }
+fun: .comp_loc_mut_arg_prepare { -- reg loc imm consumed err }
   \ For words like `imm +: loc`: capture RHS arg and target local.
   .cf_args_fold1 { reg imm consumed }
   .read_word .comp_local { loc }
   reg loc imm consumed
 end
 
-fun: comp_loc_mut_store_prepared { loc reg -- err }
+fun: .comp_loc_mut_store_prepared { loc reg -- err }
   \ `reg` metadata already invalidated by allocator/fold backtracking.
   reg .inc .comp_args_set
   loc .comp_pop_into_local
 end
 
-fun: comp_loc_mut_store_realloc { loc reg -- err }
+fun: .comp_loc_mut_store_realloc { loc reg -- err }
   \ Hand-emitted op changed `reg`; discard stale arg metadata before storing.
   reg .comp_realloc_reg
   loc reg .comp_loc_mut_store_prepared
 end
 
-fun: comp_loc_mut_fold_imm { reg loc imm aux emit -- err }
+fun: .comp_loc_mut_fold_imm { reg loc imm aux emit -- err }
   \ Emit immediate-form mutation of `loc`; RHS was already backtracked.
   reg .comp_args_set
   loc .comp_push_from_local
@@ -3085,7 +3088,7 @@ fun: comp_loc_mut_fold_imm { reg loc imm aux emit -- err }
   loc loc_reg .comp_loc_mut_store_prepared
 end
 
-fun: comp_loc_mut_imm { reg_op validate_inp validate emit -- err }
+fun: .comp_loc_mut_imm { reg_op validate_inp validate emit -- err }
   ( C: "name" -- ) ( E: imm -- )
   \ Try immediate-form local mutation; otherwise emit regular reg-reg op.
 
@@ -3103,20 +3106,20 @@ fun: comp_loc_mut_imm { reg_op validate_inp validate emit -- err }
   loc rhs_reg .comp_loc_mut_store_prepared
 end
 
-fun: comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
+fun: .comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
   .read_word .comp_local { loc }
   loc .comp_push_from_local
   .comp_args_get .dec loc
 end
 
-fun: comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
+fun: .comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   \ Mutate local with fixed immediate, e.g. `inc:` / `+cell:`.
   .comp_loc_unary_init { reg loc }
   reg reg imm aux emit .call [ 1 .comp_args_set ] .try
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun: comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
+fun: .comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
   .comp_args1_reg { candidate }
   .read_word .comp_local { loc }
   loc .comp_push_from_local
@@ -3131,13 +3134,13 @@ fun: comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
   loc candidate .comp_loc_mut_store_prepared
 end
 
-fun: comp_loc_mut_cset_zero { cond -- err } ( C: "name" -- ) ( E: -- )
+fun: .comp_loc_mut_cset_zero { cond -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_unary_init { reg loc }
   reg cond .comp_emit_cset_zero
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun: comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rhs -- )
+fun: .comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rhs -- )
   .comp_loc_mut_arg_prepare { reg loc imm consumed }
 
   if consumed .then
@@ -3151,74 +3154,74 @@ fun: comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rh
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: or { -- err } [ .redefine ]
+fun_comp: .or { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .or .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_ORR_IMM
-  instr' cf_logical_validate instr' cf_logical_emit xt'' or
+  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .or
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise `or` into a local: `mask or: some_val`.
+\ Bitwise `.or` into a local: `mask or: some_val`.
 fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_ORR_REG ASM_OP_ORR_IMM
-  instr' cf_logical_validate instr' cf_logical_emit
+  instr' .cf_logical_validate instr' .cf_logical_emit
   .comp_loc_mut_imm
 end
 
-fun_comp: and { -- err } [ .redefine ]
+fun_comp: .and { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .and .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_AND_IMM
-  instr' cf_logical_validate instr' cf_logical_emit xt'' and
+  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .and
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise `and` into a local: `mask and: some_val`.
+\ Bitwise `.and` into a local: `mask and: some_val`.
 fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_AND_REG ASM_OP_AND_IMM
-  instr' cf_logical_validate instr' cf_logical_emit
+  instr' .cf_logical_validate instr' .cf_logical_emit
   .comp_loc_mut_imm
 end
 
-fun_comp: xor { -- err } [ .redefine ]
+fun_comp: .xor { -- err } [ .redefine ]
   true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .xor .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_EOR_IMM
-  instr' cf_logical_validate instr' cf_logical_emit xt'' xor
+  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .xor
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise `xor` into a local: `mask xor: some_val`.
+\ Bitwise `.xor` into a local: `mask xor: some_val`.
 fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_EOR_REG ASM_OP_EOR_IMM
-  instr' cf_logical_validate instr' cf_logical_emit
+  instr' .cf_logical_validate instr' .cf_logical_emit
   .comp_loc_mut_imm
 end
 
-fun_comp: lsl { -- err } [ .redefine ]
+fun_comp: .lsl { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .lsl .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_LSL_REG
-  instr' cf_shift_validate instr' cf_shift_emit xt'' lsl
+  instr' .cf_shift_validate instr' .cf_shift_emit xt'' .lsl
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: lsr { -- err } [ .redefine ]
+fun_comp: .lsr { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .lsr .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_LSR_REG
-  instr' cf_shift_validate instr' cf_shift_emit xt'' lsr
+  instr' .cf_shift_validate instr' .cf_shift_emit xt'' .lsr
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: asr { -- err } [ .redefine ]
+fun_comp: .asr { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .asr .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_ASR_REG
-  instr' cf_shift_validate instr' cf_shift_emit xt'' asr
+  instr' .cf_shift_validate instr' .cf_shift_emit xt'' .asr
   .cf_fold2_partial_or_fallback
 end
 
@@ -3226,14 +3229,14 @@ fun_comp: + { -- err } [ .redefine ]
   true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 + .cf_fold_done .ret end
   reg reg1 imm1 consumed true
-  instr' cf_addsub_validate instr' cf_addsub_emit xt'' +
+  instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' +
   .cf_fold2_partial_or_fallback
 end
 
 \ Add a value to a local: `val +: some_val`.
 fun_comp: +: { -- err } ( C: "name" -- ) ( E: imm -- )
   ASM_OP_ADD_REG true
-  instr' cf_addsub_validate instr' cf_addsub_emit
+  instr' .cf_addsub_validate instr' .cf_addsub_emit
   .comp_loc_mut_imm
 end
 
@@ -3241,7 +3244,7 @@ fun_comp: - { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 - .cf_fold_done .ret end
   reg reg1 imm1 consumed false
-  instr' cf_addsub_validate instr' cf_addsub_emit xt'' -
+  instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' -
   .cf_fold2_partial_or_fallback
 end
 
@@ -3250,19 +3253,19 @@ fun_comp: * { -- err } [ .redefine ]
   true 0 err 1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 * .cf_fold_done .ret end
   reg reg1 imm1 consumed true
-  instr' cf_pow2_validate instr' cf_mul_pow2_emit xt'' *
+  instr' .cf_pow2_validate instr' .cf_mul_pow2_emit xt'' *
   .cf_fold2_partial_or_fallback
 end
 
 \ Multiply a local: `factor *: some_val`.
 fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
   ASM_OP_MUL_REG true
-  instr' cf_pow2_validate instr' cf_mul_pow2_emit
+  instr' .cf_pow2_validate instr' .cf_mul_pow2_emit
   .comp_loc_mut_imm
 end
 
 \ No partial CF: signed pow2 division needs several biasing instructions,
-\ because `asr` rounds negative values down, while signed division rounds
+\ because `.asr` rounds negative values down, while signed division rounds
 \ toward zero. Not worth the code size for now.
 fun_comp: / { -- err } [ .redefine ]
   " redundant arithmetic: division by 0 -> 0" { err0 }
@@ -3278,25 +3281,25 @@ fun_comp: u/ { -- err } [ .redefine ]
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 u/ .cf_fold_done .ret end
   reg reg1 imm1 consumed err1
-  instr' cf_pow2_validate_reject_1 instr' cf_udiv_pow2_emit xt'' u/
+  instr' .cf_pow2_validate_reject_1 instr' .cf_udiv_pow2_emit xt'' u/
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: mod { -- err } [ .redefine ]
+fun_comp: .mod { -- err } [ .redefine ]
   " redundant arithmetic: modulo by 0 -> dividend" { err0 }
   " redundant arithmetic: modulo by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .mod .cf_fold_done .ret end
-  reg1 imm1 consumed .cf_restore_rhs call'' mod
+  reg1 imm1 consumed .cf_restore_rhs call'' .mod
 end
 
-fun_comp: umod { -- err } [ .redefine ]
+fun_comp: .umod { -- err } [ .redefine ]
   " redundant arithmetic: modulo by 0 -> dividend" { err0 }
   " redundant arithmetic: modulo by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .umod .cf_fold_done .ret end
   reg reg1 imm1 consumed err1
-  instr' cf_pow2_validate_reject_1 instr' cf_umod_pow2_emit xt'' umod
+  instr' .cf_pow2_validate_reject_1 instr' .cf_umod_pow2_emit xt'' .umod
   .cf_fold2_partial_or_fallback
 end
 
@@ -3316,26 +3319,26 @@ fun_comp: u/mod { -- err } [ .redefine ]
   reg1 imm1 consumed .cf_restore_rhs call'' u/mod
 end
 
-fun_comp: inc { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call'' inc end
+fun_comp: .inc { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call'' .inc end
 end
 
 \ Increment a local: `inc: some_val`.
 fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
-  1 true instr' cf_addsub_emit .comp_loc_mut_fixed
+  1 true instr' .cf_addsub_emit .comp_loc_mut_fixed
 end
 
-fun_comp: dec { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call'' dec end
+fun_comp: .dec { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call'' .dec end
 end
 
 \ Decrement a local: `dec: some_val`.
 fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
-  1 false instr' cf_addsub_emit .comp_loc_mut_fixed
+  1 false instr' .cf_addsub_emit .comp_loc_mut_fixed
 end
 
-fun_comp: negate { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call'' negate end
+fun_comp: .negate { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call'' .negate end
 end
 
 \ Negate a local: `negate: some_val`.
@@ -3345,8 +3348,8 @@ fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: abs { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call'' abs end
+fun_comp: .abs { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call'' .abs end
 end
 
 \ Absolute-value a local: `abs: some_val`.
@@ -3356,8 +3359,8 @@ fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: bit_clz { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call'' bit_clz end
+fun_comp: .bit_clz { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call'' .bit_clz end
 end
 
 \ Count leading zeros in a local: `bit_clz: some_val`.
@@ -3367,8 +3370,8 @@ fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: bit_ctz { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call'' bit_ctz end
+fun_comp: .bit_ctz { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call'' .bit_ctz end
 end
 
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
@@ -3378,8 +3381,8 @@ fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: bit_len { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call'' bit_len end
+fun_comp: .bit_len { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call'' .bit_len end
 end
 
 \ Compute bit length into a local: `bit_len: some_val`.
@@ -3390,8 +3393,8 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: pow2_ceil { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call'' pow2_ceil end
+fun_comp: .pow2_ceil { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call'' .pow2_ceil end
 end
 
 \ Round-up a local to a power of two: `pow2_ceil: some_val`.
@@ -3403,8 +3406,8 @@ fun_comp: pow2_ceil: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 \ No partial CF: `csel` needs both values in regs; constants still cost `mov`.
-fun_comp: min { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call'' min end
+fun_comp: .min { -- err } [ .redefine ]
+  if .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call'' .min end
 end
 
 \ Minimum into a local: `candidate min: some_val`.
@@ -3412,8 +3415,8 @@ fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
   false ASM_LT .comp_loc_mut_csel
 end
 
-fun_comp: umin { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call'' umin end
+fun_comp: .umin { -- err } [ .redefine ]
+  if .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call'' .umin end
 end
 
 \ Unsigned minimum into a local: `candidate umin: some_val`.
@@ -3421,8 +3424,8 @@ fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
   false ASM_LO .comp_loc_mut_csel
 end
 
-fun_comp: max { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call'' max end
+fun_comp: .max { -- err } [ .redefine ]
+  if .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call'' .max end
 end
 
 \ Maximum into a local: `candidate max: some_val`.
@@ -3430,8 +3433,8 @@ fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
   false ASM_GT .comp_loc_mut_csel
 end
 
-fun_comp: umax { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call'' umax end
+fun_comp: .umax { -- err } [ .redefine ]
+  if .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call'' .umax end
 end
 
 \ Unsigned maximum into a local: `candidate umax: some_val`.
@@ -3440,9 +3443,9 @@ fun_comp: umax: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 \ No partial CF: adopted child of the min/max family.
-fun_comp: fallback { -- err } [ .redefine ]
+fun_comp: .fallback { -- err } [ .redefine ]
   if .cf_fold_cleared2 .then .fallback .cf_fold_done
-  else { -- } call'' fallback end
+  else { -- } call'' .fallback end
 end
 
 \ Fallback into a local: `candidate fallback: some_val`.
@@ -3450,9 +3453,9 @@ fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
   true ASM_NE .comp_loc_mut_csel
 end
 
-fun_comp: cint_to_cell { -- err } [ .redefine ]
+fun_comp: .cint_to_cell { -- err } [ .redefine ]
   if .cf_fold_cleared1 .then .cint_to_cell .cf_fold_done
-  else { -- } call'' cint_to_cell end
+  else { -- } call'' .cint_to_cell end
 end
 
 \ Sign-extend a local from int32 to cell: `cint_to_cell: some_val`.
@@ -3516,7 +3519,7 @@ fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
   ASM_GE .comp_loc_mut_cset_zero
 end
 
-fun: cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
+fun: .cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
 
   if consumed 2 = .then
@@ -3525,7 +3528,7 @@ fun: cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
   end
 
   reg0 reg1 imm1 consumed rhs_cond
-  instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset fallback
+  instr' .cf_cmp_validate instr' .cf_emit_cmp_imm_cset fallback
   .cf_fold2_partial_or_fallback
 end
 
@@ -3535,7 +3538,7 @@ end
 
 \ In-place local test: `rhs =: some_val`.
 fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  ASM_EQ instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  ASM_EQ instr' .cf_cmp_validate instr' .cf_emit_cmp_imm_cset
   .comp_loc_mut_cmp_imm
 end
 
@@ -3545,7 +3548,7 @@ end
 
 \ In-place local test: `rhs <>: some_val`.
 fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  ASM_NE instr' cf_cmp_validate instr' cf_emit_cmp_imm_cset
+  ASM_NE instr' .cf_cmp_validate instr' .cf_emit_cmp_imm_cset
   .comp_loc_mut_cmp_imm
 end
 
@@ -3581,13 +3584,13 @@ fun_comp: u>= { -- err } [ .redefine ]
   xt' u>= xt'' u>= ASM_HS .cf_cmp_fold2_or_call
 end
 
-fun_comp: cells { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call'' cells end
+fun_comp: .cells { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call'' .cells end
 end
 
 \ Scale a local by cell size: `cells: some_val`.
 fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
-  3 ASM_OP_LSL_REG instr' cf_shift_emit .comp_loc_mut_fixed
+  3 ASM_OP_LSL_REG instr' .cf_shift_emit .comp_loc_mut_fixed
 end
 
 fun_comp: /cells { -- err } [ .redefine ]
@@ -3596,7 +3599,7 @@ end
 
 \ Divide a local by cell size: `/cells: some_val`.
 fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
-  3 ASM_OP_ASR_REG instr' cf_shift_emit .comp_loc_mut_fixed
+  3 ASM_OP_ASR_REG instr' .cf_shift_emit .comp_loc_mut_fixed
 end
 
 fun_comp: +cell { -- err } [ .redefine ]
@@ -3605,7 +3608,7 @@ end
 
 \ Add one cell to a local: `+cell: some_val`.
 fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
-  CELL true instr' cf_addsub_emit .comp_loc_mut_fixed
+  CELL true instr' .cf_addsub_emit .comp_loc_mut_fixed
 end
 
 fun_comp: -cell { -- err } [ .redefine ]
@@ -3614,10 +3617,10 @@ end
 
 \ Subtract one cell from a local: `-cell: some_val`.
 fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
-  CELL false instr' cf_addsub_emit .comp_loc_mut_fixed
+  CELL false instr' .cf_addsub_emit .comp_loc_mut_fixed
 end
 
-fun_comp: odd { -- err }
+fun_comp: .odd { -- err }
   if .cf_fold_cleared1 .then 1 .and .cf_fold_done
   else
     { -- }
@@ -3626,7 +3629,7 @@ fun_comp: odd { -- err }
   end
 end
 
-fun: odd { val -> bool } .odd end
+fun: .odd { val -> bool } .odd end
 
 \ In-place local test: `odd: some_val`.
 fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
@@ -3635,32 +3638,32 @@ fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: is_aligned_to { -- err } [ .redefine ]
+fun_comp: .is_aligned_to { -- err } [ .redefine ]
   false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .is_aligned_to .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
-  instr' cf_align_validate instr' cf_align_emit xt'' is_aligned_to
+  instr' .cf_align_validate instr' .cf_align_emit xt'' .is_aligned_to
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: align_down { -- err } [ .redefine ]
+fun_comp: .align_down { -- err } [ .redefine ]
   false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .align_down .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
-  instr' cf_align_down_validate instr' cf_align_down_emit xt'' align_down
+  instr' .cf_align_down_validate instr' .cf_align_down_emit xt'' .align_down
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: align_up { -- err } [ .redefine ]
+fun_comp: .align_up { -- err } [ .redefine ]
   false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .align_up .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
-  instr' cf_align_up_validate instr' cf_align_up_emit xt'' align_up
+  instr' .cf_align_up_validate instr' .cf_align_up_emit xt'' .align_up
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: invert { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call'' invert end
+fun_comp: .invert { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call'' .invert end
 end
 
 \ Invert a local: `invert: some_val`.
@@ -3670,8 +3673,8 @@ fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: low_bits { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call'' low_bits end
+fun_comp: .low_bits { -- err } [ .redefine ]
+  if .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call'' .low_bits end
 end
 
 \ Set a local to a mask of its low bit count: `low_bits: some_val`.
@@ -3682,25 +3685,25 @@ fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: bits_trunc { -- err } [ .redefine ]
+fun_comp: .bits_trunc { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   false 0 err 64 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .bits_trunc .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
-  instr' cf_bits_trunc_validate instr' cf_logical_emit xt'' bits_trunc
+  instr' .cf_bits_trunc_validate instr' .cf_logical_emit xt'' .bits_trunc
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: bits_clear { -- err } [ .redefine ]
+fun_comp: .bits_clear { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   false 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   if ok .then reg imm0 imm1 .bits_clear .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_AND_IMM 1 .or
-  instr' cf_logical_validate instr' cf_logical_emit xt'' bits_clear
+  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .bits_clear
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: bit_mask_get { -- err } [ .redefine ]
+fun_comp: .bit_mask_get { -- err } [ .redefine ]
   .cf_args_fold2 { reg reg1 src mask _known consumed }
   if consumed 2 = .then
     if mask -1 = .then " redundant arithmetic" .throw end
@@ -3708,15 +3711,15 @@ fun_comp: bit_mask_get { -- err } [ .redefine ]
     reg src mask .bit_mask_get .cf_fold_done
   else
     reg reg1 mask consumed nil
-    instr' cf_bit_mask_get_validate instr' cf_bit_mask_get_emit xt'' bit_mask_get
+    instr' .cf_bit_mask_get_validate instr' .cf_bit_mask_get_emit xt'' .bit_mask_get
     .cf_fold2_partial_or_fallback
   end
 end
 
-fun_comp: bit_mask_set { -- err } [ .redefine ]
+fun_comp: .bit_mask_set { -- err } [ .redefine ]
   \ No partial CF: useful for constant masks, but requires ternary partial-CF.
   \ Full CF alone is not worth keeping the ternary-only machinery.
-  call'' bit_mask_set
+  call'' .bit_mask_set
 end
 
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
@@ -3731,7 +3734,7 @@ end
 
 \ ## More memory stuff
 
-fun: comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
+fun: .comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
   \ Peephole: replace immediately preceding `add Xn, Xn, #off`
   \ with a load/store with an inline offset when it fits.
   .here_write ASM_INSTR_SIZE - { instr_adr }
@@ -3747,7 +3750,7 @@ fun: comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
   true
 end
 
-fun: comp_mem_load { size opc -- err } [ .redefine ]
+fun: .comp_mem_load { size opc -- err } [ .redefine ]
   1 nil .comp_args_min
   .comp_args_get .dec { reg }
   reg .comp_realloc_reg
@@ -3758,7 +3761,7 @@ fun: comp_mem_load { size opc -- err } [ .redefine ]
   reg reg 0 size opc .asm_load_store_off .comp_instr
 end
 
-fun: comp_mem_store { size -- err }
+fun: .comp_mem_store { size -- err }
   2 nil .comp_args_min
   .comp_args_get .dec { adr }
   adr .dec { val }
@@ -3803,9 +3806,9 @@ fun_comp: !clong { -- err }               0b11      .comp_mem_store end
 fun_comp: @culong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
 fun_comp: !culong { -- err }               0b11      .comp_mem_store end
 
-6 1 extern: mmap     ( adr size pflag mflag fdes off -- adr|-1 )
-2 1 extern: munmap   ( adr size -- 0|-1 :Cint )
-3 1 extern: mprotect ( adr size pflag -- 0|-1 :Cint )
+6 1 extern: .mmap     mmap     ( adr size pflag mflag fdes off -- adr|-1 )
+2 1 extern: .munmap   munmap   ( adr size -- 0|-1 :Cint )
+3 1 extern: .mprotect mprotect ( adr size pflag -- 0|-1 :Cint )
 
 0 let: PROT_NONE
 1 let: PROT_READ
@@ -3818,21 +3821,21 @@ fun_comp: !culong { -- err }               0b11      .comp_mem_store end
 4096 let: MAP_ANON
 4098 let: MAP_DEFAULT
 
-fun: mem_map { size pflag -- addr err }
+fun: .mem_map { size pflag -- addr err }
   0 size pflag MAP_DEFAULT -1 0 .mmap { addr }
   if addr .invert =0 .then " unable to mmap" .throw end
   addr
 end
 
-fun: mem_unmap { addr size -> err }
+fun: .mem_unmap { addr size -> err }
   if .munmap .then " unable to munmap" .throw end
 end
 
-fun: mem_prot { addr size pflag -> err }
+fun: .mem_prot { addr size pflag -> err }
   if .mprotect .then " unable to mprotect" .throw end
 end
 
-fun: mem_unprot { addr size -> err } PROT_RW .mem_prot end
+fun: .mem_unprot { addr size -> err } PROT_RW .mem_prot end
 
 \ ## Stacks continued
 
@@ -3842,7 +3845,7 @@ fun: mem_unprot { addr size -> err } PROT_RW .mem_prot end
 \
 \ This is the preferred way to acquire memory pages from the OS.
 \ Size is counted in bytes; to allocate cells, use `size cells`.
-fun: stack_init { size stk -- Err }
+fun: .stack_init { size stk -- Err }
   stk size' Stack .memzero \ Ensure deinit-safe.
 
   size PAGE_SIZE .align_up        { size }
@@ -3867,7 +3870,7 @@ end
 
 \ Returned error, if any, must come from static storage.
 \ Caller may unmap memory before reporting this error.
-fun: stack_deinit { stk -- err }
+fun: .stack_deinit { stk -- err }
   ifz stk .then .ret end
 
   stk @ { bytelen }
@@ -3885,11 +3888,11 @@ end
 fun: stack? { stk -> bool } @ <>0 end
 
 \ Length in BYTES, not cells.
-fun: stack_len { stk -- len } stk .Stack_top @ stk .Stack_floor @ - end
+fun: .stack_len { stk -- len } stk .Stack_top @ stk .Stack_floor @ - end
 
-fun: stack_trunc { stk } if stk .then stk .Stack_floor @ stk .Stack_top ! end end
+fun: .stack_trunc { stk } if stk .then stk .Stack_floor @ stk .Stack_top ! end end
 
-fun: stack_repr { stk }
+fun: .stack_repr { stk }
   ifz stk .then " [debug] stack is nil" .elog .elf .ret end
 
   " [debug] stack           " .elog stk .debug_arg
@@ -3917,24 +3920,24 @@ end
 \ See earlier `context` and `Ctx` for definitions.
 \
 \ In JIT mode, the outer interpreter pre-allocates a context.
-\ In AOT mode, the entry `main` is responsible for this.
+\ In AOT mode, the entry `.main` is responsible for this.
 
 \ Default per-arena memory capacity we use internally.
 \ Apps are free to choose their own arena capacities.
 1 30 .lsl let: CTX_CAP
 
 \ Initialize context with borrowed memory.
-fun: ctx_init { buf len ctx }
+fun: .ctx_init { buf len ctx }
   nil       ctx .Ctx_self !
   buf       ctx .Ctx_top !
   buf len + ctx .Ctx_ceil !
 end
 
-\ Shortcut which combines `stack_init` with context header allocation.
+\ Shortcut which combines `.stack_init` with context header allocation.
 \ Size + align of context `type` is included into total mapped `size`.
 \
 \ Type must begin with `Ctx`; otherwise undefined behavior.
-fun: stack_init_ctx { size type stk -- ctx Err }
+fun: .stack_init_ctx { size type stk -- ctx Err }
   size stk .stack_init .try
 
   stk .Stack_floor @ { ctx }
@@ -3953,30 +3956,30 @@ end
 
 \ stp x28, xzr, [sp, #-16]!
 \ mov x28, x0
-fun_comp: ctx_push { -- err } ( E: ctx -- )
-  1 " context before `ctx_push`" .comp_args_valid
+fun_comp: .ctx_push { -- err } ( E: ctx -- )
+  1 " context before `.ctx_push`" .comp_args_valid
   ASM_REG_CTX ASM_REG_ZR ASM_REG_SP 0 FUND_ALIGN - .asm_store_pair_pre .comp_instr
   ASM_REG_CTX 0 .asm_mov_reg .comp_instr
   0 .comp_args_set
 end
 
 \ ldp x28, xzr, [sp], #16
-fun_comp: ctx_pop { -- err } ( E: -- )
+fun_comp: .ctx_pop { -- err } ( E: -- )
   ASM_REG_CTX ASM_REG_ZR ASM_REG_SP FUND_ALIGN .asm_load_pair_post .comp_instr
 end
 
 \ Runs body with supplied ambient context, restoring prior context at `end`.
 \ Body must reach `end`: no `.ret .try .throw` or local auto-try.
-fun_comp: with_ctx { -- end_xt err } ( E: ctx -- )
-  call'' ctx_push
-  xt'' ctx_pop
+fun_comp: .with_ctx { -- end_xt err } ( E: ctx -- )
+  call'' .ctx_push
+  xt'' .ctx_pop
 end
 
-fun: ctx_top { -- top } context .Ctx_top @ end
-fun: ctx_top_set { top } top context .Ctx_top ! end
+fun: .ctx_top { -- top } context .Ctx_top @ end
+fun: .ctx_top_set { top } top context .Ctx_top ! end
 
 \ Allocates memory in the current ambient context.
-fun: ctx_alloc { size align -- adr err }
+fun: .ctx_alloc { size align -- adr err }
   context { ctx }
   ctx .Ctx_top @ align .align_up { adr }
   adr size + { top }
@@ -3988,7 +3991,7 @@ fun: ctx_alloc { size align -- adr err }
 end
 
 \ Available memory in the current ambient context.
-fun: ctx_avail { align -- buf cap }
+fun: .ctx_avail { align -- buf cap }
   context { ctx }
   ctx .Ctx_top @ align .align_up { buf }
   ctx .Ctx_ceil @ buf - 0 .max { cap }
@@ -4007,9 +4010,9 @@ end
 \ of constant-folding optimizations.
 
 \ Control stack for auxiliary loop constructs like `leave` and `.while`.
-\ Each auxiliary construct pushes `aux_meta aux_pop`, and `loop_frame_end_xt`
-\ repeatedly calls aux pops until it reaches the `nop` terminator installed
-\ by `loop_frame_init`.
+\ Each auxiliary construct pushes `aux_meta aux_pop`, and `.loop_frame_end_xt`
+\ repeatedly calls aux pops until it reaches the `.nop` terminator installed
+\ by `.loop_frame_init`.
 \
 \ TODO: since we never unmap this memory, this is a known leak
 \ in the theoretical case of repeatedly discarding and initing
@@ -4034,40 +4037,40 @@ end
 \ each loop word for `end` to consume.
 0 var: LOOP_IND
 
-fun: loop_frame_adr { -- adr err }
+fun: .loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
   ifz frame .then " missing loop frame" .throw end
   frame .cells { off }
   STACK .Stack_floor @ off +
 end
 
-fun: loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
+fun: .loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
   .comp_barrier
-  LOOP_AUX s> .call_xt \ Pop all auxiliaries until a terminating `nop`.
+  LOOP_AUX s> .call_xt \ Pop all auxiliaries until a terminating `.nop`.
   prev_loop_ind LOOP_IND !
 end
 
-fun: loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
+fun: .loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
   \ Stash prev loop info; record where caller's `meta` will land.
   LOOP_IND @            STACK >s
-  xt' loop_frame_end_xt STACK >s
+  xt' .loop_frame_end_xt STACK >s
   STACK .Stack_top @ STACK .Stack_floor @ - /cells LOOP_IND !
 
-  \ Terminator for `loop_frame_end_xt`.
-  xt' nop LOOP_AUX >s
+  \ Terminator for `.loop_frame_end_xt`.
+  xt' .nop LOOP_AUX >s
 end
 
-fun: loop_back { meta -> err }
+fun: .loop_back { meta -> err }
   .cont_meta_instr_adr { adr }
   .here_write { out }
   adr out - .asm_branch .comp_instr \ b <beg>
 end
 
-fun: loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
+fun: .loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
   .comp_barrier
   meta CONT_MASK_INP_LEN .bit_mask_get " arguments before ending `loop`" .comp_args_valid
   meta .loop_back \ b <beg>
-  call'' end \ Run `loop_frame_end_xt`.
+  call'' end \ Run `.loop_frame_end_xt`.
 end
 
 fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
@@ -4075,10 +4078,10 @@ fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
   .comp_barrier
   .loop_frame_init
   .comp_args_get 0 CONT_MASK_INP_LEN .bit_mask_set CONT_MASK_HAS_INP .or { meta }
-  .here_write .instr_off meta .cont_meta_instr_off_set xt' loop_end_xt
+  .here_write .instr_off meta .cont_meta_instr_off_set xt' .loop_end_xt
 end
 
-fun: leave_end_xt { -- err }
+fun: .leave_end_xt { -- err }
   LOOP_AUX s> .cont_meta_instr_adr { adr }
   .here_write adr - .asm_branch adr !32
   LOOP_AUX s> .call_xt
@@ -4095,10 +4098,10 @@ fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_end_xt )
   len .comp_args_set
   .comp_barrier
   .reserve_instr 0 .cont_meta_instr_off_set LOOP_AUX >s
-  xt' leave_end_xt LOOP_AUX >s
+  xt' .leave_end_xt LOOP_AUX >s
 end
 
-fun: while_end_xt { -- err }
+fun: .while_end_xt { -- err }
   LOOP_AUX s> { meta }
   meta CONT_MASK_INP_LEN .bit_mask_get { reg }
   reg meta .if_patch
@@ -4106,7 +4109,7 @@ fun: while_end_xt { -- err }
 end
 
 \ Tests a predicate; if predicate is 0, leaves the loop.
-fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
+fun_comp: .while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
   .loop_frame_adr @ { meta }
   meta CONT_MASK_INP_LEN .bit_mask_get { inp_len }
 
@@ -4125,7 +4128,7 @@ fun_comp: while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
   end
 
   meta LOOP_AUX >s
-  xt' while_end_xt LOOP_AUX >s
+  xt' .while_end_xt LOOP_AUX >s
 end
 
 \ Goes back to loop start.
@@ -4141,20 +4144,20 @@ end
 \ ## Memory stuff continued
 
 fun_comp: alloca' { -- err } ( C: "type" -- ) ( E: -- adr )
-  call'' size' call'' alloca
+  call'' size' call'' .alloca
 end
 
 fun_comp: allocaz' { -- err } ( C: "type" -- ) ( E: -- adr )
   call' size' { size }
   size .comp_push
-  call'' alloca
+  call'' .alloca
   size .comp_push
-  compile' memzero
+  compile' .memzero
   call'' systack_ptr \ mov x0, sp
 end
 
 \ Count non-nil cells; stop at nil.
-fun: cellz_len { adr -- len }
+fun: .cellz_len { adr -- len }
   adr { cur }
   loop
     cur @ .while
@@ -4164,7 +4167,7 @@ fun: cellz_len { adr -- len }
 end
 
 \ Copy non-nil cells from `src` to `out`; return updated `out` address.
-fun: cellz_copy { src out -- next }
+fun: .cellz_copy { src out -- next }
   loop
     src @ { val }
     val .while
@@ -4175,7 +4178,7 @@ fun: cellz_copy { src out -- next }
   out
 end
 
-fun: comp_store_cells { nil_term -- err }
+fun: .comp_store_cells { nil_term -- err }
   .comp_args_get .dec { adr }
   0 { ind }
 
@@ -4215,11 +4218,11 @@ end
 
 \ ## Assembler continued
 
-fun: asm_append_instr { instr out -- out } instr out !32 out 4 + end
-fun: asm_imm16_lane { val hw -- lane } val hw 4 .lsl .lsr 0xffff .and end
-fun: asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .and - <>0 end
+fun: .asm_append_instr { instr out -- out } instr out !32 out 4 + end
+fun: .asm_imm16_lane { val hw -- lane } val hw 4 .lsl .lsr 0xffff .and end
+fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .and - <>0 end
 
-fun: asm_append_movk_if_needed { reg neg hw imm out -- out }
+fun: .asm_append_movk_if_needed { reg neg hw imm out -- out }
   imm hw .asm_imm16_lane { lane }
   if neg lane .asm_movk_needed .then
     reg 0b11 hw lane .asm_mov_wide out .asm_append_instr
@@ -4230,7 +4233,7 @@ end
 
 \ Writes instructions for loading `imm` into `reg`.
 \ Returns updated instruction buffer address.
-fun: asm_append_imm_to_reg { reg imm out -- out }
+fun: .asm_append_imm_to_reg { reg imm out -- out }
   imm 0 < { neg }
 
   imm 0 .asm_imm16_lane { lane }
@@ -4245,15 +4248,15 @@ end
 
 \ ## String comparison continued
 
-fun: compare { str0 len0 str1 len1 -- cmp }
+fun: .compare { str0 len0 str1 len1 -- cmp }
   0 { cmp }
   len0 len1 .min { len }
   if len .then str0 str1 len .memcmp .cint_to_cell { cmp } end
   len0 len1 - cmp .fallback
 end
 
-\ `strcmp` doesn't like null string pointers.
-fun: ccompare { cstr0 cstr1 -- cmp }
+\ `.strcmp` doesn't like null string pointers.
+fun: .ccompare { cstr0 cstr1 -- cmp }
   ifz   cstr0 cstr1 .or .then 0
   elifz cstr0           .then -1
   elifz cstr1           .then +1
@@ -4272,7 +4275,7 @@ fun: cstr<> { cstr0 cstr1 -> bool } .ccompare <>0 end
 
 \ Short for "compile variadic arguments begin". Assumes the Apple Arm64 ABI
 \ where vargs always use the systack. Modifies the SP, which must be later
-\ restored with `comp_va_end`. Doesn't clobber any registers.
+\ restored with `.comp_va_end`. Doesn't clobber any registers.
 \
 \ We always store pairs and modify the SP by 16, because Arm64 requires the SP
 \ to be aligned to 16 when accessing memory. When length is odd, we also store
@@ -4280,8 +4283,8 @@ fun: cstr<> { cstr0 cstr1 -> bool } .ccompare <>0 end
 \
 \ `floor` is the count of non-vargs preceding vargs.
 \ The layout is always `( …non-vargs… …vargs… )`.
-\ `diff` must be passed to `comp_va_end`.
-fun: comp_va_beg { floor -- diff err }
+\ `diff` must be passed to `.comp_va_end`.
+fun: .comp_va_beg { floor -- diff err }
   .comp_args_get           { ceil }
   ceil floor - 2 .align_up { diff }
   diff floor +             { ceil }
@@ -4300,7 +4303,7 @@ fun: comp_va_beg { floor -- diff err }
 end
 
 \ Short for "compile variadic arguments end".
-fun: comp_va_end { len -- err }
+fun: .comp_va_end { len -- err }
   if len .then
     len .cells 16 .align_up { off }
     ASM_REG_SP ASM_REG_SP off .asm_add_imm .comp_instr \ add sp, sp, <off>
@@ -4310,14 +4313,14 @@ end
 \ Prepends `pre_len` args to current args. Each arg is represented with an XT.
 \ Exactly `pre_len` XTs must be on top of the control stack. XTs may be either
 \ `WORDLIST_EXEC` or `WORDLIST_COMP`.
-fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
+fun: .comp_args_prepend { pre_len -- err } ( …pre… -- )
   ifz pre_len .then .ret end
 
   .comp_args_get     { post_len }
   post_len pre_len + { arg_len }
 
   if arg_len ASM_ARG_LEN_MAX > .then
-    " in `comp_args_prepend`: too many total args" .throw
+    " in `.comp_args_prepend`: too many total args" .throw
   end
 
   pre_len { reg }
@@ -4355,20 +4358,20 @@ fun: comp_args_prepend { pre_len -- err } ( …pre… -- )
   arg_len .comp_args_set
 end
 
-fun_comp: logf { -- err } ( E: fmt …vargs… -- )
+fun_comp: .logf { -- err } ( E: fmt …vargs… -- )
   1 .comp_va_beg { len }
-  compile' printf
+  compile' .printf
   len .comp_va_end
   0 .comp_args_set
 end
 
-fun_comp: elogf { -- err } ( E: fmt …vargs… -- )
+fun_comp: .elogf { -- err } ( E: fmt …vargs… -- )
   1 .comp_va_beg { len }
 
   xt'' stderr STACK >s
   1 .comp_args_prepend
   call'' systack_ptr
-  compile' vfprintf
+  compile' .vfprintf
 
   len .comp_va_end
   0 .comp_args_set
@@ -4378,20 +4381,19 @@ end
 \
 \ Also see `./errno.af`.
 
-0 1 extern: __error
-1 1 extern: strerror
+0 1 extern: .__error  __error
+1 1 extern: .strerror strerror
 
-\ We'd like to treat `errno` value-like, similarly to `stdin stdout stderr`.
-\ Unfortunately, on MacOS, it only seems to be available via a function call
-\ which clobbers `x0 x8 x9` last time I tested it; ABI is subject to change.
-\ This makes it call-like.
-fun: errno { -- code } .__error @s32 end
+\ We'd prefer `errno` to be a value, like `stdin stdout stderr`. On macOS it is
+\ only available through a function call, which clobbered `x0 x8 x9` when last
+\ tested; the ABI is subject to change. Therefore `.errno` is a regular call.
+fun: .errno { -- code } .__error @s32 end
 
 \ ## String formatting continued
 
-\ Formats a string, `snprintf`-style, into the remaining memory in the
+\ Formats a string, `.snprintf`-style, into the remaining memory in the
 \ current ambient context; see `## Context`.
-fun: strf { fmt vlist -- str }
+fun: .strf { fmt vlist -- str }
   1 .ctx_avail { buf cap }
   ifz cap .then " <unable to format string: out of space>" .ret end
 
@@ -4403,16 +4405,16 @@ fun: strf { fmt vlist -- str }
   buf
 end
 
-fun_comp: strf { -- err } ( E: fmt …vargs… -- err )
+fun_comp: .strf { -- err } ( E: fmt …vargs… -- err )
   1 .comp_va_beg { len }
   call'' systack_ptr
-  compile' strf
+  compile' .strf
   len .comp_va_end
 end
 
-\ For functions like `snprintf` which return length or error sentinel.
+\ For functions like `.snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
-fun: validate_format_len { len -- len err }
+fun: .validate_format_len { len -- len err }
   if len <0 .then
     .errno { code }
     code .strerror { msg }
@@ -4424,39 +4426,39 @@ end
 \ Formats into a given buffer, with null-termination. Usage:
 \
 \   BUF CAP " codes: %zd %zd %zd" 10 20 30 str_prnf
-fun_comp: str_prnf { -- err } ( E: buf cap fmt …vargs… -- len|err )
+fun_comp: .str_prnf { -- err } ( E: buf cap fmt …vargs… -- len|err )
   3 .comp_va_beg { len }
-  compile' snprintf
+  compile' .snprintf
   len .comp_va_end
-  compile' cint_to_cell
-  compile' validate_format_len
+  compile' .cint_to_cell
+  compile' .validate_format_len
 end
 
-fun_comp: fmtf { -- err } ( E: file fmt …vargs… )
+fun_comp: .fmtf { -- err } ( E: file fmt …vargs… )
   2 .comp_va_beg { len }
-  compile' fprintf
+  compile' .fprintf
   len .comp_va_end
-  compile' cint_to_cell
-  compile' validate_format_len
+  compile' .cint_to_cell
+  compile' .validate_format_len
   0 .comp_args_set
 end
 
 \ ## OS errors continued
 
-\ `code` comes from `errno`, `ferror`, Posix functions, etc.
-fun: os_err { code text -- err_str }
+\ `code` comes from `.errno`, `.ferror`, Posix functions, etc.
+fun: .os_err { code text -- err_str }
   code .strerror { msg }
   " %s; code: %zd; msg: %s" text code msg .strf
 end
 
-\ For Posix functions which directly return an `errno`-like
+\ For Posix functions which directly return an `.errno`-like
 \ code on failure, and zero on success. No sign extension:
 \ Posix error codes are expected to be positive.
 fun: ?posix_err { code text -- err_str }
   if code .then code text .os_err else nil end
 end
 
-fun: fatal { err } " fatal: %s" err .elogf .elf .abort end
+fun: .fatal { err } " fatal: %s" err .elogf .elf .abort end
 
 \ ## Stack manipulation continued
 
@@ -4510,11 +4512,11 @@ end
 
 \ ## Stack printing
 
-fun: log_int  { num } " %zd" num .logf end
-fun: log_cell { num } " 0x%zx %zd" num num .logf end
-fun: show     { num -> } .log_cell .lf end
+fun: .log_int  { num } " %zd" num .logf end
+fun: .log_cell { num } " 0x%zx %zd" num num .logf end
+fun: .show     { num -> } .log_cell .lf end
 
-fun: stack_log_cells { stack }
+fun: .stack_log_cells { stack }
   stack .Stack_top @ stack .Stack_floor @ - /cells { len }
 
   ifz len .then
@@ -4540,12 +4542,12 @@ fun: stack_log_cells { stack }
   end
 end
 
-fun: s STACK .stack_log_cells end
-fun: sc .s STACK .stack_trunc end
+fun: .s STACK .stack_log_cells end
+fun: .sc .s STACK .stack_trunc end
 
 \ ## Dictionary introspection
 
-fun: wordlist_log { dict list_name }
+fun: .wordlist_log { dict list_name }
   dict .Interp_dict_len @u32 { len }
 
   ifz len .then
@@ -4584,7 +4586,7 @@ fun: wordlist_log { dict list_name }
 end
 
 \ "words" is magically recommended by compiler in REPL.
-fun: words
+fun: .words
   interp .Interp_dict_exec " WORDLIST_EXEC" .wordlist_log
   interp .Interp_dict_comp " WORDLIST_COMP" .wordlist_log
 end
@@ -4597,18 +4599,18 @@ end
 \
 \ Usage example:
 \
-\   1 1 false indirect: SOME_FUNC some_func
+\   1 1 false indirect: SOME_FUNC .some_func
 \
-\   fun: some_func { inp -- out } [ .redefine ] inp end
+\   fun: .some_func { inp -- out } [ .redefine ] inp end
 \
-\   SOME_FUNC indirect_to' some_func
+\   SOME_FUNC indirect_to' .some_func
 
 struct: Indir_decl
-  Cell 1 field: Indir_decl_off
-  Adr  1 field: Indir_decl_instr
-  U8   1 field: Indir_decl_inp
-  U8   1 field: Indir_decl_out
-  U8   1 field: Indir_decl_has_err
+  Cell 1 field: .Indir_decl_off
+  Adr  1 field: .Indir_decl_instr
+  U8   1 field: .Indir_decl_inp
+  U8   1 field: .Indir_decl_out
+  U8   1 field: .Indir_decl_has_err
 end
 
 fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
@@ -4645,7 +4647,7 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
 end
 
 \ This would be a 1-liner without signature checks and error messages.
-fun: indirect_to { decl xt_to -- err }
+fun: .indirect_to { decl xt_to -- err }
   decl .Indir_decl_inp @b       { decl_inp }
   xt_to .Sym_inp_len   @b       { sym_inp }
   xt_to .Sym_name .Sym_word_buf { name }
@@ -4681,14 +4683,14 @@ fun: indirect_to' { decl -- err } ( C: "name" -- )
 end
 
 \ Comptime analogue of top-level import.
-fun_comp: use' { -- err } .read_word .comp_str compile' use end
+fun_comp: use' { -- err } .read_word .comp_str compile' .use end
 
 \ ## Multi-comparisons
 
 \ For internal use below. Each `ccmp` runs only if previous test didn't pass;
 \ otherwise it sets condition flags to our `nzcv` fallback. The final `cset`
 \ sets the final bool based on resulting flags.
-fun: comp_cmp_many { name cond_each nzcv cond_end -- err }
+fun: .comp_cmp_many { name cond_each nzcv cond_end -- err }
   ( E: val …preds… -- bool )
 
   .comp_args_get { len }
@@ -4748,19 +4750,19 @@ fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT .comp_cmp_m
 
 \ ## Assertions
 
-fun: is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
+fun: .is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
 
-fun: assert_cond { cond text -- err }
+fun: .assert_cond { cond text -- err }
   if cond .then .ret end
   " assertion failed: %s" text .strf
 end
 
-fun: assert_bin_cond { lhs rhs cond text op -- err }
+fun: .assert_bin_cond { lhs rhs cond text op -- err }
   if cond .then .ret end
   " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .strf
 end
 
-fun: assert_str_eq { act exp -- err }
+fun: .assert_str_eq { act exp -- err }
   ifz exp .then
     ifz act .then .ret end
     " expected string to be nil; got: %s" act .strf .throw
@@ -4776,7 +4778,7 @@ fun: assert_str_eq { act exp -- err }
   " expected string: %s; actual string: %s" exp act .strf
 end
 
-fun: assert_str_has { act exp -- err }
+fun: .assert_str_has { act exp -- err }
   ifz act .then
     " missing string; expected string to have: %s"
     exp .strf .throw
@@ -4788,12 +4790,12 @@ fun: assert_str_has { act exp -- err }
   exp act .strf .throw
 end
 
-fun: assert_beg { -- beg }
+fun: .assert_beg { -- beg }
   interp .Interp_module @ .Interp_module_reader { read }
   read .Interp_reader_src @ read .Interp_reader_pos @u32 +
 end
 
-fun: assert_body { beg -- str len err }
+fun: .assert_body { beg -- str len err }
   interp .Interp_module @ .Interp_module_reader { read }
   read .Interp_reader_src @ read .Interp_reader_pos @u32 + { ceil }
 
@@ -4812,19 +4814,19 @@ fun: assert_body { beg -- str len err }
   beg len
 end
 
-fun: assert_end_xt { beg -- err }
+fun: .assert_end_xt { beg -- err }
   1 " when compiling `assert`" .comp_args_valid
   beg .assert_body .comp_cstr
-  compile' assert_cond
+  compile' .assert_cond
 end
 
 fun_comp: assert { -- beg end_xt err } ( E: cond -- )
   [ .plain_call ]
-  .assert_beg xt' assert_end_xt
+  .assert_beg xt' .assert_end_xt
   [ true .comp_only ]
 end
 
-fun: assert_bin_end_xt { beg cond cmp_xt -- err }
+fun: .assert_bin_end_xt { beg cond cmp_xt -- err }
   2 " when compiling binary assert" .comp_args_valid
   cmp_xt .Sym_name .Sym_word_buf { op }
   cmp_xt .Sym_name .Sym_word_len @u32 { op_len }
@@ -4848,11 +4850,11 @@ fun: assert_bin_end_xt { beg cond cmp_xt -- err }
   .comp_alloc_next_reg reg0 reg1 cond .comp_emit_cmp_cset_reg
   beg .assert_body .comp_cstr
   op op_len .comp_cstr
-  compile' assert_bin_cond
+  compile' .assert_bin_cond
 end
 
-fun: assert_bin_init { cond cmp_xt -- beg cond cmp_xt end_xt err }
-  .assert_beg cond cmp_xt xt' assert_bin_end_xt
+fun: .assert_bin_init { cond cmp_xt -- beg cond cmp_xt end_xt err }
+  .assert_beg cond cmp_xt xt' .assert_bin_end_xt
   [ true .comp_only ]
 end
 
@@ -4873,10 +4875,10 @@ fun_comp: assertu>= { -- beg cond cmp_xt end_xt err } ASM_HS xt' u>= .assert_bin
 \ The outer interpreter uses CLI args up to `--` if any.
 \ This word returns the leftover args, starting at `--`.
 \
-\ Note: AOT-compiled programs just use args received in `main`.
-fun: interp_args { -- argc argv err }
+\ Note: AOT-compiled programs just use args received in `.main`.
+fun: .interp_args { -- argc argv err }
   ifz interp .then
-    " `interp_args` available only in interpretation; hint: in AOT, pass argc/argv from `main`"
+    " `.interp_args` available only in interpretation; hint: in AOT, pass argc/argv from `.main`"
     .throw
   end
 
@@ -4906,8 +4908,8 @@ fun: main_arena { -- adr len } [ .plain_call ] main_arena end
 
 \ ldp x28, xzr, [sp], #16
 \ add sp, sp, #frame
-fun: with_main_ctx_end { -- err }
-  call'' ctx_pop
+fun: .with_main_ctx_end { -- err }
+  call'' .ctx_pop
   ASM_REG_SP ASM_REG_SP size' Ctx FUND_ALIGN .align_up .asm_add_imm .comp_instr
 end
 
@@ -4915,7 +4917,7 @@ end
 \
 \ Example usage:
 \
-\   fun: main { -- exit }
+\   fun: .main { -- exit }
 \     .with_main_ctx .run end { err }
 \     if err .then " error: %s" err .elogf .elf 1 else 0 end
 \   end
@@ -4923,7 +4925,7 @@ end
 \ Runtime effects:
 \ - Inner code sees default / main ambient context.
 \ - Outer code doesn't get its registers clobbered.
-\ - Words like `strf` can allocate memory for text.
+\ - Words like `.strf` can allocate memory for text.
 \
 \ Code inside `.with_main_ctx ... end` must run to completion.
 \ This means no `.ret .try .throw`, and no `-- err` in caller,
@@ -4940,11 +4942,11 @@ end
 \ Capture and handle outputs / errors after `end`.
 \ Main arena's memory remains valid after `end`;
 \ we have no way to relinquish it to the OS.
-fun_comp: with_main_ctx { -- end_xt err }
+fun_comp: .with_main_ctx { -- end_xt err }
   size' Ctx FUND_ALIGN .align_up { size }
   ASM_REG_SP ASM_REG_SP size .asm_sub_imm .comp_instr \ sub sp, sp, #frame
-  call'' main_arena call'' systack_ptr compile' ctx_init
+  call'' main_arena call'' systack_ptr compile' .ctx_init
   call'' systack_ptr \ mov x0, sp
-  call'' ctx_push    \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
-  xt' with_main_ctx_end
+  call'' .ctx_push    \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
+  xt' .with_main_ctx_end
 end

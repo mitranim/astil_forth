@@ -10,16 +10,16 @@ An exception is a Go-style return value, implicitly appended to the success outp
 If you "catch", a call becomes Go-style. The compiler reveals the error and skips the "try" instructions.
 
 ```forth
-: outer
+: .outer
   \ With hidden "try" instructions:
-  inner0 {           }
-  inner1 { val0      }
-  inner2 { val0 val1 }
+  .inner0 {           }
+  .inner1 { val0      }
+  .inner2 { val0 val1 }
 
   \ No exceptions and no hidden instructions:
-  inner0 catch {           err } \ registers: x0
-  inner1 catch { val0      err } \ registers: x0 x1
-  inner2 catch { val0 val1 err } \ registers: x0 x1 x2
+  .inner0 .catch {           err } \ registers: x0
+  .inner1 .catch { val0      err } \ registers: x0 x1
+  .inner2 .catch { val0 val1 err } \ registers: x0 x1 x2
 ;
 ```
 
@@ -46,23 +46,23 @@ b   <epilogue>
 You can automatically catch _everything_, revealing all errors and ensuring that the current word doesn't implicitly throw:
 
 ```forth
-: outer [ true catches ]
-  inner0 {           err }
-  inner1 { val0      err }
-  inner2 { val1 val2 err }
+: .outer [ true catches ]
+  .inner0 {           err }
+  .inner1 { val0      err }
+  .inner2 { val1 val2 err }
 ;
 ```
 
-Even with implicit `catch`, you can `throw` or `try`. The control flow is entirely local; there are no _implicit_ exceptions. (The word is now known to "throw"; its error can be caught. External callers such as `libc` would silently ignore the error.)
+Even with implicit `.catch`, you can `.throw` or `.try`. The control flow is entirely local; there are no _implicit_ exceptions. (The word is now known to "throw"; its error can be caught. External callers such as `libc` would silently ignore the error.)
 
 ```forth
-: outer [ true catches ]
-  inner0 {           err } err try
-  inner1 { val0      err } err throw
-  inner2 { val1 val2 err } err try
+: .outer [ true catches ]
+  .inner0 {           err } err .try
+  .inner1 { val0      err } err .throw
+  .inner2 { val1 val2 err } err .try
 
-  ( E: --     ) \ Official signature of `outer`.
-  ( E: -- err ) \ Real signature of `outer` in the ABI.
+  ( E: --     ) \ Official signature of `.outer`.
+  ( E: -- err ) \ Real signature of `.outer` in the ABI.
 ;
 ```
 
@@ -73,10 +73,10 @@ This is an exact inverse of Go (and Rust). By default, errors are exceptions and
 The best part is _cross-language ABI compatibility_. Having exceptions without a runtime or unwinder means that other languages can seamlessly call our functions and handle returned errors. We can pass callbacks to foreign callers, allow them to receive Forth errors as return values at no added cost, and guarantee no surprises, such as a panic handler unwinding the C stack.
 
 ```forth
-: some_forth_word
+: .some_forth_word
   { some_input -- }       \ Parameter signature in Forth.
   ( E: inp -- err )       \ Real ABI signature.
-  " mock exception" throw \ Returned in first output register.
+  " mock exception" .throw \ Returned in first output register.
 ;
 ```
 

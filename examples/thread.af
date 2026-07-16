@@ -4,14 +4,14 @@ use' pthread.af
 
 \ Basic example of spawning a thread with its own memory context.
 
-fun: child { msg -- str }
+fun: .child { msg -- str }
   " [child] running..." .log .lf
   " child msg: %s" msg .strf
 end
 
-fun: parent { -- Err }
+fun: .parent { -- Err }
   alloca' Stack { mem } \ Child thread memory.
-  instr' child  { fun } \ Child thread function.
+  instr' .child  { fun } \ Child thread function.
   " parent msg" { inp } \ Child thread input.
   nil           { out } \ Child thread output.
 

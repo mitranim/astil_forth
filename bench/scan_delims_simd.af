@@ -10,7 +10,7 @@ use' simd.af
 SRC_LEN   mem: SRC
 256       mem: DELS
 
-1 1 extern: getenv
+1 1 extern: .getenv getenv
 
 char' { SRC 0  + !b
 char' a SRC 1  + !b
@@ -29,7 +29,7 @@ TAB     SRC 13 + !b
 char' f SRC 14 + !b
 char' g SRC 15 + !b
 
-fun: init { buf len }
+fun: .init { buf len }
   buf len + { ceil }
   0 { ind }
   loop
@@ -40,7 +40,7 @@ fun: init { buf len }
   end
 end
 
-fun: scan_delim_consts { -- err }
+fun: .scan_delim_consts { -- err }
   4          .asm_movi_2d_zero .comp_instr \ movi v4.2d, #0
   5          .asm_movi_2d_zero .comp_instr \ movi v5.2d, #0
   6  223     .asm_movi_16b     .comp_instr \ movi v6.16b, #223
@@ -54,7 +54,7 @@ fun: scan_delim_consts { -- err }
   14 1       .asm_movi_16b     .comp_instr \ movi v14.16b, #1
 end
 
-fun: scan_delim_mask { -- err }
+fun: .scan_delim_mask { -- err }
   2 0 6     .asm_and_16b .comp_instr \ and  v2.16b, v0.16b, v6.16b
   2 3 2 7 8 .comp_cmeq_pair_mask_16b
   2 3 0 9   .comp_cmeq_or_mask_16b
@@ -65,7 +65,7 @@ fun: scan_delim_mask { -- err }
   2 14      .comp_mask_to_u8_lanes_16b
 end
 
-fun: scan { pat len -- count }
+fun: .scan { pat len -- count }
   [ .scan_delim_consts ]
   pat { ptr }
   loop
@@ -82,7 +82,7 @@ fun: scan { pat len -- count }
   [ 0 4 5 .comp_u16x8_pair_sum_umov_d0 1 .comp_args_set ]
 end
 
-fun: run { -- err }
+fun: .run { -- err }
   CAP .alloca { buf }
   buf CAP .init
   0 { out }
@@ -99,7 +99,7 @@ fun: run { -- err }
 end
 .run
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end { err }
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

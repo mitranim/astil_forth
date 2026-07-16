@@ -1,10 +1,10 @@
 use' lang.af
 
-\ To receive CLI args and env, declare them as arguments in `main`.
-\ Our compiler doesn't validate the input signature of `main`.
+\ To receive CLI args and env, declare them as arguments in `.main`.
+\ Our compiler doesn't validate the input signature of `.main`.
 \ AOT-compiled programs receive args straight from the OS.
 
-fun: run { argc argv envp -- exit }
+fun: .run { argc argv envp -- exit }
   if .has_interp .then
     " [main] mode: JIT" .log .lf
   else
@@ -46,7 +46,7 @@ end
 \ Note that you don't _have_ to call this.
 0 nil nil .run
 
-fun: main { argc argv envp -- exit } .with_main_ctx argc argv envp .run end end
+fun: .main { argc argv envp -- exit } .with_main_ctx argc argv envp .run end end
 
 \ Usage:
 \

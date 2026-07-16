@@ -364,9 +364,11 @@ static Err intrin_extern_fun(Interp *interp) {
   try(int_stack_pop(ints, &out_len));
   try(int_stack_pop(ints, &inp_len));
 
+  Word_str link_name;
+  try(interp_valid_name(interp, &link_name));
   Word_str name;
   try(interp_valid_name(interp, &name));
-  try(interp_extern_fun(interp, name.buf, inp_len, out_len));
+  try(interp_extern_fun(interp, name.buf, link_name.buf, inp_len, out_len));
   return nullptr;
 }
 
@@ -452,7 +454,7 @@ It's specified only for vain consistency with reg-CC.
 */
 
 static const USED auto INTRIN_THROWS = (Sym){
-  .name.buf  = "throws",
+  .name.buf  = ".throws",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_throws,
   .inp_len   = 1,
@@ -462,7 +464,7 @@ static const USED auto INTRIN_THROWS = (Sym){
 };
 
 static const USED auto INTRIN_CATCH = (Sym){
-  .name.buf = "catch",
+  .name.buf = ".catch",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_catch,
   .inp_len  = 1,
@@ -471,7 +473,7 @@ static const USED auto INTRIN_CATCH = (Sym){
 };
 
 static const USED auto INTRIN_INLINE = (Sym){
-  .name.buf  = "inline",
+  .name.buf  = ".inline",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline,
   .out_len   = 1,
@@ -480,7 +482,7 @@ static const USED auto INTRIN_INLINE = (Sym){
 };
 
 static const USED auto INTRIN_INLINE_WORD = (Sym){
-  .name.buf  = "inline_word",
+  .name.buf  = ".inline_word",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_inline_word,
   .inp_len   = 1,
@@ -490,7 +492,7 @@ static const USED auto INTRIN_INLINE_WORD = (Sym){
 };
 
 static const USED auto INTRIN_DEBUG_WORD = (Sym){
-  .name.buf = "debug_word",
+  .name.buf = ".debug_word",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_word,
   .inp_len  = 1,

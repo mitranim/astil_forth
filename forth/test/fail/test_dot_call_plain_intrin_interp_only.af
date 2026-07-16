@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun_comp: test_dot_call_plain_intrin_interp_only_fail { -- err }
-  true interp_only
-end

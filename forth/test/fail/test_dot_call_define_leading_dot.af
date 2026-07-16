@@ -1,2 +1,0 @@
-\ Must fail to compile.
-fun: .bad_dot_name { -- err } end

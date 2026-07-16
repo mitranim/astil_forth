@@ -2,16 +2,16 @@
 
 The system supports two ways of allocating stack memory:
 - Local references: addresses of local variables.
-- C-style `alloca`: arbitrary space on the system stack.
+- C-style `.alloca`: arbitrary space on the system stack.
 
-Both are cleaned up on `ret`. This reduces memory management headaches, especially when using `libc` procedures which require pointers to caller-allocated storage. (Don't have to `free`.)
+Both are cleaned up on `.ret`. This reduces memory management headaches, especially when using `libc` procedures which require pointers to caller-allocated storage. (Don't have to `.free`.)
 
 ## Local references
 
 Initialize a local, then use `ref'`:
 
 ```forth
-: word
+: .word
   123      \ mov  x0, #123
   { val }  \ str  x0, [x29, #16] -- evicted to memory by `ref'`.
   234      \ mov  x0, #234
@@ -37,7 +37,7 @@ Initialize a local, then use `ref'`:
 Such locals are generally accessed with `str`. But occasionally, the compiler is able to replace a memory op with a `mov`:
 
 ```forth
-: word
+: .word
   123      \ mov x0, #123
   { val }  \ str x0, [x29, #16] -- evicted to memory by `ref'`.
   ref' val \ add x0, x29, #16   -- evicts `val` to memory.
@@ -50,24 +50,24 @@ Such locals are generally accessed with `str`. But occasionally, the compiler is
 Local references are handy for C interop:
 
 ```forth
-: thread_spawn { fun inp -- thread }
+: .thread_spawn { fun inp -- thread }
   nil { thread }
-  ref' thread nil fun inp pthread_create
-  " unable to spawn a thread" try_errno_posix
+  ref' thread nil fun inp .pthread_create
+  " unable to spawn a thread" .try_errno_posix
   thread \ Holds a valid pointer now.
 ;
 ```
 
-## `alloca`
+## `.alloca`
 
-Because we're using native calls, it's easy to support C-style `alloca` which reserves an arbitrary amount of space on the system stack.
+Because we're using native calls, it's easy to support C-style `.alloca` which reserves an arbitrary amount of space on the system stack.
 
 When size is constant, the compiler inlines the offset into an instruction. When size is dynamic, the compiler takes care of SP alignment.
 
 ```forth
-: example_alloca
-  32 alloca { one } \ sub x0, sp, #32 ; mov sp, x0
-  64 alloca { two } \ sub x0, sp, #64 ; mov sp, x0
+: .example_alloca
+  32 .alloca { one } \ sub x0, sp, #32 ; mov sp, x0
+  64 .alloca { two } \ sub x0, sp, #64 ; mov sp, x0
   one two { -- }
 ;
 ```
@@ -92,29 +92,29 @@ ret
 
 ## Usage with `libc`
 
-The main use of `alloca` is for stack-allocated structs.
+The main use of `.alloca` is for stack-allocated structs.
 This often eliminates globals and avoids heap allocation.
 
 ```forth
-2 0 extern: clock_gettime
+2 0 extern: .clock_gettime clock_gettime
 
 \ C: `struct timespec`
 struct: Timespec
-  S64 1 field: Timespec_sec
-  S64 1 field: Timespec_nsec
+  S64 1 field: .Timespec_sec
+  S64 1 field: .Timespec_nsec
 end
 
-: example
-  Timespec alloca { inst }
-  0 inst clock_gettime
+: .example
+  Timespec .alloca { inst }
+  0 inst .clock_gettime
 
-  inst Timespec_sec  @ { secs }
-  inst Timespec_nsec @ { nano }
+  inst .Timespec_sec  @ { secs }
+  inst .Timespec_nsec @ { nano }
 
-  " real seconds: %zd" secs logf lf
-  " real nanos:   %zd" nano logf lf
+  " real seconds: %zd" secs .logf .lf
+  " real nanos:   %zd" nano .logf .lf
 ;
-example
+.example
 
 \ real seconds: 1772116542
 \ real nanos:   322626000

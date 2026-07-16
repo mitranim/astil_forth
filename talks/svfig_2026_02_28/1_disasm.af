@@ -2,10 +2,10 @@ use' lang.af
 
 \ See `./1_disasm.md`.
 
-: example_arith
+: .example_arith
   10 20 + 30 * { -- }
 ;
-dis' example_arith
+dis' .example_arith
 \ mov  x0, #10
 \ mov  x1, #20
 \ add  x0, x0, x1
@@ -14,12 +14,12 @@ dis' example_arith
 \ ret
 
 \ Numeric literals are compile-time constants, so the compiler
-\ is able to hardcode them into `alloca` instructions.
-: example_alloca_static
-  Cell alloca { cell }
-  128  alloca { chunk }
+\ is able to hardcode them into `.alloca` instructions.
+: .example_alloca_static
+  Cell .alloca { cell }
+  128  .alloca { chunk }
 ;
-dis' example_alloca_static
+dis' .example_alloca_static
 \ stp  x29, x30, [sp, #-16]!
 \ mov  x29, sp
 \ sub  x0, sp, #16   -- allocate `cell`
@@ -31,11 +31,11 @@ dis' example_alloca_static
 \ ldp  x29, x30, [sp], #16
 \ ret
 
-\ Compiler supports dynamic `alloca` sizes as well.
-: example_alloca_dynamic { size -- }
-  size alloca { -- }
+\ Compiler supports dynamic `.alloca` sizes as well.
+: .example_alloca_dynamic { size -- }
+  size .alloca { -- }
 ;
-dis' example_alloca_dynamic
+dis' .example_alloca_dynamic
 \ stp  x29, x30, [sp, #-16]!
 \ mov  x29, sp
 \ sub  x0, sp, x0
@@ -45,15 +45,15 @@ dis' example_alloca_dynamic
 \ ldp  x29, x30, [sp], #16
 \ ret
 
-: example_loop
+: .example_loop
   0 { ind }
   loop
-    ind 12 < while
+    ind 12 < .while
     123 ind * { -- } \ Just something to do.
     inc: ind
   end
 ;
-dis' example_loop
+dis' .example_loop
 \ mov  x0, #0
 \ mov  x8, x0
 \ mov  x0, x8
@@ -84,7 +84,7 @@ dis' example_loop
 \
 \ Getting an instruction dump:
 \
-\   debug' some_word
+\   debug' .some_word
 \
 \ Shell shortcut for disassembly:
 \

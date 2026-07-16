@@ -1,6 +1,6 @@
 use' ../../lang.af
 
-fun: test_assert_static_fail_after_drop_with_err { one two -- err }
+fun: .test_assert_static_fail_after_drop_with_err { one two -- err }
   one two { -- }
   assert= 123 234 end
 end

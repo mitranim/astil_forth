@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: .test_call_extra_dot { -- out }
+  29 1 .u/
+end

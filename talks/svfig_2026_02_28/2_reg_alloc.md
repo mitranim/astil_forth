@@ -27,9 +27,9 @@ Why preserve the Forth stack in interpretation:
 The following code is valid under stack-CC, but does _not_ compile under reg-CC due to arity mismatch. It's also misleading.
 
 ```forth
-: word 10 20 30 + * . ;
+: .word 10 20 30 + * . ;
 
-: word
+: .word
   10 20 30 + * .
   \        ^ error here: arity = 2, inputs = 3
   \        `+` tries to consume all 3 arguments!
@@ -39,9 +39,9 @@ The following code is valid under stack-CC, but does _not_ compile under reg-CC 
 Under reg-CC, it must be converted to:
 
 ```forth
-: word 20 30 + 10 * . ;
+: .word 20 30 + 10 * . ;
 
-: word
+: .word
   20 30 + \ inputs: 2, outputs: 1
   10    * \ inputs: 2, outputs: 1
         . \ inputs: 1, outputs: 0
@@ -80,7 +80,7 @@ But the following is OK:
 
 ```forth
 10 20 + { one } \ Correct inputs; output is consumed.
-10 20 + { --  } \ Correct inputs; this is how we `drop` outputs.
+10 20 + { --  } \ Correct inputs; this is how we `.drop` outputs.
 ```
 
 Local names replace stack manipulation (see below).
@@ -103,7 +103,7 @@ This allows the compiler to place low-numbered stack items into low-numbered par
 Simple example:
 
 ```forth
-: word 20 30 + 10 * . ;
+: .word 20 30 + 10 * . ;
 
 20 \ mov x0, 20     -- length: 1
 30 \ mov x1, 30     -- length: 2
@@ -115,7 +115,7 @@ Simple example:
 With named inputs. The compiler doesn't implicitly "push" parameters, but it knows where they are (register slots):
 
 ```forth
-: arith { one two three -- four }
+: .arith { one two three -- four }
         \ x0  x1  x2       x0
   one   \ -- register already x0
   two   \ -- register already x1
@@ -137,7 +137,7 @@ _arith:
 If we reverse value order, the compiler has to shuffle the registers around. Matching input order is already second nature to Forth users:
 
 ```forth
-: word { one two -- out }
+: .word { one two -- out }
       \ mov x2, x0
   two \ mov x0, x1
   one \ mov x1, x2
@@ -148,7 +148,7 @@ If we reverse value order, the compiler has to shuffle the registers around. Mat
 Assigning literals to names works the same:
 
 ```forth
-: word { -- out }
+: .word { -- out }
   10          \ mov x0, 10
   20          \ mov x1, 20
   { one two } \ Associate registers with names.
@@ -161,32 +161,32 @@ Assigning literals to names works the same:
 
 - Verbs are greedy.
 - Stack is gone.
-- `dup`, `swap`, `rot`, etc. are gone.
+- `.dup .swap .rot` etc. are gone.
 - Parameters are not implicitly pushed.
 - How do we manipulate the "stack"?
 - Locals: both necessary and sufficient.
 
-The following stack-based code was BRUTAL for me. Manipulation words like `dup rot swap` make it harder to figure out the state of the stack. This is also invalid in reg-CC because there's no stack manipulation:
+The following stack-based code was BRUTAL for me. Manipulation words like `.dup .rot .swap` make it harder to figure out the state of the stack. This is also invalid in reg-CC because there's no stack manipulation:
 
 ```forth
-: asm_lsl_imm ( Xd Xn imm6 -- instr )
-  dup negate 64 mod 6 bits_trunc 16 lsl    \ immr
-  63 rot -          6 bits_trunc 10 lsl or \ imms
-  swap                            5 lsl or \ Xn
-                                        or \ Xd
-  0b1_10_100110_1_000000_000000_00000_00000 or
+: .asm_lsl_imm ( Xd Xn imm6 -- instr )
+  .dup .negate 64 .mod 6 .bits_trunc 16 .lsl     \ immr
+  63 .rot -            6 .bits_trunc 10 .lsl .or \ imms
+  .swap                               5 .lsl .or \ Xn
+                                             .or \ Xd
+  0b1_10_100110_1_000000_000000_00000_00000  .or
 ;
 ```
 
 Reg-CC doesn't support the above. The code must use locals. Note that this is equally valid in stack-CC:
 
 ```forth
-: asm_lsl_imm { Xd Xn imm6 -- instr }
-  imm6 negate 64 mod 6 bits_trunc 16 lsl { immr }
-  63 imm6 -          6 bits_trunc 10 lsl { imms }
-  Xn 5 lsl
-  Xd or imms or immr or \ Still kinda concatenative.
-  0b1_10_100110_1_000000_000000_00000_00000 or
+: .asm_lsl_imm { Xd Xn imm6 -- instr }
+  imm6 .negate 64 .mod 6 .bits_trunc 16 .lsl { immr }
+  63 imm6 -            6 .bits_trunc 10 .lsl { imms }
+  Xn 5 .lsl
+  Xd .or imms .or immr .or \ Still kinda concatenative.
+  0b1_10_100110_1_000000_000000_00000_00000 .or
 ;
 ```
 
@@ -196,31 +196,31 @@ This partially surrenders concatenative properties of Forth. When forwarding to 
 
 ```forth
 \ Stack-based:
-: compare ( str0 len0 str1 len1 -- direction ) rot min strncmp ;
-: str=    ( str0 len0 str1 len1 -- bool      ) compare =0 ;
-: str<    ( str0 len0 str1 len1 -- bool      ) compare <0 ;
-: str<>   ( str0 len0 str1 len1 -- bool      ) compare <>0 ;
+: .compare ( str0 len0 str1 len1 -- direction ) .rot .min .strncmp ;
+: str=     ( str0 len0 str1 len1 -- bool      ) .compare =0 ;
+: str<     ( str0 len0 str1 len1 -- bool      ) .compare <0 ;
+: str<>    ( str0 len0 str1 len1 -- bool      ) .compare <>0 ;
 
 
 
 \ Stack-based without comments:
-: compare rot min strncmp ;
-: str=    compare =0 ;
-: str<    compare <0 ;
-: str<>   compare <>0 ;
+: .compare .rot .min .strncmp ;
+: str=  .compare =0 ;
+: str<  .compare <0 ;
+: str<> .compare <>0 ;
 
 
 
 \ Locals-based. Can't be made shorter.
 \ This is why the compiler doesn't implicitly "push"
 \ parameters to the "stack": so you CAN reorder them.
-: compare { str0 len0 str1 len1 -- direction }
-  len0 len1 min { len } \ perform "rot"
-  str0 str1 len strncmp
+: .compare { str0 len0 str1 len1 -- direction }
+  len0 len1 .min { len } \ perform "rot"
+  str0 str1 len .strncmp
 ;
-: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare =0 ;
-: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <0 ;
-: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 compare <>0 ;
+: str=  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 .compare =0 ;
+: str<  { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 .compare <0 ;
+: str<> { str0 len0 str1 len1 -- bool } str0 len0 str1 len1 .compare <>0 ;
 ```
 
 Concatenation is not entirely lost. You still write forward code. Outputs still flow into inputs. The following expressions are equally valid:
@@ -240,7 +240,7 @@ For me, the tradeoff is well worth it. Forward-execution is preserved, while err
 Control structures simply clobber the entire "stack" (parameter registers). This was sufficient for avoiding data flow analysis. The "stack" is only `x0 x1 x2 x3 x4 x5 x6 x7`, and the other registers can be used for locals. Simplicity is nice:
 
 ```forth
-: word { cond }    \ Assigned to x2: non-param location.
+: .word { cond }    \ Assigned to x2: non-param location.
   123      { val } \ Assigned to x0: param location.
   val cond { -- }
 ;
@@ -251,11 +251,11 @@ Control structures simply clobber the entire "stack" (parameter registers). This
 
 
 
-: word { cond } \ Assigned to x8: non-param location.
+: .word { cond } \ Assigned to x8: non-param location.
   123 { val }   \ Assigned to x9: non-param location.
 
-  \ `then` and `end` clobber param registers and relocate `val`.
-  if cond then 234 { val } end
+  \ `.then` and `end` clobber param registers and relocate `val`.
+  if cond .then 234 { val } end
 
   val cond { -- } \ x0, x1 <- x9 x8
 ;
@@ -271,8 +271,8 @@ Control structures simply clobber the entire "stack" (parameter registers). This
 \ ret
 ```
 
-- Control structures clobber the "stack" using `comp_barrier`.
-- Usage examples: `elif_init loop leave until` and more.
+- Control structures clobber the "stack" using `.comp_barrier`.
+- Usage examples: `.elif_init loop leave until` and more.
 - Simple hack to avoid branch analysis.
 - Branching is implemented in Forth, compiler doesn't _know_ about it.
 

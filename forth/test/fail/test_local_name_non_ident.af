@@ -1,0 +1,3 @@
+\ Must fail to compile.
+fun: .test_local_name_non_ident { val-name -- err }
+end

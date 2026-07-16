@@ -1,2 +1,2 @@
 \ Must fail to compile.
-fun: test_too_many_input_regs_fail { A B C D E F G H I -- } end
+fun: .test_too_many_input_regs_fail { A B C D E F G H I -- } end

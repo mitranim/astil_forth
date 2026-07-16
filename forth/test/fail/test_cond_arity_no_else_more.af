@@ -1,6 +1,6 @@
 use' ../../lang.af
 
-fun: test_cond_arity_no_else_more_fail { val flag -- out0 out1 }
+fun: .test_cond_arity_no_else_more_fail { val flag -- out0 out1 }
   val flag if .then 10 end
 end
 

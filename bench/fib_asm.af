@@ -1,6 +1,6 @@
 use' lang.af
 
-fun: fib { _src -- _out } [
+fun: .fib { _src -- _out } [
   0 .comp_realloc_reg
   0 1        .asm_cmp_imm     .comp_instr \ cmp x0, 1
   12  ASM_GT .asm_branch_cond .comp_instr \ b.gt <init>
@@ -18,7 +18,7 @@ fun: fib { _src -- _out } [
   1 .comp_args_set
 ] end
 
-fun: run_loop { _count }
+fun: .run_loop { _count }
   [
     9 .comp_realloc_reg
     9 0 .asm_mov_reg .comp_instr \ mov x9, x0
@@ -32,10 +32,10 @@ fun: run_loop { _count }
   ]
 end
 
-fun: run
+fun: .run
   1 20 .lsl .run_loop
   \ 91 .fib .log_int .lf
 end
 .run
 
-fun: main { -- exit } .run 0 end
+fun: .main { -- exit } .run 0 end

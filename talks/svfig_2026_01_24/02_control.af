@@ -2,21 +2,21 @@ use' lang_s.af
 
 \ Nicer control flow structures.
 
-: main { val }
+: .main { val }
   if
     val 0 =
-  then
-    " branch: 0" log lf
-  elif val 1 = then
-    " branch: 1" log lf
-  elif val 2 = then
-    " branch: 2" log lf
+  .then
+    " branch: 0" .log .lf
+  elif val 1 = .then
+    " branch: 1" .log .lf
+  elif val 2 = .then
+    " branch: 2" .log .lf
   else
-    " branch: none" log lf
+    " branch: none" .log .lf
   end \ Terminates everything.
 ;
 
-" run 0: " log 0 main
-" run 1: " log 1 main
-" run 2: " log 2 main
-" run 3: " log 3 main
+" run 0: " .log 0 .main
+" run 1: " .log 1 .main
+" run 2: " .log 2 .main
+" run 3: " .log 3 .main

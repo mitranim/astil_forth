@@ -3,60 +3,60 @@ use' lang_s.af
 \ Translated from Gforth's `bubble.fs`.
 
 8192      let: LEN
-LEN cells mem: LIST
+LEN .cells mem: LIST
 
-fun: list_ceil ( list len -- ceil ) cells + end
+fun: .list_ceil ( list len -- ceil ) .cells + end
 
-fun: pseudo_random ( seed -- val ) 1309 * 13849 + 65535 and end
+fun: .pseudo_random ( seed -- val ) 1309 * 13849 + 65535 .and end
 
-fun: list_init { list len -- }
+fun: .list_init { list len -- }
   74755 { seed }
-  list len list_ceil
+  list len .list_ceil
   list
   CELL
   +loop: ptr
-    seed pseudo_random { seed }
+    seed .pseudo_random { seed }
     seed ptr !
   end
 end
 
-fun: list_dump { list len -- }
-  list len list_ceil list CELL
+fun: .list_dump { list len -- }
+  list len .list_ceil list CELL
   +loop: ptr
-    ptr @ log_int space
+    ptr @ .log_int .space
   end
-  lf
+  .lf
 end
 
-fun: list_verify { list len -- }
-  len cells list + -cell
+fun: .list_verify { list len -- }
+  len .cells list + -cell
   list
   CELL
   +loop: ptr
-    if ptr @2 > then " [bubble] not sorted" throw end
+    if ptr @2 > .then " [bubble] not sorted" .throw end
   end
 end
 
-fun: bubble { list len -- }
-  list len list_ceil
+fun: .bubble { list len -- }
+  list len .list_ceil
   list
   CELL
   -loop: ceil_ptr
     ceil_ptr list CELL
     +loop: ptr
-      if ptr @2 > then ptr @2 swap ptr !2 end
+      if ptr @2 > .then ptr @2 .swap ptr !2 end
     end
   end
 end
 
-fun: bubble_sort { list len -- }
-  list len list_init
-  list len bubble
+fun: .bubble_sort { list len -- }
+  list len .list_init
+  list len .bubble
   \ list len list_dump
-  list len list_verify
+  list len .list_verify
 end
 
-\ fun: bubble_with_flag ( -- )
+\ fun: .bubble_with_flag ( -- )
 \   CEIL LIST CELL
 \   -loop: ceil_ptr
 \     true to: flag
@@ -64,23 +64,23 @@ end
 \     ceil_ptr LIST CELL
 \     +loop: ptr
 \       ptr @2 >
-\ then
-\         ptr @2 swap ptr !2
+\ .then
+\         ptr @2 .swap ptr !2
 \         false to: flag
 \       end
 \     end
 \
-\     flag then leave end
+\     flag .then leave end
 \   end
 \ end
 
-\ fun: addrs
-\   " LIST: " log LIST .sc
-\   " CEIL: " log CEIL .sc
+\ fun: .addrs
+\   " LIST: " .log LIST .sc
+\   " CEIL: " .log CEIL .sc
 \ end
 
-fun: run
-  LIST LEN bubble_sort
-  " [bubble] done" log lf
+fun: .run
+  LIST LEN .bubble_sort
+  " [bubble] done" .log .lf
 end
-run
+.run

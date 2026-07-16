@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_redundant_addsub { val -- out } val 0 + end
+fun: .test_const_fold_redundant_addsub { val -- out } val 0 + end

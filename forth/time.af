@@ -11,23 +11,23 @@ S64 let: Time  \ time_t
 
 \ `struct timespec`. Used by reference.
 struct: Timespec
-  S64 1 field: Timespec_sec
-  S64 1 field: Timespec_nsec
+  S64 1 field: .Timespec_sec
+  S64 1 field: .Timespec_nsec
 end
 
 \ `struct tm`. Used by reference.
 struct: Date
-  S32  1 field: Date_sec    \ seconds after the minute [0-60]
-  S32  1 field: Date_min    \ minutes after the hour [0-59]
-  S32  1 field: Date_hour   \ hours since midnight [0-23]
-  S32  1 field: Date_mday   \ day of the month [1-31]
-  S32  1 field: Date_mon    \ months since January [0-11]
-  S32  1 field: Date_year   \ years since 1900
-  S32  1 field: Date_wday   \ days since Sunday [0-6]
-  S32  1 field: Date_yday   \ days since January 1 [0-365]
-  S32  1 field: Date_isdst  \ Daylight Savings Time flag
-  S64  1 field: Date_gmtoff \ offset from UTC in seconds
-  Cstr 1 field: Date_zone   \ timezone abbreviation
+  S32  1 field: .Date_sec    \ seconds after the minute [0-60]
+  S32  1 field: .Date_min    \ minutes after the hour [0-59]
+  S32  1 field: .Date_hour   \ hours since midnight [0-23]
+  S32  1 field: .Date_mday   \ day of the month [1-31]
+  S32  1 field: .Date_mon    \ months since January [0-11]
+  S32  1 field: .Date_year   \ years since 1900
+  S32  1 field: .Date_wday   \ days since Sunday [0-6]
+  S32  1 field: .Date_yday   \ days since January 1 [0-365]
+  S32  1 field: .Date_isdst  \ Daylight Savings Time flag
+  S64  1 field: .Date_gmtoff \ offset from UTC in seconds
+  Cstr 1 field: .Date_zone   \ timezone abbreviation
 end
 
 1000000 let: CLOCKS_PER_SEC
@@ -35,40 +35,40 @@ end
 0 let: CLOCK_REALTIME
 6 let: CLOCK_MONOTONIC
 
-fun: getdate_err { -- err } extern_adr' getdate_err @ end
+fun: .getdate_err { -- err } extern_adr' getdate_err @ end
 
-0 1 extern: clock       (          -- clock|-1 )
-1 1 extern: time        ( time_adr -- time|-1  )
-1 1 extern: getdate     ( str      -- date     )
+0 1 extern: .clock   clock   (          -- clock|-1 )
+1 1 extern: .time    time    ( time_adr -- time|-1  )
+1 1 extern: .getdate getdate ( str      -- date     )
 
-4 1 extern: strftime    ( buf size fmt date -- len )
-4 1 extern: strptime    ( buf fmt date      -- str )
+4 1 extern: .strftime strftime ( buf size fmt date -- len )
+4 1 extern: .strptime strptime ( buf fmt date      -- str )
 
-1 1 extern: asctime     ( date          -- str  )
-2 1 extern: asctime_r   ( date buf      -- str  )
-1 1 extern: ctime       ( time_adr      -- str  )
-2 1 extern: ctime_r     ( time_adr buf  -- str  )
-1 1 extern: gmtime      ( time_adr      -- date )
-2 1 extern: gmtime_r    ( time_adr date -- date )
-1 1 extern: localtime   ( time_adr      -- date )
-2 1 extern: localtime_r ( time_adr date -- date )
-1 1 extern: mktime      ( date          -- time|-1 )
-1 1 extern: timegm      ( date          -- time|-1 )
-1 1 extern: timelocal   ( date          -- time|-1 )
+1 1 extern: .asctime     asctime     ( date          -- str  )
+2 1 extern: .asctime_r   asctime_r   ( date buf      -- str  )
+1 1 extern: .ctime       ctime       ( time_adr      -- str  )
+2 1 extern: .ctime_r     ctime_r     ( time_adr buf  -- str  )
+1 1 extern: .gmtime      gmtime      ( time_adr      -- date )
+2 1 extern: .gmtime_r    gmtime_r    ( time_adr date -- date )
+1 1 extern: .localtime   localtime   ( time_adr      -- date )
+2 1 extern: .localtime_r localtime_r ( time_adr date -- date )
+1 1 extern: .mktime      mktime      ( date          -- time|-1 )
+1 1 extern: .timegm      timegm      ( date          -- time|-1 )
+1 1 extern: .timelocal   timelocal   ( date          -- time|-1 )
 
-1 1 extern: posix2time  ( time -- time )
-1 1 extern: time2posix  ( time -- time )
+1 1 extern: .posix2time posix2time  ( time -- time )
+1 1 extern: .time2posix time2posix  ( time -- time )
 
-0 0 extern: tzset       ( -- )
-0 0 extern: tzsetwall   ( -- )
+0 0 extern: .tzset     tzset     ( -- )
+0 0 extern: .tzsetwall tzsetwall ( -- )
 
-2 1 extern: timespec_get ( timespec base -- base :Cint )
+2 1 extern: .timespec_get timespec_get ( timespec base -- base :Cint )
 
-2 1 extern: clock_gettime         ( clock_id timespec -- 0|-1 :Cint )
-2 1 extern: clock_settime         ( clock_id timespec -- 0|-1 :Cint )
-2 1 extern: clock_getres          ( clock_id timespec -- 0|-1 :Cint )
-1 1 extern: clock_gettime_nsec_np ( clock_id          -- val        )
+2 1 extern: .clock_gettime         clock_gettime         ( clock_id timespec -- 0|-1 :Cint )
+2 1 extern: .clock_settime         clock_settime         ( clock_id timespec -- 0|-1 :Cint )
+2 1 extern: .clock_getres          clock_getres          ( clock_id timespec -- 0|-1 :Cint )
+1 1 extern: .clock_gettime_nsec_np clock_gettime_nsec_np ( clock_id          -- val        )
 
-1 1 extern: sleep     ( secs              -- left       )
-1 1 extern: usleep    ( usec              -- 0|-1 :Cint )
-2 1 extern: nanosleep ( timespec timespec -- 0|-1 :Cint )
+1 1 extern: .sleep     sleep     ( secs              -- left       )
+1 1 extern: .usleep    usleep    ( usec              -- 0|-1 :Cint )
+2 1 extern: .nanosleep nanosleep ( timespec timespec -- 0|-1 :Cint )

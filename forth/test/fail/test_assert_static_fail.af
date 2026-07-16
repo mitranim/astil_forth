@@ -1,5 +1,5 @@
 use' ../../lang.af
 
-fun: test_assert_static_fail
+fun: .test_assert_static_fail
   assert= 10 20 end
 end

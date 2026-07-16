@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: .test_local_assignment_leading_dot { -- err }
+  { .tmp }
+end

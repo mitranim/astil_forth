@@ -41,7 +41,7 @@ SVG and ASCII graphics for this talk are slopbot-generated. (But accurate.)
 
 ## Show me!
 
-We must actually _run_ a program first. It defines `main` and decides whether to run it immediately, or only in AOT.
+We must actually _run_ a program first. It defines `.main` and decides whether to run it immediately, or only in AOT.
 
 Via CLI:
 
@@ -58,20 +58,20 @@ make disasm file=out.exe && open local/out.s
 From inside a running program:
 
 ```forth
-: main { -- exit }
-  has_interp
-  then
-    " hello world (JIT mode)!" log lf
+: .main { -- exit }
+  .has_interp
+  .then
+    " hello world (JIT mode)!" .log .lf
   else
-    " hello world (AOT-compiled)!" log lf
+    " hello world (AOT-compiled)!" .log .lf
   end
   0
 ;
 
 \ optional:
-main
+.main
 
-xt' main " out.exe" compile_executable
+xt' .main " out.exe" .compile_executable
 
 \ in your shell:
 \
@@ -91,17 +91,17 @@ astil lang.af -
 ```
 
 ```forth
-: main { -- exit } " hello world! (first)" log lf 0 ;
+: .main { -- exit } " hello world! (first)" .log .lf 0 ;
 
-xt' main " out0.exe" compile_executable
+xt' .main " out0.exe" .compile_executable
 
-: main { -- exit } " hello world! (second)" log lf 0 ;
+: .main { -- exit } " hello world! (second)" .log .lf 0 ;
 
-xt' main " out1.exe" compile_executable
+xt' .main " out1.exe" .compile_executable
 
-: main { -- exit } " hello world! (third)" log lf 0 ;
+: .main { -- exit } " hello world! (third)" .log .lf 0 ;
 
-xt' main " out2.exe" compile_executable
+xt' .main " out2.exe" .compile_executable
 ```
 
 ```sh
@@ -117,15 +117,15 @@ Changes to mutable data persist into executables:
 ```forth
 123 var: VAL
 
-: main { -- exit } VAL @ . 0 ;
+: .main { -- exit } VAL @ . 0 ;
 
-main \ 123
+.main \ 123
 
 456 VAL !
 
-main \ 456
+.main \ 456
 
-xt' main " out.exe" compile_executable
+xt' .main " out.exe" .compile_executable
 ```
 
 ```sh

@@ -5,8 +5,8 @@
 Words are case-sensitive.
 
 ```forth
-: one 123 ;
-: ONE 234 ;
+: .one 123 ;
+: ONE [ .plain_call ] 234 ;
 ```
 
 Numeric literals are unambiguous.
@@ -36,26 +36,26 @@ More ergonomic control flow structures:
 #loop true #while #leave #leave #leave #end
 
 #begin
-  dup2 > #while
-  space space
-  dup pick0 over . cr
-  inc
+  .dup2 > #while
+  .space .space
+  .dup .pick0 .over . cr
+  .inc
 #repeat
 ```
 
 Separate wordlists for regular and compile-time words.
 
 ```forth
-:  char' parse_char           ;
-:: char' parse_char comp_push ;
+:  char' .parse_char            ;
+:: char' .parse_char .comp_push ;
 
-:  " parse_str ;
-:: " comp_str  ;
+:  " .parse_str ;
+:: " .comp_str  ;
 
-:  log" parse_str drop     puts ;
-:: log" comp_cstr compile' puts ;
+:  log" .parse_str .drop     .puts ;
+:: log" .comp_cstr compile' .puts ;
 
-: some_word
+: .some_word
   compile'  char'
   compile'' char'
 ;
@@ -64,9 +64,9 @@ Separate wordlists for regular and compile-time words.
 Exceptions are strings (error messages) rather than numeric codes.
 
 ```forth
-" readable error message" throw
+" readable error message" .throw
 
-" error codes: %zd %zd" 10 20 [ 2 ] errf throw
+" error codes: %zd %zd" 10 20 [ 2 ] .errf .throw
 ```
 
 Booleans are `0 1` rather than `0 -1`.
@@ -76,7 +76,7 @@ Special _semantic_ roles get special _syntactic_ roles.
 ```forth
 use'  ./some_file.af
 char'    A
-compile' some_word
+compile' .some_word
 
 123 to:  name
 234 let: CONST

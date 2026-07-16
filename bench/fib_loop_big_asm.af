@@ -5,12 +5,12 @@ use' lang.af
 \ Emulates 128-bit integers in 64-bit GPRs.
 
 \ adc Xd, Xn, Xm
-fun: asm_adc_reg { Xd Xn Xm -- instr }
+fun: .asm_adc_reg { Xd Xn Xm -- instr }
   Xd Xn Xm .asm_pattern_arith_reg
   0b1_0_0_11010000_00000_000000_00000_00000 .or
 end
 
-fun: fib { _depth -- lo hi } [
+fun: .fib { _depth -- lo hi } [
   0 .comp_realloc_reg
   1 .comp_realloc_reg
   2 .comp_realloc_reg
@@ -36,7 +36,7 @@ fun: fib { _depth -- lo hi } [
   2 .comp_args_set
 ] end
 
-fun: bigint_divmod10_step { quo bit rem -- quo rem }
+fun: .bigint_divmod10_step { quo bit rem -- quo rem }
   rem 1 .lsl bit + { rem }
   quo 1 .lsl { quo }
   if rem 10 >= .then
@@ -46,7 +46,7 @@ fun: bigint_divmod10_step { quo bit rem -- quo rem }
   quo rem
 end
 
-fun: bigint_divmod10 { lo hi -- qlo qhi rem }
+fun: .bigint_divmod10 { lo hi -- qlo qhi rem }
   0 0 0 { qlo qhi rem }
   hi { word }
   64 { ind }
@@ -69,7 +69,7 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   qlo qhi rem
 end
 
-fun: bigint_log_decimal { lo hi }
+fun: .bigint_log_decimal { lo hi }
   40 .alloca { buf }
   buf 40 +  { ptr }
   ifz lo hi .or .then
@@ -94,7 +94,7 @@ fun: bigint_log_decimal { lo hi }
   end
 end
 
-fun: run
+fun: .run
   1 18 .lsl { runs }
   loop
     runs .while
@@ -105,4 +105,4 @@ fun: run
 end
 .run
 
-fun: main { -- exit } .run 0 end
+fun: .main { -- exit } .run 0 end

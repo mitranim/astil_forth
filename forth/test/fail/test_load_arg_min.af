@@ -1,4 +1,4 @@
 \ Must fail to compile.
-fun: test_load_arg_min_fail { -- err }
+fun: .test_load_arg_min_fail { -- err }
   @
 end

@@ -8,13 +8,13 @@ use' lang.af
 4096      let: ARENA_PAGES
 
 struct: Arena
-  Stack 1 field: Arena_pages \ `stack_of(Stack)`
-  Adr   1 field: Arena_low   \ `Stack*` of active page
+  Stack 1 field: .Arena_pages \ `stack_of(Stack)`
+  Adr   1 field: .Arena_low   \ `Stack*` of active page
 end
 
-fun: arena_init { arn -> } size' Arena .memzero end
+fun: .arena_init { arn -> } size' Arena .memzero end
 
-fun: arena_deinit { arn -- Err }
+fun: .arena_deinit { arn -- Err }
   ifz arn .then .ret end
 
   arn .Stack_floor @ { floor }
@@ -34,7 +34,7 @@ fun: arena_deinit { arn -- Err }
 end
 
 \ Truncate every page and reset to first page if any, while keeping capacity.
-fun: arena_trunc { arn }
+fun: .arena_trunc { arn }
   ifz arn .then .ret end
 
   arn .Stack_floor @ { floor }
@@ -50,7 +50,7 @@ fun: arena_trunc { arn }
   floor arn .Arena_low !
 end
 
-fun: arena_alloc { size arn -- adr err }
+fun: .arena_alloc { size arn -- adr err }
   ifz size .then " unable to allocate: size is zero" .throw end
 
   arn .Arena_low @ { low }

@@ -2,7 +2,7 @@ use' lang.af
 
 \ Adapted from Gforth's `sieve.fs`.
 
-fun: find_prime { flags cap -- num }
+fun: .find_prime { flags cap -- num }
   flags cap 1 .memfill
   flags cap + 0 3 { ceil num step }
   flags { ptr0 }
@@ -28,7 +28,7 @@ fun: find_prime { flags cap -- num }
   num
 end
 
-fun: run
+fun: .run
   8192 { cap }
   cap .alloca { flags }
   4096 { runs }
@@ -43,4 +43,4 @@ fun: run
 end
 .run
 
-fun: main { -- exit } .run 0 end
+fun: .main { -- exit } .run 0 end

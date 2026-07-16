@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_rhs_umod_zero { val -- out } val 0 .umod end
+fun: .test_const_fold_rhs_umod_zero { val -- out } val 0 .umod end

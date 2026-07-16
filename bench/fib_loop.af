@@ -1,6 +1,6 @@
 use' lang.af
 
-fun: fib { ind -- out }
+fun: .fib { ind -- out }
   0 1 { prev next }
   loop
     ind .while
@@ -10,7 +10,7 @@ fun: fib { ind -- out }
   next
 end
 
-fun: run
+fun: .run
   1 20 .lsl { runs }
   loop
     runs .while
@@ -21,4 +21,4 @@ fun: run
 end
 .run
 
-fun: main { -- exit } .run 0 end
+fun: .main { -- exit } .run 0 end

@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_inner_assign_local_name_fail { val -- err }
-  val { tmp.name }
-end

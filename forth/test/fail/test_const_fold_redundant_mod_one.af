@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_redundant_mod_one { val -- out } val 1 .mod end
+fun: .test_const_fold_redundant_mod_one { val -- out } val 1 .mod end

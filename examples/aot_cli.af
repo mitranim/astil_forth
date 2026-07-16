@@ -9,7 +9,7 @@ use' lang.af
 \
 \ See `./aot.af` for compiling from INSIDE the program.
 
-fun: run { -- exit }
+fun: .run { -- exit }
   if .has_interp .then
     " hello world (JIT mode)!" .log .lf
   else
@@ -23,7 +23,7 @@ end
 \ Run immediately in JIT mode.
 .run
 
-fun: main { -- exit } .with_main_ctx .run end end
+fun: .main { -- exit } .with_main_ctx .run end end
 
 
 
@@ -36,8 +36,8 @@ fun: main { -- exit } .with_main_ctx .run end end
 \
 \ In the Forth REPL:
 \
-\   fun: run { -- exit } " hello world!" .log .lf 0 end
-\   fun: main { -- exit } .with_main_ctx .run end end
+\   fun: .run { -- exit } " hello world!" .log .lf 0 end
+\   fun: .main { -- exit } .with_main_ctx .run end end
 \   \ Then hit Ctrl+D (not Ctrl+C) to terminate stdin.
 \
 \ In your shell:

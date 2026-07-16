@@ -69,21 +69,21 @@ General rule for testing:
 - Then we test codegen optimizations where applicable.
 - We don't bother testing pessimizations.
 
-## Reg-CC call syntax
+## Call and name syntax
 
-When editing `.af` under reg-CC:
+When editing `.af` under either calling convention:
 
 - Source is whitespace-separated words.
 - Numeric literals are classified before word lookup.
 - Value-like spelling is `[A-Za-z_][A-Za-z0-9_]*`.
 - Call-like spelling is every other non-numeric word.
 - Locals and value-like globals must be value-like.
-- Callable names need call-like source spelling unless manually plain, such as control-only words and value-like generated words.
-- Ident-like callable names get call-like spelling via dot-call.
-- Compiler strips exactly one leading `.` for lookup; `.logf` looks up `logf`.
+- Word names need call-like source spelling unless manually plain, such as control-only words and value-like generated words.
+- Ident-like callable names get call-like spelling by storing a leading dot.
+- Lookup is exact; `.logf` looks up the symbol named `.logf`.
 - Regular functions, intrinsics, and externs follow the same call-like rule.
 - Non-ident callable names are already call-like; do not add dot to `+`, `!b`, `u/mod`, `fun:`, or `xt'`.
 - Control-only words are plain by design: `if ifz else elif elifz end loop leave again assert`.
-- Control words which operate on runtime args use call-like spelling. Example control words which require dot-call: `.then .while .try .throw .ret .recur`.
+- Control words which operate on runtime args use call-like names: `.then .while .try .throw .ret .recur`.
 - At file/eval root, `.ret` stops interpreting current input and leaves interpreter stack as-is; inside a compiled word, `.ret` returns current outputs.
-- Stored names cannot begin with `.` or look like numeric literals.
+- Word names may begin with `.`, but no stored name may look like a numeric literal.

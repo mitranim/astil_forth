@@ -6,52 +6,52 @@ use' lang_s.af
 8192 let: LEN
 LEN  mem: FLAGS
 
-fun: find_prime { flags len -- num }
-  flags len 1 memfill
+fun: .find_prime { flags len -- num }
+  flags len 1 .memfill
 
   0 3 ( num step )
 
   flags len + flags +for: ptr0
-    if ptr0 c@ then
-      dup ptr0 +
-      if dup flags len + < then
-        flags len + swap 2 pick +loop: ptr1 0 ptr1 c! end
+    if ptr0 c@ .then
+      .dup ptr0 +
+      if .dup flags len + < .then
+        flags len + .swap 2 .pick +loop: ptr1 0 ptr1 c! end
       else
-        drop
+        .drop
       end
-      swap inc swap
+      .swap .inc .swap
     end
     2 +
   end
-  drop
+  .drop
 end
 
-fun: run
+fun: .run
   \ FLAGS LEN find_prime .
 
-  RUNS for
-    FLAGS LEN find_prime drop
+  RUNS .for
+    FLAGS LEN .find_prime .drop
   end
 end
-run
+.run
 
 (
 Runs notably slower.
 
-fun: find_prime
-  FLAGS LEN 1 memfill
+fun: .find_prime
+  FLAGS LEN 1 .memfill
 
   0 3 { num step }
 
   EFLAG FLAGS +for: ptr0
-    if ptr0 c@ then
+    if ptr0 c@ .then
       ptr0 step + { ptr1 }
 
       EFLAG ptr0 step +loop: ptr1
         0 ptr1 c!
       end
 
-      num inc { num }
+      num .inc { num }
     end
 
     step 2 + { step }

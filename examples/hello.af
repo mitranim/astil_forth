@@ -8,7 +8,7 @@ use' lang.af
 \ x16 = 4 -> XNU write syscall.
 \
 \ Inspired by Cosmopolitan Libc: https://justine.lol/cosmopolitan.
-fun: sys_write { _fdes _str _len } [
+fun: .sys_write { _fdes _str _len } [
   0                 .comp_realloc_reg \ x0 clobber = kernel return value.
   8                 .comp_realloc_reg \ x8 clobber = Linux sysno.
   8 64 .asm_mov_imm .comp_instr       \ mov x8, 64
@@ -20,7 +20,7 @@ fun: sys_write { _fdes _str _len } [
 STDOUT s" hello world! (using syscall)" .sys_write
 STDOUT CRLF 2 .sys_write
 
-fun: bool_str { val -- str } if val .then " true" else " false" end end
+fun: .bool_str { val -- str } if val .then " true" else " false" end end
 
 " bool_str(false): " .log false .bool_str .log .lf
 " bool_str(true):  " .log true  .bool_str .log .lf

@@ -47,7 +47,11 @@ typedef struct Sym {
     } norm;
 
     void *intrin; // Interpreter intrinsic; implies `interp_only`.
-    void *exter;  // External address; obtained from `dlsym`.
+
+    struct {
+      void       *exter;     // Address obtained from `dlsym`.
+      const char *link_name; // Stable native symbol name.
+    };
   };
 
   Sym_set callees;     // Dependencies in compiled code.
@@ -58,8 +62,11 @@ typedef struct Sym {
   bool    has_err;     // Last output is an error, or intrinsic returns `Err`.
   bool    comp_only;   // Can only be used between `:` and `;`.
   bool    interp_only; // Forbidden in AOT executables.
-  bool    plain_call;  // Enables ident-like call without dot; reg-CC only.
+  bool    plain_call;  // Enables an ident-like callable name.
 } Sym;
+
+// Extern-only metadata must not bloat every symbol.
+static_assert(sizeof(Sym) <= 256);
 
 typedef stack_of(Sym)  Sym_stack;
 typedef dict_of(Sym *) Sym_dict;

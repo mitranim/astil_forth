@@ -71,9 +71,9 @@ static Err build(Interp *interp, const char *path) {
     return err_str("unable to build executable: missing output path");
   }
 
-  const auto sym = dict_get(&interp->dict_exec, "main");
+  const auto sym = dict_get(&interp->dict_exec, ".main");
   if (!sym) {
-    return err_str("unable to build executable: missing entry point `main`");
+    return err_str("unable to build executable: missing entry point `.main`");
   }
 
   try(compile_mach_executable_to(interp, path, sym));

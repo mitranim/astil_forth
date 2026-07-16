@@ -1,5 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_plain_str_prnf_fail { -- err }
-  4096 .alloca { buf }
-  buf 4096 " bad" str_prnf
-end

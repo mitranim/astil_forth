@@ -1,0 +1,33 @@
+use' lang.af
+use' time.af
+
+27 let: ESC
+
+fun: .now { -- out } nil .time end
+fun: .del_line   ESC .logc " [1A" .log ESC .logc " [2K" .log end
+fun: .strike_beg ESC .logc " [9m" .log end
+fun: .strike_end ESC .logc " [0m" .log end
+
+fun: .log_time { min sec }
+  " elapsed (mins:secs): %0.2zd:%0.2zd" min sec .logf
+end
+
+fun: .run
+  .now 0 0 false { start mins secs printed }
+
+  loop
+    \ Strike-out the previous entry.
+    if printed .then
+      .del_line
+      .strike_beg mins secs .log_time .strike_end .lf
+    end
+
+    .now start -    { elapsed }
+    elapsed 60 /    { mins }
+    elapsed 60 .mod { secs }
+    true            { printed }
+    " elapsed (mins:secs): %0.2zd:%0.2zd" mins secs .logf .lf
+    1 .sleep { -- }
+  end
+end
+.run

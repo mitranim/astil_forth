@@ -1,4 +1,4 @@
 \ Must fail to compile: error output declaration is required.
-fun: test_throw_requires_err_fail { -- not_err }
+fun: .test_throw_requires_err_fail { -- not_err }
   " test_err" .throw
 end

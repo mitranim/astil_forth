@@ -293,22 +293,6 @@ static Err intrin_comp_only(bool val, Interp *interp) {
   return nullptr;
 }
 
-static Err err_plain_call_name(const char *name) {
-  return errf(
-    "invalid plain-call name " FMT_QUOTED
-    ": plain-call names must be ident-like",
-    name
-  );
-}
-
-static Err intrin_plain_call(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-  if (!is_word_ident_like(sym->name)) return err_plain_call_name(sym->name.buf);
-  sym->plain_call = true;
-  return nullptr;
-}
-
 static Err intrin_interp_only(bool val, Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
@@ -443,11 +427,19 @@ static Err intrin_comp_extern_adr(Sint buf, Sint len, Interp *interp) {
 }
 
 static Err intrin_extern_fun(
-  Sint buf, Sint len, Sint inp_len, Sint out_len, Interp *interp
+  Sint    name_buf,
+  Sint    name_len,
+  Sint    link_buf,
+  Sint    link_len,
+  Sint    inp_len,
+  Sint    out_len,
+  Interp *interp
 ) {
   Word_str name;
-  try(interp_valid_name(buf, len, &name));
-  try(interp_extern_fun(interp, name.buf, inp_len, out_len));
+  Word_str link_name;
+  try(interp_valid_name(name_buf, name_len, &name));
+  try(interp_valid_name(link_buf, link_len, &link_name));
+  try(interp_extern_fun(interp, name.buf, link_name.buf, inp_len, out_len));
   return nullptr;
 }
 
@@ -769,7 +761,7 @@ static const USED auto INTRIN_BRACE = (Sym){
 };
 
 static const USED auto INTRIN_COMP_SIGNATURE_GET = (Sym){
-  .name.buf  = "comp_signature_get",
+  .name.buf  = ".comp_signature_get",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_signature_get,
   .out_len   = 4,
@@ -778,7 +770,7 @@ static const USED auto INTRIN_COMP_SIGNATURE_GET = (Sym){
 };
 
 static const USED auto INTRIN_COMP_SIGNATURE_SET = (Sym){
-  .name.buf  = "comp_signature_set",
+  .name.buf  = ".comp_signature_set",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_signature_set,
   .inp_len   = 3,
@@ -788,7 +780,7 @@ static const USED auto INTRIN_COMP_SIGNATURE_SET = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ARGS_VALID = (Sym){
-  .name.buf  = "comp_args_valid",
+  .name.buf  = ".comp_args_valid",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_valid,
   .inp_len   = 2,
@@ -798,7 +790,7 @@ static const USED auto INTRIN_COMP_ARGS_VALID = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ARGS_MIN = (Sym){
-  .name.buf  = "comp_args_min",
+  .name.buf  = ".comp_args_min",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_min,
   .inp_len   = 2,
@@ -808,7 +800,7 @@ static const USED auto INTRIN_COMP_ARGS_MIN = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ARGS_GET = (Sym){
-  .name.buf  = "comp_args_get",
+  .name.buf  = ".comp_args_get",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_get,
   .out_len   = 2,
@@ -817,7 +809,7 @@ static const USED auto INTRIN_COMP_ARGS_GET = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ARGS_SET = (Sym){
-  .name.buf  = "comp_args_set",
+  .name.buf  = ".comp_args_set",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_set,
   .inp_len   = 1,
@@ -827,7 +819,7 @@ static const USED auto INTRIN_COMP_ARGS_SET = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ARGS_FOLD = (Sym){
-  .name.buf  = "comp_args_fold",
+  .name.buf  = ".comp_args_fold",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_args_fold,
   .inp_len   = 1,
@@ -837,7 +829,7 @@ static const USED auto INTRIN_COMP_ARGS_FOLD = (Sym){
 };
 
 static const USED auto INTRIN_COMP_BARRIER = (Sym){
-  .name.buf  = "comp_barrier",
+  .name.buf  = ".comp_barrier",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_barrier,
   .inp_len   = 0,
@@ -847,7 +839,7 @@ static const USED auto INTRIN_COMP_BARRIER = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ALLOC_NEXT_REG = (Sym){
-  .name.buf  = "comp_alloc_next_reg",
+  .name.buf  = ".comp_alloc_next_reg",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_alloc_next_reg,
   .out_len   = 2,
@@ -856,7 +848,7 @@ static const USED auto INTRIN_COMP_ALLOC_NEXT_REG = (Sym){
 };
 
 static const USED auto INTRIN_COMP_REALLOC_REG = (Sym){
-  .name.buf  = "comp_realloc_reg",
+  .name.buf  = ".comp_realloc_reg",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_realloc_reg,
   .inp_len   = 1,
@@ -866,7 +858,7 @@ static const USED auto INTRIN_COMP_REALLOC_REG = (Sym){
 };
 
 static const USED auto INTRIN_COMP_PUSH_FROM_LOCAL = (Sym){
-  .name.buf  = "comp_push_from_local",
+  .name.buf  = ".comp_push_from_local",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_push_from_local,
   .inp_len   = 1,
@@ -876,7 +868,7 @@ static const USED auto INTRIN_COMP_PUSH_FROM_LOCAL = (Sym){
 };
 
 static const USED auto INTRIN_COMP_POP_INTO_LOCAL = (Sym){
-  .name.buf  = "comp_pop_into_local",
+  .name.buf  = ".comp_pop_into_local",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_pop_into_local,
   .inp_len   = 1,
@@ -886,7 +878,7 @@ static const USED auto INTRIN_COMP_POP_INTO_LOCAL = (Sym){
 };
 
 static const USED auto INTRIN_COMP_ASSIGN_LOCAL_FROM_REG = (Sym){
-  .name.buf  = "comp_assign_local_from_reg",
+  .name.buf  = ".comp_assign_local_from_reg",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_comp_assign_local_from_reg,
   .inp_len   = 2,
@@ -896,7 +888,7 @@ static const USED auto INTRIN_COMP_ASSIGN_LOCAL_FROM_REG = (Sym){
 };
 
 static const USED auto INTRIN_ALLOCA = (Sym){
-  .name.buf  = "alloca",
+  .name.buf  = ".alloca",
   .wordlist  = WORDLIST_COMP,
   .intrin    = (void *)intrin_alloca,
   .out_len   = 1,
@@ -905,7 +897,7 @@ static const USED auto INTRIN_ALLOCA = (Sym){
 };
 
 static const USED auto INTRIN_COMPILE_EXECUTABLE = (Sym){
-  .name.buf = "compile_executable",
+  .name.buf = ".compile_executable",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_compile_executable,
   .inp_len  = 2,
@@ -914,7 +906,7 @@ static const USED auto INTRIN_COMPILE_EXECUTABLE = (Sym){
 };
 
 static const USED auto INTRIN_DEBUG_WORD = (Sym){
-  .name.buf = "debug_word",
+  .name.buf = ".debug_word",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)debug_word,
   .inp_len  = 1,
@@ -923,7 +915,7 @@ static const USED auto INTRIN_DEBUG_WORD = (Sym){
 };
 
 static const USED auto INTRIN_DEBUG_CTX = (Sym){
-  .name.buf  = "debug_ctx",
+  .name.buf  = ".debug_ctx",
   .wordlist  = WORDLIST_EXEC,
   .intrin    = (void *)intrin_debug_ctx,
   .comp_only = true,
@@ -937,7 +929,7 @@ static const USED auto INTRIN_DEBUG_CTX_COMP = (Sym){
 };
 
 static const USED auto INTRIN_DEBUG_ARG = (Sym){
-  .name.buf = "debug_arg",
+  .name.buf = ".debug_arg",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_debug_arg,
   .inp_len  = 1,

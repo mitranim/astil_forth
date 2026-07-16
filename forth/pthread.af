@@ -91,127 +91,127 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 \ Then on little-endian, C can store with 32-bit instructions,
 \ and we can load with 64-bit instructions, and it just works.
 
-1 1 extern: pthread_attr_init                ( attr                  -- err :Cint )
-1 1 extern: pthread_attr_destroy             ( attr                  -- err :Cint )
-2 1 extern: pthread_attr_getdetachstate      ( attr detach_adr       -- err :Cint )
-2 1 extern: pthread_attr_setdetachstate      ( attr detach           -- err :Cint )
-2 1 extern: pthread_attr_getguardsize        ( attr size_adr         -- err :Cint )
-2 1 extern: pthread_attr_setguardsize        ( attr size             -- err :Cint )
-2 1 extern: pthread_attr_getinheritsched     ( attr inherit_adr      -- err :Cint )
-2 1 extern: pthread_attr_setinheritsched     ( attr inherit          -- err :Cint )
-2 1 extern: pthread_attr_getschedparam       ( attr param            -- err :Cint )
-2 1 extern: pthread_attr_setschedparam       ( attr param            -- err :Cint )
-2 1 extern: pthread_attr_getschedpolicy      ( attr policy_adr       -- err :Cint )
-2 1 extern: pthread_attr_setschedpolicy      ( attr policy           -- err :Cint )
-2 1 extern: pthread_attr_getscope            ( attr scope_adr        -- err :Cint )
-2 1 extern: pthread_attr_setscope            ( attr scope            -- err :Cint )
-3 1 extern: pthread_attr_getstack            ( attr adr_adr size_adr -- err :Cint )
-3 1 extern: pthread_attr_setstack            ( attr stack_adr size   -- err :Cint )
-2 1 extern: pthread_attr_getstackaddr        ( attr adr_adr          -- err :Cint )
-2 1 extern: pthread_attr_setstackaddr        ( attr stack_adr        -- err :Cint )
-2 1 extern: pthread_attr_getstacksize        ( attr size_adr         -- err :Cint )
-2 1 extern: pthread_attr_setstacksize        ( attr size             -- err :Cint )
+1 1 extern: .pthread_attr_init            pthread_attr_init            ( attr                  -- err :Cint )
+1 1 extern: .pthread_attr_destroy         pthread_attr_destroy         ( attr                  -- err :Cint )
+2 1 extern: .pthread_attr_getdetachstate  pthread_attr_getdetachstate  ( attr detach_adr       -- err :Cint )
+2 1 extern: .pthread_attr_setdetachstate  pthread_attr_setdetachstate  ( attr detach           -- err :Cint )
+2 1 extern: .pthread_attr_getguardsize    pthread_attr_getguardsize    ( attr size_adr         -- err :Cint )
+2 1 extern: .pthread_attr_setguardsize    pthread_attr_setguardsize    ( attr size             -- err :Cint )
+2 1 extern: .pthread_attr_getinheritsched pthread_attr_getinheritsched ( attr inherit_adr      -- err :Cint )
+2 1 extern: .pthread_attr_setinheritsched pthread_attr_setinheritsched ( attr inherit          -- err :Cint )
+2 1 extern: .pthread_attr_getschedparam   pthread_attr_getschedparam   ( attr param            -- err :Cint )
+2 1 extern: .pthread_attr_setschedparam   pthread_attr_setschedparam   ( attr param            -- err :Cint )
+2 1 extern: .pthread_attr_getschedpolicy  pthread_attr_getschedpolicy  ( attr policy_adr       -- err :Cint )
+2 1 extern: .pthread_attr_setschedpolicy  pthread_attr_setschedpolicy  ( attr policy           -- err :Cint )
+2 1 extern: .pthread_attr_getscope        pthread_attr_getscope        ( attr scope_adr        -- err :Cint )
+2 1 extern: .pthread_attr_setscope        pthread_attr_setscope        ( attr scope            -- err :Cint )
+3 1 extern: .pthread_attr_getstack        pthread_attr_getstack        ( attr adr_adr size_adr -- err :Cint )
+3 1 extern: .pthread_attr_setstack        pthread_attr_setstack        ( attr stack_adr size   -- err :Cint )
+2 1 extern: .pthread_attr_getstackaddr    pthread_attr_getstackaddr    ( attr adr_adr          -- err :Cint )
+2 1 extern: .pthread_attr_setstackaddr    pthread_attr_setstackaddr    ( attr stack_adr        -- err :Cint )
+2 1 extern: .pthread_attr_getstacksize    pthread_attr_getstacksize    ( attr size_adr         -- err :Cint )
+2 1 extern: .pthread_attr_setstacksize    pthread_attr_setstacksize    ( attr size             -- err :Cint )
 
-1 1 extern: pthread_cond_broadcast           ( cond            -- err :Cint )
-1 1 extern: pthread_cond_destroy             ( cond            -- err :Cint )
-2 1 extern: pthread_cond_init                ( cond attr       -- err :Cint )
-1 1 extern: pthread_cond_signal              ( cond            -- err :Cint )
-3 1 extern: pthread_cond_timedwait           ( cond mutex time -- err :Cint )
-2 1 extern: pthread_cond_wait                ( cond mutex      -- err :Cint )
+1 1 extern: .pthread_cond_broadcast pthread_cond_broadcast ( cond            -- err :Cint )
+1 1 extern: .pthread_cond_destroy   pthread_cond_destroy   ( cond            -- err :Cint )
+2 1 extern: .pthread_cond_init      pthread_cond_init      ( cond attr       -- err :Cint )
+1 1 extern: .pthread_cond_signal    pthread_cond_signal    ( cond            -- err :Cint )
+3 1 extern: .pthread_cond_timedwait pthread_cond_timedwait ( cond mutex time -- err :Cint )
+2 1 extern: .pthread_cond_wait      pthread_cond_wait      ( cond mutex      -- err :Cint )
 
-1 1 extern: pthread_condattr_init            ( attr            -- err :Cint )
-1 1 extern: pthread_condattr_destroy         ( attr            -- err :Cint )
-2 1 extern: pthread_condattr_getpshared      ( attr shared_adr -- err :Cint )
-2 1 extern: pthread_condattr_setpshared      ( attr shared     -- err :Cint )
+1 1 extern: .pthread_condattr_init       pthread_condattr_init       ( attr            -- err :Cint )
+1 1 extern: .pthread_condattr_destroy    pthread_condattr_destroy    ( attr            -- err :Cint )
+2 1 extern: .pthread_condattr_getpshared pthread_condattr_getpshared ( attr shared_adr -- err :Cint )
+2 1 extern: .pthread_condattr_setpshared pthread_condattr_setpshared ( attr shared     -- err :Cint )
 
-4 1 extern: pthread_create                   ( thread_adr attr fun inp -- err :Cint )
-4 1 extern: pthread_create_suspended_np      ( thread_adr attr fun inp -- err :Cint )
-1 1 extern: pthread_cancel                   ( thread                  -- err :Cint )
-2 1 extern: pthread_kill                     ( thread sig              -- err :Cint )
-2 1 extern: pthread_join                     ( thread out_adr          -- err :Cint )
-1 1 extern: pthread_detach                   ( thread                  -- err :Cint )
-2 1 extern: pthread_threadid_np              ( thread id_adr           -- err :Cint )
-3 1 extern: pthread_getschedparam            ( thread policy_adr param -- err :Cint )
-3 1 extern: pthread_setschedparam            ( thread policy     param -- err :Cint )
+4 1 extern: .pthread_create              pthread_create              ( thread_adr attr fun inp -- err :Cint )
+4 1 extern: .pthread_create_suspended_np pthread_create_suspended_np ( thread_adr attr fun inp -- err :Cint )
+1 1 extern: .pthread_cancel              pthread_cancel              ( thread                  -- err :Cint )
+2 1 extern: .pthread_kill                pthread_kill                ( thread sig              -- err :Cint )
+2 1 extern: .pthread_join                pthread_join                ( thread out_adr          -- err :Cint )
+1 1 extern: .pthread_detach              pthread_detach              ( thread                  -- err :Cint )
+2 1 extern: .pthread_threadid_np         pthread_threadid_np         ( thread id_adr           -- err :Cint )
+3 1 extern: .pthread_getschedparam       pthread_getschedparam       ( thread policy_adr param -- err :Cint )
+3 1 extern: .pthread_setschedparam       pthread_setschedparam       ( thread policy     param -- err :Cint )
 
-3 1 extern: pthread_atfork                   ( prep parent child    -- err :Cint  )
-2 1 extern: pthread_once                     ( once_ctrl init_fun   -- err :Cint  )
-3 1 extern: pthread_sigmask                  ( how set_adr oset_adr -- err :Cint  )
-1 0 extern: pthread_exit                     ( out_adr              --            )
-0 0 extern: pthread_yield_np                 (                      --            )
-0 1 extern: pthread_is_threaded_np           (                      -- bool :Cint )
-2 1 extern: pthread_equal                    ( thread0 thread1      -- bool :Cint )
+3 1 extern: .pthread_atfork         pthread_atfork         ( prep parent child    -- err :Cint  )
+2 1 extern: .pthread_once           pthread_once           ( once_ctrl init_fun   -- err :Cint  )
+3 1 extern: .pthread_sigmask        pthread_sigmask        ( how set_adr oset_adr -- err :Cint  )
+1 0 extern: .pthread_exit           pthread_exit           ( out_adr              --            )
+0 0 extern: .pthread_yield_np       pthread_yield_np       (                      --            )
+0 1 extern: .pthread_is_threaded_np pthread_is_threaded_np (                      -- bool :Cint )
+2 1 extern: .pthread_equal          pthread_equal          ( thread0 thread1      -- bool :Cint )
 
-0 1 extern: pthread_getconcurrency           (     -- lvl :Cint )
-1 1 extern: pthread_setconcurrency           ( lvl -- err :Cint )
+0 1 extern: .pthread_getconcurrency pthread_getconcurrency (     -- lvl :Cint )
+1 1 extern: .pthread_setconcurrency pthread_setconcurrency ( lvl -- err :Cint )
 
-2 1 extern: pthread_setcancelstate           ( state state_adr -- err :Cint )
-2 1 extern: pthread_setcanceltype            ( type  type_adr  -- err :Cint )
-0 0 extern: pthread_testcancel               (                 --           )
+2 1 extern: .pthread_setcancelstate pthread_setcancelstate ( state state_adr -- err :Cint )
+2 1 extern: .pthread_setcanceltype  pthread_setcanceltype  ( type  type_adr  -- err :Cint )
+0 0 extern: .pthread_testcancel     pthread_testcancel     (                 --           )
 
-2 1 extern: pthread_key_create               ( key_adr deinit_fun -- err :Cint )
-1 1 extern: pthread_key_delete               ( key                -- err :Cint )
+2 1 extern: .pthread_key_create pthread_key_create ( key_adr deinit_fun -- err :Cint )
+1 1 extern: .pthread_key_delete pthread_key_delete ( key                -- err :Cint )
 
-1 1 extern: pthread_getspecific              ( key     -- val       )
-2 1 extern: pthread_setspecific              ( key val -- err :Cint )
+1 1 extern: .pthread_getspecific pthread_getspecific ( key     -- val       )
+2 1 extern: .pthread_setspecific pthread_setspecific ( key val -- err :Cint )
 
-1 1 extern: pthread_mutexattr_init           ( attr            -- err :Cint )
-1 1 extern: pthread_mutexattr_destroy        ( attr            -- err :Cint )
-2 1 extern: pthread_mutexattr_getprioceiling ( attr ceil_adr   -- err :Cint )
-2 1 extern: pthread_mutexattr_setprioceiling ( attr ceil       -- err :Cint )
-2 1 extern: pthread_mutexattr_getprotocol    ( attr prot_adr   -- err :Cint )
-2 1 extern: pthread_mutexattr_setprotocol    ( attr prot       -- err :Cint )
-2 1 extern: pthread_mutexattr_getpshared     ( attr shared_adr -- err :Cint )
-2 1 extern: pthread_mutexattr_setpshared     ( attr shared     -- err :Cint )
-2 1 extern: pthread_mutexattr_gettype        ( attr type_adr   -- err :Cint )
-2 1 extern: pthread_mutexattr_settype        ( attr type       -- err :Cint )
-2 1 extern: pthread_mutexattr_getpolicy_np   ( attr pol_adr    -- err :Cint )
-2 1 extern: pthread_mutexattr_setpolicy_np   ( attr pol        -- err :Cint )
+1 1 extern: .pthread_mutexattr_init           pthread_mutexattr_init           ( attr            -- err :Cint )
+1 1 extern: .pthread_mutexattr_destroy        pthread_mutexattr_destroy        ( attr            -- err :Cint )
+2 1 extern: .pthread_mutexattr_getprioceiling pthread_mutexattr_getprioceiling ( attr ceil_adr   -- err :Cint )
+2 1 extern: .pthread_mutexattr_setprioceiling pthread_mutexattr_setprioceiling ( attr ceil       -- err :Cint )
+2 1 extern: .pthread_mutexattr_getprotocol    pthread_mutexattr_getprotocol    ( attr prot_adr   -- err :Cint )
+2 1 extern: .pthread_mutexattr_setprotocol    pthread_mutexattr_setprotocol    ( attr prot       -- err :Cint )
+2 1 extern: .pthread_mutexattr_getpshared     pthread_mutexattr_getpshared     ( attr shared_adr -- err :Cint )
+2 1 extern: .pthread_mutexattr_setpshared     pthread_mutexattr_setpshared     ( attr shared     -- err :Cint )
+2 1 extern: .pthread_mutexattr_gettype        pthread_mutexattr_gettype        ( attr type_adr   -- err :Cint )
+2 1 extern: .pthread_mutexattr_settype        pthread_mutexattr_settype        ( attr type       -- err :Cint )
+2 1 extern: .pthread_mutexattr_getpolicy_np   pthread_mutexattr_getpolicy_np   ( attr pol_adr    -- err :Cint )
+2 1 extern: .pthread_mutexattr_setpolicy_np   pthread_mutexattr_setpolicy_np   ( attr pol        -- err :Cint )
 
-2 1 extern: pthread_mutex_init               ( mut attr -- err :Cint )
-1 1 extern: pthread_mutex_destroy            ( mut      -- err :Cint )
-1 1 extern: pthread_mutex_trylock            ( mut      -- err :Cint )
-1 1 extern: pthread_mutex_lock               ( mut      -- err :Cint )
-1 1 extern: pthread_mutex_unlock             ( mut      -- err :Cint )
+2 1 extern: .pthread_mutex_init    pthread_mutex_init    ( mut attr -- err :Cint )
+1 1 extern: .pthread_mutex_destroy pthread_mutex_destroy ( mut      -- err :Cint )
+1 1 extern: .pthread_mutex_trylock pthread_mutex_trylock ( mut      -- err :Cint )
+1 1 extern: .pthread_mutex_lock    pthread_mutex_lock    ( mut      -- err :Cint )
+1 1 extern: .pthread_mutex_unlock  pthread_mutex_unlock  ( mut      -- err :Cint )
 
-2 1 extern: pthread_mutex_getprioceiling     ( mut ceil_adr      -- err :Cint )
-3 1 extern: pthread_mutex_setprioceiling     ( mut ceil ceil_adr -- err :Cint )
+2 1 extern: .pthread_mutex_getprioceiling pthread_mutex_getprioceiling ( mut ceil_adr      -- err :Cint )
+3 1 extern: .pthread_mutex_setprioceiling pthread_mutex_setprioceiling ( mut ceil ceil_adr -- err :Cint )
 
-1 1 extern: pthread_rwlockattr_init          ( attr            -- err :Cint )
-1 1 extern: pthread_rwlockattr_destroy       ( attr            -- err :Cint )
-2 1 extern: pthread_rwlockattr_getpshared    ( attr shared_adr -- err :Cint )
-2 1 extern: pthread_rwlockattr_setpshared    ( attr shared     -- err :Cint )
+1 1 extern: .pthread_rwlockattr_init       pthread_rwlockattr_init       ( attr            -- err :Cint )
+1 1 extern: .pthread_rwlockattr_destroy    pthread_rwlockattr_destroy    ( attr            -- err :Cint )
+2 1 extern: .pthread_rwlockattr_getpshared pthread_rwlockattr_getpshared ( attr shared_adr -- err :Cint )
+2 1 extern: .pthread_rwlockattr_setpshared pthread_rwlockattr_setpshared ( attr shared     -- err :Cint )
 
-2 1 extern: pthread_rwlock_init              ( lock attr -- err :Cint )
-1 1 extern: pthread_rwlock_destroy           ( lock      -- err :Cint )
-1 1 extern: pthread_rwlock_tryrdlock         ( lock      -- err :Cint )
-1 1 extern: pthread_rwlock_trywrlock         ( lock      -- err :Cint )
-1 1 extern: pthread_rwlock_rdlock            ( lock      -- err :Cint )
-1 1 extern: pthread_rwlock_wrlock            ( lock      -- err :Cint )
-1 1 extern: pthread_rwlock_unlock            ( lock      -- err :Cint )
+2 1 extern: .pthread_rwlock_init      pthread_rwlock_init      ( lock attr -- err :Cint )
+1 1 extern: .pthread_rwlock_destroy   pthread_rwlock_destroy   ( lock      -- err :Cint )
+1 1 extern: .pthread_rwlock_tryrdlock pthread_rwlock_tryrdlock ( lock      -- err :Cint )
+1 1 extern: .pthread_rwlock_trywrlock pthread_rwlock_trywrlock ( lock      -- err :Cint )
+1 1 extern: .pthread_rwlock_rdlock    pthread_rwlock_rdlock    ( lock      -- err :Cint )
+1 1 extern: .pthread_rwlock_wrlock    pthread_rwlock_wrlock    ( lock      -- err :Cint )
+1 1 extern: .pthread_rwlock_unlock    pthread_rwlock_unlock    ( lock      -- err :Cint )
 
-2 1 extern: pthread_cond_signal_thread_np    ( cond thread -- err :Cint )
+2 1 extern: .pthread_cond_signal_thread_np pthread_cond_signal_thread_np ( cond thread -- err :Cint )
 
 \ `Timespec` is defined in `./time.af`.
-3 1 extern: pthread_cond_timedwait_relative_np ( cond mutex timespec -- err :Cint )
+3 1 extern: .pthread_cond_timedwait_relative_np pthread_cond_timedwait_relative_np ( cond mutex timespec -- err :Cint )
 
-0 1 extern: pthread_jit_write_protect_supported_np (         -- bool :Cint )
-1 0 extern: pthread_jit_write_protect_np           ( enabled --            )
-0 0 extern: pthread_jit_write_freeze_callbacks_np  (         --            )
+0 1 extern: .pthread_jit_write_protect_supported_np pthread_jit_write_protect_supported_np (         -- bool :Cint )
+1 0 extern: .pthread_jit_write_protect_np           pthread_jit_write_protect_np           ( enabled --            )
+0 0 extern: .pthread_jit_write_freeze_callbacks_np  pthread_jit_write_freeze_callbacks_np  (         --            )
 
 \ Not found via `dlsym`.
-\ 2 1 extern: pthread_jit_write_with_callback_np
+\ 2 1 extern: .pthread_jit_write_with_callback_np pthread_jit_write_with_callback_np
 
-\ Internal closure used by `thread_run_with_ctx`.
+\ Internal closure used by `.thread_run_with_ctx`.
 struct: Thread_run
-  Cell 1 field: Thread_run_inp
-  Adr  1 field: Thread_run_fun
-  Adr  1 field: Thread_run_ctx
+  Cell 1 field: .Thread_run_inp
+  Adr  1 field: .Thread_run_fun
+  Adr  1 field: .Thread_run_ctx
 end
 
 \ Internal trampoline for joinable threads which
 \ receive context backed by parent-owned memory.
-fun: thread_run_with_ctx { run -- out }
+fun: .thread_run_with_ctx { run -- out }
   run .Thread_run_inp @ { inp }
   run .Thread_run_fun @ { fun }
   run .Thread_run_ctx @ .with_ctx
@@ -219,16 +219,16 @@ fun: thread_run_with_ctx { run -- out }
   end
 end
 
-\ Wraps `pthread_create` with descriptive error on failure.
-\ The parent must either `thread_join` or `pthread_detach`.
+\ Wraps `.pthread_create` with descriptive error on failure.
+\ The parent must either `.thread_join` or `.pthread_detach`.
 \ If error, parent owns `inp`. Otherwise thread owns `inp`.
 \
 \ Caution: this doesn't set up memory context for the child thread.
 \ If the callback depends on context either directly or indirectly,
-\ such as by calling `os_err` / `?posix_err` / `strf` / etc., then
-\ caller must allocate an arena and use `thread_spawn_ctx` instead.
+\ such as by calling `.os_err` / `?posix_err` / `.strf` / etc., then
+\ caller must allocate an arena and use `.thread_spawn_ctx` instead.
 \ See `../examples/thread.af`.
-fun: thread_spawn { fun inp -- thread err }
+fun: .thread_spawn { fun inp -- thread err }
   nil { attr }
   .slot { thread }
 
@@ -240,7 +240,7 @@ end
 \ Spawns joinable thread with parent-created memory context.
 \
 \ Structure referenced by `ctx` must be allocated in its own
-\ backing memory. Most parents should use `stack_init_ctx`.
+\ backing memory. Most parents should use `.stack_init_ctx`.
 \
 \ Backing memory is parent-owned and should outlive the child
 \ in case of successful join, but must not be stack-allocated
@@ -256,7 +256,7 @@ end
 \ must survive for at least as long as the child thread.
 \
 \ See directory `examples` for usage.
-fun: thread_spawn_ctx { fun inp ctx -- thread Err }
+fun: .thread_spawn_ctx { fun inp ctx -- thread Err }
   ctx .Ctx_top @ align' Thread_run .align_up { run }
   run size' Thread_run +                     { top }
 
@@ -269,22 +269,22 @@ fun: thread_spawn_ctx { fun inp ctx -- thread Err }
   fun run .Thread_run_fun !
   ctx run .Thread_run_ctx !
 
-  instr' thread_run_with_ctx run .thread_spawn
+  instr' .thread_run_with_ctx run .thread_spawn
 
   \ Internal note. Keep the closure allocated on spawn failure for simplicity,
   \ and because of the edge case where parent passes its own context to child.
-  \ If spawning fails, `thread_spawn` formats error message into memory backed
+  \ If spawning fails, `.thread_spawn` formats error message into memory backed
   \ by parent's context. Rewind could invalidate error before parent reads it.
 end
 
-\ Wraps `pthread_create` with `PTHREAD_CREATE_DETACHED`.
-\ The parent must not `thread_join` or `pthread_detach`.
+\ Wraps `.pthread_create` with `PTHREAD_CREATE_DETACHED`.
+\ The parent must not `.thread_join` or `.pthread_detach`.
 \ If error, parent owns `inp`. Otherwise thread owns it.
 \
 \ Doesn't set up memory context for child thread.
 \ Detached threads tend to use their own context.
 \ See `../examples/http_echo.af`.
-fun: thread_spawn_detached { fun inp -- thread Err }
+fun: .thread_spawn_detached { fun inp -- thread Err }
   alloca' Pthread_attr { attr   }
   .slot                { thread }
 
@@ -305,8 +305,8 @@ fun: thread_spawn_detached { fun inp -- thread Err }
   thread @ err
 end
 
-\ Wraps `pthread_join`, throwing a descriptive error on failure.
-fun: thread_join { thread -- out err }
+\ Wraps `.pthread_join`, throwing a descriptive error on failure.
+fun: .thread_join { thread -- out err }
   .slot { out }
   thread out .pthread_join
   " unable to join with thread" ?posix_err { err }

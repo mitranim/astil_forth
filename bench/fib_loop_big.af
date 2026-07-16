@@ -4,14 +4,14 @@ use' lang.af
 \
 \ Emulates 128-bit integers in 64-bit GPRs.
 
-fun: int128_add { lo0 hi0 lo1 hi1 -- lo hi }
+fun: .int128_add { lo0 hi0 lo1 hi1 -- lo hi }
   lo0 lo1 + { lo }
   lo lo0 u< { carry }
   hi0 hi1 + carry + { hi }
   lo hi
 end
 
-fun: fib { depth -- lo hi }
+fun: .fib { depth -- lo hi }
   0 0 1 0 { prev_lo prev_hi next_lo next_hi }
   depth { ind }
   loop
@@ -24,7 +24,7 @@ fun: fib { depth -- lo hi }
   next_lo next_hi
 end
 
-fun: bigint_divmod10_step { quo bit rem -- quo rem }
+fun: .bigint_divmod10_step { quo bit rem -- quo rem }
   rem 1 .lsl bit + { rem }
   quo 1 .lsl { quo }
   if rem 10 >= .then
@@ -34,7 +34,7 @@ fun: bigint_divmod10_step { quo bit rem -- quo rem }
   quo rem
 end
 
-fun: bigint_divmod10 { lo hi -- qlo qhi rem }
+fun: .bigint_divmod10 { lo hi -- qlo qhi rem }
   0 0 0 { qlo qhi rem }
   hi { word }
   64 { ind }
@@ -57,7 +57,7 @@ fun: bigint_divmod10 { lo hi -- qlo qhi rem }
   qlo qhi rem
 end
 
-fun: bigint_log_decimal { lo hi }
+fun: .bigint_log_decimal { lo hi }
   40 .alloca { buf }
   buf 40 +  { ptr }
 
@@ -83,7 +83,7 @@ fun: bigint_log_decimal { lo hi }
   end
 end
 
-fun: run
+fun: .run
   1 18 .lsl { runs }
   loop
     runs .while
@@ -94,4 +94,4 @@ fun: run
 end
 .run
 
-fun: main { -- exit } .run 0 end
+fun: .main { -- exit } .run 0 end

@@ -12,7 +12,7 @@ See `../clib/mach_o.h` for many useful links.
 
 This is supported only for the register-based calling convention,
 where interpreter state and Forth stack are not (supposed to be)
-used by compiled code reachable from "main". For stack-CC, we'd
+used by compiled code reachable from `.main`. For stack-CC, we'd
 need to setup the stack, which is easily doable via a dedicated
 Mach-O section; maybe later.
 */

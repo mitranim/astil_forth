@@ -2,11 +2,11 @@ use' lang.af
 
 \ Adapted from Gforth's `bubble.fs`.
 
-fun: list_ceil { list len -> adr } .cells + end
+fun: .list_ceil { list len -> adr } .cells + end
 
-fun: pseudo_random { seed -> val } 1309 * 13849 + 65535 .and end
+fun: .pseudo_random { seed -> val } 1309 * 13849 + 65535 .and end
 
-fun: list_init { list len -> }
+fun: .list_init { list len -> }
   .list_ceil { ceil }
   74755 { seed }
   loop
@@ -17,7 +17,7 @@ fun: list_init { list len -> }
   end
 end
 
-fun: list_dump { list len -> }
+fun: .list_dump { list len -> }
   .list_ceil { ceil }
   loop
     list ceil < .while
@@ -27,7 +27,7 @@ fun: list_dump { list len -> }
   .lf
 end
 
-fun: list_verify { list len -> err }
+fun: .list_verify { list len -> err }
   .cells + -cell { ceil }
   loop
     list ceil < .while
@@ -36,7 +36,7 @@ fun: list_verify { list len -> err }
   end
 end
 
-fun: bubble { list len }
+fun: .bubble { list len }
   list len .list_ceil { ceil_ptr }
   loop
     -cell: ceil_ptr
@@ -50,20 +50,20 @@ fun: bubble { list len }
   end
 end
 
-fun: bubble_sort { list len -- err }
+fun: .bubble_sort { list len -- err }
   list len .list_init
   list len .bubble
   \ list len .list_dump
   list len .list_verify
 end
 
-fun: run { -- err }
+fun: .run { -- err }
   8192 { len }
   len .cells .alloca len .bubble_sort
 end
 .run
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end { err }
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

@@ -6,12 +6,12 @@ use' lang.af
 
 \ Valid under stack-CC but not under reg-CC
 \ because every verb must consume all args.
-: word
+: .word
   \ 10 20 30 + * .
   \          ^ error here: arity: 2, inputs: 3
 ;
 
-: word [ redefine ]
+: .word [ .redefine ]
   \ The following should fail to compile.
   \ 10       +             \ Not enough inputs.
   \ 10 20 30 +             \ Too many inputs.
@@ -20,9 +20,9 @@ use' lang.af
   \ The following should compile OK.
   10 20 + { one }
 ;
-\ dis' word
+\ dis' .word
 
-: word { one two three -- four } [ redefine ]
+: .word { one two three -- four } [ .redefine ]
   \      x0  x1  x2       x0
 
   one   \ -- ignored: register already x0
@@ -32,23 +32,23 @@ use' lang.af
   three \ mov x1, x2
   *     \ mul x0, x0, x1
 ;
-\ dis' word
+\ dis' .word
 
-: word { one two -- out } [ redefine ]
+: .word { one two -- out } [ .redefine ]
       \ mov x2, x0     -- compiled later during `;`
   two \ mov x0, x1     -- compiled immediately
       \ nop            -- tentative relocation of `two`, erased during `;`
   one \ mov x1, x2     -- compiled later during `;`
   +   \ add x0, x0, x1 -- compiled immediately
 ;
-\ dis' word
+\ dis' .word
 
 \ When locals are not clobbered, the compiler keeps
 \ them in registers and doesn't bother with memory.
-: word [ redefine ]
+: .word [ .redefine ]
   123 234 { one two }
 ;
-\ dis' word
+\ dis' .word
 \
 \ mov x0, #123
 \ mov x1, #234
@@ -56,12 +56,12 @@ use' lang.af
 
 \ When locals are clobbered, the compiler prefers to keep them
 \ in other, unclobbered, registers if possible.
-: word [ redefine ]
+: .word [ .redefine ]
   123 234 { one two }
   345 456 { -- }      \ Clobbering causes relocation.
   one two { -- }      \ Ensure the locals are "used".
 ;
-\ dis' word
+\ dis' .word
 \
 \ mov  x0, #123
 \ mov  x1, #234

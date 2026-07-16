@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_throw_fail { -- err }
-  " test_err" throw
-end

@@ -33,30 +33,30 @@ use' ./time.af \ Defines `Timespec`.
 
 \ `struct stat`. Used by reference.
 struct: Fstat
-  S32      1 field: Fstat_dev           \ [XSI] ID of device containing file
-  U16      1 field: Fstat_mode          \ [XSI] Mode of file (see below)
-  U16      1 field: Fstat_nlink         \ [XSI] Number of hard links
-  U64      1 field: Fstat_ino           \ [XSI] File serial number
-  U32      1 field: Fstat_uid           \ [XSI] User ID of the file
-  U32      1 field: Fstat_gid           \ [XSI] Group ID of the file
-  S32      1 field: Fstat_rdev          \ [XSI] Device ID
-  Timespec 1 field: Fstat_atimespec     \ time of last access
-  Timespec 1 field: Fstat_mtimespec     \ time of last data modification
-  Timespec 1 field: Fstat_ctimespec     \ time of last status change
-  Timespec 1 field: Fstat_birthtimespec \ time of file creation(birth)
-  S64      1 field: Fstat_size          \ [XSI] file size, in bytes
-  S64      1 field: Fstat_blocks        \ [XSI] blocks allocated for file
-  S32      1 field: Fstat_blksize       \ [XSI] optimal blocksize for I/O
-  U32      1 field: Fstat_flags         \ user defined flags for file
-  U32      1 field: Fstat_gen           \ file generation number
-  S32      1 field: Fstat_lspare        \ RESERVED: DO NOT USE!
-  S64      2 field: Fstat_qspare        \ RESERVED: DO NOT USE!
+  S32      1 field: .Fstat_dev           \ [XSI] ID of device containing file
+  U16      1 field: .Fstat_mode          \ [XSI] Mode of file (see below)
+  U16      1 field: .Fstat_nlink         \ [XSI] Number of hard links
+  U64      1 field: .Fstat_ino           \ [XSI] File serial number
+  U32      1 field: .Fstat_uid           \ [XSI] User ID of the file
+  U32      1 field: .Fstat_gid           \ [XSI] Group ID of the file
+  S32      1 field: .Fstat_rdev          \ [XSI] Device ID
+  Timespec 1 field: .Fstat_atimespec     \ time of last access
+  Timespec 1 field: .Fstat_mtimespec     \ time of last data modification
+  Timespec 1 field: .Fstat_ctimespec     \ time of last status change
+  Timespec 1 field: .Fstat_birthtimespec \ time of file creation(birth)
+  S64      1 field: .Fstat_size          \ [XSI] file size, in bytes
+  S64      1 field: .Fstat_blocks        \ [XSI] blocks allocated for file
+  S32      1 field: .Fstat_blksize       \ [XSI] optimal blocksize for I/O
+  U32      1 field: .Fstat_flags         \ user defined flags for file
+  U32      1 field: .Fstat_gen           \ file generation number
+  S32      1 field: .Fstat_lspare        \ RESERVED: DO NOT USE!
+  S64      2 field: .Fstat_qspare        \ RESERVED: DO NOT USE!
 end
 
-\ `readv` and `preadv` take an array of these.
+\ `.readv` and `.preadv` take an array of these.
 struct: Iov
-  Adr  1 field: Iov_base \ [XSI] Base address of I/O memory region
-  Cell 1 field: Iov_len  \ [XSI] Size of region iov_base points to
+  Adr  1 field: .Iov_base \ [XSI] Base address of I/O memory region
+  Cell 1 field: .Iov_len  \ [XSI] Size of region iov_base points to
 end
 
 \ When C _thinks_ it returns `-1`, the actual output register
@@ -88,86 +88,86 @@ end
 0x20000000 let: O_NOFOLLOW_ANY    \ do not follow symlinks in the entire path
 0x00001000 let: O_RESOLVE_BENEATH \ path must reside in the hierarchy beneath the starting directory
 
-\ Exactly one of these must be `or`d into flags in `open`.
-\ Note that `fopen` and `fdopen` take a STRING as mode!
+\ Exactly one of these must be `.or`d into flags in `.open`.
+\ Note that `.fopen` and `.fdopen` take a STRING as mode!
 0                      let: O_RDONLY  \ open for reading only
 1                      let: O_WRONLY  \ open for writing only
 2                      let: O_RDWR    \ open for reading and writing
 0x40000000             let: O_EXEC    \ open file for execute only
 O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 
-2 1 extern: open  ( path flag -- fdes|-1 :Cint )
-1 1 extern: close ( fdes      -- 0|-1    :Cint )
-2 1 extern: fstat ( fdes stat -- 0|-1    :Cint )
-2 1 extern: lstat ( path stat -- 0|-1    :Cint )
-2 1 extern: stat  ( path stat -- 0|-1    :Cint )
+2 1 extern: .open  open  ( path flag -- fdes|-1 :Cint )
+1 1 extern: .close close ( fdes      -- 0|-1    :Cint )
+2 1 extern: .fstat fstat ( fdes stat -- 0|-1    :Cint )
+2 1 extern: .lstat lstat ( path stat -- 0|-1    :Cint )
+2 1 extern: .stat  stat  ( path stat -- 0|-1    :Cint )
 
-1 1 extern: fgetc            ( file -- char|-1 :Cint )
-1 1 extern: getc_unlocked    ( file -- char|-1 :Cint )
-1 1 extern: getchar          ( file -- char|-1 :Cint )
-1 1 extern: getchar_unlocked ( file -- char|-1 :Cint )
-1 1 extern: getw             ( file -- char|-1 :Cint )
+1 1 extern: .fgetc            fgetc            ( file -- char|-1 :Cint )
+1 1 extern: .getc_unlocked    getc_unlocked    ( file -- char|-1 :Cint )
+1 1 extern: .getchar          getchar          ( file -- char|-1 :Cint )
+1 1 extern: .getchar_unlocked getchar_unlocked ( file -- char|-1 :Cint )
+1 1 extern: .getw             getw             ( file -- char|-1 :Cint )
 
-3 1 extern: read   ( fdes buf len         -- len|-1 )
-4 1 extern: pread  ( fdes buf len off     -- len|-1 )
-3 1 extern: readv  ( fdes iov iov_len     -- len|-1 )
-4 1 extern: preadv ( fdes iov iov_len off -- len|-1 )
+3 1 extern: .read   read   ( fdes buf len         -- len|-1 )
+4 1 extern: .pread  pread  ( fdes buf len off     -- len|-1 )
+3 1 extern: .readv  readv  ( fdes iov iov_len     -- len|-1 )
+4 1 extern: .preadv preadv ( fdes iov iov_len off -- len|-1 )
 
-3 1 extern: write   ( fdes buf len         -- len|-1 )
-4 1 extern: pwrite  ( fdes buf len off     -- len|-1 )
-3 1 extern: writev  ( fdes iov iov_len     -- len|-1 )
-4 1 extern: pwritev ( fdes iov iov_len off -- len|-1 )
+3 1 extern: .write   write   ( fdes buf len         -- len|-1 )
+4 1 extern: .pwrite  pwrite  ( fdes buf len off     -- len|-1 )
+3 1 extern: .writev  writev  ( fdes iov iov_len     -- len|-1 )
+4 1 extern: .pwritev pwritev ( fdes iov iov_len off -- len|-1 )
 
-\ Note: `fread`, `fwrite` and some other funcs are defined in `lang.af`.
-2 1 extern: fopen    ( path mode      -- file )
-2 1 extern: fdopen   ( fdes mode      -- file )
-3 1 extern: freopen  ( path mode file -- file )
-3 1 extern: fmemopen ( buf cap mode   -- file )
-1 1 extern: fclose   ( file           -- 0|-1 :Cint )
+\ Note: `.fread`, `.fwrite` and some other funcs are defined in `lang.af`.
+2 1 extern: .fopen    fopen    ( path mode      -- file )
+2 1 extern: .fdopen   fdopen   ( fdes mode      -- file )
+3 1 extern: .freopen  freopen  ( path mode file -- file )
+3 1 extern: .fmemopen fmemopen ( buf cap mode   -- file )
+1 1 extern: .fclose   fclose   ( file           -- 0|-1 :Cint )
 
-2 1 extern: fgetpos ( file pos_adr    -- 0|-1 :Cint )
-2 1 extern: fsetpos ( file pos_adr    -- 0|-1 :Cint )
-3 1 extern: fseek   ( file off whence -- 0|-1 :Cint )
-3 1 extern: fseeko  ( file off whence -- 0|-1 :Cint )
-1 1 extern: ftell   ( file            -- off|-1     )
-1 1 extern: ftello  ( file            -- off|-1     )
-1 0 extern: rewind  ( file            --            )
+2 1 extern: .fgetpos fgetpos ( file pos_adr    -- 0|-1 :Cint )
+2 1 extern: .fsetpos fsetpos ( file pos_adr    -- 0|-1 :Cint )
+3 1 extern: .fseek   fseek   ( file off whence -- 0|-1 :Cint )
+3 1 extern: .fseeko  fseeko  ( file off whence -- 0|-1 :Cint )
+1 1 extern: .ftell   ftell   ( file            -- off|-1     )
+1 1 extern: .ftello  ftello  ( file            -- off|-1     )
+1 0 extern: .rewind  rewind  ( file            --            )
 
-1 0 extern: clearerr          ( file --               )
-1 0 extern: clearerr_unlocked ( file --               )
-1 1 extern: feof              ( file -- bool          )
-1 1 extern: feof_unlocked     ( file -- bool          )
-1 1 extern: ferror            ( file -- bool          )
-1 1 extern: ferror_unlocked   ( file -- bool          )
-1 1 extern: fileno            ( file -- fdes|-1 :Cint )
-1 1 extern: fileno_unlocked   ( file -- fdes|-1 :Cint )
+1 0 extern: .clearerr          clearerr          ( file --               )
+1 0 extern: .clearerr_unlocked clearerr_unlocked ( file --               )
+1 1 extern: .feof              feof              ( file -- bool          )
+1 1 extern: .feof_unlocked     feof_unlocked     ( file -- bool          )
+1 1 extern: .ferror            ferror            ( file -- bool          )
+1 1 extern: .ferror_unlocked   ferror_unlocked   ( file -- bool          )
+1 1 extern: .fileno            fileno            ( file -- fdes|-1 :Cint )
+1 1 extern: .fileno_unlocked   fileno_unlocked   ( file -- fdes|-1 :Cint )
 
 \ TODO: translate `<unistd.h>`.
 
 \ `code` usually comes from `.errno`. Sometimes the caller
 \ has to save it before some intermediary errno-clobbering
 \ call, then invoke this.
-fun: io_err { code action path -- err_str }
+fun: .io_err { code action path -- err_str }
   code .strerror { msg }
   " unable to %s `%s`; code: %zd; msg: %s" action path code msg .strf
 end
 
-fun: fd_stat { fdes path stat_adr -- err }
+fun: .fd_stat { fdes path stat_adr -- err }
   if fdes stat_adr .fstat .then .errno " stat" path .io_err .throw end
 end
 
-fun: path_stat { path stat_adr -> err }
+fun: .path_stat { path stat_adr -> err }
   if .stat .then .errno " stat" path .io_err .throw end
 end
 
-fun: fd_open { path mode -> fdes err }
+fun: .fd_open { path mode -> fdes err }
   .open .cint_to_cell { out }
   if out <0 .then .errno " open" path .io_err .throw end
   out
 end
 
-\ TODO dedup with `fd_write`.
-fun: fd_read { fdes buf cap -- len err }
+\ TODO dedup with `.fd_write`.
+fun: .fd_read { fdes buf cap -- len err }
   loop
     fdes buf cap .read { len }
     if len >=0 .then leave end
@@ -178,8 +178,8 @@ fun: fd_read { fdes buf cap -- len err }
   len
 end
 
-\ TODO dedup with `fd_read`.
-fun: fd_write { fdes buf cap -- len err }
+\ TODO dedup with `.fd_read`.
+fun: .fd_write { fdes buf cap -- len err }
   loop
     fdes buf cap .write { len }
     if len >=0 .then leave end
@@ -191,11 +191,11 @@ fun: fd_write { fdes buf cap -- len err }
 end
 
 \ Best-effort logging/diagnostic write. Ignores short writes
-\ and OS errors. Prefer `fd_write_all` for real connections.
-fun: fd_write_opt { fdes buf len -> } .write { -- } end
+\ and OS errors. Prefer `.fd_write_all` for real connections.
+fun: .fd_write_opt { fdes buf len -> } .write { -- } end
 
-\ Wraps `write` with an error without retrying `EINTR`.
-fun: fd_write_once { fdes buf len -- wrote err }
+\ Wraps `.write` with an error without retrying `EINTR`.
+fun: .fd_write_once { fdes buf len -- wrote err }
   fdes buf len .write { wrote }
   if wrote <0 .then
     .errno " unable to write" .os_err { err }
@@ -204,7 +204,7 @@ fun: fd_write_once { fdes buf len -- wrote err }
   wrote
 end
 
-fun: fd_write_all { fdes buf len -- err }
+fun: .fd_write_all { fdes buf len -- err }
   loop
     ifz len .then .ret end
 
@@ -224,31 +224,31 @@ fun: fd_write_all { fdes buf len -- err }
 end
 
 \ Writes `\r\n`; for use in HTTP.
-fun: fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
+fun: .fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
 
-fun: file_err_code { file -- code }
+fun: .file_err_code { file -- code }
   if file .ferror .then .errno else 0 end
 end
 
-fun: file_err { code action -- err_str }
+fun: .file_err { code action -- err_str }
   ifz code .then " file error without error code: %s" action .strf .ret end
   code .strerror { msg }
   " file error: %s; code: %zd; msg: %s" action code msg .strf
 end
 
-fun: file_open { path mode -> file err }
+fun: .file_open { path mode -> file err }
   .fopen { file }
   ifz file .then .errno " open" path .io_err .throw end
   file
 end
 
-fun: file_write_char { char file -> err }
+fun: .file_write_char { char file -> err }
   if .fputc .cint_to_cell <0 .then
     .errno " failed to write char" .file_err .throw
   end
 end
 
-fun: file_write_bytes { buf len file -- err }
+fun: .file_write_bytes { buf len file -- err }
   buf 1 len file .fwrite { out }
   if out len = .then .ret end
   file .file_err_code { code } \ Must be called before formatting.

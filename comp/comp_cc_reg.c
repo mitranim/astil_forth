@@ -876,18 +876,18 @@ static Err comp_alloca(Comp *comp) {
 /*
 Examples without and with `.try`:
 
-  fun: word0 { -- err }              err end
-  fun: word1 { -- val err }    10    err end
-  fun: word2 { -- val val err} 10 20 err end
+  fun: .word0 { -- err }              err end
+  fun: .word1 { -- val err }    10    err end
+  fun: .word2 { -- val val err} 10 20 err end
 
-  word0 { err }
-  word1 { val err }
-  word2 { val val err }
+  .word0 { err }
+  .word1 { val err }
+  .word2 { val val err }
 
   err   .try
-  word0 .try
-  word1 .try { val }
-  word2 .try { val val }
+  .word0 .try
+  .word1 .try { val }
+  .word2 .try { val val }
 */
 static Err comp_append_try(Comp *comp, const Sym *sym) {
   if (!sym->has_err) {

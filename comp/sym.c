@@ -1,6 +1,7 @@
 #pragma once
 #include "./sym.h"
 #include "../clib/set.c"
+#include "./read_char.c"
 
 // clang-format off
 
@@ -13,9 +14,35 @@ static bool sym_valid(const Sym *sym) {
     is_aligned(&sym->callees) &&
     is_aligned(&sym->callers) &&
     sym->name.len &&
+    (sym->type != SYM_EXTERN || (sym->link_name && sym->link_name[0])) &&
     set_valid((const Set *)&sym->callees) &&
     set_valid((const Set *)&sym->callers)
   );
+}
+
+static Err err_declaration_call_like(const char *name) {
+  return errf("invalid declaration " FMT_QUOTED "; use `.%s`", name, name);
+}
+
+static Err err_declaration_plain_call(const char *name) {
+  return errf(
+    "invalid declaration " FMT_QUOTED
+    "; use an ident-like name or remove `.plain_call`",
+    name
+  );
+}
+
+static Err sym_validate_name(const Sym *sym) {
+  const auto name = sym->name;
+  if (is_num_begin((U8)name.buf[0], (U8)name.buf[1])) {
+    return err_declaration_call_like(name.buf);
+  }
+
+  const auto ident_like = is_word_ident_like(name);
+  if (sym->plain_call) {
+    return ident_like ? nullptr : err_declaration_plain_call(name.buf);
+  }
+  return ident_like ? err_declaration_call_like(name.buf) : nullptr;
 }
 
 // clang-format on

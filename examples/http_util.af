@@ -5,7 +5,7 @@ use' pthread.af
 
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
-fun: conn_close { conn }
+fun: .conn_close { conn }
   " [srv] closing connection %zd" conn .elogf .elf
 
   if conn .close .then
@@ -17,7 +17,7 @@ fun: conn_close { conn }
 end
 
 \ Single-threaded accept loop. Convenient for examples/tests.
-fun: net_accept_loop { sock handler }
+fun: .net_accept_loop { sock handler }
   alloca' Sockaddr_storage { addr }
   alloca' Cuint            { size }
 
@@ -43,7 +43,7 @@ end
 \ Multi-threaded accept loop. Spawns one detached worker per accepted conn.
 \ The handler receives one input: `conn`. Closes connection on spawn fail.
 \ No cancellation support. No thread limit.
-fun: net_accept_loop_threaded { sock handler }
+fun: .net_accept_loop_threaded { sock handler }
   alloca' Sockaddr_storage { addr }
   alloca' Cuint            { size }
   .ctx_top                 { top }

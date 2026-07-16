@@ -5,14 +5,14 @@ use' lang.af
 1 24 .lsl let: RUNS
 214 RUNS * let: WANT
 
-fun: runtime_const { seed -- val }
+fun: .runtime_const { seed -- val }
   seed seed - 11 + 22 + 333 + 44 - 5 * 6 / 7 .mod 8 .lsl 9 .or 10 .xor 3 .and
   40 .max 50 .min 4 .cells + 24 /cells + 0 99 .fallback + 37 8 .align_up +
 end
 
-fun: runtime_step { acc -- out } acc .runtime_const acc + end
+fun: .runtime_step { acc -- out } acc .runtime_const acc + end
 
-fun: run { -- err }
+fun: .run { -- err }
   0 { acc }
   RUNS { runs }
 
@@ -26,7 +26,7 @@ fun: run { -- err }
 end
 .run
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end { err }
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

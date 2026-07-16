@@ -1,2 +1,2 @@
 \ Must fail to compile.
-fun: test_discard_assign_read_fail { -- out } 10 { _val } _val end
+fun: .test_discard_assign_read_fail { -- out } 10 { _val } _val end

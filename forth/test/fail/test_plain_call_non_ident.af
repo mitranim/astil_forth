@@ -1,0 +1,2 @@
+\ Must fail to compile.
+fun: bad-name [ .plain_call ] end

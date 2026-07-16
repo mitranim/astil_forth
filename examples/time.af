@@ -1,7 +1,7 @@
 use' lang.af
 use' time.af
 
-fun: run { -- err }
+fun: .run { -- err }
   \ Allocate a C-compatible struct on the system stack,
   \ and get the address. We can now use it with `libc`.
   alloca' Timespec { inst }

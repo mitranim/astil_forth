@@ -1,2 +1,2 @@
 \ Must fail to compile.
-then
+fun: bad_name end

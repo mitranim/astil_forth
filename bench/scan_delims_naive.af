@@ -9,7 +9,7 @@ use' lang.af
 SRC_LEN   mem: SRC
 256       mem: DELS
 
-1 1 extern: getenv
+1 1 extern: .getenv getenv
 
 char' { SRC 0  + !b
 char' a SRC 1  + !b
@@ -38,7 +38,7 @@ char' g SRC 15 + !b
 1 DELS LF      + !b
 1 DELS TAB     + !b
 
-fun: init { buf len }
+fun: .init { buf len }
   buf len + { ceil }
   0 { ind }
   loop
@@ -49,7 +49,7 @@ fun: init { buf len }
   end
 end
 
-fun: scan { buf len dels -- out }
+fun: .scan { buf len dels -- out }
   buf len + { ceil }
   0
   loop
@@ -59,7 +59,7 @@ fun: scan { buf len dels -- out }
   end
 end
 
-fun: run { -- err }
+fun: .run { -- err }
   CAP .alloca { buf }
   buf CAP .init
   0 { out }
@@ -76,7 +76,7 @@ fun: run { -- err }
 end
 .run
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end { err }
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

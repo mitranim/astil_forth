@@ -4,9 +4,9 @@ use' ../time.af
 use' ../pthread.af
 
 \ We test both JIT-compiled and AOT-compiled modes.
-\ For AOT, every test must be called in `main_run`.
+\ For AOT, every test must be called in `.main_run`.
 
-fun: test_test { -- err }
+fun: .test_test { -- err }
   assert= 10 10 end
   10 20 { one two }
   assert= one 10 end
@@ -14,7 +14,7 @@ fun: test_test { -- err }
 end
 .test_test
 
-fun: test_empty_comment { -- err }
+fun: .test_empty_comment { -- err }
   \ `\` immediately followed by newline: this used to skip the NEXT line.
   \
   10 20 30
@@ -25,7 +25,7 @@ fun: test_empty_comment { -- err }
 end
 .test_empty_comment
 
-fun: test_locals { -- err }
+fun: .test_locals { -- err }
   { }
   10 { -- }
   10 { } { val0 }
@@ -119,11 +119,11 @@ end
 .test_locals
 
 0 var: TEST_PARAMS_PUSH_VOID_VAL
-fun: test_params_push_sum { left right -> sum } + end
-fun: test_params_push_sum3 { one two three -> sum } + + end
-fun: test_params_push_void { val -> } TEST_PARAMS_PUSH_VOID_VAL ! end
+fun: .test_params_push_sum { left right -> sum } + end
+fun: .test_params_push_sum3 { one two three -> sum } + + end
+fun: .test_params_push_void { val -> } TEST_PARAMS_PUSH_VOID_VAL ! end
 
-fun: test_params_push { -- err }
+fun: .test_params_push { -- err }
   10 .test_params_push_void
   assert= 10 20 .test_params_push_sum 30 end
   assert= 10 20 30 .test_params_push_sum3 60 end
@@ -133,18 +133,18 @@ end
 
 \ Stack operations are tested early because they're used by conditionals and
 \ loops, which makes testing kinda cyclic.
-fun: test_stack_len_bytes { stack -- len }
+fun: .test_stack_len_bytes { stack -- len }
   stack .Stack_top @ stack .Stack_floor @ -
 end
 
-fun: test_stack_cap_bytes { stack -- len }
+fun: .test_stack_cap_bytes { stack -- len }
   stack .Stack_ceil @ stack .Stack_floor @ -
 end
 
-fun: test_stack_len_cells { stack -- len } stack .test_stack_len_bytes /cells end
-fun: test_stack_cap_cells { stack -- len } stack .test_stack_cap_bytes /cells end
+fun: .test_stack_len_cells { stack -- len } stack .test_stack_len_bytes /cells end
+fun: .test_stack_cap_cells { stack -- len } stack .test_stack_cap_bytes /cells end
 
-fun: test_stack_primitives { -- err }
+fun: .test_stack_primitives { -- err }
   assert= size' Stack 40 end
 
   alloca' Stack { stk }
@@ -177,7 +177,7 @@ fun: test_stack_primitives { -- err }
 end
 .test_stack_primitives
 
-fun: test_to_stack_sequence { -- err }
+fun: .test_to_stack_sequence { -- err }
   alloca' Stack { stk }
   32 stk .stack_init
 
@@ -213,7 +213,7 @@ fun: test_to_stack_sequence { -- err }
 end
 .test_to_stack_sequence
 
-fun: test_stack_braces { -- err }
+fun: .test_stack_braces { -- err }
   alloca' Stack { stk }
   32 stk .stack_init
 
@@ -246,11 +246,11 @@ fun: test_stack_braces { -- err }
 end
 .test_stack_braces
 
-fun: bang_with_more_inputs { val adr _x2 _x3 _x4 } val adr ! end
+fun: .bang_with_more_inputs { val adr _x2 _x3 _x4 } val adr ! end
 
-fun: bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next end
+fun: .bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next end
 
-fun: test_conditionals { -- err }
+fun: .test_conditionals { -- err }
   \ Must fail to compile: bare `if .then end`
   \ doesn't support outputs.
   \ if false .then 10 end
@@ -370,43 +370,43 @@ fun: test_conditionals { -- err }
 end
 .test_conditionals
 
-fun: cond_input_if { val flag -- out } val flag if .then end end
-fun: cond_input_ifn { val flag -- out } val flag ifz .then end end
-fun: cond_input_if_else { val flag -- out } val flag if .then else end end
+fun: .cond_input_if { val flag -- out } val flag if .then end end
+fun: .cond_input_ifn { val flag -- out } val flag ifz .then end end
+fun: .cond_input_if_else { val flag -- out } val flag if .then else end end
 
-fun: cond_input_elif { val flag0 flag1 -- out }
+fun: .cond_input_elif { val flag0 flag1 -- out }
   val flag0 if .then
   elif flag1 .then
   else
   end
 end
 
-fun: cond_input_elifn { val flag0 flag1 -- out }
+fun: .cond_input_elifn { val flag0 flag1 -- out }
   val flag0 if .then
   elifz flag1 .then
   else
   end
 end
 
-fun: cond_input_elif_diff { flag0 flag1 -- out0 out1 }
+fun: .cond_input_elif_diff { flag0 flag1 -- out0 out1 }
   if flag0 .then 10 11
   elif flag1 .then 20 30
   else 20 40
   end
 end
 
-fun: cond_input_elif_diff_no_else { flag0 flag1 -- out }
+fun: .cond_input_elif_diff_no_else { flag0 flag1 -- out }
   if flag0 .then 10
   elif flag1 .then 20
   else 20
   end
 end
 
-fun: cond_input_max { A B C D E F G flag -- A B C D E F G }
+fun: .cond_input_max { A B C D E F G flag -- A B C D E F G }
   A B C D E F G flag if .then end
 end
 
-fun: test_cond_input_arity { -- err }
+fun: .test_cond_input_arity { -- err }
   assert= 123 false .cond_input_if 123 end
   assert= 123 true .cond_input_if 123 end
 
@@ -457,29 +457,29 @@ fun: test_cond_input_arity { -- err }
 end
 .test_cond_input_arity
 
-fun: recursive_fun { val -- val }
+fun: .recursive_fun { val -- val }
   if val 13 <= .then val .ret end
   val .dec .recur
 end
 
-fun: test_recursion { -- err }
+fun: .test_recursion { -- err }
   assert= 123 .recursive_fun 13 end
 end
 .test_recursion
 
-fun: recursive_fib_fun { ind -- out }
+fun: .recursive_fib_fun { ind -- out }
   if ind 1 <= .then 1 .ret end
   ind 1 - .recur { prev }
   ind 2 - .recur
   prev +
 end
 
-fun: test_recursive_saved_local { -- err }
+fun: .test_recursive_saved_local { -- err }
   assert= 10 .recursive_fib_fun 89 end
 end
 .test_recursive_saved_local
 
-fun: recur_reg_clobber_fun { val -- out }
+fun: .recur_reg_clobber_fun { val -- out }
   -1 -2 { -- } \ Unconditionally clobber x0 x1.
   ifz val .then 0 .ret end
   val val { _ignored saved } \ `_ignored` = x0, `saved` = x1, `val` = none
@@ -487,108 +487,108 @@ fun: recur_reg_clobber_fun { val -- out }
   saved .inc
 end
 
-fun: test_recur_reg_clobber { -- err }
+fun: .test_recur_reg_clobber { -- err }
   assert= 10 .recur_reg_clobber_fun 11 end
 end
 .test_recur_reg_clobber
 
-1 2 true indirect: TEST_INDIRECT_FORWARD test_indirect_forward_target
+1 2 true indirect: TEST_INDIRECT_FORWARD .test_indirect_forward_target
 
-fun: test_indirect_forward_caller { src -- char err }
+fun: .test_indirect_forward_caller { src -- char err }
   src .test_indirect_forward_target
 end
 
-fun: test_indirect_forward_target { src -- char err } [ .redefine ]
+fun: .test_indirect_forward_target { src -- char err } [ .redefine ]
   src @b
 end
 
-TEST_INDIRECT_FORWARD indirect_to' test_indirect_forward_target
+TEST_INDIRECT_FORWARD indirect_to' .test_indirect_forward_target
 
-1 1 false indirect: TEST_INDIRECT_CLOBBER test_indirect_clobber_target
+1 1 false indirect: TEST_INDIRECT_CLOBBER .test_indirect_clobber_target
 
 \ This tests the clobber contract of the generated indirect trampoline.
 \ Padding locals put `saved` in x4; the indirect target will clobber x4.
 \ The caller must relocate `saved` before calling the trampoline.
-fun: test_indirect_clobber_caller { _a _b _c _d saved arg -- out }
+fun: .test_indirect_clobber_caller { _a _b _c _d saved arg -- out }
   arg .test_indirect_clobber_target { called }
   saved called +
 end
 
-fun: test_indirect_clobber_target { arg -- out } [ .redefine ]
+fun: .test_indirect_clobber_target { arg -- out } [ .redefine ]
   \ Simulate an unknown target implementation clobbering a non-ABI arg reg.
   [ 444 4 .comp_load ]
   arg
 end
 
-TEST_INDIRECT_CLOBBER indirect_to' test_indirect_clobber_target
+TEST_INDIRECT_CLOBBER indirect_to' .test_indirect_clobber_target
 
-0 2 true indirect: TEST_INDIRECT_FORWARD_0 test_indirect_forward_target_0
-fun: test_indirect_forward_caller_0 { -- out err } .test_indirect_forward_target_0 end
-fun: test_indirect_forward_target_0 { -- out err } [ .redefine ] 100 end
-TEST_INDIRECT_FORWARD_0 indirect_to' test_indirect_forward_target_0
+0 2 true indirect: TEST_INDIRECT_FORWARD_0 .test_indirect_forward_target_0
+fun: .test_indirect_forward_caller_0 { -- out err } .test_indirect_forward_target_0 end
+fun: .test_indirect_forward_target_0 { -- out err } [ .redefine ] 100 end
+TEST_INDIRECT_FORWARD_0 indirect_to' .test_indirect_forward_target_0
 
-2 2 true indirect: TEST_INDIRECT_FORWARD_2 test_indirect_forward_target_2
-fun: test_indirect_forward_caller_2 { a b -- out err } a b .test_indirect_forward_target_2 end
-fun: test_indirect_forward_target_2 { a b -- out err } [ .redefine ] a b + end
-TEST_INDIRECT_FORWARD_2 indirect_to' test_indirect_forward_target_2
+2 2 true indirect: TEST_INDIRECT_FORWARD_2 .test_indirect_forward_target_2
+fun: .test_indirect_forward_caller_2 { a b -- out err } a b .test_indirect_forward_target_2 end
+fun: .test_indirect_forward_target_2 { a b -- out err } [ .redefine ] a b + end
+TEST_INDIRECT_FORWARD_2 indirect_to' .test_indirect_forward_target_2
 
-3 2 true indirect: TEST_INDIRECT_FORWARD_3 test_indirect_forward_target_3
-fun: test_indirect_forward_caller_3 { a b c -- out err } a b c .test_indirect_forward_target_3 end
-fun: test_indirect_forward_target_3 { a b c -- out err } [ .redefine ] a b + c + end
-TEST_INDIRECT_FORWARD_3 indirect_to' test_indirect_forward_target_3
+3 2 true indirect: TEST_INDIRECT_FORWARD_3 .test_indirect_forward_target_3
+fun: .test_indirect_forward_caller_3 { a b c -- out err } a b c .test_indirect_forward_target_3 end
+fun: .test_indirect_forward_target_3 { a b c -- out err } [ .redefine ] a b + c + end
+TEST_INDIRECT_FORWARD_3 indirect_to' .test_indirect_forward_target_3
 
-4 2 true indirect: TEST_INDIRECT_FORWARD_4 test_indirect_forward_target_4
-fun: test_indirect_forward_caller_4 { a b c d -- out err } a b c d .test_indirect_forward_target_4 end
-fun: test_indirect_forward_target_4 { a b c d -- out err } [ .redefine ] a b + c + d + end
-TEST_INDIRECT_FORWARD_4 indirect_to' test_indirect_forward_target_4
+4 2 true indirect: TEST_INDIRECT_FORWARD_4 .test_indirect_forward_target_4
+fun: .test_indirect_forward_caller_4 { a b c d -- out err } a b c d .test_indirect_forward_target_4 end
+fun: .test_indirect_forward_target_4 { a b c d -- out err } [ .redefine ] a b + c + d + end
+TEST_INDIRECT_FORWARD_4 indirect_to' .test_indirect_forward_target_4
 
-5 2 true indirect: TEST_INDIRECT_FORWARD_5 test_indirect_forward_target_5
-fun: test_indirect_forward_caller_5 { a b c d e -- out err } a b c d e .test_indirect_forward_target_5 end
-fun: test_indirect_forward_target_5 { a b c d e -- out err } [ .redefine ] a b + c + d + e + end
-TEST_INDIRECT_FORWARD_5 indirect_to' test_indirect_forward_target_5
+5 2 true indirect: TEST_INDIRECT_FORWARD_5 .test_indirect_forward_target_5
+fun: .test_indirect_forward_caller_5 { a b c d e -- out err } a b c d e .test_indirect_forward_target_5 end
+fun: .test_indirect_forward_target_5 { a b c d e -- out err } [ .redefine ] a b + c + d + e + end
+TEST_INDIRECT_FORWARD_5 indirect_to' .test_indirect_forward_target_5
 
-6 2 true indirect: TEST_INDIRECT_FORWARD_6 test_indirect_forward_target_6
-fun: test_indirect_forward_caller_6 { a b c d e f -- out err } a b c d e f .test_indirect_forward_target_6 end
-fun: test_indirect_forward_target_6 { a b c d e f -- out err } [ .redefine ] a b + c + d + e + f + end
-TEST_INDIRECT_FORWARD_6 indirect_to' test_indirect_forward_target_6
+6 2 true indirect: TEST_INDIRECT_FORWARD_6 .test_indirect_forward_target_6
+fun: .test_indirect_forward_caller_6 { a b c d e f -- out err } a b c d e f .test_indirect_forward_target_6 end
+fun: .test_indirect_forward_target_6 { a b c d e f -- out err } [ .redefine ] a b + c + d + e + f + end
+TEST_INDIRECT_FORWARD_6 indirect_to' .test_indirect_forward_target_6
 
-7 2 true indirect: TEST_INDIRECT_FORWARD_7 test_indirect_forward_target_7
-fun: test_indirect_forward_caller_7 { a b c d e f g -- out err } a b c d e f g .test_indirect_forward_target_7 end
-fun: test_indirect_forward_target_7 { a b c d e f g -- out err } [ .redefine ] a b + c + d + e + f + g + end
-TEST_INDIRECT_FORWARD_7 indirect_to' test_indirect_forward_target_7
+7 2 true indirect: TEST_INDIRECT_FORWARD_7 .test_indirect_forward_target_7
+fun: .test_indirect_forward_caller_7 { a b c d e f g -- out err } a b c d e f g .test_indirect_forward_target_7 end
+fun: .test_indirect_forward_target_7 { a b c d e f g -- out err } [ .redefine ] a b + c + d + e + f + g + end
+TEST_INDIRECT_FORWARD_7 indirect_to' .test_indirect_forward_target_7
 
-8 2 true indirect: TEST_INDIRECT_FORWARD_8 test_indirect_forward_target_8
-fun: test_indirect_forward_caller_8 { a b c d e f g h -- out err } a b c d e f g h .test_indirect_forward_target_8 end
-fun: test_indirect_forward_target_8 { a b c d e f g h -- out err } [ .redefine ] a b + c + d + e + f + g + h + end
-TEST_INDIRECT_FORWARD_8 indirect_to' test_indirect_forward_target_8
+8 2 true indirect: TEST_INDIRECT_FORWARD_8 .test_indirect_forward_target_8
+fun: .test_indirect_forward_caller_8 { a b c d e f g h -- out err } a b c d e f g h .test_indirect_forward_target_8 end
+fun: .test_indirect_forward_target_8 { a b c d e f g h -- out err } [ .redefine ] a b + c + d + e + f + g + h + end
+TEST_INDIRECT_FORWARD_8 indirect_to' .test_indirect_forward_target_8
 
-0 3 true indirect: TEST_INDIRECT_FORWARD_OUT2 test_indirect_forward_out2
-fun: test_indirect_forward_caller_out2 { -- a b err } .test_indirect_forward_out2 end
-fun: test_indirect_forward_out2 { -- a b err } [ .redefine ] 11 22 end
-TEST_INDIRECT_FORWARD_OUT2 indirect_to' test_indirect_forward_out2
+0 3 true indirect: TEST_INDIRECT_FORWARD_OUT2 .test_indirect_forward_out2
+fun: .test_indirect_forward_caller_out2 { -- a b err } .test_indirect_forward_out2 end
+fun: .test_indirect_forward_out2 { -- a b err } [ .redefine ] 11 22 end
+TEST_INDIRECT_FORWARD_OUT2 indirect_to' .test_indirect_forward_out2
 
-0 7 false indirect: TEST_INDIRECT_FORWARD_OUT7 test_indirect_forward_out7
-fun: test_indirect_forward_caller_out7 { -- a b c d e f g } .test_indirect_forward_out7 end
-fun: test_indirect_forward_out7 { -- a b c d e f g } [ .redefine ] 0 1 2 3 4 5 6 end
-TEST_INDIRECT_FORWARD_OUT7 indirect_to' test_indirect_forward_out7
+0 7 false indirect: TEST_INDIRECT_FORWARD_OUT7 .test_indirect_forward_out7
+fun: .test_indirect_forward_caller_out7 { -- a b c d e f g } .test_indirect_forward_out7 end
+fun: .test_indirect_forward_out7 { -- a b c d e f g } [ .redefine ] 0 1 2 3 4 5 6 end
+TEST_INDIRECT_FORWARD_OUT7 indirect_to' .test_indirect_forward_out7
 
-0 8 false indirect: TEST_INDIRECT_FORWARD_OUT8 test_indirect_forward_out8
-fun: test_indirect_forward_caller_out8 { -- a b c d e f g h } .test_indirect_forward_out8 end
-fun: test_indirect_forward_out8 { -- a b c d e f g h } [ .redefine ] 0 1 2 3 4 5 6 7 end
-TEST_INDIRECT_FORWARD_OUT8 indirect_to' test_indirect_forward_out8
+0 8 false indirect: TEST_INDIRECT_FORWARD_OUT8 .test_indirect_forward_out8
+fun: .test_indirect_forward_caller_out8 { -- a b c d e f g h } .test_indirect_forward_out8 end
+fun: .test_indirect_forward_out8 { -- a b c d e f g h } [ .redefine ] 0 1 2 3 4 5 6 7 end
+TEST_INDIRECT_FORWARD_OUT8 indirect_to' .test_indirect_forward_out8
 
-fun: test_indirect_forward_eq { act exp -- err }
+fun: .test_indirect_forward_eq { act exp -- err }
   if act exp = .then .ret end
   " indirect forward call mismatch: actual=%zd expected=%zd" act exp .strf .throw
 end
 
-fun: test_indirect_clobber { -- err }
+fun: .test_indirect_clobber { -- err }
   \ Fails as 467 if indirect trampoline clobbers are not reported to callers.
   0 0 0 0 100 23 .test_indirect_clobber_caller 123 .test_indirect_forward_eq
 end
 .test_indirect_clobber
 
-fun: test_indirect_forward { -- err }
+fun: .test_indirect_forward { -- err }
   " abc" .test_indirect_forward_caller { char }
   char char' a .test_indirect_forward_eq
 
@@ -626,19 +626,19 @@ fun: test_indirect_forward { -- err }
 end
 .test_indirect_forward
 
-fun: recur_fun_with_err { val -- out err }
+fun: .recur_fun_with_err { val -- out err }
   ifz val .then 100 .ret end
   if val 3 = .then 0 " some_error" .ret end
   val .dec .recur
 end
 
-fun: recur_manual_fun { val -- out Err }
+fun: .recur_manual_fun { val -- out Err }
   ifz val .then 100 .ret end
   if val 3 = .then 0 " some_error" .ret end
   val .dec .recur
 end
 
-fun: test_recur_with_err { -- Err }
+fun: .test_recur_with_err { -- Err }
   2 .recur_fun_with_err { out err }
   assert= out 100 end .try
   assert= err nil end .try
@@ -653,10 +653,10 @@ fun: test_recur_with_err { -- Err }
 end
 .test_recur_with_err
 
-fun: test_sleep_loop loop " sleeping" .log .lf 1 .sleep { -- } end end
+fun: .test_sleep_loop loop " sleeping" .log .lf 1 .sleep { -- } end end
 \ test_sleep_loop
 
-fun: test_loop_leave { -- err }
+fun: .test_loop_leave { -- err }
   assert=
     -1 { val } loop leave .abort end val
     -1
@@ -672,7 +672,7 @@ fun: test_loop_leave { -- err }
 end
 .test_loop_leave
 
-fun: test_loop_nested { -- err }
+fun: .test_loop_nested { -- err }
   -1 { one }
   -2 { two }
   -3 { three }
@@ -691,17 +691,17 @@ fun: test_loop_nested { -- err }
 end
 .test_loop_nested
 
-fun: test_sym_instr_len { XT -- len }
+fun: .test_sym_instr_len { XT -- len }
   XT .Sym_union .Sym_norm_spans { spans }
   spans .Sym_instrs_ret @u32 .inc
   spans .Sym_instrs_prologue @u32 -
 end
 
-fun: test_actual_instr { XT ind -- instr }
+fun: .test_actual_instr { XT ind -- instr }
   XT .sym_instr ind 4 * + @u32
 end
 
-fun: test_word_instr_count { XT instr -- count }
+fun: .test_word_instr_count { XT instr -- count }
   XT .test_sym_instr_len { len }
   0 { count }
   0 { ind }
@@ -713,7 +713,7 @@ fun: test_word_instr_count { XT instr -- count }
   count
 end
 
-fun: test_word_has_branch_cond { XT cond -- bool }
+fun: .test_word_has_branch_cond { XT cond -- bool }
   \ Matches `b.<cond>` while ignoring the PC-relative offset.
   0b11111111_0000000000000000000_1_0000 { mask }
   0b01010100_0000000000000000000_0_0000 { match }
@@ -729,7 +729,7 @@ fun: test_word_has_branch_cond { XT cond -- bool }
   false
 end
 
-fun: test_word_has_cset { XT -- bool }
+fun: .test_word_has_cset { XT -- bool }
   XT .test_sym_instr_len { len }
   0 { ind }
   loop
@@ -741,7 +741,7 @@ fun: test_word_has_cset { XT -- bool }
   false
 end
 
-fun: test_while_cset_branch_fusion_fun { val -- out }
+fun: .test_while_cset_branch_fusion_fun { val -- out }
   0 { out }
   loop
     val 0 >= .while
@@ -751,62 +751,62 @@ fun: test_while_cset_branch_fusion_fun { val -- out }
   out
 end
 
-fun: test_while_cset_branch_fusion { -- err }
+fun: .test_while_cset_branch_fusion { -- err }
   assert= 3 .test_while_cset_branch_fusion_fun 4 end
   assert= -1 .test_while_cset_branch_fusion_fun 0 end
-  assert xt' test_while_cset_branch_fusion_fun ASM_LT .test_word_has_branch_cond end
-  assert xt' test_while_cset_branch_fusion_fun .test_word_has_cset =0 end
+  assert xt' .test_while_cset_branch_fusion_fun ASM_LT .test_word_has_branch_cond end
+  assert xt' .test_while_cset_branch_fusion_fun .test_word_has_cset =0 end
 end
 .test_while_cset_branch_fusion
 
-fun: test_comp_reg_cmp_keeps_rhs_in_arg_fun { one two -- out }
+fun: .test_comp_reg_cmp_keeps_rhs_in_arg_fun { one two -- out }
   one two = two +
 end
 
-fun: test_comp_reg_cmp_keeps_rhs_in_arg { -- err }
+fun: .test_comp_reg_cmp_keeps_rhs_in_arg { -- err }
   assert= 1 1 .test_comp_reg_cmp_keeps_rhs_in_arg_fun 2 end
   assert= 1 2 .test_comp_reg_cmp_keeps_rhs_in_arg_fun 2 end
-  assert= xt' test_comp_reg_cmp_keeps_rhs_in_arg_fun .test_sym_instr_len 4 end
+  assert= xt' .test_comp_reg_cmp_keeps_rhs_in_arg_fun .test_sym_instr_len 4 end
 end
 .test_comp_reg_cmp_keeps_rhs_in_arg
 
-fun: test_call_leaf_frame_fun 0 .call end
+fun: .test_call_leaf_frame_fun 0 .call end
 
-fun: test_call_non_leaf_frame_fun 0 .sleep { -- } 0 .call end
+fun: .test_call_non_leaf_frame_fun 0 .sleep { -- } 0 .call end
 
-fun: test_call_frame { -- err }
+fun: .test_call_frame { -- err }
   ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 .asm_store_pair_pre { frame_push }
-  assert= xt' test_call_leaf_frame_fun frame_push .test_word_instr_count 1 end
-  assert= xt' test_call_non_leaf_frame_fun frame_push .test_word_instr_count 1 end
+  assert= xt' .test_call_leaf_frame_fun frame_push .test_word_instr_count 1 end
+  assert= xt' .test_call_non_leaf_frame_fun frame_push .test_word_instr_count 1 end
 end
 .test_call_frame
 
-fun: test_if_cset_branch_fusion_fun { val -- out }
+fun: .test_if_cset_branch_fusion_fun { val -- out }
   0 { out }
   if val 0 = .then 7 { out } end
   out
 end
 
-fun: test_ifz_cset_branch_fusion_fun { val -- out }
+fun: .test_ifz_cset_branch_fusion_fun { val -- out }
   0 { out }
   ifz val 0 = .then 7 { out } end
   out
 end
 
-fun: test_if_cset_branch_fusion { -- err }
+fun: .test_if_cset_branch_fusion { -- err }
   assert= 0 .test_if_cset_branch_fusion_fun 7 end
   assert= 1 .test_if_cset_branch_fusion_fun 0 end
-  assert xt' test_if_cset_branch_fusion_fun ASM_NE .test_word_has_branch_cond end
-  assert xt' test_if_cset_branch_fusion_fun .test_word_has_cset =0 end
+  assert xt' .test_if_cset_branch_fusion_fun ASM_NE .test_word_has_branch_cond end
+  assert xt' .test_if_cset_branch_fusion_fun .test_word_has_cset =0 end
 
   assert= 0 .test_ifz_cset_branch_fusion_fun 0 end
   assert= 1 .test_ifz_cset_branch_fusion_fun 7 end
-  assert xt' test_ifz_cset_branch_fusion_fun ASM_EQ .test_word_has_branch_cond end
-  assert xt' test_ifz_cset_branch_fusion_fun .test_word_has_cset =0 end
+  assert xt' .test_ifz_cset_branch_fusion_fun ASM_EQ .test_word_has_branch_cond end
+  assert xt' .test_ifz_cset_branch_fusion_fun .test_word_has_cset =0 end
 end
 .test_if_cset_branch_fusion
 
-fun: test_loop_while { -- err }
+fun: .test_loop_while { -- err }
   assert=
     -1 { val }
     loop false .while 10 { val } end
@@ -870,7 +870,7 @@ fun: test_loop_while { -- err }
 end
 .test_loop_while
 
-fun: test_loop_while_leave { -- err }
+fun: .test_loop_while_leave { -- err }
   assert=
     -1 { val } loop false .while 10 { val } leave end val
     -1
@@ -898,7 +898,7 @@ fun: test_loop_while_leave { -- err }
 end
 .test_loop_while_leave
 
-fun: test_loop_manual_countdown { -- err }
+fun: .test_loop_manual_countdown { -- err }
   \ Should terminate right away.
   -12 { ind } loop dec: ind ind >=0 .while end
   -1 { ind } loop dec: ind ind >=0 .while end
@@ -977,7 +977,7 @@ fun: test_loop_manual_countdown { -- err }
 end
 .test_loop_manual_countdown
 
-fun: test_loop_manual_counting { -- err }
+fun: .test_loop_manual_counting { -- err }
   0 0 { acc ind }
   loop
     ind 12 < .while
@@ -999,7 +999,7 @@ fun: test_loop_manual_counting { -- err }
 end
 .test_loop_manual_counting
 
-fun: test_again_loop_basic
+fun: .test_again_loop_basic
   loop
     leave
     again
@@ -1007,7 +1007,7 @@ fun: test_again_loop_basic
 end
 .test_again_loop_basic
 
-fun: test_again_loop { -- err }
+fun: .test_again_loop { -- err }
   -1 { len }
   loop
     inc: len
@@ -1018,7 +1018,7 @@ fun: test_again_loop { -- err }
 end
 .test_again_loop
 
-fun: test_again_countdown_manual { -- err }
+fun: .test_again_countdown_manual { -- err }
   7 { ind }
   loop
     dec: ind
@@ -1038,7 +1038,7 @@ fun: test_again_countdown_manual { -- err }
 end
 .test_again_countdown_manual
 
-fun: cont_meta_loop_leave_top { val -- out }
+fun: .cont_meta_loop_leave_top { val -- out }
   val
   loop
     .inc
@@ -1046,7 +1046,7 @@ fun: cont_meta_loop_leave_top { val -- out }
   end
 end
 
-fun: cont_meta_loop_while_top { val -- out }
+fun: .cont_meta_loop_while_top { val -- out }
   val
   loop
     .inc
@@ -1055,7 +1055,7 @@ fun: cont_meta_loop_while_top { val -- out }
   end
 end
 
-fun: cont_meta_countdown_manual_top { val len -- out }
+fun: .cont_meta_countdown_manual_top { val len -- out }
   loop
     dec: len
     len >=0 .while
@@ -1064,7 +1064,7 @@ fun: cont_meta_countdown_manual_top { val len -- out }
   val
 end
 
-fun: test_cont_meta_loop_inputs { -- err }
+fun: .test_cont_meta_loop_inputs { -- err }
   assert= 10 .cont_meta_loop_leave_top 11 end
   assert= 10 .cont_meta_loop_while_top 11 end
 
@@ -1072,7 +1072,7 @@ fun: test_cont_meta_loop_inputs { -- err }
 end
 .test_cont_meta_loop_inputs
 
-fun: test_cont_meta_loop_arity_bad { -- Err }
+fun: .test_cont_meta_loop_arity_bad { -- Err }
   use' ./fail/test_cont_meta_loop_arity_bad.af
   " loop" .assert_str_has
 end
@@ -1081,7 +1081,7 @@ end
 123 var: VAR
 
 \ Load/store is used internally by testing utils. The test is kinda cyclic.
-fun: test_load_store { -- err }
+fun: .test_load_store { -- err }
   if .has_interp .then
     assert= VAR @ 123 end
   else
@@ -1095,7 +1095,7 @@ fun: test_load_store { -- err }
 end
 .test_load_store
 
-fun: test_load_store_typed { -- err }
+fun: .test_load_store_typed { -- err }
   CELL .alloca { ptr }
 
   0 ptr !
@@ -1145,9 +1145,9 @@ fun: test_load_store_typed { -- err }
 end
 .test_load_store_typed
 
-fun: test_load_store_pair_swap_fun { one two ptr } one two ptr !swap end
+fun: .test_load_store_pair_swap_fun { one two ptr } one two ptr !swap end
 
-fun: test_load_store_pair_swap { -- err }
+fun: .test_load_store_pair_swap { -- err }
   CELL 2 * .alloca { ptr }
   123 234 ptr !swap
   ptr @2 { one two }
@@ -1156,7 +1156,7 @@ fun: test_load_store_pair_swap { -- err }
 end
 .test_load_store_pair_swap
 
-fun: test_store_cells { -- err }
+fun: .test_store_cells { -- err }
   3 .cells .alloca { ptr }
   11 22 33 ptr !cells
 
@@ -1166,7 +1166,7 @@ fun: test_store_cells { -- err }
 end
 .test_store_cells
 
-fun: test_store_cellz { -- err }
+fun: .test_store_cellz { -- err }
   4 .cells .alloca { ptr }
   " one" " two" " three" ptr !cellz
 
@@ -1177,7 +1177,7 @@ fun: test_store_cellz { -- err }
 end
 .test_store_cellz
 
-fun: test_store_cellz_empty { -- err }
+fun: .test_store_cellz_empty { -- err }
   CELL .alloca { ptr }
   123 ptr !
 
@@ -1186,7 +1186,7 @@ fun: test_store_cellz_empty { -- err }
 end
 .test_store_cellz_empty
 
-fun: test_cellz_len_copy { -- err }
+fun: .test_cellz_len_copy { -- err }
   3 .cells .alloca { src }
   " one" " two" src !cellz
 
@@ -1203,16 +1203,16 @@ fun: test_cellz_len_copy { -- err }
 end
 .test_cellz_len_copy
 
-fun: test_load_store_pair_swap_instr { -- err }
+fun: .test_load_store_pair_swap_instr { -- err }
   1 0 2 0 .asm_store_pair_off { instr }
   assert=
-    xt' test_load_store_pair_swap_fun instr .test_word_instr_count
+    xt' .test_load_store_pair_swap_fun instr .test_word_instr_count
     1
   end
 end
 .test_load_store_pair_swap_instr
 
-fun: test_load_store_arg_min { -- Err }
+fun: .test_load_store_arg_min { -- Err }
   use' ./fail/test_load_arg_min.af
   " arity mismatch: required: 1, provided: 0"
   .assert_str_has .try
@@ -1223,7 +1223,7 @@ fun: test_load_store_arg_min { -- Err }
 end
 .test_load_store_arg_min
 
-fun: test_asm_csel_order { -- err }
+fun: .test_asm_csel_order { -- err }
   assert=
     0 1 2 ASM_PL .asm_csel
     0b10011010100000100101000000100000
@@ -1235,7 +1235,7 @@ fun: test_asm_csel_order { -- err }
 end
 .test_asm_csel_order
 
-fun: test_negate { -- err }
+fun: .test_negate { -- err }
   assert= 0 .negate 0 end
   assert= 123 .negate -123 end
   assert= -123 .negate 123 end
@@ -1244,7 +1244,7 @@ end
 
 \ This mostly verifies the normal word path; assertion comparisons use their own
 \ emitted branches.
-fun: test_equal { -- err }
+fun: .test_equal { -- err }
   assert= 0 0 = 1 end
   assert= 0 123 = 0 end
   assert= 123 0 = 0 end
@@ -1256,7 +1256,7 @@ fun: test_equal { -- err }
 end
 .test_equal
 
-fun: test_not_equal { -- err }
+fun: .test_not_equal { -- err }
   assert= 0 0 <> 0 end
   assert= 0 123 <> 1 end
   assert= 123 0 <> 1 end
@@ -1268,7 +1268,7 @@ fun: test_not_equal { -- err }
 end
 .test_not_equal
 
-fun: test_greater { -- err }
+fun: .test_greater { -- err }
   assert= 0 0 > 0 end
   assert= 0 123 > 0 end
   assert= 123 0 > 1 end
@@ -1280,7 +1280,7 @@ fun: test_greater { -- err }
 end
 .test_greater
 
-fun: test_lesser { -- err }
+fun: .test_lesser { -- err }
   assert= 0 0 < 0 end
   assert= 0 123 < 1 end
   assert= 123 0 < 0 end
@@ -1292,7 +1292,7 @@ fun: test_lesser { -- err }
 end
 .test_lesser
 
-fun: test_lesser_equal { -- err }
+fun: .test_lesser_equal { -- err }
   assert= 0 0 <= 1 end
   assert= 0 123 <= 1 end
   assert= 123 0 <= 0 end
@@ -1304,7 +1304,7 @@ fun: test_lesser_equal { -- err }
 end
 .test_lesser_equal
 
-fun: test_greater_equal { -- err }
+fun: .test_greater_equal { -- err }
   assert= 0 0 >= 1 end
   assert= 0 123 >= 0 end
   assert= 123 0 >= 1 end
@@ -1316,7 +1316,7 @@ fun: test_greater_equal { -- err }
 end
 .test_greater_equal
 
-fun: test_unsigned_compare { -- err }
+fun: .test_unsigned_compare { -- err }
   assert= 0 0 u< 0 end
   assert= 0 1 u< 1 end
   assert= -1 0 u< 0 end
@@ -1340,7 +1340,7 @@ fun: test_unsigned_compare { -- err }
 end
 .test_unsigned_compare
 
-fun: test_compare_many { -- err }
+fun: .test_compare_many { -- err }
   \ Keep these direct. The multi-check words below lower directly to compare
   \ and conditional-compare instructions; binding their outputs through locals
   \ would add local read/write behavior to the assertion path.
@@ -1386,9 +1386,9 @@ fun: test_compare_many { -- err }
 end
 .test_compare_many
 
-fun: assert_fail { -- err } assert 123 456 = end end
+fun: .assert_fail { -- err } assert 123 456 = end end
 
-fun: test_assert_bin_ops { -- err }
+fun: .test_assert_bin_ops { -- err }
   assert<> 10 20 end
   assert> 20 10 end
   assert< 10 20 end
@@ -1400,24 +1400,24 @@ fun: test_assert_bin_ops { -- err }
   assertu>= -1 0 end
 end
 
-fun: assert_bin_fail    { lhs rhs -- err } assert=  lhs rhs end end
-fun: assert_bin_lt_fail { lhs rhs -- err } assert<  lhs rhs end end
-fun: assert_bin_eq_ok   { lhs rhs -- err } assert=  lhs rhs end end
-fun: assert_bin_ne_ok   { lhs rhs -- err } assert<> lhs rhs end end
-fun: asm_logical_imm_enc_err { val -- err_str }
+fun: .assert_bin_fail    { lhs rhs -- err } assert=  lhs rhs end end
+fun: .assert_bin_lt_fail { lhs rhs -- err } assert<  lhs rhs end end
+fun: .assert_bin_eq_ok   { lhs rhs -- err } assert=  lhs rhs end end
+fun: .assert_bin_ne_ok   { lhs rhs -- err } assert<> lhs rhs end end
+fun: .asm_logical_imm_enc_err { val -- err_str }
   val .asm_logical_imm_enc { _N _immr _imms err_str }
   err_str
 end
-fun: asm_and_imm_err { out inp imm -- instr err_str }
+fun: .asm_and_imm_err { out inp imm -- instr err_str }
   out inp imm .asm_and_imm
 end
 
-fun: test_assert_try_manual { -- Err }
+fun: .test_assert_try_manual { -- Err }
   10 10 .assert_bin_eq_ok .try
   10 20 .assert_bin_ne_ok
 end
 
-fun: test_assert_bin_runtime_errors { -- Err }
+fun: .test_assert_bin_runtime_errors { -- Err }
   123 456 .assert_bin_fail { err }
   err " assertion failed: lhs rhs = (0x7b 0x1c8 =)" .assert_str_has .try
 
@@ -1425,9 +1425,9 @@ fun: test_assert_bin_runtime_errors { -- Err }
   err " assertion failed: lhs rhs < (0x1c8 0x7b <)" .assert_str_has
 end
 
-fun: test_assert_fail_err { -- err_str } .assert_fail end
+fun: .test_assert_fail_err { -- err_str } .assert_fail end
 
-fun: test_assert { -- err }
+fun: .test_assert { -- err }
   assert 10 10 = end
   assert= 10 10 end
   .test_assert_bin_ops
@@ -1438,7 +1438,7 @@ fun: test_assert { -- err }
 end
 .test_assert
 
-fun: test_arith { -- err }
+fun: .test_arith { -- err }
   assert= 234 123 - 111 end
   assert= 234 123 + 357 end
   assert= 234 123 * 28782 end
@@ -1446,7 +1446,7 @@ fun: test_arith { -- err }
 end
 .test_arith
 
-fun: test_comptime_stack_arith { -- err }
+fun: .test_comptime_stack_arith { -- err }
   assert= 234 123 - 111 end
   assert= 234 123 + 357 end
   assert= 234 123 * 28782 end
@@ -1466,7 +1466,7 @@ fun: test_comptime_stack_arith { -- err }
 end
 .test_comptime_stack_arith
 
-fun: test_mod { -- err }
+fun: .test_mod { -- err }
   assert= 12 2 .mod 0 end
   assert= 12 3 .mod 0 end
   assert= 12 4 .mod 0 end
@@ -1478,7 +1478,7 @@ fun: test_mod { -- err }
 end
 .test_mod
 
-fun: test_slash_mod { -- err }
+fun: .test_slash_mod { -- err }
   12 2 /mod { mod div }
   assert= mod 0 end
   assert= div 6 end
@@ -1506,7 +1506,7 @@ fun: test_slash_mod { -- err }
 end
 .test_slash_mod
 
-fun: test_unsigned_div_mod { -- err }
+fun: .test_unsigned_div_mod { -- err }
   assert= -1 2 u/ 9223372036854775807 end
   assert= -1 2 .umod 1 end
   -1 2 u/mod { mod div }
@@ -1515,14 +1515,14 @@ fun: test_unsigned_div_mod { -- err }
 end
 .test_unsigned_div_mod
 
-fun: test_abs { -- err }
+fun: .test_abs { -- err }
   assert= 0 .abs 0 end
   assert= -123 .abs 123 end
   assert= 123 .abs 123 end
 end
 .test_abs
 
-fun: test_min { -- err }
+fun: .test_min { -- err }
   assert= 123 234 .min 123 end
   assert= 234 123 .min 123 end
   assert= 0 123 .min 0 end
@@ -1534,7 +1534,7 @@ fun: test_min { -- err }
 end
 .test_min
 
-fun: test_umin { -- err }
+fun: .test_umin { -- err }
   assert= 123 234 .umin 123 end
   assert= 234 123 .umin 123 end
   assert= 0 -123 .umin 0 end
@@ -1544,7 +1544,7 @@ fun: test_umin { -- err }
 end
 .test_umin
 
-fun: test_max { -- err }
+fun: .test_max { -- err }
   assert= 123 234 .max 234 end
   assert= 234 123 .max 234 end
   assert= 0 123 .max 123 end
@@ -1556,7 +1556,7 @@ fun: test_max { -- err }
 end
 .test_max
 
-fun: test_umax { -- err }
+fun: .test_umax { -- err }
   assert= 123 234 .umax 234 end
   assert= 234 123 .umax 234 end
   assert= 0 -123 .umax -123 end
@@ -1566,7 +1566,7 @@ fun: test_umax { -- err }
 end
 .test_umax
 
-fun: test_bit_len { -- err }
+fun: .test_bit_len { -- err }
   assert= 0 .bit_len 0 end
   assert= 1 .bit_len 1 end
   assert= 2 .bit_len 2 end
@@ -1577,7 +1577,7 @@ fun: test_bit_len { -- err }
 end
 .test_bit_len
 
-fun: test_pow2_ceil { -- err }
+fun: .test_pow2_ceil { -- err }
   assert= 0 .pow2_ceil 1 end
   assert= 1 .pow2_ceil 1 end
   assert= 2 .pow2_ceil 2 end
@@ -1589,7 +1589,7 @@ fun: test_pow2_ceil { -- err }
 end
 .test_pow2_ceil
 
-fun: test_bit_counts { -- err }
+fun: .test_bit_counts { -- err }
   assert= 0 .bit_clz 64 end
   assert= 1 .bit_clz 63 end
   assert=
@@ -1607,7 +1607,7 @@ fun: test_bit_counts { -- err }
 end
 .test_bit_counts
 
-fun: test_bit_masks { -- err }
+fun: .test_bit_masks { -- err }
   assert= 5 .low_bits 31 end
   assert= 0x1238 8 .is_aligned_to 1 end
   assert= 0x1234 8 .is_aligned_to 0 end
@@ -1630,7 +1630,7 @@ fun: test_bit_masks { -- err }
 end
 .test_bit_masks
 
-fun: test_local_mutators { -- err }
+fun: .test_local_mutators { -- err }
   10 { val } 7 +: val assert= val 17 end
   7 { val } 3 *: val assert= val 21 end
   0b110101 { val } 0b101010 and: val assert= val 0b100000 end
@@ -1674,7 +1674,7 @@ fun: test_local_mutators { -- err }
 end
 .test_local_mutators
 
-fun: test_asm_new_bits { -- err }
+fun: .test_asm_new_bits { -- err }
   assert= 2 3 4 .asm_bic 0b10001010001001000000000001100010 end
   assert= 2 3 .asm_rbit 0b11011010110000000000000001100010 end
   assert= 2 3 .asm_clz 0b11011010110000000001000001100010 end
@@ -1711,7 +1711,7 @@ fun: test_asm_new_bits { -- err }
 end
 .test_asm_new_bits
 
-fun: test_asm_cmp_branch { -- err }
+fun: .test_asm_cmp_branch { -- err }
   assert= 1 8 0 .asm_cmp_branch 0b10110100000000000000000001000001 end
   assert= 1 8 1 .asm_cmp_branch 0b10110101000000000000000001000001 end
   assert= 1 8 .asm_cbz 0b10110100000000000000000001000001 end
@@ -1719,7 +1719,7 @@ fun: test_asm_cmp_branch { -- err }
 end
 .test_asm_cmp_branch
 
-fun: test_asm_append_imm_to_reg { -- err }
+fun: .test_asm_append_imm_to_reg { -- err }
   32 .alloca { buf }
 
   assert= 0 0 buf .asm_append_imm_to_reg buf 4 + end
@@ -1740,7 +1740,7 @@ fun: test_asm_append_imm_to_reg { -- err }
 end
 .test_asm_append_imm_to_reg
 
-fun: test_cstr_eq { -- err }
+fun: .test_cstr_eq { -- err }
   assert= nil nil cstr= true end
   assert= nil " one" cstr= false end
   assert= " one" nil cstr= false end
@@ -1750,7 +1750,7 @@ fun: test_cstr_eq { -- err }
 end
 .test_cstr_eq
 
-fun: test_str_slice { -- err }
+fun: .test_str_slice { -- err }
   assert= s" one" s" two" str= false end
   assert= nil 0 " one" 0 str= true end
   assert= nil 0 " one" 1 str< true end
@@ -1762,7 +1762,7 @@ fun: test_str_slice { -- err }
 end
 .test_str_slice
 
-fun: test_cstr_less { -- err }
+fun: .test_cstr_less { -- err }
   assert= nil nil cstr< false end
   assert= nil " one" cstr< true end
   assert= " one" nil cstr< false end
@@ -1774,209 +1774,152 @@ fun: test_cstr_less { -- err }
 end
 .test_cstr_less
 
-fun: test_dot_call_extern { -- err }
+fun: .test_extern_call { -- err }
   assert= " abc" .strlen 3 end
 end
-.test_dot_call_extern
+.test_extern_call
 
-fun: test_dot_call_inner/name { -- out } 123 end
+fun: .stored_call_name { -- val } 123 end
+fun: stored_plain_name { -- val } [ .plain_call ] 456 end
+0 1 extern: .process_id getpid
+0 1 extern: .process_id_alias getpid
 
-fun: test_dot_call_inner_call { -- err }
-  assert= test_dot_call_inner/name 123 end
+fun: .test_call_names { -- err }
+  assert= .stored_call_name 123 end
+  assert= stored_plain_name 456 end
+  .process_id { pid }
+  assert pid 0 > end
+  assert= .process_id_alias pid end
 end
-.test_dot_call_inner_call
+.test_call_names
 
-fun: test_dot_call_failures { -- Err }
-  use' ./fail/test_dot_call_plain_extern.af
-  " invalid plain call `strlen`: use `.strlen`"
+fun: test/calllike_name { -- out } 123 end
+
+fun: .test_calllike_name { -- err }
+  assert= test/calllike_name 123 end
+end
+.test_calllike_name
+
+fun: .test_call_name_failures { -- Err }
+  use' ./fail/test_call_missing_dot_extern.af
+  " undefined word `strlen`: use `.strlen`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_plain_comp_dot.af
-  " invalid plain call `logf`: use `.logf`"
+  use' ./fail/test_call_missing_dot_comp.af
+  " undefined word `logf`: use `.logf`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_plain_str_prnf.af
-  " invalid plain call `str_prnf`: use `.str_prnf`"
+  use' ./fail/test_call_extra_dot_local.af
+  " undefined word `.val`: use `val`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_plain_fmtf.af
-  " invalid plain call `fmtf`: use `.fmtf`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin.af
-  " invalid plain call `debug_mem`: use `.debug_mem`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin_extern_fun.af
-  " invalid plain call `extern_fun`: use `.extern_fun`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin_comp_only.af
-  " invalid plain call `comp_only`: use `.comp_only`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin_alloca.af
-  " invalid plain call `alloca`: use `.alloca`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin_plain_call.af
-  " invalid plain call `plain_call`: use `.plain_call`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin_interp_only.af
-  " invalid plain call `interp_only`: use `.interp_only`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_intrin_redefine.af
-  " invalid plain call `redefine`: use `.redefine`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_local.af
-  " invalid dot-call `.val`: `val` is a local, and locals are ident-like; use `val`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_local_name.af
+  use' ./fail/test_local_name_leading_dot.af
   " invalid local name `.val`: local names must be ident-like"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_assign_local_name.af
+  use' ./fail/test_local_assignment_leading_dot.af
   " invalid local name `.tmp`: local names must be ident-like"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_digit_local_name.af
+  use' ./fail/test_local_name_numeric.af
   " invalid local name `1val`: local names must be ident-like"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_digit_assign_local_name.af
+  use' ./fail/test_local_assignment_numeric.af
   " invalid local name `1tmp`: local names must be ident-like"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_inner_local_name.af
+  use' ./fail/test_local_name_non_ident.af
   " invalid local name `val-name`: local names must be ident-like"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_inner_assign_local_name.af
+  use' ./fail/test_local_assignment_non_ident.af
   " invalid local name `tmp.name`: local names must be ident-like"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_value.af
-  " invalid dot-call `.TEST_DOT_CALL_VALUE`: use `TEST_DOT_CALL_VALUE`"
+  use' ./fail/test_call_extra_dot_value.af
+  " undefined word `.TEST_VALUE`: use `TEST_VALUE`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_control.af
-  " invalid plain call `try`: use `.try`"
+  use' ./fail/test_call_missing_dot_control.af
+  " undefined word `try`: use `.try`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_root_control.af
-  " invalid plain call `then`: use `.then`"
+  use' ./fail/test_call_extra_dot.af
+  " undefined word `.u/`: use `u/`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_root_if.af
-  " word `if` is compile-time only"
+  use' ./fail/test_value_name_non_ident.af
+  " invalid declaration `BAD-VALUE`; use an ident-like name or remove `.plain_call`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_root_end.af
-  " unexpected `end`: no structure to close"
+  use' ./fail/test_call_undefined.af
+  " undefined word `.MISSING_WORD`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_root_end_invalid_xt.af
-  " invalid word address"
+  use' ./fail/test_declaration_ident.af
+  " invalid declaration `bad_name`; use `.bad_name`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_root_try.af
-  " word `try` is compile-time only"
+  use' ./fail/test_declaration_numeric.af
+  " invalid declaration `1bad_name`; use `.1bad_name`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_throw.af
-  " invalid plain call `throw`: use `.throw`"
+  use' ./fail/test_declaration_signed_numeric.af
+  " invalid declaration `+1bad_name`; use `.+1bad_name`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_redundant.af
-  " invalid dot-call `.u/`: `u/` is already call-like; use `u/`"
+  use' ./fail/test_extern_declaration_precedes_redefinition.af
+  " invalid declaration `bad_name`; use `.bad_name`"
   .assert_str_has .try
 
-  use' ./fail/test_dot_call_redundant_inner.af
-  " invalid dot-call `.u/mod`: `u/mod` is already call-like; use `u/mod`"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_plain_call_non_ident.af
-  " invalid plain-call name `BAD-VALUE`: plain-call names must be ident-like"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_undefined.af
-  " undefined dot-call `.TEST_DOT_CALL_MISSING`: lookup name `TEST_DOT_CALL_MISSING` was not found"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_define_leading_dot.af
-  " invalid name `.bad_dot_name`: leading `.` is call syntax"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_define_leading_digit.af
-  " invalid name `1bad_name`: names which begin like numeric literals are reserved"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_define_leading_num_sign.af
-  " invalid name `+1bad_name`: names which begin like numeric literals are reserved"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_extern_leading_dot.af
-  " invalid name `.bad_ext`: leading `.` is call syntax"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_extern_leading_digit.af
-  " invalid name `1bad_ext`: names which begin like numeric literals are reserved"
-  .assert_str_has .try
-
-  use' ./fail/test_dot_call_extern_leading_num_sign.af
-  " invalid name `-1bad_ext`: names which begin like numeric literals are reserved"
-  .assert_str_has
 end
-.test_dot_call_failures
+.test_call_name_failures
 
-fun: int32_negative { -- val } [
+fun: .int32_negative { -- val } [
   0b0_00_100101_00_0000000000000000_00000 .comp_instr \ mov w0, -1
   1 .comp_args_set
 ] end
 
-fun: test_cint_to_cell { -- err }
+fun: .test_cint_to_cell { -- err }
   assert= .int32_negative 0xffff_ffff end
   assert= .int32_negative .cint_to_cell 0xffff_ffff_ffff_ffff end
   assert= .int32_negative .cint_to_cell -1 end
 end
 .test_cint_to_cell
 
-fun: test_comptime_arg_stack_sum16_fun { -- val }
+fun: .test_comptime_arg_stack_sum16_fun { -- val }
   100 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   + + + + + + + + + + + + + + +
 end
 
-fun: test_comptime_arg_stack_sum16 { -- err }
+fun: .test_comptime_arg_stack_sum16 { -- err }
   assert= .test_comptime_arg_stack_sum16_fun 220 end
 end
 .test_comptime_arg_stack_sum16
 
-fun: test_assign_all_arg_regs_fun { -- val }
+fun: .test_assign_all_arg_regs_fun { -- val }
   0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   { A B C D E F G H I J K L M N O P }
   A B + C + D + E + F + G + H + I + J + K + L + M + N + O + P +
 end
 
-fun: test_assign_all_arg_regs { -- err }
+fun: .test_assign_all_arg_regs { -- err }
   assert= .test_assign_all_arg_regs_fun 120 end
 end
 .test_assign_all_arg_regs
 
-fun: test_comptime_arg_stack_mod_scratch_fun { -- val }
+fun: .test_comptime_arg_stack_mod_scratch_fun { -- val }
   1000 1 2 3 4 5 6 7 8 20 6 .mod
   + + + + + + + + +
 end
 
-fun: test_comptime_arg_stack_mod_scratch { -- err }
+fun: .test_comptime_arg_stack_mod_scratch { -- err }
   assert= .test_comptime_arg_stack_mod_scratch_fun 1038 end
 end
 .test_comptime_arg_stack_mod_scratch
 
-fun: test_stack_push_9 { -- err }
+fun: .test_stack_push_9 { -- err }
   alloca' Stack { stk }
   32 stk .stack_init
 
@@ -1998,9 +1941,9 @@ fun: test_stack_push_9 { -- err }
 end
 .test_stack_push_9
 
-fun: fallback_high_regs_fun { keep one two -- keep out } keep one two .fallback end
+fun: .fallback_high_regs_fun { keep one two -- keep out } keep one two .fallback end
 
-fun: test_fallback { -- err }
+fun: .test_fallback { -- err }
   assert= 0 0 .fallback 0 end
   assert= 0 1 .fallback 1 end
   assert= 1 0 .fallback 1 end
@@ -2020,7 +1963,7 @@ fun: test_fallback { -- err }
 end
 .test_fallback
 
-fun: test_strf { -- err }
+fun: .test_strf { -- err }
   " codes: %zd %zd %zd" 10 20 30 .strf { buf0 }
   buf0 " codes: 10 20 30" .assert_str_eq
 
@@ -2036,7 +1979,7 @@ fun: test_strf { -- err }
 end
 .test_strf
 
-fun: test_strf_exact_fill { -- err }
+fun: .test_strf_exact_fill { -- err }
   alloca' Ctx { ctx }
   2 .alloca { buf }
   buf 2 ctx .ctx_init
@@ -2051,7 +1994,7 @@ fun: test_strf_exact_fill { -- err }
 end
 .test_strf_exact_fill
 
-fun: test_strf_out_of_space { -- err }
+fun: .test_strf_out_of_space { -- err }
   alloca' Ctx { ctx }
   nil 0 ctx .ctx_init
 
@@ -2064,11 +2007,11 @@ end
 .test_strf_out_of_space
 
 struct: Test_req_ctx
-  Ctx  1 field: Test_req_ctx_ctx
-  Cell 1 field: Test_req_ctx_val
+  Ctx  1 field: .Test_req_ctx_ctx
+  Cell 1 field: .Test_req_ctx_val
 end
 
-fun: test_stack_init_ctx { -- err }
+fun: .test_stack_init_ctx { -- err }
   alloca' Stack { mem }
 
   PAGE_SIZE Test_req_ctx mem .stack_init_ctx { ctx }
@@ -2082,17 +2025,17 @@ fun: test_stack_init_ctx { -- err }
 end
 .test_stack_init_ctx
 
-fun: test_thread_custom_ctx_child { _ -- val }
+fun: .test_thread_custom_ctx_child { _ -- val }
   context .Test_req_ctx_val @
 end
 
-fun: test_thread_custom_ctx { -- err }
+fun: .test_thread_custom_ctx { -- err }
   alloca' Stack { mem }
 
   PAGE_SIZE Test_req_ctx mem .stack_init_ctx { ctx }
   123 ctx .Test_req_ctx_val !
 
-  instr' test_thread_custom_ctx_child nil ctx .thread_spawn_ctx { thread }
+  instr' .test_thread_custom_ctx_child nil ctx .thread_spawn_ctx { thread }
   thread .thread_join { out }
 
   assert= out 123 end
@@ -2103,7 +2046,7 @@ end
 \ Our `.try` pops the top argument, tests it for being nil/zero, and returns it
 \ in the current function's error register if non-zero. By accident, we also
 \ allow to "push" more arguments afterwards. Works exactly like a stack.
-fun: test_try_multiple { -- err }
+fun: .test_try_multiple { -- err }
   nil .try
   nil nil .try .try
   nil .try nil .try
@@ -2128,7 +2071,7 @@ fun: test_try_multiple { -- err }
 end
 .test_try_multiple
 
-fun: test_strf_wrap { -- err }
+fun: .test_strf_wrap { -- err }
   " one" .strf { err0 }
   " two: %s" err0 .strf { err1 }
 
@@ -2155,7 +2098,7 @@ fun: test_strf_wrap { -- err }
 end
 .test_strf_wrap
 
-fun: test_alloca { ptr -- err }
+fun: .test_alloca { ptr -- err }
   ptr @ { -- } \ Should not segfault. The value is undefined.
 
   123 ptr !
@@ -2165,7 +2108,7 @@ fun: test_alloca { ptr -- err }
   assert= ptr @ 234 end
 end
 
-fun: test_alloca_cell { -- err }
+fun: .test_alloca_cell { -- err }
   CELL .alloca .test_alloca
   size' Cell .alloca .test_alloca
   alloca' Cell .test_alloca
@@ -2181,7 +2124,7 @@ fun: test_alloca_cell { -- err }
 end
 .test_alloca_cell
 
-fun: test_allocaz_fun { left right -- sum err }
+fun: .test_allocaz_fun { left right -- sum err }
   allocaz' Cell { ptr }
   assert= ptr @ 0 end
 
@@ -2189,12 +2132,12 @@ fun: test_allocaz_fun { left right -- sum err }
   ptr @
 end
 
-fun: test_allocaz { -- err }
+fun: .test_allocaz { -- err }
   assert= 11 31 .test_allocaz_fun 42 end
 end
 .test_allocaz
 
-fun: test_alloca_align { -- err }
+fun: .test_alloca_align { -- err }
   systack_ptr { SP }
   1 .alloca { adr0 }
   2 .alloca { adr1 }
@@ -2221,7 +2164,7 @@ end
 
 65536 let: SIZE_BIG
 
-fun: test_alloca_big { -- err }
+fun: .test_alloca_big { -- err }
   SIZE_BIG .alloca { adr0 }
   SIZE_BIG .alloca { adr1 }
   SIZE_BIG .alloca { adr2 }
@@ -2235,7 +2178,7 @@ fun: test_alloca_big { -- err }
 end
 .test_alloca_big
 
-fun: test_alloca_dynamic { size0 size1 -- err }
+fun: .test_alloca_dynamic { size0 size1 -- err }
   systack_ptr { SP }
   size0 .alloca { adr0 }
   size1 .alloca { adr1 }
@@ -2248,7 +2191,7 @@ fun: test_alloca_dynamic { size0 size1 -- err }
 end
 32 64 .test_alloca_dynamic
 
-fun: test_alloca_dynamic_non_x0 { keep size -- err }
+fun: .test_alloca_dynamic_non_x0 { keep size -- err }
   keep size .alloca { keep2 adr }
 
   assert= keep2 keep end
@@ -2272,7 +2215,7 @@ Opaq_1_1 3 arr: Arr4
 Opaq_2_2 3 arr: Arr5
 Opaq_3_1 3 arr: Arr6
 
-fun: test_array_sizes { -- err }
+fun: .test_array_sizes { -- err }
   assert= size' Opaq_1_1 1 end
   assert= size' Opaq_2_2 2 end
   assert= size' Opaq_3_1 3 end
@@ -2302,18 +2245,18 @@ end
 .test_array_sizes
 
 struct: Typ
-  U64 1 field: Typ_field0
-  U32 1 field: Typ_field1
+  U64 1 field: .Typ_field0
+  U32 1 field: .Typ_field1
 end
 
 struct: Typ_arity
-  Adr 1 field: Typ_arity_head
-  U8 PAGE_SIZE PAGE_SIZE field_aligned: Typ_arity_guard
+  Adr 1 field: .Typ_arity_head
+  U8 PAGE_SIZE PAGE_SIZE field_aligned: .Typ_arity_guard
 end
 
 \ Field alignment and padding needs to match C.
 \ We test alignment for a lot more cases below.
-fun: test_struct_fields_basic { -- err }
+fun: .test_struct_fields_basic { -- err }
   assert= size' Typ 16 end
   assert= align' Typ 8 end
   assert= 0 .Typ_field0 0 end
@@ -2325,12 +2268,12 @@ fun: test_struct_fields_basic { -- err }
 end
 .test_struct_fields_basic
 
-fun: test_struct_field_comp_arity { val }
+fun: .test_struct_field_comp_arity { val }
   val .Typ_arity_guard
   { _val }
 end
 
-fun: test_struct_fields_load_store { -- err }
+fun: .test_struct_fields_load_store { -- err }
   allocaz' Typ { ptr }
 
   assert= ptr .Typ_field0 ptr end
@@ -2355,33 +2298,33 @@ end
 .test_struct_fields_load_store
 
 struct: Typ_field_peephole
-  U64 1 field: Typ_field_peephole_0
-  U8  1 field: Typ_field_peephole_1
-  U64 1 field: Typ_field_peephole_2
+  U64 1 field: .Typ_field_peephole_0
+  U8  1 field: .Typ_field_peephole_1
+  U64 1 field: .Typ_field_peephole_2
 end
 
 struct: Typ_field_peephole_unscaled
-  U8 1 field: Typ_field_peephole_unscaled_0
-  U8 1 field: Typ_field_peephole_unscaled_1
+  U8 1 field: .Typ_field_peephole_unscaled_0
+  U8 1 field: .Typ_field_peephole_unscaled_1
 end
 
-fun: test_struct_field_load_peephole_fun { ptr -- val }
+fun: .test_struct_field_load_peephole_fun { ptr -- val }
   ptr .Typ_field_peephole_2 @
 end
 
-fun: test_struct_field_store_peephole_fun { val ptr }
+fun: .test_struct_field_store_peephole_fun { val ptr }
   val ptr .Typ_field_peephole_2 !
 end
 
-fun: test_struct_field_byte_peephole_fun { ptr -- val }
+fun: .test_struct_field_byte_peephole_fun { ptr -- val }
   ptr .Typ_field_peephole_1 @b
 end
 
-fun: test_struct_field_unscaled_peephole_fun { ptr -- val }
+fun: .test_struct_field_unscaled_peephole_fun { ptr -- val }
   ptr .Typ_field_peephole_unscaled_1 @
 end
 
-fun: test_struct_field_peephole_expect_instr { XT ind exp -- err }
+fun: .test_struct_field_peephole_expect_instr { XT ind exp -- err }
   XT .sym_instr ind 4 * + @u32 { act }
   if exp act <> .then
     XT .Sym_name .Sym_word_buf { name }
@@ -2391,25 +2334,25 @@ fun: test_struct_field_peephole_expect_instr { XT ind exp -- err }
   end
 end
 
-fun: test_struct_field_peephole { -- err }
+fun: .test_struct_field_peephole { -- err }
   ifz .has_interp .then .ret end
 
-  xt' test_struct_field_load_peephole_fun { load_xt }
+  xt' .test_struct_field_load_peephole_fun { load_xt }
   0 0 2 0b11 0b01 .asm_load_store_off { load_instr }
   load_xt 0 load_instr .test_struct_field_peephole_expect_instr
   load_xt 1 asm_ret .test_struct_field_peephole_expect_instr
 
-  xt' test_struct_field_store_peephole_fun { store_xt }
+  xt' .test_struct_field_store_peephole_fun { store_xt }
   0 1 2 0b11 0b00 .asm_load_store_off { store_instr }
   store_xt 0 store_instr .test_struct_field_peephole_expect_instr
   store_xt 1 asm_ret .test_struct_field_peephole_expect_instr
 
-  xt' test_struct_field_byte_peephole_fun { byte_xt }
+  xt' .test_struct_field_byte_peephole_fun { byte_xt }
   0 0 8 0b00 0b01 .asm_load_store_off { byte_instr }
   byte_xt 0 byte_instr .test_struct_field_peephole_expect_instr
   byte_xt 1 asm_ret .test_struct_field_peephole_expect_instr
 
-  xt' test_struct_field_unscaled_peephole_fun { unscaled_xt }
+  xt' .test_struct_field_unscaled_peephole_fun { unscaled_xt }
   0 0 1 .asm_load_unscaled_off { unscaled_instr }
   unscaled_xt 0 unscaled_instr .test_struct_field_peephole_expect_instr
   unscaled_xt 1 asm_ret .test_struct_field_peephole_expect_instr
@@ -2418,17 +2361,17 @@ end
 
 struct: Typ0 end
 
-fun: test_struct_0 { -- err }
+fun: .test_struct_0 { -- err }
   assert= size' Typ0 0 end
   assert= align' Typ0 0 end
 end
 .test_struct_0
 
 struct: Typ1
-  U8 1 field: Typ1_field
+  U8 1 field: .Typ1_field
 end
 
-fun: test_struct_1 { -- err }
+fun: .test_struct_1 { -- err }
   assert= size' Typ1 1 end
   assert= align' Typ1 1 end
   assert= 123 .Typ1_field 123 end
@@ -2436,11 +2379,11 @@ end
 .test_struct_1
 
 struct: Typ2
-  U8 1 field: Typ2_field0
-  U32 1 field: Typ2_field1
+  U8 1 field: .Typ2_field0
+  U32 1 field: .Typ2_field1
 end
 
-fun: test_struct_2 { -- err }
+fun: .test_struct_2 { -- err }
   assert= size' Typ2 8 end
   assert= align' Typ2 4 end
   assert= 123 .Typ2_field0 123 end
@@ -2449,11 +2392,11 @@ end
 .test_struct_2
 
 struct: Typ3
-  U32 1 field: Typ3_field0
-  U8 1 field: Typ3_field1
+  U32 1 field: .Typ3_field0
+  U8 1 field: .Typ3_field1
 end
 
-fun: test_struct_3 { -- err }
+fun: .test_struct_3 { -- err }
   assert= size' Typ3 8 end
   assert= align' Typ3 4 end
   assert= nil .Typ3_field0 0 end
@@ -2464,12 +2407,12 @@ end
 .test_struct_3
 
 struct: Typ4
-  U8 1 field: Typ4_field0
-  U32 1 field: Typ4_field1
-  U64 1 field: Typ4_field2
+  U8 1 field: .Typ4_field0
+  U32 1 field: .Typ4_field1
+  U64 1 field: .Typ4_field2
 end
 
-fun: test_struct_4 { -- err }
+fun: .test_struct_4 { -- err }
   assert= size' Typ4 16 end
   assert= align' Typ4 8 end
   assert= 123 .Typ4_field0 123 end
@@ -2479,12 +2422,12 @@ end
 .test_struct_4
 
 struct: Typ5
-  U32 1 field: Typ5_field0
-  U8 1 field: Typ5_field1
-  U64 1 field: Typ5_field2
+  U32 1 field: .Typ5_field0
+  U8 1 field: .Typ5_field1
+  U64 1 field: .Typ5_field2
 end
 
-fun: test_struct_5 { -- err }
+fun: .test_struct_5 { -- err }
   assert= size' Typ5 16 end
   assert= align' Typ5 8 end
   assert= 123 .Typ5_field0 123 end
@@ -2494,12 +2437,12 @@ end
 .test_struct_5
 
 struct: Typ6
-  U32 1 field: Typ6_field0
-  U64 1 field: Typ6_field1
-  U8 1 field: Typ6_field2
+  U32 1 field: .Typ6_field0
+  U64 1 field: .Typ6_field1
+  U8 1 field: .Typ6_field2
 end
 
-fun: test_struct_6 { -- err }
+fun: .test_struct_6 { -- err }
   assert= size' Typ6 24 end
   assert= align' Typ6 8 end
   assert= 123 .Typ6_field0 123 end
@@ -2509,13 +2452,13 @@ end
 .test_struct_6
 
 struct: Typ7
-  U64 1 field: Typ7_field0
-  U32 1 field: Typ7_field1
-  U32 1 field: Typ7_field2
-  U8 1 field: Typ7_field3
+  U64 1 field: .Typ7_field0
+  U32 1 field: .Typ7_field1
+  U32 1 field: .Typ7_field2
+  U8 1 field: .Typ7_field3
 end
 
-fun: test_struct_7 { -- err }
+fun: .test_struct_7 { -- err }
   assert= size' Typ7 24 end
   assert= align' Typ7 8 end
   assert= 123 .Typ7_field0 123 end
@@ -2526,13 +2469,13 @@ end
 .test_struct_7
 
 struct: Typ8
-  U8 1 field: Typ8_field0
-  U8 1 field: Typ8_field1
-  U8 1 field: Typ8_field2
-  U32 1 field: Typ8_field3
+  U8 1 field: .Typ8_field0
+  U8 1 field: .Typ8_field1
+  U8 1 field: .Typ8_field2
+  U32 1 field: .Typ8_field3
 end
 
-fun: test_struct_8 { -- err }
+fun: .test_struct_8 { -- err }
   assert= size' Typ8 8 end
   assert= align' Typ8 4 end
   assert= 123 .Typ8_field0 123 end
@@ -2543,11 +2486,11 @@ end
 .test_struct_8
 
 struct: Typ9
-  U8 1 field: Typ9_field0
-  U8 128 field: Typ9_field1
+  U8 1 field: .Typ9_field0
+  U8 128 field: .Typ9_field1
 end
 
-fun: test_struct_9 { -- err }
+fun: .test_struct_9 { -- err }
   assert= size' Typ9 129 end
   assert= align' Typ9 1 end
   assert= 123 .Typ9_field0 123 end
@@ -2556,13 +2499,13 @@ end
 .test_struct_9
 
 struct: Typ10
-  U8 1 field: Typ10_field0
-  U8 2 field: Typ10_field1
-  U32 3 field: Typ10_field2
-  U8 128 field: Typ10_field3
+  U8 1 field: .Typ10_field0
+  U8 2 field: .Typ10_field1
+  U32 3 field: .Typ10_field2
+  U8 128 field: .Typ10_field3
 end
 
-fun: test_struct_10 { -- err }
+fun: .test_struct_10 { -- err }
   assert= size' Typ10 144 end
   assert= align' Typ10 4 end
   assert= 123 .Typ10_field0 123 end
@@ -2573,11 +2516,11 @@ end
 .test_struct_10
 
 struct: Typ11
-  Opaq_5_1 3 field: Typ11_field0
-  U64 1 field: Typ11_field1
+  Opaq_5_1 3 field: .Typ11_field0
+  U64 1 field: .Typ11_field1
 end
 
-fun: test_struct_11 { -- err }
+fun: .test_struct_11 { -- err }
   assert= size' Typ11 24 end
   assert= align' Typ11 8 end
   assert= 123 .Typ11_field0 123 end
@@ -2586,11 +2529,11 @@ end
 .test_struct_11
 
 union: Typ_union
-  U8   1 field: Typ_union_byte
-  Cell 1 field: Typ_union_cell
+  U8   1 field: .Typ_union_byte
+  Cell 1 field: .Typ_union_cell
 end
 
-fun: test_union_named_basic { -- err }
+fun: .test_union_named_basic { -- err }
   assert= size' Typ_union 8 end
   assert= align' Typ_union 8 end
   assert= 0 .Typ_union_byte 0 end
@@ -2605,11 +2548,11 @@ end
 .test_union_named_basic
 
 union: Typ_union_small
-  U8  1 field: Typ_union_small_byte
-  U16 1 field: Typ_union_small_short
+  U8  1 field: .Typ_union_small_byte
+  U16 1 field: .Typ_union_small_short
 end
 
-fun: test_union_named_small { -- err }
+fun: .test_union_named_small { -- err }
   assert= size' Typ_union_small 2 end
   assert= align' Typ_union_small 2 end
   assert= 0 .Typ_union_small_byte 0 end
@@ -2618,12 +2561,12 @@ end
 .test_union_named_small
 
 struct: Typ_union_wrap
-  U8        1 field: Typ_union_wrap_tag
-  Typ_union 1 field: Typ_union_wrap_union
-  U8        1 field: Typ_union_wrap_tail
+  U8        1 field: .Typ_union_wrap_tag
+  Typ_union 1 field: .Typ_union_wrap_union
+  U8        1 field: .Typ_union_wrap_tail
 end
 
-fun: test_union_named_embedded { -- err }
+fun: .test_union_named_embedded { -- err }
   assert= size' Typ_union_wrap 24 end
   assert= align' Typ_union_wrap 8 end
   assert= 0 .Typ_union_wrap_tag 0 end
@@ -2638,26 +2581,26 @@ end
 
 \ Also equivalent to:
 \
-\ fun: test_throw { -- err } " test_err" end
-fun: test_throw { -- err } " test_err" .throw end
+\ fun: .test_throw { -- err } " test_err" end
+fun: .test_throw { -- err } " test_err" .throw end
 
-fun: test_unused_local_error { -- Err }
+fun: .test_unused_local_error { -- Err }
   use' ./fail/test_unused_local.af
   " unused local"
   .assert_str_has
 end
 .test_unused_local_error
 
-fun: test_discard_param_read { -- Err }
+fun: .test_discard_param_read { -- Err }
   use' ./fail/test_discard_param_read.af
   " undefined word"
   .assert_str_has
 end
 .test_discard_param_read
 
-fun: discard_param_push_suffix { val _ignored -> out } end
+fun: .discard_param_push_suffix { val _ignored -> out } end
 
-fun: test_discard_param_push { -- Err }
+fun: .test_discard_param_push { -- Err }
   assert= 10 20 .discard_param_push_suffix 10 end .try
 
   use' ./fail/test_discard_param_push.af
@@ -2666,28 +2609,28 @@ fun: test_discard_param_push { -- Err }
 end
 .test_discard_param_push
 
-fun: test_discard_assign_read { -- Err }
+fun: .test_discard_assign_read { -- Err }
   use' ./fail/test_discard_assign_read.af
   " undefined word"
   .assert_str_has
 end
 .test_discard_assign_read
 
-fun: test_redundant_discard { -- Err }
+fun: .test_redundant_discard { -- Err }
   use' ./fail/test_redundant_discard.af
   " redundant discard"
   .assert_str_has
 end
 .test_redundant_discard
 
-fun: test_unpopped_anon_local { -- Err }
+fun: .test_unpopped_anon_local { -- Err }
   use' ./fail/test_unpopped_anon_local.af
   " unused local"
   .assert_str_has
 end
 .test_unpopped_anon_local
 
-fun: test_explicit_err_0 { -- Err }
+fun: .test_explicit_err_0 { -- Err }
   .test_throw { err0 }
   " test_err" { err1 }
 
@@ -2696,13 +2639,13 @@ fun: test_explicit_err_0 { -- Err }
 end
 .test_explicit_err_0
 
-fun: test_explicit_err_1_fun { one -- two err }
+fun: .test_explicit_err_1_fun { one -- two err }
   ifz one .then .test_throw end
   one 2 *
 end
 
-\ Compare with `test_explicit_err_1` which is the actual test.
-fun: test_explicit_err_1_fun_throwing { -- err }
+\ Compare with `.test_explicit_err_1` which is the actual test.
+fun: .test_explicit_err_1_fun_throwing { -- err }
   \ 0 test_explicit_err_1_fun { -- } \ Must .throw.
 
   123 .test_explicit_err_1_fun { val }
@@ -2711,7 +2654,7 @@ fun: test_explicit_err_1_fun_throwing { -- err }
 end
 .test_explicit_err_1_fun_throwing
 
-fun: test_explicit_err_1 { -- Err }
+fun: .test_explicit_err_1 { -- Err }
   0 .test_explicit_err_1_fun { val err }
   err " test_err" .assert_str_eq .try
 
@@ -2725,13 +2668,13 @@ fun: test_explicit_err_1 { -- Err }
 end
 .test_explicit_err_1
 
-fun: test_explicit_err_2_fun { one two -- three err }
+fun: .test_explicit_err_2_fun { one two -- three err }
   ifz one .then .test_throw end
   one two +
 end
 
-\ Compare with `test_explicit_err_2` which is the actual test.
-fun: test_explicit_err_2_fun_throwing { -- err }
+\ Compare with `.test_explicit_err_2` which is the actual test.
+fun: .test_explicit_err_2_fun_throwing { -- err }
   \ 0 123 test_explicit_err_2_fun { -- } \ Must .throw.
 
   11 22 .test_explicit_err_2_fun { val }
@@ -2744,7 +2687,7 @@ fun: test_explicit_err_2_fun_throwing { -- err }
 end
 .test_explicit_err_2_fun_throwing
 
-fun: test_explicit_err_2 { -- Err }
+fun: .test_explicit_err_2 { -- Err }
   0 11 .test_explicit_err_2_fun { val err }
   err " test_err" .assert_str_eq .try
 
@@ -2764,15 +2707,15 @@ fun: test_explicit_err_2 { -- Err }
 end
 .test_explicit_err_2
 
-fun: test_explicit_err_3_fun { one -- two three err }
+fun: .test_explicit_err_3_fun { one -- two three err }
   ifz one .then .test_throw end
   one 2 * { two }
   one .negate { three }
   two three
 end
 
-\ Compare with `test_explicit_err_3` which is the actual test.
-fun: test_explicit_err_3_fun_throwing { -- err }
+\ Compare with `.test_explicit_err_3` which is the actual test.
+fun: .test_explicit_err_3_fun_throwing { -- err }
   \ 0 test_explicit_err_3_fun { -- } \ Must .throw.
 
   assert= 123 .negate -123 end
@@ -2786,7 +2729,7 @@ fun: test_explicit_err_3_fun_throwing { -- err }
 end
 .test_explicit_err_3_fun_throwing
 
-fun: test_explicit_err_3 { -- Err }
+fun: .test_explicit_err_3 { -- Err }
   123 234 345 { -- } \ Predictable state of regs x0 x1 x2.
   0 .test_explicit_err_3_fun { one two err }
   err " test_err" .assert_str_eq .try
@@ -2802,15 +2745,15 @@ fun: test_explicit_err_3 { -- Err }
 end
 .test_explicit_err_3
 
-fun: test_explicit_err_4_fun { one two -- three four err }
+fun: .test_explicit_err_4_fun { one two -- three four err }
   ifz one .then .test_throw end
   one two + { three }
   two one - { four }
   three four
 end
 
-\ Compare with `test_explicit_err_4` which is the actual test.
-fun: test_explicit_err_4_fun_throwing { -- err }
+\ Compare with `.test_explicit_err_4` which is the actual test.
+fun: .test_explicit_err_4_fun_throwing { -- err }
   \ 0 123 test_explicit_err_4_fun { -- } \ Must .throw.
 
   13 25 .test_explicit_err_4_fun { one two }
@@ -2829,7 +2772,7 @@ fun: test_explicit_err_4_fun_throwing { -- err }
 end
 .test_explicit_err_4_fun_throwing
 
-fun: test_explicit_err_4 { -- Err }
+fun: .test_explicit_err_4 { -- Err }
   0 13 .test_explicit_err_4_fun { one two err }
   err " test_err" .assert_str_eq .try
 
@@ -2854,10 +2797,10 @@ end
 .test_explicit_err_4
 
 \ Must compile.
-fun: test_max_input_regs { _A _B _C _D _E _F _G _H } end
+fun: .test_max_input_regs { _A _B _C _D _E _F _G _H } end
 
-fun: test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
-fun: test_max_output_regs { -- err } [ .redefine ]
+fun: .test_max_output_regs { -- A B C D E F G H } 0 1 2 3 4 5 6 7 end
+fun: .test_max_output_regs { -- err } [ .redefine ]
   .test_max_output_regs { A B C D E F G H }
   assert= A 0 end
   assert= B 1 end
@@ -2870,11 +2813,11 @@ fun: test_max_output_regs { -- err } [ .redefine ]
 end
 .test_max_output_regs
 
-fun: test_max_output_regs_with_err { -- A B C D E F G err }
+fun: .test_max_output_regs_with_err { -- A B C D E F G err }
   if false .then .test_throw end
   0 1 2 3 4 5 6
 end
-fun: test_max_output_regs_with_err { -- err } [ .redefine ]
+fun: .test_max_output_regs_with_err { -- err } [ .redefine ]
   .test_max_output_regs_with_err { A B C D E F G }
   assert= A 0 end
   assert= B 1 end
@@ -2886,184 +2829,184 @@ fun: test_max_output_regs_with_err { -- err } [ .redefine ]
 end
 .test_max_output_regs_with_err
 
-fun: test_redefine_missing_marker { -- Err }
+fun: .test_redefine_missing_marker { -- Err }
   use' ./fail/test_redefine_missing_marker.af
   " hint: use `[ .redefine ]` to replace it"
   .assert_str_has
 end
 .test_redefine_missing_marker
 
-fun: test_numeric_literal_not_terminated { -- Err }
+fun: .test_numeric_literal_not_terminated { -- Err }
   use' ./fail/test_numeric_literal_not_terminated.af
   " numeric literal must be terminated with whitespace: digit 10 from character `a` is outside radix 10"
   .assert_str_has
 end
 .test_numeric_literal_not_terminated
 
-fun: test_numeric_prefix_no_digit { -- Err }
+fun: .test_numeric_prefix_no_digit { -- Err }
   use' ./fail/test_numeric_prefix_no_digit.af
   " unexpected bare `0x_`; requires at least one digit"
   .assert_str_has
 end
 .test_numeric_prefix_no_digit
 
-fun: test_numeric_minus_unsigned { -- Err }
+fun: .test_numeric_minus_unsigned { -- Err }
   use' ./fail/test_numeric_minus_unsigned.af
   " unsupported minus sign in `-0x`; only decimals may be signed"
   .assert_str_has
 end
 .test_numeric_minus_unsigned
 
-fun: test_signature_err_auto_callee { -- err } end
+fun: .test_signature_err_auto_callee { -- err } end
 
-fun: test_signature_err_auto { -- err }
-  assert= xt' test_signature_err_auto_callee .Sym_has_err @b true end
-  assert= xt' test_signature_err_auto_callee .Sym_out_len @b 1 end
+fun: .test_signature_err_auto { -- err }
+  assert= xt' .test_signature_err_auto_callee .Sym_has_err @b true end
+  assert= xt' .test_signature_err_auto_callee .Sym_out_len @b 1 end
 end
 .test_signature_err_auto
 
-fun: test_Err_manual_callee { -- Err } " test_err" end
+fun: .test_Err_manual_callee { -- Err } " test_err" end
 
-fun: test_Err_manual_visible { -- Err }
+fun: .test_Err_manual_visible { -- Err }
   .test_Err_manual_callee { err }
   err " test_err" .assert_str_eq .try
 end
 .test_Err_manual_visible
 
-fun: test_Err_callee_auto_tried_by_err_caller { -- err }
+fun: .test_Err_callee_auto_tried_by_err_caller { -- err }
   .test_Err_manual_callee
   .unreachable
 end
 
-fun: test_err_no_error_output_reveals_callee_err { -- err_str }
+fun: .test_err_no_error_output_reveals_callee_err { -- err_str }
   .test_Err_manual_callee
 end
 
-fun: test_err_no_error_output_reveals { -- err }
+fun: .test_err_no_error_output_reveals { -- err }
   .test_err_no_error_output_reveals_callee_err " test_err" .assert_str_eq
 end
 .test_err_no_error_output_reveals
 
-fun: test_has_err_not_auto_marked_callee { -- err } end
+fun: .test_has_err_not_auto_marked_callee { -- err } end
 
-fun: test_has_err_not_auto_marked_caller { -- err_str }
+fun: .test_has_err_not_auto_marked_caller { -- err_str }
   .test_has_err_not_auto_marked_callee
 end
 
-fun: test_has_err_not_auto_marked { -- err }
-  assert= xt' test_has_err_not_auto_marked_callee .Sym_has_err @b true end
+fun: .test_has_err_not_auto_marked { -- err }
+  assert= xt' .test_has_err_not_auto_marked_callee .Sym_has_err @b true end
   assert=
-    xt' test_has_err_not_auto_marked_caller .Sym_has_err @b
+    xt' .test_has_err_not_auto_marked_caller .Sym_has_err @b
     false
   end
 end
 .test_has_err_not_auto_marked
 
-fun: test_throw_requires_err { -- Err }
+fun: .test_throw_requires_err { -- Err }
   use' ./fail/test_throw_requires_err.af
   " unable to `.throw`: current word has no error output"
   .assert_str_has
 end
 .test_throw_requires_err
 
-fun: test_too_many_input_regs { -- Err }
+fun: .test_too_many_input_regs { -- Err }
   use' ./fail/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
   .assert_str_has
 end
 .test_too_many_input_regs
 
-fun: test_too_many_output_regs { -- Err }
+fun: .test_too_many_output_regs { -- Err }
   use' ./fail/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   .assert_str_has
 end
 .test_too_many_output_regs
 
-fun: test_too_many_output_regs_with_err { -- Err }
+fun: .test_too_many_output_regs_with_err { -- Err }
   use' ./fail/test_too_many_output_regs_with_err.af
   " too many output parameters: 8 registers available, 9 parameters requested"
   .assert_str_has
 end
 .test_too_many_output_regs_with_err
 
-fun: test_too_many_comptime_arg_regs { -- Err }
+fun: .test_too_many_comptime_arg_regs { -- Err }
   use' ./fail/test_too_many_comptime_arg_regs.af
   " too many arguments: 16 registers available, 17 arguments provided"
   .assert_str_has
 end
 .test_too_many_comptime_arg_regs
 
-fun: test_too_many_call_args { -- Err }
+fun: .test_too_many_call_args { -- Err }
   use' ./fail/test_too_many_call_args.af
-  " unable to compile `call`: 8 param registers available, 9 arguments provided"
+  " unable to compile `.call`: 8 param registers available, 9 arguments provided"
   .assert_str_has
 end
 .test_too_many_call_args
 
-fun: test_comptime_stack_underflow { -- Err }
+fun: .test_comptime_stack_underflow { -- Err }
   use' ./fail/test_comptime_stack_underflow.af
-  " in `some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
+  " in `.some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
   .assert_str_has
 end
 .test_comptime_stack_underflow
 
-fun: test_cond_arity_bare_if { -- Err }
+fun: .test_cond_arity_bare_if { -- Err }
   use' ./fail/test_cond_arity_bare_if.af
   " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
   .assert_str_has
 end
 .test_cond_arity_bare_if
 
-fun: test_cond_arity_else_mismatch { -- Err }
+fun: .test_cond_arity_else_mismatch { -- Err }
   use' ./fail/test_cond_arity_else_mismatch.af
-  " in `test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
+  " in `.test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
   .assert_str_has
 end
 .test_cond_arity_else_mismatch
 
-fun: test_cond_arity_elif_mismatch { -- Err }
+fun: .test_cond_arity_elif_mismatch { -- Err }
   use' ./fail/test_cond_arity_elif_mismatch.af
-  " in `test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
+  " in `.test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   .assert_str_has
 end
 .test_cond_arity_elif_mismatch
 
-fun: test_cond_arity_elifz_mismatch { -- Err }
+fun: .test_cond_arity_elifz_mismatch { -- Err }
   use' ./fail/test_cond_arity_elifz_mismatch.af
-  " in `test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
+  " in `.test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   .assert_str_has
 end
 .test_cond_arity_elifz_mismatch
 
-fun: test_cond_arity_no_else { -- Err }
+fun: .test_cond_arity_no_else { -- Err }
   use' ./fail/test_cond_arity_no_else.af
   " arguments before ending conditional without `else`: arity mismatch"
   .assert_str_has
 end
 .test_cond_arity_no_else
 
-fun: test_cond_arity_no_else_less { -- Err }
+fun: .test_cond_arity_no_else_less { -- Err }
   use' ./fail/test_cond_arity_no_else_less.af
   " arguments before ending conditional without `else`: arity mismatch"
   .assert_str_has
 end
 .test_cond_arity_no_else_less
 
-fun: test_cond_arity_no_else_more { -- Err }
+fun: .test_cond_arity_no_else_more { -- Err }
   use' ./fail/test_cond_arity_no_else_more.af
   " arguments before ending conditional without `else`: arity mismatch"
   .assert_str_has
 end
 .test_cond_arity_no_else_more
 
-fun: test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN .mem_unprot end
-fun: test_arena_unprot_err { adr -- err_str } adr .test_arena_unprot end
-fun: arena_alloc_err { size arn -- adr err_str } size arn .arena_alloc end
-fun: use_err { path len -- err_str } path len .use end
-fun: find_word_err { str len wlist -- xt err_str } str len wlist .find_word end
+fun: .test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN .mem_unprot end
+fun: .test_arena_unprot_err { adr -- err_str } adr .test_arena_unprot end
+fun: .arena_alloc_err { size arn -- adr err_str } size arn .arena_alloc end
+fun: .use_err { path len -- err_str } path len .use end
+fun: .find_word_err { str len wlist -- xt err_str } str len wlist .find_word end
 
-fun: test_arena_alloc { -- err }
+fun: .test_arena_alloc { -- err }
   alloca' Arena { arn }
   arn .arena_init
 
@@ -3097,7 +3040,7 @@ fun: test_arena_alloc { -- err }
 end
 .test_arena_alloc
 
-fun: test_arena_trunc { -- err }
+fun: .test_arena_trunc { -- err }
   alloca' Arena { arn }
   arn .arena_init
 
@@ -3129,7 +3072,7 @@ fun: test_arena_trunc { -- err }
 end
 .test_arena_trunc
 
-fun: test_arena_deinit { -- err }
+fun: .test_arena_deinit { -- err }
   alloca' Arena { arn }
   arn .arena_init
 
@@ -3147,7 +3090,7 @@ fun: test_arena_deinit { -- err }
 end
 .test_arena_deinit
 
-fun: test_arena_errors { -- err }
+fun: .test_arena_errors { -- err }
   alloca' Arena { arn }
   arn .arena_init
 
@@ -3161,13 +3104,13 @@ fun: test_arena_errors { -- err }
 end
 .test_arena_errors
 
-fun: test_word_len_over { -- err }
+fun: .test_word_len_over { -- err }
   s" ./fail/test_word_len_over.af" .use_err { err }
   err " word length 128 exceeds max word length 127" .assert_str_has
 end
 .test_word_len_over
 
-fun: test_dropped_intrinsics_hidden { -- err }
+fun: .test_dropped_intrinsics_hidden { -- err }
   s" :" WORDLIST_EXEC .find_word_err { _xt err }
   err " undefined word" .assert_str_has
   s" ::" WORDLIST_EXEC .find_word_err { _xt err }
@@ -3180,7 +3123,7 @@ end
 s" ./test_import_empty.af" .use
 
 s" ./test_interp_ret.af" .use
-fun: test_interp_ret_import { ret_val -- err } assert= ret_val 123 end end
+fun: .test_interp_ret_import { ret_val -- err } assert= ret_val 123 end end
 .test_interp_ret_import
 
 use' ./test_const_fold.af
@@ -3189,7 +3132,7 @@ use' ./test_simd.af
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
 \ interpreter-only features (currently none).
-fun: main_run { -- err }
+fun: .main_run { -- err }
   .test_test
   .test_locals
   .test_stack_primitives
@@ -3242,6 +3185,7 @@ fun: main_run { -- err }
   .test_asm_append_imm_to_reg
   .test_cstr_eq
   .test_cstr_less
+  .test_call_names
   .test_cint_to_cell
   .test_comptime_arg_stack_sum16
   .test_comptime_arg_stack_mod_scratch
@@ -3309,7 +3253,7 @@ fun: main_run { -- err }
   .test_simd_asm
 end
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .main_run { err } end
   if err .then " error: %s" err .elogf .elf 1 .ret end
   " [test] [aot] ok" .elog .elf

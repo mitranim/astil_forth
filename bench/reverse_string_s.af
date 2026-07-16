@@ -1,25 +1,25 @@
 use' lang_s.af
 
-fun: reverse { str len -- }
+fun: .reverse { str len -- }
   str           { low }
-  str len + dec { high }
+  str len + .dec { high }
 
   loop
-    low high < while
+    low high < .while
     low c@ high c@ low c! high c!
     inc: low
     dec: high
   end
 end
 
-fun: run
+fun: .run
   s" 0123456789abcdef" { str len }
 
-  1 22 lsl inc for
-    str len reverse
+  1 22 .lsl .inc .for
+    str len .reverse
   end
 
   \ str log lf
   \ fedcba9876543210
 end
-run
+.run

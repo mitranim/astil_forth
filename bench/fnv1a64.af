@@ -8,9 +8,9 @@ use' lang.af
 65536              let: CAP
 512                let: RUNS
 
-1 1 extern: getenv
+1 1 extern: .getenv getenv
 
-fun: init { buf cap }
+fun: .init { buf cap }
   s" 0123456789abcdef" { src len }
   buf cap + { ceil }
   0 { ind }
@@ -22,7 +22,7 @@ fun: init { buf cap }
   end
 end
 
-fun: fnv1a64 { hash buf len -- hash }
+fun: .fnv1a64 { hash buf len -- hash }
   buf len + { ceil }
   hash
   loop
@@ -32,7 +32,7 @@ fun: fnv1a64 { hash buf len -- hash }
   end
 end
 
-fun: run { -- err }
+fun: .run { -- err }
   65536 { cap }
   cap .alloca { buf }
   buf cap .init
@@ -51,7 +51,7 @@ fun: run { -- err }
 end
 .run
 
-fun: main { -- exit }
+fun: .main { -- exit }
   .with_main_ctx .run end { err }
   if err .then " error: %s" err .elogf .elf 1 else 0 end
 end

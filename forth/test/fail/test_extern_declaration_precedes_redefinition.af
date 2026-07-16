@@ -1,0 +1,3 @@
+\ Must report the invalid declaration before checking redefinition or linkage.
+fun: bad_name [ .plain_call ] end
+0 0 extern: bad_name astil_missing_extern

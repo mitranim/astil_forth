@@ -1,5 +1,5 @@
 \ Must fail to compile.
-fun: test_dot_call_local_fail { -- err }
+fun: .test_call_extra_dot_local { -- err }
   1 { val }
   .val
   nil

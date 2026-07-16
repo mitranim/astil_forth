@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_control_fail { -- err }
-  try
-end

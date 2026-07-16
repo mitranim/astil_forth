@@ -1,2 +1,2 @@
 use' ../../lang.af
-fun: test_const_fold_redundant_align_up { val -- out } val 1 .align_up end
+fun: .test_const_fold_redundant_align_up { val -- out } val 1 .align_up end

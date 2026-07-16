@@ -1,4 +1,4 @@
-fun: cont_meta_loop_arity_bad { val -- out }
+fun: .cont_meta_loop_arity_bad { val -- out }
   loop
     val
     leave

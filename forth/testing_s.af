@@ -13,84 +13,84 @@ use' ./lang_s.af
 0 var: T_LEN_0 \ Stack length at `T{`.
 0 var: T_LEN_1 \ Stack length at `<T>`.
 
-fun: T_reset
-  T_LEN_0 @ stack_set_len
+fun: .T_reset
+  T_LEN_0 @ .stack_set_len
   T_LEN_0 off!
   T_LEN_1 off!
 end
 
-fun: T_stack_eq ( len0 len1 len -- equal )
+fun: .T_stack_eq ( len0 len1 len -- equal )
   to: len
   to: len1
   to: len0
 
   len 0 +for: ind
-    ind len0 + pick0 { one }
-    ind len1 + pick0 { two }
-    if one two <> then false ret end
+    ind len0 + .pick0 { one }
+    ind len1 + .pick0 { two }
+    if one two <> .then false .ret end
   end
   true
 end
 
-fun: T{  stack_len T_LEN_0 ! end
-fun: <T> stack_len T_LEN_1 ! end
+fun: T{  .stack_len T_LEN_0 ! end
+fun: <T> .stack_len T_LEN_1 ! end
 
 fun: }T
-  stack_len   to: len2 \ Length at `}T`.
+  .stack_len   to: len2 \ Length at `}T`.
   T_LEN_1 @   to: len1 \ Stack length at `<T>`.
   T_LEN_0 @   to: len0 \ Stack length at `T{`.
   len1 len0 - to: rel0 \ Relative length before `<T>`.
   len2 len1 - to: rel1 \ Relative length after `<T>`.
 
   \ Does the stack length match?
-  if rel0 rel1 = then
+  if rel0 rel1 = .then
     \ Does the content match?
-    if len0 len1 rel1 T_stack_eq then T_reset ret end
+    if len0 len1 rel1 .T_stack_eq .then .T_reset .ret end
   else
-    " stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 [ 2 ] elogf elf
+    " stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 [ 2 ] .elogf .elf
   end
 
-  " stack content mismatch: T{ " elog
-  len1 len0 +for: ind " %zd " ind pick0 [ 1 ] elogf end
-  " <T> " elog
-  len2 ind  +for: ind " %zd " ind pick0 [ 1 ] elogf end
-  " }T" elog elf
+  " stack content mismatch: T{ " .elog
+  len1 len0 +for: ind " %zd " ind .pick0 [ 1 ] .elogf end
+  " <T> " .elog
+  len2 ind  +for: ind " %zd " ind .pick0 [ 1 ] .elogf end
+  " }T" .elog .elf
 
-  T_reset
-  " test failure" throw
-  unreachable
+  .T_reset
+  " test failure" .throw
+  .unreachable
 end
 
-fun: T_str_eq ( act exp -- )
+fun: .T_str_eq ( act exp -- )
   to: exp
   to: act
 
-  ifz exp then
-    ifz act then ret end
-    " expected string to be nil; got: %s" act [ 1 ] errf throw
+  ifz exp .then
+    ifz act .then .ret end
+    " expected string to be nil; got: %s" act [ 1 ] .errf .throw
   end
 
-  ifz act then
-    " unexpected nil string; expected: %s" exp [ 1 ] errf throw
+  ifz act .then
+    " unexpected nil string; expected: %s" exp [ 1 ] .errf .throw
   end
 
-  if act exp cstr= then ret end
+  if act exp cstr= .then .ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
-  " expected string: %s; actual string: %s" exp act [ 2 ] errf throw
+  " expected string: %s; actual string: %s" exp act [ 2 ] .errf .throw
 end
 
-fun: T_err_contains ( act exp -- )
+fun: .T_err_contains ( act exp -- )
   to: exp
   to: act
 
-  ifz act then
-    " missing error message; expected error to contain: %s" exp [ 1 ] errf
-    throw
+  ifz act .then
+    " missing error message; expected error to contain: %s" exp [ 1 ] .errf
+    .throw
   end
 
-  if act exp strstr then ret end
+  if act exp .strstr .then .ret end
 
   " expected error message to contain: %s; actual error message: %s"
-  exp act [ 2 ] errf throw
+  exp act [ 2 ] .errf .throw
 end

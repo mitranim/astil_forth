@@ -33,26 +33,6 @@ static Err err_discard_local(const char *name) {
 }
 
 #ifndef CALL_CONV_STACK
-static Err err_name_dotted(const char *name) {
-  return errf("invalid name " FMT_QUOTED ": leading `.` is call syntax", name);
-}
-
-static Err err_name_numeric(const char *name) {
-  return errf(
-    "invalid name " FMT_QUOTED
-    ": names which begin like numeric literals are reserved",
-    name
-  );
-}
-
-static Err comp_validate_word_name(const char *name) {
-  if (name[0] == '.') return err_name_dotted(name);
-  if (is_num_begin((U8)name[0], (U8)name[1])) {
-    return err_name_numeric(name);
-  }
-  return nullptr;
-}
-
 static Err err_local_name_not_ident(const char *name) {
   return errf(
     "invalid local name " FMT_QUOTED ": local names must be ident-like", name
@@ -318,14 +298,17 @@ static void comp_rewind(const Comp *prev, Comp *next) {
 Used for registering dynamically-linked symbols, either intrinsic or external.
 The provided address is used only in JIT-compiled code. In AOT-compiled code,
 intrinsics are not used, and external symbols are patched by the OS dylinker.
+Returns the registered name in stable compiler-owned storage.
 */
-static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
+static const char *comp_register_dysym(
+  Comp_syms *syms, const char *name, U64 addr
+) {
   const auto addrs = &syms->addrs;
   const auto names = &syms->names;
   const auto inds  = &syms->inds;
 
   auto got_ind = dict_get_or(inds, name, INVALID_IND);
-  if (got_ind != INVALID_IND) return;
+  if (got_ind != INVALID_IND) return names->floor[got_ind].buf;
 
   got_ind = addrs->len;
   assert_fatal(stack_len(names) == got_ind);
@@ -337,6 +320,7 @@ static void comp_register_dysym(Comp_syms *syms, const char *name, U64 addr) {
   names->top++;
   list_push(addrs, addr);
   dict_set(inds, got_name->buf, got_ind);
+  return got_name->buf;
 }
 
 static void *comp_find_extern(Comp *comp, const char *name) {

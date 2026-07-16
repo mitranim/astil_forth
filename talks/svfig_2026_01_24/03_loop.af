@@ -2,13 +2,13 @@ use' lang_s.af
 
 \ Nicer loops.
 
-: main
+: .main
   42 0 1
   +loop: ind
-    ind 5  < while
-    ind 8  < while
-    ind 12 < while
-    " index: %zd" ind [ 1 ] logf lf
+    ind 5  < .while
+    ind 8  < .while
+    ind 12 < .while
+    " index: %zd" ind [ 1 ] .logf .lf
   end \ Terminates everything.
 
   loop
@@ -19,4 +19,4 @@ use' lang_s.af
     leave
   end \ Terminates everything.
 ;
-main
+.main

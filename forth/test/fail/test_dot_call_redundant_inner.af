@@ -1,4 +1,0 @@
-\ Must fail to compile.
-fun: test_dot_call_redundant_inner_fail { -- rem quo }
-  29 1 .u/mod
-end

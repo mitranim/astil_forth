@@ -1,0 +1,4 @@
+\ Must fail to compile.
+fun: .test_local_assignment_numeric { val -- err }
+  val { 1tmp }
+end

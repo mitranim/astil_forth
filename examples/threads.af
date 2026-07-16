@@ -5,7 +5,7 @@ use' pthread.af
 \ Basic example of spawning and joining with multiple threads.
 \ Each thread uses a dedicated region of parent-owned memory.
 
-fun: child { inout -- Err }
+fun: .child { inout -- Err }
   inout @ { path }
   " [child] checking length of `%s`..." path .logf .lf
 
@@ -21,7 +21,7 @@ fun: child { inout -- Err }
   err
 end
 
-fun: cleanup { id mem }
+fun: .cleanup { id mem }
   mem .stack_deinit { err }
   if err .then
     " [parent] unable to deinit memory for child thread %zd: %s" id err .logf .lf
@@ -29,11 +29,11 @@ fun: cleanup { id mem }
 end
 
 struct: Child_ctx
-  Ctx  1 field: Child_ctx_ctx
-  Cell 1 field: Child_ctx_inout
+  Ctx  1 field: .Child_ctx_ctx
+  Cell 1 field: .Child_ctx_inout
 end
 
-fun: spawn { id inp mem -- thread inout ok }
+fun: .spawn { id inp mem -- thread inout ok }
   " [parent] spawning thread %zd..." id .logf .lf
 
   CTX_CAP Child_ctx mem .stack_init_ctx { ctx err }
@@ -48,7 +48,7 @@ fun: spawn { id inp mem -- thread inout ok }
   ctx .Child_ctx_inout { inout }
   inp inout !
 
-  instr' child inout ctx .thread_spawn_ctx { thread err }
+  instr' .child inout ctx .thread_spawn_ctx { thread err }
 
   if err .then
     " [parent] unable to spawn thread %zd: %s" id err .logf .lf
@@ -59,7 +59,7 @@ fun: spawn { id inp mem -- thread inout ok }
   thread inout true
 end
 
-fun: wait { id path out thread -- ok }
+fun: .wait { id path out thread -- ok }
   " [parent] waiting on thread %zd..." id .logf .lf
   thread .thread_join { err join_err }
 
@@ -77,7 +77,7 @@ fun: wait { id path out thread -- ok }
   true
 end
 
-fun: parent
+fun: .parent
   " missing/none"  { path0 } \ Input for `thread0`: missing file.
   " forth/lang.af" { path1 } \ Input for `thread1`: existing file.
   alloca' Stack    { mem0  } \ Backing memory of `thread0`.

@@ -285,14 +285,9 @@ static Err err_word_undefined(const char *name) {
   return errf("undefined word " FMT_QUOTED, name);
 }
 
-static Err err_dot_call_undefined(
-  const char *source_name, const char *lookup_name
-) {
+static Err err_word_undefined_use(const char *name, const char *replacement) {
   return errf(
-    "undefined dot-call " FMT_QUOTED ": lookup name " FMT_QUOTED
-    " was not found",
-    source_name,
-    lookup_name
+    "undefined word " FMT_QUOTED ": use " FMT_QUOTED, name, replacement
   );
 }
 
@@ -313,61 +308,29 @@ static Err err_word_comp_only(const char *name) {
   return errf("word " FMT_QUOTED " is compile-time only", name);
 }
 
-static Err err_dot_call_local(const char *source_name, const char *lookup_name) {
-  return errf(
-    "invalid dot-call " FMT_QUOTED ": " FMT_QUOTED
-    " is a local, and locals are ident-like; use " FMT_QUOTED,
-    source_name,
-    lookup_name,
-    lookup_name
-  );
+static bool interp_name_exists(Interp *interp, const char *name) {
+  const auto comp = &interp->comp;
+  if (comp->ctx.compiling && comp_local_get(comp, name)) return true;
+  return dict_has(&interp->dict_comp, name) ||
+    dict_has(&interp->dict_exec, name);
 }
 
-static Err err_dot_call_empty() {
-  return errf(
-    "invalid empty dot-call `.`: missing name; hint: use `.show` to print a number"
-  );
-}
+static Err interp_err_word_undefined(Interp *interp, Word_str word) {
+  const auto name = word.buf;
 
-static Err err_plain_call_dot(const char *source_name, const char *lookup_name) {
-  return errf(
-    "invalid plain call " FMT_QUOTED ": use `.%s`", source_name, lookup_name
-  );
-}
-
-static Err err_dot_call_plain(const char *source_name, const char *lookup_name) {
-  return errf(
-    "invalid dot-call " FMT_QUOTED ": use " FMT_QUOTED, source_name, lookup_name
-  );
-}
-
-static Err err_dot_call_redundant(
-  const char *source_name, const char *lookup_name
-) {
-  return errf(
-    "invalid dot-call " FMT_QUOTED ": " FMT_QUOTED
-    " is already call-like; use " FMT_QUOTED,
-    source_name,
-    lookup_name,
-    lookup_name
-  );
-}
-
-static Err interp_validate_call_syntax(
-  const char *source_name, const char *lookup_name, bool dot_call, const Sym *sym
-) {
-  if (!is_word_ident_like(sym->name)) {
-    if (dot_call) return err_dot_call_redundant(source_name, lookup_name);
-    return nullptr;
+  if (name[0] == '.' && name[1] && interp_name_exists(interp, name + 1)) {
+    return err_word_undefined_use(name, name + 1);
   }
 
-  if (dot_call) {
-    if (sym->plain_call) return err_dot_call_plain(source_name, lookup_name);
-    return nullptr;
+  if (is_word_ident_like(word) && word.len + 1 < str_cap(&word)) {
+    Word_str dotted = {.len = word.len + 1, .buf = "."};
+    memcpy(dotted.buf + 1, word.buf, word.len + 1);
+    if (interp_name_exists(interp, dotted.buf)) {
+      return err_word_undefined_use(name, dotted.buf);
+    }
   }
 
-  if (!sym->plain_call) return err_plain_call_dot(source_name, lookup_name);
-  return nullptr;
+  return err_word_undefined(name);
 }
 
 static Err interp_word(Interp *interp, Word_str word) {
@@ -376,7 +339,6 @@ static Err interp_word(Interp *interp, Word_str word) {
   const auto comp      = &interp->comp;
   const auto ctx       = &comp->ctx;
 
-#ifdef CALL_CONV_STACK
   const auto name = word.buf;
 
   if (ctx->compiling) {
@@ -389,7 +351,7 @@ static Err interp_word(Interp *interp, Word_str word) {
     sym = dict_get(dict_exec, name);
     if (sym) return comp_append_call_sym(comp, sym);
 
-    return err_word_undefined(name);
+    return interp_err_word_undefined(interp, word);
   }
 
   auto sym = dict_get(dict_exec, name);
@@ -401,52 +363,7 @@ static Err interp_word(Interp *interp, Word_str word) {
     return interp_call_sym(interp, sym);
   }
 
-  return err_word_undefined(name);
-#else
-  const auto source_name = word.buf;
-  const auto dot_call    = source_name[0] == '.';
-  const auto lookup_name = dot_call ? source_name + 1 : source_name;
-  if (dot_call && !lookup_name[0]) return err_dot_call_empty();
-
-  if (ctx->compiling) {
-    const auto loc = comp_local_get(comp, lookup_name);
-    if (loc) {
-      if (dot_call) return err_dot_call_local(source_name, lookup_name);
-      return comp_append_push_from_local(comp, loc);
-    }
-
-    auto sym = dict_get(dict_comp, lookup_name);
-    if (sym) {
-      try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
-      return interp_call_sym(interp, sym);
-    }
-
-    sym = dict_get(dict_exec, lookup_name);
-    if (sym) {
-      try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
-      return comp_append_call_sym(comp, sym);
-    }
-
-    if (dot_call) return err_dot_call_undefined(source_name, lookup_name);
-    return err_word_undefined(lookup_name);
-  }
-
-  auto sym = dict_get(dict_exec, lookup_name);
-  if (sym) {
-    try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
-    return interp_call_sym(interp, sym);
-  }
-
-  sym = dict_get(dict_comp, lookup_name);
-  if (sym) {
-    try(interp_validate_call_syntax(source_name, lookup_name, dot_call, sym));
-    if (sym->comp_only && !ctx->sym) return err_word_comp_only(lookup_name);
-    return interp_call_sym(interp, sym);
-  }
-
-  if (dot_call) return err_dot_call_undefined(source_name, lookup_name);
-  return err_word_undefined(lookup_name);
-#endif // CALL_CONV_STACK
+  return interp_err_word_undefined(interp, word);
 }
 
 static Err read_interp_word(Interp *interp) {
@@ -765,15 +682,8 @@ static Err interp_extern_adr(Interp *interp, const char *name) {
 }
 
 static Err interp_extern_fun(
-  Interp *interp, const char *name, Sint inp_len, Sint out_len
+  Interp *interp, const char *name, const char *link_name, Sint inp_len, Sint out_len
 ) {
-#ifndef CALL_CONV_STACK
-  try(comp_validate_word_name(name));
-#endif // CALL_CONV_STACK
-
-  void *ext_adr;
-  try(find_extern(name, &ext_adr));
-
   if (inp_len < 0) {
     return errf(FMT_QUOTED ": negative input parameter count", name);
   }
@@ -787,32 +697,43 @@ static Err interp_extern_fun(
     return errf(FMT_QUOTED ": too many output parameters", name);
   }
 
-  const auto wordlist = WORDLIST_EXEC;
-  Word_str   word;
+  const auto wordlist  = WORDLIST_EXEC;
+  Word_str   word      = {};
+  Word_str   link_word = {};
   try(valid_word(name, (Ind)strlen(name), &word));
+  try(valid_word(link_name, (Ind)strlen(link_name), &link_word));
+
+  const Sym validating = {.type = SYM_EXTERN, .name = word};
+  try(sym_validate_name(&validating));
+
   const auto redef = interp->comp.ctx.redefining;
   try(interp_validate_redefinition(interp, word.buf, wordlist, redef));
+
+  void *ext_adr;
+  try(find_extern(link_name, &ext_adr));
+
+  const auto comp             = &interp->comp;
+  const auto syms             = &comp->code.externs;
+  const auto stable_link_name = comp_register_dysym(
+    syms, link_word.buf, (U64)ext_adr
+  );
 
   const auto sym = stack_push(
     &interp->syms,
     (Sym){
-      .type     = SYM_EXTERN,
-      .name     = word,
-      .wordlist = wordlist,
-      .exter    = ext_adr,
-      .inp_len  = (U8)inp_len,
-      .out_len  = (U8)out_len,
-      .clobber  = ASM_REGS_VOLATILE, // Only used in reg-based call-conv.
+      .type      = SYM_EXTERN,
+      .name      = word,
+      .wordlist  = wordlist,
+      .exter     = ext_adr,
+      .link_name = stable_link_name,
+      .inp_len   = (U8)inp_len,
+      .out_len   = (U8)out_len,
+      .clobber   = ASM_REGS_VOLATILE, // Only used in reg-based call-conv.
     }
   );
 
   const auto dict = &interp->dict_exec;
-  const auto comp = &interp->comp;
-  const auto syms = &comp->code.externs;
-
   dict_set(dict, sym->name.buf, sym);
-  comp_register_dysym(syms, sym->name.buf, (U64)ext_adr);
-
   return nullptr;
 }
 

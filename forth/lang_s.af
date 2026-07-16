@@ -1,7 +1,7 @@
-fun: drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 comp_instr ] end
-fun: drop  [ 0b1_1_0_100010_0_000000001000_11011_11011 comp_instr ] end
-fun_comp: \ 10 read_until_char drop2 read_char drop end
-fun_comp: ( 41 read_until_char drop2 read_char drop end
+fun: .drop2 [ 0b1_1_0_100010_0_000000010000_11011_11011 .comp_instr ] end
+fun: .drop  [ 0b1_1_0_100010_0_000000001000_11011_11011 .comp_instr ] end
+fun_comp: \ 10 .read_until_char .drop2 .read_char .drop end
+fun_comp: ( 41 .read_until_char .drop2 .read_char .drop end
 
 \ Can use comments now!
 \
@@ -15,9 +15,9 @@ fun_comp: ( 41 read_until_char drop2 read_char drop end
 \ file `./lang.af` for the register-based calling convention.
 
 \ brk 666
-fun: abort [ 0b110_101_00_001_0000001010011010_000_00 comp_instr ] end
-fun: unreachable abort end
-fun: nop end
+fun: .abort [ 0b110_101_00_001_0000001010011010_000_00 .comp_instr ] end
+fun: .unreachable .abort end
+fun: .nop end
 
 \ ## Assembler and bitwise ops
 \
@@ -27,510 +27,510 @@ fun: nop end
 \ The assembler is also split; some parts are defined
 \ further down, after some stack-manipulation words.
 
-fun: ASM_INSTR_SIZE       4      end
-fun: ASM_REG_ERR          0      end
-fun: ASM_REG_DAT_SP_FLOOR 26     end \ SYNC[asm_arm64_cc_stack_special_regs].
-fun: ASM_REG_DAT_SP       27     end \ SYNC[asm_arm64_cc_stack_special_regs].
-fun: ASM_REG_INTERP       28     end \ SYNC[asm_reg_ctx].
-fun: ASM_REG_FP           29     end
-fun: ASM_REG_LR           30     end
-fun: ASM_REG_SP           31     end
-fun: ASM_EQ               0b0000 end
-fun: ASM_NE               0b0001 end
-fun: ASM_CS               0b0010 end
-fun: ASM_CC               0b0011 end
-fun: ASM_MI               0b0100 end
-fun: ASM_PL               0b0101 end
-fun: ASM_VS               0b0110 end
-fun: ASM_VC               0b0111 end
-fun: ASM_HI               0b1000 end
-fun: ASM_LS               0b1001 end
-fun: ASM_GE               0b1010 end
-fun: ASM_LT               0b1011 end
-fun: ASM_GT               0b1100 end
-fun: ASM_LE               0b1101 end
-fun: ASM_AL               0b1110 end
-fun: ASM_NV               0b1111 end
-fun: ASM_PLACEHOLDER      666    end \ udf 666; used in retropatching.
+fun: ASM_INSTR_SIZE [ .plain_call ]       4      end
+fun: ASM_REG_ERR [ .plain_call ]          0      end
+fun: ASM_REG_DAT_SP_FLOOR [ .plain_call ] 26     end \ SYNC[asm_arm64_cc_stack_special_regs].
+fun: ASM_REG_DAT_SP [ .plain_call ]       27     end \ SYNC[asm_arm64_cc_stack_special_regs].
+fun: ASM_REG_INTERP [ .plain_call ]       28     end \ SYNC[asm_reg_ctx].
+fun: ASM_REG_FP [ .plain_call ]           29     end
+fun: ASM_REG_LR [ .plain_call ]           30     end
+fun: ASM_REG_SP [ .plain_call ]           31     end
+fun: ASM_EQ [ .plain_call ]               0b0000 end
+fun: ASM_NE [ .plain_call ]               0b0001 end
+fun: ASM_CS [ .plain_call ]               0b0010 end
+fun: ASM_CC [ .plain_call ]               0b0011 end
+fun: ASM_MI [ .plain_call ]               0b0100 end
+fun: ASM_PL [ .plain_call ]               0b0101 end
+fun: ASM_VS [ .plain_call ]               0b0110 end
+fun: ASM_VC [ .plain_call ]               0b0111 end
+fun: ASM_HI [ .plain_call ]               0b1000 end
+fun: ASM_LS [ .plain_call ]               0b1001 end
+fun: ASM_GE [ .plain_call ]               0b1010 end
+fun: ASM_LT [ .plain_call ]               0b1011 end
+fun: ASM_GT [ .plain_call ]               0b1100 end
+fun: ASM_LE [ .plain_call ]               0b1101 end
+fun: ASM_AL [ .plain_call ]               0b1110 end
+fun: ASM_NV [ .plain_call ]               0b1111 end
+fun: ASM_PLACEHOLDER [ .plain_call ]      666    end \ udf 666; used in retropatching.
 
-fun: asm_pop_x1_x2
+fun: .asm_pop_x1_x2
   \ ldp x1, x2, [x27, -16]!
   0b10_101_0_011_1_1111110_00010_11011_00001
 end
 
-fun: asm_push_x1_x2
+fun: .asm_push_x1_x2
   \ stp x1, x2, [x27], 16
   0b10_101_0_001_0_0000010_00010_11011_00001
 end
 
-fun: asm_pop_x1
+fun: .asm_pop_x1
   \ ldr x1, [x27, -8]!
   0b11_111_0_00_01_0_111111000_11_11011_00001
 end
 
-fun: asm_push_x1
+fun: .asm_push_x1
   \ str x1, [x27], 8
   0b11_111_0_00_00_0_000001000_01_11011_00001
 end
 
 \ Bitwise arithmetic needed for the early stages of the self-assembler.
 
-fun: or ( i1 i2 -- i3 ) [
-  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
-  0b1_01_01010_00_0_00010_000000_00001_00001 comp_instr \ orr x1, x1, x2
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+fun: .or ( i1 i2 -- i3 ) [
+  .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_01_01010_00_0_00010_000000_00001_00001 .comp_instr \ orr x1, x1, x2
+  .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: and ( i1 i2 -- i3 ) [
-  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
-  0b1_00_01010_00_0_00010_000000_00001_00001 comp_instr \ and x1, x1, x2
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+fun: .and ( i1 i2 -- i3 ) [
+  .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_00_01010_00_0_00010_000000_00001_00001 .comp_instr \ and x1, x1, x2
+  .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: xor ( i1 i2 -- i3 ) [
-  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
-  0b1_10_01010_00_0_00010_000000_00001_00001 comp_instr \ eor x1, x1, x2
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+fun: .xor ( i1 i2 -- i3 ) [
+  .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_10_01010_00_0_00010_000000_00001_00001 .comp_instr \ eor x1, x1, x2
+  .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: lsl ( i1 bits -- i2 ) [
-  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
-  0b1_0_0_11010110_00010_0010_00_00001_00001 comp_instr \ lsl x1, x1, x2
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+fun: .lsl ( i1 bits -- i2 ) [
+  .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_0_0_11010110_00010_0010_00_00001_00001 .comp_instr \ lsl x1, x1, x2
+  .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: lsr ( i1 bits -- i2 ) [
-  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
-  0b1_0_0_11010110_00010_0010_01_00001_00001 comp_instr \ lsr x1, x1, x2
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+fun: .lsr ( i1 bits -- i2 ) [
+  .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
+  0b1_0_0_11010110_00010_0010_01_00001_00001 .comp_instr \ lsr x1, x1, x2
+  .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: invert ( i1 -- i2 ) [
-  asm_pop_x1                                 comp_instr \ ldr x1, [x27, -8]!
-  0b1_01_01010_00_1_00001_000000_11111_00001 comp_instr \ mvn x1, x1
-  asm_push_x1                                comp_instr \ str x1, [x27], 8
+fun: .invert ( i1 -- i2 ) [
+  .asm_pop_x1                                .comp_instr \ ldr x1, [x27, -8]!
+  0b1_01_01010_00_1_00001_000000_11111_00001 .comp_instr \ mvn x1, x1
+  .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Our parsing rules prevent `1+` or `+1` from being a word name.
-fun: inc ( i1 -- i2 ) [
-  asm_pop_x1                                comp_instr \ ldr x1, [x27, -8]!
-  0b1_0_0_100010_0_000000000001_00001_00001 comp_instr \ add x1, x1, 1
-  asm_push_x1                               comp_instr \ str x1, [x27], 8
+fun: .inc ( i1 -- i2 ) [
+  .asm_pop_x1                               .comp_instr \ ldr x1, [x27, -8]!
+  0b1_0_0_100010_0_000000000001_00001_00001 .comp_instr \ add x1, x1, 1
+  .asm_push_x1                              .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Our parsing rules prevent `1-` or `-1` from being a word name.
-fun: dec ( i1 -- i2 ) [
-  asm_pop_x1                                comp_instr \ ldr x1, [x27, -8]!
-  0b1_1_0_100010_0_000000000001_00001_00001 comp_instr \ sub x1, x1, 1
-  asm_push_x1                               comp_instr \ str x1, [x27], 8
+fun: .dec ( i1 -- i2 ) [
+  .asm_pop_x1                               .comp_instr \ ldr x1, [x27, -8]!
+  0b1_1_0_100010_0_000000000001_00001_00001 .comp_instr \ sub x1, x1, 1
+  .asm_push_x1                              .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: swap ( i1 i2 -- i2 i1 ) [
-  asm_pop_x1_x2                              comp_instr \ ldp x1, x2, [x27, -16]!
-  0b10_101_0_001_0_0000010_00001_11011_00010 comp_instr \ stp x2, x1, [x27], 16
+fun: .swap ( i1 i2 -- i2 i1 ) [
+  .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
+  0b10_101_0_001_0_0000010_00001_11011_00010 .comp_instr \ stp x2, x1, [x27], 16
 ] end
 
-fun: low_bits ( bit_len -- bits ) 1 swap lsl dec end
-fun: bits_trunc ( imm bit_len -- imm ) low_bits and end
+fun: .low_bits ( bit_len -- bits ) 1 .swap .lsl .dec end
+fun: .bits_trunc ( imm bit_len -- imm ) .low_bits .and end
 
 \ cmp Xn, <imm>
-fun: asm_cmp_imm ( Xn imm -- instr )
-       10 lsl    \ imm
-  swap 5  lsl or \ Xn
-  0b1_1_1_100010_0_000000000000_00000_11111 or
+fun: .asm_cmp_imm ( Xn imm -- instr )
+       10 .lsl     \ imm
+  .swap 5 .lsl .or \ Xn
+  0b1_1_1_100010_0_000000000000_00000_11111 .or
 end
 
 \ cmp Xn, 0
-fun: asm_cmp_zero ( Xn -- instr ) 0 asm_cmp_imm end
+fun: .asm_cmp_zero ( Xn -- instr ) 0 .asm_cmp_imm end
 
 \ cset Xd, <cond>
-fun: asm_cset ( Xd cond -- instr )
+fun: .asm_cset ( Xd cond -- instr )
   0b1_0_0_11010100_11111_0000_0_1_11111_00000
-  swap 1 xor 12 lsl or \ cond
-                    or \ Xd
+  .swap 1 .xor 12 .lsl .or \ cond
+                       .or \ Xd
 end
 
 \ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
-fun: asm_sign_extend_32 ( Xd Xn -- instr )
-  5 lsl or
-  31 10 lsl or
-  0b1_00_100110_1_000000_000000_00000_00000 or
+fun: .asm_sign_extend_32 ( Xd Xn -- instr )
+  5 .lsl .or
+  31 10 .lsl .or
+  0b1_00_100110_1_000000_000000_00000_00000 .or
 end
 
-fun: cint_to_cell ( int32 -- cell ) [
-  asm_pop_x1             comp_instr \ ldr x1, [x27, -8]!
-  1 1 asm_sign_extend_32 comp_instr \ sxtw x1, w1
-  asm_push_x1            comp_instr \ str x1, [x27], 8
+fun: .cint_to_cell ( int32 -- cell ) [
+  .asm_pop_x1             .comp_instr \ ldr x1, [x27, -8]!
+  1 1 .asm_sign_extend_32 .comp_instr \ sxtw x1, w1
+  .asm_push_x1            .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: <>0 ( int -- bool ) [
-           asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-  1        asm_cmp_zero comp_instr \ cmp x1, 0
-  1 ASM_NE asm_cset     comp_instr \ cset x1, ne
-           asm_push_x1  comp_instr \ str x1, [x27], 8
+           .asm_pop_x1   .comp_instr \ ldr x1, [x27, -8]!
+  1        .asm_cmp_zero .comp_instr \ cmp x1, 0
+  1 ASM_NE .asm_cset     .comp_instr \ cset x1, ne
+           .asm_push_x1  .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: =0 ( int -- bool ) [
-           asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-  1        asm_cmp_zero comp_instr \ cmp x1, 0
-  1 ASM_EQ asm_cset     comp_instr \ cset x1, eq
-           asm_push_x1  comp_instr \ str x1, [x27], 8
+           .asm_pop_x1   .comp_instr \ ldr x1, [x27, -8]!
+  1        .asm_cmp_zero .comp_instr \ cmp x1, 0
+  1 ASM_EQ .asm_cset     .comp_instr \ cset x1, eq
+           .asm_push_x1  .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Shared by a lot of load and store instructions. 64-bit only.
-fun: asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr_mask )
-  3 lsr 7 bits_trunc 15 lsl    \ imm7
-  swap               5  lsl or \ Xn
-  swap               10 lsl or \ Xt2
-                            or \ Xt1
+fun: .asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr_mask )
+  3 .lsr 7 .bits_trunc 15 .lsl    \ imm7
+  .swap                5  .lsl .or \ Xn
+  .swap                10 .lsl .or \ Xt2
+                               .or \ Xt1
 end
 
 \ ldp Xt1, Xt2, [Xn, <imm>]!
-fun: asm_load_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
-  asm_pattern_load_store_pair
-  0b10_101_0_011_1_0000000_00000_00000_00000 or
+fun: .asm_load_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
+  .asm_pattern_load_store_pair
+  0b10_101_0_011_1_0000000_00000_00000_00000 .or
 end
 
 \ ldp Xt1, Xt2, [Xn], <imm>
-fun: asm_load_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
-  asm_pattern_load_store_pair
-  0b10_101_0_001_1_0000000_00000_00000_00000 or
+fun: .asm_load_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
+  .asm_pattern_load_store_pair
+  0b10_101_0_001_1_0000000_00000_00000_00000 .or
 end
 
 \ ldp Xt1, Xt2, [Xn, <imm>]
-fun: asm_load_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
-  asm_pattern_load_store_pair
-  0b10_101_0_010_1_0000000_00000_00000_00000 or
+fun: .asm_load_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
+  .asm_pattern_load_store_pair
+  0b10_101_0_010_1_0000000_00000_00000_00000 .or
 end
 
 \ stp Xt1, Xt2, [Xn, <imm>]!
-fun: asm_store_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
-  asm_pattern_load_store_pair
-  0b10_101_0_011_0_0000000_00000_00000_00000 or
+fun: .asm_store_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
+  .asm_pattern_load_store_pair
+  0b10_101_0_011_0_0000000_00000_00000_00000 .or
 end
 
 \ stp Xt1, Xt2, [Xn], <imm>
-fun: asm_store_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
-  asm_pattern_load_store_pair
-  0b10_101_0_001_0_0000000_00000_00000_00000 or
+fun: .asm_store_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
+  .asm_pattern_load_store_pair
+  0b10_101_0_001_0_0000000_00000_00000_00000 .or
 end
 
 \ stp Xt1, Xt2, [Xn, <imm>]
-fun: asm_store_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
-  asm_pattern_load_store_pair
-  0b10_101_0_010_0_0000000_00000_00000_00000 or
+fun: .asm_store_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
+  .asm_pattern_load_store_pair
+  0b10_101_0_010_0_0000000_00000_00000_00000 .or
 end
 
 \ Shared by a lot of load and store instructions.
 \ Patches these bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
-fun: asm_pattern_load_store ( Xt Xn imm9 -- instr_mask )
-  9 bits_trunc 12 lsl    \ imm9
-  swap         5  lsl or \ Xn
-                      or \ Xt
+fun: .asm_pattern_load_store ( Xt Xn imm9 -- instr_mask )
+  9 .bits_trunc 12 .lsl     \ imm9
+  .swap         5  .lsl .or \ Xn
+                        .or \ Xt
 end
 
 \ ldr Xt, [Xn, <imm>]!
-fun: asm_load_pre ( Xt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b11_111_0_00_01_0_000000000_11_00000_00000 or
+fun: .asm_load_pre ( Xt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_11_00000_00000 .or
 end
 
 \ ldr Xt, [Xn], <imm>
-fun: asm_load_post ( Xt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b11_111_0_00_01_0_000000000_01_00000_00000 or
+fun: .asm_load_post ( Xt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_01_00000_00000 .or
 end
 
 \ str Xt, [Xn, <imm>]!
-fun: asm_store_pre ( Xt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b11_111_0_00_00_0_000000000_11_00000_00000 or
+fun: .asm_store_pre ( Xt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_11_00000_00000 .or
 end
 
 \ str Xt, [Xn], <imm>
-fun: asm_store_post ( Xt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b11_111_0_00_00_0_000000000_01_00000_00000 or
+fun: .asm_store_post ( Xt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_01_00000_00000 .or
 end
 
 \ ldur Xt, [Xn, <imm>]
-fun: asm_load_off ( Xt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b11_111_0_00_01_0_000000000_00_00000_00000 or
+fun: .asm_load_off ( Xt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b11_111_0_00_01_0_000000000_00_00000_00000 .or
 end
 
 \ stur Xt, [Xn, <imm>]
-fun: asm_store_off ( Xt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b11_111_0_00_00_0_000000000_00_00000_00000 or
+fun: .asm_store_off ( Xt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b11_111_0_00_00_0_000000000_00_00000_00000 .or
 end
 
 \ For unsigned ints only.
 \
 \ ldur Wt, [Xn, <imm>]
-fun: asm_load_off_32 ( Wt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b10_111_0_00_01_0_000000000_00_00000_00000 or
+fun: .asm_load_off_32 ( Wt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b10_111_0_00_01_0_000000000_00_00000_00000 .or
 end
 
 \ stur Wt, [Xn, <imm>]
-fun: asm_store_off_32 ( Wt Xn imm9 -- instr )
-  asm_pattern_load_store
-  0b10_111_0_00_00_0_000000000_00_00000_00000 or
+fun: .asm_store_off_32 ( Wt Xn imm9 -- instr )
+  .asm_pattern_load_store
+  0b10_111_0_00_00_0_000000000_00_00000_00000 .or
 end
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
-fun: asm_pattern_load_store_with_register_off ( Xt Xn Xm scale -- instr_mask )
-  <>0  12 lsl    \ lsl 3
-  swap 16 lsl or \ Xm
-  swap 5  lsl or \ Xn
-              or \ Xt
+fun: .asm_pattern_load_store_with_register_off ( Xt Xn Xm scale -- instr_mask )
+  <>0  12  .lsl     \ lsl 3
+  .swap 16 .lsl .or \ Xm
+  .swap 5  .lsl .or \ Xn
+                .or \ Xt
 end
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
-fun: asm_load_with_register_off ( Xt Xn Xm scale -- instr )
-  asm_pattern_load_store_with_register_off
-  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 or
+fun: .asm_load_with_register_off ( Xt Xn Xm scale -- instr )
+  .asm_pattern_load_store_with_register_off
+  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 .or
 end
 
 \ str Xt, [Xn, Xm, lsl <scale>]
-fun: asm_store_with_register_off ( Xt Xn Xm scale -- instr )
-  asm_pattern_load_store_with_register_off
-  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 or
+fun: .asm_store_with_register_off ( Xt Xn Xm scale -- instr )
+  .asm_pattern_load_store_with_register_off
+  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 .or
 end
 
 \ Shared by some integer arithmetic instructions.
-fun: asm_pattern_arith_reg ( Xd Xn Xm -- instr_mask )
-       16 lsl    \ Xm
-  swap 5  lsl or \ Xn
-              or \ Xd
+fun: .asm_pattern_arith_reg ( Xd Xn Xm -- instr_mask )
+       16 .lsl    \ Xm
+  .swap 5  .lsl .or \ Xn
+              .or \ Xd
 end
 
 \ Shared by some integer arithmetic and load/store instructions.
-fun: asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
-  12 bits_trunc 10 lsl    \ imm12
-  swap           5 lsl or \ Xn
-                       or \ Xd
+fun: .asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
+  12 .bits_trunc 10 .lsl     \ imm12
+  .swap           5 .lsl .or \ Xn
+                         .or \ Xd
 end
 
 \ Immediate offset must be unsigned.
 \ ldr Xt, [Xn, <imm>]
-fun: asm_load_scaled_off ( Xt Xn imm9 -- instr )
-  3 lsr asm_pattern_arith_imm
-  0b11_111_0_01_01_000000000000_00000_00000 or
+fun: .asm_load_scaled_off ( Xt Xn imm9 -- instr )
+  3 .lsr .asm_pattern_arith_imm
+  0b11_111_0_01_01_000000000000_00000_00000 .or
 end
 
 \ Immediate offset must be unsigned.
 \ str Xt, [Xn, <imm>]
-fun: asm_store_scaled_off ( Xt Xn imm9 -- instr )
-  3 lsr asm_pattern_arith_imm
-  0b11_111_0_01_00_000000000000_00000_00000 or
+fun: .asm_store_scaled_off ( Xt Xn imm9 -- instr )
+  3 .lsr .asm_pattern_arith_imm
+  0b11_111_0_01_00_000000000000_00000_00000 .or
 end
 
 \ For unsigned bytes only.
 \
 \ ldrb Wt, [Xn, imm12]
-fun: asm_load_byte_off ( Wt Xn imm12 -- instr )
-  asm_pattern_arith_imm
-  0b00_11_1_0_0_1_01_000000000000_00000_00000 or
+fun: .asm_load_byte_off ( Wt Xn imm12 -- instr )
+  .asm_pattern_arith_imm
+  0b00_11_1_0_0_1_01_000000000000_00000_00000 .or
 end
 
 \ strb Wt, [Xn, imm12]
-fun: asm_store_byte_off ( Wt Xn imm12 -- instr )
-  asm_pattern_arith_imm
-  0b00_11_1_0_0_1_00_000000000000_00000_00000 or
+fun: .asm_store_byte_off ( Wt Xn imm12 -- instr )
+  .asm_pattern_arith_imm
+  0b00_11_1_0_0_1_00_000000000000_00000_00000 .or
 end
 
 \ str Xd, [x27], 8
-fun: asm_push1 ( Xd -- instr ) ASM_REG_DAT_SP 8 asm_store_post end
+fun: .asm_push1 ( Xd -- instr ) ASM_REG_DAT_SP 8 .asm_store_post end
 
 \ ldr Xd, [x27, -8]!
-fun: asm_pop1 ( Xd -- instr ) ASM_REG_DAT_SP -8 asm_load_pre end
+fun: .asm_pop1 ( Xd -- instr ) ASM_REG_DAT_SP -8 .asm_load_pre end
 
 \ stp Xt1, Xt2, [x27], 16
-fun: asm_push2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP 16 asm_store_pair_post end
+fun: .asm_push2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP 16 .asm_store_pair_post end
 
 \ ldp Xt1, Xt2, [x27, -16]!
-fun: asm_pop2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP -16 asm_load_pair_pre end
+fun: .asm_pop2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP -16 .asm_load_pair_pre end
 
 \ add Xd, Xn, <imm12>
-fun: asm_add_imm ( Xd Xn imm12 -- instr )
-  asm_pattern_arith_imm
-  0b1_0_0_100010_0_000000000000_00000_00000 or
+fun: .asm_add_imm ( Xd Xn imm12 -- instr )
+  .asm_pattern_arith_imm
+  0b1_0_0_100010_0_000000000000_00000_00000 .or
 end
 
 \ add Xd, Xn, Xm
-fun: asm_add_reg ( Xd Xn Xm -- instr )
-  asm_pattern_arith_reg
-  0b1_0_0_01011_00_0_00000_000000_00000_00000 or
+fun: .asm_add_reg ( Xd Xn Xm -- instr )
+  .asm_pattern_arith_reg
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 .or
 end
 
 \ sub Xd, Xn, <imm12>
-fun: asm_sub_imm ( Xd Xn imm12 -- instr )
-  asm_pattern_arith_imm
-  0b1_1_0_100010_0_000000000000_00000_00000 or
+fun: .asm_sub_imm ( Xd Xn imm12 -- instr )
+  .asm_pattern_arith_imm
+  0b1_1_0_100010_0_000000000000_00000_00000 .or
 end
 
 \ sub Xd, Xn, Xm
-fun: asm_sub_reg ( Xd Xn Xm -- instr )
-  asm_pattern_arith_reg
-  0b1_1_0_01011_00_0_00000_000000_00000_00000 or
+fun: .asm_sub_reg ( Xd Xn Xm -- instr )
+  .asm_pattern_arith_reg
+  0b1_1_0_01011_00_0_00000_000000_00000_00000 .or
 end
 
 \ sub Xd, Xn, Xm, lsl 3
-fun: asm_sub_reg_words ( Xd Xn Xm -- instr )
-  asm_sub_reg
-  0b0_0_0_00000_00_0_00000_000011_00000_00000 or
+fun: .asm_sub_reg_words ( Xd Xn Xm -- instr )
+  .asm_sub_reg
+  0b0_0_0_00000_00_0_00000_000011_00000_00000 .or
 end
 
 \ mul Xd, Xn, Xm
-fun: asm_mul ( Xd Xn Xm -- instr )
-  asm_pattern_arith_reg
-  0b1_00_11011_000_00000_0_11111_00000_00000 or
+fun: .asm_mul ( Xd Xn Xm -- instr )
+  .asm_pattern_arith_reg
+  0b1_00_11011_000_00000_0_11111_00000_00000 .or
 end
 
 \ sdiv Xd, Xn, Xm
-fun: asm_sdiv ( Xd Xn Xm -- instr )
-  asm_pattern_arith_reg
-  0b1_0_0_11010110_00000_00001_1_00000_00000 or
+fun: .asm_sdiv ( Xd Xn Xm -- instr )
+  .asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_00001_1_00000_00000 .or
 end
 
 \ msub Xd, Xn, Xm, Xa
-fun: asm_msub ( Xd Xn Xm Xa -- instr )
+fun: .asm_msub ( Xd Xn Xm Xa -- instr )
   0b1_00_11011_000_00000_1_00000_00000_00000
-  swap 10 lsl or \ Xa
-  swap 16 lsl or \ Xm
-  swap 5  lsl or \ Xn
-              or \ Xd
+  .swap 10 .lsl .or \ Xa
+  .swap 16 .lsl .or \ Xm
+  .swap 5  .lsl .or \ Xn
+                .or \ Xd
 end
 
 \ asr Xd, Xn, imm6
-fun: asm_asr_imm ( Xd Xn imm6 -- instr )
-  asm_pattern_arith_reg
-  0b1_00_100110_1_000000_111111_00000_00000 or
+fun: .asm_asr_imm ( Xd Xn imm6 -- instr )
+  .asm_pattern_arith_reg
+  0b1_00_100110_1_000000_111111_00000_00000 .or
 end
 
 \ asr Xd, Xn, Xm
-fun: asm_asr_reg ( Xd Xn Xm -- instr )
-  asm_pattern_arith_reg
-  0b1_0_0_11010110_00000_0010_10_00000_00000 or
+fun: .asm_asr_reg ( Xd Xn Xm -- instr )
+  .asm_pattern_arith_reg
+  0b1_0_0_11010110_00000_0010_10_00000_00000 .or
 end
 
 \ Arithmetic (sign-preserving) right shift.
-fun: asr ( i1 bits -- i2 ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 1 2 asm_asr_reg   comp_instr \ asr x1, x1, x2
-        asm_push_x1   comp_instr \ str x1, [x27], 8
+fun: .asr ( i1 bits -- i2 ) [
+        .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 .asm_asr_reg   .comp_instr \ asr x1, x1, x2
+        .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
 \ eor Xd, Xn, Xm
-fun: asm_eor_reg ( Xd Xn Xm -- instr )
-  asm_pattern_arith_reg
-  0b1_10_01010_00_0_00000_000000_00000_00000 or
+fun: .asm_eor_reg ( Xd Xn Xm -- instr )
+  .asm_pattern_arith_reg
+  0b1_10_01010_00_0_00000_000000_00000_00000 .or
 end
 
-fun: asm_pattern_arith_csel ( Xd Xn Xm cond -- instr_mask )
-  [ 3 asm_pop1 comp_instr ]  \ Stash `cond`.
-  asm_pattern_arith_reg      \ Xd Xm Xn
-  [ 3 asm_push1 comp_instr ] \ Pop `cond`.
-  12 lsl or                  \ cond
+fun: .asm_pattern_arith_csel ( Xd Xn Xm cond -- instr_mask )
+  [ 3 .asm_pop1 .comp_instr ]  \ Stash `cond`.
+  .asm_pattern_arith_reg       \ Xd Xm Xn
+  [ 3 .asm_push1 .comp_instr ] \ Pop `cond`.
+  12 .lsl .or                  \ cond
 end
 
 \ csel Xd, Xn, Xm, <cond>
-fun: asm_csel ( Xd Xn Xm cond -- instr )
-  asm_pattern_arith_csel
-  0b1_0_0_11010100_00000_0000_0_0_00000_00000 or
+fun: .asm_csel ( Xd Xn Xm cond -- instr )
+  .asm_pattern_arith_csel
+  0b1_0_0_11010100_00000_0000_0_0_00000_00000 .or
 end
 
 \ csneg Xd, Xn, Xm, <cond>
-fun: asm_csneg ( Xd Xn Xm cond -- instr )
-  asm_pattern_arith_csel
-  0b1_1_0_11010100_00000_0000_0_1_00000_00000 or
+fun: .asm_csneg ( Xd Xn Xm cond -- instr )
+  .asm_pattern_arith_csel
+  0b1_1_0_11010100_00000_0000_0_1_00000_00000 .or
 end
 
 \ cmp Xn, Xm
-fun: asm_cmp_reg ( Xn Xm -- instr )
-       16 lsl    \ Xm
-  swap 5  lsl or \ Xn
-  0b1_1_1_01011_00_0_00000_000_000_00000_11111 or
+fun: .asm_cmp_reg ( Xn Xm -- instr )
+       16 .lsl    \ Xm
+  .swap 5  .lsl .or \ Xn
+  0b1_1_1_01011_00_0_00000_000_000_00000_11111 .or
 end
 
 \ b <off>
-fun: asm_branch ( off26 -- instr )
-  2  lsr        \ Offset is implicitly times 4.
-  26 bits_trunc \ Offset may be negative.
-  0b0_00_101_00000000000000000000000000 or
+fun: .asm_branch ( off26 -- instr )
+  2  .lsr        \ Offset is implicitly times 4.
+  26 .bits_trunc \ Offset may be negative.
+  0b0_00_101_00000000000000000000000000 .or
 end
 
 \ b.<cond> <off>
-fun: asm_branch_cond ( off19 cond -- instr )
-  swap 2 asr 19 bits_trunc 5 lsl \ `off19`; implicitly times 4.
-  or                             \ cond
-  0b010_101_00_0000000000000000000_0_0000 or
+fun: .asm_branch_cond ( off19 cond -- instr )
+  .swap 2 .asr 19 .bits_trunc 5 .lsl \ `off19`; implicitly times 4.
+  .or                             \ cond
+  0b010_101_00_0000000000000000000_0_0000 .or
 end
 
 \ `off19` offset is implicitly times 4 and can be negative.
-fun: asm_pattern_cmp_branch ( Xt off19 -- instr_mask )
-  2 lsr 19 bits_trunc 5 lsl \ off19
-                         or \ Xt
+fun: .asm_pattern_cmp_branch ( Xt off19 -- instr_mask )
+  2 .lsr 19 .bits_trunc 5 .lsl \ off19
+                         .or \ Xt
 end
 
 \ cbz x1, <off>
-fun: asm_cbz ( Xt off19 -- instr )
-  asm_pattern_cmp_branch
-  0b1_011010_0_0000000000000000000_00000 or
+fun: .asm_cbz ( Xt off19 -- instr )
+  .asm_pattern_cmp_branch
+  0b1_011010_0_0000000000000000000_00000 .or
 end
 
 \ cbnz x1, <off>
-fun: asm_cbnz ( Xt off19 -- instr )
-  asm_pattern_cmp_branch
-  0b1_011010_1_0000000000000000000_00000 or
+fun: .asm_cbnz ( Xt off19 -- instr )
+  .asm_pattern_cmp_branch
+  0b1_011010_1_0000000000000000000_00000 .or
 end
 
 \ Same as `0 pick`.
-fun: dup ( i1 -- i1 i1 ) [
-  1 ASM_REG_DAT_SP -8 asm_load_off comp_instr \ ldur x1, [x27, -8]
-                      asm_push_x1  comp_instr \ str x1, [x27], 8
+fun: .dup ( i1 -- i1 i1 ) [
+  1 ASM_REG_DAT_SP -8 .asm_load_off .comp_instr \ ldur x1, [x27, -8]
+                      .asm_push_x1  .comp_instr \ str x1, [x27], 8
 ] end
 
 \ neg Xd, Xd
-fun: asm_neg ( Xd -- instr )
-  dup 16 lsl or \ Xt
-  0b1_1_0_01011_00_0_00000_000000_11111_00000 or
+fun: .asm_neg ( Xd -- instr )
+  .dup 16 .lsl .or \ Xt
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 .or
 end
 
 \ eor <reg>, <reg>, <reg>
-fun: asm_zero_reg ( reg -- instr ) dup dup asm_eor_reg end
+fun: .asm_zero_reg ( reg -- instr ) .dup .dup .asm_eor_reg end
 
-fun: asm_mov_reg ( Xd Xm -- instr )
+fun: .asm_mov_reg ( Xd Xm -- instr )
   0b1_01_01010_00_0_00000_000000_11111_00000
-  swap 16 lsl or \ Xm
-              or \ Xd
+  .swap 16 .lsl .or \ Xm
+                .or \ Xd
 end
 
 \ Immediate must be unsigned.
-fun: asm_mov_imm ( Xd imm -- instr )
+fun: .asm_mov_imm ( Xd imm -- instr )
   0b1_10_100101_00_0000000000000000_00000
-  swap 5 lsl or \ imm
-             or \ Xd
+  .swap 5 .lsl .or \ imm
+               .or \ Xd
 end
 
 \ mvn Xd, Xm
-fun: asm_mvn ( Xd Xm -- instr )
-  16 lsl \ Xm
-      or \ Xd
-  0b1_01_01010_00_1_00000_000000_11111_00000 or
+fun: .asm_mvn ( Xd Xm -- instr )
+  16 .lsl \ Xm
+      .or \ Xd
+  0b1_01_01010_00_1_00000_000000_11111_00000 .or
 end
 
 \ `ret x30`; requires caution with SP / FP.
-fun: asm_ret 0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 end
+fun: .asm_ret 0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 end
 
-fun: asm_nop 0b110_101_01000000110010_0000_000_11111 end
+fun: .asm_nop 0b110_101_01000000110010_0000_000_11111 end
 
 \ svc 666
-fun: asm_svc 0b110_101_00_000_0000001010011010_000_01 end
+fun: .asm_svc 0b110_101_00_000_0000001010011010_000_01 end
 
 \ ## Compilation-related words
 \
@@ -544,350 +544,350 @@ fun: asm_svc 0b110_101_00_000_0000001010011010_000_01 end
 \ seeks in the compile-time wordlist.
 
 \ SYNC[wordlist_enum].
-fun: WORDLIST_EXEC 1 end
-fun: WORDLIST_COMP 2 end
+fun: WORDLIST_EXEC [ .plain_call ] 1 end
+fun: WORDLIST_COMP [ .plain_call ] 2 end
 
 \ Non-immediate replacement for standard `literal`.
-fun: comp_push ( C: num -- ) ( E: -- num )
-  1           comp_load  \ ldr x1, <num>
-  asm_push_x1 comp_instr \ str x1, [x27], 8
+fun: .comp_push ( C: num -- ) ( E: -- num )
+  1            .comp_load  \ ldr x1, <num>
+  .asm_push_x1 .comp_instr \ str x1, [x27], 8
 end
 
-fun: next_word ( wlist "word" -- exec_tok ) read_word find_word end
+fun: .next_word ( wlist "word" -- exec_tok ) .read_word .find_word end
 
-fun:      xt_next ( C: wlist "word" -- ) ( E: -- exec_tok ) next_word comp_push end
-fun_comp: xt'  WORDLIST_EXEC xt_next end
-fun_comp: xt'' WORDLIST_COMP xt_next end
+fun:      .xt_next ( C: wlist "word" -- ) ( E: -- exec_tok ) .next_word .comp_push end
+fun_comp: xt'  WORDLIST_EXEC .xt_next end
+fun_comp: xt'' WORDLIST_COMP .xt_next end
 
-fun:      inline_next ( wlist "word" -- ) ( E: <word> ) next_word inline_word end
-fun_comp: inline'  WORDLIST_EXEC inline_next end
-fun_comp: inline'' WORDLIST_COMP inline_next end
+fun:      .inline_next ( wlist "word" -- ) ( E: <word> ) .next_word .inline_word end
+fun_comp: inline'  WORDLIST_EXEC .inline_next end
+fun_comp: inline'' WORDLIST_COMP .inline_next end
 
 \ Renamed from standard "postpone".
-fun:      call_xt_next ( wlist "word" -- ) ( E: <word> ) next_word comp_call end
-fun_comp: call'  WORDLIST_EXEC call_xt_next end
-fun_comp: call'' WORDLIST_COMP call_xt_next end
+fun:      .call_xt_next ( wlist "word" -- ) ( E: <word> ) .next_word .comp_call end
+fun_comp: call'  WORDLIST_EXEC .call_xt_next end
+fun_comp: call'' WORDLIST_COMP .call_xt_next end
 
-fun:      compile_next ( wlist "word" -- ) next_word comp_push xt' comp_call comp_call end
-fun_comp: compile'  WORDLIST_EXEC compile_next end
-fun_comp: compile'' WORDLIST_COMP compile_next end
+fun:      .compile_next ( wlist "word" -- ) .next_word .comp_push xt' .comp_call .comp_call end
+fun_comp: compile'  WORDLIST_EXEC .compile_next end
+fun_comp: compile'' WORDLIST_COMP .compile_next end
 
 \ ## Stack manipulation
 
 \ Same as `1 pick 1 pick`.
-fun: dup2 ( i1 i2 -- i1 i2 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -16 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -16]
-  1 2                    asm_push2         comp_instr \ stp x1, x2, [x27], 16
+fun: .dup2 ( i1 i2 -- i1 i2 i1 i2 ) [
+  1 2 ASM_REG_DAT_SP -16 .asm_load_pair_off .comp_instr \ ldp x1, x2, [x27, -16]
+  1 2                    .asm_push2         .comp_instr \ stp x1, x2, [x27], 16
 ] end
 
 \ Same as `swap drop`.
-fun: nip ( i1 i2 -- i2 ) [
-                      asm_pop_x1    comp_instr \ ldr x1, [x27, -8]!
-  1 ASM_REG_DAT_SP -8 asm_store_off comp_instr \ stur x1, [x27, -8]
+fun: .nip ( i1 i2 -- i2 ) [
+                      .asm_pop_x1    .comp_instr \ ldr x1, [x27, -8]!
+  1 ASM_REG_DAT_SP -8 .asm_store_off .comp_instr \ stur x1, [x27, -8]
 ] end
 
 \ Same as `swap2 drop2`.
-fun: nip2 ( i1 i2 i3 i4 -- i3 i4 ) [
-                         asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+fun: .nip2 ( i1 i2 i3 i4 -- i3 i4 ) [
+                         .asm_pop_x1_x2      .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 ASM_REG_DAT_SP -16 .asm_store_pair_off .comp_instr \ stp x1, x2, [x27, -16]
 ] end
 
 \ Same as `1 pick`.
-fun: over ( i1 i2 -- i1 i2 i1 ) [
-  1 ASM_REG_DAT_SP -16 asm_load_off comp_instr \ ldur x1, [x27, -16]
-                       asm_push_x1  comp_instr \ str x1, [x27], 8
+fun: .over ( i1 i2 -- i1 i2 i1 ) [
+  1 ASM_REG_DAT_SP -16 .asm_load_off .comp_instr \ ldur x1, [x27, -16]
+                       .asm_push_x1  .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Same as `3 pick 3 pick`.
-fun: over2 ( i1 i2 i3 i4 -- i1 i2 i3 i4 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -32 asm_load_pair_off comp_instr \ ldp x1, x2, [x27, -32]
-                         asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
+fun: .over2 ( i1 i2 i3 i4 -- i1 i2 i3 i4 i1 i2 ) [
+  1 2 ASM_REG_DAT_SP -32 .asm_load_pair_off .comp_instr \ ldp x1, x2, [x27, -32]
+                         .asm_push_x1_x2    .comp_instr \ stp x1, x2, [x27], 16
 ] end
 
 \ Same as `3 roll 3 roll`.
-fun: swap2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -32 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -32]
-  3 4 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -16]
-  3 4 ASM_REG_DAT_SP -32 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -32]
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+fun: .swap2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 ) [
+  1 2 ASM_REG_DAT_SP -32 .asm_load_pair_off  .comp_instr \ ldp x1, x2, [x27, -32]
+  3 4 ASM_REG_DAT_SP -16 .asm_load_pair_off  .comp_instr \ ldp x3, x4, [x27, -16]
+  3 4 ASM_REG_DAT_SP -32 .asm_store_pair_off .comp_instr \ stp x3, x4, [x27, -32]
+  1 2 ASM_REG_DAT_SP -16 .asm_store_pair_off .comp_instr \ stp x1, x2, [x27, -16]
 ] end
 
 \ Same as `-rot swap rot`.
-fun: swap_over ( i1 i2 i3 -- i2 i1 i3 ) [
-  1 2 ASM_REG_DAT_SP -24 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -24]
-  2 1 ASM_REG_DAT_SP -24 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -24]
+fun: .swap_over ( i1 i2 i3 -- i2 i1 i3 ) [
+  1 2 ASM_REG_DAT_SP -24 .asm_load_pair_off  .comp_instr \ ldp x1, x2, [x27, -24]
+  2 1 ASM_REG_DAT_SP -24 .asm_store_pair_off .comp_instr \ stp x2, x1, [x27, -24]
 ] end
 
 \ Same as `over -rot`.
-fun: dup_over ( i1 i2 -- i1 i1 i2 ) [
-  1 2            ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
-  1 2            ASM_REG_DAT_SP -8  asm_store_pair_off comp_instr \ stp x1, x2, [x27, -8]
-  ASM_REG_DAT_SP ASM_REG_DAT_SP  8  asm_add_imm        comp_instr \ add x27, x27, 8
+fun: .dup_over ( i1 i2 -- i1 i1 i2 ) [
+  1 2            ASM_REG_DAT_SP -16 .asm_load_pair_off  .comp_instr \ ldp x1, x2, [x27, -16]
+  1 2            ASM_REG_DAT_SP -8  .asm_store_pair_off .comp_instr \ stp x1, x2, [x27, -8]
+  ASM_REG_DAT_SP ASM_REG_DAT_SP  8  .asm_add_imm        .comp_instr \ add x27, x27, 8
 ] end
 
 \ Same as `dup rot`.
-fun: tuck ( i1 i2 -- i2 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -16]
-  2 1 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x2, x1, [x27, -16]
-                      2  asm_push1          comp_instr \ str x2, [x27], 8
+fun: .tuck ( i1 i2 -- i2 i1 i2 ) [
+  1 2 ASM_REG_DAT_SP -16 .asm_load_pair_off  .comp_instr \ ldp x1, x2, [x27, -16]
+  2 1 ASM_REG_DAT_SP -16 .asm_store_pair_off .comp_instr \ stp x2, x1, [x27, -16]
+                      2  .asm_push1          .comp_instr \ str x2, [x27], 8
 ] end
 
-fun: tuck2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 i3 i4 ) [
-  inline' swap2
-  3 4 asm_push2 comp_instr \ stp x3, x4, [x27], 16
+fun: .tuck2 ( i1 i2 i3 i4 -- i3 i4 i1 i2 i3 i4 ) [
+  inline' .swap2
+  3 4 .asm_push2 .comp_instr \ stp x3, x4, [x27], 16
 ] end
 
 \ Same as `2 roll`.
-fun: rot ( i1 i2 i3 -- i2 i3 i1 ) [
-    1 ASM_REG_DAT_SP -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
-  2 3 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
-  2 3 ASM_REG_DAT_SP -24 asm_store_pair_off comp_instr \ stp x2, x3, [x27, -24]
-    1 ASM_REG_DAT_SP  -8 asm_store_off      comp_instr \ stur x1, [x27, -8]
+fun: .rot ( i1 i2 i3 -- i2 i3 i1 ) [
+    1 ASM_REG_DAT_SP -24 .asm_load_off       .comp_instr \ ldur x1, [x27, -24]
+  2 3 ASM_REG_DAT_SP -16 .asm_load_pair_off  .comp_instr \ ldp x2, x3, [x27, -16]
+  2 3 ASM_REG_DAT_SP -24 .asm_store_pair_off .comp_instr \ stp x2, x3, [x27, -24]
+    1 ASM_REG_DAT_SP  -8 .asm_store_off      .comp_instr \ stur x1, [x27, -8]
 ] end
 
 fun: -rot ( i1 i2 i3 -- i3 i1 i2 ) [
-    1 ASM_REG_DAT_SP -24 asm_load_off       comp_instr \ ldur x1, [x27, -24]
-  2 3 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x2, x3, [x27, -16]
-    3 ASM_REG_DAT_SP -24 asm_store_off      comp_instr \ stur x3, [x27, -24]
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+    1 ASM_REG_DAT_SP -24 .asm_load_off       .comp_instr \ ldur x1, [x27, -24]
+  2 3 ASM_REG_DAT_SP -16 .asm_load_pair_off  .comp_instr \ ldp x2, x3, [x27, -16]
+    3 ASM_REG_DAT_SP -24 .asm_store_off      .comp_instr \ stur x3, [x27, -24]
+  1 2 ASM_REG_DAT_SP -16 .asm_store_pair_off .comp_instr \ stp x1, x2, [x27, -16]
 ] end
 
-fun: rot2 ( i1 i2 i3 i4 i5 i6 -- i3 i4 i5 i6 i1 i2 ) [
-  1 2 ASM_REG_DAT_SP -48 asm_load_pair_off  comp_instr \ ldp x1, x2, [x27, -48]
-  3 4 ASM_REG_DAT_SP -32 asm_load_pair_off  comp_instr \ ldp x3, x4, [x27, -32]
-  5 6 ASM_REG_DAT_SP -16 asm_load_pair_off  comp_instr \ ldp x5, x6, [x27, -16]
-  3 4 ASM_REG_DAT_SP -48 asm_store_pair_off comp_instr \ stp x3, x4, [x27, -48]
-  5 6 ASM_REG_DAT_SP -32 asm_store_pair_off comp_instr \ stp x5, x6, [x27, -32]
-  1 2 ASM_REG_DAT_SP -16 asm_store_pair_off comp_instr \ stp x1, x2, [x27, -16]
+fun: .rot2 ( i1 i2 i3 i4 i5 i6 -- i3 i4 i5 i6 i1 i2 ) [
+  1 2 ASM_REG_DAT_SP -48 .asm_load_pair_off  .comp_instr \ ldp x1, x2, [x27, -48]
+  3 4 ASM_REG_DAT_SP -32 .asm_load_pair_off  .comp_instr \ ldp x3, x4, [x27, -32]
+  5 6 ASM_REG_DAT_SP -16 .asm_load_pair_off  .comp_instr \ ldp x5, x6, [x27, -16]
+  3 4 ASM_REG_DAT_SP -48 .asm_store_pair_off .comp_instr \ stp x3, x4, [x27, -48]
+  5 6 ASM_REG_DAT_SP -32 .asm_store_pair_off .comp_instr \ stp x5, x6, [x27, -32]
+  1 2 ASM_REG_DAT_SP -16 .asm_store_pair_off .comp_instr \ stp x1, x2, [x27, -16]
 ] end
 
 \ Pushes the stack item found at the given index, duplicating it.
-fun: pick ( … ind -- … [ind] ) [
-                       asm_pop_x1                 comp_instr \ ldr x1, [x27, -8]!
-  1 1                  asm_mvn                    comp_instr \ mvn x1, x1
-  1 ASM_REG_DAT_SP 1 1 asm_load_with_register_off comp_instr \ ldr x1, [x27, x1, lsl 3]
-                       asm_push_x1                comp_instr \ str x1, [x27], 8
+fun: .pick ( … ind -- … [ind] ) [
+                       .asm_pop_x1                 .comp_instr \ ldr x1, [x27, -8]!
+  1 1                  .asm_mvn                    .comp_instr \ mvn x1, x1
+  1 ASM_REG_DAT_SP 1 1 .asm_load_with_register_off .comp_instr \ ldr x1, [x27, x1, lsl 3]
+                       .asm_push_x1                .comp_instr \ str x1, [x27], 8
 ] end
 
-\ FIFO version of `pick`: starts from stack bottom.
-fun: pick0 ( … ind -- … [ind] ) [
-           asm_pop_x1                 comp_instr \ ldr x1, [x27, -8]!
-  1 26 1 1 asm_load_with_register_off comp_instr \ ldr x1, [x26, x1, lsl 3]
-           asm_push_x1                comp_instr \ str x1, [x27], 8
+\ FIFO version of `.pick`: starts from stack bottom.
+fun: .pick0 ( … ind -- … [ind] ) [
+           .asm_pop_x1                 .comp_instr \ ldr x1, [x27, -8]!
+  1 26 1 1 .asm_load_with_register_off .comp_instr \ ldr x1, [x26, x1, lsl 3]
+           .asm_push_x1                .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Overwrite the cell at the given index with the given value.
-fun: bury ( … val ind -- … ) [
-                       asm_pop_x1_x2               comp_instr \ ldp x1, x2, [x27, -16]!
-  2 2                  asm_mvn                     comp_instr \ mvn x2, x2
-  1 ASM_REG_DAT_SP 2 1 asm_store_with_register_off comp_instr \ str x1, [x27, x2, lsl 3]
+fun: .bury ( … val ind -- … ) [
+                       .asm_pop_x1_x2               .comp_instr \ ldp x1, x2, [x27, -16]!
+  2 2                  .asm_mvn                     .comp_instr \ mvn x2, x2
+  1 ASM_REG_DAT_SP 2 1 .asm_store_with_register_off .comp_instr \ str x1, [x27, x2, lsl 3]
 ] end
 
-fun: flip ( i1 i2 i3 -- i3 i2 i1 ) [
-  1 ASM_REG_DAT_SP -24 asm_load_off  comp_instr \ ldr x1, [x27, -24]
-  2 ASM_REG_DAT_SP -8  asm_load_off  comp_instr \ ldr x2, [x27, -8]
-  2 ASM_REG_DAT_SP -24 asm_store_off comp_instr \ str x2, [x27, -24]
-  1 ASM_REG_DAT_SP -8  asm_store_off comp_instr \ str x1, [x27, -8]
+fun: .flip ( i1 i2 i3 -- i3 i2 i1 ) [
+  1 ASM_REG_DAT_SP -24 .asm_load_off  .comp_instr \ ldr x1, [x27, -24]
+  2 ASM_REG_DAT_SP -8  .asm_load_off  .comp_instr \ ldr x2, [x27, -8]
+  2 ASM_REG_DAT_SP -24 .asm_store_off .comp_instr \ str x2, [x27, -24]
+  1 ASM_REG_DAT_SP -8  .asm_store_off .comp_instr \ str x1, [x27, -8]
 ] end
 
 \ ## Arithmetic
 
-fun: negate ( i1 -- i2 ) [
-    asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
-  1 asm_neg     comp_instr \ neg x1, x1
-    asm_push_x1 comp_instr \ str x1, [x27], 8
+fun: .negate ( i1 -- i2 ) [
+    .asm_pop_x1  .comp_instr \ ldr x1, [x27, -8]!
+  1 .asm_neg     .comp_instr \ neg x1, x1
+    .asm_push_x1 .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: + ( i1 i2 -- i3 ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 1 2 asm_add_reg   comp_instr \ add x1, x1, x2
-        asm_push_x1   comp_instr \ str x1, [x27], 8
+        .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 .asm_add_reg   .comp_instr \ add x1, x1, x2
+        .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: - ( i1 i2 -- i3 ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 1 2 asm_sub_reg   comp_instr \ sub x1, x1, x2
-        asm_push_x1   comp_instr \ str x1, [x27], 8
+        .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 .asm_sub_reg   .comp_instr \ sub x1, x1, x2
+        .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: * ( i1 i2 -- i3 ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 1 2 asm_mul       comp_instr \ mul x1, x1, x2
-        asm_push_x1   comp_instr \ str x1, [x27], 8
+        .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 .asm_mul       .comp_instr \ mul x1, x1, x2
+        .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: / ( i1 i2 -- i3 ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 1 2 asm_sdiv      comp_instr \ sdiv x1, x1, x2
-        asm_push_x1   comp_instr \ str x1, [x27], 8
+        .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 1 2 .asm_sdiv      .comp_instr \ sdiv x1, x1, x2
+        .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: mod ( i1 i2 -- i3 ) [
-          asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-    3 1 2 asm_sdiv      comp_instr \ sdiv x3, x1, x2
-  1 3 2 1 asm_msub      comp_instr \ msub x1, x3, x2, x1
-          asm_push_x1   comp_instr \ str x1, [x27], 8
+fun: .mod ( i1 i2 -- i3 ) [
+          .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+    3 1 2 .asm_sdiv      .comp_instr \ sdiv x3, x1, x2
+  1 3 2 1 .asm_msub      .comp_instr \ msub x1, x3, x2, x1
+          .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: /mod ( dividend divisor -- rem quo ) [
-      1 2 asm_pop2  comp_instr \ ldp x1, x2, [x27, -16]!
-    3 1 2 asm_sdiv  comp_instr \ sdiv x3, x1, x2
-  1 3 2 1 asm_msub  comp_instr \ msub x1, x3, x2, x1
-      1 3 asm_push2 comp_instr \ stp x1, x3, [x27], 16
+      1 2 .asm_pop2  .comp_instr \ ldp x1, x2, [x27, -16]!
+    3 1 2 .asm_sdiv  .comp_instr \ sdiv x3, x1, x2
+  1 3 2 1 .asm_msub  .comp_instr \ msub x1, x3, x2, x1
+      1 3 .asm_push2 .comp_instr \ stp x1, x3, [x27], 16
 ] end
 
-fun: abs ( ±int -- +int ) [
-               asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-  1            asm_cmp_zero comp_instr \ cmp x1, 0
-  1 1 1 ASM_PL asm_csneg    comp_instr \ cneg x1, x1, pl
-               asm_push_x1  comp_instr \ str x1, [x27], 8
+fun: .abs ( ±int -- +int ) [
+               .asm_pop_x1   .comp_instr \ ldr x1, [x27, -8]!
+  1            .asm_cmp_zero .comp_instr \ cmp x1, 0
+  1 1 1 ASM_PL .asm_csneg    .comp_instr \ cneg x1, x1, pl
+               .asm_push_x1  .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: min ( i1 i2 -- i1|i2 ) [
-               asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-    1 2        asm_cmp_reg   comp_instr \ cmp x1, x2
-  1 1 2 ASM_LT asm_csel      comp_instr \ csel x1, x1, x2, lt
-               asm_push_x1   comp_instr \ str x1, [x27], 8
+fun: .min ( i1 i2 -- i1|i2 ) [
+               .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+    1 2        .asm_cmp_reg   .comp_instr \ cmp x1, x2
+  1 1 2 ASM_LT .asm_csel      .comp_instr \ csel x1, x1, x2, lt
+               .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: max ( i1 i2 -- i1|i2 ) [
-               asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-    1 2        asm_cmp_reg   comp_instr \ cmp x1, x2
-  1 1 2 ASM_GT asm_csel      comp_instr \ csel x1, x1, x2, gt
-               asm_push_x1   comp_instr \ str x1, [x27], 8
+fun: .max ( i1 i2 -- i1|i2 ) [
+               .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+    1 2        .asm_cmp_reg   .comp_instr \ cmp x1, x2
+  1 1 2 ASM_GT .asm_csel      .comp_instr \ csel x1, x1, x2, gt
+               .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Chooses a non-zero value, preferring the second input.
-fun: fallback ( one two -- out ) [
-               asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-    2          asm_cmp_zero  comp_instr \ cmp x2, 0
-  1 2 1 ASM_NE asm_csel      comp_instr \ csel x1, x2, x1, ne
-               asm_push_x1   comp_instr \ str x1, [x27], 8
+fun: .fallback ( one two -- out ) [
+               .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+    2          .asm_cmp_zero  .comp_instr \ cmp x2, 0
+  1 2 1 ASM_NE .asm_csel      .comp_instr \ csel x1, x2, x1, ne
+               .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: CELL 8 end
-fun: cells  ( len  -- size ) 3 lsl end
-fun: /cells ( size -- len  ) 3 asr end
+fun: CELL [ .plain_call ] 8 end
+fun: .cells  ( len  -- size ) 3 .lsl end
+fun: /cells ( size -- len  ) 3 .asr end
 fun: +cell  ( adr  -- adr  ) CELL + end
 fun: -cell  ( adr  -- adr  ) CELL - end
 
 \ ## Assembler continued
 
 \ lsl Xd, Xn, <imm>
-fun: asm_lsl_imm ( Xd Xn imm6 -- instr )
-  dup negate 64 mod 6 bits_trunc 16 lsl    \ immr
-  63 rot -          6 bits_trunc 10 lsl or \ imms
-  swap                            5 lsl or \ Xn
-                                        or \ Xd
-  0b1_10_100110_1_000000_000000_00000_00000 or
+fun: .asm_lsl_imm ( Xd Xn imm6 -- instr )
+  .dup .negate 64 .mod 6 .bits_trunc 16 .lsl     \ immr
+  63 .rot -            6 .bits_trunc 10 .lsl .or \ imms
+  .swap                               5 .lsl .or \ Xn
+                                             .or \ Xd
+  0b1_10_100110_1_000000_000000_00000_00000  .or
 end
 
 \ tbz Xt, <bit>, <imm>
-fun: asm_test_bit_branch_zero ( Xt bit imm14 -- instr )
-  2 lsr 14 bits_trunc 5 lsl    \ imm14
-  over         5 lsr 31 lsl or \ b5
-  swap  5 bits_trunc 19 lsl or \ b40
-                            or \ Xt
-  0b0_01_101_1_0_00000_00000000000000_00000 or
+fun: .asm_test_bit_branch_zero ( Xt bit imm14 -- instr )
+  2 .lsr 14 .bits_trunc 5 .lsl     \ imm14
+  .over         5 .lsr 31 .lsl .or \ b5
+  .swap  5 .bits_trunc 19 .lsl .or \ b40
+                               .or \ Xt
+  0b0_01_101_1_0_00000_00000000000000_00000 .or
 end
 
 \ br Xn
-fun: asm_branch_to_reg ( Xn -- instr )
-  5 lsl
-  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 or
+fun: .asm_branch_to_reg ( Xn -- instr )
+  5 .lsl
+  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 .or
 end
 
 \ blr Xn
-fun: asm_branch_link_reg ( Xn -- instr )
-  5 lsl
-  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 or
+fun: .asm_branch_link_reg ( Xn -- instr )
+  5 .lsl
+  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 .or
 end
 
 \ orr Xd, Xn, #(1 << bit)
 \ TODO add general-purpose `orr`.
-fun: asm_orr_bit ( Xd Xn bit -- instr )
-  64 swap - 16 lsl    \ immr
-  swap      5  lsl or \ Xn
-                   or \ Xd
-  0b1_01_100100_1_000000_000000_00000_00000 or
+fun: .asm_orr_bit ( Xd Xn bit -- instr )
+  64 .swap - 16 .lsl     \ immr
+  .swap      5  .lsl .or \ Xn
+                     .or \ Xd
+  0b1_01_100100_1_000000_000000_00000_00000 .or
 end
 
-fun: asm_comp_cset_reg ( C: cond -- ) ( E: i1 i2 -- bool )
-  1 2    asm_pop2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2    asm_cmp_reg   comp_instr \ cmp x1, x2
-  1 swap asm_cset      comp_instr \ cset x1, <cond>
-  1      asm_push1     comp_instr \ str x1, [x27], 8
+fun: .asm_comp_cset_reg ( C: cond -- ) ( E: i1 i2 -- bool )
+  1 2    .asm_pop2      .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2    .asm_cmp_reg   .comp_instr \ cmp x1, x2
+  1 .swap .asm_cset     .comp_instr \ cset x1, <cond>
+  1      .asm_push1     .comp_instr \ str x1, [x27], 8
 end
 
-fun: asm_comp_cset_zero ( C: cond -- ) ( E: i1 i2 -- bool )
-  1      asm_pop1     comp_instr \ ldr x1, [x27, -8]!
-  1      asm_cmp_zero comp_instr \ cmp x1, 0
-  1 swap asm_cset     comp_instr \ cset x1, <cond>
-  1      asm_push1    comp_instr \ str x1, [x27], 8
+fun: .asm_comp_cset_zero ( C: cond -- ) ( E: i1 i2 -- bool )
+  1      .asm_pop1     .comp_instr \ ldr x1, [x27, -8]!
+  1      .asm_cmp_zero .comp_instr \ cmp x1, 0
+  1 .swap .asm_cset    .comp_instr \ cset x1, <cond>
+  1      .asm_push1    .comp_instr \ str x1, [x27], 8
 end
 
 \ ## Numeric comparison
 
 \ https://gforth.org/manual/Numeric-comparison.html
-fun: =   ( i1 i2 -- bool ) [ ASM_EQ asm_comp_cset_reg  ] end
-fun: <>  ( i1 i2 -- bool ) [ ASM_NE asm_comp_cset_reg  ] end
-fun: >   ( i1 i2 -- bool ) [ ASM_GT asm_comp_cset_reg  ] end
-fun: <   ( i1 i2 -- bool ) [ ASM_LT asm_comp_cset_reg  ] end
-fun: <=  ( i1 i2 -- bool ) [ ASM_LE asm_comp_cset_reg  ] end
-fun: >=  ( i1 i2 -- bool ) [ ASM_GE asm_comp_cset_reg  ] end
-fun: <0  ( num   -- bool ) [ ASM_LT asm_comp_cset_zero ] end \ Or `MI`.
-fun: >0  ( num   -- bool ) [ ASM_GT asm_comp_cset_zero ] end
-fun: <=0 ( num   -- bool ) [ ASM_LE asm_comp_cset_zero ] end
-fun: >=0 ( num   -- bool ) [ ASM_GE asm_comp_cset_zero ] end \ Or `PL`.
+fun: =   ( i1 i2 -- bool ) [ ASM_EQ .asm_comp_cset_reg  ] end
+fun: <>  ( i1 i2 -- bool ) [ ASM_NE .asm_comp_cset_reg  ] end
+fun: >   ( i1 i2 -- bool ) [ ASM_GT .asm_comp_cset_reg  ] end
+fun: <   ( i1 i2 -- bool ) [ ASM_LT .asm_comp_cset_reg  ] end
+fun: <=  ( i1 i2 -- bool ) [ ASM_LE .asm_comp_cset_reg  ] end
+fun: >=  ( i1 i2 -- bool ) [ ASM_GE .asm_comp_cset_reg  ] end
+fun: <0  ( num   -- bool ) [ ASM_LT .asm_comp_cset_zero ] end \ Or `MI`.
+fun: >0  ( num   -- bool ) [ ASM_GT .asm_comp_cset_zero ] end
+fun: <=0 ( num   -- bool ) [ ASM_LE .asm_comp_cset_zero ] end
+fun: >=0 ( num   -- bool ) [ ASM_GE .asm_comp_cset_zero ] end \ Or `PL`.
 
-fun: odd ( i1 -- bool ) 1 and end
+fun: .odd ( i1 -- bool ) 1 .and end
 
 \ ## Memory load / store
 
 fun: @ ( adr -- val ) [
-        asm_pop_x1   comp_instr \ ldr x1, [x27, -8]!
-  1 1 0 asm_load_off comp_instr \ ldur x1, [x1]
-        asm_push_x1  comp_instr \ str x1, [x27], 8
+        .asm_pop_x1   .comp_instr \ ldr x1, [x27, -8]!
+  1 1 0 .asm_load_off .comp_instr \ ldur x1, [x1]
+        .asm_push_x1  .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: ! ( val adr -- ) [
-        asm_pop_x1_x2 comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 0 asm_store_off comp_instr \ stur x1, [x2]
+        .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 .asm_store_off .comp_instr \ stur x1, [x2]
 ] end
 
 fun: @2 ( adr -- val0 val1 ) [
-          asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
-  1 2 1 0 asm_load_pair_off comp_instr \ ldp x1, x2, [x1]
-          asm_push_x1_x2    comp_instr \ stp x1, x2, [x27], 16
+          .asm_pop_x1        .comp_instr \ ldr x1, [x27, -8]!
+  1 2 1 0 .asm_load_pair_off .comp_instr \ ldp x1, x2, [x1]
+          .asm_push_x1_x2    .comp_instr \ stp x1, x2, [x27], 16
 ] end
 
 fun: !2 ( val0 val1 adr -- val0 val1 ) [
-  3       asm_pop1           comp_instr \ ldr x3, [x27, -8]!
-          asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 3 0 asm_store_pair_off comp_instr \ stp x1, x2, [x3]
+  3       .asm_pop1           .comp_instr \ ldr x3, [x27, -8]!
+          .asm_pop_x1_x2      .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 3 0 .asm_store_pair_off .comp_instr \ stp x1, x2, [x3]
 ] end
 
 \ 32-bit version of `@`. Used for C `uint`.
 fun: @32 ( adr -- val ) [
-        asm_pop_x1      comp_instr \ ldr  x1, [x27, -8]!
-  1 1 0 asm_load_off_32 comp_instr \ ldur w1, [x1]
-        asm_push_x1     comp_instr \ str  x1, [x27], 8
+        .asm_pop_x1      .comp_instr \ ldr  x1, [x27, -8]!
+  1 1 0 .asm_load_off_32 .comp_instr \ ldur w1, [x1]
+        .asm_push_x1     .comp_instr \ str  x1, [x27], 8
 ] end
 
 \ 32-bit version of `!`. Used for instructions and C `uint`.
 fun: !32 ( val adr -- ) [
-        asm_pop_x1_x2    comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 0 asm_store_off_32 comp_instr \ str w1, x2
+        .asm_pop_x1_x2    .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 .asm_store_off_32 .comp_instr \ str w1, x2
 ] end
 
-fun: off! ( adr -- ) 0 swap ! end
-fun: on!  ( adr -- ) 1 swap ! end
+fun: off! ( adr -- ) 0 .swap ! end
+fun: on!  ( adr -- ) 1 .swap ! end
 
 \ ## Stack introspection and manipulation
 
 \ Floor of data stack.
 \ str x26, [x27], 8
-fun: sp0 ( -- adr ) [ ASM_REG_DAT_SP_FLOOR asm_push1 comp_instr ] end
+fun: .sp0 ( -- adr ) [ ASM_REG_DAT_SP_FLOOR .asm_push1 .comp_instr ] end
 
 \ Pushes the address of the next writable stack cell.
 \ Like `sp@` in Gforth but renamed to make sense.
@@ -898,25 +898,25 @@ fun: sp0 ( -- adr ) [ ASM_REG_DAT_SP_FLOOR asm_push1 comp_instr ] end
 \ in the value position is considered to be "unpredictable". Different
 \ CPUs are allowed to handle this differently; on Apple Silicon chips,
 \ this is considered a "bad instruction" and blows up.
-fun: sp ( -- adr ) [
-  ASM_REG_DAT_SP ASM_REG_DAT_SP 0 asm_store_off comp_instr \ stur x27, [x27]
-  ASM_REG_DAT_SP ASM_REG_DAT_SP 8 asm_add_imm   comp_instr \ add x27, x27, 8
+fun: .sp ( -- adr ) [
+  ASM_REG_DAT_SP ASM_REG_DAT_SP 0 .asm_store_off .comp_instr \ stur x27, [x27]
+  ASM_REG_DAT_SP ASM_REG_DAT_SP 8 .asm_add_imm   .comp_instr \ add x27, x27, 8
 ] end
 
 \ Sets the stack pointer register to the given address.
 \ Uses two instructions for the same reason as the above.
 fun: sp! ( adr -- ) [
-                   asm_pop_x1  comp_instr \ ldr x1, [x27, -8]!
-  ASM_REG_DAT_SP 1 asm_mov_reg comp_instr \ mov x27, x1
+                   .asm_pop_x1  .comp_instr \ ldr x1, [x27, -8]!
+  ASM_REG_DAT_SP 1 .asm_mov_reg .comp_instr \ mov x27, x1
 ] end
 
 \ Stack introspection doesn't need to be optimal.
-fun: sp_at         ( ind    -- ptr ) cells sp0 + end
-fun: stack_len     (        -- len ) sp sp0 - /cells end
-fun: stack_trunc   ( …      -- )     sp0 sp! end
-fun: stack_set_len ( … len  -- … )   sp_at sp! end
-fun: stack+        ( … diff -- … )   dec cells sp swap + sp! end
-fun: stack-        ( … diff -- … )   inc cells sp swap - sp! end
+fun: .sp_at         ( ind    -- ptr ) .cells .sp0 + end
+fun: .stack_len     (        -- len ) .sp .sp0 - /cells end
+fun: .stack_trunc   ( …      -- )     .sp0 sp! end
+fun: .stack_set_len ( … len  -- … )   .sp_at sp! end
+fun: stack+         ( … diff -- … )   .dec .cells .sp .swap + sp! end
+fun: stack-         ( … diff -- … )   .inc .cells .sp .swap - sp! end
 
 \ ## Variables
 \
@@ -924,16 +924,18 @@ fun: stack-        ( … diff -- … )   inc cells sp swap - sp! end
 \
 \ We could easily define variables without compiler support,
 \ allocating memory via libc. The reason for compiler-managed
-\ memory via `comp_alloc_data` is for compatibility with AOT
+\ memory via `.comp_alloc_data` is for compatibility with AOT
 \ compilation, which is currently supported only in reg-CC.
 \ In stack-CC, either way would work.
 
 \ For words which define words. Kinda like `create`.
-fun_comp: word{ compile' read_word compile' define_fun end
-fun_comp: }word compile'' end 0 comp_only end
+fun_comp: word{
+  compile' .read_word compile' .define_fun compile' .plain_call
+end
+fun_comp: }word compile'' end 0 .comp_only end
 
 \ Similar to standard `constant`.
-fun: let: ( C: val -- ) ( E: -- val ) word{ comp_push }word end
+fun: let: ( C: val -- ) ( E: -- val ) word{ .comp_push }word end
 
 0 let: nil
 0 let: false
@@ -942,11 +944,11 @@ fun: let: ( C: val -- ) ( E: -- val ) word{ comp_push }word end
 \ Similar to standard `variable`.
 fun: var: ( C: init "name" -- ) ( E: -- adr )
   word{
-    sp CELL -                   \ Address of the `init` value.
-    CELL        comp_alloc_data ( -- adr )
-    1           comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-    asm_push_x1 comp_instr      \ str x1, [x27], 8
-    drop                        \ Don't need the `init` value anymore.
+    .sp CELL -                    \ Address of the `init` value.
+    CELL         .comp_alloc_data ( -- adr )
+    1            .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+    .asm_push_x1 .comp_instr      \ str x1, [x27], 8
+    .drop                         \ Don't need the `init` value anymore.
   }word
 end
 
@@ -954,9 +956,9 @@ end
 \ Like `buf:` but doesn't return capacity.
 fun: mem: ( C: cap "name" -- ) ( E: -- adr )
   word{
-    nil swap    comp_alloc_data ( -- adr )
-    1           comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-    asm_push_x1 comp_instr      \ str x1, [x27], 8
+    nil .swap    .comp_alloc_data ( -- adr )
+    1            .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+    .asm_push_x1 .comp_instr      \ str x1, [x27], 8
   }word
 end
 
@@ -965,10 +967,10 @@ end
 \ at least the given capacity in bytes.
 fun: buf: ( C: cap "name" -- ) ( E: -- adr cap )
   word{
-    dup nil swap comp_alloc_data ( -- adr )
-    1            comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-    asm_push_x1  comp_instr      \ str x1, [x27], 8
-                 comp_push       \ str <cap>, [x27], 8
+    .dup nil .swap .comp_alloc_data ( -- adr )
+    1              .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+    .asm_push_x1   .comp_instr      \ str x1, [x27], 8
+                   .comp_push       \ str <cap>, [x27], 8
   }word
 end
 
@@ -978,24 +980,24 @@ end
 \ We can compile load/store and push/pop as we like.
 
 \ SYNC[asm_local_addressing].
-fun: asm_local_get ( reg fp_off -- instr ) ASM_REG_FP swap asm_load_scaled_off end
-fun: asm_local_set ( reg fp_off -- instr ) ASM_REG_FP swap asm_store_scaled_off end
+fun: .asm_local_get ( reg fp_off -- instr ) ASM_REG_FP .swap .asm_load_scaled_off end
+fun: .asm_local_set ( reg fp_off -- instr ) ASM_REG_FP .swap .asm_store_scaled_off end
 
 \ SYNC[asm_local_addressing].
-fun: comp_push_from_local ( C: fp_off -- ) ( E: -- val )
-  1 swap asm_local_get comp_instr \ ldr x1, [FP, <loc>]
-  1      asm_push1     comp_instr \ str x1, [x27], 8
+fun: .comp_push_from_local ( C: fp_off -- ) ( E: -- val )
+  1 .swap .asm_local_get .comp_instr \ ldr x1, [FP, <loc>]
+  1       .asm_push1     .comp_instr \ str x1, [x27], 8
 end
 
 \ SYNC[asm_local_addressing].
-fun: comp_pop_into_local ( C: fp_off -- ) ( E: val -- )
-  1      asm_pop1      comp_instr \ ldr x1, [x27, -8]!
-  1 swap asm_local_set comp_instr \ str x1, [FP, <loc>]
+fun: .comp_pop_into_local ( C: fp_off -- ) ( E: val -- )
+  1       .asm_pop1      .comp_instr \ ldr x1, [x27, -8]!
+  1 .swap .asm_local_set .comp_instr \ str x1, [FP, <loc>]
 end
 
 \ Stores a value to a local, declaring the local if necessary.
 fun_comp: to: ( C: "name" -- ) ( E: val -- )
-  read_word comp_local comp_pop_into_local
+  .read_word .comp_local .comp_pop_into_local
 end
 
 \ Returns the address of a local (on the system stack),
@@ -1003,16 +1005,16 @@ end
 \
 \ SYNC[asm_local_addressing].
 fun_comp: ref: ( C: "name" -- ) ( E: -- adr )
-  read_word comp_local
-  1 swap ASM_REG_FP swap asm_add_imm comp_instr \ add x1, FP, <loc>
-  1                      asm_push1   comp_instr \ str x1, [x27], 8
+  .read_word .comp_local
+  1 .swap ASM_REG_FP .swap .asm_add_imm .comp_instr \ add x1, FP, <loc>
+  1                        .asm_push1   .comp_instr \ str x1, [x27], 8
 end
 
 \ ## External functions
 
-\ Finds an extern symbol by name and declares it as a function.
-fun: extern: ( C: inp_len out_len "name" -- ) ( E: …inps -- …outs )
-  read_word swap2 extern_fun
+\ Declares a Forth function with a separate native link name.
+fun: extern: ( C: inp_len out_len "name" "link_name" -- ) ( E: …inps -- …outs )
+  .read_word .read_word .rot2 .extern_fun
 end
 
 \ ## Memory
@@ -1020,86 +1022,86 @@ end
 \ The program is implicitly linked with `libc`,
 \ so we get to use C stdlib functions.
 
-2 1 extern: calloc  ( len size -- addr )
-1 1 extern: malloc  ( size -- addr )
-1 0 extern: free    ( addr -- )
-3 0 extern: memset  ( buf char len -- )
-3 0 extern: memcpy  ( dst src len -- )
-3 0 extern: memmove ( dst src len -- )
-3 1 extern: memcmp  ( adr0 adr1 len -- cmp :Cint )
+2 1 extern: .calloc  calloc  ( len size -- addr )
+1 1 extern: .malloc  malloc  ( size -- addr )
+1 0 extern: .free    free    ( addr -- )
+3 0 extern: .memset  memset  ( buf char len -- )
+3 0 extern: .memcpy  memcpy  ( dst src len -- )
+3 0 extern: .memmove memmove ( dst src len -- )
+3 1 extern: .memcmp  memcmp  ( adr0 adr1 len -- cmp :Cint )
 
-1 1 extern: strdup  ( cstr -- cstr )
-1 1 extern: strlen  ( cstr -- len )
-2 1 extern: strcmp  ( cstr0 cstr1 -- cmp :Cint )
-3 1 extern: strncmp ( str0 str1 len -- cmp :Cint )
-3 0 extern: strncpy ( dst src str_len -- )
-3 0 extern: strlcpy ( dst src buf_len -- )
-2 1 extern: strstr  ( cstr0 cstr0 -- adr )
+1 1 extern: .strdup  strdup  ( cstr -- cstr )
+1 1 extern: .strlen  strlen  ( cstr -- len )
+2 1 extern: .strcmp  strcmp  ( cstr0 cstr1 -- cmp :Cint )
+3 1 extern: .strncmp strncmp ( str0 str1 len -- cmp :Cint )
+3 0 extern: .strncpy strncpy ( dst src str_len -- )
+3 0 extern: .strlcpy strlcpy ( dst src buf_len -- )
+2 1 extern: .strstr  strstr  ( cstr0 cstr0 -- adr )
 
-fun: move    ( src dst len  -- ) swap_over strncpy end
-fun: memfill ( buf len char -- ) swap memset end
-fun: memzero ( buf len      -- ) 0 memfill end
+fun: .move    ( src dst len  -- ) .swap_over .strncpy end
+fun: .memfill ( buf len char -- ) .swap .memset end
+fun: .memzero ( buf len      -- ) 0 .memfill end
 
-\ See `ccompare` below for null-terminated strings.
-fun: compare ( str0 len0 str1 len1 -- direction )
+\ See `.ccompare` below for null-terminated strings.
+fun: .compare ( str0 len0 str1 len1 -- direction )
   to: len1
   to: str1
   to: len0
   to: str0
   len0 len1 -
-  str0 str1 len0 len1 min memcmp cint_to_cell
-  fallback
+  str0 str1 len0 len1 .min .memcmp .cint_to_cell
+  .fallback
 end
-fun: str=  ( str0 len0 str1 len1 -- bool ) compare =0 end
-fun: str<  ( str0 len0 str1 len1 -- bool ) compare <0 end
-fun: str<> ( str0 len0 str1 len1 -- bool ) compare <>0 end
+fun: str=  ( str0 len0 str1 len1 -- bool ) .compare =0 end
+fun: str<  ( str0 len0 str1 len1 -- bool ) .compare <0 end
+fun: str<> ( str0 len0 str1 len1 -- bool ) .compare <>0 end
 
 \ ## Characters and strings
 
 fun: c@ ( str -- char ) [
-        asm_pop_x1        comp_instr \ ldr x1, [x27, -8]!
-  1 1 0 asm_load_byte_off comp_instr \ ldrb x1, [x1]
-        asm_push_x1       comp_instr \ str x1, [x27], 8
+        .asm_pop_x1        .comp_instr \ ldr x1, [x27, -8]!
+  1 1 0 .asm_load_byte_off .comp_instr \ ldrb x1, [x1]
+        .asm_push_x1       .comp_instr \ str x1, [x27], 8
 ] end
 
 fun: c! ( char adr -- ) [
-        asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 0 asm_store_byte_off comp_instr \ strb x1, [x2]
+        .asm_pop_x1_x2      .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 0 .asm_store_byte_off .comp_instr \ strb x1, [x2]
 ] end
 
-fun: read_word_char ( "str" -- char ) read_word drop c@ end
+fun: .read_word_char ( "str" -- char ) .read_word .drop c@ end
 
-fun:      char' ( E: "str" -- char )           read_word_char end
-fun_comp: char' ( C: "str" -- ) ( E: -- char ) read_word_char comp_push end
+fun:      char' ( E: "str" -- char )           .read_word_char end
+fun_comp: char' ( C: "str" -- ) ( E: -- char ) .read_word_char .comp_push end
 
-fun: parse_str ( E: "str" -- str len ) char' " read_until_char read_char drop end
+fun: .parse_str ( E: "str" -- str len ) char' " .read_until_char .read_char .drop end
 
-fun: comp_alloc_cstr ( buf len -- cstr )
+fun: .comp_alloc_cstr ( buf len -- cstr )
   to: len to: buf
-  buf len inc comp_alloc_data to: adr
+  buf len .inc .comp_alloc_data to: adr
   nil adr len + c!
   adr
 end
 
 \ Copies a string and appends a terminating null byte.
-fun: comp_str ( C: buf len -- ) ( E: -- str len )
-  tuck                           ( len buf len )
-  comp_alloc_cstr 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  2               comp_load      \ ldr x2, <len>
-  asm_push_x1_x2  comp_instr     \ stp x1, x2, [x27], 16
+fun: .comp_str ( C: buf len -- ) ( E: -- str len )
+  .tuck                              ( len buf len )
+  .comp_alloc_cstr 1 .comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  2                  .comp_load      \ ldr x2, <len>
+  .asm_push_x1_x2    .comp_instr     \ stp x1, x2, [x27], 16
 end
 
-fun: comp_cstr ( C: buf len -- ) ( E: -- cstr )
-  comp_alloc_cstr 1 comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  asm_push_x1     comp_instr       \ str x1, [x27], 8
+fun: .comp_cstr ( C: buf len -- ) ( E: -- cstr )
+  .comp_alloc_cstr 1 .comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
+  .asm_push_x1       .comp_instr     \ str x1, [x27], 8
 end
 
 \ Parses the input until the terminating quote, and returns the address and
 \ length of the resulting string. In interpretation mode, the string points
 \ into the transient reader input and is not null-terminated. In compilation
 \ mode, the string is statically allocated, unique, and null-terminated.
-fun:      s" ( E: "str" -- str len )           read_char drop parse_str end
-fun_comp: s" ( C: "str" -- ) ( E: -- str len ) read_char drop parse_str comp_str end
+fun:      s" ( E: "str" -- str len )           .read_char .drop .parse_str end
+fun_comp: s" ( C: "str" -- ) ( E: -- str len ) .read_char .drop .parse_str .comp_str end
 
 4096 buf: ROOT_STR_BUF
 
@@ -1107,10 +1109,10 @@ fun_comp: s" ( C: "str" -- ) ( E: -- str len ) read_char drop parse_str comp_str
 \ length. The string is always null-terminated. In interpretation mode, this
 \ reuses the same buffer for each call, and the string may be truncated.
 fun: " ( E: "str" -- cstr )
-  read_char drop parse_str to: len to: src
+  .read_char .drop .parse_str to: len to: src
   ROOT_STR_BUF to: cap to: buf
-  len cap min to: len
-  buf src len memcpy
+  len cap .min to: len
+  buf src len .memcpy
   nil buf len + c!
   buf
 end
@@ -1118,18 +1120,18 @@ end
 \ Unlike interpretation-mode `"`, this allocates a unique string
 \ in the compiler-managed data region and compiles a PC-relative
 \ reference to it.
-fun_comp: " ( C: "str" -- ) ( E: -- cstr ) read_char drop parse_str comp_cstr end
+fun_comp: " ( C: "str" -- ) ( E: -- cstr ) .read_char .drop .parse_str .comp_cstr end
 
 \ ## External symbols
 
 \ Finds an extern symbol by name and returns its address.
 fun_comp: extern_adr' ( C: "name" -- ) ( E: -- adr )
-  read_word comp_extern_adr
+  .read_word .comp_extern_adr
 end
 
 \ Indirect version of `extern_adr'`: compiles its usage into another word.
 fun_comp: comp_extern_adr' ( C: "name" -- ) ( E: -- adr )
-  read_word comp_str compile' comp_extern_adr
+  .read_word .comp_str compile' .comp_extern_adr
 end
 
 \ ## Conditionals
@@ -1152,40 +1154,40 @@ end
 \ terminated with a single "end", which is generic: it pops one
 \ XT from the stack and executes it. The XT can pop another one,
 \ popping multiple control frames in a chain. We terminate such
-\ chains by prepending a `nop` XT.
+\ chains by prepending a `.nop` XT.
 
-fun: reserve_instr ASM_PLACEHOLDER comp_instr end
-fun: reserve_here ( -- adr ) here_write reserve_instr end
-fun: reserve_cond ( -- adr ) asm_pop_x1 comp_instr reserve_here end
-fun: off_to_pc    ( adr -- off ) here_write swap - end \ For forward jumps.
+fun: .reserve_instr ASM_PLACEHOLDER .comp_instr end
+fun: .reserve_here ( -- adr ) .here_write .reserve_instr end
+fun: .reserve_cond ( -- adr ) .asm_pop_x1 .comp_instr .reserve_here end
+fun: .off_to_pc    ( adr -- off ) .here_write .swap - end \ For forward jumps.
 
-fun: if_pop ( nop if_adr -- )
+fun: .if_pop ( nop if_adr -- )
   \ cbz x1, <else|end>
-  dup off_to_pc 1 swap asm_cbz swap !32
-  call_xt
+  .dup .off_to_pc 1 .swap .asm_cbz .swap !32
+  .call_xt
 end
 
-fun: ifn_pop ( nop ifn_adr -- )
+fun: .ifn_pop ( nop ifn_adr -- )
   \ cbnz x1, <else|end>
-  dup off_to_pc 1 swap asm_cbnz swap !32
-  call_xt
+  .dup .off_to_pc 1 .swap .asm_cbnz .swap !32
+  .call_xt
 end
 
-fun_comp: if  xt' nop xt' if_pop  end
-fun_comp: ifz xt' nop xt' ifn_pop end
-fun_comp: then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) reserve_cond swap end
+fun_comp: if [ .plain_call ]  xt' .nop xt' .if_pop  end
+fun_comp: ifz [ .plain_call ] xt' .nop xt' .ifn_pop end
+fun_comp: .then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) .reserve_cond .swap end
 
-fun: else_pop ( prev_fun else_adr -- ) dup off_to_pc asm_branch swap !32 call_xt end
+fun: .else_pop ( prev_fun else_adr -- ) .dup .off_to_pc .asm_branch .swap !32 .call_xt end
 
-fun_comp: else ( C: if_adr if_fun -- else_adr else_fun )
-  reserve_here to: adr
-  xt' nop -rot
-  call_xt
-  adr xt' else_pop
+fun_comp: else [ .plain_call ] ( C: if_adr if_fun -- else_adr else_fun )
+  .reserve_here to: adr
+  xt' .nop -rot
+  .call_xt
+  adr xt' .else_pop
 end
 
-fun_comp: elif  call'' else xt' if_pop  end
-fun_comp: elifz call'' else xt' ifn_pop end
+fun_comp: elif  [ .plain_call ] call'' else xt' .if_pop  end
+fun_comp: elifz [ .plain_call ] call'' else xt' .ifn_pop end
 
 \ ## Loops
 \
@@ -1206,73 +1208,73 @@ fun_comp: elifz call'' else xt' ifn_pop end
 
 fun: loop_frame! ( C: frame_ind -- ) LOOP_FRAME ! end
 
-fun: loop_frame_init ( C: -- frame_ind fun )
-  LOOP_FRAME @ xt' loop_frame! stack_len LOOP_FRAME !
+fun: .loop_frame_init ( C: -- frame_ind fun )
+  LOOP_FRAME @ xt' loop_frame! .stack_len LOOP_FRAME !
 end
 
 \ Used by auxiliary loop constructs such as "leave" and "while"
 \ to insert their control frame before a loop control frame.
 \ This allows to pop the control frames in the right order
 \ with a single "end" word.
-fun: loop_aux
+fun: .loop_aux
   ( C: … <loop> … <aux> stack_len -- … <aux> <loop> … )
             to: stack_len_0
-  stack_len to: stack_len_1
+  .stack_len to: stack_len_1
 
-  ifz LOOP_FRAME @ then
-    " auxiliary loop constructs require an ancestor loop frame" throw
+  ifz LOOP_FRAME @ .then
+    " auxiliary loop constructs require an ancestor loop frame" .throw
   end
 
   stack_len_1  stack_len_0 - to: frame_len
-  frame_len    cells         to: frame_size
-  stack_len_0  sp_at         to: frame_sp_prev
-  stack_len_1  sp_at         to: frame_sp_temp
-  LOOP_FRAME @ sp_at         to: loop_sp_prev
+  frame_len    .cells        to: frame_size
+  stack_len_0  .sp_at        to: frame_sp_prev
+  stack_len_1  .sp_at        to: frame_sp_temp
+  LOOP_FRAME @ .sp_at        to: loop_sp_prev
   loop_sp_prev frame_size  + to: loop_sp_next
 
   \ Need a backup copy of the frame we're moving,
   \ because we're about to overwrite that data.
   frame_len stack+
-  frame_sp_temp frame_sp_prev frame_size memmove
+  frame_sp_temp frame_sp_prev frame_size .memmove
 
   \ Move everything starting with the loop frame,
   \ making space for the aux frame we're inserting.
   frame_sp_temp loop_sp_next - to: rest_size
-  loop_sp_next loop_sp_prev rest_size memmove
+  loop_sp_next loop_sp_prev rest_size .memmove
 
   \ The aux frame is now behind the moved loop frame.
-  loop_sp_prev frame_sp_temp frame_size memmove
+  loop_sp_prev frame_sp_temp frame_size .memmove
   frame_len stack-
 
   \ Subsequent aux constructs will be inserted after the new frame.
   LOOP_FRAME @ frame_len + LOOP_FRAME !
 end
 
-fun: loop_end ( C: loop_adr -- ) here_write - asm_branch comp_instr end \ b <begin>
-fun: loop_pop ( C: prev_fun …aux… loop_adr -- ) loop_end call'' end end
+fun: .loop_end ( C: loop_adr -- ) .here_write - .asm_branch .comp_instr end \ b <begin>
+fun: .loop_pop ( C: prev_fun …aux… loop_adr -- ) .loop_end call'' end end
 
 \ Implementation note. Each loop frame is "split" into two sub-frames:
 \ the "prev frame", and the "current frame". Auxiliary loop constructs
 \ such as "leave" and "while" insert their own frames in-between these
 \ subframes. See `loop_aux`.
-fun_comp: loop
+fun_comp: loop [ .plain_call ]
   ( C: -- frame_ind frame_fun … loop_adr loop_fun )
   \ Control frame is split:   ↑ auxiliary constructs like "leave" go here.
-  loop_frame_init here_write xt' loop_pop
+  .loop_frame_init .here_write xt' .loop_pop
 end
 
 \ Breaks out of any loop.
-fun_comp: leave
+fun_comp: leave [ .plain_call ]
   ( C: prev… <loop> …rest -- prev… leave_adr leave_fun <loop> …rest )
-  stack_len to: len
-  reserve_here xt' else_pop len loop_aux
+  .stack_len to: len
+  .reserve_here xt' .else_pop len .loop_aux
 end
 
 \ Breaks out of any loop.
-fun_comp: while
+fun_comp: .while
   ( C: prev… <loop> …rest -- prev… while_adr while_fun <loop> …rest )
-  stack_len to: len
-  reserve_cond xt' if_pop len loop_aux
+  .stack_len to: len
+  .reserve_cond xt' .if_pop len .loop_aux
 end
 
 \ Goes back to loop start. Requires loop frames to begin with `loop_adr`:
@@ -1281,39 +1283,39 @@ end
 \ Warning: the implementation of count-up loops in this file is not compatible
 \ with `again` because they update counters and check bounds at the end, rather
 \ than at the start. The issue was fixed for reg-CC, but not for stack-CC.
-fun_comp: again
-  ifz LOOP_FRAME @ dup then " `again` requires an ancestor loop frame" throw end
-  sp_at @ loop_end \ b <beg>
+fun_comp: again [ .plain_call ]
+  ifz LOOP_FRAME @ .dup .then " `again` requires an ancestor loop frame" .throw end
+  .sp_at @ .loop_end \ b <beg>
 end
 
-fun: count_loop_pop ( prev_fun …aux… loop_adr cond_adr cond -- )
+fun: .count_loop_pop ( prev_fun …aux… loop_adr cond_adr cond -- )
   to: cond
   to: adr
-  loop_end \ b <beg>
-  adr off_to_pc cond asm_branch_cond adr !32 \ b.<cond> <end>
-  call_xt \ Pop auxiliaries; restore the previous loop frame.
+  .loop_end \ b <beg>
+  adr .off_to_pc cond .asm_branch_cond adr !32 \ b.<cond> <end>
+  .call_xt \ Pop auxiliaries; restore the previous loop frame.
 end
 
-fun: for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr )
-  ASM_LE count_loop_pop
+fun: .for_countdown_loop_pop ( prev_fun …aux… loop_adr cond_adr )
+  ASM_LE .count_loop_pop
 end
 
-fun: for_countdown_loop_init
+fun: .for_countdown_loop_init
   ( C: cur_loc -- frame_ind frame_fun … loop_adr cond_adr fun_for )
   ( E: ceil -- )
 
   to: cur                 \ We'll reuse ceiling as index.
-  loop_frame_init
-  cur comp_pop_into_local \ Grab the initial ceiling value.
+  .loop_frame_init
+  cur .comp_pop_into_local \ Grab the initial ceiling value.
 
-  here_write to: loop_adr
-  1 cur asm_local_get       comp_instr \ ldr x1, [FP, <cur>]
-  1     asm_cmp_zero        comp_instr \ cmp x1, 0
-  reserve_here to: cond_adr            \ b.<cond> <end>
-  1 1 1 asm_sub_imm         comp_instr \ sub x1, x1, 1
-  1 cur asm_local_set       comp_instr \ str x1, [FP, <cur>]
+  .here_write to: loop_adr
+  1 cur .asm_local_get       .comp_instr \ ldr x1, [FP, <cur>]
+  1     .asm_cmp_zero        .comp_instr \ cmp x1, 0
+  .reserve_here to: cond_adr             \ b.<cond> <end>
+  1 1 1 .asm_sub_imm         .comp_instr \ sub x1, x1, 1
+  1 cur .asm_local_set       .comp_instr \ str x1, [FP, <cur>]
 
-  loop_adr cond_adr xt' for_countdown_loop_pop
+  loop_adr cond_adr xt' .for_countdown_loop_pop
 end
 
 \ A count-down-by-one loop. Analogue of the non-standard
@@ -1328,10 +1330,10 @@ end
 \
 \ > This is the preferred loop of native code compiler writers
 \   who are too lazy to optimize `?do` loops properly.
-fun_comp: for
+fun_comp: .for
   ( C: -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
-  nil 0 comp_local for_countdown_loop_init
+  nil 0 .comp_local .for_countdown_loop_init
 end
 
 \ Like `for` but requires a local name to make the index
@@ -1344,15 +1346,15 @@ end
 fun_comp: -for:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil -- )
-  read_word comp_local for_countdown_loop_init
+  .read_word .comp_local .for_countdown_loop_init
 end
 
-fun: for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_cur -- )
+fun: .for_countup_loop_pop ( prev_fun …aux… loop_adr cond_adr loc_cur -- )
   to: cur
-  1 cur asm_local_get comp_instr \ ldr x1, [FP, <loc>]
-  1 1 1 asm_add_imm   comp_instr \ add x1, x1, 1
-  1 cur asm_local_set comp_instr \ str x1, [FP, <loc>]
-  ASM_GE count_loop_pop          \ b <begin>; retropatch b.<cond> <end>
+  1 cur .asm_local_get .comp_instr \ ldr x1, [FP, <loc>]
+  1 1 1 .asm_add_imm   .comp_instr \ add x1, x1, 1
+  1 cur .asm_local_set .comp_instr \ str x1, [FP, <loc>]
+  ASM_GE .count_loop_pop           \ b <begin>; retropatch b.<cond> <end>
 end
 
 \ Not used by `for` and `-for:` because they get away
@@ -1360,17 +1362,17 @@ end
 \
 \ The meaning of "cursor" and "limit" may differ between loop words.
 \ The cursor is often a pointer.
-fun: comp_count_loop_init ( loc_cur loc_lim -- loop_adr cond_adr loc_cur )
+fun: .comp_count_loop_init ( loc_cur loc_lim -- loop_adr cond_adr loc_cur )
   to: lim
   to: cur
 
-  here_write to: loop_adr
-  1 cur asm_local_get comp_instr \ ldr x1, [FP, <loc>]
-  2 lim asm_local_get comp_instr \ ldr x2, [FP, <loc>]
-  1 2   asm_cmp_reg   comp_instr \ cmp x1, x2
+  .here_write to: loop_adr
+  1 cur .asm_local_get .comp_instr \ ldr x1, [FP, <loc>]
+  2 lim .asm_local_get .comp_instr \ ldr x2, [FP, <loc>]
+  1 2   .asm_cmp_reg   .comp_instr \ cmp x1, x2
 
   loop_adr
-  reserve_here \ b.<cond> <end>
+  .reserve_here \ b.<cond> <end>
   cur
 end
 
@@ -1384,25 +1386,25 @@ end
 fun_comp: +for:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loop_fun )
   ( E: ceil floor -- )
-  loop_frame_init
+  .loop_frame_init
 
-  nil 0 comp_local     to: lim \ ceil  = limit
-  read_word comp_local to: cur \ floor = cursor
+  nil 0      .comp_local to: lim \ ceil  = limit
+  .read_word .comp_local to: cur \ floor = cursor
 
-  cur     comp_pop_into_local
-  lim     comp_pop_into_local
-  cur lim comp_count_loop_init
-  xt' for_countup_loop_pop
+  cur     .comp_pop_into_local
+  lim     .comp_pop_into_local
+  cur lim .comp_count_loop_init
+  xt' .for_countup_loop_pop
 end
 
-fun: loop_countup_pop ( prev_fun …aux… loop_adr cond_adr loc_cur loc_step )
+fun: .loop_countup_pop ( prev_fun …aux… loop_adr cond_adr loc_cur loc_step )
   to: step to: cur
 
-  1 cur  asm_local_get comp_instr \ ldr x1, [FP, <loc>]
-  2 step asm_local_get comp_instr \ ldr x2, [FP, <loc>]
-  1 1 2  asm_add_reg   comp_instr \ add x1, x1, x2
-  1 cur  asm_local_set comp_instr \ str x1, [FP, <off>]
-  ASM_GE count_loop_pop           \ b <begin>; retropatch b.<cond> <end>
+  1 cur  .asm_local_get .comp_instr \ ldr x1, [FP, <loc>]
+  2 step .asm_local_get .comp_instr \ ldr x2, [FP, <loc>]
+  1 1 2  .asm_add_reg   .comp_instr \ add x1, x1, x2
+  1 cur  .asm_local_set .comp_instr \ str x1, [FP, <off>]
+  ASM_GE .count_loop_pop            \ b <begin>; retropatch b.<cond> <end>
 end
 
 \ Similar to the standard `?do ... +loop`, but terminated with an `end`
@@ -1413,69 +1415,69 @@ end
 fun_comp: +loop:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loc_cur loc_step loop_fun )
   ( E: ceil floor step -- )
-  loop_frame_init
+  .loop_frame_init
 
-  nil 0 comp_local     to: lim \ ceil  = limit
-  read_word comp_local to: cur \ floor = cursor
-  nil 0 comp_local     to: step
+  nil 0      .comp_local to: lim \ ceil  = limit
+  .read_word .comp_local to: cur \ floor = cursor
+  nil 0      .comp_local to: step
 
-  step    comp_pop_into_local
-  cur     comp_pop_into_local
-  lim     comp_pop_into_local
-  cur lim comp_count_loop_init
-  step xt' loop_countup_pop
+  step    .comp_pop_into_local
+  cur     .comp_pop_into_local
+  lim     .comp_pop_into_local
+  cur lim .comp_count_loop_init
+  step xt' .loop_countup_pop
 end
 
-fun: loop_countdown_pop ASM_LT count_loop_pop end
+fun: .loop_countdown_pop ASM_LT .count_loop_pop end
 
 \ Like in `+loop:`, the range is `[floor,ceil)`.
 fun_comp: -loop:
   ( C: "name" -- frame_ind frame_fun … loop_adr cond_adr loop_fun )
   ( E: ceil floor step -- )
-  loop_frame_init
+  .loop_frame_init
 
-  read_word comp_local to: cur \ ceil  = cursor
-  nil 0 comp_local     to: lim \ floor = limit
-  nil 0 comp_local     to: step
+  .read_word .comp_local to: cur \ ceil  = cursor
+  nil 0      .comp_local to: lim \ floor = limit
+  nil 0      .comp_local to: step
 
-  step comp_pop_into_local
-  lim  comp_pop_into_local
-  cur  comp_pop_into_local
+  step .comp_pop_into_local
+  lim  .comp_pop_into_local
+  cur  .comp_pop_into_local
 
-  here_write to: loop_adr
+  .here_write to: loop_adr
 
-  \ We can almost use `comp_count_loop_init` here,
+  \ We can almost use `.comp_count_loop_init` here,
   \ but this loop wants subtraction at the start.
   \ TODO use `ldp` for adjacent offsets.
-  1 cur  asm_local_get    comp_instr    \ ldr x1, [FP, <ceil_off>]
-  2 lim  asm_local_get    comp_instr    \ ldr x2, [FP, <floor_off>]
-  3 step asm_local_get    comp_instr    \ ldr x3, [FP, <step_off>]
-  1 1 3  asm_sub_reg      comp_instr    \ sub x1, x1, x3
-  1 2    asm_cmp_reg      comp_instr    \ cmp x1, x2
-  here_write to: cond_adr reserve_instr \ b.lt <end>
-  1 cur  asm_local_set    comp_instr    \ str x1, [FP, <ceil_off>]
+  1 cur  .asm_local_get    .comp_instr    \ ldr x1, [FP, <ceil_off>]
+  2 lim  .asm_local_get    .comp_instr    \ ldr x2, [FP, <floor_off>]
+  3 step .asm_local_get    .comp_instr    \ ldr x3, [FP, <step_off>]
+  1 1 3  .asm_sub_reg      .comp_instr    \ sub x1, x1, x3
+  1 2    .asm_cmp_reg      .comp_instr    \ cmp x1, x2
+  .here_write to: cond_adr .reserve_instr \ b.lt <end>
+  1 cur  .asm_local_set    .comp_instr    \ str x1, [FP, <ceil_off>]
 
-  loop_adr cond_adr xt' loop_countdown_pop
+  loop_adr cond_adr xt' .loop_countdown_pop
 end
 
-fun: ?dup ( val bool -- val ?val ) if then dup end end
+fun: ?dup ( val bool -- val ?val ) if .then .dup end end
 
 \ ## String comparison continued
 
 \ `strcmp` doesn't like null string pointers.
-fun: ccompare ( cstr0 cstr1 -- cmp )
+fun: .ccompare ( cstr0 cstr1 -- cmp )
   to: cstr1
   to: cstr0
 
-  ifz cstr0 cstr1 or then 0 ret end
-  ifz cstr0 then -1 ret end
-  ifz cstr1 then +1 ret end
-  cstr0 cstr1 strcmp cint_to_cell
+  ifz cstr0 cstr1 .or .then 0 .ret end
+  ifz cstr0 .then -1 .ret end
+  ifz cstr1 .then +1 .ret end
+  cstr0 cstr1 .strcmp .cint_to_cell
 end
 
-fun: cstr=  ( cstr0 cstr1 -- bool ) ccompare =0 end
-fun: cstr<  ( cstr0 cstr1 -- bool ) ccompare <0 end
-fun: cstr<> ( cstr0 cstr1 -- bool ) ccompare <>0 end
+fun: cstr=  ( cstr0 cstr1 -- bool ) .ccompare =0 end
+fun: cstr<  ( cstr0 cstr1 -- bool ) .ccompare <0 end
+fun: cstr<> ( cstr0 cstr1 -- bool ) .ccompare <>0 end
 
 \ ## IO
 \
@@ -1489,44 +1491,44 @@ fun: cstr<> ( cstr0 cstr1 -- bool ) ccompare <>0 end
 10 let: LF
 13 let: CR
 
-3 mem: CRLF    \ \r\n\0
-CR CRLF     c! \ \r
-LF CRLF inc c! \ \n
+3 mem: CRLF     \ \r\n\0
+CR CRLF      c! \ \r
+LF CRLF .inc c! \ \n
 
-fun: stdin  ( -- adr ) extern_adr' __stdinp  @ end
-fun: stdout ( -- adr ) extern_adr' __stdoutp @ end
-fun: stderr ( -- adr ) extern_adr' __stderrp @ end
+fun: stdin  [ .plain_call ] ( -- adr ) extern_adr' __stdinp  @ end
+fun: stdout [ .plain_call ] ( -- adr ) extern_adr' __stdoutp @ end
+fun: stderr [ .plain_call ] ( -- adr ) extern_adr' __stderrp @ end
 
 \ These definitions ignore errors and sizes returned by `libc`.
 \ This is inconsistent with reg-CC where we define the outputs
 \ and sometimes handle them.
-4 0 extern: fwrite   ( src size len file -- )
-1 0 extern: putchar  ( char -- )
-2 0 extern: fputc    ( char file -- )
-2 0 extern: fputs    ( cstr file -- )
-1 0 extern: printf   ( … fmt -- )
-2 0 extern: fprintf  ( … file fmt -- )
-3 0 extern: snprintf ( … buf cap fmt -- )
-1 0 extern: fflush   ( file -- )
+4 0 extern: .fwrite   fwrite   ( src size len file -- )
+1 0 extern: .putchar  putchar  ( char -- )
+2 0 extern: .fputc    fputc    ( char file -- )
+2 0 extern: .fputs    fputs    ( cstr file -- )
+1 0 extern: .printf   printf   ( … fmt -- )
+2 0 extern: .fprintf  fprintf  ( … file fmt -- )
+3 0 extern: .snprintf snprintf ( … buf cap fmt -- )
+1 0 extern: .fflush   fflush   ( file -- )
 
-fun: logc     ( char    -- ) putchar              end \ Renamed from `emit`.
-fun: elogc    ( char    -- ) stderr fputc         end
-fun: log      ( cstr    -- ) stdout fputs         end
-fun: elog     ( cstr    -- ) stderr fputs         end
-fun: logs     ( str len -- ) 1 swap stdout fwrite end \ Renamed from `type`.
-fun: elogs    ( str len -- ) 1 swap stderr fwrite end
-fun: flush    (         -- ) stdout fflush        end
-fun: eflush   (         -- ) stderr fflush        end
-fun: lf       (         -- ) LF putchar           end \ Renamed from `cr`.
-fun: elf      (         -- ) LF elogc             end
-fun: space    (         -- ) 32 putchar           end
-fun: espace   (         -- ) 32 elogc             end
+fun: .logc     ( char    -- ) .putchar               end \ Renamed from `emit`.
+fun: .elogc    ( char    -- ) stderr .fputc          end
+fun: .log      ( cstr    -- ) stdout .fputs          end
+fun: .elog     ( cstr    -- ) stderr .fputs          end
+fun: .logs     ( str len -- ) 1 .swap stdout .fwrite end \ Renamed from `type`.
+fun: .elogs    ( str len -- ) 1 .swap stderr .fwrite end
+fun: .flush    (         -- ) stdout .fflush         end
+fun: .eflush   (         -- ) stderr .fflush         end
+fun: .lf       (         -- ) LF .putchar            end \ Renamed from `cr`.
+fun: .elf      (         -- ) LF .elogc              end
+fun: .space    (         -- ) 32 .putchar            end
+fun: .espace   (         -- ) 32 .elogc              end
 
 \ ## Locals: braces
 
 \ Compiles movement of values from the data stack
 \ to the locals in the intuitive "reverse" order.
-fun: } ( locals… len -- ) for comp_pop_into_local end end
+fun: } ( locals… len -- ) .for .comp_pop_into_local end end
 
 \ Support for the `{ inp0 inp1 -- out0 out1 }` locals notation.
 \ Capture order matches stack push order in the parens notation
@@ -1535,150 +1537,150 @@ fun_comp: {
   0 to: loc_len
 
   loop
-    read_word to: len to: str
-    if s" }" str len str= then loc_len } ret end
+    .read_word to: len to: str
+    if s" }" str len str= .then loc_len } .ret end
 
-    s" --" str len str<> while \ `--` to `}` is a comment.
+    s" --" str len str<> .while \ `--` to `}` is a comment.
 
     \ Resulting local token is used by `}` which we're about to call.
-    str len comp_local ( -- loc_tok )
+    str len .comp_local ( -- loc_tok )
 
-    loc_len inc to: loc_len
+    loc_len .inc to: loc_len
   end
 
   \ After `--`: skip all words which aren't `}`.
-  loop read_word s" }" str= =0 while end
+  loop .read_word s" }" str= =0 .while end
 
   loc_len }
 end
 
 \ For compiling words which modify a local by applying the given function.
-fun: comp_loc_mut ( C: fun "name" -- ) ( E: -- )
-  read_word comp_local
-  dup comp_push_from_local
-  swap comp_call
-  comp_pop_into_local
+fun: .comp_loc_mut ( C: fun "name" -- ) ( E: -- )
+  .read_word .comp_local
+  .dup .comp_push_from_local
+  .swap .comp_call
+  .comp_pop_into_local
 end
 
 \ Usage: `inc: some_val`.
-fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' inc comp_loc_mut end
-fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' dec comp_loc_mut end
+fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' .inc .comp_loc_mut end
+fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' .dec .comp_loc_mut end
 
 \ Non-standard and sane: no wraparound semantics.
-fun: within { num floor ceil -- bool } num floor >= num ceil < and end
+fun: .within { num floor ceil -- bool } num floor >= num ceil < .and end
 
 \ ## Varargs and formatting
 
-fun: align_down ( size width -- size ) negate and end
-fun: align_up   { size width -- size } width dec size + width align_down end
+fun: .align_down ( size width -- size ) .negate .and end
+fun: .align_up   { size width -- size } width .dec size + width .align_down end
 
 \ On Arm64, we can't just modify `sp` by 8 bytes and leave it like that.
 \ The ABI requires it to be aligned to 16 bytes when loading or storing.
 \ We duplicate-store to have a predictable value in the upper 8 bytes,
 \ instead of leaving random stack garbage there.
 \
-\ TODO better name: this pops one stack item, but `dup` implies otherwise.
+\ TODO better name: this pops one stack item, but `.dup` implies otherwise.
 fun: dup>systack [
-  inline
-                     asm_pop_x1         comp_instr \ ldr x1, [x27, -8]!
-  1 1 ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x1, [sp, -16]!
+  .inline
+                     .asm_pop_x1         .comp_instr \ ldr x1, [x27, -8]!
+  1 1 ASM_REG_SP -16 .asm_store_pair_pre .comp_instr \ stp x1, x1, [sp, -16]!
 ] end
 
 fun: pair>systack ( Forth: i1 i2 -- | System: -- i1 i2 ) [
-  inline
-                     asm_pop_x1_x2      comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2 ASM_REG_SP -16 asm_store_pair_pre comp_instr \ stp x1, x2, [sp, -16]!
+  .inline
+                     .asm_pop_x1_x2      .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2 ASM_REG_SP -16 .asm_store_pair_pre .comp_instr \ stp x1, x2, [sp, -16]!
 ] end
 
 \ Note: `add` is one of the few instructions which treat `x31` as `sp`
 \ rather than `xzr`. `add x1, sp, 0` disassembles as `mov x1, sp`.
-fun: systack_ptr ( -- sp ) [
-  inline
-  1 ASM_REG_SP 0 asm_add_imm comp_instr \ add x1, sp, 0 | mov x1, sp
-                 asm_push_x1 comp_instr \ str x1, [x27], 8
+fun: systack_ptr [ .plain_call ] ( -- sp ) [
+  .inline
+  1 ASM_REG_SP 0 .asm_add_imm .comp_instr \ add x1, sp, 0 | mov x1, sp
+                 .asm_push_x1 .comp_instr \ str x1, [x27], 8
 ] end
 
 \ For debugging.
-fun: sysstack_frame_ptr ( -- fp ) [
-  inline
-  1 ASM_REG_FP asm_mov_reg comp_instr \ mov x1, x29
-               asm_push_x1 comp_instr \ str x1, [x27], 8
+fun: sysstack_frame_ptr [ .plain_call ] ( -- fp ) [
+  .inline
+  1 ASM_REG_FP .asm_mov_reg .comp_instr \ mov x1, x29
+               .asm_push_x1 .comp_instr \ str x1, [x27], 8
 ] end
 
 \ Short for "compile variadic arguments begin". Assumes the Apple Arm64 ABI
 \ where varargs always use the systack. Modifies the SP which must be later
-\ restored with `comp_va_end`. Doesn't clobber any registers.
+\ restored with `.comp_va_end`. Doesn't clobber any registers.
 \
 \ The input is the amount of vargs.
 \
 \ Unlike in reg-CC, we don't just pop-push pairs, because we have to pop
 \ the precise `len` amount of items from the Forth integer stack.
-fun: comp_va_beg ( C: len -- )
-  if dup odd then
-    xt' dup>systack inline_word
-    dec
+fun: .comp_va_beg ( C: len -- )
+  if .dup .odd .then
+    xt' dup>systack .inline_word
+    .dec
   end
 
-  ifz dup then drop ret end
+  ifz .dup .then .drop .ret end
 
   \ Not odd = automatically aligned to 16.
   loop
-    dup while
-    xt' pair>systack inline_word
+    .dup .while
+    xt' pair>systack .inline_word
     2 -
   end
-  drop
+  .drop
 end
 
 \ Short for "compile variadic arguments end".
-fun: comp_va_end ( C: len -- )
-  if dup then
-    cells 16 align_up
-    ASM_REG_SP ASM_REG_SP rot
-    asm_add_imm comp_instr \ add sp, sp, <off>
+fun: .comp_va_end ( C: len -- )
+  if .dup .then
+    .cells 16 .align_up
+    ASM_REG_SP ASM_REG_SP .rot
+    .asm_add_imm .comp_instr \ add sp, sp, <off>
   else
-    drop
+    .drop
   end
 end
 
 \ The given offset is how many non-vargs precede the vargs.
 \ The given function must have exactly that arity.
-fun: comp_varcall ( C: len fun -- ) ( E: …args… …vargs… -- )
-  over comp_va_beg
-  comp_call
-  comp_va_end
+fun: .comp_varcall ( C: len fun -- ) ( E: …args… …vargs… -- )
+  .over .comp_va_beg
+  .comp_call
+  .comp_va_end
 end
 
-\ Format-print to stdio. `logf` prints to `stdout`. `elogf` prints to `stderr`.
+\ Format-print to stdio. `.logf` prints to `stdout`. `.elogf` prints to `stderr`.
 \ `len` is the count of variadic args, which must be available at compile time.
 \ Usage example:
 \
-\   " numbers: %zd %zd %zd" 10 20 30 [ 3 ] logf lf
-fun_comp: logf ( C: len -- )  ( E: fmt …vargs… -- ) xt' printf comp_varcall end
+\   " numbers: %zd %zd %zd" 10 20 30 [ 3 ] .logf .lf
+fun_comp: .logf ( C: len -- )  ( E: fmt …vargs… -- ) xt' .printf .comp_varcall end
 
-fun_comp: elogf ( C: len -- ) ( E: fmt …vargs… -- )
-  dup comp_va_beg
+fun_comp: .elogf ( C: len -- ) ( E: fmt …vargs… -- )
+  .dup .comp_va_beg
   compile' stderr
-  compile' swap
-  compile' fprintf
-  comp_va_end
+  compile' .swap
+  compile' .fprintf
+  .comp_va_end
 end
 
 \ Formats into a given string buffer. `len` is the amount of variadic args,
 \ which must be available at compile time. Returns the same buffer address.
 \ String is null-terminated. Usage:
 \
-\   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] strf
-fun_comp: strf ( C: len -- ) ( E: buf cap fmt …vargs… -- buf )
-  xt' snprintf comp_varcall
+\   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] .strf
+fun_comp: .strf ( C: len -- ) ( E: buf cap fmt …vargs… -- buf )
+  xt' .snprintf .comp_varcall
 end
 
 \ ## Exceptions
 \
 \ The compiler provides the following exception-related intrinsics:
-\ - `try`
-\ - `throw`
-\ - `catch`
+\ - `.try`
+\ - `.throw`
+\ - `.catch`
 \
 \ The stack-CC version of our system uses `x0` as an exception register,
 \ matching the ABI convention in our C code, where many functions return
@@ -1687,8 +1689,8 @@ end
 \ In contrast, the reg-CC version (see `./lang.af`) doesn't really
 \ have exceptions; it puts errors into word signatures, as params.
 
-fun_comp: catch'  WORDLIST_EXEC catch end
-fun_comp: catch'' WORDLIST_COMP catch end
+fun_comp: catch'  WORDLIST_EXEC .catch end
+fun_comp: catch'' WORDLIST_COMP .catch end
 
 4096    let: ERR_CAP
 ERR_CAP mem: ERR_BUF
@@ -1697,54 +1699,54 @@ ERR_CAP mem: ERR_BUF
 \ which must be available during compilation. Typical usage:
 \
 \   " unable to blah: %zd" err_code errf throw
-fun_comp: errf ( E: fmt …vargs… len -- err )
-  dup      comp_va_beg
+fun_comp: .errf ( E: fmt …vargs… len -- err )
+  .dup      .comp_va_beg
   compile' ERR_BUF
-  compile' ERR_CAP  ( fmt buf cap )
-  compile' rot      ( buf cap fmt )
-  compile' snprintf ( buf cap fmt -- )
-  compile' ERR_BUF  ( -- buf )
-  comp_va_end
+  compile' ERR_CAP   ( fmt buf cap )
+  compile' .rot      ( buf cap fmt )
+  compile' .snprintf ( buf cap fmt -- )
+  compile' ERR_BUF   ( -- buf )
+  .comp_va_end
 end
 
 \ ## Stack printing
 
-fun: log_int  ( num     -- ) " %zd" swap [ 1 ] logf end
-fun: log_cell { num ind -- } " 0x%zx %zd <%zd>" num num ind [ 3 ] logf end
-fun: .        ( num     -- ) stack_len dec log_cell lf end
+fun: .log_int  ( num     -- ) " %zd" .swap [ 1 ] .logf end
+fun: .log_cell { num ind -- } " 0x%zx %zd <%zd>" num num ind [ 3 ] .logf end
+fun: .         ( num     -- ) .stack_len .dec .log_cell .lf end
 
 fun: .s
-  stack_len to: len
+  .stack_len to: len
 
-  ifz len then
-    " stack is empty" log lf
-    ret
+  ifz len .then
+    " stack is empty" .log .lf
+    .ret
   end
 
-  if len <0 then
-    " stack length is negative: " log len log_int lf
-    ret
+  if len <0 .then
+    " stack length is negative: " .log len .log_int .lf
+    .ret
   end
 
-  " stack <%zd>:" len [ 1 ] logf lf
+  " stack <%zd>:" len [ 1 ] .logf .lf
 
   len 0 +for: ind
-    space space
-    ind pick0 ind log_cell lf
+    .space .space
+    ind .pick0 ind .log_cell .lf
   end
 end
 
-fun: .sc .s stack_trunc end
+fun: .sc .s .stack_trunc end
 
 \ ## More memory stuff
 
-0 1 extern: __error
-1 1 extern: strerror
+0 1 extern: .__error  __error
+1 1 extern: .strerror strerror
 
-fun: errno ( -- err ) __error @32 end \ TODO switch to `ldrsw`.
+fun: .errno ( -- err ) .__error @32 end \ TODO switch to `ldrsw`.
 
-6 1 extern: mmap     ( adr len pflag mflag fdes off -- adr|-1 )
-3 1 extern: mprotect ( adr len pflag -- 0|-1 :Cint )
+6 1 extern: .mmap     mmap     ( adr len pflag mflag fdes off -- adr|-1 )
+3 1 extern: .mprotect mprotect ( adr len pflag -- 0|-1 :Cint )
 
 16384 let: PAGE_SIZE
 0     let: PROT_NONE
@@ -1753,23 +1755,23 @@ fun: errno ( -- err ) __error @32 end \ TODO switch to `ldrsw`.
 2     let: MAP_PRIVATE
 4096  let: MAP_ANON
 
-fun: mem_map { size pflag -- addr }
-  MAP_ANON MAP_PRIVATE or      to: mflag
-  0 size pflag mflag -1 0 mmap to: addr
-  if addr -1 = then
+fun: .mem_map { size pflag -- addr }
+  MAP_ANON MAP_PRIVATE .or      to: mflag
+  0 size pflag mflag -1 0 .mmap to: addr
+  if addr -1 = .then
     " unable to map memory; code: %zd; message: %s"
-    errno dup strerror [ 2 ] errf
-    throw
+    .errno .dup .strerror [ 2 ] .errf
+    .throw
   end
   addr
 end
 
-fun: mem_unprot ( addr size -- )
-  PROT_READ PROT_WRITE or mprotect
-  if then
+fun: .mem_unprot ( addr size -- )
+  PROT_READ PROT_WRITE .or .mprotect
+  if .then
     " unable to unprotect memory; code: %zd; message: %s"
-    errno dup strerror [ 2 ] errf
-    throw
+    .errno .dup .strerror [ 2 ] .errf
+    .throw
   end
 end
 
@@ -1777,12 +1779,12 @@ end
 \ Attempting to read or write inside the guards,
 \ aka underflow or overflow, triggers a segfault.
 \ The given size is rounded up to the page size.
-fun: mem_alloc ( size1 -- addr size2 )
-        PAGE_SIZE align_up to: size2
-  size2 PAGE_SIZE 1 lsl +  to: size
-  size  PROT_NONE mem_map  to: addr
-  addr  PAGE_SIZE +        to: addr
-  addr  size2 mem_unprot
+fun: .mem_alloc ( size1 -- addr size2 )
+        PAGE_SIZE .align_up to: size2
+  size2 PAGE_SIZE 1 .lsl +  to: size
+  size  PROT_NONE .mem_map  to: addr
+  addr  PAGE_SIZE +         to: addr
+  addr  size2 .mem_unprot
   addr  size2
 end
 
@@ -1795,13 +1797,13 @@ end
 \ TODO consider compiling with lazy-init; dig up the old code.
 fun: cells_guard: ( C: len "name" -- ) ( E: -- addr )
   word{
-    cells mem_alloc drop
-    1           comp_load  \ ldr x1, <addr>
-    1 asm_push1 comp_instr \ str x2, [x27], 8
+    .cells .mem_alloc .drop
+    1            .comp_load  \ ldr x1, <addr>
+    1 .asm_push1 .comp_instr \ str x2, [x27], 8
   }word
 end
 
 \ ## Misc
 
 \ Comptime analogue of top-level import.
-fun_comp: use' read_word comp_str compile' use end
+fun_comp: use' .read_word .comp_str compile' .use end

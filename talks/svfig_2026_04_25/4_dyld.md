@@ -1,8 +1,8 @@
 ```forth
 
-1 0 extern: puts
+1 0 extern: .puts puts
 
-: main " hello" puts ;
+: .main " hello" .puts ;
 
 ```
 

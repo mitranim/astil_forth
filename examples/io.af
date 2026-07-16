@@ -7,7 +7,7 @@ use' io.af
 
 \ ## Stat
 
-fun: example_file_stat { -- err }
+fun: .example_file_stat { -- err }
   " examples/io.af" { path }
   alloca' Fstat     { stat }
 
@@ -31,7 +31,7 @@ end
 
 128 mem: BUF
 
-fun: example_seek_and_thou_shall_find { -- Err }
+fun: .example_seek_and_thou_shall_find { -- Err }
   " examples/io.af" { path }
   path " r" .file_open .try { file }
   37 91 { off cap }

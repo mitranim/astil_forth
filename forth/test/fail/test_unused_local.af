@@ -1,2 +1,2 @@
 \ Must fail to compile.
-fun: test_unused_local_fail { val } end
+fun: .test_unused_local_fail { val } end
