@@ -69,10 +69,7 @@ static Err interp_fun(Interp *interp, Wordlist list) {
   Word_str name;
   try(interp_read_word(interp, &name));
   try(interp_fun_begin(interp, list, name));
-
-  const auto sym = interp_semicolon_sym(interp);
-  try(int_stack_push(&interp->ints, (Sint)sym));
-  return nullptr;
+  return interp_semicolon_push(interp);
 }
 
 static Err intrin_fun(Interp *interp) {
@@ -87,14 +84,14 @@ static Err intrin_define_fun(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
   try(interp_fun_begin(interp, WORDLIST_EXEC, name));
-  return nullptr;
+  return interp_semicolon_push(interp);
 }
 
 static Err intrin_define_fun_comp(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
   try(interp_fun_begin(interp, WORDLIST_COMP, name));
-  return nullptr;
+  return interp_semicolon_push(interp);
 }
 
 static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }

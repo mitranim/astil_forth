@@ -107,13 +107,12 @@ static Err intrin_semicolon(Interp *interp) {
 
 static Sym *interp_semicolon_sym(Interp *interp) { return interp->syms.floor; }
 
-static Err intrin_end(Interp *interp) {
-#ifdef CALL_CONV_STACK
-  if (!stack_len(&interp->ints) && interp->comp.ctx.sym) {
-    return intrin_semicolon(interp);
-  }
-#endif
+static Err interp_semicolon_push(Interp *interp) {
+  const auto sym = interp_semicolon_sym(interp);
+  return int_stack_push(&interp->ints, (Sint)sym);
+}
 
+static Err intrin_end(Interp *interp) {
   if (!stack_len(&interp->ints)) {
     return err_str("unexpected `end`: no structure to close");
   }

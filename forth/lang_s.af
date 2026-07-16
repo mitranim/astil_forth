@@ -928,14 +928,13 @@ fun: stack-         ( … diff -- … )   .inc .cells .sp .swap - sp! end
 \ compilation, which is currently supported only in reg-CC.
 \ In stack-CC, either way would work.
 
-\ For words which define words. Kinda like `create`.
-fun_comp: word{
-  compile' .read_word compile' .define_fun compile' .plain_call
-end
-fun_comp: }word compile'' end 0 .comp_only end
-
 \ Similar to standard `constant`.
-fun: let: ( C: val -- ) ( E: -- val ) word{ .comp_push }word end
+fun: let: ( C: val "name" -- ) ( E: -- val )
+  .read_word .define_fun .plain_call
+    .swap .comp_push
+  call'' end
+  [ 0 .comp_only ]
+end
 
 0 let: nil
 0 let: false
@@ -943,35 +942,38 @@ fun: let: ( C: val -- ) ( E: -- val ) word{ .comp_push }word end
 
 \ Similar to standard `variable`.
 fun: var: ( C: init "name" -- ) ( E: -- adr )
-  word{
+  .read_word .define_fun .plain_call .swap
     .sp CELL -                    \ Address of the `init` value.
     CELL         .comp_alloc_data ( -- adr )
     1            .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     .asm_push_x1 .comp_instr      \ str x1, [x27], 8
     .drop                         \ Don't need the `init` value anymore.
-  }word
+  call'' end
+  [ false .comp_only ]
 end
 
 \ Shortcut for the standard idiom `create <name> N allot`.
 \ Like `buf:` but doesn't return capacity.
 fun: mem: ( C: cap "name" -- ) ( E: -- adr )
-  word{
+  .read_word .define_fun .plain_call .swap
     nil .swap    .comp_alloc_data ( -- adr )
     1            .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     .asm_push_x1 .comp_instr      \ str x1, [x27], 8
-  }word
+  call'' end
+  [ false .comp_only ]
 end
 
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
 \ at least the given capacity in bytes.
 fun: buf: ( C: cap "name" -- ) ( E: -- adr cap )
-  word{
+  .read_word .define_fun .plain_call .swap
     .dup nil .swap .comp_alloc_data ( -- adr )
     1              .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     .asm_push_x1   .comp_instr      \ str x1, [x27], 8
                    .comp_push       \ str <cap>, [x27], 8
-  }word
+  call'' end
+  [ false .comp_only ]
 end
 
 \ ## Locals: basic
@@ -1796,11 +1798,12 @@ end
 \
 \ TODO consider compiling with lazy-init; dig up the old code.
 fun: cells_guard: ( C: len "name" -- ) ( E: -- addr )
-  word{
+  .read_word .define_fun .plain_call .swap
     .cells .mem_alloc .drop
     1            .comp_load  \ ldr x1, <addr>
     1 .asm_push1 .comp_instr \ str x2, [x27], 8
-  }word
+  call'' end
+  [ false .comp_only ]
 end
 
 \ ## Misc

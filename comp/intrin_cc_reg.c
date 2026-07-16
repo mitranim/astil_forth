@@ -225,22 +225,14 @@ static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin_raw(interp, WORDLIST_EXEC, name));
-
-  const auto sym = interp_semicolon_sym(interp);
-  try(int_stack_push(&interp->ints, (Sint)sym));
-
-  return nullptr;
+  return interp_semicolon_push(interp);
 }
 
 static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin_raw(interp, WORDLIST_COMP, name));
-
-  const auto sym = interp_semicolon_sym(interp);
-  try(int_stack_push(&interp->ints, (Sint)sym));
-
-  return nullptr;
+  return interp_semicolon_push(interp);
 }
 
 static Err intrin_ret(Interp *interp) {
