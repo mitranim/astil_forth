@@ -2236,22 +2236,18 @@ fun: int: { size -- err } ( C: "name" -- ) ( E: -- type )
   .read_word size size .define_type
 end
 
-\ SYNC[type_fields].
-fun: .sizeof { type -> size } @ end
-
 fun: size' { -- size err } ( C: "type" -- )
-  WORDLIST_EXEC .next_word .call_xt STACK s> .sizeof
+  \ SYNC[type_fields].
+  WORDLIST_EXEC .next_word .call_xt STACK s> @
 end
 
 fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
   call' size' .comp_push
 end
 
-\ SYNC[type_fields].
-fun: .alignof { type -> align } +cell @ end
-
 fun: align' { -- align err } ( C: "type" -- )
-  WORDLIST_EXEC .next_word .call_xt STACK s> .alignof
+  \ SYNC[type_fields].
+  WORDLIST_EXEC .next_word .call_xt STACK s> +cell @
 end
 
 fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
@@ -2312,8 +2308,9 @@ end
 \   Elem_type 32 field: .Some_field
 \   Some_arr  1  field: .Some_field
 fun: arr: { type len -- err } ( C: "name" -- ) ( E: -- type )
-  type .sizeof len * { size }
-  type .alignof      { align }
+  \ SYNC[type_fields].
+  type @       len * { size }
+  type +cell @       { align }
   .read_word size align .define_type
 end
 
@@ -2409,7 +2406,8 @@ fun: .define_agg_field
   \ Since aggregate types are intended for C interop, alignment of every field
   \ must match the platform's C ABI. So far, ABI compat seems to hold.
   \ We still need more comprehensive tests.
-  type .sizeof len * { size }
+  \ SYNC[type_fields].
+  type @ len * { size }
 
   mode AGG_UNION = .then
     name name_len 0 .define_field_word
@@ -2435,7 +2433,7 @@ end
 fun: field: { mode agg_align off fun type len -- mode align off fun err }
   ( C: "name" -- )
   ( E: struct_adr -- field_adr )
-  type .alignof { align }
+  type +cell @ { align } \ SYNC[type_fields].
   .read_word mode agg_align align off type len .define_agg_field fun
 end
 
@@ -3953,7 +3951,7 @@ fun: .stack_init_ctx { size type stk -- ctx Err }
   size stk .stack_init .try
 
   stk .Stack_floor @ { ctx }
-  type .sizeof { size }
+  type .Type_size @ { size } \ SYNC[type_fields].
   ctx size + { top }
   stk .Stack_ceil @ { ceil }
 
