@@ -27,6 +27,9 @@ BUILD = ("make", "PROD=true", "build")
 
 TOOLS = {
     "clang": ("clang", "--version"),
+    "go": ("go", "version"),
+    "zig": ("zig", "version"),
+    "java": ("java", "-version"),
     "gforth": ("gforth", "--version"),
     "luajit": ("luajit", "-v"),
     "bun": ("bun", "--version"),
@@ -67,6 +70,18 @@ def bench(
 
 def c_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
     return (("make", "PROD=true", exe),)
+
+
+def go_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
+    return (("go", "build", "-o", exe, f"./{src}"),)
+
+
+def zig_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
+    return (("zig", "build-exe", "-O", "ReleaseFast", f"-femit-bin={exe}", src),)
+
+
+def java_class(src: str) -> tuple[tuple[str, ...], ...]:
+    return (("javac", src),)
 
 
 def aot(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
@@ -188,6 +203,30 @@ bench("scan_delims_js_bun", "bench/scan_delims.mjs", "bun run bench/scan_delims.
 bench("scan_delims_cl_sbcl", "bench/scan_delims.lisp", "sbcl --script bench/scan_delims.lisp", tools=("sbcl",))
 bench("scan_delims_pypy", "bench/scan_delims.py", "pypy3 bench/scan_delims.py", tools=("pypy3",))
 bench("scan_delims_python", "bench/scan_delims_cpython.py", "python3 bench/scan_delims_cpython.py", tools=("python3",))
+
+section("BINARY TREE")
+bench("bin_tree_clang", "bench/bin_tree.c", "bench/bin_tree.exe", setup=c_exe("bench/bin_tree.c", "bench/bin_tree.exe"), tools=("clang",))
+bench("bin_tree_astil_aot", "bench/bin_tree.af", "bench/bin_tree_astil.exe", setup=aot("bench/bin_tree.af", "bench/bin_tree_astil.exe"), tools=("clang",))
+bench("bin_tree_astil_reg", "bench/bin_tree.af", "./astil.exe bench/bin_tree.af", setup=(BUILD,), tools=("clang",))
+bench("bin_tree_astil_stack", "bench/bin_tree_s.af", "./astil_s.exe bench/bin_tree_s.af", setup=(BUILD,), tools=("clang",))
+bench("bin_tree_gforth", "bench/bin_tree_g.fs", "gforth bench/bin_tree_g.fs -e bye", tools=("gforth",))
+bench("bin_tree_zig", "bench/bin_tree.zig", "bench/bin_tree_zig.exe", setup=zig_exe("bench/bin_tree.zig", "bench/bin_tree_zig.exe"), tools=("zig",))
+bench("bin_tree_go", "bench/bin_tree.go", "bench/bin_tree_go.exe", setup=go_exe("bench/bin_tree.go", "bench/bin_tree_go.exe"), tools=("go",))
+bench("bin_tree_luajit", "bench/bin_tree.lua", "luajit bench/bin_tree.lua", tools=("luajit",))
+bench("bin_tree_js_bun", "bench/bin_tree.mjs", "bun run bench/bin_tree.mjs", tools=("bun",))
+bench("bin_tree_js_bun_lucky", "bench/bin_tree_lucky.mjs", "bun run bench/bin_tree_lucky.mjs", tools=("bun",))
+bench("bin_tree_java", "bench/bin_tree.java", "java -cp bench bin_tree", setup=java_class("bench/bin_tree.java"), tools=("java",))
+bench("bin_tree_cl_sbcl", "bench/bin_tree.lisp", "sbcl --script bench/bin_tree.lisp", tools=("sbcl",))
+bench("bin_tree_pypy", "bench/bin_tree.py", "pypy3 bench/bin_tree.py", tools=("pypy3",))
+bench("bin_tree_python", "bench/bin_tree.py", "python3 bench/bin_tree.py", tools=("python3",))
+
+section("BINARY TREE BULK")
+bench("bin_tree_clang_bulk", "bench/bin_tree_bulk.c", "bench/bin_tree_bulk.exe", setup=c_exe("bench/bin_tree_bulk.c", "bench/bin_tree_bulk.exe"), tools=("clang",))
+bench("bin_tree_astil_aot_bulk", "bench/bin_tree_bulk.af", "bench/bin_tree_bulk_astil.exe", setup=aot("bench/bin_tree_bulk.af", "bench/bin_tree_bulk_astil.exe"), tools=("clang",))
+bench("bin_tree_astil_reg_bulk", "bench/bin_tree_bulk.af", "./astil.exe bench/bin_tree_bulk.af", setup=(BUILD,), tools=("clang",))
+bench("bin_tree_astil_stack_bulk", "bench/bin_tree_bulk_s.af", "./astil_s.exe bench/bin_tree_bulk_s.af", setup=(BUILD,), tools=("clang",))
+bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk_g.fs", "gforth bench/bin_tree_bulk_g.fs -e bye", tools=("gforth",))
+bench("bin_tree_go_bulk", "bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe", setup=go_exe("bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe"), tools=("go",))
 
 
 def parse_args() -> argparse.Namespace:

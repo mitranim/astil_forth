@@ -1,0 +1,100 @@
+use' lang.af
+
+\ Like `./bin_tree.af` but with full prealloc and one-loop init.
+
+struct: Node
+  Adr 1 field: .Node_left
+  Adr 1 field: .Node_right
+end
+
+fun: .node_tree_len { dep -- len } 2 dep .lsl .dec end
+
+fun: .node_tree_init { dep -- node err }
+  dep .node_tree_len { len }
+  len size' Node * { size }
+  size align' Node .ctx_alloc { root }
+  root size .memzero
+
+  len 2 / { ceil }
+  0 { ind }
+  loop
+    ind ceil < .while
+    ind size' Node * root + { node }
+    ind 1 .lsl .inc size' Node * root + { next }
+    next node .Node_left  !
+    next size' Node + node .Node_right !
+    inc: ind
+  end
+
+  root
+end
+
+fun: .node_tree_count { node -- len }
+  node =0 .then 0 .ret end
+  1 { out }
+  node .Node_left  @ .recur +: out
+  node .Node_right @ .recur +: out
+  out
+end
+
+fun: .run { -- err }
+  4 { min_dep }
+  18 { max_dep }
+  max_dep .inc { stretch_dep }
+
+  1024 { cap }
+  cap .alloca { out }
+  out { buf }
+
+  .ctx_top { base }
+  max_dep .node_tree_init { long_lived_tree }
+  .ctx_top { long }
+
+  stretch_dep .node_tree_init .node_tree_count { count }
+  long .ctx_top_set
+
+  buf cap " stretch tree of depth %zd; count: %zd%c"
+  stretch_dep count LF .strf_into { buf cap }
+
+  min_dep { depth }
+  loop
+    depth max_dep <= .while
+    0 { count }
+    1 max_dep depth - min_dep + .lsl { iters }
+    iters { runs }
+
+    loop
+      runs .while
+      dec: runs
+      depth .node_tree_init .node_tree_count +: count
+      long .ctx_top_set
+    end
+
+    buf cap " %zd trees of depth %zd; count: %zd%c"
+    iters depth count LF .strf_into { buf cap }
+    2 +: depth
+  end
+
+  long_lived_tree .node_tree_count { count }
+  buf cap " long lived tree of depth %zd; count: %zd%c"
+  max_dep count LF .strf_into { buf cap }
+  base .ctx_top_set
+
+  out " stretch tree of depth 19; count: 1048575
+262144 trees of depth 4; count: 8126464
+65536 trees of depth 6; count: 8323072
+16384 trees of depth 8; count: 8372224
+4096 trees of depth 10; count: 8384512
+1024 trees of depth 12; count: 8387584
+256 trees of depth 14; count: 8388352
+64 trees of depth 16; count: 8388544
+16 trees of depth 18; count: 8388592
+long lived tree of depth 18; count: 524287
+" .assert_str_eq
+end
+.run
+
+fun: .main { -- exit }
+  .with_main_ctx .run end { err }
+  err .then " error: %s" err .elogf .elf 1 else 0 end
+end

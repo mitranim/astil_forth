@@ -4000,7 +4000,19 @@ fun_comp: .with_ctx { -- end_xt err } ( E: ctx -- )
 end
 
 fun: .ctx_top { -- top } context .Ctx_top @ end
+
+fun_comp: .ctx_top { -- err } ( E: … -- … top )
+  .comp_alloc_next_reg ASM_REG_CTX 1 .asm_load_off .comp_instr \ ldr <top>, [x28, #8]
+end
+
 fun: .ctx_top_set { top } top context .Ctx_top ! end
+
+fun_comp: .ctx_top_set { -- err } ( E: … top -- … )
+  1 nil .comp_args_min
+  .comp_args_get .dec { top }
+  top ASM_REG_CTX 1 .asm_store_off .comp_instr \ str <top>, [x28, #8]
+  top .comp_args_set
+end
 
 \ Allocates memory in the current ambient context.
 fun: .ctx_alloc { size align -- adr err }

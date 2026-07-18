@@ -29,6 +29,9 @@
 /bench/*
 !/bench/*.md
 !/bench/*.c
+!/bench/*.go
+!/bench/*.zig
+!/bench/*.java
 !/bench/*.af
 !/bench/*.fs
 !/bench/*.lua

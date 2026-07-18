@@ -879,6 +879,29 @@ fun: .test_call_frame { -- err }
 end
 .test_call_frame
 
+fun: .test_ctx_top_get_codegen_fun { keep -- keep top } keep .ctx_top end
+fun: .test_ctx_top_set_codegen_fun { keep top -- keep } keep top .ctx_top_set end
+fun: .test_ctx_top_roundtrip_codegen_fun .ctx_top .ctx_top_set end
+
+fun: .test_ctx_top_codegen { -- err }
+  context .Ctx_top @ { top }
+  99 .test_ctx_top_get_codegen_fun { keep act }
+  assert= keep 99 end
+  assert= act top end
+  assert= 99 top .test_ctx_top_set_codegen_fun 99 end
+
+  1 ASM_REG_CTX 1 .asm_load_off { load }
+  1 ASM_REG_CTX 1 .asm_store_off { store }
+  assert= xt' .test_ctx_top_get_codegen_fun load .test_word_instr_count 1 end
+  assert= xt' .test_ctx_top_set_codegen_fun store .test_word_instr_count 1 end
+
+  0 ASM_REG_CTX 1 .asm_load_off { load }
+  0 ASM_REG_CTX 1 .asm_store_off { store }
+  assert= xt' .test_ctx_top_roundtrip_codegen_fun load .test_word_instr_count 1 end
+  assert= xt' .test_ctx_top_roundtrip_codegen_fun store .test_word_instr_count 1 end
+end
+.test_ctx_top_codegen
+
 fun: .test_then_cmp_zero_fusion_fun { val -- out }
   0 { out }
   val 0 = .then 7 { out } end

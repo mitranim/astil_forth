@@ -1,0 +1,96 @@
+use' lang_s.af
+
+\ BOT-TRANSLATED from reg-CC file.
+
+2 .cells let: NODE_SIZE
+
+fun: .Node_left  ( node -- field ) end
+fun: .Node_right ( node -- field ) CELL + end
+
+fun: .node_tree_init ( dep -- node )
+  NODE_SIZE CELL .ctx_alloc
+
+  .over .then
+    .swap .dec .swap
+    .over .recur .over .Node_left !
+    .over .recur .over .Node_right !
+  else
+    nil .over .Node_left !
+    nil .over .Node_right !
+  end
+
+  .nip
+end
+
+fun: .node_tree_count ( node -- len )
+  .dup =0 .then .drop 0 .ret end
+  .dup .Node_left @ .recur
+  .swap .Node_right @ .recur
+  + .inc
+end
+
+fun: .str_append { buf cap str -- buf cap }
+  str .strlen { len }
+  len cap .dec 0 .max .min { len }
+  buf str len .memcpy
+  cap .then nil buf len + c! end
+  buf len +
+  cap len -
+end
+
+fun: .run
+  4 { min_dep }
+  18 { max_dep }
+  max_dep .inc { stretch_dep }
+
+  1024 1 .ctx_alloc { out }
+  out { buf }
+  1024 { cap }
+
+  context .Ctx_top @ { base }
+  max_dep .node_tree_init { long_lived_tree }
+  context .Ctx_top @ { long }
+
+  stretch_dep .node_tree_init .node_tree_count { count }
+  long .ctx_top_set
+
+  buf cap " stretch tree of depth %zd; count: %zd%c"
+  stretch_dep count LF [ 3 ] .errf .str_append { buf cap }
+  long .ctx_top_set
+
+  min_dep { depth }
+  loop
+    depth max_dep <= .while
+    1 max_dep depth - min_dep + .lsl { iters }
+
+    0
+    iters .for
+      depth .node_tree_init .node_tree_count +
+      long .ctx_top_set
+    end
+    { count }
+
+    buf cap " %zd trees of depth %zd; count: %zd%c"
+    iters depth count LF [ 4 ] .errf .str_append { buf cap }
+    long .ctx_top_set
+    depth 2 + { depth }
+  end
+
+  long_lived_tree .node_tree_count { count }
+  buf cap " long lived tree of depth %zd; count: %zd%c"
+  max_dep count LF [ 3 ] .errf .str_append { buf cap }
+  base .ctx_top_set
+
+  out " stretch tree of depth 19; count: 1048575
+262144 trees of depth 4; count: 8126464
+65536 trees of depth 6; count: 8323072
+16384 trees of depth 8; count: 8372224
+4096 trees of depth 10; count: 8384512
+1024 trees of depth 12; count: 8387584
+256 trees of depth 14; count: 8388352
+64 trees of depth 16; count: 8388544
+16 trees of depth 18; count: 8388592
+long lived tree of depth 18; count: 524287
+" cstr<> .then " binary tree output mismatch" .throw end
+end
+.run
