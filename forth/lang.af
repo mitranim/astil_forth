@@ -2263,6 +2263,20 @@ fun: is_aligned_to' { adr -- bool err }
   adr size .is_aligned_to
 end
 
+\ Shortcut for returning the shape of the type named by the next word.
+\ `size align` is often passed to allocation words, like `.ctx_alloc`.
+fun: shape' { -- size align err } ( C: "type" -- )
+  WORDLIST_EXEC .next_word .call_xt STACK s> { typ }
+  \ SYNC[type_fields].
+  typ @ typ +cell @
+end
+
+fun_comp: shape' { -- err } ( C: "type" -- ) ( E: -- size align )
+  call' shape' { size align }
+  size .comp_push
+  align .comp_push
+end
+
 \ ### Integer types
 \
 \ Assumes Arm64 + Apple ABI.
@@ -4006,6 +4020,14 @@ fun: .ctx_avail { align -- buf cap }
   ctx .Ctx_top @ align .align_up { buf }
   ctx .Ctx_ceil @ buf - 0 .max { cap }
   buf cap
+end
+
+\ Shortcut for allocating one object described by a statically-named type
+\ using the current ambient memory context. The memory state is undefined.
+\ Deallocation is done in bulk via `.ctx_top_set`.
+fun_comp: new' { -- err } ( C: "type" -- ) ( E: -- adr )
+  call'' shape'
+  compile' .ctx_alloc
 end
 
 \ ## Loops
