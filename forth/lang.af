@@ -3924,7 +3924,7 @@ end
 
 \ Default per-arena memory capacity we use internally.
 \ Apps are free to choose their own arena capacities.
-1 30 .lsl let: CTX_CAP
+MAIN_ARENA_LEN let: CTX_CAP
 
 \ Initialize context with borrowed memory.
 fun: .ctx_init { buf len ctx }
