@@ -4427,6 +4427,28 @@ fun_comp: .errf { -- err } ( E: fmt …vargs… -- err )
   len .comp_va_end
 end
 
+\ Truncation succeeds; other failures produce an empty append.
+fun: .strf_into { buf cap fmt vlist -- buf cap }
+  buf cap fmt vlist .vsnprintf .cint_to_cell { len }
+  len <0 .then
+    cap .then nil buf !b end
+    buf cap .ret
+  end
+  len cap .dec 0 .max .min { len }
+  buf len +
+  cap len -
+end
+
+\ Formats into a given buffer, returning the remaining buffer and capacity:
+\
+\   buf cap " codes: %zd" 10 .strf_into { buf cap }
+fun_comp: .strf_into { -- err } ( E: buf cap fmt …vargs… -- buf cap )
+  3 .comp_va_beg { len }
+  call'' systack_ptr
+  compile' .strf_into
+  len .comp_va_end
+end
+
 \ For functions like `.snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
 fun: .validate_format_len { len -- len err }
