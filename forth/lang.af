@@ -1429,11 +1429,11 @@ end
 \     Adr  1 field: .Stack_cellar  \ Lower guard.
 \     Adr  1 field: .Stack_floor   \ First data cell.
 \     Adr  1 field: .Stack_top     \ Next data cell.
-\     Adr  1 field: .Stack_ceil    \ After last data cell.
+\     Adr  1 field: .Stack_ceil    \ Higher guard.
 \   end
 \
 \ See `.stack_init` for guarded allocation via memory mapping.
-\ A stack can also be allocated without guards if so desired.
+\ A stack can also be allocated without guards, if so desired.
 \
 \ The stack operations below have somewhat suboptimal performance.
 \ They're meant primarily for control frames, used in compilation
@@ -1455,9 +1455,8 @@ end
 \ Not available when running in AOT-compiled mode.
 \
 \ SYNC[interp_fields].
-fun_comp: STACK { -- err } ( E: -- adr )
-  [ .plain_call ]
-  \ mov <arg>, x28; add <arg>, <arg>, offsetof(Interp, ints)
+fun_comp: STACK { -- err } ( E: -- adr ) [ .plain_call ]
+  \ mov <reg>, x28 ; add <reg>, <reg>, <offsetof(Interp, ints)>
   .comp_alloc_next_reg { reg }
   reg ASM_REG_CTX .asm_mov_reg .comp_instr
   reg reg INTERP_INTS_OFF .asm_add_imm .comp_instr
@@ -1466,14 +1465,12 @@ end
 
 fun: STACK { -- adr } [ .plain_call ] STACK end
 
-\ ldur <out>, [<stk>, STACK_OFF_TOP]
 fun: .asm_stack_top_load { out stk -> instr }
-  STACK_OFF_TOP .asm_load_unscaled_off
+  STACK_OFF_TOP .asm_load_unscaled_off \ ldur <out>, [<stk>, STACK_OFF_TOP]
 end
 
-\ stur <out>, [<stk>, STACK_OFF_TOP]
 fun: .asm_stack_top_store { out stk -> instr }
-  STACK_OFF_TOP .asm_store_unscaled_off
+  STACK_OFF_TOP .asm_store_unscaled_off \ stur <out>, [<stk>, STACK_OFF_TOP]
 end
 
 \ Pops a cell from a stack. Usage:
@@ -1919,50 +1916,60 @@ fun: .instr_adr     { off -> adr } interp_instrs + end
 \
 \ All control structures pass around a "meta" cell.
 \
-\ SYNC[control_meta_layout]:
+\ Lower 32 bits: inp_len, out_len, has_out, branch_type,
+\ backend-defined instruction info.
 \
-\ - 19..63: instruction offset
-\ - 15..18: branch_cond + 1, or 0 for none
-\ -     14: exec_prev
-\ -     13: 0 / 1 = `cbz` / `cbnz`
-\ -     12: has_else
-\ -     11: has_out_len
-\ -     10: has_inp_len
-\ -   5..9: out_len
-\ -   0..4: inp_len
+\ Above 32 bits: packed instruction offset.
 \
-\ Instruction offset describes the start of some conditional branch or loop.
-\ It's used to compile PC-relative branch instructions at the branch points.
+\ Instruction offset describes start of some conditional branch or loop.
+\ It's used to compile PC-relative branch instructions at branch points.
 \
 \ `inp_len` and `out_len` record "register stack length" or "arg length"
-\ at branch entry and exit points respectively. `has_inp` and `has_out`
-\ record whether we've already recorded / inferred respective lengths.
+\ at branch entry and exit points. `has_out` distinguishes unknown output
+\ length from a known zero output length.
 \
-\ Branch points must validate matching lengths. Such as:
-\ in conditionals, every `.then` takes the same `inp_len`,
-\ and `out_len` must match between every `elif else end`.
+\ Output arity remains shared across a conditional chain so each completed
+\ branch can be diagnosed at its closing `elif` or `else`.
 \
-\ Single-bit masks are used with `or and`.
-\ Multi-bit masks must be used with `bit_mask_get bit_mask_set`.
+\ Single-bit masks are used with `.or .and`.
+\ Multi-bit masks must be used with `.bit_mask_get .bit_mask_set`.
 
 ASM_ARG_LEN_MAX .bit_len .low_bits let: CONT_MASK_INP_LEN
-CONT_MASK_INP_LEN CONT_MASK_INP_LEN .bit_len .lsl let: CONT_MASK_OUT_LEN
 
-1 CONT_MASK_OUT_LEN .bit_len   .lsl      let: CONT_MASK_HAS_INP
-CONT_MASK_HAS_INP            1 .lsl      let: CONT_MASK_HAS_OUT
-CONT_MASK_HAS_OUT            1 .lsl      let: CONT_MASK_HAS_ELSE
-CONT_MASK_HAS_ELSE           1 .lsl      let: CONT_MASK_CBNZ
-CONT_MASK_CBNZ 1 .lsl                    let: CONT_MASK_EXEC_PREV
-0b1111 CONT_MASK_EXEC_PREV .bit_len .lsl let: CONT_MASK_BRANCH_COND
+CONT_MASK_INP_LEN
+CONT_MASK_INP_LEN .bit_len .lsl
+let: CONT_MASK_OUT_LEN
 
-CONT_MASK_BRANCH_COND .bit_len .low_bits .invert let: CONT_MASK_INSTR_OFF
+1 CONT_MASK_OUT_LEN .bit_len .lsl
+let: CONT_MASK_HAS_OUT
+
+0 let: ASM_BRANCH_TYPE_CBZ
+1 let: ASM_BRANCH_TYPE_CBNZ
+2 let: ASM_BRANCH_TYPE_COND
+
+ASM_BRANCH_TYPE_COND .bit_len .low_bits
+CONT_MASK_HAS_OUT .bit_len .lsl
+let: CONT_MASK_BRANCH_TYPE
+
+32 .low_bits
+CONT_MASK_BRANCH_TYPE .bit_len .low_bits .bits_clear
+let: CONT_MASK_INSTR_INFO
+
+32 .low_bits .invert let: CONT_MASK_INSTR_OFF
 
 fun: .cont_meta_instr_off_set { off meta -- meta }
   off .instr_off_pack meta CONT_MASK_INSTR_OFF .bit_mask_set
 end
 
-fun: .cont_meta_instr_adr { meta -> adr }
-  CONT_MASK_INSTR_OFF .bit_mask_get .instr_off_unpack .instr_adr
+fun: .cont_meta_instr_set { off type info meta -- meta }
+  type meta CONT_MASK_BRANCH_TYPE .bit_mask_set { meta }
+  info meta CONT_MASK_INSTR_INFO .bit_mask_set { meta }
+  off meta .cont_meta_instr_off_set
+end
+
+fun: .cont_meta_instr_adr { meta -- adr }
+  meta CONT_MASK_INSTR_OFF .bit_mask_get
+  .instr_off_unpack .instr_adr
 end
 
 fun: .reserve_instr { -- off err }
@@ -1971,205 +1978,210 @@ fun: .reserve_instr { -- off err }
   off
 end
 
-\ ## Conditionals
-\
-\ The general idea is to reserve branching instructions,
-\ then patch them later via words like `else` and `end`.
-\ We pass instruction address offsets through the control
-\ stack, along with extra metadata about input and output
-\ length at branch points.
-\
-\   if pred .then \ cbz <outside>
-\     if_true
-\   end
-\   outside
-\
-\   if pred .then \ cbz <if_false>
-\     if_true
-\   else      \ b <outside>
-\     if_false
-\   end
-\   outside
-\
-\ Unlike other Forth systems, we also support chains of "elif",
-\ terminated with a single "end", which is generic: it pops one
-\ XT from the stack and calls it. The XT can pop another one,
-\ popping multiple control frames in a chain.
-\
-\ Conditional chains involving `elif` have two passes.
-\ In the forward pass, every `else elif elifz` calls
-\ one previous frame, with special flags passed through
-\ the "meta" input. `else` pushes one replacement frame,
-\ `elif elifz` push two replacement frames; the second
-\ frame is configured to also call the first one.
-\ When `end` calls the last frame, the entire prior
-\ chain calls as a backwards pass, retropatching
-\ instructions reserved by each `else elif elifz`.
-
-fun: .if_patch { reg meta -- err }
-  meta .cont_meta_instr_adr { adr }
-  .here_write adr - { off }
-  meta CONT_MASK_CBNZ .and { cbnz }
-  reg off cbnz .asm_cmp_branch adr !32 \ cbz/cbnz Xn, <target>
+\ `cbz|cbnz|b.<cond>` depending on branch type and instruction info.
+\ Not to be confused with `.asm_branch_cond` which is `b.<cond>`.
+fun: .asm_cond_branch { reg off type info -- instr }
+  reg off type ASM_BRANCH_TYPE_CBNZ = .asm_cmp_branch { cmp_instr }
+  off info .asm_branch_cond { cond_instr }
+  \ Branchlessly select the instruction; don't have `.then` yet.
+  cmp_instr cond_instr type ASM_BRANCH_TYPE_COND = * .fallback
 end
 
-fun: .if_end_xt { meta -- err }
-  .comp_barrier
-  0 " branch outputs" .comp_args_valid
-  meta CONT_MASK_INP_LEN .bit_mask_get meta .if_patch
-end
-
-\ Early definition; used in bare form: `pred .then end`.
-fun_comp: .then { -- meta end_xt err } ( E: pred -- )
-  .comp_barrier
-  1 " arguments before `.then`" .comp_args_valid
-  0 .comp_args_set
-  .reserve_instr 0 .cont_meta_instr_off_set xt' .if_end_xt
-end
-
+\ Decode `cset`, returning its destination register and asm condition.
 fun: .asm_cset_decode { instr -- reg cond ok }
-  \ `cset` with `Rd` and `cond` masked out.
-  0b1_1_1_11111111_11111_0000_1_1_11111_00000 { mask }
-
   instr 0b11111 .and { reg }
   instr 12 .lsr 0b1111 .and 1 .xor { cond }
 
-  instr mask .and ASM_OP_CSET =
+  \ `cset` with `Rd` and `cond` masked out.
+  instr 0b1_1_1_11111111_11111_0000_1_1_11111_00000 .and ASM_OP_CSET =
   cond ASM_AL <> .and
   cond ASM_NV <> .and { ok }
 
   reg cond ok
 end
 
-fun: .control_try_cset_branch { pred_reg branch_on_true meta -- meta fused err }
-  .here_write ASM_INSTR_SIZE - { adr }
-  adr @u32 .asm_cset_decode { cset_reg cond ok }
-  ok cset_reg pred_reg = .and { fused }
-  fused .then
-    branch_on_true =0 .then cond 1 .xor { cond } end
-    cond .inc meta CONT_MASK_BRANCH_COND .bit_mask_set { meta }
-    adr .instr_off meta .cont_meta_instr_off_set { meta }
-  end
-  meta fused
+\ ## Conditionals
+\
+\ General idea: reserve branching instructions, then patch them later via
+\ `else` and `end`. Instruction offsets and arities travel in control meta.
+\
+\   pred .then \ cbz <outside>
+\     if_true
+\   end
+\   outside
+\
+\   pred .then \ cbz <if_false>
+\     if_true
+\   else       \ b <outside>
+\     if_false
+\   end
+\   outside
+\
+\ Unlike other Forth systems, we also support chains of `elif`, terminated
+\ with a single `end`. Generic `end` pops one XT from the control stack and
+\ calls it; that XT may chain into the previous frame.
+\
+\ Conditional chains involving `elif` have two passes. In the forward pass,
+\ every `elif else` closes and validates one branch. `elif` leaves a frame
+\ for its unconditional jump plus a marker requiring `<predicate> .then`.
+\ In the backward pass, the final `end` follows prior frames, patching every
+\ unconditional jump to the common endpoint.
+
+fun: .cond_branch_patch { meta -- err }
+  meta .cont_meta_instr_adr { adr }
+  meta CONT_MASK_INP_LEN .bit_mask_get { reg }
+  meta CONT_MASK_BRANCH_TYPE .bit_mask_get { type }
+  meta CONT_MASK_INSTR_INFO .bit_mask_get { info }
+  .here_write adr - { off }
+  reg off type info .asm_cond_branch adr !32
 end
 
-fun: .if_patch { reg meta -- err } [ .redefine ]
-  meta CONT_MASK_BRANCH_COND .bit_mask_get { cond }
-  cond .then
-    meta .cont_meta_instr_adr { adr }
-    .here_write adr - { off }
-    cond .dec { cond }
-    off cond .asm_branch_cond adr !32 \ b.<cond> <target>
-    .ret
-  end
-  reg meta .if_patch
+fun: .comp_branch_patch { meta -> err }
+  .cont_meta_instr_adr { adr }
+  .here_write adr - .asm_branch adr !32
 end
 
-\ Now that we have nullary conditionals, we can redefine
-\ them into full-blown arity-aware condition expressions.
-
-\ Called either during the forward pass by `else elif elifz`,
-\ or during the backward pass by `end`.
-fun: .if_end_xt { meta -- err } [ .redefine ]
+fun: .then_end_xt { meta -- err }
   .comp_barrier
-  meta CONT_MASK_INP_LEN .bit_mask_get meta .if_patch
+  0 " branch outputs" .comp_args_valid
+  meta .cond_branch_patch
+end
 
-  meta CONT_MASK_HAS_ELSE .and =0 .then
-    meta CONT_MASK_INP_LEN .bit_mask_get
-    " arguments before ending conditional without `else`"
-    .comp_args_valid
+\ Early one-branch conditional, used only to bootstrap the final definitions.
+fun_comp: .then { -- meta end_xt err } ( E: pred -- )
+  .comp_barrier
+  1 " arguments before `.then`" .comp_args_valid
+  0 .comp_args_set
+  .reserve_instr ASM_BRANCH_TYPE_CBZ nil nil .cont_meta_instr_set
+  xt' .then_end_xt
+end
+
+\ Now that we have basic branching, we can define
+\ full-blown arity-aware condition expressions.
+
+fun: .cond_branch_beg { pred_reg meta -- meta err }
+  .here_write ASM_INSTR_SIZE - { cset_adr }
+  cset_adr ASM_INSTR_SIZE - { cmp_adr }
+  cset_adr @u32 { cset_instr }
+
+  \ Tiny peephole fusion: `val =0 .then|.while`:
+  \
+  \   cmp val, 0; cset val, eq
+  \   ->
+  \   cbnz val, out
+  pred_reg .asm_cmp_zero cmp_adr @u32 = { is_cmp_zero }
+  pred_reg ASM_EQ .asm_cset cset_instr = { is_cset_eq }
+  is_cset_eq is_cmp_zero .and .then
+    .comp_instr_drop
+    ASM_PLACEHOLDER cmp_adr !32
+    cmp_adr .instr_off
+    ASM_BRANCH_TYPE_CBNZ
+    nil meta .cont_meta_instr_set .ret
   end
 
-  \ Only in the backward pass.
-  meta CONT_MASK_EXEC_PREV .and .then call'' end end
+  \ Other comparisons: `cmp lhs, rhs; cset pred, lt` -> `cmp lhs, rhs; b.ge out`.
+  cset_instr .asm_cset_decode { cset_reg cond ok }
+  ok cset_reg pred_reg = .and .then
+    cset_adr .instr_off
+    ASM_BRANCH_TYPE_COND cond 1 .xor
+    meta .cont_meta_instr_set .ret
+  end
+
+  .reserve_instr ASM_BRANCH_TYPE_CBZ nil meta .cont_meta_instr_set
 end
 
-fun_comp: if  { -- meta end_xt } [ .plain_call true .comp_only ]
-  nil xt' .if_end_xt
-end
-
-fun_comp: ifz { -- meta end_xt } [ .plain_call true .comp_only ]
-  CONT_MASK_CBNZ xt' .if_end_xt
-end
-
-\ Caution: after this definition, `if ifz` are required,
-\ and bare `.then` is invalid. Shape: `if pred .then end`.
-fun_comp: .then { meta end_xt -- meta end_xt err } ( E: pred -- ) [ .redefine ]
+fun: .then_end_xt { meta -- err } [ .redefine ]
   .comp_barrier
+  meta CONT_MASK_INP_LEN .bit_mask_get { len }
+
+  len " arguments before ending conditional without `else`" .comp_args_valid
+  meta CONT_MASK_HAS_OUT .and .then
+    meta CONT_MASK_OUT_LEN .bit_mask_get
+    " branch outputs do not match conditional inputs" .comp_args_valid
+  end
+
+  meta .cond_branch_patch
+  call'' end
+end
+
+fun: .cond_chain_end_xt { meta -> err } .comp_branch_patch call'' end end
+
+fun: .else_end_xt { meta -- err }
+  .comp_barrier
+  meta CONT_MASK_OUT_LEN .bit_mask_get
+  " branch outputs" .comp_args_valid
+  meta .cond_chain_end_xt
+end
+
+fun: .elif_invalid_end_xt { _meta -- err }
+  " unexpected end after `elif`; expected `elif <predicate> .then`"
+end
+
+fun_comp: .then { prev_xt -- meta end_xt err } ( E: …args… pred -- …args… )
+  [ .redefine ]
+  .comp_barrier
+
   " arguments before `.then`" { msg }
-  meta CONT_MASK_HAS_INP .and { has }
 
-  has .then
+  \ This XT-comparison hack lets us use `.then`
+  \ in two ways: bare and after `elif`.
+  xt' .elif_invalid_end_xt prev_xt = { continued }
+
+  \ `<pred> .then` opener: infer arity.
+  continued =0 .then
+    1 msg .comp_args_min
+    .comp_args_get .dec { len }
+    len nil CONT_MASK_INP_LEN .bit_mask_set { meta }
+    prev_xt  STACK >s
+    xt' .nop STACK >s
+  end
+
+  \ `elif <pred> .then` continuation: validate arity.
+  continued .then
+    STACK s> { meta }
     meta CONT_MASK_INP_LEN .bit_mask_get { len }
     len .inc msg .comp_args_valid
   end
 
-  has =0 .then
-    1 msg .comp_args_min
-    .comp_args_get .dec { len }
-    len meta CONT_MASK_INP_LEN .bit_mask_set CONT_MASK_HAS_INP .or { meta }
-  end
-
   len .comp_args_set
-  len meta CONT_MASK_CBNZ .and meta .control_try_cset_branch { meta fused }
-
-  \ Fused path patches old `cset`; fallback reserves a fresh `cbz/cbnz`.
-  fused =0 .then
-    .reserve_instr meta .cont_meta_instr_off_set { meta }
-  end
-  meta end_xt
+  len meta .cond_branch_beg xt' .then_end_xt
 end
 
-fun: .else_patch { meta -- err }
-  meta .cont_meta_instr_adr { adr }
-  .here_write adr - .asm_branch adr !32
-end
-
-fun: .else_end_xt { meta -- err }
-  .comp_barrier
-  meta .else_patch
-  meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
-  if meta CONT_MASK_EXEC_PREV .and .then call'' end end
-end
-
-fun_comp: else { meta end_xt -- meta end_xt err }
+fun_comp: else { meta then_end_xt -- meta end_xt err }
   [ .plain_call ]
+
+  then_end_xt xt' .then_end_xt <> .then
+    then_end_xt xt' .elif_invalid_end_xt = .then
+      meta .elif_invalid_end_xt
+    end
+    " unexpected `else`: no branch to close" .throw
+  end
+
   .comp_barrier
-  .reserve_instr { off }
 
-  meta
-    CONT_MASK_HAS_ELSE .or
-    CONT_MASK_EXEC_PREV .bits_clear
-  STACK >s
-  end_xt .call_xt
-
-  off meta .cont_meta_instr_off_set { meta }
   meta CONT_MASK_HAS_OUT .and { has }
-
-  if has .then
-    meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
+  has .then
+    meta CONT_MASK_OUT_LEN .bit_mask_get
+    " branch outputs" .comp_args_valid
+  end
+  has =0 .then
+    .comp_args_get meta CONT_MASK_OUT_LEN .bit_mask_set
+    CONT_MASK_HAS_OUT .or { meta }
   end
 
-  ifz has .then
-    .comp_args_get meta CONT_MASK_OUT_LEN .bit_mask_set CONT_MASK_HAS_OUT .or { meta }
-  end
-
+  .reserve_instr { off }
+  meta .cond_branch_patch
   meta CONT_MASK_INP_LEN .bit_mask_get .comp_args_set
-  meta xt' .else_end_xt
+
+  off meta .cont_meta_instr_off_set
+  xt' .else_end_xt
 end
 
-fun_comp: elif { meta end_xt -> else_meta else_xt meta end_xt err }
+fun_comp: elif { meta then_end_xt -> chain_meta chain_end_xt meta end_xt err }
   [ .plain_call ]
-  call'' else { meta else_xt }
-  meta else_xt
-  meta CONT_MASK_EXEC_PREV .or xt' .if_end_xt
-end
-
-fun_comp: elifz { meta end_xt -> else_meta else_xt meta end_xt err }
-  [ .plain_call ]
-  call'' else { meta else_xt }
-  meta else_xt
-  meta CONT_MASK_EXEC_PREV .or CONT_MASK_CBNZ .or xt' .if_end_xt
+  call'' else { meta -- }
+  meta xt' .cond_chain_end_xt
+  meta xt' .elif_invalid_end_xt
 end
 
 \ ## Types
@@ -2352,14 +2364,14 @@ end
 \ Compile field access, which computes address + offset.
 fun: .comp_struct_field { off -- err }
   .comp_args_get { len }
-  ifz len .then " struct field must be preceded by struct pointer" .throw end
-  ifz off .then .ret end
+  len =0 .then " struct field must be preceded by struct address" .throw end
+  off =0 .then .ret end
 
   \ Same reg: replace prior address with address + offset.
   len .dec { adr_reg }
   adr_reg .comp_realloc_reg \ Disassociate locals from this reg.
 
-  if off ASM_MAX_IMM12 <= .then
+  off ASM_MAX_IMM12 <= .then
     adr_reg adr_reg off .asm_add_imm .comp_instr \ add <adr>, <adr>, <off>
   else
     .comp_alloc_next_reg { off_reg }
@@ -2377,7 +2389,7 @@ fun: .define_field_word { name name_len off -- err }
   name name_len .define_fun
     1 1 false .comp_signature_set ( E: struct_adr -- field_adr )
     1 .comp_args_set
-    if off .then off .comp_push compile' + end
+    off .then off .comp_push compile' + end
   call'' end
 
   \ Compile-time semantics.
@@ -2399,7 +2411,7 @@ fun: .define_agg_field
   \ We still need more comprehensive tests.
   type .sizeof len * { size }
 
-  if mode AGG_UNION = .then
+  mode AGG_UNION = .then
     name name_len 0 .define_field_word
     mode agg_align align .max off size .max .ret
   end
@@ -2669,7 +2681,7 @@ fun: .call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
 \ used inside other words, even when compiling other comptime words.
 \ For example, using this `.call` word inside another `fun_comp` word
 \ invokes `.call` at comptime, and compiles a runtime call of some
-\ dynamically-provided instruction pointer, usually from `instr'`.
+\ dynamically-provided instruction address, usually from `instr'`.
 \ For the newly-defined comptime word, that call runs at comptime
 \ of _other_ words where it's later used.
 \
@@ -2680,11 +2692,11 @@ fun: .call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
 fun_comp: .call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   .comp_args_get { len }
 
-  ifz len .then
+  len =0 .then
     " unable to compile `.call`: at least 1 argument is required" .throw
   end
 
-  if len ASM_PARAM_LEN_MAX .inc > .then
+  len ASM_PARAM_LEN_MAX .inc > .then
     " unable to compile `.call`: 8 param registers available, 9 arguments provided" .throw
   end
 
@@ -2696,11 +2708,11 @@ fun_comp: .call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   interp .Interp_comp_field .Interp_comp_ctx_field .Interp_comp_ctx_sym @ { sym }
   sym .Sym_callees .Interp_set_len @u32 0 = { leaf }
 
-  if leaf .then
+  leaf .then
     ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 .asm_store_pair_pre .comp_instr \ stp x29, x30, [sp, #-16]!
   end
   len .dec .asm_branch_link_reg .comp_instr \ blr <fun>
-  if leaf .then
+  leaf .then
     ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 .asm_load_pair_post .comp_instr  \ ldp x29, x30, [sp], #16
   end
 end
@@ -2709,7 +2721,7 @@ end
 
 fun: .asm_ror64 { val rot -- out }
   rot 63 .and { rot }
-  ifz rot .then val .ret end
+  rot =0 .then val .ret end
 
   val rot .lsr
   val 64 rot - .lsl
@@ -2717,10 +2729,10 @@ fun: .asm_ror64 { val rot -- out }
 end
 
 fun: .asm_logical_imm_enc { imm -- N immr imms err }
-  if imm 0 = .then
+  imm 0 = .then
     " unable to encode logical immediate: 0 is reserved" .throw
   end
-  if imm .invert 0 = .then
+  imm .invert 0 = .then
     " unable to encode logical immediate: all ones is reserved" .throw
   end
 
@@ -2730,7 +2742,7 @@ fun: .asm_logical_imm_enc { imm -- N immr imms err }
   norm .invert .bit_ctz { ones }
   zeros ones + { size }
 
-  if imm size .asm_ror64 imm <> .then
+  imm size .asm_ror64 imm <> .then
     " unable to encode logical immediate: value is not a repeated bitmask" .throw
   end
 
@@ -2783,18 +2795,18 @@ end
 
 fun: .asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
   \ Prefer unsigned scaled addressing: it has much larger range.
-  if off >=0 .then
+  off >=0 .then
     1 size .lsl { width }
-    ifz off width .mod .then
+    off width .mod =0 .then
       off width / { imm }
-      if imm ASM_MAX_IMM12 <= .then
+      imm ASM_MAX_IMM12 <= .then
         Rt Xn imm size opc .asm_load_store_off true .ret
       end
     end
   end
 
   \ Fall back to unscaled addressing for small byte-precision offsets.
-  if off -256 >= off 255 <= .and .then
+  off -256 >= off 255 <= .and .then
     Rt Xn off size opc .asm_load_store_unscaled_off true .ret
   end
 
@@ -2835,7 +2847,7 @@ end
 
 fun: .cf_fold_cleared1 { -- reg imm ok err }
   .cf_args_fold1 { reg imm consumed }
-  ifz consumed .then reg 0 false .ret end
+  consumed =0 .then reg 0 false .ret end
   reg imm true
 end
 
@@ -2849,8 +2861,8 @@ end
 
 fun: .cf_fold_cleared2 { -- reg imm0 imm1 ok err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
-  if consumed 2 <> .then
-    if consumed 1 = .then imm1 reg1 .comp_load end
+  consumed 2 <> .then
+    consumed 1 = .then imm1 reg1 .comp_load end
     0 0 0 false .ret
   end
   reg0 imm0 imm1 true
@@ -2868,23 +2880,23 @@ fun: .cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
 end
 
 fun: .cf_restore_rhs { reg1 imm1 consumed -- err }
-  if consumed 1 = .then imm1 reg1 .comp_load end
+  consumed 1 = .then imm1 reg1 .comp_load end
 end
 
 fun: .cf_fold2_valid { lhs bad0 msg0 bad1 msg1 -- reg0 reg1 imm0 imm1 consumed ok err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 known consumed }
 
-  if known .then
-    if imm1 bad0 = .then msg0 .throw end
-    if msg1 .then if imm1 bad1 = .then msg1 .throw end end
+  known .then
+    imm1 bad0 = .then msg0 .throw end
+    msg1 .then imm1 bad1 = .then msg1 .throw end end
   end
 
-  if consumed 2 <> .then reg0 reg1 imm0 imm1 consumed false .ret end
+  consumed 2 <> .then reg0 reg1 imm0 imm1 consumed false .ret end
 
-  if imm1 bad0 = lhs imm0 bad0 = .and .or .then msg0 .throw end
+  imm1 bad0 = lhs imm0 bad0 = .and .or .then msg0 .throw end
 
-  if msg1 .then
-    if imm1 bad1 = lhs imm0 bad1 = .and .or .then msg1 .throw end
+  msg1 .then
+    imm1 bad1 = lhs imm0 bad1 = .and .or .then msg1 .throw end
   end
   reg0 reg1 imm0 imm1 consumed
   true
@@ -2892,8 +2904,8 @@ end
 
 \ Fits the unsigned immediate accepted by our `add/sub #imm12` utils.
 fun: .cf_addsub_imm12_mag { imm -- mag ok }
-  if imm >=0 .then imm imm ASM_MAX_IMM12 <= .ret end
-  if imm ASM_MAX_IMM12 .negate >= .then imm .negate true .ret end
+  imm >=0 .then imm imm ASM_MAX_IMM12 <= .ret end
+  imm ASM_MAX_IMM12 .negate >= .then imm .negate true .ret end
   0 false
 end
 
@@ -2902,11 +2914,11 @@ fun: .cf_validate { imm validate_inp validate -> aux ok err }
 end
 
 fun: .cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validate emit fallback -- err }
-  if consumed 1 >= .then
+  consumed 1 >= .then
     \ RHS constant: `num 10 +`.
     imm1 validate_inp validate .cf_validate { aux ok }
     reg1 .inc .comp_args_set
-    if ok .then
+    ok .then
       reg0 .comp_realloc_reg
       reg0 reg0 imm1 aux emit .call [ 1 .comp_args_set ] .try
       reg0 .inc .comp_args_set
@@ -2919,12 +2931,12 @@ fun: .cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp valida
 end
 
 fun: .cf_shift_validate { imm reg_op -- aux ok err }
-  ifz imm .then " redundant arithmetic" .throw end
+  imm =0 .then " redundant arithmetic" .throw end
   reg_op imm 0 >= imm 63 <= .and
 end
 
 fun: .cf_shift_emit { reg0 reg1 imm reg_op -- err }
-  if reg_op ASM_OP_LSL_REG = .then
+  reg_op ASM_OP_LSL_REG = .then
     64 imm - 6 .bits_trunc { immr }
     63 imm - 6 .bits_trunc { imms }
     reg0 reg1 immr imms ASM_OP_UBFM .asm_bitfield .comp_instr \ lsl Xd, Xn, #imm6
@@ -2941,7 +2953,7 @@ fun: .cf_logical_validate { imm aux -- aux ok Err }
   aux inv - { op }
   imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .and .or { edge }
   imm inv ?invert { imm }
-  if edge .then " redundant arithmetic" .throw end
+  edge .then " redundant arithmetic" .throw end
   imm op .asm_logical_imm_mask =0
 end
 
@@ -2950,7 +2962,7 @@ fun: .cf_logical_emit { reg0 reg1 _imm mask -- err }
 end
 
 fun: .cf_align_validate { size _ -- aux ok Err }
-  if size 1 = .then " redundant arithmetic" .throw end
+  size 1 = .then " redundant arithmetic" .throw end
   size .dec ASM_OP_ANDS_IMM .asm_logical_imm_mask =0
 end
 
@@ -2960,7 +2972,7 @@ fun: .cf_align_emit { out adr _size mask -- err }
 end
 
 fun: .cf_align_down_validate { size _ -- aux ok Err }
-  if size 1 = .then " redundant arithmetic" .throw end
+  size 1 = .then " redundant arithmetic" .throw end
   size .negate ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
@@ -2969,7 +2981,7 @@ fun: .cf_align_down_emit { out len _size mask -- err }
 end
 
 fun: .cf_align_up_validate { size _ -- aux ok Err }
-  if size 1 = .then " redundant arithmetic" .throw end
+  size 1 = .then " redundant arithmetic" .throw end
   size .dec .cf_imm_u12 { add_ok }
   size .negate ASM_OP_AND_IMM .asm_logical_imm_mask { mask mask_err }
   mask add_ok mask_err =0 .and
@@ -2981,23 +2993,23 @@ fun: .cf_align_up_emit { out len size mask -- err }
 end
 
 fun: .cf_bits_trunc_validate { len _ -- aux ok Err }
-  if len 0 <= len 64 >= .or .then " redundant arithmetic" .throw end
+  len 0 <= len 64 >= .or .then " redundant arithmetic" .throw end
   len .low_bits ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
 fun: .cf_bit_mask_validate { mask -- err }
-  if mask .then
+  mask .then
     mask mask .bit_ctz .lsr { packed }
-    if packed packed .inc .and =0 .then .ret end
+    packed packed .inc .and =0 .then .ret end
   end
   " invalid bit mask: expected nonzero contiguous mask" .throw
 end
 
 fun: .cf_bit_mask_get_validate { mask _ -- aux ok Err }
-  if mask -1 = .then " redundant arithmetic" .throw end
+  mask -1 = .then " redundant arithmetic" .throw end
   mask .cf_bit_mask_validate .try
   mask ASM_OP_AND_IMM .asm_logical_imm_mask { instr_mask err }
-  if err .then nil false .ret end
+  err .then nil false .ret end
   mask .bit_ctz 32 .lsl instr_mask .or true
 end
 
@@ -3009,7 +3021,7 @@ fun: .cf_bit_mask_get_emit { out src _mask aux -- err }
 end
 
 fun: .cf_addsub_validate { imm add -- aux ok err }
-  ifz imm .then " redundant arithmetic" .throw end
+  imm =0 .then " redundant arithmetic" .throw end
   imm .cf_addsub_imm12_mag { -- ok }
   add ok
 end
@@ -3021,23 +3033,23 @@ end
 
 fun: .cf_pow2_validate { imm flags -- aux ok err }
   " redundant arithmetic" { err }
-  ifz imm .then
-    if flags 1 .and .then err .throw end
+  imm =0 .then
+    flags 1 .and .then err .throw end
     nil false .ret
   end
-  if imm 1 = .then err .throw end
+  imm 1 = .then err .throw end
   imm <0 { neg }
-  if neg .then
-    ifz flags 1 .and .then nil false .ret end
+  neg .then
+    flags 1 .and =0 .then nil false .ret end
     imm .negate { imm }
   end
-  if imm imm .dec .and .then nil false .ret end
+  imm imm .dec .and .then nil false .ret end
   imm .bit_ctz neg 6 .lsl .or { aux }
   aux true
 end
 
 fun: .cf_pow2_validate_reject_1 { imm msg -- aux ok err }
-  if imm 1 = .then msg .throw end
+  imm 1 = .then msg .throw end
   imm nil .cf_pow2_validate
 end
 
@@ -3054,7 +3066,7 @@ end
 fun: .cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
   aux 0x3f .and { shift }
   reg0 reg1 shift .asm_lsl_imm .comp_instr \ lsl Xd, Xn, #imm6
-  if aux 0x40 .and .then
+  aux 0x40 .and .then
     reg0 .asm_neg .comp_instr \ neg Xd, Xn
   end
 end
@@ -3094,9 +3106,9 @@ fun: .comp_loc_mut_imm { reg_op validate_inp validate emit -- err }
 
   .comp_loc_mut_arg_prepare { reg loc imm consumed }
 
-  if consumed .then
+  consumed .then
     imm validate_inp validate .cf_validate { aux ok }
-    if ok .then reg loc imm aux emit .comp_loc_mut_fold_imm .ret end
+    ok .then reg loc imm aux emit .comp_loc_mut_fold_imm .ret end
     imm reg .comp_load
   end
 
@@ -3125,7 +3137,7 @@ fun: .comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- 
   loc .comp_push_from_local
   candidate .inc { cur }
 
-  if zero .then
+  zero .then
     candidate candidate cur cond .comp_emit_csel_nonzero
   else
     candidate cur candidate cur candidate cond .comp_emit_csel_reg
@@ -3143,9 +3155,9 @@ end
 fun: .comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rhs -- )
   .comp_loc_mut_arg_prepare { reg loc imm consumed }
 
-  if consumed .then
+  consumed .then
     imm cond validate .cf_validate { aux ok }
-    if ok .then reg loc imm aux emit .comp_loc_mut_fold_imm .ret end
+    ok .then reg loc imm aux emit .comp_loc_mut_fold_imm .ret end
     imm reg .comp_load
   end
 
@@ -3157,7 +3169,7 @@ end
 fun_comp: .or { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .or .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .or .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_ORR_IMM
   instr' .cf_logical_validate instr' .cf_logical_emit xt'' .or
   .cf_fold2_partial_or_fallback
@@ -3173,7 +3185,7 @@ end
 fun_comp: .and { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .and .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .and .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_AND_IMM
   instr' .cf_logical_validate instr' .cf_logical_emit xt'' .and
   .cf_fold2_partial_or_fallback
@@ -3188,7 +3200,7 @@ end
 
 fun_comp: .xor { -- err } [ .redefine ]
   true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .xor .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .xor .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_EOR_IMM
   instr' .cf_logical_validate instr' .cf_logical_emit xt'' .xor
   .cf_fold2_partial_or_fallback
@@ -3203,7 +3215,7 @@ end
 
 fun_comp: .lsl { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .lsl .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .lsl .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_LSL_REG
   instr' .cf_shift_validate instr' .cf_shift_emit xt'' .lsl
   .cf_fold2_partial_or_fallback
@@ -3211,7 +3223,7 @@ end
 
 fun_comp: .lsr { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .lsr .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .lsr .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_LSR_REG
   instr' .cf_shift_validate instr' .cf_shift_emit xt'' .lsr
   .cf_fold2_partial_or_fallback
@@ -3219,7 +3231,7 @@ end
 
 fun_comp: .asr { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .asr .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .asr .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_ASR_REG
   instr' .cf_shift_validate instr' .cf_shift_emit xt'' .asr
   .cf_fold2_partial_or_fallback
@@ -3227,7 +3239,7 @@ end
 
 fun_comp: + { -- err } [ .redefine ]
   true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 + .cf_fold_done .ret end
+  ok .then reg imm0 imm1 + .cf_fold_done .ret end
   reg reg1 imm1 consumed true
   instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' +
   .cf_fold2_partial_or_fallback
@@ -3242,7 +3254,7 @@ end
 
 fun_comp: - { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 - .cf_fold_done .ret end
+  ok .then reg imm0 imm1 - .cf_fold_done .ret end
   reg reg1 imm1 consumed false
   instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' -
   .cf_fold2_partial_or_fallback
@@ -3251,7 +3263,7 @@ end
 fun_comp: * { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err 1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 * .cf_fold_done .ret end
+  ok .then reg imm0 imm1 * .cf_fold_done .ret end
   reg reg1 imm1 consumed true
   instr' .cf_pow2_validate instr' .cf_mul_pow2_emit xt'' *
   .cf_fold2_partial_or_fallback
@@ -3271,7 +3283,7 @@ fun_comp: / { -- err } [ .redefine ]
   " redundant arithmetic: division by 0 -> 0" { err0 }
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 / .cf_fold_done .ret end
+  ok .then reg imm0 imm1 / .cf_fold_done .ret end
   reg1 imm1 consumed .cf_restore_rhs call'' /
 end
 
@@ -3279,7 +3291,7 @@ fun_comp: u/ { -- err } [ .redefine ]
   " redundant arithmetic: division by 0 -> 0" { err0 }
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 u/ .cf_fold_done .ret end
+  ok .then reg imm0 imm1 u/ .cf_fold_done .ret end
   reg reg1 imm1 consumed err1
   instr' .cf_pow2_validate_reject_1 instr' .cf_udiv_pow2_emit xt'' u/
   .cf_fold2_partial_or_fallback
@@ -3289,7 +3301,7 @@ fun_comp: .mod { -- err } [ .redefine ]
   " redundant arithmetic: modulo by 0 -> dividend" { err0 }
   " redundant arithmetic: modulo by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .mod .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .mod .cf_fold_done .ret end
   reg1 imm1 consumed .cf_restore_rhs call'' .mod
 end
 
@@ -3297,7 +3309,7 @@ fun_comp: .umod { -- err } [ .redefine ]
   " redundant arithmetic: modulo by 0 -> dividend" { err0 }
   " redundant arithmetic: modulo by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .umod .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .umod .cf_fold_done .ret end
   reg reg1 imm1 consumed err1
   instr' .cf_pow2_validate_reject_1 instr' .cf_umod_pow2_emit xt'' .umod
   .cf_fold2_partial_or_fallback
@@ -3307,7 +3319,7 @@ fun_comp: /mod { -- err } [ .redefine ]
   " redundant arithmetic: div by 0 -> quo 0, rem dividend" { err0 }
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
-  if ok .then reg0 reg1 imm0 imm1 /mod .cf_fold_done2 .ret end
+  ok .then reg0 reg1 imm0 imm1 /mod .cf_fold_done2 .ret end
   reg1 imm1 consumed .cf_restore_rhs call'' /mod
 end
 
@@ -3315,12 +3327,12 @@ fun_comp: u/mod { -- err } [ .redefine ]
   " redundant arithmetic: div by 0 -> quo 0, rem dividend" { err0 }
   " redundant arithmetic: division by 1" { err1 }
   false 0 err0 1 err1 .cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
-  if ok .then reg0 reg1 imm0 imm1 u/mod .cf_fold_done2 .ret end
+  ok .then reg0 reg1 imm0 imm1 u/mod .cf_fold_done2 .ret end
   reg1 imm1 consumed .cf_restore_rhs call'' u/mod
 end
 
 fun_comp: .inc { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call'' .inc end
+  .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call'' .inc end
 end
 
 \ Increment a local: `inc: some_val`.
@@ -3329,7 +3341,7 @@ fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .dec { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call'' .dec end
+  .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call'' .dec end
 end
 
 \ Decrement a local: `dec: some_val`.
@@ -3338,7 +3350,7 @@ fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .negate { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call'' .negate end
+  .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call'' .negate end
 end
 
 \ Negate a local: `negate: some_val`.
@@ -3349,7 +3361,7 @@ fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .abs { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call'' .abs end
+  .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call'' .abs end
 end
 
 \ Absolute-value a local: `abs: some_val`.
@@ -3360,7 +3372,7 @@ fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .bit_clz { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call'' .bit_clz end
+  .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call'' .bit_clz end
 end
 
 \ Count leading zeros in a local: `bit_clz: some_val`.
@@ -3371,7 +3383,7 @@ fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .bit_ctz { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call'' .bit_ctz end
+  .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call'' .bit_ctz end
 end
 
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
@@ -3382,7 +3394,7 @@ fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .bit_len { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call'' .bit_len end
+  .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call'' .bit_len end
 end
 
 \ Compute bit length into a local: `bit_len: some_val`.
@@ -3394,7 +3406,7 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .pow2_ceil { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call'' .pow2_ceil end
+  .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call'' .pow2_ceil end
 end
 
 \ Round-up a local to a power of two: `pow2_ceil: some_val`.
@@ -3407,7 +3419,7 @@ end
 
 \ No partial CF: `csel` needs both values in regs; constants still cost `mov`.
 fun_comp: .min { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call'' .min end
+  .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call'' .min end
 end
 
 \ Minimum into a local: `candidate min: some_val`.
@@ -3416,7 +3428,7 @@ fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: .umin { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call'' .umin end
+  .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call'' .umin end
 end
 
 \ Unsigned minimum into a local: `candidate umin: some_val`.
@@ -3425,7 +3437,7 @@ fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: .max { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call'' .max end
+  .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call'' .max end
 end
 
 \ Maximum into a local: `candidate max: some_val`.
@@ -3434,7 +3446,7 @@ fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: .umax { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call'' .umax end
+  .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call'' .umax end
 end
 
 \ Unsigned maximum into a local: `candidate umax: some_val`.
@@ -3444,7 +3456,7 @@ end
 
 \ No partial CF: adopted child of the min/max family.
 fun_comp: .fallback { -- err } [ .redefine ]
-  if .cf_fold_cleared2 .then .fallback .cf_fold_done
+  .cf_fold_cleared2 .then .fallback .cf_fold_done
   else { -- } call'' .fallback end
 end
 
@@ -3454,7 +3466,7 @@ fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: .cint_to_cell { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .cint_to_cell .cf_fold_done
+  .cf_fold_cleared1 .then .cint_to_cell .cf_fold_done
   else { -- } call'' .cint_to_cell end
 end
 
@@ -3466,7 +3478,7 @@ fun_comp: cint_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: =0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then =0 .cf_fold_done else { -- } call'' =0 end
+  .cf_fold_cleared1 .then =0 .cf_fold_done else { -- } call'' =0 end
 end
 
 \ In-place local test: `=0: some_val`.
@@ -3475,7 +3487,7 @@ fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <>0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then <>0 .cf_fold_done else { -- } call'' <>0 end
+  .cf_fold_cleared1 .then <>0 .cf_fold_done else { -- } call'' <>0 end
 end
 
 \ In-place local test: `<>0: some_val`.
@@ -3484,7 +3496,7 @@ fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then <0 .cf_fold_done else { -- } call'' <0 end
+  .cf_fold_cleared1 .then <0 .cf_fold_done else { -- } call'' <0 end
 end
 
 \ In-place local test: `<0: some_val`.
@@ -3493,7 +3505,7 @@ fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then >0 .cf_fold_done else { -- } call'' >0 end
+  .cf_fold_cleared1 .then >0 .cf_fold_done else { -- } call'' >0 end
 end
 
 \ In-place local test: `>0: some_val`.
@@ -3502,7 +3514,7 @@ fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <=0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then <=0 .cf_fold_done else { -- } call'' <=0 end
+  .cf_fold_cleared1 .then <=0 .cf_fold_done else { -- } call'' <=0 end
 end
 
 \ In-place local test: `<=0: some_val`.
@@ -3511,7 +3523,7 @@ fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >=0 { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then >=0 .cf_fold_done else { -- } call'' >=0 end
+  .cf_fold_cleared1 .then >=0 .cf_fold_done else { -- } call'' >=0 end
 end
 
 \ In-place local test: `>=0: some_val`.
@@ -3522,7 +3534,7 @@ end
 fun: .cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
 
-  if consumed 2 = .then
+  consumed 2 = .then
     imm0 imm1 raw_xt .sym_instr .call [ 1 .comp_args_set ] { bool }
     reg0 bool .cf_fold_done .ret
   end
@@ -3585,7 +3597,7 @@ fun_comp: u>= { -- err } [ .redefine ]
 end
 
 fun_comp: .cells { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call'' .cells end
+  .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call'' .cells end
 end
 
 \ Scale a local by cell size: `cells: some_val`.
@@ -3594,7 +3606,7 @@ fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: /cells { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then /cells .cf_fold_done else { -- } call'' /cells end
+  .cf_fold_cleared1 .then /cells .cf_fold_done else { -- } call'' /cells end
 end
 
 \ Divide a local by cell size: `/cells: some_val`.
@@ -3603,7 +3615,7 @@ fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: +cell { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then +cell .cf_fold_done else { -- } call'' +cell end
+  .cf_fold_cleared1 .then +cell .cf_fold_done else { -- } call'' +cell end
 end
 
 \ Add one cell to a local: `+cell: some_val`.
@@ -3612,7 +3624,7 @@ fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: -cell { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then -cell .cf_fold_done else { -- } call'' -cell end
+  .cf_fold_cleared1 .then -cell .cf_fold_done else { -- } call'' -cell end
 end
 
 \ Subtract one cell from a local: `-cell: some_val`.
@@ -3621,7 +3633,7 @@ fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .odd { -- err }
-  if .cf_fold_cleared1 .then 1 .and .cf_fold_done
+  .cf_fold_cleared1 .then 1 .and .cf_fold_done
   else
     { -- }
     .comp_args1_reg { reg }
@@ -3640,7 +3652,7 @@ end
 
 fun_comp: .is_aligned_to { -- err } [ .redefine ]
   false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .is_aligned_to .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .is_aligned_to .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
   instr' .cf_align_validate instr' .cf_align_emit xt'' .is_aligned_to
   .cf_fold2_partial_or_fallback
@@ -3648,7 +3660,7 @@ end
 
 fun_comp: .align_down { -- err } [ .redefine ]
   false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .align_down .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .align_down .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
   instr' .cf_align_down_validate instr' .cf_align_down_emit xt'' .align_down
   .cf_fold2_partial_or_fallback
@@ -3656,14 +3668,14 @@ end
 
 fun_comp: .align_up { -- err } [ .redefine ]
   false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .align_up .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .align_up .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
   instr' .cf_align_up_validate instr' .cf_align_up_emit xt'' .align_up
   .cf_fold2_partial_or_fallback
 end
 
 fun_comp: .invert { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call'' .invert end
+  .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call'' .invert end
 end
 
 \ Invert a local: `invert: some_val`.
@@ -3674,7 +3686,7 @@ fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .low_bits { -- err } [ .redefine ]
-  if .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call'' .low_bits end
+  .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call'' .low_bits end
 end
 
 \ Set a local to a mask of its low bit count: `low_bits: some_val`.
@@ -3688,7 +3700,7 @@ end
 fun_comp: .bits_trunc { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   false 0 err 64 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .bits_trunc .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bits_trunc .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
   instr' .cf_bits_trunc_validate instr' .cf_logical_emit xt'' .bits_trunc
   .cf_fold2_partial_or_fallback
@@ -3697,7 +3709,7 @@ end
 fun_comp: .bits_clear { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   false 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  if ok .then reg imm0 imm1 .bits_clear .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bits_clear .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_AND_IMM 1 .or
   instr' .cf_logical_validate instr' .cf_logical_emit xt'' .bits_clear
   .cf_fold2_partial_or_fallback
@@ -3705,8 +3717,8 @@ end
 
 fun_comp: .bit_mask_get { -- err } [ .redefine ]
   .cf_args_fold2 { reg reg1 src mask _known consumed }
-  if consumed 2 = .then
-    if mask -1 = .then " redundant arithmetic" .throw end
+  consumed 2 = .then
+    mask -1 = .then " redundant arithmetic" .throw end
     mask .cf_bit_mask_validate
     reg src mask .bit_mask_get .cf_fold_done
   else
@@ -3740,10 +3752,10 @@ fun: .comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
   .here_write ASM_INSTR_SIZE - { instr_adr }
   instr_adr .asm_add_imm_decode_at { Xd Xn0 off ok }
   ok Xd Xn = .and Xn0 Xn = .and { ok }
-  ifz ok .then false .ret end
+  ok =0 .then false .ret end
 
   Rt Xn off size opc .asm_load_store_byte_off { instr -- ok }
-  ifz ok .then false .ret end
+  ok =0 .then false .ret end
 
   \ Safe only because this is the most recently emitted instruction.
   instr instr_adr !32
@@ -3755,7 +3767,7 @@ fun: .comp_mem_load { size opc -- err } [ .redefine ]
   .comp_args_get .dec { reg }
   reg .comp_realloc_reg
 
-  if reg reg size opc .comp_mem_try_fold_offset .then .ret end
+  reg reg size opc .comp_mem_try_fold_offset .then .ret end
 
   \ ldr<size> <reg>, [<reg>]
   reg reg 0 size opc .asm_load_store_off .comp_instr
@@ -3766,7 +3778,7 @@ fun: .comp_mem_store { size -- err }
   .comp_args_get .dec { adr }
   adr .dec { val }
 
-  if val adr size 0b00 .comp_mem_try_fold_offset .then
+  val adr size 0b00 .comp_mem_try_fold_offset .then
     val .comp_args_set
     .ret
   end
@@ -3823,16 +3835,16 @@ fun_comp: !culong { -- err }               0b11      .comp_mem_store end
 
 fun: .mem_map { size pflag -- addr err }
   0 size pflag MAP_DEFAULT -1 0 .mmap { addr }
-  if addr .invert =0 .then " unable to mmap" .throw end
+  addr .invert =0 .then " unable to mmap" .throw end
   addr
 end
 
 fun: .mem_unmap { addr size -> err }
-  if .munmap .then " unable to munmap" .throw end
+  .munmap .then " unable to munmap" .throw end
 end
 
 fun: .mem_prot { addr size pflag -> err }
-  if .mprotect .then " unable to mprotect" .throw end
+  .mprotect .then " unable to mprotect" .throw end
 end
 
 fun: .mem_unprot { addr size -> err } PROT_RW .mem_prot end
@@ -3856,7 +3868,7 @@ fun: .stack_init { size stk -- Err }
 
   floor size .mem_unprot { err }
 
-  if err .then
+  err .then
     cellar bytelen .mem_unmap { -- }
     err .ret
   end
@@ -3871,7 +3883,7 @@ end
 \ Returned error, if any, must come from static storage.
 \ Caller may unmap memory before reporting this error.
 fun: .stack_deinit { stk -- err }
-  ifz stk .then .ret end
+  stk =0 .then .ret end
 
   stk @ { bytelen }
   stk .Stack_cellar @ { cellar }
@@ -3882,7 +3894,7 @@ fun: .stack_deinit { stk -- err }
   nil stk .Stack_top !
   nil stk .Stack_ceil !
 
-  if cellar .then cellar bytelen .mem_unmap end
+  cellar .then cellar bytelen .mem_unmap end
 end
 
 fun: stack? { stk -> bool } @ <>0 end
@@ -3890,10 +3902,10 @@ fun: stack? { stk -> bool } @ <>0 end
 \ Length in BYTES, not cells.
 fun: .stack_len { stk -- len } stk .Stack_top @ stk .Stack_floor @ - end
 
-fun: .stack_trunc { stk } if stk .then stk .Stack_floor @ stk .Stack_top ! end end
+fun: .stack_trunc { stk } stk .then stk .Stack_floor @ stk .Stack_top ! end end
 
 fun: .stack_repr { stk }
-  ifz stk .then " [debug] stack is nil" .elog .elf .ret end
+  stk =0 .then " [debug] stack is nil" .elog .elf .ret end
 
   " [debug] stack           " .elog stk .debug_arg
   " [debug] Stack_bytelen @ " .elog stk @ .debug_arg
@@ -3945,7 +3957,7 @@ fun: .stack_init_ctx { size type stk -- ctx Err }
   ctx size + { top }
   stk .Stack_ceil @ { ceil }
 
-  if top ceil > .then
+  top ceil > .then
     stk .stack_deinit { -- }
     " unable to initialize context: out of space" .throw
   end
@@ -3983,7 +3995,7 @@ fun: .ctx_alloc { size align -- adr err }
   context { ctx }
   ctx .Ctx_top @ align .align_up { adr }
   adr size + { top }
-  if top ctx .Ctx_ceil @ > .then
+  top ctx .Ctx_ceil @ > .then
     nil " unable to allocate context memory: out of space" .ret
   end
   top ctx .Ctx_top !
@@ -4028,7 +4040,7 @@ end
 \                                   LOOP_IND points here
 \
 \ `meta` holds the loop start instruction offset and entry arity,
-\ as described by SYNC[control_meta_layout]. Every loop exit point
+\ as described by the control metadata section. Every loop exit point
 \ must have exactly this entry arity. Loops have no fallback/else
 \ branch and do not infer a separate output arity.
 \
@@ -4039,7 +4051,7 @@ end
 
 fun: .loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
-  ifz frame .then " missing loop frame" .throw end
+  frame =0 .then " missing loop frame" .throw end
   frame .cells { off }
   STACK .Stack_floor @ off +
 end
@@ -4068,7 +4080,8 @@ end
 
 fun: .loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
   .comp_barrier
-  meta CONT_MASK_INP_LEN .bit_mask_get " arguments before ending `loop`" .comp_args_valid
+  meta CONT_MASK_INP_LEN .bit_mask_get
+  " arguments before ending `loop`" .comp_args_valid
   meta .loop_back \ b <beg>
   call'' end \ Run `.loop_frame_end_xt`.
 end
@@ -4077,57 +4090,39 @@ fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
   [ .plain_call ]
   .comp_barrier
   .loop_frame_init
-  .comp_args_get 0 CONT_MASK_INP_LEN .bit_mask_set CONT_MASK_HAS_INP .or { meta }
+  .comp_args_get nil CONT_MASK_INP_LEN .bit_mask_set { meta }
   .here_write .instr_off meta .cont_meta_instr_off_set xt' .loop_end_xt
 end
 
 fun: .leave_end_xt { -- err }
-  LOOP_AUX s> .cont_meta_instr_adr { adr }
-  .here_write adr - .asm_branch adr !32
+  LOOP_AUX s> .comp_branch_patch
   LOOP_AUX s> .call_xt
 end
 
 \ Breaks out of any loop.
 fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_end_xt )
   [ .plain_call ]
-  .loop_frame_adr @ { meta }
-  meta CONT_MASK_INP_LEN .bit_mask_get { len }
+  .loop_frame_adr @ CONT_MASK_INP_LEN .bit_mask_get
+  " arguments before `leave`" .comp_args_valid
 
-  len " arguments before `leave`" .comp_args_valid
-
-  len .comp_args_set
   .comp_barrier
   .reserve_instr 0 .cont_meta_instr_off_set LOOP_AUX >s
   xt' .leave_end_xt LOOP_AUX >s
 end
 
 fun: .while_end_xt { -- err }
-  LOOP_AUX s> { meta }
-  meta CONT_MASK_INP_LEN .bit_mask_get { reg }
-  reg meta .if_patch
+  LOOP_AUX s> .cond_branch_patch
   LOOP_AUX s> .call_xt
 end
 
 \ Tests a predicate; if predicate is 0, leaves the loop.
 fun_comp: .while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
   .loop_frame_adr @ { meta }
-  meta CONT_MASK_INP_LEN .bit_mask_get { inp_len }
-
-  " arguments before `.while`" { msg }
-  1 msg .comp_args_min
-  .comp_args_get .dec { out_len }
-  out_len .comp_args_set
-
-  out_len msg .comp_args_valid
+  meta CONT_MASK_INP_LEN .bit_mask_get { len }
+  len .inc " arguments before `.while`" .comp_args_valid
+  len .comp_args_set
   .comp_barrier
-  inp_len .comp_args_set
-
-  out_len false meta .control_try_cset_branch { meta fused }
-  if fused =0 .then
-    .reserve_instr meta .cont_meta_instr_off_set { meta }
-  end
-
-  meta LOOP_AUX >s
+  len meta .cond_branch_beg LOOP_AUX >s
   xt' .while_end_xt LOOP_AUX >s
 end
 
@@ -4188,11 +4183,11 @@ fun: .comp_store_cells { nil_term -- err }
     2 +: ind
   end
 
-  if ind adr < .then
+  ind adr < .then
     ind adr ind .asm_store_off .comp_instr \ str Xi, [Xn, #off]
   end
 
-  if nil_term .then
+  nil_term .then
     ASM_REG_ZR adr adr .asm_store_off .comp_instr \ str xzr, [Xn, #off]
   end
 
@@ -4224,7 +4219,7 @@ fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .and - <>0 en
 
 fun: .asm_append_movk_if_needed { reg neg hw imm out -- out }
   imm hw .asm_imm16_lane { lane }
-  if neg lane .asm_movk_needed .then
+  neg lane .asm_movk_needed .then
     reg 0b11 hw lane .asm_mov_wide out .asm_append_instr
   else
     out
@@ -4251,15 +4246,15 @@ end
 fun: .compare { str0 len0 str1 len1 -- cmp }
   0 { cmp }
   len0 len1 .min { len }
-  if len .then str0 str1 len .memcmp .cint_to_cell { cmp } end
+  len .then str0 str1 len .memcmp .cint_to_cell { cmp } end
   len0 len1 - cmp .fallback
 end
 
 \ `.strcmp` doesn't like null string pointers.
 fun: .ccompare { cstr0 cstr1 -- cmp }
-  ifz   cstr0 cstr1 .or .then 0
-  elifz cstr0           .then -1
-  elifz cstr1           .then +1
+    cstr0 cstr1 .or =0 .then 0
+  elif cstr0           =0 .then -1
+  elif cstr1           =0 .then +1
   else  cstr0 cstr1 .strcmp .cint_to_cell
   end
 end
@@ -4304,7 +4299,7 @@ end
 
 \ Short for "compile variadic arguments end".
 fun: .comp_va_end { len -- err }
-  if len .then
+  len .then
     len .cells 16 .align_up { off }
     ASM_REG_SP ASM_REG_SP off .asm_add_imm .comp_instr \ add sp, sp, <off>
   end
@@ -4314,12 +4309,12 @@ end
 \ Exactly `pre_len` XTs must be on top of the control stack. XTs may be either
 \ `WORDLIST_EXEC` or `WORDLIST_COMP`.
 fun: .comp_args_prepend { pre_len -- err } ( …pre… -- )
-  ifz pre_len .then .ret end
+  pre_len =0 .then .ret end
 
   .comp_args_get     { post_len }
   post_len pre_len + { arg_len }
 
-  if arg_len ASM_ARG_LEN_MAX > .then
+  arg_len ASM_ARG_LEN_MAX > .then
     " in `.comp_args_prepend`: too many total args" .throw
   end
 
@@ -4346,7 +4341,7 @@ fun: .comp_args_prepend { pre_len -- err } ( …pre… -- )
     STACK s> { XT }
     XT .Sym_wordlist @b { wlist }
 
-    if wlist WORDLIST_EXEC = .then
+    wlist WORDLIST_EXEC = .then
       XT .comp_call
     elif wlist WORDLIST_COMP = .then
       XT .call_xt
@@ -4395,10 +4390,10 @@ fun: .errno { -- code } .__error @s32 end
 \ current ambient context; see `## Context`.
 fun: .strf { fmt vlist -- str }
   1 .ctx_avail { buf cap }
-  ifz cap .then " <unable to format string: out of space>" .ret end
+  cap =0 .then " <unable to format string: out of space>" .ret end
 
   buf cap fmt vlist .vsnprintf .cint_to_cell { len }
-  if len <0 .then " <unable to format string>" .ret end
+  len <0 .then " <unable to format string>" .ret end
 
   cap len .inc .min { len } \ Include terminating nil byte.
   buf len + .ctx_top_set
@@ -4415,7 +4410,7 @@ end
 \ For functions like `.snprintf` which return length or error sentinel.
 \ Assumes length has already been sign-extended from `Cint`.
 fun: .validate_format_len { len -- len err }
-  if len <0 .then
+  len <0 .then
     .errno { code }
     code .strerror { msg }
     " unable to format string; code: %zd; msg: %s" code msg .strf .throw
@@ -4455,7 +4450,7 @@ end
 \ code on failure, and zero on success. No sign extension:
 \ Posix error codes are expected to be positive.
 fun: ?posix_err { code text -- err_str }
-  if code .then code text .os_err else nil end
+  code .then code text .os_err else nil end
 end
 
 fun: .fatal { err } " fatal: %s" err .elogf .elf .abort end
@@ -4469,7 +4464,7 @@ fun: .fatal { err } " fatal: %s" err .elogf .elf .abort end
 fun_comp: stack{ { -- err } ( E: stack -- )
   .comp_args_get { len }
 
-  if len 1 <> .then
+  len 1 <> .then
     " unable to use `stack{`: exactly one argument is required (stack address)"
     .throw
   end
@@ -4479,9 +4474,9 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   loop
     .read_word { str len }
 
-    if s" }" str len str= .then leave end
+    s" }" str len str= .then leave end
 
-    if s" --" str len str= .then
+    s" --" str len str= .then
       " unsupported `--` in `stack{`" .throw
     end
 
@@ -4489,7 +4484,7 @@ fun_comp: stack{ { -- err } ( E: stack -- )
     inc: locs
   end
 
-  ifz locs .then 0 .comp_args_set .ret end
+  locs =0 .then 0 .comp_args_set .ret end
 
   0 { stk_reg }
   .comp_alloc_next_reg { top_reg }
@@ -4519,12 +4514,12 @@ fun: .show     { num -> } .log_cell .lf end
 fun: .stack_log_cells { stack }
   stack .Stack_top @ stack .Stack_floor @ - /cells { len }
 
-  ifz len .then
+  len =0 .then
     " stack is empty" .log .lf
     .ret
   end
 
-  if len <0 .then
+  len <0 .then
     " stack length is negative: %zd" len .logf .lf
     .ret
   end
@@ -4550,7 +4545,7 @@ fun: .sc .s STACK .stack_trunc end
 fun: .wordlist_log { dict list_name }
   dict .Interp_dict_len @u32 { len }
 
-  ifz len .then
+  len =0 .then
     " %s: empty" list_name .logf .lf
     .ret
   end
@@ -4574,7 +4569,7 @@ fun: .wordlist_log { dict list_name }
     1 bit_ind .lsl           { bit_mask }
     bitset bit_mask .and     { live }
 
-    ifz live .then inc: ind again end
+    live =0 .then inc: ind again end
 
     ind .cells { off }
     keys off + @ { key }
@@ -4652,7 +4647,7 @@ fun: .indirect_to { decl xt_to -- err }
   xt_to .Sym_inp_len   @b       { sym_inp }
   xt_to .Sym_name .Sym_word_buf { name }
 
-  if decl_inp sym_inp <> .then
+  decl_inp sym_inp <> .then
     " unable to indirect to `%s`: input count: %zd <> %zd"
     name decl_inp sym_inp .strf .throw
   end
@@ -4660,7 +4655,7 @@ fun: .indirect_to { decl xt_to -- err }
   decl .Indir_decl_out @b { decl_out }
   xt_to .Sym_out_len   @b { sym_out }
 
-  if decl_out sym_out <> .then
+  decl_out sym_out <> .then
     " unable to indirect to `%s`: output count: %zd <> %zd"
     name decl_out sym_out .strf .throw
   end
@@ -4668,7 +4663,7 @@ fun: .indirect_to { decl xt_to -- err }
   decl .Indir_decl_has_err @b { decl_has_err }
   xt_to .Sym_has_err       @b { sym_has_err }
 
-  if decl_has_err sym_has_err <> .then
+  decl_has_err sym_has_err <> .then
     " unable to indirect to `%s`: has_err: %zd <> %zd"
     name decl_has_err sym_has_err .strf .throw
   end
@@ -4695,7 +4690,7 @@ fun: .comp_cmp_many { name cond_each nzcv cond_end -- err }
 
   .comp_args_get { len }
 
-  if len 3 < .then
+  len 3 < .then
     " `%s` requires at least 3 inputs: value to test, and predicates" name .strf .throw
   end
 
@@ -4753,38 +4748,38 @@ fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT .comp_cmp_m
 fun: .is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
 
 fun: .assert_cond { cond text -- err }
-  if cond .then .ret end
+  cond .then .ret end
   " assertion failed: %s" text .strf
 end
 
 fun: .assert_bin_cond { lhs rhs cond text op -- err }
-  if cond .then .ret end
+  cond .then .ret end
   " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .strf
 end
 
 fun: .assert_str_eq { act exp -- err }
-  ifz exp .then
-    ifz act .then .ret end
+  exp =0 .then
+    act =0 .then .ret end
     " expected string to be nil; got: %s" act .strf .throw
   end
 
-  ifz act .then
+  act =0 .then
     " unexpected nil string; expected: %s" exp .strf .throw
   end
 
-  if act exp cstr= .then .ret end
+  act exp cstr= .then .ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
   " expected string: %s; actual string: %s" exp act .strf
 end
 
 fun: .assert_str_has { act exp -- err }
-  ifz act .then
+  act =0 .then
     " missing string; expected string to have: %s"
     exp .strf .throw
   end
 
-  if act exp .strstr .then .ret end
+  act exp .strstr .then .ret end
 
   " expected string to have: %s; actual string: %s"
   exp act .strf .throw
@@ -4803,7 +4798,7 @@ fun: .assert_body { beg -- str len err }
   ceil .dec @b .is_whitespace =0 { fail }
   s" end" ceil 3 str<> fail .or { fail }
 
-  if fail .then
+  fail .then
     " invalid assertion shape: must be terminated with `end`" .throw
   end
 
@@ -4833,10 +4828,10 @@ fun: .assert_bin_end_xt { beg cond cmp_xt -- err }
   .cf_args_fold2 { reg0 fold_reg1 lhs rhs known consumed }
   known 2 = { static }
 
-  if static .then
+  static .then
     reg0 .comp_args_set
     lhs rhs cmp_xt .sym_instr .call [ 1 .comp_args_set ] { bool }
-    ifz bool .then
+    bool =0 .then
       beg .assert_body { text text_len }
       " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"
       text_len text op_len op lhs rhs op_len op .strf .ret
@@ -4877,7 +4872,7 @@ fun_comp: assertu>= { -- beg cond cmp_xt end_xt err } ASM_HS xt' u>= .assert_bin
 \
 \ Note: AOT-compiled programs just use args received in `.main`.
 fun: .interp_args { -- argc argv err }
-  ifz interp .then
+  interp =0 .then
     " `.interp_args` available only in interpretation; hint: in AOT, pass argc/argv from `.main`"
     .throw
   end
@@ -4892,7 +4887,7 @@ fun: .interp_args { -- argc argv err }
   end
 
   ceil argv - /cells { argc }
-  if argc .then argc argv else 0 nil end
+  argc .then argc argv else 0 nil end
 end
 
 \ ## Context continued
@@ -4919,7 +4914,7 @@ end
 \
 \   fun: .main { -- exit }
 \     .with_main_ctx .run end { err }
-\     if err .then " error: %s" err .elogf .elf 1 else 0 end
+\     err .then " error: %s" err .elogf .elf 1 else 0 end
 \   end
 \
 \ Runtime effects:
@@ -4947,6 +4942,6 @@ fun_comp: .with_main_ctx { -- end_xt err }
   ASM_REG_SP ASM_REG_SP size .asm_sub_imm .comp_instr \ sub sp, sp, #frame
   call'' main_arena call'' systack_ptr compile' .ctx_init
   call'' systack_ptr \ mov x0, sp
-  call'' .ctx_push    \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
+  call'' .ctx_push   \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
   xt' .with_main_ctx_end
 end

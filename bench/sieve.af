@@ -9,7 +9,7 @@ fun: .find_prime { flags cap -- num }
 
   loop
     ptr0 ceil < .while
-    if ptr0 @u8 .then
+    ptr0 @u8 .then
       ptr0 step + { ptr1 }
 
       loop

@@ -1140,14 +1140,14 @@ end
 \
 \ General idea:
 \
-\   if pred then \ cbz <outside>
+\   pred .then \ cbz <outside>
 \     if_true
 \   end
 \   outside
 \
-\   if pred then \ cbz <if_false>
+\   pred .then \ cbz <if_false>
 \     if_true
-\   else      \ b <outside>
+\   else       \ b <outside>
 \     if_false
 \   end
 \   outside
@@ -1156,7 +1156,8 @@ end
 \ terminated with a single "end", which is generic: it pops one
 \ XT from the stack and executes it. The XT can pop another one,
 \ popping multiple control frames in a chain. We terminate such
-\ chains by prepending a `.nop` XT.
+\ chains by prepending a `.nop` XT. After `elif`, a marker lets
+\ `.then` distinguish a continuation from a new conditional.
 
 fun: .reserve_instr ASM_PLACEHOLDER .comp_instr end
 fun: .reserve_here ( -- adr ) .here_write .reserve_instr end
@@ -1169,17 +1170,22 @@ fun: .if_pop ( nop if_adr -- )
   .call_xt
 end
 
-fun: .ifn_pop ( nop ifn_adr -- )
-  \ cbnz x1, <else|end>
-  .dup .off_to_pc 1 .swap .asm_cbnz .swap !32
-  .call_xt
+fun: .then_open xt' .nop end
+
+fun: .elif_invalid_end
+  " unexpected end after `elif`; expected `elif <predicate> .then`" .throw
 end
 
-fun_comp: if [ .plain_call ]  xt' .nop xt' .if_pop  end
-fun_comp: ifz [ .plain_call ] xt' .nop xt' .ifn_pop end
-fun_comp: .then ( C: if_fun -- if_adr if_fun ) ( E: pred -- ) .reserve_cond .swap end
+fun_comp: .then ( C: prev_fun -- … if_adr if_fun ) ( E: pred -- )
+  \ Select `.drop` after `elif`; otherwise append a chain terminator.
+  .dup xt' .elif_invalid_end =
+  xt' .then_open .swap xt' .drop * .fallback .call_xt
+  .reserve_cond xt' .if_pop
+end
 
-fun: .else_pop ( prev_fun else_adr -- ) .dup .off_to_pc .asm_branch .swap !32 .call_xt end
+fun: .else_pop ( prev_fun else_adr -- )
+  .dup .off_to_pc .asm_branch .swap !32 .call_xt
+end
 
 fun_comp: else [ .plain_call ] ( C: if_adr if_fun -- else_adr else_fun )
   .reserve_here to: adr
@@ -1188,8 +1194,7 @@ fun_comp: else [ .plain_call ] ( C: if_adr if_fun -- else_adr else_fun )
   adr xt' .else_pop
 end
 
-fun_comp: elif  [ .plain_call ] call'' else xt' .if_pop  end
-fun_comp: elifz [ .plain_call ] call'' else xt' .ifn_pop end
+fun_comp: elif [ .plain_call ] call'' else xt' .elif_invalid_end end
 
 \ ## Loops
 \
@@ -1223,7 +1228,7 @@ fun: .loop_aux
             to: stack_len_0
   .stack_len to: stack_len_1
 
-  ifz LOOP_FRAME @ .then
+  LOOP_FRAME @ =0 .then
     " auxiliary loop constructs require an ancestor loop frame" .throw
   end
 
@@ -1286,7 +1291,7 @@ end
 \ with `again` because they update counters and check bounds at the end, rather
 \ than at the start. The issue was fixed for reg-CC, but not for stack-CC.
 fun_comp: again [ .plain_call ]
-  ifz LOOP_FRAME @ .dup .then " `again` requires an ancestor loop frame" .throw end
+  LOOP_FRAME @ .dup =0 .then " `again` requires an ancestor loop frame" .throw end
   .sp_at @ .loop_end \ b <beg>
 end
 
@@ -1462,7 +1467,7 @@ fun_comp: -loop:
   loop_adr cond_adr xt' .loop_countdown_pop
 end
 
-fun: ?dup ( val bool -- val ?val ) if .then .dup end end
+fun: ?dup ( val bool -- val ?val ) .then .dup end end
 
 \ ## String comparison continued
 
@@ -1471,9 +1476,9 @@ fun: .ccompare ( cstr0 cstr1 -- cmp )
   to: cstr1
   to: cstr0
 
-  ifz cstr0 cstr1 .or .then 0 .ret end
-  ifz cstr0 .then -1 .ret end
-  ifz cstr1 .then +1 .ret end
+  cstr0 cstr1 .or =0 .then 0 .ret end
+  cstr0 =0 .then -1 .ret end
+  cstr1 =0 .then +1 .ret end
   cstr0 cstr1 .strcmp .cint_to_cell
 end
 
@@ -1540,7 +1545,7 @@ fun_comp: {
 
   loop
     .read_word to: len to: str
-    if s" }" str len str= .then loc_len } .ret end
+    s" }" str len str= .then loc_len } .ret end
 
     s" --" str len str<> .while \ `--` to `}` is a comment.
 
@@ -1618,12 +1623,12 @@ fun: sysstack_frame_ptr [ .plain_call ] ( -- fp ) [
 \ Unlike in reg-CC, we don't just pop-push pairs, because we have to pop
 \ the precise `len` amount of items from the Forth integer stack.
 fun: .comp_va_beg ( C: len -- )
-  if .dup .odd .then
+  .dup .odd .then
     xt' dup>systack .inline_word
     .dec
   end
 
-  ifz .dup .then .drop .ret end
+  .dup =0 .then .drop .ret end
 
   \ Not odd = automatically aligned to 16.
   loop
@@ -1636,7 +1641,7 @@ end
 
 \ Short for "compile variadic arguments end".
 fun: .comp_va_end ( C: len -- )
-  if .dup .then
+  .dup .then
     .cells 16 .align_up
     ASM_REG_SP ASM_REG_SP .rot
     .asm_add_imm .comp_instr \ add sp, sp, <off>
@@ -1720,12 +1725,12 @@ fun: .         ( num     -- ) .stack_len .dec .log_cell .lf end
 fun: .s
   .stack_len to: len
 
-  ifz len .then
+  len =0 .then
     " stack is empty" .log .lf
     .ret
   end
 
-  if len <0 .then
+  len <0 .then
     " stack length is negative: " .log len .log_int .lf
     .ret
   end
@@ -1760,7 +1765,7 @@ fun: .errno ( -- err ) .__error @32 end \ TODO switch to `ldrsw`.
 fun: .mem_map { size pflag -- addr }
   MAP_ANON MAP_PRIVATE .or      to: mflag
   0 size pflag mflag -1 0 .mmap to: addr
-  if addr -1 = .then
+  addr -1 = .then
     " unable to map memory; code: %zd; message: %s"
     .errno .dup .strerror [ 2 ] .errf
     .throw
@@ -1770,7 +1775,7 @@ end
 
 fun: .mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE .or .mprotect
-  if .then
+  .then
     " unable to unprotect memory; code: %zd; message: %s"
     .errno .dup .strerror [ 2 ] .errf
     .throw

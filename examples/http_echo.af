@@ -18,11 +18,11 @@ fun: .read_req { conn buf cap -- len err }
 
   loop
     conn buf cap .read { wrote }
-    ifz wrote .then len .ret end
+    wrote =0 .then len .ret end
 
-    if wrote <0 .then
+    wrote <0 .then
       .errno { code }
-      if code EINTR = .then again end
+      code EINTR = .then again end
       code " unable to read request" .os_err .throw
     end
 
@@ -53,7 +53,7 @@ fun: .handle_conn { conn }
   alloca' Stack { mem }
   CTX_CAP Ctx mem .stack_init_ctx { ctx err }
 
-  if err .then
+  err .then
     " [srv] unable to init connection handler memory: %s" err .elogf .elf
     conn .conn_close
     .ret
@@ -62,11 +62,11 @@ fun: .handle_conn { conn }
   ctx .with_ctx
     conn .respond_conn { err }
     conn .conn_close
-    if err .then " [srv] unable to respond; error: %s" err .elogf .elf end
+    err .then " [srv] unable to respond; error: %s" err .elogf .elf end
   end
 
   mem .stack_deinit { err }
-  if err .then
+  err .then
     " [srv] unable to deinit connection handler memory: %s" err .elogf .elf
   end
 end
@@ -74,7 +74,7 @@ end
 fun: .run { -- err }
   " 2345"                  { port }
   128                      { backlog }
-  instr' .handle_conn       { handler }
+  instr' .handle_conn      { handler }
   port backlog .net_listen { sock }
 
   " [srv] listening on http://localhost:%s" port .elogf .elf
@@ -86,7 +86,7 @@ end
 \ For AOT builds. Requires dropping / commenting the root `.run`.
 fun: .main { -- exit }
   .with_main_ctx .run end { err }
-  if err .then " error: %s" err .elogf .elf 1 else 0 end
+  err .then " error: %s" err .elogf .elf 1 else 0 end
 end
 
 .run

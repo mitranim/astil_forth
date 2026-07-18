@@ -31,7 +31,7 @@ fun: .list_verify { list len -> err }
   .cells + -cell { ceil }
   loop
     list ceil < .while
-    if list @2 > .then " [bubble] not sorted" .throw end
+    list @2 > .then " [bubble] not sorted" .throw end
     +cell: list
   end
 end
@@ -44,7 +44,7 @@ fun: .bubble { list len }
     list { ptr }
     loop
       ptr ceil_ptr < .while
-      if ptr @2 > .then ptr @2 ptr !swap end
+      ptr @2 > .then ptr @2 ptr !swap end
       +cell: ptr
     end
   end
@@ -65,5 +65,5 @@ end
 
 fun: .main { -- exit }
   .with_main_ctx .run end { err }
-  if err .then " error: %s" err .elogf .elf 1 else 0 end
+  err .then " error: %s" err .elogf .elf 1 else 0 end
 end

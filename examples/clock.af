@@ -17,7 +17,7 @@ fun: .run
 
   loop
     \ Strike-out the previous entry.
-    if printed .then
+    printed .then
       .del_line
       .strike_beg mins secs .log_time .strike_end .lf
     end

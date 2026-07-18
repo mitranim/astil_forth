@@ -260,7 +260,7 @@ fun: .thread_spawn_ctx { fun inp ctx -- thread Err }
   ctx .Ctx_top @ align' Thread_run .align_up { run }
   run size' Thread_run +                     { top }
 
-  if top ctx .Ctx_ceil @ > .then
+  top ctx .Ctx_ceil @ > .then
     " unable to allocate thread closure: context out of space" .throw
   end
 
@@ -294,7 +294,7 @@ fun: .thread_spawn_detached { fun inp -- thread Err }
   attr PTHREAD_CREATE_DETACHED .pthread_attr_setdetachstate
   " unable to mark thread as detached" ?posix_err { err }
 
-  ifz err .then
+  err =0 .then
     thread attr fun inp .pthread_create
     " unable to spawn detached thread" ?posix_err { err }
   end

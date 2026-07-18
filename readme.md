@@ -68,7 +68,7 @@ use' lang.af
 fun: .run
   " hello world!" .log .lf
 
-  if 10 .then
+  10 .then
     " branch 0" .log .lf
   elif 20 .then
     " branch 1" .log .lf
@@ -223,7 +223,7 @@ fun: .always_succeeds { -- val err } 234 end \ implicit nil error
 
 ```forth
 fun: .some_word { -- out0 out1 err }
-  if fail .then
+  fail .then
     " err_msg" .throw \ x0 x1 x2 = junk junk err
   end
   123 234 \ x0 x1 x2 = 123 234 nil
@@ -234,7 +234,7 @@ When all outputs must be defined, just return instead:
 
 ```forth
 fun: .some_word { -- out0 out1 err }
-  if fail .then
+  fail .then
     nil nil " err_msg" .ret
   end
   123 234 \ implicit nil
@@ -261,9 +261,9 @@ fun: .caller { -- Err } .always_fails end
 ```forth
 \ Worse:
 fun: .some_word { -- out Err }
-  .word0 { err }           if err .then nil err .ret end
-  .word1 { val0 err }      if err .then nil err .ret end
-  .word2 { val1 val2 err } if err .then nil err .ret end
+  .word0 { err }           err .then nil err .ret end
+  .word1 { val0 err }      err .then nil err .ret end
+  .word2 { val1 val2 err } err .then nil err .ret end
   val0 val1 val2 + *
 end
 
@@ -311,6 +311,8 @@ AF functions which don't depend on ambient memory context can be passed as callb
 All of the above is reg-CC only, and doesn't quite apply to stack-CC, which always treats errors as exceptions and provides `catch'`.
 
 ## CLI
+
+Build currently **requires Clang 22.1 or higher**.
 
 With global installation:
 
@@ -569,7 +571,7 @@ end
 Control words which don't deal with runtime args stay plain. Control words which use or affect args have call-like names:
 
 ```forth
-if 123 .then 234 else 345 end
+123 .then 234 else 345 end
 loop predicate .while body again end
 err .try
 err .throw
@@ -577,7 +579,7 @@ val .ret
 .recur
 ```
 
-Examples of control-only words: `if ifz elif elifz else loop leave again assert end`. `leave` and `again` validate loop arity, but stay plain.
+Control-only words include `elif else loop leave again assert end`. In reg-CC, `leave` and `again` validate loop arity, but stay plain.
 
 In file root, `.ret` simply quits the current file. Inside a compiled word, `.ret` returns current args as outputs. Even nullary `.ret` requires a dot.
 
@@ -605,7 +607,7 @@ Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
 - All conditionals and loops are terminated with `end`. No need to remember other terminators.
-- Conditionals take the form `if .then else end`, which reads much nicer.
+- Conditionals take the form `predicate .then else end`.
 - `elif` is supported.
 - Any amount of conditional branches is terminated with a single `end`.
 - Any amount of `leave` or `.while` is terminated with the same `end` as the loop.
@@ -616,8 +618,8 @@ Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave .while agai
 loop
   predicate .while
   body
-  if done .then leave end
-  if skip .then again end
+  done .then leave end
+  skip .then again end
 end
 ```
 
@@ -641,7 +643,7 @@ Special _semantic_ roles get special _syntactic_ roles:
 - Calls use call-like spelling; see [call syntax](#call-syntax).
   - Syntax highlighters are encouraged to scope calls differently from values.
 - Modifier-style comptime words may begin with `#`; like `#debug_ctx`.
-- Structural control words may stay plain; syntax highlighters may hardcode common names such as `if ifz else elif elifz end loop leave again assert`.
+- Structural control words may stay plain; syntax highlighters may hardcode common names: `else elif end loop leave again assert`.
 
 Special syntax highlighting is also recommended for `( ) [ ] { }` _inside_ word names.
 

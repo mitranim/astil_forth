@@ -6,14 +6,14 @@ fun: .run { -- err }
   \ and get the address. We can now use it with `libc`.
   alloca' Timespec { inst }
 
-  if CLOCK_MONOTONIC inst .clock_gettime .then
+  CLOCK_MONOTONIC inst .clock_gettime .then
     .errno " unable to get time" .os_err .throw
   end
 
   " mono seconds: " .log inst .Timespec_sec  @ .log_int .lf
   " mono nanos:   " .log inst .Timespec_nsec @ .log_int .lf
 
-  if CLOCK_REALTIME inst .clock_gettime .then
+  CLOCK_REALTIME inst .clock_gettime .then
     .errno " unable to get time" .os_err .throw
   end
 

@@ -12,9 +12,9 @@ fun: .find_prime { flags len -- num }
   0 3 ( num step )
 
   flags len + flags +for: ptr0
-    if ptr0 c@ .then
+    ptr0 c@ .then
       .dup ptr0 +
-      if .dup flags len + < .then
+      .dup flags len + < .then
         flags len + .swap 2 .pick +loop: ptr1 0 ptr1 c! end
       else
         .drop
@@ -44,7 +44,7 @@ fun: .find_prime
   0 3 { num step }
 
   EFLAG FLAGS +for: ptr0
-    if ptr0 c@ .then
+    ptr0 c@ .then
       ptr0 step + { ptr1 }
 
       EFLAG ptr0 step +loop: ptr1

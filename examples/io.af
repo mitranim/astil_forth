@@ -36,7 +36,7 @@ fun: .example_seek_and_thou_shall_find { -- Err }
   path " r" .file_open .try { file }
   37 91 { off cap }
 
-  if file off 0 .fseek .then
+  file off 0 .fseek .then
     .errno { code }
     file .fclose { -- }
     code " seek file" path .io_err .ret
@@ -46,8 +46,8 @@ fun: .example_seek_and_thou_shall_find { -- Err }
   file .file_err_code { code }
   file .fclose { -- } \ Read-only close errors are noise.
 
-  if len cap <> .then
-    if code .then code " unable to read file" .os_err .ret end
+  len cap <> .then
+    code .then code " unable to read file" .os_err .ret end
     " unable to read file: unexpected EOF" .ret
   end
 

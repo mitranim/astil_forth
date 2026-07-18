@@ -2,7 +2,7 @@
 use' ../../lang_s.af
 
 fun: .test_stack_recur_then_throw_fail ( val -- val )
-  ifz .dup .then .ret end
+  .dup =0 .then .ret end
   .dec .recur
   " late throw" .throw
 end

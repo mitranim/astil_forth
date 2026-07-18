@@ -251,115 +251,115 @@ fun: .bang_with_more_inputs { val adr _x2 _x3 _x4 } val adr ! end
 fun: .bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next end
 
 fun: .test_conditionals { -- err }
-  \ Must fail to compile: bare `if .then end`
-  \ doesn't support outputs.
-  \ if false .then 10 end
+  \ Must fail to compile: conditional without `else`
+  \ can't change stack arity.
+  \ false .then 10 end
 
-  assert= if false .then 10 else 20 end 20 end
-  assert= if true .then 10 else 20 end 10 end
+  assert= false .then 10 else 20 end 20 end
+  assert= true .then 10 else 20 end 10 end
 
-  assert= ifz false .then 10 else 20 end 10 end
-  assert= ifz true .then 10 else 20 end 20 end
+  assert= false =0 .then 10 else 20 end 10 end
+  assert= true =0 .then 10 else 20 end 20 end
 
   assert=
-    if false .then 10 elif true .then 20 else 30 end
+    false .then 10 elif true .then 20 else 30 end
     20
   end
 
   assert=
-    if false .then 10 elifz false .then 20 else 30 end
+    false .then 10 elif false =0 .then 20 else 30 end
     20
   end
 
   10 { loc }
-  if false .then 20 else 30 end { out }
+  false .then 20 else 30 end { out }
   assert= loc 10 end
   assert= out 30 end
 
-  assert= -1 { val } if false .then 10 { val } end val -1 end
-  assert= -1 { val } if true .then 10 { val } end val 10 end
+  assert= -1 { val } false .then 10 { val } end val -1 end
+  assert= -1 { val } true .then 10 { val } end val 10 end
 
-  assert= if false .then 10 else 20 end 20 end
-  assert= if true .then 10 else 20 end 10 end
+  assert= false .then 10 else 20 end 20 end
+  assert= true .then 10 else 20 end 10 end
 
-  assert= -1 { val } ifz false .then 10 { val } end val 10 end
-  assert= -1 { val } ifz true .then 10 { val } end val -1 end
+  assert= -1 { val } false =0 .then 10 { val } end val 10 end
+  assert= -1 { val } true =0 .then 10 { val } end val -1 end
 
-  assert= ifz false .then 10 else 20 end 10 end
-  assert= ifz true .then 10 else 20 end 20 end
+  assert= false =0 .then 10 else 20 end 10 end
+  assert= true =0 .then 10 else 20 end 20 end
 
   assert=
     -1 { val }
-    if false .then 10 { val } elif false .then 20 { val } end val
+    false .then 10 { val } elif false .then 20 { val } end val
     -1
   end
 
   assert=
-    if false .then 10 elif false .then 20 else 30 end
+    false .then 10 elif false .then 20 else 30 end
     30
   end
 
   assert=
     -1 { val }
-    if false .then 10 { val } elif true .then 20 { val } end val
+    false .then 10 { val } elif true .then 20 { val } end val
     20
   end
 
   assert=
-    if false .then 10 elif true .then 20 else 30 end
+    false .then 10 elif true .then 20 else 30 end
     20
   end
 
   assert=
     -1 { val }
-    if true .then 10 { val } elif false .then 20 { val } end val
+    true .then 10 { val } elif false .then 20 { val } end val
     10
   end
 
   assert=
-    if true .then 10 elif false .then 20 else 30 end
+    true .then 10 elif false .then 20 else 30 end
     10
   end
 
   assert=
     -1 { val }
-    if false .then 10 { val } elifz false .then 20 { val } end val
+    false .then 10 { val } elif false =0 .then 20 { val } end val
     20
   end
 
   assert=
-    if false .then 10 elifz false .then 20 else 30 end
+    false .then 10 elif false =0 .then 20 else 30 end
     20
   end
 
   assert=
     -1 { val }
-    if false .then 10 { val } elifz true .then 20 { val } end val
+    false .then 10 { val } elif true =0 .then 20 { val } end val
     -1
   end
 
   assert=
-    if false .then 10 elifz true .then 20 else 30 end
+    false .then 10 elif true =0 .then 20 else 30 end
     30
   end
 
   assert=
     -1 { val }
-    if true .then 10 { val } elifz false .then 20 { val } end val
+    true .then 10 { val } elif false =0 .then 20 { val } end val
     10
   end
 
   assert=
-    if true .then 10 elifz false .then 20 else 30 end
+    true .then 10 elif false =0 .then 20 else 30 end
     10
   end
 
   assert=
     -1 { val }
-    if false .then
+    false .then
       10 { val }
     else
-      if true .then
+      true .then
         20 { val }
       end
     end
@@ -370,40 +370,105 @@ fun: .test_conditionals { -- err }
 end
 .test_conditionals
 
-fun: .cond_input_if { val flag -- out } val flag if .then end end
-fun: .cond_input_ifn { val flag -- out } val flag ifz .then end end
-fun: .cond_input_if_else { val flag -- out } val flag if .then else end end
+0 var: TEST_COND_PRED_HITS
+
+fun: .test_cond_pred { bool -- bool }
+  TEST_COND_PRED_HITS @ .inc TEST_COND_PRED_HITS !
+  bool
+end
+
+fun: .test_cond_skip_pred { pred0 -- val }
+  0 TEST_COND_PRED_HITS !
+  pred0 .then 10
+  elif false .test_cond_pred .then 20
+  else 30
+  end
+end
+
+fun: .test_cond_skip_predicates { -- err }
+  assert= true .test_cond_skip_pred 10 end
+  assert= TEST_COND_PRED_HITS @ 0 end
+  assert= false .test_cond_skip_pred 30 end
+  assert= TEST_COND_PRED_HITS @ 1 end
+end
+.test_cond_skip_predicates
+
+fun: .test_control_meta { -- err }
+  3 16 .asm_cbz { cbz_instr }
+  3 16 .asm_cbnz { cbnz_instr }
+  16 ASM_EQ .asm_branch_cond { cond_instr }
+
+  assert=
+    3 16 ASM_BRANCH_TYPE_CBZ nil .asm_cond_branch
+    cbz_instr
+  end
+  assert=
+    3 16 ASM_BRANCH_TYPE_CBNZ nil .asm_cond_branch
+    cbnz_instr
+  end
+  assert=
+    3 16 ASM_BRANCH_TYPE_COND ASM_EQ .asm_cond_branch
+    cond_instr
+  end
+
+  3 nil CONT_MASK_INP_LEN .bit_mask_set { meta }
+  0 meta CONT_MASK_OUT_LEN .bit_mask_set
+  CONT_MASK_HAS_OUT .or { meta }
+  assert= meta CONT_MASK_INP_LEN .bit_mask_get 3 end
+  assert= meta CONT_MASK_OUT_LEN .bit_mask_get 0 end
+  assert meta CONT_MASK_HAS_OUT .and end
+
+  interp_instrs { instr_adr }
+  instr_adr .instr_off meta .cont_meta_instr_off_set { meta }
+  assert= meta .cont_meta_instr_adr instr_adr end
+
+  assert= CONT_MASK_INSTR_OFF .bit_ctz 32 end
+  assert= CONT_MASK_INSTR_OFF 32 .low_bits .and 0 end
+  assert=
+    CONT_MASK_INP_LEN
+    CONT_MASK_OUT_LEN .or
+    CONT_MASK_HAS_OUT .or
+    CONT_MASK_BRANCH_TYPE .or
+    CONT_MASK_INSTR_INFO .or
+    32 .low_bits
+  end
+end
+.test_control_meta
+
+fun: .cond_input_if { val flag -- out } val flag .then end end
+fun: .cond_input_ifn { val flag -- out } val flag =0 .then end end
+fun: .cond_input_if_else { val flag -- out } val flag .then else end end
 
 fun: .cond_input_elif { val flag0 flag1 -- out }
-  val flag0 if .then
+  val flag0 .then
   elif flag1 .then
   else
   end
 end
 
 fun: .cond_input_elifn { val flag0 flag1 -- out }
-  val flag0 if .then
-  elifz flag1 .then
+  val flag0 .then
+  elif flag1 =0 .then
   else
   end
 end
 
 fun: .cond_input_elif_diff { flag0 flag1 -- out0 out1 }
-  if flag0 .then 10 11
+  flag0 .then 10 11
   elif flag1 .then 20 30
   else 20 40
   end
 end
 
 fun: .cond_input_elif_diff_no_else { flag0 flag1 -- out }
-  if flag0 .then 10
+  flag0 .then 10
   elif flag1 .then 20
   else 20
   end
 end
 
 fun: .cond_input_max { A B C D E F G flag -- A B C D E F G }
-  A B C D E F G flag if .then end
+  A B C D E F G flag .then end
 end
 
 fun: .test_cond_input_arity { -- err }
@@ -458,7 +523,7 @@ end
 .test_cond_input_arity
 
 fun: .recursive_fun { val -- val }
-  if val 13 <= .then val .ret end
+  val 13 <= .then val .ret end
   val .dec .recur
 end
 
@@ -468,7 +533,7 @@ end
 .test_recursion
 
 fun: .recursive_fib_fun { ind -- out }
-  if ind 1 <= .then 1 .ret end
+  ind 1 <= .then 1 .ret end
   ind 1 - .recur { prev }
   ind 2 - .recur
   prev +
@@ -481,7 +546,7 @@ end
 
 fun: .recur_reg_clobber_fun { val -- out }
   -1 -2 { -- } \ Unconditionally clobber x0 x1.
-  ifz val .then 0 .ret end
+  val =0 .then 0 .ret end
   val val { _ignored saved } \ `_ignored` = x0, `saved` = x1, `val` = none
   0 .recur { -- } \ Must relocate `saved`.
   saved .inc
@@ -578,7 +643,7 @@ fun: .test_indirect_forward_out8 { -- a b c d e f g h } [ .redefine ] 0 1 2 3 4 
 TEST_INDIRECT_FORWARD_OUT8 indirect_to' .test_indirect_forward_out8
 
 fun: .test_indirect_forward_eq { act exp -- err }
-  if act exp = .then .ret end
+  act exp = .then .ret end
   " indirect forward call mismatch: actual=%zd expected=%zd" act exp .strf .throw
 end
 
@@ -627,14 +692,14 @@ end
 .test_indirect_forward
 
 fun: .recur_fun_with_err { val -- out err }
-  ifz val .then 100 .ret end
-  if val 3 = .then 0 " some_error" .ret end
+  val =0 .then 100 .ret end
+  val 3 = .then 0 " some_error" .ret end
   val .dec .recur
 end
 
 fun: .recur_manual_fun { val -- out Err }
-  ifz val .then 100 .ret end
-  if val 3 = .then 0 " some_error" .ret end
+  val =0 .then 100 .ret end
+  val 3 = .then 0 " some_error" .ret end
   val .dec .recur
 end
 
@@ -707,7 +772,7 @@ fun: .test_word_instr_count { XT instr -- count }
   0 { ind }
   loop
     ind len < .while
-    if XT ind .test_actual_instr instr = .then inc: count end
+    XT ind .test_actual_instr instr = .then inc: count end
     inc: ind
   end
   count
@@ -723,7 +788,7 @@ fun: .test_word_has_branch_cond { XT cond -- bool }
   loop
     ind len < .while
     XT ind .test_actual_instr { instr }
-    instr mask .and match = instr 0xf .and cond = .and if .then true .ret end
+    instr mask .and match = instr 0xf .and cond = .and .then true .ret end
     inc: ind
   end
   false
@@ -735,7 +800,20 @@ fun: .test_word_has_cset { XT -- bool }
   loop
     ind len < .while
     XT ind .test_actual_instr .asm_cset_decode { _reg _cond ok }
-    ok if .then true .ret end
+    ok .then true .ret end
+    inc: ind
+  end
+  false
+end
+
+fun: .test_word_has_cbnz { XT -- bool }
+  XT .test_sym_instr_len { len }
+  0 { ind }
+  loop
+    ind len < .while
+    XT ind .test_actual_instr 24 .lsr 0xff .and 0xb5 = .then
+      true .ret
+    end
     inc: ind
   end
   false
@@ -759,6 +837,26 @@ fun: .test_while_cset_branch_fusion { -- err }
 end
 .test_while_cset_branch_fusion
 
+fun: .test_while_eq_zero_fusion_fun { val -- out }
+  0 { out }
+  loop
+    val =0 .while
+    inc: out
+    inc: val
+  end
+  out
+end
+
+fun: .test_while_eq_zero_fusion { -- err }
+  0 .asm_cmp_zero { cmp_zero }
+  assert= 0 .test_while_eq_zero_fusion_fun 1 end
+  assert= 1 .test_while_eq_zero_fusion_fun 0 end
+  assert xt' .test_while_eq_zero_fusion_fun .test_word_has_cbnz end
+  assert xt' .test_while_eq_zero_fusion_fun .test_word_has_cset =0 end
+  assert= xt' .test_while_eq_zero_fusion_fun cmp_zero .test_word_instr_count 0 end
+end
+.test_while_eq_zero_fusion
+
 fun: .test_comp_reg_cmp_keeps_rhs_in_arg_fun { one two -- out }
   one two = two +
 end
@@ -781,30 +879,33 @@ fun: .test_call_frame { -- err }
 end
 .test_call_frame
 
-fun: .test_if_cset_branch_fusion_fun { val -- out }
+fun: .test_then_cmp_zero_fusion_fun { val -- out }
   0 { out }
-  if val 0 = .then 7 { out } end
+  val 0 = .then 7 { out } end
   out
 end
 
-fun: .test_ifz_cset_branch_fusion_fun { val -- out }
+fun: .test_then_eq_zero_fusion_fun { val -- out }
   0 { out }
-  ifz val 0 = .then 7 { out } end
+  val =0 .then 7 { out } end
   out
 end
 
-fun: .test_if_cset_branch_fusion { -- err }
-  assert= 0 .test_if_cset_branch_fusion_fun 7 end
-  assert= 1 .test_if_cset_branch_fusion_fun 0 end
-  assert xt' .test_if_cset_branch_fusion_fun ASM_NE .test_word_has_branch_cond end
-  assert xt' .test_if_cset_branch_fusion_fun .test_word_has_cset =0 end
+fun: .test_then_zero_fusion { -- err }
+  0 .asm_cmp_zero { cmp_zero }
+  assert= 0 .test_then_cmp_zero_fusion_fun 7 end
+  assert= 1 .test_then_cmp_zero_fusion_fun 0 end
+  assert xt' .test_then_cmp_zero_fusion_fun .test_word_has_cbnz end
+  assert xt' .test_then_cmp_zero_fusion_fun .test_word_has_cset =0 end
+  assert= xt' .test_then_cmp_zero_fusion_fun cmp_zero .test_word_instr_count 0 end
 
-  assert= 0 .test_ifz_cset_branch_fusion_fun 0 end
-  assert= 1 .test_ifz_cset_branch_fusion_fun 7 end
-  assert xt' .test_ifz_cset_branch_fusion_fun ASM_EQ .test_word_has_branch_cond end
-  assert xt' .test_ifz_cset_branch_fusion_fun .test_word_has_cset =0 end
+  assert= 0 .test_then_eq_zero_fusion_fun 7 end
+  assert= 1 .test_then_eq_zero_fusion_fun 0 end
+  assert xt' .test_then_eq_zero_fusion_fun .test_word_has_cbnz end
+  assert xt' .test_then_eq_zero_fusion_fun .test_word_has_cset =0 end
+  assert= xt' .test_then_eq_zero_fusion_fun cmp_zero .test_word_instr_count 0 end
 end
-.test_if_cset_branch_fusion
+.test_then_zero_fusion
 
 fun: .test_loop_while { -- err }
   assert=
@@ -930,7 +1031,7 @@ fun: .test_loop_manual_countdown { -- err }
     loop
       dec: ind
       ind >=0 .while
-      if val 5 > .then leave end
+      val 5 > .then leave end
       inc: val
     end
     val
@@ -1011,7 +1112,7 @@ fun: .test_again_loop { -- err }
   -1 { len }
   loop
     inc: len
-    if len 7 < .then again end
+    len 7 < .then again end
     leave
   end
   assert= len 7 end
@@ -1082,7 +1183,7 @@ end
 
 \ Load/store is used internally by testing utils. The test is kinda cyclic.
 fun: .test_load_store { -- err }
-  if .has_interp .then
+  .has_interp .then
     assert= VAR @ 123 end
   else
     assert= VAR @ 345 end \ Preserved in AOT from this test.
@@ -2326,7 +2427,7 @@ end
 
 fun: .test_struct_field_peephole_expect_instr { XT ind exp -- err }
   XT .sym_instr ind 4 * + @u32 { act }
-  if exp act <> .then
+  exp act <> .then
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
     " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
@@ -2335,7 +2436,7 @@ fun: .test_struct_field_peephole_expect_instr { XT ind exp -- err }
 end
 
 fun: .test_struct_field_peephole { -- err }
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   xt' .test_struct_field_load_peephole_fun { load_xt }
   0 0 2 0b11 0b01 .asm_load_store_off { load_instr }
@@ -2640,7 +2741,7 @@ end
 .test_explicit_err_0
 
 fun: .test_explicit_err_1_fun { one -- two err }
-  ifz one .then .test_throw end
+  one =0 .then .test_throw end
   one 2 *
 end
 
@@ -2669,7 +2770,7 @@ end
 .test_explicit_err_1
 
 fun: .test_explicit_err_2_fun { one two -- three err }
-  ifz one .then .test_throw end
+  one =0 .then .test_throw end
   one two +
 end
 
@@ -2708,7 +2809,7 @@ end
 .test_explicit_err_2
 
 fun: .test_explicit_err_3_fun { one -- two three err }
-  ifz one .then .test_throw end
+  one =0 .then .test_throw end
   one 2 * { two }
   one .negate { three }
   two three
@@ -2746,7 +2847,7 @@ end
 .test_explicit_err_3
 
 fun: .test_explicit_err_4_fun { one two -- three four err }
-  ifz one .then .test_throw end
+  one =0 .then .test_throw end
   one two + { three }
   two one - { four }
   three four
@@ -2814,7 +2915,7 @@ end
 .test_max_output_regs
 
 fun: .test_max_output_regs_with_err { -- A B C D E F G err }
-  if false .then .test_throw end
+  false .then .test_throw end
   0 1 2 3 4 5 6
 end
 fun: .test_max_output_regs_with_err { -- err } [ .redefine ]
@@ -2951,12 +3052,12 @@ fun: .test_comptime_stack_underflow { -- Err }
 end
 .test_comptime_stack_underflow
 
-fun: .test_cond_arity_bare_if { -- Err }
-  use' ./fail/test_cond_arity_bare_if.af
+fun: .test_cond_arity_bare_then { -- Err }
+  use' ./fail/test_cond_arity_bare_then.af
   " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
   .assert_str_has
 end
-.test_cond_arity_bare_if
+.test_cond_arity_bare_then
 
 fun: .test_cond_arity_else_mismatch { -- Err }
   use' ./fail/test_cond_arity_else_mismatch.af
@@ -2972,12 +3073,19 @@ fun: .test_cond_arity_elif_mismatch { -- Err }
 end
 .test_cond_arity_elif_mismatch
 
-fun: .test_cond_arity_elifz_mismatch { -- Err }
-  use' ./fail/test_cond_arity_elifz_mismatch.af
-  " in `.test_cond_arity_elifz_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
+fun: .test_cond_arity_elif_inverted_mismatch { -- Err }
+  use' ./fail/test_cond_arity_elif_inverted_mismatch.af
+  " in `.test_cond_arity_elif_inverted_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
   .assert_str_has
 end
-.test_cond_arity_elifz_mismatch
+.test_cond_arity_elif_inverted_mismatch
+
+fun: .test_cond_elif_missing_pred { -- Err }
+  use' ./fail/test_cond_elif_missing_pred.af
+  " unexpected end after `elif`; expected `elif <predicate> .then`"
+  .assert_str_has
+end
+.test_cond_elif_missing_pred
 
 fun: .test_cond_arity_no_else { -- Err }
   use' ./fail/test_cond_arity_no_else.af
@@ -3255,7 +3363,7 @@ end
 
 fun: .main { -- exit }
   .with_main_ctx .main_run { err } end
-  if err .then " error: %s" err .elogf .elf 1 .ret end
+  err .then " error: %s" err .elogf .elf 1 .ret end
   " [test] [aot] ok" .elog .elf
   0
 end

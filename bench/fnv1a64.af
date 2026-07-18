@@ -46,12 +46,12 @@ fun: .run { -- err }
     hash buf cap .fnv1a64 { hash }
   end
 
-  if " FNV1A64_PRINT" .getenv .then " 0x%zx" hash .logf .lf end
+  " FNV1A64_PRINT" .getenv .then " 0x%zx" hash .logf .lf end
   assert= hash WANT end
 end
 .run
 
 fun: .main { -- exit }
   .with_main_ctx .run end { err }
-  if err .then " error: %s" err .elogf .elf 1 else 0 end
+  err .then " error: %s" err .elogf .elf 1 else 0 end
 end

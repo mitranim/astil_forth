@@ -1,0 +1,5 @@
+use' ../../lang.af
+
+fun: .test_cond_arity_elif_inverted_mismatch_fail { -- out }
+  false .then 10 elif false =0 .then 20 30 else 40 end
+end

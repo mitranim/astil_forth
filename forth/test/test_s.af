@@ -30,43 +30,67 @@ end
 .test_call_name_failures
 
 fun: .test_conditionals
-  T{ if false .then 10 end <T> }T
-  T{ if true .then 10 end <T> 10 }T
-  T{ if false .then 10 else 20 end <T> 20 }T
-  T{ if true .then 10 else 20 end <T> 10 }T
-  T{ ifz false .then 10 end <T> 10 }T
-  T{ ifz true .then 10 end <T> }T
-  T{ ifz false .then 10 else 20 end <T> 10 }T
-  T{ ifz true .then 10 else 20 end <T> 20 }T
-  T{ if true .then 10 elif true .then 20 end <T> 10 }T
-  T{ if false .then 10 elif true .then 20 end <T> 20 }T
-  T{ if false .then 10 elif true .then 20 else 30 end <T> 20 }T
-  T{ if false .then 10 elif false .then 20 else 30 end <T> 30 }T
-  T{ if true .then 10 elif true .then 20 elif true .then 30 end <T> 10 }T
-  T{ if false .then 10 elif true .then 20 elif false .then 30 end <T> 20 }T
-  T{ if false .then 10 elif false .then 20 elif true .then 30 end <T> 30 }T
-  T{ if false .then 10 elif false .then 20 elif false .then 30 end <T> }T
-  T{ if true .then 10 elif true .then 20 elif true .then 30 else 40 end <T> 10 }T
-  T{ if false .then 10 elif true .then 20 elif false .then 30 else 40 end <T> 20 }T
-  T{ if false .then 10 elif false .then 20 elif true .then 30 else 40 end <T> 30 }T
-  T{ if false .then 10 elif false .then 20 elif false .then 30 else 40 end <T> 40 }T
-  T{ ifz false .then 10 elifz false .then 20 elifz false .then 30 else 40 end <T> 10 }T
-  T{ ifz true .then 10 elifz false .then 20 elifz false .then 30 else 40 end <T> 20 }T
-  T{ ifz true .then 10 elifz true .then 20 elifz false .then 30 else 40 end <T> 30 }T
-  T{ ifz true .then 10 elifz true .then 20 elifz true .then 30 else 40 end <T> 40 }T
+  T{ false .then 10 end <T> }T
+  T{ true .then 10 end <T> 10 }T
+  T{ false .then 10 else 20 end <T> 20 }T
+  T{ true .then 10 else 20 end <T> 10 }T
+  T{ false =0 .then 10 end <T> 10 }T
+  T{ true =0 .then 10 end <T> }T
+  T{ false =0 .then 10 else 20 end <T> 10 }T
+  T{ true =0 .then 10 else 20 end <T> 20 }T
+  T{ true .then 10 elif true .then 20 end <T> 10 }T
+  T{ false .then 10 elif true .then 20 end <T> 20 }T
+  T{ false .then 10 elif true .then 20 else 30 end <T> 20 }T
+  T{ false .then 10 elif false .then 20 else 30 end <T> 30 }T
+  T{ true .then 10 elif true .then 20 elif true .then 30 end <T> 10 }T
+  T{ false .then 10 elif true .then 20 elif false .then 30 end <T> 20 }T
+  T{ false .then 10 elif false .then 20 elif true .then 30 end <T> 30 }T
+  T{ false .then 10 elif false .then 20 elif false .then 30 end <T> }T
+  T{ true .then 10 elif true .then 20 elif true .then 30 else 40 end <T> 10 }T
+  T{ false .then 10 elif true .then 20 elif false .then 30 else 40 end <T> 20 }T
+  T{ false .then 10 elif false .then 20 elif true .then 30 else 40 end <T> 30 }T
+  T{ false .then 10 elif false .then 20 elif false .then 30 else 40 end <T> 40 }T
+  T{ false =0 .then 10 elif false =0 .then 20 elif false =0 .then 30 else 40 end <T> 10 }T
+  T{ true =0 .then 10 elif false =0 .then 20 elif false =0 .then 30 else 40 end <T> 20 }T
+  T{ true =0 .then 10 elif true =0 .then 20 elif false =0 .then 30 else 40 end <T> 30 }T
+  T{ true =0 .then 10 elif true =0 .then 20 elif true =0 .then 30 else 40 end <T> 40 }T
 end
 .test_conditionals
 
+0 var: TEST_COND_PRED_HITS
+
+fun: .test_cond_pred ( bool -- bool )
+  TEST_COND_PRED_HITS @ .inc TEST_COND_PRED_HITS !
+end
+
+fun: .test_cond_skip_predicates
+  0 TEST_COND_PRED_HITS !
+  T{ true .then 10 elif false .test_cond_pred .then 20 else 30 end <T> 10 }T
+  T{ TEST_COND_PRED_HITS @ <T> 0 }T
+
+  0 TEST_COND_PRED_HITS !
+  T{ false .then 10 elif false .test_cond_pred .then 20 else 30 end <T> 30 }T
+  T{ TEST_COND_PRED_HITS @ <T> 1 }T
+end
+.test_cond_skip_predicates
+
+fun: .test_cond_elif_missing_pred
+  s" ./fail/test_stack_cond_elif_missing_pred.af" catch' .use { err }
+  err " unexpected end after `elif`; expected `elif <predicate> .then`"
+  .T_err_contains
+end
+.test_cond_elif_missing_pred
+
 fun: .test_recursion ( val -- val )
-  if .dup 13 <= .then .ret end
+  .dup 13 <= .then .ret end
   .dec .recur
 end
 T{ 123 .test_recursion <T> 13 }T
 
 fun: .recur_throw_callee ( val -- val )
   [ true .throws ]
-  ifz .dup .then .drop 100 .ret end
-  if .dup 3 = .then .drop " recur_err_stack" .throw end
+  .dup =0 .then .drop 100 .ret end
+  .dup 3 = .then .drop " recur_err_stack" .throw end
   .dec .recur
 end
 
@@ -179,7 +203,7 @@ fun: .test_loop_for
   T{
     0
     12 .for
-      if .dup 5 > .then leave end
+      .dup 5 > .then leave end
       .dup .inc
     end
     .drop
@@ -231,7 +255,7 @@ fun: .test_loop_for_countdown
 
   T{
     12 -for: ind
-      if ind 5 <= .then leave end
+      ind 5 <= .then leave end
       ind
     end
     <T>
@@ -282,7 +306,7 @@ fun: .test_loop_for_countup
 
   T{
     12 0 +for: ind
-      if ind 5 > .then leave end
+      ind 5 > .then leave end
       ind
     end
     <T>
@@ -362,7 +386,7 @@ fun: .test_again_loop
     -1
     loop
       .inc .dup
-      if .dup 7 < .then again end
+      .dup 7 < .then again end
       leave
     end
     .drop
@@ -664,7 +688,7 @@ end
 fun: .test_throw " test_err" .throw end
 
 fun: .test_catch_0_val
-  if false .then .test_throw end
+  false .then .test_throw end
   123
 end
 
@@ -677,7 +701,7 @@ end
 .test_catch_0
 
 fun: .test_catch_1_cond ( one -- two )
-  if .dup .then 2 * .ret end
+  .dup .then 2 * .ret end
   .drop
   .test_throw
 end
@@ -691,7 +715,7 @@ end
 .test_catch_1
 
 fun: .test_catch_2_cond ( one two -- three four )
-  if .dup2 <>0 .swap <>0 .and .then * .dup .ret end
+  .dup2 <>0 .swap <>0 .and .then * .dup .ret end
   .drop2
   .test_throw
 end

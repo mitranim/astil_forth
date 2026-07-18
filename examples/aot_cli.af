@@ -10,7 +10,7 @@ use' lang.af
 \ See `./aot.af` for compiling from INSIDE the program.
 
 fun: .run { -- exit }
-  if .has_interp .then
+  .has_interp .then
     " hello world (JIT mode)!" .log .lf
   else
     " hello world (AOT-compiled)!" .log .lf

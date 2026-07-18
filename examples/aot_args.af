@@ -5,13 +5,13 @@ use' lang.af
 \ AOT-compiled programs receive args straight from the OS.
 
 fun: .run { argc argv envp -- exit }
-  if .has_interp .then
+  .has_interp .then
     " [main] mode: JIT" .log .lf
   else
     " [main] mode: AOT" .log .lf
   end
 
-  if argc .then
+  argc .then
     " [main] args (%zd):" argc .logf .lf
 
     0 { ind }
@@ -26,8 +26,8 @@ fun: .run { argc argv envp -- exit }
   end
 
   \ Optional: dump env.
-  if false .then
-    if envp .then
+  false .then
+    envp .then
       " [main] env:" .log .lf
 
       loop

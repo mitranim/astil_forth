@@ -27,7 +27,7 @@ fun: .T_stack_eq ( len0 len1 len -- equal )
   len 0 +for: ind
     ind len0 + .pick0 { one }
     ind len1 + .pick0 { two }
-    if one two <> .then false .ret end
+    one two <> .then false .ret end
   end
   true
 end
@@ -43,9 +43,9 @@ fun: }T
   len2 len1 - to: rel1 \ Relative length after `<T>`.
 
   \ Does the stack length match?
-  if rel0 rel1 = .then
+  rel0 rel1 = .then
     \ Does the content match?
-    if len0 len1 rel1 .T_stack_eq .then .T_reset .ret end
+    len0 len1 rel1 .T_stack_eq .then .T_reset .ret end
   else
     " stack length mismatch: (%zd) <T> (%zd)" rel0 rel1 [ 2 ] .elogf .elf
   end
@@ -65,16 +65,16 @@ fun: .T_str_eq ( act exp -- )
   to: exp
   to: act
 
-  ifz exp .then
-    ifz act .then .ret end
+  exp =0 .then
+    act =0 .then .ret end
     " expected string to be nil; got: %s" act [ 1 ] .errf .throw
   end
 
-  ifz act .then
+  act =0 .then
     " unexpected nil string; expected: %s" exp [ 1 ] .errf .throw
   end
 
-  if act exp cstr= .then .ret end
+  act exp cstr= .then .ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
   " expected string: %s; actual string: %s" exp act [ 2 ] .errf .throw
@@ -84,12 +84,12 @@ fun: .T_err_contains ( act exp -- )
   to: exp
   to: act
 
-  ifz act .then
+  act =0 .then
     " missing error message; expected error to contain: %s" exp [ 1 ] .errf
     .throw
   end
 
-  if act exp .strstr .then .ret end
+  act exp .strstr .then .ret end
 
   " expected error message to contain: %s; actual error message: %s"
   exp act [ 2 ] .errf .throw

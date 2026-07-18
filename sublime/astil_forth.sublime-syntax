@@ -30,13 +30,7 @@ variables:
   braces_param: '(?:[^\s{}]+)'
   brace_params_pre: (?:stack)
   declarator: '[^\s"{{tick}}{{delim_chars}}]+'
-  keyword: |-
-    (?x:
-      if|ifz|elif|elifz|else|
-      loop|leave|again|
-      assert|
-      end
-    )
+  keyword: (?x:elif|else|loop|leave|again|assert|end)
 
 contexts:
   prototype:

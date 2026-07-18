@@ -20,7 +20,7 @@ fun: .cf_want_word { XT -- err }
   CF_WANT_LEN @ { exp_len }
   XT .Sym_union .Sym_norm_spans { spans }
   spans .Sym_instrs_ret @u32 .inc spans .Sym_instrs_prologue @u32 - { act_len }
-  if exp_len act_len <> .then
+  exp_len act_len <> .then
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
     " [test] `%.*s` instruction length mismatch: expected %zd, actual %zd"
@@ -32,7 +32,7 @@ fun: .cf_want_word { XT -- err }
     ind exp_len < .while
     CF_WANT_INSTRS ind 4 * + @u32 { exp }
     XT .sym_instr ind 4 * + @u32 { act }
-    if exp act <> .then
+    exp act <> .then
       XT .Sym_name .Sym_word_buf { name }
       XT .Sym_name .Sym_word_len @u32 { name_len }
       " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
@@ -47,18 +47,18 @@ fun: .cf_imm_lane { imm hw -- lane }
 end
 
 fun: .cf_base_hw { bits -- hw }
-  if bits 0 .cf_imm_lane .then 0 .ret end
-  if bits 1 .cf_imm_lane .then 1 .ret end
-  if bits 2 .cf_imm_lane .then 2 .ret end
-  if bits 3 .cf_imm_lane .then 3 .ret end
+  bits 0 .cf_imm_lane .then 0 .ret end
+  bits 1 .cf_imm_lane .then 1 .ret end
+  bits 2 .cf_imm_lane .then 2 .ret end
+  bits 3 .cf_imm_lane .then 3 .ret end
   0
 end
 
 fun: .cf_want_movk_if { reg neg base_hw hw bits }
   bits hw .cf_imm_lane { lane }
-  if hw base_hw <> .then
-    if lane .then
-      if neg .then lane .invert 0xffff .and else lane end { imm16 }
+  hw base_hw <> .then
+    lane .then
+      neg .then lane .invert 0xffff .and else lane end { imm16 }
       reg 0b11 hw imm16 .asm_mov_wide .cf_want_instr
     end
   end
@@ -66,8 +66,8 @@ end
 
 fun: .cf_want_load { reg imm }
   imm <0 { neg }
-  if neg .then imm .invert else imm end { bits }
-  if neg .then 0b00 else 0b10 end { opc }
+  neg .then imm .invert else imm end { bits }
+  neg .then 0b00 else 0b10 end { opc }
 
   bits .cf_base_hw { hw }
   bits hw .cf_imm_lane { imm16 }
@@ -107,7 +107,7 @@ fun: .const_fold_arith_fun { -- val } 10 20 30 40 + - * end
 
 fun: .test_const_fold_arith { -- err }
   assert= .const_fold_arith_fun -500 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   -500 xt' .const_fold_arith_fun .cf_want_load_word
 end
@@ -124,7 +124,7 @@ fun: .test_const_fold_large_imm { -- err }
   assert= out0 0x12345678a end
   assert= out1 0x12345678a end
   assert= out2 0xaaaaaaaaa end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 0x12345678a .cf_want_load
@@ -144,7 +144,7 @@ fun: .test_const_fold_ugly_imm { -- err }
   .const_fold_ugly_imm_fun { out0 out1 }
   assert= out0 0x123456789abcdef0 end
   assert= out1 0 0x123456789abc - end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 0x123456789abcdef0 .cf_want_load
@@ -160,7 +160,7 @@ end
 
 fun: .test_const_fold_negative_lane_imm { -- err }
   assert= .const_fold_negative_lane_imm_fun 0 0x100020003 - end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 0x100020003 - { imm }
@@ -189,7 +189,7 @@ fun: .test_const_fold_unary { -- err }
   assert= out4 42 end
   assert= out5 0 end
   assert= out6 8 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 42 .cf_want_load
@@ -217,7 +217,7 @@ fun: .test_const_fold_pow2_ceil { -- err }
   assert= out1 1 end
   assert= out2 4096 end
   assert= out3 8192 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 1 .cf_want_load
@@ -238,7 +238,7 @@ fun: .test_const_fold_bit_count { -- err }
   .const_fold_bit_count_fun { out0 out1 }
   assert= out0 64 end
   assert= out1 3 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 64 .cf_want_load
@@ -265,7 +265,7 @@ fun: .test_const_fold_zero_cmp { -- err }
   assert= out3 1 end
   assert= out4 1 end
   assert= out5 1 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 1 .cf_want_load
@@ -308,7 +308,7 @@ fun: .test_const_fold_bit_shift { -- err }
   assert= out3 48 end
   assert= out4 8 end
   assert= out5 -16 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 14 .cf_want_load
@@ -478,7 +478,7 @@ fun: .test_const_fold_div_mod { -- err }
   assert= out7 1 end
   assert= out8 1 end
 
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 5 .cf_want_load
@@ -544,7 +544,7 @@ fun: .test_const_fold_compare2 { -- err }
   assert= out5 1 end
   assert= out6 1 end
   assert= out7 1 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 3 .cf_want_load
@@ -581,7 +581,7 @@ end
 
 fun: .test_const_fold_assert_static_pass { -- err }
   .const_fold_assert_static_pass_fun
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   .cf_want_ret
@@ -606,7 +606,7 @@ fun: .test_const_fold_ucompare2 { -- err }
   assert= out3 1 end
   assert= out4 1 end
   assert= out5 1 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 0 .cf_want_load
@@ -641,7 +641,7 @@ fun: .test_const_fold_derived { -- err }
   assert= out5 32 end
   assert= out6 40 end
   assert= out7 42 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 40 .cf_want_load
@@ -667,7 +667,7 @@ fun: .const_fold_bit_mask_get_fun { -- out }
 end
 
 fun: .test_const_fold_bits { -- err }
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   31 xt' .const_fold_low_bits_fun .cf_want_load_word
   5 xt' .const_fold_bits_trunc_fun .cf_want_load_word
@@ -687,7 +687,7 @@ fun: .test_const_fold_cint_to_cell { -- err }
   .const_fold_cint_to_cell_fun { out0 out1 }
   assert= out0 -1 end
   assert= out1 123 end
-  ifz .has_interp .then .ret end
+  .has_interp =0 .then .ret end
 
   .cf_want_clear
   0 -1 .cf_want_load

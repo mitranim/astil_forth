@@ -1,0 +1,5 @@
+use' ../../lang.af
+
+fun: .test_cond_arity_bare_then_fail { -- out }
+  true .then 10 end
+end

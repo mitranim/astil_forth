@@ -12,7 +12,7 @@ fun: .child { inout -- Err }
   alloca' Fstat { stat }
   path stat .path_stat { err }
 
-  ifz err .then
+  err =0 .then
     \ Store the output back.
     stat .Fstat_size @ inout !
   end
@@ -23,7 +23,7 @@ end
 
 fun: .cleanup { id mem }
   mem .stack_deinit { err }
-  if err .then
+  err .then
     " [parent] unable to deinit memory for child thread %zd: %s" id err .logf .lf
   end
 end
@@ -38,7 +38,7 @@ fun: .spawn { id inp mem -- thread inout ok }
 
   CTX_CAP Child_ctx mem .stack_init_ctx { ctx err }
 
-  if err .then
+  err .then
     " [parent] unable to init memory for child thread %zd: %s" id err .logf .lf
     nil nil false .ret
   end
@@ -50,7 +50,7 @@ fun: .spawn { id inp mem -- thread inout ok }
 
   instr' .child inout ctx .thread_spawn_ctx { thread err }
 
-  if err .then
+  err .then
     " [parent] unable to spawn thread %zd: %s" id err .logf .lf
     id mem .cleanup
     nil nil false .ret
@@ -63,12 +63,12 @@ fun: .wait { id path out thread -- ok }
   " [parent] waiting on thread %zd..." id .logf .lf
   thread .thread_join { err join_err }
 
-  if join_err .then
+  join_err .then
     " [parent] unable to join with thread %zd: %s" id join_err .logf .lf
     false .ret
   end
 
-  if err .then
+  err .then
     " [parent] error from thread %zd: %s" id err .logf .lf
   else
     " [parent] result from thread %zd: length of `%s`: %zd" id path out @ .logf .lf
@@ -88,15 +88,15 @@ fun: .parent
 
   \ After spawning a thread, we must either join or detach it.
 
-  if ok0 .then 0 path0 val0 thread0 .wait { ok0 } end
-  if ok1 .then 1 path1 val1 thread1 .wait { ok1 } end
+  ok0 .then 0 path0 val0 thread0 .wait { ok0 } end
+  ok1 .then 1 path1 val1 thread1 .wait { ok1 } end
 
   \ Unmap child thread memory on join success.
   \
   \ On join failure, thread might still be running and using memory.
   \ In those cases, we leak child thread memory to avoid corruption.
 
-  if ok0 .then 0 mem0 .cleanup end
-  if ok1 .then 1 mem1 .cleanup end
+  ok0 .then 0 mem0 .cleanup end
+  ok1 .then 1 mem1 .cleanup end
 end
 .parent

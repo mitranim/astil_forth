@@ -27,7 +27,7 @@ end
 fun: .bigint_divmod10_step { quo bit rem -- quo rem }
   rem 1 .lsl bit + { rem }
   quo 1 .lsl { quo }
-  if rem 10 >= .then
+  rem 10 >= .then
     rem 10 - { rem }
     inc: quo
   end
@@ -61,7 +61,7 @@ fun: .bigint_log_decimal { lo hi }
   40 .alloca { buf }
   buf 40 +  { ptr }
 
-  ifz lo hi .or .then
+  lo hi .or =0 .then
     48 .logc
     .ret
   end
@@ -72,7 +72,7 @@ fun: .bigint_log_decimal { lo hi }
     rem 48 + ptr !8
     qlo { lo }
     qhi { hi }
-    ifz lo hi .or .then leave end
+    lo hi .or =0 .then leave end
   end
 
   ptr { pos }

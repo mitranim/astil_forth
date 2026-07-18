@@ -1,0 +1,7 @@
+use' ../../lang_s.af
+
+fun: .test_stack_cond_elif_missing_pred_fail
+  false .then 10
+  elif
+  end
+end

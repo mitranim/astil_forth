@@ -8,7 +8,7 @@ use' pthread.af
 fun: .conn_close { conn }
   " [srv] closing connection %zd" conn .elogf .elf
 
-  if conn .close .then
+  conn .close .then
     .errno { code }
     code .strerror { msg }
     " [srv] unable to close connection %zd; code: %zd; msg: %s"
@@ -26,9 +26,9 @@ fun: .net_accept_loop { sock handler }
     size' Sockaddr_storage size !cuint
     sock addr size .accept .cint_to_cell { conn }
 
-    if conn <0 .then
+    conn <0 .then
       .errno { code }
-      if code EINTR = .then again end
+      code EINTR = .then again end
       code .strerror { msg }
       " [srv] unable to accept connection %zd; code: %zd; msg: %s"
       conn code msg .elogf .elf
@@ -55,9 +55,9 @@ fun: .net_accept_loop_threaded { sock handler }
     size' Sockaddr_storage size !cuint
     sock addr size .accept .cint_to_cell { conn }
 
-    if conn <0 .then
+    conn <0 .then
       .errno { code }
-      if code EINTR = .then again end
+      code EINTR = .then again end
       code .strerror { msg }
       " [srv] unable to accept connection; code: %zd; msg: %s" code msg .elogf .elf
       again
@@ -67,7 +67,7 @@ fun: .net_accept_loop_threaded { sock handler }
 
     handler conn .thread_spawn_detached { _ err }
 
-    if err .then
+    err .then
       " [srv] unable to spawn worker: %s" err .elogf .elf
       conn .conn_close
     end

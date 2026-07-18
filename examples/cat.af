@@ -17,8 +17,8 @@ fun: .echo_stdin { -- err }
   cap .alloca { buf }
   loop
     STDIN_FILENO buf cap .fd_read { len }
-    if len =0 .then leave end
-    if len >0 .then
+    len =0 .then leave end
+    len >0 .then
       STDOUT_FILENO buf len .fd_write_all
       again
     end
@@ -30,7 +30,7 @@ fun: .echo_file_loop { fdes -- err }
   cap .alloca { buf }
   loop
     fdes buf cap .fd_read { len }
-    ifz len .then leave end
+    len =0 .then leave end
     STDOUT_FILENO buf len .fd_write_all
   end
 end
@@ -43,7 +43,7 @@ fun: .echo_file { path -- Err }
 end
 
 fun: .cat { argc argv -- err }
-  if argc 1 <= .then .echo_stdin .ret end
+  argc 1 <= .then .echo_stdin .ret end
   argc .cells argv + { ceil }
 
   loop
@@ -51,7 +51,7 @@ fun: .cat { argc argv -- err }
     argv ceil < .while
     argv @ { arg }
 
-    if arg " -" cstr= .then
+    arg " -" cstr= .then
       .echo_stdin
     else
       arg .echo_file
@@ -65,5 +65,5 @@ end
 \ AOT entry.
 fun: .main { argc argv -- exit }
   .with_main_ctx argc argv .cat { err } end
-  if err .then " error: %s" err .elogf .elf 1 else 0 end
+  err .then " error: %s" err .elogf .elf 1 else 0 end
 end

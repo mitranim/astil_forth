@@ -1,5 +1,0 @@
-use' ../../lang.af
-
-fun: .test_cond_arity_bare_if_fail { -- out }
-  if true .then 10 end
-end

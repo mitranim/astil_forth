@@ -18,10 +18,10 @@ use' ./time.af \ Defines `Timespec`.
 \ whose `int` result may also be an actual useful value, sign-extend the value
 \ before testing or using it, via `.cint_to_cell`. Examples:
 \
-\   if .libc_word .then .errno " unable to blah" .os_err .throw end
+\   .libc_word .then .errno " unable to blah" .os_err .throw end
 \
 \   .libc_word .cint_to_cell { val }
-\   if val <0 .then .errno "unable to blah" .os_err .throw end
+\   val <0 .then .errno "unable to blah" .os_err .throw end
 \
 \ We prefer to annotate all extern words which return such
 \ a "gotcha" value with `:Cint`. Many examples below.
@@ -29,7 +29,7 @@ use' ./time.af \ Defines `Timespec`.
 \ Machine-word returns such as `ssize_t` don't need width repair:
 \
 \   .some_word { len }
-\   if len <0 .then ... end
+\   len <0 .then ... end
 
 \ `struct stat`. Used by reference.
 struct: Fstat
@@ -153,16 +153,16 @@ fun: .io_err { code action path -- err_str }
 end
 
 fun: .fd_stat { fdes path stat_adr -- err }
-  if fdes stat_adr .fstat .then .errno " stat" path .io_err .throw end
+  fdes stat_adr .fstat .then .errno " stat" path .io_err .throw end
 end
 
 fun: .path_stat { path stat_adr -> err }
-  if .stat .then .errno " stat" path .io_err .throw end
+  .stat .then .errno " stat" path .io_err .throw end
 end
 
 fun: .fd_open { path mode -> fdes err }
   .open .cint_to_cell { out }
-  if out <0 .then .errno " open" path .io_err .throw end
+  out <0 .then .errno " open" path .io_err .throw end
   out
 end
 
@@ -170,9 +170,9 @@ end
 fun: .fd_read { fdes buf cap -- len err }
   loop
     fdes buf cap .read { len }
-    if len >=0 .then leave end
+    len >=0 .then leave end
     .errno { code }
-    if code EINTR = .then again end
+    code EINTR = .then again end
     code " unable to read" .os_err .throw
   end
   len
@@ -182,9 +182,9 @@ end
 fun: .fd_write { fdes buf cap -- len err }
   loop
     fdes buf cap .write { len }
-    if len >=0 .then leave end
+    len >=0 .then leave end
     .errno { code }
-    if code EINTR = .then again end
+    code EINTR = .then again end
     code " unable to write" .os_err .throw
   end
   len
@@ -197,7 +197,7 @@ fun: .fd_write_opt { fdes buf len -> } .write { -- } end
 \ Wraps `.write` with an error without retrying `EINTR`.
 fun: .fd_write_once { fdes buf len -- wrote err }
   fdes buf len .write { wrote }
-  if wrote <0 .then
+  wrote <0 .then
     .errno " unable to write" .os_err { err }
     0 err .ret
   end
@@ -206,17 +206,17 @@ end
 
 fun: .fd_write_all { fdes buf len -- err }
   loop
-    ifz len .then .ret end
+    len =0 .then .ret end
 
     fdes buf len .write { wrote }
 
-    if wrote <0 .then
+    wrote <0 .then
       .errno { code }
-      if code EINTR = .then again end
+      code EINTR = .then again end
       code " unable to write" .os_err .throw
     end
 
-    ifz wrote .then " unable to write: wrote zero bytes" .throw end
+    wrote =0 .then " unable to write: wrote zero bytes" .throw end
 
     wrote +: buf
     len wrote - { len }
@@ -227,31 +227,31 @@ end
 fun: .fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
 
 fun: .file_err_code { file -- code }
-  if file .ferror .then .errno else 0 end
+  file .ferror .then .errno else 0 end
 end
 
 fun: .file_err { code action -- err_str }
-  ifz code .then " file error without error code: %s" action .strf .ret end
+  code =0 .then " file error without error code: %s" action .strf .ret end
   code .strerror { msg }
   " file error: %s; code: %zd; msg: %s" action code msg .strf
 end
 
 fun: .file_open { path mode -> file err }
   .fopen { file }
-  ifz file .then .errno " open" path .io_err .throw end
+  file =0 .then .errno " open" path .io_err .throw end
   file
 end
 
 fun: .file_write_char { char file -> err }
-  if .fputc .cint_to_cell <0 .then
+  .fputc .cint_to_cell <0 .then
     .errno " failed to write char" .file_err .throw
   end
 end
 
 fun: .file_write_bytes { buf len file -- err }
   buf 1 len file .fwrite { out }
-  if out len = .then .ret end
+  out len = .then .ret end
   file .file_err_code { code } \ Must be called before formatting.
   " wrote %zd instead of %zd bytes" out len .strf { action }
-  if code .then code action .file_err else action end
+  code .then code action .file_err else action end
 end
