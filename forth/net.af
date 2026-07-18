@@ -65,12 +65,12 @@ fun: .net_addr_info { port -- ainf err }
 
   code .then
     code .gai_strerror { msg }
-    " unable to listen on port %s; code: %zd; msg: %s" port code msg .strf .throw
+    " unable to listen on port %s; code: %zd; msg: %s" port code msg .errf .throw
   end
 
   ainf @ =0 .then
     \ This line should not be reached on Posix-conforming systems.
-    " unable to listen on port %s: no addrinfo available" port .strf .throw
+    " unable to listen on port %s: no addrinfo available" port .errf .throw
   end
 
   ainf @
@@ -126,9 +126,9 @@ fun: .net_listen { port backlog -- sock Err }
   ainf .freeaddrinfo
 
   err .then
-    " unable to listen on port %s: socket error: %s" port err .strf { err }
+    " unable to listen on port %s: socket error: %s" port err .errf { err }
   elif sock <0 .then
-    " unable to listen on port %s: no sockets available" port .strf { err }
+    " unable to listen on port %s: no sockets available" port .errf { err }
   end
 
   sock err

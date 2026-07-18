@@ -149,7 +149,7 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 \ call, then invoke this.
 fun: .io_err { code action path -- err_str }
   code .strerror { msg }
-  " unable to %s `%s`; code: %zd; msg: %s" action path code msg .strf
+  " unable to %s `%s`; code: %zd; msg: %s" action path code msg .errf
 end
 
 fun: .fd_stat { fdes path stat_adr -- err }
@@ -231,9 +231,9 @@ fun: .file_err_code { file -- code }
 end
 
 fun: .file_err { code action -- err_str }
-  code =0 .then " file error without error code: %s" action .strf .ret end
+  code =0 .then " file error without error code: %s" action .errf .ret end
   code .strerror { msg }
-  " file error: %s; code: %zd; msg: %s" action code msg .strf
+  " file error: %s; code: %zd; msg: %s" action code msg .errf
 end
 
 fun: .file_open { path mode -> file err }
@@ -252,6 +252,6 @@ fun: .file_write_bytes { buf len file -- err }
   buf 1 len file .fwrite { out }
   out len = .then .ret end
   file .file_err_code { code } \ Must be called before formatting.
-  " wrote %zd instead of %zd bytes" out len .strf { action }
+  " wrote %zd instead of %zd bytes" out len .errf { action }
   code .then code action .file_err else action end
 end

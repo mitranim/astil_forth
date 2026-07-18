@@ -1586,7 +1586,7 @@ end
 fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' .inc .comp_loc_mut end
 fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' .dec .comp_loc_mut end
 
-\ ## Memory context
+\ ## Context
 
 \ Partial mirror of C `Ctx`. The self field exists but stack-CC doesn't use it.
 \ SYNC[ctx_fields].
@@ -1711,9 +1711,9 @@ fun_comp: .elogf ( C: len -- ) ( E: fmt …vargs… -- )
   .comp_va_end
 end
 
-\ Formats a string, `.snprintf`-style, into the remaining memory
-\ in the current ambient context.
-fun: .strf { fmt vlist -- str }
+\ Formats `.snprintf`-style into current ambient context; see `## Context`.
+\ Error formatting must be infallible, so failures return fallback strings.
+fun: .errf { fmt vlist -- str }
   1 .ctx_avail { buf cap }
   cap =0 .then " <unable to format string: out of space>" .ret end
 
@@ -1725,10 +1725,10 @@ fun: .strf { fmt vlist -- str }
   buf
 end
 
-fun_comp: .strf ( C: len -- ) ( E: fmt …vargs… -- str )
+fun_comp: .errf ( C: len -- ) ( E: fmt …vargs… -- str )
   .dup .comp_va_beg
   compile' systack_ptr
-  compile' .strf
+  compile' .errf
   .comp_va_end
 end
 
@@ -1800,7 +1800,7 @@ fun: .mem_map { size pflag -- addr }
   0 size pflag mflag -1 0 .mmap to: addr
   addr -1 = .then
     " unable to map memory; code: %zd; message: %s"
-    .errno .dup .strerror [ 2 ] .strf
+    .errno .dup .strerror [ 2 ] .errf
     .throw
   end
   addr
@@ -1810,7 +1810,7 @@ fun: .mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE .or .mprotect
   .then
     " unable to unprotect memory; code: %zd; message: %s"
-    .errno .dup .strerror [ 2 ] .strf
+    .errno .dup .strerror [ 2 ] .errf
     .throw
   end
 end

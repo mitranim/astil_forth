@@ -601,10 +601,10 @@ fun: .test_ctx_alloc_out_of_space
 end
 .test_ctx_alloc_out_of_space
 
-fun: .test_strf
+fun: .test_errf
   context .Ctx_top @ { top0 }
-  " numbers: %zd %zd %zd" 10 20 30 [ 3 ] .strf { str0 }
-  " codes: %zd %zd %zd" 40 50 60 [ 3 ] .strf { str1 }
+  " numbers: %zd %zd %zd" 10 20 30 [ 3 ] .errf { str0 }
+  " codes: %zd %zd %zd" 40 50 60 [ 3 ] .errf { str1 }
   context .Ctx_top @ { top1 }
 
   str0 " numbers: 10 20 30" .T_str_eq
@@ -613,7 +613,7 @@ fun: .test_strf
   T{ top1 top0 > <T> true }T
   str0 " numbers: 10 20 30" .T_str_eq
 end
-.test_strf
+.test_errf
 
 fun: .test_to
   T{ 10 to: one <T> }T

@@ -2539,7 +2539,7 @@ end
 \
 \ Resulting address can be passed to `.call` or foreign code as a callback.
 \
-\ Some of our words, such as `.strf`, directly use ambient memory context.
+\ Some of our words, such as `.errf`, directly use ambient memory context.
 \ Their callers depend on ambient context indirectly. When passing words
 \ to foreign callers, ensure one of:
 \
@@ -4384,9 +4384,9 @@ fun: .errno { -- code } .__error @s32 end
 
 \ ## String formatting continued
 
-\ Formats a string, `.snprintf`-style, into the remaining memory in the
-\ current ambient context; see `## Context`.
-fun: .strf { fmt vlist -- str }
+\ Formats `.snprintf`-style into current ambient context; see `## Context`.
+\ Error formatting must be infallible, so failures return fallback strings.
+fun: .errf { fmt vlist -- str }
   1 .ctx_avail { buf cap }
   cap =0 .then " <unable to format string: out of space>" .ret end
 
@@ -4398,10 +4398,10 @@ fun: .strf { fmt vlist -- str }
   buf
 end
 
-fun_comp: .strf { -- err } ( E: fmt …vargs… -- err )
+fun_comp: .errf { -- err } ( E: fmt …vargs… -- err )
   1 .comp_va_beg { len }
   call'' systack_ptr
-  compile' .strf
+  compile' .errf
   len .comp_va_end
 end
 
@@ -4411,15 +4411,15 @@ fun: .validate_format_len { len -- len err }
   len <0 .then
     .errno { code }
     code .strerror { msg }
-    " unable to format string; code: %zd; msg: %s" code msg .strf .throw
+    " unable to format string; code: %zd; msg: %s" code msg .errf .throw
   end
   len
 end
 
 \ Formats into a given buffer, with null-termination. Usage:
 \
-\   BUF CAP " codes: %zd %zd %zd" 10 20 30 str_prnf
-fun_comp: .str_prnf { -- err } ( E: buf cap fmt …vargs… -- len|err )
+\   BUF CAP " codes: %zd %zd %zd" 10 20 30 .str_prnf
+fun_comp: .str_prnf { -- err } ( E: buf cap fmt …vargs… -- len err )
   3 .comp_va_beg { len }
   compile' .snprintf
   len .comp_va_end
@@ -4441,7 +4441,7 @@ end
 \ `code` comes from `.errno`, `.ferror`, Posix functions, etc.
 fun: .os_err { code text -- err_str }
   code .strerror { msg }
-  " %s; code: %zd; msg: %s" text code msg .strf
+  " %s; code: %zd; msg: %s" text code msg .errf
 end
 
 \ For Posix functions which directly return an `.errno`-like
@@ -4647,7 +4647,7 @@ fun: .indirect_to { decl xt_to -- err }
 
   decl_inp sym_inp <> .then
     " unable to indirect to `%s`: input count: %zd <> %zd"
-    name decl_inp sym_inp .strf .throw
+    name decl_inp sym_inp .errf .throw
   end
 
   decl .Indir_decl_out @b { decl_out }
@@ -4655,7 +4655,7 @@ fun: .indirect_to { decl xt_to -- err }
 
   decl_out sym_out <> .then
     " unable to indirect to `%s`: output count: %zd <> %zd"
-    name decl_out sym_out .strf .throw
+    name decl_out sym_out .errf .throw
   end
 
   decl .Indir_decl_has_err @b { decl_has_err }
@@ -4663,7 +4663,7 @@ fun: .indirect_to { decl xt_to -- err }
 
   decl_has_err sym_has_err <> .then
     " unable to indirect to `%s`: has_err: %zd <> %zd"
-    name decl_has_err sym_has_err .strf .throw
+    name decl_has_err sym_has_err .errf .throw
   end
 
   decl .Indir_decl_instr @ { instr_adr }
@@ -4689,7 +4689,7 @@ fun: .comp_cmp_many { name cond_each nzcv cond_end -- err }
   .comp_args_get { len }
 
   len 3 < .then
-    " `%s` requires at least 3 inputs: value to test, and predicates" name .strf .throw
+    " `%s` requires at least 3 inputs: value to test, and predicates" name .errf .throw
   end
 
   0 1 .asm_cmp_reg .comp_instr \ cmp x0, x1
@@ -4747,40 +4747,40 @@ fun: .is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
 
 fun: .assert_cond { cond text -- err }
   cond .then .ret end
-  " assertion failed: %s" text .strf
+  " assertion failed: %s" text .errf
 end
 
 fun: .assert_bin_cond { lhs rhs cond text op -- err }
   cond .then .ret end
-  " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .strf
+  " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .errf
 end
 
 fun: .assert_str_eq { act exp -- err }
   exp =0 .then
     act =0 .then .ret end
-    " expected string to be nil; got: %s" act .strf .throw
+    " expected string to be nil; got: %s" act .errf .throw
   end
 
   act =0 .then
-    " unexpected nil string; expected: %s" exp .strf .throw
+    " unexpected nil string; expected: %s" exp .errf .throw
   end
 
   act exp cstr= .then .ret end
 
   \ TODO format with newlines; our reader doesn't support escapes yet.
-  " expected string: %s; actual string: %s" exp act .strf
+  " expected string: %s; actual string: %s" exp act .errf
 end
 
 fun: .assert_str_has { act exp -- err }
   act =0 .then
     " missing string; expected string to have: %s"
-    exp .strf .throw
+    exp .errf .throw
   end
 
   act exp .strstr .then .ret end
 
   " expected string to have: %s; actual string: %s"
-  exp act .strf .throw
+  exp act .errf .throw
 end
 
 fun: .assert_beg { -- beg }
@@ -4832,7 +4832,7 @@ fun: .assert_bin_end_xt { beg cond cmp_xt -- err }
     bool =0 .then
       beg .assert_body { text text_len }
       " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"
-      text_len text op_len op lhs rhs op_len op .strf .ret
+      text_len text op_len op lhs rhs op_len op .errf .ret
     end
     .ret
   end
@@ -4918,7 +4918,7 @@ end
 \ Runtime effects:
 \ - Inner code sees default / main ambient context.
 \ - Outer code doesn't get its registers clobbered.
-\ - Words like `.strf` can allocate memory for text.
+\ - Words like `.errf` can allocate memory for text.
 \
 \ Code inside `.with_main_ctx ... end` must run to completion.
 \ This means no `.ret .try .throw`, and no `-- err` in caller,

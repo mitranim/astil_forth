@@ -394,13 +394,13 @@ AF simplifies MM in two ways:
 
 AF dedicates one register (`x28`) to the ambient context, available anywhere via the word `context`. See the type `Ctx` for the structure's definition.
 
-The context acts as a bump-allocator over borrowed caller-owned memory. It's used by words like `.strf`, which need thread-specific scratch memory.
+The context acts as a bump-allocator over borrowed caller-owned memory. It's used by words like `.errf`, which need thread-specific scratch memory.
 
 The outer compiler automatically sets up the main arena. In JIT, it also sets up the main context. In AOT, the main arena is memory-mapped automatically, but the context requires extra setup. General AOT pattern:
 
 ```forth
 fun: .run { -- exit }
-  " hello %s" " world" .strf .log .lf
+  " hello %s" " world" .errf .log .lf
   0
 end
 
@@ -412,7 +412,7 @@ end
 The main arena can't be freed, but may be rewound by saving `.ctx_top` and restoring it via `.ctx_top_set`. Other arenas are caller-owned; callees may allocate, or restore a prior top; caller frees the whole thing:
 
 ```forth
-fun: .callee { -- str } " code: %zd" 123 .strf end
+fun: .callee { -- str } " code: %zd" 123 .errf end
 
 fun: .caller { -- Err }
   alloca' Stack { mem } \ Locally-owned scratch memory.

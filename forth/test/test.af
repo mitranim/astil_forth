@@ -644,7 +644,7 @@ TEST_INDIRECT_FORWARD_OUT8 indirect_to' .test_indirect_forward_out8
 
 fun: .test_indirect_forward_eq { act exp -- err }
   act exp = .then .ret end
-  " indirect forward call mismatch: actual=%zd expected=%zd" act exp .strf .throw
+  " indirect forward call mismatch: actual=%zd expected=%zd" act exp .errf .throw
 end
 
 fun: .test_indirect_clobber { -- err }
@@ -2064,48 +2064,80 @@ fun: .test_fallback { -- err }
 end
 .test_fallback
 
-fun: .test_strf { -- err }
-  " codes: %zd %zd %zd" 10 20 30 .strf { buf0 }
+fun: .test_errf { -- err }
+  " codes: %zd %zd %zd" 10 20 30 .errf { buf0 }
   buf0 " codes: 10 20 30" .assert_str_eq
 
-  " codes: %zd %zd %zd" 40 50 60 .strf { buf1 }
+  " codes: %zd %zd %zd" 40 50 60 .errf { buf1 }
   buf1 " codes: 40 50 60" .assert_str_eq
 
-  " codes: %zd %zd %zd" 70 80 90 .strf { buf2 }
+  " codes: %zd %zd %zd" 70 80 90 .errf { buf2 }
   buf2 " codes: 70 80 90" .assert_str_eq
 
   assert<> buf0 buf1 end
   assert<> buf0 buf2 end
   assert<> buf1 buf2 end
 end
-.test_strf
+.test_errf
 
-fun: .test_strf_exact_fill { -- err }
+fun: .strf_into_infallible { out -- buf cap }
+  out 4 " abcdef" .strf_into
+end
+
+fun: .test_strf_into { -- err }
+  32 .alloca { out }
+
+  out 32 " codes: %zd " 10 .strf_into { buf cap }
+  assert= buf out 10 + end
+  assert= cap 22 end
+
+  buf cap " %zd" 20 .strf_into { buf cap }
+  assert= buf out 12 + end
+  assert= cap 20 end
+  out " codes: 10 20" .assert_str_eq
+
+  4 .alloca { trunc }
+  trunc 4 " abcdef" .strf_into { buf cap }
+  assert= buf trunc 3 + end
+  assert= cap 1 end
+  trunc " abc" .assert_str_eq
+
+  out 0 " ignored" .strf_into { buf cap }
+  assert= buf out end
+  assert= cap 0 end
+
+  4 .alloca .strf_into_infallible { buf cap }
+  assert= cap 1 end
+  buf 3 - " abc" .assert_str_eq
+end
+.test_strf_into
+
+fun: .test_errf_exact_fill { -- err }
   alloca' Ctx { ctx }
   2 .alloca { buf }
   buf 2 ctx .ctx_init
   context { prev_ctx }
 
   ctx .with_ctx
-    " A" .strf { out }
+    " A" .errf { out }
   end
 
   assert= context prev_ctx end
   out " A" .assert_str_eq
 end
-.test_strf_exact_fill
+.test_errf_exact_fill
 
-fun: .test_strf_out_of_space { -- err }
+fun: .test_errf_out_of_space { -- err }
   alloca' Ctx { ctx }
   nil 0 ctx .ctx_init
 
   ctx .with_ctx
-    " codes: %zd %zd %zd" 10 20 30 .strf { out }
+    " codes: %zd %zd %zd" 10 20 30 .errf { out }
   end
 
   out " <unable to format string: out of space>" .assert_str_eq
 end
-.test_strf_out_of_space
+.test_errf_out_of_space
 
 struct: Test_req_ctx
   Ctx  1 field: .Test_req_ctx_ctx
@@ -2172,9 +2204,9 @@ fun: .test_try_multiple { -- err }
 end
 .test_try_multiple
 
-fun: .test_strf_wrap { -- err }
-  " one" .strf { err0 }
-  " two: %s" err0 .strf { err1 }
+fun: .test_errf_wrap { -- err }
+  " one" .errf { err0 }
+  " two: %s" err0 .errf { err1 }
 
   \ err0 .logf .lf
   \ err1 .logf .lf
@@ -2182,14 +2214,14 @@ fun: .test_strf_wrap { -- err }
   err0 " one" .assert_str_eq
   err1 " two: one" .assert_str_eq
 
-  " three: %s" err1 .strf { err2 }
+  " three: %s" err1 .errf { err2 }
 
   assert<> err0 err2 end
   assert<> err0 err1 end
 
   err2 " three: two: one" .assert_str_eq
 
-  " four: %zd: %s" 123 err2 .strf { err3 }
+  " four: %zd: %s" 123 err2 .errf { err3 }
 
   assert<> err3 err0 end
   assert<> err3 err1 end
@@ -2197,7 +2229,7 @@ fun: .test_strf_wrap { -- err }
 
   err3 " four: 123: three: two: one" .assert_str_eq
 end
-.test_strf_wrap
+.test_errf_wrap
 
 fun: .test_alloca { ptr -- err }
   ptr @ { -- } \ Should not segfault. The value is undefined.
@@ -2431,7 +2463,7 @@ fun: .test_struct_field_peephole_expect_instr { XT ind exp -- err }
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
     " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
-    name_len name ind exp act .strf .throw
+    name_len name ind exp act .errf .throw
   end
 end
 
@@ -3299,12 +3331,13 @@ fun: .main_run { -- err }
   .test_comptime_arg_stack_mod_scratch
   .test_stack_push_9
   .test_fallback
-  .test_strf
-  .test_strf_exact_fill
-  .test_strf_out_of_space
+  .test_errf
+  .test_strf_into
+  .test_errf_exact_fill
+  .test_errf_out_of_space
   .test_stack_init_ctx
   .test_thread_custom_ctx
-  .test_strf_wrap
+  .test_errf_wrap
   .test_alloca_cell
   .test_allocaz
   .test_alloca_align

@@ -225,7 +225,7 @@ end
 \
 \ Caution: this doesn't set up memory context for the child thread.
 \ If the callback depends on context either directly or indirectly,
-\ such as by calling `.os_err` / `?posix_err` / `.strf` / etc., then
+\ such as by calling `.os_err` / `?posix_err` / `.errf` / etc., then
 \ caller must allocate an arena and use `.thread_spawn_ctx` instead.
 \ See `../examples/thread.af`.
 fun: .thread_spawn { fun inp -- thread err }
