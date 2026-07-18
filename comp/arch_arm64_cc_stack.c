@@ -5,7 +5,7 @@ system which uses the Forth data stack for its calling convention.
 Compare `./arch_arm64_cc_reg.c` which uses the native reg-based callvention.
 
 Special registers:
-- `x28` = interpreter pointer
+- `x28` = interpreter / ambient context pointer
 - `x27` = top of integer stack
 - `x26` = floor of integer stack
 - `x0`  = error string pointer
@@ -139,13 +139,13 @@ static Err asm_append_try_catch(
 
 static void asm_append_call_intrin_before(Comp *comp) {
   asm_append_store_scaled_offset(
-    comp, ASM_REG_INT_TOP, ASM_REG_INTERP, INTERP_INTS_TOP
+    comp, ASM_REG_INT_TOP, ASM_REG_CTX, INTERP_INTS_TOP
   );
 }
 
 static void asm_append_call_intrin_after(Comp *comp) {
   asm_append_load_scaled_offset(
-    comp, ASM_REG_INT_TOP, ASM_REG_INTERP, INTERP_INTS_TOP
+    comp, ASM_REG_INT_TOP, ASM_REG_CTX, INTERP_INTS_TOP
   );
 }
 
@@ -161,7 +161,7 @@ static Err asm_append_call_intrin(
   constexpr auto reg = ASM_SCRATCH_REG_8;
 
   asm_append_call_intrin_before(comp);
-  asm_append_mov_reg(comp, ASM_PARAM_REG_0, ASM_REG_INTERP);
+  asm_append_mov_reg(comp, ASM_PARAM_REG_0, ASM_REG_CTX);
   asm_append_dysym_load(comp, callee->name.buf, reg, &comp->code.intrins);
   asm_append_branch_link_to_reg(comp, reg);
   asm_append_call_intrin_after(comp);

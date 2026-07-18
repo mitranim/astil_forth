@@ -27,31 +27,31 @@ fun: .nop end
 \ The assembler is also split; some parts are defined
 \ further down, after some stack-manipulation words.
 
-fun: ASM_INSTR_SIZE [ .plain_call ]       4      end
-fun: ASM_REG_ERR [ .plain_call ]          0      end
+fun: ASM_INSTR_SIZE       [ .plain_call ] 4      end
+fun: ASM_REG_ERR          [ .plain_call ] 0      end
 fun: ASM_REG_DAT_SP_FLOOR [ .plain_call ] 26     end \ SYNC[asm_arm64_cc_stack_special_regs].
-fun: ASM_REG_DAT_SP [ .plain_call ]       27     end \ SYNC[asm_arm64_cc_stack_special_regs].
-fun: ASM_REG_INTERP [ .plain_call ]       28     end \ SYNC[asm_reg_ctx].
-fun: ASM_REG_FP [ .plain_call ]           29     end
-fun: ASM_REG_LR [ .plain_call ]           30     end
-fun: ASM_REG_SP [ .plain_call ]           31     end
-fun: ASM_EQ [ .plain_call ]               0b0000 end
-fun: ASM_NE [ .plain_call ]               0b0001 end
-fun: ASM_CS [ .plain_call ]               0b0010 end
-fun: ASM_CC [ .plain_call ]               0b0011 end
-fun: ASM_MI [ .plain_call ]               0b0100 end
-fun: ASM_PL [ .plain_call ]               0b0101 end
-fun: ASM_VS [ .plain_call ]               0b0110 end
-fun: ASM_VC [ .plain_call ]               0b0111 end
-fun: ASM_HI [ .plain_call ]               0b1000 end
-fun: ASM_LS [ .plain_call ]               0b1001 end
-fun: ASM_GE [ .plain_call ]               0b1010 end
-fun: ASM_LT [ .plain_call ]               0b1011 end
-fun: ASM_GT [ .plain_call ]               0b1100 end
-fun: ASM_LE [ .plain_call ]               0b1101 end
-fun: ASM_AL [ .plain_call ]               0b1110 end
-fun: ASM_NV [ .plain_call ]               0b1111 end
-fun: ASM_PLACEHOLDER [ .plain_call ]      666    end \ udf 666; used in retropatching.
+fun: ASM_REG_DAT_SP       [ .plain_call ] 27     end \ SYNC[asm_arm64_cc_stack_special_regs].
+fun: ASM_REG_CTX          [ .plain_call ] 28     end \ SYNC[asm_reg_ctx].
+fun: ASM_REG_FP           [ .plain_call ] 29     end
+fun: ASM_REG_LR           [ .plain_call ] 30     end
+fun: ASM_REG_SP           [ .plain_call ] 31     end
+fun: ASM_EQ               [ .plain_call ] 0b0000 end
+fun: ASM_NE               [ .plain_call ] 0b0001 end
+fun: ASM_CS               [ .plain_call ] 0b0010 end
+fun: ASM_CC               [ .plain_call ] 0b0011 end
+fun: ASM_MI               [ .plain_call ] 0b0100 end
+fun: ASM_PL               [ .plain_call ] 0b0101 end
+fun: ASM_VS               [ .plain_call ] 0b0110 end
+fun: ASM_VC               [ .plain_call ] 0b0111 end
+fun: ASM_HI               [ .plain_call ] 0b1000 end
+fun: ASM_LS               [ .plain_call ] 0b1001 end
+fun: ASM_GE               [ .plain_call ] 0b1010 end
+fun: ASM_LT               [ .plain_call ] 0b1011 end
+fun: ASM_GT               [ .plain_call ] 0b1100 end
+fun: ASM_LE               [ .plain_call ] 0b1101 end
+fun: ASM_AL               [ .plain_call ] 0b1110 end
+fun: ASM_NV               [ .plain_call ] 0b1111 end
+fun: ASM_PLACEHOLDER      [ .plain_call ] 666    end \ udf 666; used in retropatching.
 
 fun: .asm_pop_x1_x2
   \ ldp x1, x2, [x27, -16]!
@@ -1509,14 +1509,15 @@ fun: stderr [ .plain_call ] ( -- adr ) extern_adr' __stderrp @ end
 \ These definitions ignore errors and sizes returned by `libc`.
 \ This is inconsistent with reg-CC where we define the outputs
 \ and sometimes handle them.
-4 0 extern: .fwrite   fwrite   ( src size len file -- )
-1 0 extern: .putchar  putchar  ( char -- )
-2 0 extern: .fputc    fputc    ( char file -- )
-2 0 extern: .fputs    fputs    ( cstr file -- )
-1 0 extern: .printf   printf   ( … fmt -- )
-2 0 extern: .fprintf  fprintf  ( … file fmt -- )
-3 0 extern: .snprintf snprintf ( … buf cap fmt -- )
-1 0 extern: .fflush   fflush   ( file -- )
+4 0 extern: .fwrite    fwrite    ( src size len file -- )
+1 0 extern: .putchar   putchar   ( char -- )
+2 0 extern: .fputc     fputc     ( char file -- )
+2 0 extern: .fputs     fputs     ( cstr file -- )
+1 0 extern: .printf    printf    ( … fmt -- )
+2 0 extern: .fprintf   fprintf   ( … file fmt -- )
+3 0 extern: .snprintf  snprintf  ( … buf cap fmt -- )
+4 1 extern: .vsnprintf vsnprintf ( buf cap fmt vlist -- len|-1 :Cint )
+1 0 extern: .fflush    fflush    ( file -- )
 
 fun: .logc     ( char    -- ) .putchar               end \ Renamed from `emit`.
 fun: .elogc    ( char    -- ) stderr .fputc          end
@@ -1561,6 +1562,18 @@ fun_comp: {
   loc_len }
 end
 
+\ ## Misc numeric stuff
+\
+\ Placed here because requires braces.
+
+\ Non-standard and sane: no wraparound semantics.
+fun: .within { num floor ceil -- bool } num floor >= num ceil < .and end
+
+fun: .align_down ( size width -- size ) .negate .and end
+fun: .align_up   { size width -- size } width .dec size + width .align_down end
+
+\ ## Locals mutation
+
 \ For compiling words which modify a local by applying the given function.
 fun: .comp_loc_mut ( C: fun "name" -- ) ( E: -- )
   .read_word .comp_local
@@ -1573,13 +1586,38 @@ end
 fun_comp: inc: ( C: "name" -- ) ( E: -- ) xt' .inc .comp_loc_mut end
 fun_comp: dec: ( C: "name" -- ) ( E: -- ) xt' .dec .comp_loc_mut end
 
-\ Non-standard and sane: no wraparound semantics.
-fun: .within { num floor ceil -- bool } num floor >= num ceil < .and end
+\ ## Memory context
 
-\ ## Varargs and formatting
+\ Partial mirror of C `Ctx`. The self field exists but stack-CC doesn't use it.
+\ SYNC[ctx_fields].
+fun: .Ctx_top  ( ctx -- adr ) CELL + end
+fun: .Ctx_ceil ( ctx -- adr ) 2 .cells + end
 
-fun: .align_down ( size width -- size ) .negate .and end
-fun: .align_up   { size width -- size } width .dec size + width .align_down end
+fun: context [ .plain_call ] ( -- ctx ) [
+  ASM_REG_CTX .asm_push1 .comp_instr \ str x28, [x27], 8
+] end
+
+fun: .ctx_top_set { top } top context .Ctx_top ! end
+
+fun: .ctx_alloc { size align -- adr }
+  context { ctx }
+  ctx .Ctx_top @ align .align_up { adr }
+  adr size + { top }
+  top ctx .Ctx_ceil @ > .then
+    " unable to allocate context memory: out of space" .throw
+  end
+  top ctx .Ctx_top !
+  adr
+end
+
+fun: .ctx_avail { align -- buf cap }
+  context { ctx }
+  ctx .Ctx_top @ align .align_up { buf }
+  ctx .Ctx_ceil @ buf - 0 .max { cap }
+  buf cap
+end
+
+\ ## Vargs and formatting
 
 \ On Arm64, we can't just modify `sp` by 8 bytes and leave it like that.
 \ The ABI requires it to be aligned to 16 bytes when loading or storing.
@@ -1673,13 +1711,25 @@ fun_comp: .elogf ( C: len -- ) ( E: fmt …vargs… -- )
   .comp_va_end
 end
 
-\ Formats into a given string buffer. `len` is the amount of variadic args,
-\ which must be available at compile time. Returns the same buffer address.
-\ String is null-terminated. Usage:
-\
-\   BUF CAP " codes: %zd %zd %zd" 10 20 30 [ 3 ] .strf
-fun_comp: .strf ( C: len -- ) ( E: buf cap fmt …vargs… -- buf )
-  xt' .snprintf .comp_varcall
+\ Formats a string, `.snprintf`-style, into the remaining memory
+\ in the current ambient context.
+fun: .strf { fmt vlist -- str }
+  1 .ctx_avail { buf cap }
+  cap =0 .then " <unable to format string: out of space>" .ret end
+
+  buf cap fmt vlist .vsnprintf .cint_to_cell { len }
+  len <0 .then " <unable to format string>" .ret end
+
+  cap len .inc .min { len } \ Include terminating nil byte.
+  buf len + .ctx_top_set
+  buf
+end
+
+fun_comp: .strf ( C: len -- ) ( E: fmt …vargs… -- str )
+  .dup .comp_va_beg
+  compile' systack_ptr
+  compile' .strf
+  .comp_va_end
 end
 
 \ ## Exceptions
@@ -1698,23 +1748,6 @@ end
 
 fun_comp: catch'  WORDLIST_EXEC .catch end
 fun_comp: catch'' WORDLIST_COMP .catch end
-
-4096    let: ERR_CAP
-ERR_CAP mem: ERR_BUF
-
-\ Formats an error message. `len` is the count of variadic args
-\ which must be available during compilation. Typical usage:
-\
-\   " unable to blah: %zd" err_code errf throw
-fun_comp: .errf ( E: fmt …vargs… len -- err )
-  .dup      .comp_va_beg
-  compile' ERR_BUF
-  compile' ERR_CAP   ( fmt buf cap )
-  compile' .rot      ( buf cap fmt )
-  compile' .snprintf ( buf cap fmt -- )
-  compile' ERR_BUF   ( -- buf )
-  .comp_va_end
-end
 
 \ ## Stack printing
 
@@ -1767,7 +1800,7 @@ fun: .mem_map { size pflag -- addr }
   0 size pflag mflag -1 0 .mmap to: addr
   addr -1 = .then
     " unable to map memory; code: %zd; message: %s"
-    .errno .dup .strerror [ 2 ] .errf
+    .errno .dup .strerror [ 2 ] .strf
     .throw
   end
   addr
@@ -1777,7 +1810,7 @@ fun: .mem_unprot ( addr size -- )
   PROT_READ PROT_WRITE .or .mprotect
   .then
     " unable to unprotect memory; code: %zd; message: %s"
-    .errno .dup .strerror [ 2 ] .errf
+    .errno .dup .strerror [ 2 ] .strf
     .throw
   end
 end

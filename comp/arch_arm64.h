@@ -107,9 +107,6 @@ static constexpr U8 ASM_INLINABLE_INSTR_LEN = 4;
 // SYNC[asm_reg_ctx].
 static constexpr U8 ASM_REG_CTX = 28;
 
-// Legacy alias for stack-CC.
-static constexpr U8 ASM_REG_INTERP = ASM_REG_CTX;
-
 // clang-format off
 #ifdef CALL_CONV_STACK
 
