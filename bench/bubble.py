@@ -27,6 +27,5 @@ def bubble_sort(length):
   list_init(list)
   bubble(list)
   list_verify(list)
-  # print(list)
 
-bubble_sort(8192)
+bubble_sort(32768)

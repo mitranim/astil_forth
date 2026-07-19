@@ -6,9 +6,7 @@
 ;
 
 : main
-  36 fib
-
-  \ 36 fib . cr
-  \ ." done" cr
+  39 fib 102334155 <>
+  abort" recursive Fibonacci output mismatch"
 ;
 main

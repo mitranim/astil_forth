@@ -11,6 +11,8 @@ def reverse(str):
 def run(str, runs):
   for _ in range(runs):
     reverse(str)
-  # print("".join(str))
+  reverse(str)
+  if "".join(str) != "fedcba9876543210":
+    raise RuntimeError("reverse-string output mismatch")
 
-run(list("0123456789abcdef"), (1 << 22) + 1)
+run(list("0123456789abcdef"), 1 << 25)

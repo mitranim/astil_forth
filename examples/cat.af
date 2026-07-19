@@ -1,7 +1,7 @@
 use' lang.af
 use' io.af
 
-\ Simple `.cat`-like program.
+\ Simple `cat`-like program.
 \
 \ JIT usage:
 \
@@ -64,6 +64,6 @@ end
 
 \ AOT entry.
 fun: .main { argc argv -- exit }
-  .with_main_ctx argc argv .cat { err } end
+  .with_main_ctx argc argv .cat end { err }
   err .then " error: %s" err .elogf .elf 1 else 0 end
 end

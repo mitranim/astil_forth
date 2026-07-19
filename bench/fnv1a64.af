@@ -4,11 +4,9 @@ use' lang.af
 
 0xcbf29ce484222325 let: FNV_OFFSET_BASIS
 0x100000001b3      let: FNV_PRIME
-0x8d8a704cbb222325 let: WANT
+0xb0a1ea8560222325 let: WANT
 65536              let: CAP
-512                let: RUNS
-
-1 1 extern: .getenv getenv
+2048               let: RUNS
 
 fun: .init { buf cap }
   s" 0123456789abcdef" { src len }
@@ -46,7 +44,6 @@ fun: .run { -- err }
     hash buf cap .fnv1a64 { hash }
   end
 
-  " FNV1A64_PRINT" .getenv .then " 0x%zx" hash .logf .lf end
   assert= hash WANT end
 end
 .run

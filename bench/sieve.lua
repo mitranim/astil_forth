@@ -29,10 +29,11 @@ end
 
 local function run(len, runs)
   local flags = {}
+  local out = 0
   for _ = 1, runs do
-    find_prime(flags, len)
+    out = find_prime(flags, len)
   end
-  -- print(find_prime(flags, len))
+  if out ~= 1899 then error("mismatch: expected 1899; got " .. out) end
 end
 
-run(8192, 4096)
+run(8192, 16384)

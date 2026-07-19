@@ -5,8 +5,9 @@
 ;
 
 : main
-  1 20 lshift \ runs
-  0 ?do 91 fib drop loop
-  \ 91 fib . cr
+  0
+  1 22 lshift 0 ?do drop 91 fib loop
+  7540113804746346429 <>
+  abort" iterative Fibonacci output mismatch"
 ;
 main

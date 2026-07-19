@@ -2,7 +2,7 @@ use' lang.af
 
 \ BOT-GENERATED
 
-1 24 .lsl let: RUNS
+1 28 .lsl let: RUNS
 214 RUNS * let: WANT
 
 fun: .runtime_const { seed -- val }

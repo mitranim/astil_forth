@@ -47,15 +47,13 @@
 )
 
 (defun bubble-sort (len)
-  (
-    let
+  (let
     ((list (make-array len :element-type 'fixnum)))
     (declare (fixnums-t list))
     (list-init list)
     (bubble list)
     (list-verify list)
-    ; (princ list) (write-char #\newline)
   )
 )
 
-(bubble-sort 8192)
+(bubble-sort 32768)

@@ -18,7 +18,11 @@
 (defun run (str runs)
   (declare (simple-string str) (fixnum runs))
   (loop :repeat runs :do (reverse-string str))
-  ; (princ str) (write-char #\newline)
+  (reverse-string str)
+  (unless
+    (string= str "fedcba9876543210")
+    (error "reverse-string output mismatch")
+  )
 )
 
-(run (copy-seq "0123456789abcdef") (1+ (ash 1 22)))
+(run (copy-seq "0123456789abcdef") (ash 1 25))

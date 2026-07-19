@@ -1,8 +1,9 @@
 // BOT-TRANSLATED (with tweaks).
 
 #include <stdint.h>
+#include <stdlib.h>
 
-static constexpr uint16_t RUNS = 4096;
+static constexpr uint16_t RUNS = 16384;
 static constexpr uint16_t CAP  = 8192;
 
 static int64_t escape(int64_t val) {
@@ -43,13 +44,12 @@ static int64_t find_prime(uint8_t *flags, int32_t cap) {
   return num;
 }
 
-// #include <stdio.h>
-
 int main() {
   uint8_t flags[CAP];
+  int64_t out = 0;
 
   for (int32_t ind = 0; ind < RUNS; ind++) {
-    escape(find_prime(flags, CAP));
+    out = escape(find_prime(flags, CAP));
   }
-  // printf("%lld\n", find_prime(flags, CAP));
+  if (out != 1899) abort();
 }

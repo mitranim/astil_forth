@@ -3,6 +3,6 @@ local function fib(ind)
   return fib(ind - 1) + fib(ind - 2)
 end
 
-fib(36)
-
--- print(fib(36))
+if fib(39) ~= 102334155 then
+  error("recursive Fibonacci output mismatch")
+end

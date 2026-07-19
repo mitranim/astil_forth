@@ -12,9 +12,12 @@ function fib(depth) {
 }
 
 function run(depth, runs) {
-  while (runs-- > 0) fib(depth)
-  // console.log(fib(depth))
+  let out = 0
+  while (runs-- > 0) out = fib(depth)
+  if (out !== 7540113804746346429) {
+    throw Error("iterative Fibonacci output mismatch")
+  }
 }
 
 // Note: the result is slightly incorrect due to limited integer precision.
-run(91, (1 << 20))
+run(91, 1 << 22)

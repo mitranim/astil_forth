@@ -2,8 +2,7 @@ use' lang_s.af
 
 \ Translated from Gforth's `bubble.fs`.
 
-8192      let: LEN
-LEN .cells mem: LIST
+32768     let: LEN
 
 fun: .list_ceil ( list len -- ceil ) .cells + end
 
@@ -18,14 +17,6 @@ fun: .list_init { list len -- }
     seed .pseudo_random { seed }
     seed ptr !
   end
-end
-
-fun: .list_dump { list len -- }
-  list len .list_ceil list CELL
-  +loop: ptr
-    ptr @ .log_int .space
-  end
-  .lf
 end
 
 fun: .list_verify { list len -- }
@@ -52,35 +43,11 @@ end
 fun: .bubble_sort { list len -- }
   list len .list_init
   list len .bubble
-  \ list len list_dump
   list len .list_verify
 end
 
-\ fun: .bubble_with_flag ( -- )
-\   CEIL LIST CELL
-\   -loop: ceil_ptr
-\     true to: flag
-\
-\     ceil_ptr LIST CELL
-\     +loop: ptr
-\       ptr @2 >
-\ .then
-\         ptr @2 .swap ptr !2
-\         false to: flag
-\       end
-\     end
-\
-\     flag .then leave end
-\   end
-\ end
-
-\ fun: .addrs
-\   " LIST: " .log LIST .sc
-\   " CEIL: " .log CEIL .sc
-\ end
-
 fun: .run
-  LIST LEN .bubble_sort
-  " [bubble] done" .log .lf
+  LEN .cells CELL .ctx_alloc { list }
+  list LEN .bubble_sort
 end
 .run

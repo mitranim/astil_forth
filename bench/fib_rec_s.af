@@ -8,7 +8,8 @@ fun: .fib { ind -- out }
 end
 
 fun: .run
-  36 .fib
-  \ " fib(36): " log log_int lf
+  39 .fib 102334155 <> .then
+    " recursive Fibonacci output mismatch" .throw
+  end
 end
 .run

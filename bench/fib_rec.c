@@ -15,7 +15,6 @@ static int64_t escape(int64_t val) {
 // #include <stdio.h>
 
 int main() {
-  const int64_t count = 36;
-  escape(fib(escape(count)));
-  // printf("%lld\n", fib(count));
+  const int64_t count = 39;
+  if (escape(fib(escape(count))) != 102334155) abort();
 }

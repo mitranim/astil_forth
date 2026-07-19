@@ -4,10 +4,10 @@ local ffi = require("ffi")
 local bit = require("bit")
 
 local CAP = 65536
-local RUNS = 512
+local RUNS = 2048
 local OFFSET = 0xcbf29ce484222325ULL
 local PRIME = 0x100000001b3ULL
-local WANT = 0x8d8a704cbb222325ULL
+local WANT = 0xb0a1ea8560222325ULL
 local buf = ffi.new("uint8_t[?]", CAP)
 local pat = "0123456789abcdef"
 local int64 = ffi.typeof("int64_t")
@@ -33,9 +33,6 @@ end
 local hash = OFFSET
 for _ = 1, RUNS do
   hash = fnv1a64(hash, buf, CAP)
-end
-if os.getenv("FNV1A64_PRINT") then
-  io.write(fmt(hash), "\n")
 end
 if hash ~= WANT then
   error("mismatch: expected " .. fmt(WANT) .. "; got " .. fmt(hash))

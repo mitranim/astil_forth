@@ -3418,7 +3418,7 @@ fun: .main_run { -- err }
 end
 
 fun: .main { -- exit }
-  .with_main_ctx .main_run { err } end
+  .with_main_ctx .main_run end { err }
   err .then " error: %s" err .elogf .elf 1 .ret end
   " [test] [aot] ok" .elog .elf
   0

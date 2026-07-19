@@ -2,14 +2,12 @@ use' lang.af
 
 \ BOT-ASSISTED
 
-65536     let: CAP
-4096      let: RUNS
-150994944 let: WANT
-16        let: SRC_LEN
-SRC_LEN   mem: SRC
-256       mem: DELS
-
-1 1 extern: .getenv getenv
+65536      let: CAP
+32768      let: RUNS
+1207959552 let: WANT
+16         let: SRC_LEN
+SRC_LEN    mem: SRC
+256        mem: DELS
 
 char' { SRC 0  + !b
 char' a SRC 1  + !b
@@ -71,7 +69,6 @@ fun: .run { -- err }
     buf CAP DELS .scan +: out
   end
 
-  " SCAN_DELIMS_PRINT" .getenv .then out .log_int .lf end
   assert= out WANT end
 end
 .run

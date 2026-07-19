@@ -12,8 +12,11 @@ function fib(depth) {
 }
 
 function run(depth, runs) {
-  while (runs-- > 0) fib(depth)
-  // console.log(fib(depth))
+  let out = 0n
+  while (runs-- > 0) out = fib(depth)
+  if (out !== 205697230343233228174223751303346572685n) {
+    throw Error("big iterative Fibonacci output mismatch")
+  }
 }
 
-run(184, (1 << 18))
+run(184, 1 << 21)

@@ -12,18 +12,24 @@ fun: .reverse { str len }
   end
 end
 
-fun: .run
-  s" 0123456789abcdef" { str len }
+fun: .run { -- err }
+  s" 0123456789abcdef" { src len }
+  len .inc .alloca { str }
+  str src len .memcpy
+  nil str len + !b
 
-  1 22 .lsl .inc { ind }
+  1 25 .lsl { ind }
   loop
     ind .while
     dec: ind
     str len .reverse
   end
-
-  \ str .log .lf \ fedcba9876543210
+  str len .reverse
+  str " fedcba9876543210" .assert_str_eq
 end
 .run
 
-fun: .main { -- exit } .run 0 end
+fun: .main { -- exit }
+  .with_main_ctx .run end { err }
+  err .then " error: %s" err .elogf .elf 1 else 0 end
+end

@@ -15,11 +15,12 @@ end
 fun: .run
   s" 0123456789abcdef" { str len }
 
-  1 22 .lsl .inc .for
+  1 25 .lsl .for
     str len .reverse
   end
-
-  \ str log lf
-  \ fedcba9876543210
+  str len .reverse
+  str " fedcba9876543210" cstr<> .then
+    " reverse-string output mismatch" .throw
+  end
 end
 .run

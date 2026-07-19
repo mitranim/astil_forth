@@ -1,6 +1,7 @@
 // BOT-TRANSLATED (with tweaks).
 
 #include <stdint.h>
+#include <stdlib.h>
 
 static uint64_t fib(uint64_t cap) {
   uint64_t prev = 0;
@@ -24,9 +25,10 @@ static uint64_t escape(uint64_t val) {
 // #include <stdio.h>
 
 int main() {
-  const uint64_t count = 1 << 20;
+  const uint64_t count = 1 << 22;
+  uint64_t out = 0;
   for (uint64_t ind = 0; ind < escape(count); ind++) {
-    escape(fib(escape(91)));
+    out = escape(fib(escape(91)));
   }
-  // printf("%llu\n", fib(91));
+  if (out != UINT64_C(7540113804746346429)) abort();
 }

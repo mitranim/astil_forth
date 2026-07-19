@@ -10,15 +10,19 @@ fun: .fib { ind -- out }
   next
 end
 
-fun: .run
-  1 20 .lsl { runs }
+fun: .run { -- err }
+  1 22 .lsl { runs }
+  0 { out }
   loop
     runs .while
     dec: runs
-    91 .fib { -- }
+    91 .fib { out }
   end
-  \ 91 .fib .log_int .lf
+  assert= out 7540113804746346429 end
 end
 .run
 
-fun: .main { -- exit } .run 0 end
+fun: .main { -- exit }
+  .with_main_ctx .run end { err }
+  err .then " error: %s" err .elogf .elf 1 else 0 end
+end

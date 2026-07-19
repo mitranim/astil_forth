@@ -2,8 +2,8 @@
 
 local ffi = require("ffi")
 local CAP = 2 ^ 16
-local RUNS = (2 ^ 24) / (CAP / 16)
-local WANT = (2 ^ 24) * 9
+local RUNS = (2 ^ 27) / (CAP / 16)
+local WANT = (2 ^ 27) * 9
 local pat = "{a,b:c[d]e} \n\tfg"
 local buf = ffi.new("uint8_t[?]", CAP)
 local dels = ffi.new("uint8_t[256]")
@@ -39,5 +39,4 @@ end
 
 local out = 0
 for _ = 1, RUNS do out = out + scan(buf, CAP, dels) end
-if os.getenv("SCAN_DELIMS_PRINT") then print(out) end
 if out ~= WANT then error("mismatch: expected " .. WANT .. "; got " .. out) end

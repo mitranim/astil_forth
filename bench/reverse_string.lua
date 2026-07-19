@@ -24,7 +24,10 @@ local function run(str, runs)
   for _ = 1, runs do
     reverse(str)
   end
-  -- print(table.concat(str))
+  reverse(str)
+  if table.concat(str) ~= "fedcba9876543210" then
+    error("reverse-string output mismatch")
+  end
 end
 
-run(string_chars("0123456789abcdef"), bit.lshift(1, 22) + 1)
+run(string_chars("0123456789abcdef"), bit.lshift(1, 25))

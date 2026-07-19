@@ -19,8 +19,15 @@
 )
 
 (defun run (depth runs)
-  (loop :repeat runs :do (fib depth))
-  ; (princ (fib depth)) (write-char #\newline)
+  (let
+    ((out 0))
+    (declare (u64 out))
+    (loop :repeat runs :do (setf out (fib depth)))
+    (unless
+      (= out 7540113804746346429)
+      (error "iterative Fibonacci output mismatch")
+    )
+  )
 )
 
-(run 91 (ash 1 20))
+(run 91 (ash 1 22))

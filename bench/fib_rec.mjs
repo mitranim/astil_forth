@@ -5,6 +5,6 @@ function fib(ind) {
   return fib(ind - 1) + fib(ind - 2)
 }
 
-fib(36)
-
-// console.log(fib(36))
+if (fib(39) !== 102334155) {
+  throw Error("recursive Fibonacci output mismatch")
+}

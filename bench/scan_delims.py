@@ -1,10 +1,8 @@
 # BOT-ASSISTED
 
-import os
-
 CAP = 1 << 16
-RUNS = (1 << 24) // (CAP // 16)
-WANT = (1 << 24) * 9
+RUNS = (1 << 27) // (CAP // 16)
+WANT = (1 << 27) * 9
 PAT = b"{a,b:c[d]e} \n\tfg"
 DELS = bytes(1 if c in b"{}[]:, \n\t" else 0 for c in range(256))
 
@@ -21,8 +19,6 @@ def main():
     out = 0
     for _ in range(RUNS):
         out += scan(buf, DELS)
-    if os.getenv("SCAN_DELIMS_PRINT"):
-        print(out)
     if out != WANT:
         raise RuntimeError(f"mismatch: expected {WANT}; got {out}")
 

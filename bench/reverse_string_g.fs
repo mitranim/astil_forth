@@ -13,9 +13,11 @@ create BUF 16 chars allot
 
 : main
   s" 0123456789abcdef" BUF swap cmove
-  1 22 lshift 1+ 0 ?do
+  1 25 lshift 0 ?do
     BUF 16 reverse-string
   loop
-  \ BUF 16 type cr
+  BUF 16 reverse-string
+  BUF 16 s" fedcba9876543210" compare
+  abort" reverse-string output mismatch"
 ;
 main

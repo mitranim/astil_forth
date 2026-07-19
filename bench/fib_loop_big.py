@@ -11,9 +11,11 @@ def fib(depth):
   return next
 
 def run(depth, runs):
+  out = 0
   while runs > 0:
-    fib(depth)
+    out = fib(depth)
     runs -= 1
-  # print(fib(depth))
+  if out != 205697230343233228174223751303346572685:
+    raise RuntimeError("big iterative Fibonacci output mismatch")
 
-run(184, 1 << 18)
+run(184, 1 << 21)

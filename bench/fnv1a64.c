@@ -1,12 +1,10 @@
 // BOT-ASSISTED
 
-#include <inttypes.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 static constexpr uint32_t CAP  = 65536;
-static constexpr uint16_t RUNS = 512;
+static constexpr uint16_t RUNS = 2048;
 
 static uint8_t buf[CAP];
 
@@ -31,8 +29,5 @@ int main(void) {
   for (int rep = 0; rep < RUNS; rep++) {
     hash = fnv1a64(hash, buf, CAP);
   }
-  if (getenv("FNV1A64_PRINT")) {
-    printf("0x%" PRIx64 "\n", hash);
-  }
-  return hash == UINT64_C(0x8D8A704CBB222325) ? 0 : 1;
+  return hash == UINT64_C(0xB0A1EA8560222325) ? 0 : 1;
 }

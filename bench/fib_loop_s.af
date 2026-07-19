@@ -9,8 +9,10 @@ fun: .fib { ind -- out }
 end
 
 fun: .run
-  1 20 .lsl
-  .for 91 .fib .drop end
-  \ 91 fib log_int lf
+  0
+  1 22 .lsl .for .drop 91 .fib end
+  7540113804746346429 <> .then
+    " iterative Fibonacci output mismatch" .throw
+  end
 end
 .run

@@ -1,8 +1,8 @@
 // BOT-ASSISTED
 
 const CAP = 1 << 16
-const RUNS = (1 << 24) / (CAP / 16)
-const WANT = (1 << 24) * 9
+const RUNS = (1 << 27) / (CAP / 16)
+const WANT = (1 << 27) * 9
 const pat = Buffer.from("{a,b:c[d]e} \n\tfg")
 const buf = new Uint8Array(CAP)
 const dels = new Uint8Array(256)
@@ -36,5 +36,4 @@ function scan(buf, dels) {
 
 let out = 0
 for (let run = 0; run < RUNS; run++) out += scan(buf, dels)
-if (process.env.SCAN_DELIMS_PRINT) console.log(out)
 if (out !== WANT) throw Error(`mismatch: expected ${WANT}; got ${out}`)

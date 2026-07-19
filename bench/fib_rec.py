@@ -3,6 +3,5 @@ def fib(ind):
     return 1
   return fib(ind - 1) + fib(ind - 2)
 
-fib(36)
-
-# print(fib(36))
+if fib(39) != 102334155:
+  raise RuntimeError("recursive Fibonacci output mismatch")

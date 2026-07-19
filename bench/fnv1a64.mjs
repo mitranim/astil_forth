@@ -1,10 +1,10 @@
 // BOT-ASSISTED
 
 const CAP = 65536
-const RUNS = 512
+const RUNS = 2048
 const OFFSET = 0xcbf29ce484222325n
 const PRIME_LO = 0x1b3
-const WANT = 0x8d8a704cbb222325n
+const WANT = 0xb0a1ea8560222325n
 const buf = new Uint8Array(CAP)
 const pat = Buffer.from("0123456789abcdef")
 
@@ -28,10 +28,6 @@ function fmt(hash) {
 
 let hash = OFFSET
 for (let rep = 0; rep < RUNS; rep++) hash = fnv1a64(hash, buf)
-
-if (process.env.FNV1A64_PRINT) {
-  console.log(fmt(hash))
-}
 
 if (hash !== WANT) {
   throw Error(`mismatch: expected ${fmt(WANT)}; got ${fmt(hash)}`)

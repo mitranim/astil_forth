@@ -16,8 +16,15 @@
 (declaim (ftype (function (fixnum fixnum) null) run))
 (defun run (depth runs)
   (declare (fixnum depth runs))
-  (dotimes (_ runs) (fib depth))
-  ; (princ (fib depth)) (write-char #\newline)
+  (let
+    ((out 0))
+    (declare (integer out))
+    (dotimes (_ runs) (setf out (fib depth)))
+    (unless
+      (= out 205697230343233228174223751303346572685)
+      (error "big iterative Fibonacci output mismatch")
+    )
+  )
 )
 
-(run 184 (ash 1 18))
+(run 184 (ash 1 21))

@@ -2,7 +2,7 @@ use' lang_s.af
 
 \ Adapted from Gforth's `sieve.fs`.
 
-4096 let: RUNS
+16384 let: RUNS
 8192 let: LEN
 LEN  mem: FLAGS
 
@@ -27,11 +27,11 @@ fun: .find_prime { flags len -- num }
 end
 
 fun: .run
-  \ FLAGS LEN find_prime .
-
+  0
   RUNS .for
-    FLAGS LEN .find_prime .drop
+    .drop FLAGS LEN .find_prime
   end
+  1899 <> .then " mismatch: expected 1899" .throw end
 end
 .run
 

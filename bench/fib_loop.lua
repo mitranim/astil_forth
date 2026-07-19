@@ -14,10 +14,13 @@ local function fib(depth)
 end
 
 local function run(depth, runs)
+  local out = 0
   for _ = 1, runs do
-    fib(depth)
+    out = fib(depth)
   end
-  -- print(string.format("%f", fib(depth)))
+  if out ~= 7540113804746346429 then
+    error("iterative Fibonacci output mismatch")
+  end
 end
 
-run(91, bit.lshift(1, 20))
+run(91, bit.lshift(1, 22))

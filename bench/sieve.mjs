@@ -22,8 +22,9 @@ function findPrime(flags) {
 }
 
 function run(flags, runs) {
-  // console.log(findPrime(flags))
-  for (let ind = 0; ind < runs; ind++) findPrime(flags)
+  let out = 0
+  for (let ind = 0; ind < runs; ind++) out = findPrime(flags)
+  if (out !== 1899) throw Error(`mismatch: expected 1899; got ${out}`)
 }
 
-run(new Uint8Array(8192), 4096)
+run(new Uint8Array(8192), 16384)

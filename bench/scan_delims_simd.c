@@ -2,11 +2,10 @@
 
 #include "../clib/num.h"
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define BLKS (1ull << 24)
+#define BLKS (1ull << 27)
 #define CAP (1u << 16)
 #define RUNS (BLKS / (CAP / 16))
 #define WANT (BLKS * 9)
@@ -58,6 +57,5 @@ int main(void) {
   init();
   Uint out = 0;
   for (Uint run = 0; run < RUNS; run++) out += scan(escape_ptr(buf), CAP);
-  if (getenv("SCAN_DELIMS_PRINT")) printf(FMT_UINT "\n", out);
-  return out != WANT;
+  if (out != WANT) abort();
 }

@@ -2,8 +2,8 @@
 
 (declaim (optimize (speed 3) (safety 0) (debug 0)))
 (defconstant +cap+ (ash 1 16))
-(defconstant +runs+ (/ (ash 1 24) (/ +cap+ 16)))
-(defconstant +want+ (* (ash 1 24) 9))
+(defconstant +runs+ (/ (ash 1 27) (/ +cap+ 16)))
+(defconstant +want+ (* (ash 1 27) 9))
 (defparameter *buf* (make-array +cap+ :element-type '(unsigned-byte 8)))
 (defparameter *dels* (make-array 256 :element-type '(unsigned-byte 8) :initial-element 0))
 
@@ -28,5 +28,4 @@
   (declare (type fixnum out))
   (dotimes (_ +runs+)
     (incf out (scan *buf* +cap+ *dels*)))
-  (when (sb-ext:posix-getenv "SCAN_DELIMS_PRINT") (format t "~D~%" out))
   (unless (= out +want+) (error "mismatch: expected ~d; got ~d" +want+ out)))

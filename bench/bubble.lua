@@ -37,7 +37,6 @@ local function bubble_sort(len)
   list_init(list, len)
   bubble(list)
   list_verify(list)
-  -- print(table.concat(list, " "))
 end
 
-bubble_sort(8192)
+bubble_sort(32768)

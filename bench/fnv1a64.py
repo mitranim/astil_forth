@@ -1,15 +1,14 @@
 # BOT-ASSISTED
 
-import os
 import sys
 
 
 CAP = 65536
-RUNS = 512
+RUNS = 2048
 OFFSET = 0xCBF29CE484222325
 PRIME = 0x100000001B3
 MASK = 0xFFFFFFFFFFFFFFFF
-WANT = 0x8D8A704CBB222325
+WANT = 0xB0A1EA8560222325
 OFFSET_HI = 0xCBF29CE4
 OFFSET_LO = 0x84222325
 PRIME_LO = 0x1B3
@@ -46,8 +45,6 @@ def main() -> None:
         hash = OFFSET
         for _ in range(RUNS):
             hash = fnv1a64_int(hash, BUF)
-    if os.getenv("FNV1A64_PRINT"):
-        print(f"{hash:#x}")
     if hash != WANT:
         raise RuntimeError(f"mismatch: expected {WANT:#x}; got {hash:#x}")
 

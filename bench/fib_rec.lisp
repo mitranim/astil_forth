@@ -9,6 +9,7 @@
   )
 )
 
-(fib 36)
-
-; (princ (fib 36)) (write-char #\newline)
+(unless
+  (= (fib 39) 102334155)
+  (error "recursive Fibonacci output mismatch")
+)

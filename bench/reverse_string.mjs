@@ -10,7 +10,10 @@ function reverse(str) {
 
 function run(str, runs) {
   while (runs-- > 0) reverse(str)
-  // console.log(str.join(""))
+  reverse(str)
+  if (str.join("") !== "fedcba9876543210") {
+    throw Error("reverse-string output mismatch")
+  }
 }
 
-run(Array.from("0123456789abcdef"), (1 << 22) + 1)
+run(Array.from("0123456789abcdef"), 1 << 25)

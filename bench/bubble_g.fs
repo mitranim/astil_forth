@@ -18,17 +18,13 @@ variable seed ( -- addr )
 : initiate-seed ( -- )  74755 seed ! ;
 : random  ( -- n )  seed @ 1309 * 13849 + 65535 and dup seed ! ;
 
-8192 constant elements ( -- int)
+32768 constant elements ( -- int)
 
 align create ELEMS elements cells allot
 
 : initiate-list { list len -- }
   initiate-seed
   list len cells + list do random i ! cell +loop
-;
-
-: dump-list { list len -- }
-  list len cells + list do i @ . cell +loop cr
 ;
 
 : verify-list { list len -- }
@@ -52,24 +48,7 @@ align create ELEMS elements cells allot
   list len verify-list
 ;
 
-: bubble-with-flag ( -- )
-  1 elements 1 do
-    -1 ELEMS elements i - cells mybounds do
-      i 2@ > if i 2@ swap i 2! drop 0 then
-    cell +loop
-    if leave then
-  loop
-;
-
-\ : bubble-sort-with-flag ( -- )
-\   initiate-seed
-\   initiate-list
-\   bubble-with-flag
-\   verify-list
-\ ;
-
 : main ( -- )
   ELEMS elements bubble-sort
-  \ bubble-sort-with-flag
 ;
 main

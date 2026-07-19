@@ -1,6 +1,6 @@
 \ Slightly modified copy of Gforth's `sieve.fs`.
 
-4096 constant RUNS
+16384 constant RUNS
 8192 constant LEN
 create FLAGS LEN allot
 
@@ -23,10 +23,10 @@ create FLAGS LEN allot
 ;
 
 : main
-  \ find_prime .
-
+  0
   RUNS 0 do
-    FLAGS LEN find_prime drop
+    drop FLAGS LEN find_prime
   loop
+  1899 <> abort" mismatch: expected 1899"
 ;
 main

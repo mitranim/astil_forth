@@ -9,13 +9,6 @@ function listInit(list) {
   }
 }
 
-function listDump(list) {
-  let out = `{`
-  for (const val of list) out += ` ` + val
-  out += ` }`
-  console.log(out)
-}
-
 function listVerify(list) {
   for (let ind = 0; ind < list.length - 1; ind++) {
     if (list[ind] > list[ind + 1]) throw Error("[bubble] not sorted")
@@ -37,8 +30,7 @@ function bubble(list) {
 function bubbleSort(list) {
   listInit(list)
   bubble(list)
-  // listDump(list)
   listVerify(list)
 }
 
-bubbleSort(Array(8192))
+bubbleSort(Array(32768))

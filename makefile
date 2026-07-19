@@ -151,6 +151,7 @@ repl_s:
 test:
 	$(MAKE) run args='./forth/test/test.af --build=$(TEST_EXE)'
 	./$(TEST_EXE)
+	python3 -m unittest bench.test_bench
 
 # 	$(MAKE) test_repl
 
@@ -257,6 +258,7 @@ $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 			> $(MACH_GEN_OUT) \
 		; rm -rf $(GEN_DIR)/tmp.c
 
+# For quick check: `make bench args='--smoke <optional_filters>'`.
 .PHONY: bench
 bench:
 	bench/bench.py $(args)

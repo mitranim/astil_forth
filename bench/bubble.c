@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static constexpr int16_t LEN = 8192;
+static constexpr int32_t LEN = 32768;
 
 static void escape_ptr(void *val) {
   register void *x0 __asm__("x0") = val;
@@ -20,15 +20,6 @@ static void list_init(int64_t *list, int32_t len) {
   for (int32_t ind = 0; ind < len; ind++) {
     list[ind] = seed = pseudo_random(seed);
   }
-}
-
-static void list_dump(const int64_t *list, int32_t len) {
-  const auto ceil = list + len;
-  putchar('{');
-  for (auto ptr = list; ptr < ceil; ptr++) {
-    printf(" %lld", *ptr);
-  }
-  puts(" }");
 }
 
 static void list_verify(const int64_t *list, int32_t len) {
@@ -58,6 +49,5 @@ int main() {
   list_init(list, LEN);
   bubble(list, LEN);
   escape_ptr(list);
-  // list_dump(list, LEN);
   list_verify(list, LEN);
 }

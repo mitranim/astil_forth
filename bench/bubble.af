@@ -17,21 +17,11 @@ fun: .list_init { list len -> }
   end
 end
 
-fun: .list_dump { list len -> }
-  .list_ceil { ceil }
-  loop
-    list ceil < .while
-    list @ .log_int .space
-    +cell: list
-  end
-  .lf
-end
-
 fun: .list_verify { list len -> err }
   .cells + -cell { ceil }
   loop
     list ceil < .while
-    list @2 > .then " [bubble] not sorted" .throw end
+    assert<= list @2 end
     +cell: list
   end
 end
@@ -53,12 +43,11 @@ end
 fun: .bubble_sort { list len -- err }
   list len .list_init
   list len .bubble
-  \ list len .list_dump
   list len .list_verify
 end
 
 fun: .run { -- err }
-  8192 { len }
+  32768 { len }
   len .cells .alloca len .bubble_sort
 end
 .run

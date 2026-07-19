@@ -23,9 +23,11 @@ def find_prime(flags):
 
 def run(length, runs):
   flags = bytearray(length)
+  out = 0
   while runs > 0:
-    find_prime(flags)
+    out = find_prime(flags)
     runs -= 1
-  # print(find_prime(flags))
+  if out != 1899:
+    raise RuntimeError(f"mismatch: expected 1899; got {out}")
 
-run(8192, 4096)
+run(8192, 16384)

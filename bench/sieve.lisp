@@ -44,13 +44,15 @@
 (declaim (ftype (function (fixnum fixnum) null) main))
 (defun main (len runs)
   (declare (fixnum len runs))
-  (
-    let
-    ((flags (make-array len :element-type 'byte-t)))
-    (declare (bytes-t flags))
-    (dotimes (_ runs) (find-prime flags))
-    ; (princ (find-prime flags)) (write-char #\newline)
+  (let
+    (
+      (flags (make-array len :element-type 'byte-t))
+      (out 0)
+    )
+    (declare (bytes-t flags) (fixnum out))
+    (dotimes (_ runs) (setf out (find-prime flags)))
+    (unless (= out 1899) (error "mismatch: expected 1899; got ~d" out))
   )
 )
 
-(main 8192 4096)
+(main 8192 16384)
