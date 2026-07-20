@@ -10,8 +10,6 @@ use' ./http_util.af
 \   astil examples/http_echo.af
 \   curl http://localhost:2345
 
-4096 let: BUF_CAP
-
 \ Oversimplified: doesn't read fully if there's too much, doesn't resize, etc.
 fun: .read_req { conn buf cap -- len err }
   0 { len }
@@ -34,8 +32,9 @@ fun: .read_req { conn buf cap -- len err }
 end
 
 fun: .respond_conn { conn -- err }
-  BUF_CAP .alloca { buf }
-  conn buf BUF_CAP .read_req { len }
+  4096 { len }
+  len .alloca { buf }
+  conn buf len .read_req { len }
 
   " [srv] incoming request:" .elog .elf .elf
   STDERR buf len .fd_write_opt .elf
