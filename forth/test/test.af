@@ -2779,13 +2779,6 @@ fun: .test_redundant_discard { -- Err }
 end
 .test_redundant_discard
 
-fun: .test_unpopped_anon_local { -- Err }
-  use' ./fail/test_unpopped_anon_local.af
-  " unused local"
-  .assert_str_has
-end
-.test_unpopped_anon_local
-
 fun: .test_explicit_err_0 { -- Err }
   .test_throw { err0 }
   " test_err" { err1 }

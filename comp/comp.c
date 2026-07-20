@@ -75,13 +75,6 @@ static Err comp_local_get_or_make(Comp *comp, Word_str name, Local **out) {
   return comp_local_add(comp, name, out);
 }
 
-static Local *comp_local_anon(Comp *comp) {
-  const auto ctx = &comp->ctx;
-  const auto loc = stack_push(&ctx->locals, (Local){});
-  str_fmt(&loc->name, "(anon_" FMT_IND ")", ctx->anon_locs++);
-  return loc;
-}
-
 static Err err_local_invalid(Local *ptr) {
   return errf("%p is not a valid address of a local", ptr);
 }

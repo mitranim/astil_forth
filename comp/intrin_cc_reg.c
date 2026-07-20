@@ -568,13 +568,8 @@ static Err intrin_comp_realloc_reg(Sint reg, Interp *interp) {
 }
 
 static Err intrin_comp_local(Sint buf, Sint len, Interp *interp, Local **out) {
-  if (buf) {
-    try(interp_validate_buf_len(buf, len));
-    try(interp_get_local(interp, (const char *)buf, (Ind)len, out));
-    return nullptr;
-  }
-  *out = comp_local_anon(&interp->comp);
-  return nullptr;
+  try(interp_validate_buf_len(buf, len));
+  return interp_get_local(interp, (const char *)buf, (Ind)len, out);
 }
 
 static Err intrin_comp_push_from_local(Sint ptr, Interp *interp) {

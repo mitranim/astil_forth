@@ -46,6 +46,13 @@ static Err comp_ctx_init(Comp_ctx *ctx) {
   return nullptr;
 }
 
+static Local *comp_local_anon(Comp *comp) {
+  const auto ctx = &comp->ctx;
+  const auto loc = stack_push(&ctx->locals, (Local){});
+  str_fmt(&loc->name, "(anon_" FMT_IND ")", ctx->anon_locs++);
+  return loc;
+}
+
 // SYNC[comp_ctx_fields].
 static void comp_ctx_trunc(Comp_ctx *ctx) {
   stack_trunc(&ctx->asm_fix);

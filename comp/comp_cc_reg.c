@@ -36,7 +36,6 @@ static bool comp_ctx_valid(const Comp_ctx *ctx) {
     is_aligned(&ctx->loc_fix) &&
     is_aligned(&ctx->locals) &&
     is_aligned(&ctx->local_dict) &&
-    is_aligned(&ctx->anon_locs) &&
     is_aligned(&ctx->fp_off) &&
     is_aligned(&ctx->args) &&
     is_aligned(&ctx->vol_regs) &&
@@ -81,7 +80,6 @@ static void comp_ctx_trunc(Comp_ctx *ctx) {
   ctx->vol_regs = BITS_ALL; // Invalid initial state for bug detection.
 
   ptr_clear(&ctx->sym);
-  ptr_clear(&ctx->anon_locs);
   ptr_clear(&ctx->fp_off);
   ptr_clear(&ctx->saved_reg);
   ptr_clear(&ctx->arg_len);
@@ -110,7 +108,6 @@ static Err comp_ctx_snapshot(const Comp_ctx *prev, Comp_ctx *next) {
 // SYNC[comp_ctx_fields].
 static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->sym        = prev->sym;
-  next->anon_locs  = prev->anon_locs;
   next->fp_off     = prev->fp_off;
   next->vol_regs   = prev->vol_regs;
   next->saved_reg  = prev->saved_reg;
@@ -133,8 +130,7 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
 
 static const char *comp_local_name(Local *loc) {
   if (!loc) return "(nil)";
-  if (loc->name.len) return loc->name.buf;
-  return "(anonymous)";
+  return loc->name.buf;
 }
 
 static Comp_arg comp_arg_unknown(void) {
