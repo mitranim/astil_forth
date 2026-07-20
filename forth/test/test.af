@@ -1269,6 +1269,47 @@ fun: .test_load_store_typed { -- err }
 end
 .test_load_store_typed
 
+fun: .test_load_store_exec { -- err }
+  CELL .alloca { ptr }
+
+  0x123456789abcdef0 ptr call' !
+  assert= ptr call' @ 0x123456789abcdef0 end
+
+  0 ptr call' !
+  0x1234 ptr call' !b
+  assert= ptr call' @b 0x34 end
+
+  0 ptr call' !
+  0xff ptr call' !8
+  assert= ptr call' @u8 0xff end
+  assert= ptr call' @s8 -1 end
+
+  0 ptr call' !
+  0x8001 ptr call' !16
+  assert= ptr call' @u16 0x8001 end
+  assert= ptr call' @s16 -32767 end
+
+  0 ptr call' !
+  0x80000001 ptr call' !32
+  assert= ptr call' @u32 0x80000001 end
+  assert= ptr call' @s32 -2147483647 end
+
+  0 ptr call' !
+  0x80000001 ptr call' !cint
+  assert= ptr call' @cint -2147483647 end
+
+  0 ptr call' !
+  0x80000001 ptr call' !cuint
+  assert= ptr call' @cuint 0x80000001 end
+
+  0 0x100 - ptr call' !clong
+  assert= ptr call' @clong 0 0x100 - end
+
+  0x123456789abcdef0 ptr call' !culong
+  assert= ptr call' @culong 0x123456789abcdef0 end
+end
+.test_load_store_exec
+
 fun: .test_load_store_pair_swap_fun { one two ptr } one two ptr !swap end
 
 fun: .test_load_store_pair_swap { -- err }
@@ -3311,6 +3352,7 @@ fun: .main_run { -- err }
   .test_cont_meta_loop_inputs
   .test_load_store
   .test_load_store_typed
+  .test_load_store_exec
   .test_load_store_pair_swap
   .test_negate
   .test_equal
