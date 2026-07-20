@@ -73,8 +73,6 @@ python 3.14.4
 | `baseline_python` | 16.06 ± 0.41 | 13.57 ± 0.26 | 11.545 ± 0.099 | 6.60 |
 | `baseline_java` | 36.47 ± 0.60 | 38.9 ± 1.1 | 34.78 ± 0.84 | 14.98 |
 
-> Warning: unstable wall time: `baseline_luajit` (middle 50% spans 32.0%); `baseline_gforth` (middle 50% spans 17.2%).
-
 ## BUBBLE
 
 | Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
