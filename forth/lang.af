@@ -2539,13 +2539,13 @@ struct: Sym
 end
 
 \ SYNC[sym_fields].
-fun_comp: .sym_instr { -- err } ( E: XT -- instr ) call'' .Sym_union call'' @ end
+fun_comp: .xt_instr { -- err } ( E: XT -- instr ) call'' .Sym_union call'' @ end
 
-fun: .sym_instr { XT -> instr } .sym_instr end
+fun: .xt_instr { XT -> instr } .xt_instr end
 
 \ For internal use below.
 fun: .comp_word_instr { wordlist -> err } ( C: "name" -- ) ( E: -- instr )
-  .next_word .sym_instr .comp_next_page_addr
+  .next_word .xt_instr .comp_next_page_addr
 end
 
 \ Address of first executable instruction of next runtime word in source code.
@@ -2563,7 +2563,7 @@ end
 \   avoiding ABI breakage and program crash.
 \
 \ See readme on memory management; threading examples; HTTP examples.
-fun: instr' { -- instr err } call' xt' .sym_instr end
+fun: instr' { -- instr err } call' xt' .xt_instr end
 
 fun_comp: instr' { -- err } ( C: "name" -- ) ( E: -- instr )
   WORDLIST_EXEC .comp_word_instr
@@ -3547,7 +3547,7 @@ fun: .cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
   .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
 
   consumed 2 = .then
-    imm0 imm1 raw_xt .sym_instr .call [ 1 .comp_args_set ] { bool }
+    imm0 imm1 raw_xt .xt_instr .call [ 1 .comp_args_set ] { bool }
     reg0 bool .cf_fold_done .ret
   end
 
@@ -4284,10 +4284,10 @@ end
 
 \ `.strcmp` doesn't like null string pointers.
 fun: .ccompare { cstr0 cstr1 -- cmp }
-    cstr0 cstr1 .or =0 .then 0
-  elif cstr0           =0 .then -1
-  elif cstr1           =0 .then +1
-  else  cstr0 cstr1 .strcmp .cint_to_cell
+  cstr0 cstr1 .or  =0 .then 0
+  elif cstr0       =0 .then -1
+  elif cstr1       =0 .then +1
+  else cstr0 cstr1 .strcmp .cint_to_cell
   end
 end
 
@@ -4723,7 +4723,7 @@ fun: .indirect_to { decl xt_to -- err }
   end
 
   decl .Indir_decl_instr @ { instr_adr }
-  xt_to .sym_instr instr_adr - decl .Indir_decl_off !
+  xt_to .xt_instr instr_adr - decl .Indir_decl_off !
 end
 
 fun: indirect_to' { decl -- err } ( C: "name" -- )
@@ -4884,7 +4884,7 @@ fun: .assert_bin_end_xt { beg cond cmp_xt -- err }
 
   static .then
     reg0 .comp_args_set
-    lhs rhs cmp_xt .sym_instr .call [ 1 .comp_args_set ] { bool }
+    lhs rhs cmp_xt .xt_instr .call [ 1 .comp_args_set ] { bool }
     bool =0 .then
       beg .assert_body { text text_len }
       " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"

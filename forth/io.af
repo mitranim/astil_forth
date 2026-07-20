@@ -207,7 +207,6 @@ end
 fun: .fd_write_all { fdes buf len -- err }
   loop
     len =0 .then .ret end
-
     fdes buf len .write { wrote }
 
     wrote <0 .then

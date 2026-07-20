@@ -763,7 +763,7 @@ fun: .test_sym_instr_len { XT -- len }
 end
 
 fun: .test_actual_instr { XT ind -- instr }
-  XT .sym_instr ind 4 * + @u32
+  XT .xt_instr ind 4 * + @u32
 end
 
 fun: .test_word_instr_count { XT instr -- count }
@@ -2481,7 +2481,7 @@ fun: .test_struct_field_unscaled_peephole_fun { ptr -- val }
 end
 
 fun: .test_struct_field_peephole_expect_instr { XT ind exp -- err }
-  XT .sym_instr ind 4 * + @u32 { act }
+  XT .xt_instr ind 4 * + @u32 { act }
   exp act <> .then
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }

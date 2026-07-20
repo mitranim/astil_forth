@@ -17,16 +17,16 @@ fun: .read_req { conn buf cap -- len err }
   0 { len }
 
   loop
-    conn buf cap .read { wrote }
-    wrote =0 .then len .ret end
+    conn buf cap .read { read }
+    read =0 .then len .ret end
 
-    wrote <0 .then
+    read <0 .then
       .errno { code }
       code EINTR = .then again end
       code " unable to read request" .os_err .throw
     end
 
-    wrote +: len
+    read +: len
     leave
   end
 

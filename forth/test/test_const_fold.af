@@ -31,7 +31,7 @@ fun: .cf_want_word { XT -- err }
   loop
     ind exp_len < .while
     CF_WANT_INSTRS ind 4 * + @u32 { exp }
-    XT .sym_instr ind 4 * + @u32 { act }
+    XT .xt_instr ind 4 * + @u32 { act }
     exp act <> .then
       XT .Sym_name .Sym_word_buf { name }
       XT .Sym_name .Sym_word_len @u32 { name_len }
