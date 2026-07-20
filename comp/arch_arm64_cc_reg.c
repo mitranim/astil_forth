@@ -158,8 +158,6 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
   return err;
 }
 
-#define TRUST_FUN_ABI __attribute__((no_sanitize("function")))
-
 // See `asm_append_call_intrin` for the explanation of the calling convention.
 TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
   try_assert(sym->type == SYM_INTRIN);

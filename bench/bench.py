@@ -56,7 +56,7 @@ MAX_IQR_RATIO = 0.10
 RSS_UNIT_BYTES = 1 if sys.platform == "darwin" else 1024
 
 CLEAN = ("make", "clean")
-BUILD = ("make", "PROD=true", "build")
+BUILD = ("make", "build")
 
 TOOLS = {
     "clang": ("clang", "--version"),
@@ -244,7 +244,7 @@ def measure(
 
 
 def c_exe(exe: str) -> tuple[tuple[str, ...], ...]:
-    return (("make", "PROD=true", exe),)
+    return (("make", exe),)
 
 
 def go_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:

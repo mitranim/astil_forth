@@ -61,6 +61,23 @@ static Err interp_deinit(Interp *interp) {
 }
 
 static Err interp_init_syms(Interp *interp) {
+  static constexpr Ind intrin_len = (Ind)arr_cap(INTRIN);
+
+  /*
+  We have two wordlists (exec and comp), but currently restrict intrinsic
+  words to just one namespace due to limitations of `comp_register_dysym`.
+  */
+  deferred(dict_deinit) Str_set names = {};
+  dict_init(&names, round_up_pow2_Ind(intrin_len * 2));
+
+  for (auto intrin = INTRIN; intrin < arr_ceil(INTRIN); intrin++) {
+    const auto prev_len = names.len;
+    dict_set(&names, intrin->name.buf, EMPTY);
+    if (names.len == prev_len) {
+      return errf("duplicate intrinsic name " FMT_QUOTED, intrin->name.buf);
+    }
+  }
+
   const auto syms = &interp->syms;
   const auto comp = &interp->comp;
 
@@ -94,12 +111,11 @@ static Err interp_init_syms(Interp *interp) {
   }
 
   IF_DEBUG({
-    const auto            syms = &comp->code.intrins;
-    static constexpr auto len  = arr_cap(INTRIN);
+    const auto syms = &comp->code.intrins;
 
-    try_assert(syms->addrs.len == len);
-    try_assert(stack_len(&syms->names) == len);
-    try_assert(syms->inds.len == len);
+    try_assert(syms->addrs.len == intrin_len);
+    try_assert(stack_len(&syms->names) == intrin_len);
+    try_assert(syms->inds.len == intrin_len);
   });
   return nullptr;
 }

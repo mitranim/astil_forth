@@ -1,5 +1,7 @@
 #pragma once
 
+#define TRUST_FUN_ABI __attribute__((no_sanitize("function")))
+
 /*
 TODO:
 - x64 assembler (core in C, the rest in Forth)

@@ -317,8 +317,6 @@ Build currently **requires Clang 22.1 or higher**.
 With global installation:
 
 ```sh
-# (Choose between perf and debug.)
-make install PROD=true
 make install
 
 # Get some instructions:
@@ -580,8 +578,6 @@ val .ret
 ```
 
 Control-only words include `elif else loop leave again assert end`. In reg-CC, `leave` and `again` validate loop arity, but stay plain.
-
-In file root, `.ret` simply quits the current file. Inside a compiled word, `.ret` returns current args as outputs. Even nullary `.ret` requires a dot.
 
 These name rules apply to both calling conventions.
 

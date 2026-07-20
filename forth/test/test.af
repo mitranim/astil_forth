@@ -3314,14 +3314,12 @@ fun: .test_dropped_intrinsics_hidden { -- err }
   err " undefined word" .assert_str_has
   s" ;" WORDLIST_COMP .find_word_err { _xt err }
   err " undefined word" .assert_str_has
+  s" .ret" WORDLIST_EXEC .find_word_err { _xt err }
+  err " undefined word" .assert_str_has
 end
 .test_dropped_intrinsics_hidden
 
 s" ./test_import_empty.af" .use
-
-s" ./test_interp_ret.af" .use
-fun: .test_interp_ret_import { ret_val -- err } assert= ret_val 123 end end
-.test_interp_ret_import
 
 use' ./test_const_fold.af
 use' ./test_simd.af

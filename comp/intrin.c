@@ -163,8 +163,6 @@ static Err intrin_quit(Interp *interp) {
   return ERR_QUIT;
 }
 
-static Err intrin_ret_exec(Interp *) { return ERR_RET; }
-
 static Err err_char_eof() {
   return err_str("EOF where a character was expected");
 }
@@ -315,8 +313,8 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
       );
       comp_debug_print_sym_instrs(&interp->comp, sym, "[debug]   ");
       IF_DEBUG({
-        eprintf("[debug]   symbol: ");
-        repr_struct(sym);
+        eprintf("[debug]   symbol.norm: ");
+        repr_struct(&sym->norm);
       });
       return;
     }
@@ -537,14 +535,6 @@ static const USED auto INTRIN_RET = (Sym){
   .out_len   = 1,
   .has_err   = true,
   .comp_only = true,
-};
-
-static const USED auto INTRIN_RET_EXEC = (Sym){
-  .name.buf = ".ret",
-  .wordlist = WORDLIST_EXEC,
-  .intrin   = (void *)intrin_ret_exec,
-  .out_len  = 1,
-  .has_err  = true,
 };
 
 static const USED auto INTRIN_RECUR = (Sym){

@@ -3,16 +3,14 @@ MAKE_CONC := $(MAKE) -j 128 CONC=true clear=$(or $(clear),false)
 CLEAR ?= $(if $(filter false,$(clear)),, )
 HERE ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CC := clang
-PROD ?=
 STRICT ?=
-DEBUG_FLAGS_0 ?= -g3 -fsanitize=undefined,address,integer,nullability -fstack-protector
-DEBUG_FLAGS_1 ?= -g3 -Wno-unused-parameter -Wno-unused-variable
-DEBUG_FLAGS_PROD ?= -g3 -O2 -Wno-unused-parameter -Wno-unused-variable
-DEBUG_FLAGS ?= $(if $(DEBUG),$(DEBUG_FLAGS_0),$(if $(PROD),$(DEBUG_FLAGS_PROD),$(DEBUG_FLAGS_1)))
+DEFAULT_FLAGS ?= -g3 -O2 -DNDEBUG -Wno-unused-parameter -Wno-unused-variable
+DEBUG_FLAGS ?= -g3 -fsanitize=undefined,address,integer,nullability -fstack-protector
+BUILD_FLAGS ?= $(if $(DEBUG),$(DEBUG_FLAGS),$(DEFAULT_FLAGS))
 CRASH_FLAGS ?= $(and $(FAST_CRASH),-DFAST_CRASH)
 STRICT_FLAGS ?= $(and $(STRICT),-Werror)
 COMPILE_FLAGS ?= $(strip $(shell cat $(HERE)/compile_flags.txt))
-CFLAGS ?= $(and $(PROD),-DPROD) $(COMPILE_FLAGS) $(STRICT_FLAGS) $(DEBUG_FLAGS) $(CRASH_FLAGS)
+CFLAGS ?= $(COMPILE_FLAGS) $(STRICT_FLAGS) $(BUILD_FLAGS) $(CRASH_FLAGS)
 LOCAL ?= local
 CLIB_DIR ?= clib
 COMP_DIR ?= comp

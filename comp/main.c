@@ -48,9 +48,6 @@ static void print_help() {
     "Every file is evaluated immediately.\n"
     "Flags take effect only when reached.)\n"
     "\n"
-    "Debug logging with `--debug` is not available\n"
-    "when Astil Forth is compiled with `PROD=true`.\n"
-    "\n"
 #ifndef CALL_CONV_STACK
     "Compiling to a native executable:\n"
     "\n"

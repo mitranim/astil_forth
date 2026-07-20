@@ -6,7 +6,7 @@
 static bool DEBUG = false;
 static bool TRACE = false;
 
-#ifdef PROD
+#ifdef NDEBUG
 #define IF_DEBUG(code)
 #else
 #define IF_DEBUG(code) \

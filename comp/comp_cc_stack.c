@@ -108,7 +108,7 @@ static Err comp_append_push_from_local(Comp *comp, Local *loc) {
   return nullptr;
 }
 
-static Err comp_call_intrin(Interp *interp, const Sym *callee) {
+TRUST_FUN_ABI static Err comp_call_intrin(Interp *interp, const Sym *callee) {
   IF_DEBUG(try_assert(callee->type == SYM_INTRIN));
   typedef Err(Fun)(Interp *);
   const auto fun = (Fun *)callee->intrin;
