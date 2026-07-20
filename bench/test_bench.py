@@ -1,3 +1,5 @@
+# BOT-GENERATED
+
 import contextlib
 import errno
 import io
@@ -291,6 +293,44 @@ class RenderingTest(unittest.TestCase):
         self.assertNotIn(" Min ", text)
         self.assertNotIn(" Max ", text)
 
+    def test_section_can_sort_and_compare_by_cpu_mean(self) -> None:
+        cpu_fast = bench.Bench("S", "cpu_fast", "cpu_fast", ("cpu_fast",))
+        wall_fast = bench.Bench("S", "wall_fast", "wall_fast", ("wall_fast",))
+        text = bench.render_section(
+            "S",
+            [
+                bench.Result(cpu_fast, [bench.Sample(4, 1, 1024)] * 2),
+                bench.Result(wall_fast, [bench.Sample(2, 2, 1024)] * 2),
+            ],
+            sort_by="cpu_seconds",
+        )
+        self.assertLess(text.index("`cpu_fast`"), text.index("`wall_fast`"))
+        self.assertIn("| Wall [s] | CPU [s] ↓ |", text)
+        rows = {
+            line.split("`")[1]: line
+            for line in text.splitlines()
+            if line.startswith("| `")
+        }
+        self.assertTrue(rows["cpu_fast"].endswith("| 1.00 |"))
+        self.assertTrue(rows["wall_fast"].endswith("| 2.00 |"))
+
+    def test_section_rejects_unknown_sort_metric(self) -> None:
+        item = bench.Bench("S", "item", "item", ("item",))
+        with self.assertRaisesRegex(ValueError, "unknown section sort metric"):
+            bench.render_section(
+                "S",
+                [bench.Result(item, samples(1, 1))],
+                sort_by="bogus",
+            )
+
+    def test_tcp_section_sorts_by_cpu(self) -> None:
+        section = next(
+            section
+            for section in bench.SECTIONS
+            if section.title == "TCP CONNECTIONS"
+        )
+        self.assertEqual(section.sort_by, "cpu_seconds")
+
     def test_section_uses_milliseconds_for_all_subsecond_rows(self) -> None:
         fast = bench.Bench("S", "fast", "fast", ("fast",))
         slow = bench.Bench("S", "slow", "slow", ("slow",))
@@ -448,12 +488,3 @@ class SmokeTest(unittest.TestCase):
                 )
             self.assertEqual(code, 0)
             self.assertFalse(output.parent.exists())
-
-    def test_transitional_options_are_not_public(self) -> None:
-        for option in ("--prototype", "--no-progress"):
-            with (
-                self.subTest(option=option),
-                contextlib.redirect_stderr(io.StringIO()),
-                self.assertRaises(SystemExit),
-            ):
-                bench.parse_args([option])

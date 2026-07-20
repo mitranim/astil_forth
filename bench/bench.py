@@ -1,5 +1,3 @@
-#! /usr/bin/env python3
-
 """
 Driver for our cross-language benchmarks.
 
@@ -40,7 +38,7 @@ import time
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-
+from . import tcp_conn
 
 ROOT = Path(__file__).resolve().parent.parent
 GEN = ROOT / "generated"
@@ -52,6 +50,8 @@ MAX_MEASURE_SECONDS = 60.0
 MAX_RELATIVE_STANDARD_ERROR = 0.01
 PROGRESS_SECONDS = 1.0
 MAX_IQR_RATIO = 0.10
+MAX_TCP_RUNS = 5
+
 # Darwin reports ru_maxrss in bytes; Linux and the other supported Unixes use KiB.
 RSS_UNIT_BYTES = 1 if sys.platform == "darwin" else 1024
 
@@ -65,6 +65,11 @@ TOOLS = {
     "java": ("java", "-version"),
     "gforth": ("gforth", "--version"),
     "luajit": ("luajit", "-v"),
+    "luv": (
+        "luajit",
+        "-e",
+        'print("luv " .. require("luv").version_string())',
+    ),
     "bun": ("bun", "--version"),
     "sbcl": ("sbcl", "--version"),
     "pypy3": ("pypy3", "--version"),
@@ -80,6 +85,7 @@ class Bench:
     cmd: tuple[str, ...]
     setup: tuple[tuple[str, ...], ...] = ()
     tools: tuple[str, ...] = ()
+    tcp: bool = False
 
 
 @dataclass(frozen=True)
@@ -95,12 +101,24 @@ class Result:
     samples: list[Sample]
 
 
+@dataclass(frozen=True)
+class Section:
+    title: str
+    note: str | None = None
+    sort_by: str = "wall_seconds"
+
+
 BENCHES: list[Bench] = []
-SECTIONS: list[str] = []
+SECTIONS: list[Section] = []
 
 
-def section(title: str) -> None:
-    SECTIONS.append(title)
+def section(
+    title: str,
+    *,
+    note: str | None = None,
+    sort_by: str = "wall_seconds",
+) -> None:
+    SECTIONS.append(Section(title, note, sort_by))
 
 
 def bench(
@@ -110,8 +128,19 @@ def bench(
     *,
     setup: tuple[tuple[str, ...], ...] = (),
     tools: tuple[str, ...] = (),
+    tcp: bool = False,
 ) -> None:
-    BENCHES.append(Bench(SECTIONS[-1], name, file, cmd, setup, tools))
+    BENCHES.append(
+        Bench(
+            SECTIONS[-1].title,
+            name,
+            file,
+            cmd,
+            setup,
+            tools,
+            tcp,
+        )
+    )
 
 
 def wall_instability(samples: list[Sample]) -> float | None:
@@ -186,9 +215,95 @@ def terminate_and_reap(pid: int) -> None:
         pass
 
 
+def wait4_owned(
+    item: Bench,
+    pid: int,
+    cmd: tuple[str, ...],
+    timeout_seconds: float | None,
+):
+    try:
+        alarm_context = (
+            alarm(timeout_seconds)
+            if timeout_seconds is not None
+            else nullcontext()
+        )
+        with alarm_context:
+            while True:
+                try:
+                    return os.wait4(pid, 0)
+                except InterruptedError:
+                    continue
+    except BaseException as err:
+        # ECHILD means ownership is gone; signaling this PID could hit its reuse.
+        if not isinstance(err, ChildProcessError):
+            terminate_and_reap(pid)
+        if not isinstance(err, Exception):
+            raise
+        raise RuntimeError(
+            f"benchmark {item.name!r} failed while waiting for command: "
+            f"{cmd!r}"
+        ) from err
+
+
+def measure_tcp_conn(
+    item: Bench, timeout_seconds: float | None
+) -> Sample:
+    if not item.tcp:
+        raise ValueError("TCP connection measurement requires a TCP benchmark")
+    tcp_conn.ensure_fd_capacity()
+    timeout_seconds = (
+        timeout_seconds
+        if timeout_seconds is not None
+        else MAX_MEASURE_SECONDS
+    )
+    if timeout_seconds <= 0:
+        raise MeasurementDeadline
+    started = time.perf_counter_ns()
+    cmd = item.cmd
+    try:
+        pid = os.posix_spawnp(cmd[0], cmd, os.environ)
+    except OSError as err:
+        raise RuntimeError(
+            f"benchmark {item.name!r} failed to spawn command: "
+            f"{cmd!r}"
+        ) from err
+    timeout_seconds -= (
+        time.perf_counter_ns() - started
+    ) / 1_000_000_000
+    if timeout_seconds <= 0:
+        terminate_and_reap(pid)
+        raise MeasurementDeadline
+    try:
+        with alarm(timeout_seconds):
+            tcp_conn.drive()
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            _, status, usage = wait4_owned(item, pid, cmd, None)
+    except BaseException:
+        terminate_and_reap(pid)
+        raise
+
+    wall_seconds = (time.perf_counter_ns() - started) / 1_000_000_000
+    exit_code = os.waitstatus_to_exitcode(status)
+    if exit_code != -signal.SIGKILL:
+        raise RuntimeError(
+            f"benchmark {item.name!r} command exited before driver kill "
+            f"with exit status {exit_code}: {cmd!r}"
+        )
+    return Sample(
+        wall_seconds,
+        usage.ru_utime + usage.ru_stime,
+        usage.ru_maxrss * RSS_UNIT_BYTES,
+    )
+
+
 def measure(
     item: Bench, timeout_seconds: float | None = None
 ) -> Sample:
+    if item.tcp:
+        return measure_tcp_conn(item, timeout_seconds)
     cmd = item.cmd
     started = time.perf_counter_ns()
     if timeout_seconds is not None and timeout_seconds <= 0:
@@ -206,29 +321,7 @@ def measure(
         if timeout_seconds <= 0:
             terminate_and_reap(pid)
             raise MeasurementDeadline
-    try:
-        alarm_context = (
-            alarm(timeout_seconds)
-            if timeout_seconds is not None
-            else nullcontext()
-        )
-        with alarm_context:
-            while True:
-                try:
-                    _, status, usage = os.wait4(pid, 0)
-                    break
-                except InterruptedError:
-                    continue
-    except BaseException as err:
-        # ECHILD means ownership is gone; signaling this PID could hit its reuse.
-        if not isinstance(err, ChildProcessError):
-            terminate_and_reap(pid)
-        if not isinstance(err, Exception):
-            raise
-        raise RuntimeError(
-            f"benchmark {item.name!r} failed while waiting for command: "
-            f"{cmd!r}"
-        ) from err
+    _, status, usage = wait4_owned(item, pid, cmd, timeout_seconds)
     wall_seconds = (time.perf_counter_ns() - started) / 1_000_000_000
     exit_code = os.waitstatus_to_exitcode(status)
     if exit_code:
@@ -261,6 +354,164 @@ def java_class(src: str) -> tuple[tuple[str, ...], ...]:
 
 def aot(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
     return (BUILD, ("./astil.exe", src, f"--build={exe}"))
+
+
+TCP_HOME = "/tmp/forth-tcp-bench-home"
+TCP_ZIG_ENV = (
+    "env",
+    "ZIG_GLOBAL_CACHE_DIR=/tmp/forth-tcp-bench-zig-global",
+    "ZIG_LOCAL_CACHE_DIR=/tmp/forth-tcp-bench-zig-local",
+)
+TCP_GO_ENV = ("env", "GOCACHE=/tmp/forth-tcp-bench-go-cache")
+TCP_GFORTH_ENV = ("env", f"HOME={TCP_HOME}")
+TCP_JAVA_SETUP = (
+    (
+        "javac",
+        "bench/tcp_server.java",
+    ),
+)
+GFORTH_SOCKET_SETUP = (
+    (
+        "/bin/sh",
+        "-c",
+        'gf="$(realpath "$(command -v gforth)")"; '
+        'root="$(dirname "$(dirname "$gf")")"; '
+        f'HOME="{TCP_HOME}" CPATH="$root/include${{CPATH:+:$CPATH}}" '
+        "gforth -e 'require unix/socket.fs "
+        "require bench/tcp_reuse_g.fs bye'",
+    ),
+)
+
+
+def tcp_connection_bench(
+    name: str,
+    file: str,
+    cmd: tuple[str, ...],
+    *,
+    setup: tuple[tuple[str, ...], ...] = (),
+    tools: tuple[str, ...] = (),
+) -> None:
+    bench(name, file, cmd, setup=setup, tools=(*tools, "python3"), tcp=True)
+
+
+def tcp_connection_benches() -> None:
+    tcp_connection_bench(
+        "tcp_conn_clang_pthread",
+        "bench/tcp_server.c",
+        ("bench/tcp_server.exe",),
+        setup=c_exe("bench/tcp_server.exe"),
+        tools=("clang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_astil_aot_pthread",
+        "bench/tcp_server.af",
+        ("bench/tcp_server_astil.exe",),
+        setup=aot("bench/tcp_server.af", "bench/tcp_server_astil.exe"),
+        tools=("clang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_astil_reg_pthread",
+        "bench/tcp_server.af",
+        ("./astil.exe", "bench/tcp_server.af", "--eval=.run"),
+        setup=(BUILD,),
+        tools=("clang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_gforth_task",
+        "bench/tcp_server_g.fs",
+        TCP_GFORTH_ENV + ("gforth", "bench/tcp_server_g.fs", "--"),
+        setup=GFORTH_SOCKET_SETUP,
+        tools=("gforth",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_zig_pthread",
+        "bench/tcp_server.zig",
+        ("bench/tcp_server_zig.exe",),
+        setup=(
+            (
+                *TCP_ZIG_ENV,
+                "zig",
+                "build-exe",
+                "-O",
+                "ReleaseFast",
+                "-lc",
+                "-femit-bin=bench/tcp_server_zig.exe",
+                "bench/tcp_server.zig",
+            ),
+        ),
+        tools=("zig",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_go_goroutine",
+        "bench/tcp_server.go",
+        ("bench/tcp_server_go.exe",),
+        setup=(
+            TCP_GO_ENV
+            + (
+                "go",
+                "build",
+                "-o",
+                "bench/tcp_server_go.exe",
+                "./bench/tcp_server.go",
+            ),
+        ),
+        tools=("go",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_luajit_luv_evented",
+        "bench/tcp_server_luv.lua",
+        ("luajit", "bench/tcp_server_luv.lua"),
+        tools=("luajit", "luv"),
+    )
+    tcp_connection_bench(
+        "tcp_conn_luajit_luv_coro",
+        "bench/tcp_server_luv_coro.lua",
+        ("luajit", "bench/tcp_server_luv_coro.lua"),
+        tools=("luajit", "luv"),
+    )
+    tcp_connection_bench(
+        "tcp_conn_js_bun_evented",
+        "bench/tcp_server.mjs",
+        ("bun", "run", "bench/tcp_server.mjs"),
+        tools=("bun",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_java_vthread",
+        "bench/tcp_server.java",
+        ("java", "-cp", "bench", "tcp_server"),
+        setup=TCP_JAVA_SETUP,
+        tools=("java",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_java_thread",
+        "bench/tcp_server.java",
+        ("java", "-cp", "bench", "tcp_server_thread"),
+        setup=TCP_JAVA_SETUP,
+        tools=("java",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_cl_sbcl_thread",
+        "bench/tcp_server.lisp",
+        (
+            "sbcl",
+            "--dynamic-space-size",
+            "2048",
+            "--script",
+            "bench/tcp_server.lisp",
+        ),
+        tools=("sbcl",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_pypy_asyncio",
+        "bench/tcp_server.py",
+        ("pypy3", "bench/tcp_server.py"),
+        tools=("pypy3",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_python_asyncio",
+        "bench/tcp_server.py",
+        ("python3", "bench/tcp_server.py"),
+    )
 
 
 section("NONE")
@@ -413,6 +664,15 @@ bench("bin_tree_astil_stack_bulk", "bench/bin_tree_bulk_s.af", ("./astil_s.exe",
 bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk_g.fs", ("gforth", "bench/bin_tree_bulk_g.fs", "-e", "bye"), tools=("gforth",))
 bench("bin_tree_go_bulk", "bench/bin_tree_bulk.go", ("bench/bin_tree_go_bulk.exe",), setup=go_exe("bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe"), tools=("go",))
 
+TCP_NOTE = f"""
+Measures {tcp_conn.CONNECTIONS} concurrent connections with basic send + receive.
+
+Wall time includes Python TCP driver work. After every connection closes, the driver kills and reaps the idle server; this work is also included in wall time. CPU time and peak mem/RSS measure only the server subprocess. Measurements use at most {MAX_TCP_RUNS} runs.
+""".strip()
+
+section("TCP CONNECTIONS", note=TCP_NOTE, sort_by="cpu_seconds")
+tcp_connection_benches()
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -447,6 +707,12 @@ def matches_filter(item: Bench, group: str) -> bool:
 def selected_benches(filters: list[str]) -> list[Bench]:
     groups = filters or ["*"]
     return [item for item in BENCHES if all(matches_filter(item, group) for group in groups)]
+
+
+def validation_items(items: list[Bench], *, smoke: bool) -> list[Bench]:
+    if smoke:
+        return items
+    return [item for item in items if not item.tcp]
 
 
 def run(cmd: tuple[str, ...], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
@@ -598,33 +864,45 @@ def format_mib(bytes_: float) -> str:
     return f"{bytes_ / 1024**2:.1f} MiB"
 
 
-def render_section(title: str, results: list[Result]) -> str:
+def render_section(
+    title: str,
+    results: list[Result],
+    *,
+    note: str | None = None,
+    sort_by: str = "wall_seconds",
+) -> str:
+    if sort_by not in ("wall_seconds", "cpu_seconds"):
+        raise ValueError(f"unknown section sort metric: {sort_by!r}")
     results = sorted(
         results,
-        key=lambda result: summarize(result.samples, "wall_seconds")[0],
+        key=lambda result: summarize(result.samples, sort_by)[0],
     )
     wall_means = [
         summarize(result.samples, "wall_seconds")[0]
         for result in results
     ]
-    fastest = wall_means[0]
+    baseline = summarize(results[0].samples, sort_by)[0]
     wall_unit, wall_scale = duration_unit(statistics.median(wall_means))
     cpu_means = [
         summarize(result.samples, "cpu_seconds")[0]
         for result in results
     ]
     cpu_unit, cpu_scale = duration_unit(statistics.median(cpu_means))
-    lines = [
-        f"\n## {title}\n",
-        f"| Command | Wall [{wall_unit}] | CPU [{cpu_unit}] | "
+    lines = [f"\n## {title}\n"]
+    if note is not None:
+        lines.append(note + "\n")
+    lines.extend([
+        f"| Command | Wall [{wall_unit}] | CPU [{cpu_unit}]"
+        f"{' ↓' if sort_by == 'cpu_seconds' else ''} | "
         "Peak mem [MiB] | Relative |",
         "| --- | ---: | ---: | ---: | ---: |",
-    ]
+    ])
     warnings = []
     for result in results:
         wall_mean, wall_deviation = summarize(result.samples, "wall_seconds")
         cpu_mean, cpu_deviation = summarize(result.samples, "cpu_seconds")
         rss_mean, rss_deviation = summarize(result.samples, "peak_rss_bytes")
+        sort_mean = wall_mean if sort_by == "wall_seconds" else cpu_mean
         wall = format_table_measurement(
             wall_mean, wall_deviation, wall_unit, wall_scale
         )
@@ -637,7 +915,7 @@ def render_section(title: str, results: list[Result]) -> str:
         lines.append(
             f"| `{result.item.name}` | "
             f"{wall} | {cpu} | {mem} | "
-            f"{wall_mean / fastest:.2f} |"
+            f"{sort_mean / baseline:.2f} |"
         )
         instability = wall_instability(result.samples)
         if instability is not None:
@@ -697,9 +975,12 @@ def validate(items: list[Bench]) -> None:
 
 def measure_bench(item: Bench) -> Result:
     tty = sys.stderr.isatty()
+    run_limit = MAX_TCP_RUNS if item.tcp else None
+    limit_message = f"{MAX_MEASURE_SECONDS:g} second limit"
+    if run_limit is not None:
+        limit_message += f"; {run_limit} run limit"
     print(
-        f"[bench] [{item.name}] starting; "
-        f"{MAX_MEASURE_SECONDS:g} second limit",
+        f"[bench] [{item.name}] starting; {limit_message}",
         file=sys.stderr,
     )
     deadline = time.perf_counter() + MAX_MEASURE_SECONDS
@@ -725,6 +1006,8 @@ def measure_bench(item: Bench) -> Result:
             next_progress = now + PROGRESS_SECONDS
         if measurement_stable(samples):
             break
+        if run_limit is not None and len(samples) >= run_limit:
+            break
     if not samples:
         raise RuntimeError(
             f"benchmark {item.name!r} completed no runs within "
@@ -733,9 +1016,14 @@ def measure_bench(item: Bench) -> Result:
     if tty:
         print(TTY_CLEAR, end="", file=sys.stderr)
     if not measurement_stable(samples):
+        stopped_by = (
+            f"{run_limit} run limit"
+            if run_limit is not None and len(samples) >= run_limit
+            else f"{MAX_MEASURE_SECONDS:g} second limit"
+        )
         print(
             f"[bench] [{item.name}] warning: precision target not reached "
-            f"before {MAX_MEASURE_SECONDS:g} second limit",
+            f"before {stopped_by}",
             file=sys.stderr,
         )
     result = Result(item, samples)
@@ -745,14 +1033,21 @@ def measure_bench(item: Bench) -> Result:
 
 def run_section(
     out,
-    title: str,
+    section_: Section,
     items: list[Bench],
 ) -> None:
     if not items:
         return
 
     results = [measure_bench(item) for item in items]
-    out.write(render_section(title, results))
+    out.write(
+        render_section(
+            section_.title,
+            results,
+            note=section_.note,
+            sort_by=section_.sort_by,
+        )
+    )
     out.flush()
 
 
@@ -778,18 +1073,22 @@ def main_for(argv: list[str]) -> int:
         progress("setup " + " ".join(cmd))
         run(cmd)
 
-    validate(items)
+    validate(validation_items(items, smoke=args.smoke))
     if args.smoke:
         return 0
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as out:
         write_versions(out, items)
-        for title in SECTIONS:
+        for section_ in SECTIONS:
             run_section(
                 out,
-                title,
-                [item for item in items if item.section == title],
+                section_,
+                [
+                    item
+                    for item in items
+                    if item.section == section_.title
+                ],
             )
 
     progress(f"wrote {output.relative_to(ROOT) if output.is_relative_to(ROOT) else output}")

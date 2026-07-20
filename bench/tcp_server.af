@@ -1,0 +1,39 @@
+use' lang.af
+use' io.af
+use' net.af
+use' pthread.af
+
+\ BOT-ASSISTED
+
+char' R let: READY
+char' D let: DATA
+
+fun: .handle { conn -- out }
+  1 .alloca { byte }
+  READY byte !b
+  conn byte 1 0 .send 1 <> .then .abort end
+  conn byte 1 MSG_WAITALL .recv 1 <> .then .abort end
+  byte @b DATA <> .then .abort end
+  conn byte 1 0 .send 1 <> .then .abort end
+  conn .close { -- }
+  nil
+end
+
+fun: .run { -- err }
+  " 19777" { port }
+  port SOMAXCONN .net_listen { listener }
+  loop
+    listener nil nil .accept .cint_to_cell { conn }
+    conn <0 .then
+      .errno { code }
+      code EINTR = .then again end
+      code " unable to accept connection" .os_err .throw
+    end
+    instr' .handle conn .thread_spawn_detached { -- }
+  end
+end
+
+fun: .main { -- exit }
+  .with_main_ctx .run end { err }
+  err .then " error: %s" err .elogf .elf 1 else 0 end
+end

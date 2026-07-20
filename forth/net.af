@@ -14,6 +14,7 @@ use' ./io.af
 1      let: AI_PASSIVE   \ Any host IP is fine.
 0      let: AF_UNSPEC    \ Both IPv4 and IPv6.
 1      let: SOCK_STREAM  \ TCP.
+128    let: SOMAXCONN    \ Darwin's maximum listen backlog.
 0xffff let: SOL_SOCKET   \ Tells `.setsockopt` to configure socket itself.
 4      let: SO_REUSEADDR \ Enables local address reuse.
 
