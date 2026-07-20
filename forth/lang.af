@@ -1252,90 +1252,47 @@ fun: .within  { num floor ceil -- bool } num floor  >= num ceil  < .and end
 fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .and end
 
 \ ## Memory load / store
+\
+\ Early bootstrap definitions. Comptime definitions
+\ are later replaced with peephole-fusion versions;
+\ runtime definitions remain as-is.
 
-\ Loads replace the latest argument, which should be an address, with a value.
-\ Like arithmetic words, they respect the argument stack, preserving the other
-\ prior arguments.
+\ Comptime-stack-aware load: replace latest arg, preserving prior args.
 fun: .comp_mem_load { size opc -- err }
   1 nil .comp_args_min
   .comp_args_get .dec { reg }
   reg .comp_realloc_reg
-  \ ldr<size> <reg>, [<reg>]
-  reg reg 0 size opc .asm_load_store_off .comp_instr
+  reg reg 0 size opc .asm_load_store_off .comp_instr \ ldr<size> <reg>, [<reg>]
 end
 
-\ Generically defines a load word for the given size / type.
-fun: load: { size opc -- err } ( C: "name" -- )  ( E: adr -- val )
-  .read_word { str len }
+fun: @ { _adr -> val } [
+  0 0 0 .asm_load_off .comp_out0 \ ldr x0, [x0]
+] end
 
-  \ Execution-time semantics.
-  str len .define_fun
-    1 1 false .comp_signature_set ( E: adr -- val )
-    0 .comp_realloc_reg
-    0 0 0 size opc .asm_load_store_off .comp_instr \ ldr<size> r0, [x0]
-    1 .comp_args_set
-  call'' end
+fun_comp: @ { -- err } 0b11 0b01 .comp_mem_load end
 
-  \ Compile-time semantics.
-  str len .define_fun_comp
-    0 1 true .comp_signature_set
-    size     .comp_push
-    opc      .comp_push
-    compile' .comp_mem_load
-  call'' end
+fun: ! { _val _adr } [
+  0 1 0 .asm_store_off .comp_instr \ str x0, [x1]
+] end
 
-  [ false .comp_only ]
-end
+\ Byte load/store; renamed from standard `c@` and `c!`.
+fun: @b { _adr -> val } [
+  0 0 0 .asm_load_off_u8 .comp_out0 \ ldrb w0, [x0]
+] end
 
-\ Generically defines a store word for the given size / type.
-\ Execution-time semantics only. The compiler always inlines.
-fun: store: { size -- err } ( C: "name" -- ) ( E: val adr -- )
-  .read_word .define_fun
-    2 0 false .comp_signature_set
-    \ str<size> r0, [x1]
-    0 1 0 size 0b00 .asm_load_store_off .comp_instr
-  call'' end
+fun: !b { _val _adr } [
+  0 1 0 .asm_store_off_u8 .comp_instr \ strb w0, [x1]
+] end
 
-  [ false .comp_only ]
-end
+fun: @u32 { _adr -> val } [
+  0 0 0 .asm_load_off_u32 .comp_out0 \ ldr w0, [x0]
+] end
 
-0b00 0b01 load:  @u8 \ Renamed from standard `c@`.
-0b00 0b10 load:  @s8
-0b00      store: !8  \ Renamed from standard `c!`.
+fun_comp: @u32 { -- err } 0b10 0b01 .comp_mem_load end
 
-\ Byte load/store; aliases for `@u8` and `!8`.
-0b00 0b01 load:  @b \ Renamed from standard `c@`.
-0b00      store: !b \ Renamed from standard `c!`.
-
-0b01 0b01 load:  @u16
-0b01 0b10 load:  @s16
-0b01      store: !16
-
-0b10 0b01 load:  @u32
-0b10 0b10 load:  @s32
-0b10      store: !32
-
-0b11 0b01 load:  @
-0b11      store: !
-
-\ Aliases for some C types, so the user
-\ doesn't have to remember their width.
-
-\ 32 bit
-0b10 0b10 load:  @cint
-0b10      store: !cint
-
-\ 32 bit
-0b10 0b01 load:  @cuint
-0b10      store: !cuint
-
-\ 64 bit (Apple ABI)
-0b11 0b01 load:  @clong
-0b11      store: !clong
-
-\ 64 bit (Apple ABI)
-0b11 0b01 load:  @culong
-0b11      store: !culong
+fun: !32 { _val _adr } [
+  0 1 0 .asm_store_off_u32 .comp_instr \ str w0, [x1]
+] end
 
 fun_comp: @2 { -- err }
   1 nil .comp_args_min
@@ -1643,7 +1600,7 @@ fun: .memzero { buf len ->   } 0 .memfill end
 
 \ ## Characters and strings
 
-fun: .read_word_char { -- char err } .read_word { buf -- } buf @u8 end
+fun: .read_word_char { -- char err } .read_word { buf -- } buf @b end
 
 fun: char' { -- char err } ( E: "str" -- char ) .read_word_char end
 
@@ -1799,8 +1756,8 @@ end
 32 let: SPACE
 
 3 mem: CRLF     \ \r\n\0
-CR CRLF      !8 \ \r
-LF CRLF .inc !8 \ \n
+CR CRLF      !b \ \r
+LF CRLF .inc !b \ \n
 
 fun: stdin  { -- adr } [ .plain_call ] extern_adr' __stdinp  @ end
 fun: stdout { -- adr } [ .plain_call ] extern_adr' __stdoutp @ end
@@ -2303,8 +2260,8 @@ end
 8 int: Cstr \ char*
 4 int: Cint
 4 int: Cuint
-8 int: Clong
-8 int: Culong
+CELL int: Clong  \ Apple ABI: register-sized C "long".
+CELL int: Culong \ Apple ABI: register-sized C "unsigned long".
 
 \ ### Array types
 
@@ -3800,35 +3757,59 @@ fun: .comp_mem_store { size -- err }
   val .comp_args_set
 end
 
-fun_comp: @u8 { -- err } [ .redefine ] 0b00 0b01 .comp_mem_load end
-fun_comp: @s8 { -- err } [ .redefine ] 0b00 0b10 .comp_mem_load end
-fun_comp: !8  { -- err }               0b00      .comp_mem_store end
+fun_comp: @u8 { -- err } 0b00 0b01 .comp_mem_load end
+fun:      @u8 { adr -> val } @u8 end
 
-fun_comp: @b { -- err } [ .redefine ] 0b00 0b01 .comp_mem_load end
-fun_comp: !b { -- err }               0b00      .comp_mem_store end
+fun_comp: @s8 { -- err } 0b00 0b10 .comp_mem_load end
+fun:      @s8 { adr -> val } @s8 end
 
-fun_comp: @u16 { -- err } [ .redefine ] 0b01 0b01 .comp_mem_load end
-fun_comp: @s16 { -- err } [ .redefine ] 0b01 0b10 .comp_mem_load end
-fun_comp: !16  { -- err }               0b01      .comp_mem_store end
+fun_comp: !8  { -- err } 0b00 .comp_mem_store end
+fun:      !8  { val adr -> } !8 end
+
+fun_comp: @b { -- err } 0b00 0b01 .comp_mem_load end
+fun_comp: !b { -- err } 0b00 .comp_mem_store end
+
+fun_comp: @u16 { -- err } 0b01 0b01 .comp_mem_load end
+fun:      @u16 { adr -> val } @u16 end
+
+fun_comp: @s16 { -- err } 0b01 0b10 .comp_mem_load end
+fun:      @s16 { adr -> val } @s16 end
+
+fun_comp: !16  { -- err } 0b01 .comp_mem_store end
+fun:      !16  { val adr -> } !16 end
 
 fun_comp: @u32 { -- err } [ .redefine ] 0b10 0b01 .comp_mem_load end
-fun_comp: @s32 { -- err } [ .redefine ] 0b10 0b10 .comp_mem_load end
-fun_comp: !32  { -- err }               0b10      .comp_mem_store end
+fun_comp: @s32 { -- err } 0b10 0b10 .comp_mem_load end
+fun:      @s32 { adr -> val } @s32 end
+fun_comp: !32  { -- err } 0b10 .comp_mem_store end
 
 fun_comp: @ { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: ! { -- err }               0b11      .comp_mem_store end
+fun_comp: ! { -- err } 0b11 .comp_mem_store end
 
-fun_comp: @cint { -- err } [ .redefine ] 0b10 0b10 .comp_mem_load end
-fun_comp: !cint { -- err }               0b10      .comp_mem_store end
+fun_comp: @cint { -- err } 0b10 0b10 .comp_mem_load end
+fun:      @cint { adr -> val } @cint end
 
-fun_comp: @cuint { -- err } [ .redefine ] 0b10 0b01 .comp_mem_load end
-fun_comp: !cuint { -- err }               0b10      .comp_mem_store end
+fun_comp: !cint { -- err } 0b10 .comp_mem_store end
+fun:      !cint { val adr -> } !cint end
 
-fun_comp: @clong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: !clong { -- err }               0b11      .comp_mem_store end
+fun_comp: @cuint { -- err } 0b10 0b01 .comp_mem_load end
+fun:      @cuint { adr -> val } @cuint end
 
-fun_comp: @culong { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: !culong { -- err }               0b11      .comp_mem_store end
+fun_comp: !cuint { -- err } 0b10 .comp_mem_store end
+fun:      !cuint { val adr -> } !cuint end
+
+\ Apple ABI: register-sized C "long".
+fun_comp: @clong { -- err } call'' @ end
+fun:      @clong { adr -> val } @ end
+
+fun_comp: !clong { -- err } call'' ! end
+fun:      !clong { val adr -> } ! end
+
+fun_comp: @culong { -- err } call'' @ end
+fun:      @culong { adr -> val } @ end
+
+fun_comp: !culong { -- err } call'' ! end
+fun:      !culong { val adr -> } ! end
 
 6 1 extern: .mmap     mmap     ( adr size pflag mflag fdes off -- adr|-1 )
 2 1 extern: .munmap   munmap   ( adr size -- 0|-1 :Cint )
