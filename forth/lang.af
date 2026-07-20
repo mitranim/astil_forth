@@ -2814,12 +2814,6 @@ fun: .cf_args_fold1 { -- reg imm consumed err }
   reg imm consumed
 end
 
-fun: .cf_fold_cleared1 { -- reg imm ok err }
-  .cf_args_fold1 { reg imm consumed }
-  consumed =0 .then reg 0 false .ret end
-  reg imm true
-end
-
 fun: .cf_args_fold2 { -- reg0 reg1 imm0 imm1 known consumed err }
   2 nil .comp_args_min
   .comp_args_get .dec { reg1 }
@@ -3301,7 +3295,7 @@ fun_comp: u/mod { -- err } [ .redefine ]
 end
 
 fun_comp: .inc { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .inc .cf_fold_done else { -- } call'' .inc end
+  .cf_args_fold1 .then .inc .cf_fold_done else { -- } call'' .inc end
 end
 
 \ Increment a local: `inc: some_val`.
@@ -3310,7 +3304,7 @@ fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .dec { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .dec .cf_fold_done else { -- } call'' .dec end
+  .cf_args_fold1 .then .dec .cf_fold_done else { -- } call'' .dec end
 end
 
 \ Decrement a local: `dec: some_val`.
@@ -3319,7 +3313,7 @@ fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .negate { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .negate .cf_fold_done else { -- } call'' .negate end
+  .cf_args_fold1 .then .negate .cf_fold_done else { -- } call'' .negate end
 end
 
 \ Negate a local: `negate: some_val`.
@@ -3330,7 +3324,7 @@ fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .abs { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .abs .cf_fold_done else { -- } call'' .abs end
+  .cf_args_fold1 .then .abs .cf_fold_done else { -- } call'' .abs end
 end
 
 \ Absolute-value a local: `abs: some_val`.
@@ -3341,7 +3335,7 @@ fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .bit_clz { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .bit_clz .cf_fold_done else { -- } call'' .bit_clz end
+  .cf_args_fold1 .then .bit_clz .cf_fold_done else { -- } call'' .bit_clz end
 end
 
 \ Count leading zeros in a local: `bit_clz: some_val`.
@@ -3352,7 +3346,7 @@ fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .bit_ctz { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .bit_ctz .cf_fold_done else { -- } call'' .bit_ctz end
+  .cf_args_fold1 .then .bit_ctz .cf_fold_done else { -- } call'' .bit_ctz end
 end
 
 \ Count trailing zeros in a local: `bit_ctz: some_val`.
@@ -3363,7 +3357,7 @@ fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .bit_len { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .bit_len .cf_fold_done else { -- } call'' .bit_len end
+  .cf_args_fold1 .then .bit_len .cf_fold_done else { -- } call'' .bit_len end
 end
 
 \ Compute bit length into a local: `bit_len: some_val`.
@@ -3375,7 +3369,7 @@ fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .pow2_ceil { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .pow2_ceil .cf_fold_done else { -- } call'' .pow2_ceil end
+  .cf_args_fold1 .then .pow2_ceil .cf_fold_done else { -- } call'' .pow2_ceil end
 end
 
 \ Round-up a local to a power of two: `pow2_ceil: some_val`.
@@ -3435,7 +3429,7 @@ fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
 end
 
 fun_comp: .cint_to_cell { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .cint_to_cell .cf_fold_done
+  .cf_args_fold1 .then .cint_to_cell .cf_fold_done
   else { -- } call'' .cint_to_cell end
 end
 
@@ -3447,7 +3441,7 @@ fun_comp: cint_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: =0 { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then =0 .cf_fold_done else { -- } call'' =0 end
+  .cf_args_fold1 .then =0 .cf_fold_done else { -- } call'' =0 end
 end
 
 \ In-place local test: `=0: some_val`.
@@ -3456,7 +3450,7 @@ fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <>0 { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then <>0 .cf_fold_done else { -- } call'' <>0 end
+  .cf_args_fold1 .then <>0 .cf_fold_done else { -- } call'' <>0 end
 end
 
 \ In-place local test: `<>0: some_val`.
@@ -3465,7 +3459,7 @@ fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <0 { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then <0 .cf_fold_done else { -- } call'' <0 end
+  .cf_args_fold1 .then <0 .cf_fold_done else { -- } call'' <0 end
 end
 
 \ In-place local test: `<0: some_val`.
@@ -3474,7 +3468,7 @@ fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >0 { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then >0 .cf_fold_done else { -- } call'' >0 end
+  .cf_args_fold1 .then >0 .cf_fold_done else { -- } call'' >0 end
 end
 
 \ In-place local test: `>0: some_val`.
@@ -3483,7 +3477,7 @@ fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: <=0 { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then <=0 .cf_fold_done else { -- } call'' <=0 end
+  .cf_args_fold1 .then <=0 .cf_fold_done else { -- } call'' <=0 end
 end
 
 \ In-place local test: `<=0: some_val`.
@@ -3492,7 +3486,7 @@ fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: >=0 { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then >=0 .cf_fold_done else { -- } call'' >=0 end
+  .cf_args_fold1 .then >=0 .cf_fold_done else { -- } call'' >=0 end
 end
 
 \ In-place local test: `>=0: some_val`.
@@ -3566,7 +3560,7 @@ fun_comp: u>= { -- err } [ .redefine ]
 end
 
 fun_comp: .cells { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .cells .cf_fold_done else { -- } call'' .cells end
+  .cf_args_fold1 .then .cells .cf_fold_done else { -- } call'' .cells end
 end
 
 \ Scale a local by cell size: `cells: some_val`.
@@ -3575,7 +3569,7 @@ fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: /cells { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then /cells .cf_fold_done else { -- } call'' /cells end
+  .cf_args_fold1 .then /cells .cf_fold_done else { -- } call'' /cells end
 end
 
 \ Divide a local by cell size: `/cells: some_val`.
@@ -3584,7 +3578,7 @@ fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: +cell { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then +cell .cf_fold_done else { -- } call'' +cell end
+  .cf_args_fold1 .then +cell .cf_fold_done else { -- } call'' +cell end
 end
 
 \ Add one cell to a local: `+cell: some_val`.
@@ -3593,7 +3587,7 @@ fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: -cell { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then -cell .cf_fold_done else { -- } call'' -cell end
+  .cf_args_fold1 .then -cell .cf_fold_done else { -- } call'' -cell end
 end
 
 \ Subtract one cell from a local: `-cell: some_val`.
@@ -3602,7 +3596,7 @@ fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .odd { -- err }
-  .cf_fold_cleared1 .then 1 .and .cf_fold_done
+  .cf_args_fold1 .then 1 .and .cf_fold_done
   else
     { -- }
     .comp_args1_reg { reg }
@@ -3644,7 +3638,7 @@ fun_comp: .align_up { -- err } [ .redefine ]
 end
 
 fun_comp: .invert { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .invert .cf_fold_done else { -- } call'' .invert end
+  .cf_args_fold1 .then .invert .cf_fold_done else { -- } call'' .invert end
 end
 
 \ Invert a local: `invert: some_val`.
@@ -3655,7 +3649,7 @@ fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .low_bits { -- err } [ .redefine ]
-  .cf_fold_cleared1 .then .low_bits .cf_fold_done else { -- } call'' .low_bits end
+  .cf_args_fold1 .then .low_bits .cf_fold_done else { -- } call'' .low_bits end
 end
 
 \ Set a local to a mask of its low bit count: `low_bits: some_val`.
