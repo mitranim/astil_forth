@@ -78,7 +78,7 @@ analogous to a GOT (global offset table) in executable formats.
 */
 typedef struct {
   Instr_heap exec;                            // 4 MiB; executable code.
-  U8         data[1u << 18u];                 // 256 KiB; mutable values.
+  U8         data[1u << 29u];                 // 512 MiB; mutable values.
   U8         guard_0[MEM_PAGE];               // PROT_NONE
   U64        externs[MEM_PAGE / sizeof(U64)]; // Addresses of external symbols.
   U8         guard_1[MEM_PAGE];               // PROT_NONE
@@ -90,7 +90,7 @@ typedef struct {
 
 // SYNC[main_arena_off].
 static constexpr Uint MAIN_ARENA_OFF = offsetof(Comp_heap, arena);
-static_assert(MAIN_ARENA_OFF == 0x45C000);
+static_assert(MAIN_ARENA_OFF == 0x2041C000);
 
 // Invariants: `.addrs.len == stack_len(.names) == .inds.len`.
 //

@@ -1,5 +1,5 @@
-fun_comp: \ { -- err } 10 .read_until_char { -- } .read_char { -- } end
-fun_comp: ( { -- err } 41 .read_until_char { -- } .read_char { -- } end
+fun_comp: \ { -- err } 0x0a .read_until_char { -- } .read_char { -- } end
+fun_comp: ( { -- err } 0x29 .read_until_char { -- } .read_char { -- } end
 
 \ Can use comments now!
 \
@@ -1488,56 +1488,71 @@ fun: sysstack_frame_ptr { -- fp } [ .plain_call ] sysstack_frame_ptr end
 \   adrp <reg>, <page>
 \   add <reg>, <reg>, <pageoff>
 \
-\ Used for taking an address of a data entry allocated
-\ via `.comp_alloc_data` in the compiler-managed heap.
+\ Used for PC-relative addressing of parts of the program image
+\ outside the instruction region; mostly the compiler-managed
+\ data region, which holds strings and other static data.
 fun: .comp_next_page_addr { adr -- err } ( E: -- adr )
   .comp_alloc_next_reg { reg }
   adr reg .comp_page_addr
 end
 
+fun: .comp_slice { buf len -- err } ( E: -- buf len )
+  .comp_alloc_next_reg { RB }
+  .comp_alloc_next_reg { RL }
+  buf RB .comp_page_addr \ adrp RB, buf@page ; add RB, RB, buf@pageoff
+  len RL .comp_load      \ mov RL, #len
+end
+
+\ The address should be in the program image (`Comp_heap`).
 fun: .init_data_word { name name_len adr -- err }
   name name_len .define_fun .plain_call
-    0 1 false .comp_signature_set ( E: -- ptr )
+    0 1 false .comp_signature_set ( E: -- adr )
     adr .comp_next_page_addr
   call'' end
 
   name name_len .define_fun_comp
     .plain_call
     0 1 true .comp_signature_set
-    adr .comp_push compile' .comp_next_page_addr
+    adr .comp_next_page_addr compile' .comp_next_page_addr
   call'' end
 
   [ false .comp_only ]
 end
 
 \ Similar to standard `variable`, but takes an initial value like `let:`.
-fun: var: { val -- err } ( C: "name" -- ) ( E: -- ptr )
-  nil CELL .comp_alloc_data { adr }
+fun: var: { val -- err } ( C: "name" -- ) ( E: -- adr )
+  CELL CELL .comp_alloc_data { adr }
   val adr !
   .read_word adr .init_data_word
 end
 
 \ Shortcut for the standard idiom `create <name> N allot`.
-\ Unlike the standard idiom, this also zeroes the memory.
 \ Like `buf:` but doesn't return capacity.
-\ Also see `buf:` for warnings about AOT.
-fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- adr )
-  nil cap .comp_alloc_data { adr }
-  .read_word adr .init_data_word
+\ Initial memory content is undefined.
+fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- buf )
+  cap CELL .comp_alloc_data { buf }
+  .read_word buf .init_data_word
 end
 
-fun: .comp_buf { adr cap -- err } ( E: -- adr cap )
-  .comp_alloc_next_reg { RA }
-  .comp_alloc_next_reg { RL }
-  adr RA .comp_page_addr
-  cap RL .comp_load
+\ TODO maybe dedup patterns with `.init_data_word`.
+fun: .init_slice_word { name name_len buf len -- err }
+  name name_len .define_fun .plain_call
+    0 2 false .comp_signature_set ( E: -- buf len )
+    buf len .comp_slice
+  call'' end
+
+  name name_len .define_fun_comp
+    .plain_call
+    0 1 true .comp_signature_set
+    buf .comp_next_page_addr len .comp_push compile' .comp_slice
+  call'' end
 end
 
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
-\ at least the given size in bytes, initialized to zero.
+\ at least the given size in bytes.
 \
-\ TODO dedup code with `.init_data_word`.
+\ Initial memory content is undefined.
 \
 \ The buffer is allocated in the compiler-managed data region,
 \ which is preserved in AOT compilation. Changes to this data
@@ -1548,21 +1563,9 @@ end
 \ The address CHANGES from JIT to AOT. This means: it must not be
 \ stored in another static variable, or used to derive an address
 \ which would be stored in another static variable.
-fun: buf: { cap -- err } ( C: "name" -- ) ( E: -- adr cap )
-  nil cap .comp_alloc_data { adr }
-  .read_word { str len }
-
-  str len .define_fun .plain_call
-    0 2 false .comp_signature_set ( E: -- ptr cap )
-    adr cap .comp_buf
-  call'' end
-
-  str len .define_fun_comp
-    .plain_call
-    0 1 true .comp_signature_set
-    adr .comp_push cap .comp_push compile' .comp_buf
-  call'' end
-
+fun: buf: { len -- err } ( C: "name" -- ) ( E: -- buf len )
+  len CELL .comp_alloc_data { buf }
+  .read_word buf len .init_slice_word
   [ false .comp_only ]
 end
 
@@ -1600,89 +1603,29 @@ fun: .memzero { buf len ->   } 0 .memfill end
 
 \ ## Characters and strings
 
-fun: .read_word_char { -- char err } .read_word { buf -- } buf @b end
-
-fun: char' { -- char err } ( E: "str" -- char ) .read_word_char end
-
-fun_comp: char' { -- err } ( C: "str" -- ) ( E: -- char )
-  .read_word_char      { char }
-  .comp_alloc_next_reg { reg }
-  char reg .comp_load
+\ Copies a string to compiler-managed memory and appends a null byte.
+fun: .comp_alloc_cstr { src len -- cstr err }
+  len .inc { cap }
+  cap 1 .comp_alloc_data { tar }
+  tar src len .memmove \ `src tar` may overlap.
+  nil tar len + !b
+  tar
 end
 
-fun: .read_delimited { delim -- str len err }
-  .read_char { -- }
-  delim .read_until_char { str len }
-  .read_char { -- }
-  str len
-end
-
-fun: .comp_alloc_cstr { buf len -- cstr err }
-  len .inc { cap } \ Reserve terminating null byte.
-  buf cap .comp_alloc_data { adr }
-  adr len + { ceil }
-  nil ceil !b
-  adr
-end
-
-\ Copies a string and appends a terminating null byte.
 fun: .comp_str { buf len -> err } ( E: -- cstr len )
-  .comp_alloc_cstr     { adr }
-  .comp_alloc_next_reg { RS }
-  .comp_alloc_next_reg { RL }
-  adr RS .comp_page_addr \ `adrp RS, <page>` & `add RS, RS, <pageoff>`
-  len RL .comp_load      \ ldr RL, <len>
+  .comp_alloc_cstr len .comp_slice
 end
 
 fun: .comp_cstr { buf len -- err } ( E: -- cstr )
   .comp_alloc_next_reg { reg }
-  buf len .comp_alloc_cstr
-  reg .comp_page_addr \ `adrp <reg>, <page>` & `add <reg>, <reg>, <pageoff>`
+  buf len .comp_alloc_cstr reg .comp_page_addr
 end
 
-\ Parses the input until the terminating quote, and returns the address and
-\ length of the resulting string. In interpretation mode, the string points
-\ into the transient reader input and is not null-terminated. In compilation
-\ mode, the string is statically allocated, unique, and null-terminated.
-fun: s" { -- str len err } ( E: "str" -- str len ) char' " .read_delimited end
-fun: s` { -- str len err } ( E: `str` -- str len ) char' ` .read_delimited end
-fun_comp: s" { -- err } ( C: "str" -- ) ( E: -- str len ) call' s" .comp_str end
-fun_comp: s` { -- err } ( C: `str` -- ) ( E: -- str len ) call' s` .comp_str end
-
-4096 buf: ROOT_STR_BUF
-
-fun: .read_interp_cstr { delim -> cstr err }
-  .read_delimited { src len }
-  ROOT_STR_BUF { buf cap }
-  len cap .min { len }
-  buf src len .memcpy
-  nil buf len + !b
-  buf
-end
-
-\ Interpretation-mode string "literals" which return null-terminated strings
-\ without length. Reuses the same buffer for each call; may also truncate.
-fun: " { -- cstr err } ( E: "str" -- cstr ) char' " .read_interp_cstr end
-fun: ` { -- cstr err } ( E: `str` -- cstr ) char' ` .read_interp_cstr end
-
-\ Reads a string, copies it to compiler-managed data,
-\ and compiles a PC-relative reference to it.
-fun: .read_comp_cstr { delim -> err } .read_delimited .comp_cstr end
-
-fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr ) char' " .read_comp_cstr end
-fun_comp: ` { -- err } ( C: `str` -- ) ( E: -- cstr ) char' ` .read_comp_cstr end
-
-\ Shortcut for creating string "constants". Typical use:
-\
-\   " one" str: STR_ONE
-\   " two" str: STR_TWO
-\
-\ Reason: literal strings in root scope are transient.
-\ They always refer to the start of the reader buffer.
-fun: str: { str -> err }
-  .strlen .inc { cap }
-  str cap .comp_alloc_data { adr }
-  .read_word adr .init_data_word
+\ Early version without support for escapes. Redefined later.
+fun_comp: " { -- err } ( C: "str" -- ) ( E: -- cstr )
+  .read_char { -- }
+  0x22 .read_until_char .comp_cstr
+  .read_char { -- }
 end
 
 \ ## Compilation-related words continued
@@ -1747,13 +1690,13 @@ end
 1 let: STDOUT
 2 let: STDERR
 
-7  let: BELL
-8  let: BACKSPACE
-9  let: TAB
-10 let: LF
-11 let: VTAB
-13 let: CR
-32 let: SPACE
+0x07 let: BELL
+0x08 let: BACKSPACE
+0x09 let: TAB
+0x0a let: LF
+0x0b let: VTAB
+0x0d let: CR
+0x20 let: SPACE
 
 3 mem: CRLF     \ \r\n\0
 CR CRLF      !b \ \r
@@ -1859,12 +1802,12 @@ fun_comp: interp_instrs { -- err } ( E: -- adr )
 end
 
 fun: interp_instrs {     -- adr } [ .plain_call ] interp_instrs end
-fun: .instr_off     { adr -> off } interp_instrs - end
-fun: .instr_adr     { off -> adr } interp_instrs + end
+fun: .instr_off    { adr -> off } interp_instrs - end
+fun: .instr_adr    { off -> adr } interp_instrs + end
 
 \ SYNC[main_arena_off].
 \ Offset from `Comp_heap` to `Comp_heap.arena`.
-0x45c000 let: MAIN_ARENA_OFF
+0x2041c000 let: MAIN_ARENA_OFF
 
 \ SYNC[main_arena_len].
 1 30 .lsl let: MAIN_ARENA_LEN
@@ -2167,7 +2110,7 @@ end
 fun: .type_beg { name len -- type err }
   len .inc { cap }
   2 .cells cap + { size }
-  nil size .comp_alloc_data { type }
+  size CELL .comp_alloc_data { type }
   2 .cells type + name cap .strlcpy
   type
 end
@@ -3904,7 +3847,7 @@ end
 
 \ For JIT use only. TODO: AOT compatibility.
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
-  nil 40 .comp_alloc_data { adr } \ SYNC[stack_field_offsets].
+  shape' Stack .comp_alloc_data { adr }
   size adr .stack_init
   adr call' let:
 end
@@ -4386,7 +4329,7 @@ end
 0 1 extern: .__error  __error
 1 1 extern: .strerror strerror
 
-\ We'd prefer `errno` to be a value, like `stdin stdout stderr`. On macOS it is
+\ We'd prefer `errno` to be a value, like `stdin stdout stderr`. On MacOS it's
 \ only available through a function call, which clobbered `x0 x8 x9` when last
 \ tested; the ABI is subject to change. Therefore `.errno` is a regular call.
 fun: .errno { -- code } .__error @s32 end
@@ -4503,9 +4446,9 @@ fun_comp: stack{ { -- err } ( E: stack -- )
   loop
     .read_word { str len }
 
-    s" }" str len str= .then leave end
+    " }" 1 str len str= .then leave end
 
-    s" --" str len str= .then
+    " --" 2 str len str= .then
       " unsupported `--` in `stack{`" .throw
     end
 
@@ -4638,7 +4581,7 @@ struct: Indir_decl
 end
 
 fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
-  nil size' Indir_decl .comp_alloc_data { decl }
+  size' Indir_decl CELL .comp_alloc_data { decl }
 
   inp     decl .Indir_decl_inp     !b
   out     decl .Indir_decl_out     !b
@@ -4772,9 +4715,13 @@ fun_comp: >=none  { -- err } " >=none"  ASM_LT ASM_NZCV_GE_OK ASM_LT .comp_cmp_m
 fun_comp: >none   { -- err } " >none"   ASM_LE ASM_NZCV_GT_OK ASM_LE .comp_cmp_many end
 fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT .comp_cmp_many end
 
-\ ## Assertions
+\ ## Reader tools
+\
+\ Used later below.
 
-fun: .is_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
+fun: .is_char_whitespace { char -> bool } LF CR TAB VTAB SPACE =any end
+
+\ ## Assertions
 
 fun: .assert_cond { cond text -- err }
   cond .then .ret end
@@ -4824,15 +4771,15 @@ fun: .assert_body { beg -- str len err }
   read .Interp_reader_src @ read .Interp_reader_pos @u32 + { ceil }
 
   ceil 3 - { ceil }
-  ceil .dec @b .is_whitespace =0 { fail }
-  s" end" ceil 3 str<> fail .or { fail }
+  ceil .dec @b .is_char_whitespace =0 { fail }
+  " end" 3 ceil 3 str<> fail .or { fail }
 
   fail .then
     " invalid assertion shape: must be terminated with `end`" .throw
   end
 
-  loop beg  @b .is_whitespace .while inc: beg  end
-  loop ceil @b .is_whitespace .while dec: ceil end
+  loop beg  @b .is_char_whitespace .while inc: beg  end
+  loop ceil @b .is_char_whitespace .while dec: ceil end
 
   ceil beg - { len }
   beg len
@@ -4973,4 +4920,147 @@ fun_comp: .with_main_ctx { -- end_xt err }
   call'' systack_ptr \ mov x0, sp
   call'' .ctx_push   \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
   xt' .with_main_ctx_end
+end
+
+\ ## Strings with escape sequences
+
+\ SYNC[interp_data_off].
+272 let: INTERP_DATA_OFF
+
+\ SYNC[list_fields].
+struct: Interp_data
+  Adr 1 field: .Interp_data_dat
+  U32 1 field: .Interp_data_len
+  U32 1 field: .Interp_data_cap
+end
+
+fun: .interp_data { -- data } interp INTERP_DATA_OFF + end
+
+fun: .interp_data_top { data -- buf }
+  data .Interp_data_dat @ data .Interp_data_len @u32 +
+end
+
+fun: .interp_data_advance { data len }
+  data .Interp_data_len @u32 len + data .Interp_data_len !32
+end
+
+fun: .char_unescape { esc -- char err }
+  esc 0x30 = .then 0     .ret end \ \0
+  esc 0x65 = .then 0x1b  .ret end \ \e
+  esc 0x6e = .then LF    .ret end \ \n
+  esc 0x72 = .then CR    .ret end \ \r
+  esc 0x73 = .then SPACE .ret end \ \s
+  esc 0x74 = .then TAB   .ret end \ \t
+  esc 0x76 = .then VTAB  .ret end \ \v
+  esc 0x5c 0x22 0x60 =any .then esc .ret end \ \\ \" \`
+  " unsupported escape `\%c`" esc .errf { err }
+  nil err
+end
+
+fun: .read_decode_char { -- char err }
+  .read_word { buf len }
+  buf @b { char }
+  len 1 = char 0x5c <> .and .then char .ret end
+  len 2 = char 0x5c = .and .then buf .inc @b .char_unescape .ret end
+  nil " invalid character literal: expected one non-backslash byte or one escape"
+end
+
+fun: char' { -- char err } ( E: "str" -- char ) .read_decode_char end
+
+fun_comp: char' { -- err } ( C: "str" -- E: char )
+  .comp_alloc_next_reg { reg }
+  .read_decode_char reg .comp_load
+end
+
+\ Decodes a string literal from `src` to `tar` until the given delimiter,
+\ advancing both addresses. Supports some backslash escape sequences.
+\
+\ Source begins just after the opening delimiter. On success, returned `src`
+\ follows the closing delimiter, and returned `tar` points at trailing null.
+fun: .str_until { delim unescape src tar -- src tar err }
+  loop
+    src @b { char }
+    inc: src
+    char delim = .then leave end
+
+    char 0 255 =any .then
+      " unexpected EOF while looking for delimiter" .throw
+    end
+
+    char char' \\ = unescape .and .then
+      src @b .char_unescape { char }
+      inc: src
+    end
+
+    char tar !b
+    inc: tar
+  end
+
+  src @b 0 255 LF CR TAB VTAB SPACE =none .then
+    " closing delimiter must be followed by whitespace or EOF" .throw
+  end
+
+  nil tar !b
+  src tar
+end
+
+\ Read string until delimiter; optionally unescape;
+\ stage in compiler-managed data without committing.
+fun: .read_str_staged { delim unescape -- cstr len err }
+  interp .Interp_module @ .Interp_module_reader { read }
+  read .Interp_reader_src @ { beg }
+  beg read .Interp_reader_pos @u32 + .inc { src }
+  .interp_data .interp_data_top { buf }
+  delim unescape src buf .str_until buf - { src len }
+  src beg - read .Interp_reader_pos !32
+  buf len
+end
+
+\ Read string until delimiter; commit to compiler-managed data region.
+fun: .read_str_until { delim unescape -> cstr len err }
+  .read_str_staged { buf len }
+  .interp_data len .inc .interp_data_advance
+  buf len
+end
+
+\ Interp-mode string literals staged in compiler-managed data.
+\ Valid only until next interp-mode string or another mutation
+\ of that memory. Words prefixed with "r" are "raw": no escape
+\ sequence support. Other words support backslash escapes.
+fun: "   { -- cstr err }    char' " true  .read_str_staged { _ } end
+fun: `   { -- cstr err }    char' ` true  .read_str_staged { _ } end
+fun: s"  { -- buf len err } char' " true  .read_str_staged end
+fun: s`  { -- buf len err } char' ` true  .read_str_staged end
+fun: r"  { -- cstr err }    char' " false .read_str_staged { _ } end
+fun: r`  { -- cstr err }    char' ` false .read_str_staged { _ } end
+fun: rs" { -- buf len err } char' " false .read_str_staged end
+fun: rs` { -- buf len err } char' ` false .read_str_staged end
+
+\ Comptime string literals stored in compiler-managed memory.
+\ Mutable; any changes made in JIT mode persist into AOT.
+fun_comp: "   { -- err } char' " true  .read_str_until { _ } .comp_next_page_addr [ .redefine ] end
+fun_comp: `   { -- err } char' ` true  .read_str_until { _ } .comp_next_page_addr end
+fun_comp: s"  { -- err } char' " true  .read_str_until .comp_slice end
+fun_comp: s`  { -- err } char' ` true  .read_str_until .comp_slice end
+fun_comp: r"  { -- err } char' " false .read_str_until { _ } .comp_next_page_addr end
+fun_comp: r`  { -- err } char' ` false .read_str_until { _ } .comp_next_page_addr end
+fun_comp: rs" { -- err } char' " false .read_str_until .comp_slice end
+fun_comp: rs` { -- err } char' ` false .read_str_until .comp_slice end
+
+\ Captures and names a memory slice, making it safe to use in future code.
+\ Slices staged at the top of the compiler-managed data region are promoted
+\ in-place; other slices are copied into it. Also ensures null-termination.
+fun: str: { buf len -- err } ( E: -- cstr len )
+  .interp_data { data }
+
+  data .interp_data_top buf = .then
+    nil buf len + !b
+    data len .inc .interp_data_advance
+    buf
+  else
+    buf len .comp_alloc_cstr
+  end { buf }
+
+  .read_word buf len .init_slice_word
+  [ false .comp_only ]
 end

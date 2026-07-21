@@ -647,7 +647,7 @@ static const USED auto INTRIN_COMP_ALLOC_DATA = (Sym){
   .name.buf = ".comp_alloc_data",
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_comp_alloc_data,
-  .inp_len  = 2, // ( buf len -- addr ) ; buffer address may be nil
+  .inp_len  = 2, // ( size align -- addr )
   .out_len  = 2,
   .has_err  = true,
 };

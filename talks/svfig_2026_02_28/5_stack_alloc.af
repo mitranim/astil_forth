@@ -82,7 +82,7 @@ end
   inst .Timespec_sec  @ { secs }
   inst .Timespec_nsec @ { nano }
 
-  " seconds: %zd" secs .logf .lf
-  " nanos:   %zd" nano .logf .lf
+  " seconds: %zd\n" secs .logf
+  " nanos:   %zd\n" nano .logf
 ;
 \ example_alloca_time

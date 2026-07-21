@@ -19,14 +19,14 @@ fun: .run
     \ Strike-out the previous entry.
     printed .then
       .del_line
-      .strike_beg mins secs .log_time .strike_end .lf
+      .strike_beg mins secs .log_time .strike_end " \n" .log
     end
 
     .now start -    { elapsed }
     elapsed 60 /    { mins }
     elapsed 60 .mod { secs }
     true            { printed }
-    " elapsed (mins:secs): %0.2zd:%0.2zd" mins secs .logf .lf
+    " elapsed (mins:secs): %0.2zd:%0.2zd\n" mins secs .logf
     1 .sleep { -- }
   end
 end

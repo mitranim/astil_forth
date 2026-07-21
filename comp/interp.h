@@ -68,3 +68,6 @@ static_assert(!offsetof(Interp, ctx));
 
 static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);
 static constexpr auto INTERP_INTS_TOP   = offsetof(Interp, ints.top);
+// SYNC[interp_data_off].
+static constexpr auto INTERP_DATA_OFF = offsetof(Interp, comp.code.data);
+static_assert(INTERP_DATA_OFF == 272);

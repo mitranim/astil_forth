@@ -717,4 +717,4 @@ fun: .test_const_fold_all { -- err }
   .test_const_fold_cint_to_cell
 end
 
-" [test] [cf] ok" .elog .elf
+" [test] [cf] ok\n" .elog

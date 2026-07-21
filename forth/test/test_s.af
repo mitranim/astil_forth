@@ -601,6 +601,14 @@ fun: .test_ctx_alloc_out_of_space
 end
 .test_ctx_alloc_out_of_space
 
+fun: .test_comp_alloc_data_alignment
+  1 1    .comp_alloc_data { byte }
+  1 CELL .comp_alloc_data { aligned }
+  byte .drop
+  T{ aligned CELL .align_down <T> aligned }T
+end
+.test_comp_alloc_data_alignment
+
 fun: .test_errf
   context .Ctx_top @ { top0 }
   " numbers: %zd %zd %zd" 10 20 30 [ 3 ] .errf { str0 }

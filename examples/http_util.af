@@ -6,13 +6,13 @@ use' pthread.af
 \ Nice guide on libc networking: https://beej.us/guide/bgnet/html/
 
 fun: .conn_close { conn }
-  " [srv] closing connection %zd" conn .elogf .elf
+  " [srv] closing connection %zd\n" conn .elogf
 
   conn .close .then
     .errno { code }
     code .strerror { msg }
-    " [srv] unable to close connection %zd; code: %zd; msg: %s"
-    conn code msg .elogf .elf
+    " [srv] unable to close connection %zd; code: %zd; msg: %s\n"
+    conn code msg .elogf
   end
 end
 
@@ -30,12 +30,12 @@ fun: .net_accept_loop { sock handler }
       .errno { code }
       code EINTR = .then again end
       code .strerror { msg }
-      " [srv] unable to accept connection %zd; code: %zd; msg: %s"
-      conn code msg .elogf .elf
+      " [srv] unable to accept connection %zd; code: %zd; msg: %s\n"
+      conn code msg .elogf
       again
     end
 
-    " [srv] accepted connection %zd" conn .elogf .elf
+    " [srv] accepted connection %zd\n" conn .elogf
     conn handler .call
   end
 end
@@ -59,16 +59,16 @@ fun: .net_accept_loop_threaded { sock handler }
       .errno { code }
       code EINTR = .then again end
       code .strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s" code msg .elogf .elf
+      " [srv] unable to accept connection; code: %zd; msg: %s\n" code msg .elogf
       again
     end
 
-    " [srv] accepted connection %zd" conn .elogf .elf
+    " [srv] accepted connection %zd\n" conn .elogf
 
     handler conn .thread_spawn_detached { _ err }
 
     err .then
-      " [srv] unable to spawn worker: %s" err .elogf .elf
+      " [srv] unable to spawn worker: %s\n" err .elogf
       conn .conn_close
     end
   end

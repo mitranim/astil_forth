@@ -6,34 +6,34 @@ use' lang.af
 
 fun: .run { argc argv envp -- exit }
   .has_interp .then
-    " [main] mode: JIT" .log .lf
+    " [main] mode: JIT\n" .log
   else
-    " [main] mode: AOT" .log .lf
+    " [main] mode: AOT\n" .log
   end
 
   argc .then
-    " [main] args (%zd):" argc .logf .lf
+    " [main] args (%zd):\n" argc .logf
 
     0 { ind }
     loop
       ind argc < .while
       ind .cells argv + @ { arg }
-      " arg %zd: %s" ind arg .logf .lf
+      " arg %zd: %s\n" ind arg .logf
       inc: ind
     end
   else
-    " [main] args: empty" .log .lf
+    " [main] args: empty\n" .log
   end
 
   \ Optional: dump env.
   false .then
     envp .then
-      " [main] env:" .log .lf
+      " [main] env:\n" .log
 
       loop
         envp @ { pair }
         pair .while
-        " pair: %s" pair .logf .lf
+        " pair: %s\n" pair .logf
         +cell: envp
       end
     end

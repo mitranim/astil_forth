@@ -45,5 +45,5 @@ end
 
 fun: .main { -- exit }
   .with_main_ctx .run end { err }
-  err .then " error: %s" err .elogf .elf 1 else 0 end
+  err .then " error: %s\n" err .elogf 1 else 0 end
 end

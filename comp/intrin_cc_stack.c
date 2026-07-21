@@ -243,12 +243,12 @@ static Err intrin_comp_load(Interp *interp) {
 }
 
 static Err intrin_comp_alloc_data(Interp *interp) {
-  const U8 *buf;
-  Ind       len;
+  Sint      align;
+  Ind       size;
   const U8 *adr;
-  try(interp_pop_data_len(interp, &len));
-  try(interp_pop_data_ptr_opt(interp, &buf));
-  try(comp_alloc_data(&interp->comp, buf, len, &adr));
+  try(int_stack_pop(&interp->ints, &align));
+  try(interp_pop_data_len(interp, &size));
+  try(comp_alloc_data(&interp->comp, size, (Ind)align, &adr));
   try(int_stack_push(&interp->ints, (Sint)adr));
   return nullptr;
 }

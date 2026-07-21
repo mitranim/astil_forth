@@ -5,43 +5,29 @@ use' lang.af
 65536      let: CAP
 32768      let: RUNS
 1207959552 let: WANT
-16         let: SRC_LEN
-SRC_LEN    mem: SRC
-256        mem: DELS
 
-char' { SRC 0  + !b
-char' a SRC 1  + !b
-char' , SRC 2  + !b
-char' b SRC 3  + !b
-char' : SRC 4  + !b
-char' c SRC 5  + !b
-char' [ SRC 6  + !b
-char' d SRC 7  + !b
-char' ] SRC 8  + !b
-char' e SRC 9  + !b
-char' } SRC 10 + !b
-SPACE   SRC 11 + !b
-LF      SRC 12 + !b
-TAB     SRC 13 + !b
-char' f SRC 14 + !b
-char' g SRC 15 + !b
+s" {a,b:c[d]e} \n\tfg" str: SRC
 
-1 DELS char' { + !b
-1 DELS char' } + !b
-1 DELS char' [ + !b
-1 DELS char' ] + !b
-1 DELS char' : + !b
-1 DELS char' , + !b
-1 DELS SPACE   + !b
-1 DELS LF      + !b
-1 DELS TAB     + !b
+256 mem: DELS
+DELS 256 .memzero
+
+1 char' { DELS + !b
+1 char' } DELS + !b
+1 char' [ DELS + !b
+1 char' ] DELS + !b
+1 char' : DELS + !b
+1 char' , DELS + !b
+1 SPACE   DELS + !b
+1 LF      DELS + !b
+1 TAB     DELS + !b
 
 fun: .init { buf len }
   buf len + { ceil }
+  SRC { src len }
   0 { ind }
   loop
     buf ceil < .while
-    ind SRC_LEN .mod SRC + @b buf !b
+    ind len .mod src + @b buf !b
     inc: buf
     inc: ind
   end
@@ -75,5 +61,5 @@ end
 
 fun: .main { -- exit }
   .with_main_ctx .run end { err }
-  err .then " error: %s" err .elogf .elf 1 else 0 end
+  err .then " error: %s\n" err .elogf 1 else 0 end
 end

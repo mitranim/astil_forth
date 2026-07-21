@@ -7,7 +7,7 @@ use' pthread.af
 
 fun: .child { inout -- Err }
   inout @ { path }
-  " [child] checking length of `%s`..." path .logf .lf
+  " [child] checking length of `%s`...\n" path .logf
 
   alloca' Fstat { stat }
   path stat .path_stat { err }
@@ -24,7 +24,7 @@ end
 fun: .cleanup { id mem }
   mem .stack_deinit { err }
   err .then
-    " [parent] unable to deinit memory for child thread %zd: %s" id err .logf .lf
+    " [parent] unable to deinit memory for child thread %zd: %s\n" id err .logf
   end
 end
 
@@ -34,12 +34,12 @@ struct: Child_ctx
 end
 
 fun: .spawn { id inp mem -- thread inout ok }
-  " [parent] spawning thread %zd..." id .logf .lf
+  " [parent] spawning thread %zd...\n" id .logf
 
   CTX_CAP Child_ctx mem .stack_init_ctx { ctx err }
 
   err .then
-    " [parent] unable to init memory for child thread %zd: %s" id err .logf .lf
+    " [parent] unable to init memory for child thread %zd: %s\n" id err .logf
     nil nil false .ret
   end
 
@@ -51,7 +51,7 @@ fun: .spawn { id inp mem -- thread inout ok }
   instr' .child inout ctx .thread_spawn_ctx { thread err }
 
   err .then
-    " [parent] unable to spawn thread %zd: %s" id err .logf .lf
+    " [parent] unable to spawn thread %zd: %s\n" id err .logf
     id mem .cleanup
     nil nil false .ret
   end
@@ -60,18 +60,18 @@ fun: .spawn { id inp mem -- thread inout ok }
 end
 
 fun: .wait { id path out thread -- ok }
-  " [parent] waiting on thread %zd..." id .logf .lf
+  " [parent] waiting on thread %zd...\n" id .logf
   thread .thread_join { err join_err }
 
   join_err .then
-    " [parent] unable to join with thread %zd: %s" id join_err .logf .lf
+    " [parent] unable to join with thread %zd: %s\n" id join_err .logf
     false .ret
   end
 
   err .then
-    " [parent] error from thread %zd: %s" id err .logf .lf
+    " [parent] error from thread %zd: %s\n" id err .logf
   else
-    " [parent] result from thread %zd: length of `%s`: %zd" id path out @ .logf .lf
+    " [parent] result from thread %zd: length of `%s`: %zd\n" id path out @ .logf
   end
 
   true

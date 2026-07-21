@@ -718,7 +718,7 @@ fun: .test_recur_with_err { -- Err }
 end
 .test_recur_with_err
 
-fun: .test_sleep_loop loop " sleeping" .log .lf 1 .sleep { -- } end end
+fun: .test_sleep_loop loop " sleeping\n" .log 1 .sleep { -- } end end
 \ test_sleep_loop
 
 fun: .test_loop_leave { -- err }
@@ -1944,6 +1944,97 @@ fun: .test_extern_call { -- err }
 end
 .test_extern_call
 
+char' A  let: TEST_CHAR_RAW
+char' \s let: TEST_CHAR_SPACE
+
+fun: .test_char_literals { -- err }
+  assert= TEST_CHAR_RAW char' A end
+  assert= TEST_CHAR_SPACE SPACE end
+  assert= char' \0 0 end
+  assert= char' \e 27 end
+  assert= char' \n LF end
+  assert= char' \r CR end
+  assert= char' \t TAB end
+  assert= char' \v VTAB end
+  assert= char' \s SPACE end
+  assert= char' \\ 92 end
+  assert= char' \" 34 end
+  assert= char' \` 96 end
+end
+.test_char_literals
+
+64 buf: TEST_BUF
+
+fun: .test_comp_alloc_data_alignment { -- err }
+  1 1    .comp_alloc_data { _byte }
+  1 CELL .comp_alloc_data { aligned }
+  assert= aligned CELL .align_down aligned end
+end
+.test_comp_alloc_data_alignment
+
+fun: .test_buf { -- err }
+  TEST_BUF { _buf len }
+  assert= len 64 end
+end
+.test_buf
+
+s" \0\e\n\r\t\v\s\\\"\`" str: TEST_ESCAPED_STR
+r" xcopied slice" .inc 12 str: TEST_COPIED_STR
+
+fun: .test_escaped_str_decl { -- err }
+  TEST_ESCAPED_STR { str len }
+  assert= len 10 end
+  assert= str @b 0 end
+  assert= str 1 + @b 27 end
+  assert= str 2 + @b LF end
+  assert= str 3 + @b CR end
+  assert= str 4 + @b TAB end
+  assert= str 5 + @b VTAB end
+  assert= str 6 + @b SPACE end
+  assert= str 7 + @b 92 end
+  assert= str 8 + @b 34 end
+  assert= str 9 + @b 96 end
+  assert= str 10 + @b 0 end
+
+  TEST_COPIED_STR { copied_str copied_len }
+  assert= copied_len 12 end
+  copied_str " copied slice" .assert_str_eq
+end
+.test_escaped_str_decl
+
+fun: .test_escaped_literals { -- err }
+  s" one\ntwo" { str len }
+  assert= len 7 end
+  assert= str 3 + @b LF end
+  assert= str len + @b 0 end
+
+  " tab\there" { cstr }
+  assert= cstr .strlen 8 end
+  assert= cstr 3 + @b TAB end
+
+  s` one\`two\"three` { tick_str tick_len }
+  assert= tick_len 13 end
+  assert= tick_str 3 + @b 96 end
+  assert= tick_str 7 + @b 34 end
+
+  rs" one\ntwo" { raw_str raw_len }
+  assert= raw_len 8 end
+  assert= raw_str 3 + @b 92 end
+  assert= raw_str 4 + @b char' n end
+
+  r` tab\there` { raw_cstr }
+  assert= raw_cstr .strlen 9 end
+  assert= raw_cstr 3 + @b 92 end
+
+  ` line\nbreak` { tick_cstr }
+  assert= tick_cstr 4 + @b LF end
+
+  rs` raw\ntext` { raw_tick_str raw_tick_len }
+  assert= raw_tick_len 9 end
+  assert= raw_tick_str 3 + @b 92 end
+end
+.test_escaped_literals
+
 fun: .stored_call_name { -- val } 123 end
 fun: stored_plain_name { -- val } [ .plain_call ] 456 end
 0 1 extern: .process_id getpid
@@ -2272,8 +2363,8 @@ fun: .test_errf_wrap { -- err }
   " one" .errf { err0 }
   " two: %s" err0 .errf { err1 }
 
-  \ err0 .logf .lf
-  \ err1 .logf .lf
+  \ err0 .logf " \n" .log
+  \ err1 .logf " \n" .log
 
   err0 " one" .assert_str_eq
   err1 " two: one" .assert_str_eq
@@ -3307,6 +3398,34 @@ fun: .test_word_len_over { -- err }
 end
 .test_word_len_over
 
+fun: .test_escaped_literal_errors { -- err }
+  s" ./fail/test_escape_unknown.af" .use_err { unknown }
+  unknown " unsupported escape" .assert_str_has
+
+  s" ./fail/test_escape_unterminated.af" .use_err { unterminated }
+  unterminated " unexpected EOF while looking for delimiter" .assert_str_has
+
+  s" ./fail/test_escape_bad_delim_follower.af" .use_err { follower }
+  follower " closing delimiter must be followed by whitespace or EOF"
+  .assert_str_has
+end
+.test_escaped_literal_errors
+
+fun: .test_char_literal_errors { -- err }
+  s" ./fail/test_char_raw_long.af" .use_err { raw_long }
+  raw_long " invalid character literal" .assert_str_has
+
+  s" ./fail/test_char_escape_long.af" .use_err { escape_long }
+  escape_long " invalid character literal" .assert_str_has
+
+  s" ./fail/test_char_escape_unknown.af" .use_err { unknown }
+  unknown " unsupported escape" .assert_str_has
+
+  s" ./fail/test_char_escape_missing.af" .use_err { missing }
+  missing " invalid character literal" .assert_str_has
+end
+.test_char_literal_errors
+
 fun: .test_dropped_intrinsics_hidden { -- err }
   s" :" WORDLIST_EXEC .find_word_err { _xt err }
   err " undefined word" .assert_str_has
@@ -3446,15 +3565,19 @@ fun: .main_run { -- err }
   .test_arena_trunc
   .test_arena_deinit
   .test_arena_errors
+  .test_buf
+  .test_char_literals
+  .test_escaped_str_decl
+  .test_escaped_literals
   .test_const_fold_all
   .test_simd_asm
 end
 
 fun: .main { -- exit }
   .with_main_ctx .main_run end { err }
-  err .then " error: %s" err .elogf .elf 1 .ret end
-  " [test] [aot] ok" .elog .elf
+  err .then " error: %s\n" err .elogf 1 .ret end
+  " [test] [aot] ok\n" .elog
   0
 end
 
-" [test] [jit] ok" .elog .elf
+" [test] [jit] ok\n" .elog

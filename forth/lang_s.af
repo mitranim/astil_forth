@@ -943,11 +943,9 @@ end
 \ Similar to standard `variable`.
 fun: var: ( C: init "name" -- ) ( E: -- adr )
   .read_word .define_fun .plain_call .swap
-    .sp CELL -                    \ Address of the `init` value.
-    CELL         .comp_alloc_data ( -- adr )
+    CELL CELL    .comp_alloc_data .tuck ! ( init -- adr )
     1            .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     .asm_push_x1 .comp_instr      \ str x1, [x27], 8
-    .drop                         \ Don't need the `init` value anymore.
   call'' end
   [ false .comp_only ]
 end
@@ -956,7 +954,7 @@ end
 \ Like `buf:` but doesn't return capacity.
 fun: mem: ( C: cap "name" -- ) ( E: -- adr )
   .read_word .define_fun .plain_call .swap
-    nil .swap    .comp_alloc_data ( -- adr )
+    CELL         .comp_alloc_data ( -- adr )
     1            .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     .asm_push_x1 .comp_instr      \ str x1, [x27], 8
   call'' end
@@ -968,7 +966,7 @@ end
 \ at least the given capacity in bytes.
 fun: buf: ( C: cap "name" -- ) ( E: -- adr cap )
   .read_word .define_fun .plain_call .swap
-    .dup nil .swap .comp_alloc_data ( -- adr )
+    .dup CELL     .comp_alloc_data ( -- adr )
     1              .comp_page_addr  \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
     .asm_push_x1   .comp_instr      \ str x1, [x27], 8
                    .comp_push       \ str <cap>, [x27], 8
@@ -1080,7 +1078,8 @@ fun: .parse_str ( E: "str" -- str len ) char' " .read_until_char .read_char .dro
 
 fun: .comp_alloc_cstr ( buf len -- cstr )
   to: len to: buf
-  buf len .inc .comp_alloc_data to: adr
+  len .inc 1 .comp_alloc_data to: adr
+  adr buf len .memmove
   nil adr len + c!
   adr
 end

@@ -1,6 +1,6 @@
 use' lang.af
 
-" hello world! (using libc IO)" .log .lf
+" hello world! (using libc IO)\n" .log
 
 \ Don't have to use libc for IO. Just call the kernel.
 \
@@ -22,11 +22,11 @@ STDOUT CRLF 2 .sys_write
 
 fun: .bool_str { val -- str } val .then " true" else " false" end end
 
-" bool_str(false): " .log false .bool_str .log .lf
-" bool_str(true):  " .log true  .bool_str .log .lf
+" bool_str(false): " .log false .bool_str .log " \n" .log
+" bool_str(true):  " .log true  .bool_str .log " \n" .log
 
 char' @ .logc
 char' A .logc
 char' B .logc
 char' C .logc
-.lf \ @ABC
+" \n" .log \ @ABC

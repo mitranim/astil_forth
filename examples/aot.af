@@ -11,9 +11,9 @@ use' lang.af
 
 fun: .run { -- exit }
   .has_interp .then
-    " hello world (JIT mode)!" .log .lf
+    " hello world (JIT mode)!\n" .log
   else
-    " hello world (AOT-compiled)!" .log .lf
+    " hello world (AOT-compiled)!\n" .log
   end
 
   \ OK exit code
@@ -38,7 +38,7 @@ xt' .main " out.exe" .compile_executable
 \
 \ In the Forth REPL:
 \
-\   fun: .run { -- exit } " hello world!" .log .lf 0 end
+\   fun: .run { -- exit } " hello world!\n" .log 0 end
 \   fun: .main { -- exit } .with_main_ctx .run end end
 \   xt' .main " out.exe" .compile_executable
 \   \ Then hit Ctrl+D (not Ctrl+C) to exit.
@@ -62,12 +62,12 @@ xt' .main " out.exe" .compile_executable
 \
 \ Forth:
 \
-\   fun: .run { -- exit } " hello world! (first)" .log .lf 0 end
+\   fun: .run { -- exit } " hello world! (first)\n" .log 0 end
 \   fun: .main { -- exit } .with_main_ctx .run end end
 \
 \   xt' .main " out0.exe" .compile_executable
 \
-\   fun: .run { -- exit } " hello world! (second)" .log .lf 0 end
+\   fun: .run { -- exit } " hello world! (second)\n" .log 0 end
 \   fun: .main { -- exit } .with_main_ctx .run end end
 \
 \   xt' .main " out1.exe" .compile_executable

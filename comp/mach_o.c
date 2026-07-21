@@ -28,6 +28,7 @@ Mach-O section; maybe later.
 #include "./arch.c"
 #include "./comp.c"
 #include "./interp.h"
+#include <mach/shared_region.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -239,13 +240,9 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   alignment and may begin immediately after headers. Some compilers reserve
   a bit of extra space between headers and `__text` to make post-processing
   of the executable easier; inserting a code signature is a notable example.
-  In our case, `__text` needs page alignment because of `Comp_heap` mapping:
-
-    Mach-O headers        -> __TEXT  (0x320)
-    Comp_heap.exec.instrs -> __text  (0x100000)
-    Comp_heap.data        -> __data  (0x40000)
-    Comp_heap.externs     -> __got   (0x4000)
-    Comp_heap.arena       -> __arena (1 GiB, zero-filled)
+  In our case, `__text` needs page alignment because it maps to a section in
+  `Comp_heap` which is page-aligned and followed by other sections which are
+  also page-aligned.
 
   Mach-O seems to require the body of each segment load command to be padded
   to memory page size in the file too, not just in virtual memory, likely for
@@ -404,6 +401,16 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   constexpr auto arena_real_size = MAIN_ARENA_LEN;
   constexpr auto arena_vm_size   = mem_align_page(arena_real_size);
 
+  /*
+  MacOS reserves the address range beginning at `SHARED_REGION_BASE` for the
+  dyld shared cache. Our fixed AOT layout must end before it: unlike ordinary
+  VM allocations, Mach-O segments cannot be moved around the shared region.
+
+  `__LINKEDIT` immediately follows `__ARENA`. Its exact size is dynamic, but
+  every nonempty segment occupies at least one page; check exact end below.
+  */
+  static_assert(arena_vm_off + arena_vm_size + MEM_PAGE <= SHARED_REGION_BASE);
+
   try_assert(got_vm_off + got_vm_size <= arena_vm_off);
   try_assert(is_aligned_to(arena_vm_off, MEM_PAGE));
   try_assert(is_aligned_to(arena_vm_size, MEM_PAGE));
@@ -445,6 +452,8 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   const auto linkedit_file_size = mem_align_page(linkedit_real_size);
   const auto linkedit_vm_off    = arena_vm_off + arena_vm_size;
   const auto linkedit_vm_size   = linkedit_file_size;
+
+  try_assert(linkedit_vm_off + linkedit_vm_size <= SHARED_REGION_BASE);
 
   file_off += linkedit_file_size;
 

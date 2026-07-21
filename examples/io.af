@@ -17,9 +17,9 @@ fun: .example_file_stat { -- err }
   stat .Fstat_mtimespec { mtime }
   mtime .Timespec_sec @ { secs }
 
-  " [example0] path:        %s"  path .logf .lf
-  " [example0] file size:   %zd" size .logf .lf
-  " [example0] last change: %zd" secs .logf .lf
+  " [example0] path:        %s\n"  path .logf
+  " [example0] file size:   %zd\n" size .logf
+  " [example0] last change: %zd\n" secs .logf
 end
 .example_file_stat
 
@@ -51,10 +51,10 @@ fun: .example_seek_and_thou_shall_find { -- Err }
     " unable to read file: unexpected EOF" .ret
   end
 
-  .lf
-  " [example1] partial content of `%s`:" path .logf .lf .lf
+  " \n" .log
+  " [example1] partial content of `%s`:\n\n" path .logf
 
-  BUF .log .lf
+  BUF .log " \n" .log
 end
 .example_seek_and_thou_shall_find
 

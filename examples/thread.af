@@ -5,7 +5,7 @@ use' pthread.af
 \ Basic example of spawning a thread with its own memory context.
 
 fun: .child { msg -- str }
-  " [child] running..." .log .lf
+  " [child] running...\n" .log
   " child msg: %s" msg .errf
 end
 
@@ -20,7 +20,7 @@ fun: .parent { -- Err }
     " [parent] unable to init child thread memory: %s" err .errf .throw
   end
 
-  " [parent] spawning..." .log .lf
+  " [parent] spawning...\n" .log
   fun inp ctx .thread_spawn_ctx { thread err }
 
   err .then
@@ -29,13 +29,13 @@ fun: .parent { -- Err }
     mem .stack_deinit { ctx_err }
 
     ctx_err .then
-      " [parent] unable to deinit child thread memory: %s" ctx_err .logf .lf
+      " [parent] unable to deinit child thread memory: %s\n" ctx_err .logf
     end
 
     err .throw
   end
 
-  " [parent] joining..." .log .lf
+  " [parent] joining...\n" .log
   thread .thread_join { out err }
 
   \ If join fails, child thread might still be running and using memory.
@@ -43,7 +43,7 @@ fun: .parent { -- Err }
   err .then " [parent] join error: %s" err .errf .throw end
 
   \ Output needs to be used before deiniting child memory.
-  " [parent] output: %s" out .logf .lf
+  " [parent] output: %s\n" out .logf
 
   mem .stack_deinit { err }
   err .then

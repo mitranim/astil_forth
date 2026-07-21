@@ -14,9 +14,9 @@ end
 
 fun: .run
   s" 0123456789abcdef" { str len }
-  str .log .lf
+  str .log " \n" .log
   str len .reverse
-  str .log .lf
+  str .log " \n" .log
 end
 
 .run

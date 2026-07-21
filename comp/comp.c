@@ -508,22 +508,21 @@ static Err err_out_of_space_data() {
 
 // The resulting address is located at a significant distance from executable
 // code, and needs to be accessed via the `adrp & add/ldr` idiom.
-static Err comp_alloc_data(Comp *comp, const U8 *src, Ind len, const U8 **out) {
+static Err comp_alloc_data(Comp *comp, Ind size, Ind align, const U8 **out) {
   const auto data = &comp->code.data;
-  data->len       = __builtin_align_up(data->len, sizeof(void *));
+  data->len       = __builtin_align_up(data->len, align);
 
-  if (len > list_rem_bytes(data)) return err_out_of_space_data();
+  if (size > list_rem_bytes(data)) return err_out_of_space_data();
 
   const auto adr = list_next_ptr(data);
-  data->len += len;
+  data->len += size;
 
-  if (src) memcpy(adr, src, len);
   if (out) *out = adr;
 
   IF_DEBUG(eprintf(
     "[system] allocated data region with address %p and length " FMT_IND "\n",
     adr,
-    len
+    size
   ));
   return nullptr;
 }
