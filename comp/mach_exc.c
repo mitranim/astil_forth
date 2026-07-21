@@ -1,8 +1,8 @@
 /*
 This file implements a Mach handler for "bad memory access" exceptions.
-It detects underflow and overflow of the Forth integer stack, replacing
-or augmenting cryptic segmentation faults with an actual error message.
-When `DEBUG` is enabled, it also displays part of the execution context
+The handler can detect underflow and overflow of the Forth cell stack,
+augmenting cryptic segmentation faults with an actual error message.
+When `DEBUG` is enabled, also displays part of the execution context
 of the faulting thread.
 
 In the stack-CC version of the system, this also unwinds Forth frames in the
@@ -111,7 +111,7 @@ static void recovery_log_ctx(const Interp *interp) {
 
 /*
 `EXC_MASK_BAD_ACCESS` is sometimes recoverable; when it's an overflow or
-underflow of the Forth integer stack, we can assume that the thread state
+underflow of the Forth cell stack, we can assume that the thread state
 is otherwise not corrupted. We then modify the thread state to convert this
 to a Forth exception. When the thread resumes, the error bubbles up to C.
 
@@ -189,17 +189,18 @@ kern_return_t catch_mach_exception_raise_state(
 
   if (exception != EXC_BAD_ACCESS) return KERN_FAILURE;
 
-  const auto  comp      = &interp->comp;
-  const auto  bad_addr  = (void *)code[1]; // undocumented
-  const auto  ints      = &interp->ints;
-  const void *ints_low  = ints->cellar;
-  const void *ints_high = (const U8 *)ints_low + ints->bytelen;
+  const auto  comp       = &interp->comp;
+  const auto  bad_addr   = (void *)code[1]; // undocumented
+  const auto  cells      = &interp->cells;
+  const auto  heap       = comp->code.heap;
+  const void *cells_low  = heap->guard_3;
+  const void *cells_high = arr_ceil(heap->guard_4);
 
-  if (!(bad_addr >= ints_low && bad_addr < ints_high)) {
+  if (!(bad_addr >= cells_low && bad_addr < cells_high)) {
     eprintf(SYS_REC_FMT "bad access at address %p\n", bad_addr);
     eputs(SYS_REC_FMT "known valid address ranges:");
     eprintf(
-      SYS_REC_FMT "  integer    stack:        [%p,%p)\n", ints->floor, ints->ceil
+      SYS_REC_FMT "  cell       stack:        [%p,%p)\n", cells->floor, cells->ceil
     );
     eprintf(
       SYS_REC_FMT "  writable   instructions: [%p,%p)\n",
@@ -216,8 +217,8 @@ kern_return_t catch_mach_exception_raise_state(
     return KERN_FAILURE;
   }
 
-  const auto under = bad_addr < (void *)ints->floor;
-  const auto msg = under ? "integer stack underflow" : "integer stack overflow";
+  const auto under = bad_addr < (void *)cells->floor;
+  const auto msg   = under ? "cell stack underflow" : "cell stack overflow";
 
 #ifdef CALL_CONV_STACK
 

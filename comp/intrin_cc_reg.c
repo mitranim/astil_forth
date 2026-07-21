@@ -646,7 +646,7 @@ static void intrin_debug_ctx(Interp *interp) {
     inp_len,
     out_len,
     ctx->arg_len,
-    stack_len(&interp->ints),
+    stack_len(&interp->cells),
     uint32_to_bit_str((U32)sym->clobber),
     bool_str(ctx->redefining),
     bool_str(ctx->compiling),

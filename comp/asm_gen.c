@@ -15,6 +15,6 @@ completely changed the syntax of generated statements.
 Printing this ourselves is way less fragile.
 */
 int main() {
-  printf(".set INTERP_INTS_FLOOR, %d\n", (int)INTERP_INTS_FLOOR);
-  printf(".set INTERP_INTS_TOP, %d\n", (int)INTERP_INTS_TOP);
+  printf(".set CTX_CELLS_FLOOR, %d\n", (int)CTX_CELLS_FLOOR);
+  printf(".set CTX_CELLS_TOP, %d\n", (int)CTX_CELLS_TOP);
 }

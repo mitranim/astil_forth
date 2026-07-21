@@ -19,7 +19,7 @@ static bool interp_valid(const Interp *interp) {
     is_aligned(&interp->ctx.top) &&
     is_aligned(&interp->ctx.ceil) &&
     is_aligned(&interp->comp) &&
-    is_aligned(&interp->ints) &&
+    is_aligned(&interp->cells) &&
     is_aligned(&interp->syms) &&
     is_aligned(&interp->dict_exec) &&
     is_aligned(&interp->dict_comp) &&
@@ -30,7 +30,7 @@ static bool interp_valid(const Interp *interp) {
     interp->ctx.top &&
     interp->ctx.ceil &&
     interp->ctx.top <= interp->ctx.ceil &&
-    stack_valid((const Stack *)&interp->ints) &&
+    span_valid((const Span *)&interp->cells) &&
     stack_valid((const Stack *)&interp->syms) &&
     dict_valid((const Dict *)&interp->dict_exec) &&
     dict_valid((const Dict *)&interp->dict_comp)
@@ -54,7 +54,6 @@ static Err interp_deinit(Interp *interp) {
   Err err = nullptr;
   err     = either(err, comp_deinit(&interp->comp));
   err     = either(err, stack_deinit(&interp->syms));
-  err     = either(err, stack_deinit(&interp->ints));
 
   *interp = (Interp){};
   return err;
@@ -124,12 +123,17 @@ static Err interp_init(Interp *interp) {
   *interp       = (Interp){};
   Stack_opt opt = {.len = 4096};
 
-  try(stack_init(&interp->ints, &opt));
   try(stack_init(&interp->syms, &opt));
   try(comp_init(&interp->comp));
-  try(interp_init_syms(interp)); // Requires `comp_init` first.
 
   const auto heap = interp->comp.code.heap;
+
+  ptr_set(
+    &interp->cells,
+    {.top = heap->cells, .ceil = arr_ceil(heap->cells), .floor = heap->cells}
+  );
+
+  try(interp_init_syms(interp)); // Requires `comp_init` first.
 
   ptr_set(
     &interp->ctx,
@@ -140,7 +144,7 @@ static Err interp_init(Interp *interp) {
 
   IF_DEBUG({
     eprintf("[system] interpreter: %p\n", interp);
-    eprintf("[system] integer stack floor: %p\n", interp->ints.floor);
+    eprintf("[system] cell stack floor: %p\n", interp->cells.floor);
     eprintf(
       "[system] instruction floor (writable): %p\n",
       interp->comp.code.code_write.floor

@@ -68,18 +68,23 @@ static Err stack_init_impl(void *out, Stack_opt *opt, Ind val_size) {
   }
 
   *(Stack *)out = (Stack){
-    .bytelen = total_size,
-    .cellar  = cellar,
-    .floor   = floor,
     .top     = floor, // Empty ascending.
     .ceil    = floor + data_size,
+    .floor   = floor,
+    .cellar  = cellar,
+    .bytelen = total_size,
   };
   return nullptr;
 }
 
+static bool span_valid(const Span *span) {
+  return span && span->floor && span->floor <= span->top &&
+    span->top <= span->ceil;
+}
+
 // clang-format off
 
-static bool stack_valid(Stack const *stack) {
+static bool stack_valid(const Stack *stack) {
   return (
     stack &&
     is_aligned(stack) &&
@@ -91,46 +96,39 @@ static bool stack_valid(Stack const *stack) {
     stack->bytelen &&
     stack->cellar &&
     stack->cellar < stack->floor &&
-    stack->floor &&
-    stack->floor < stack->ceil &&
-    stack->top &&
-    stack->ceil
+    span_valid((const Span *)stack)
   );
 }
 
 // clang-format on
 
-static bool span_valid(const Span *span) {
-  return span && span->floor && span->floor <= span->top &&
-    span->top <= span->ceil;
-}
-
-static void stack_rewind_impl(const Stack *prev, Stack *next) {
+static void span_rewind_impl(const Span *prev, Span *next) {
   assert_fatal(next->floor == prev->floor);
+  assert_fatal(next->ceil == prev->ceil);
   next->top = prev->top;
 }
 
 static void Stack_repr(Stack *val) {
   print_struct_beg(val, Stack);
-  print_struct_field(val, bytelen);
-  print_struct_field(val, cellar);
-  print_struct_field(val, floor);
   print_struct_field(val, top);
   print_struct_field(val, ceil);
+  print_struct_field(val, floor);
+  print_struct_field(val, cellar);
+  print_struct_field(val, bytelen);
   print_struct_end();
 }
 
 // Placed here when I was too tired to properly organize.
 // TODO consider where this should be moved.
-static Err int_stack_pop(Sint_stack *src, Sint *out) {
-  if (stack_len(src) <= 0) return err_str("integer stack underflow");
+static Err cell_stack_pop(Sint_span *src, Sint *out) {
+  if (stack_len(src) <= 0) return err_str("cell stack underflow");
   const auto val = stack_pop(src);
   if (out) *out = val;
   return nullptr;
 }
 
-static Err int_stack_push(Sint_stack *tar, Sint val) {
-  if (stack_rem(tar) <= 0) return err_str("integer stack overflow");
+static Err cell_stack_push(Sint_span *tar, Sint val) {
+  if (stack_rem(tar) <= 0) return err_str("cell stack overflow");
   stack_push(tar, val);
   return nullptr;
 }

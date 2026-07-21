@@ -891,7 +891,7 @@ fun: .sp0 ( -- adr ) [ ASM_REG_DAT_SP_FLOOR .asm_push1 .comp_instr ] end
 
 \ Pushes the address of the next writable stack cell.
 \ Like `sp@` in Gforth but renamed to make sense.
-\ Note: our integer stack is empty-ascending.
+\ Note: our cell stack is empty-ascending.
 \
 \ Should have been `str x27, [x27], 8`, but Arm64 has a quirk where an
 \ address-modifying load or store which also uses the address register
@@ -1658,7 +1658,7 @@ fun: sysstack_frame_ptr [ .plain_call ] ( -- fp ) [
 \ The input is the amount of vargs.
 \
 \ Unlike in reg-CC, we don't just pop-push pairs, because we have to pop
-\ the precise `len` amount of items from the Forth integer stack.
+\ the precise `len` amount of items from the Forth cell stack.
 fun: .comp_va_beg ( C: len -- )
   .dup .odd .then
     xt' dup>systack .inline_word

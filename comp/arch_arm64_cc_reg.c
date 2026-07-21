@@ -22,14 +22,14 @@ The special registers must be kept in sync with `lang.af`.
 #include "./arch_arm64.c"
 #endif
 
-static Err err_call_arity_mismatch(const char *name, U8 inp_len, Sint ints_len) {
+static Err err_call_arity_mismatch(const char *name, U8 inp_len, Sint cells_len) {
   return errf(
     "unable to call " FMT_QUOTED
     ": %d input parameters required, but only " FMT_SINT
     " are available on the data stack\n",
     name,
     inp_len,
-    ints_len
+    cells_len
   );
 }
 
@@ -41,21 +41,21 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
   try_assert(inp_len <= ASM_INP_PARAM_REG_LEN);
   try_assert(out_len <= ASM_OUT_PARAM_REG_LEN);
 
-  const auto ints     = &interp->ints;
-  const auto ints_len = stack_len(ints);
+  const auto cells     = &interp->cells;
+  const auto cells_len = stack_len(cells);
 
-  if (inp_len > ints_len) {
-    return err_call_arity_mismatch(sym->name.buf, inp_len, ints_len);
+  if (inp_len > cells_len) {
+    return err_call_arity_mismatch(sym->name.buf, inp_len, cells_len);
   }
 
-  Sint register x7 __asm__("x7")       = inp_len > 7 ? stack_pop(ints) : 0;
-  Sint register x6 __asm__("x6")       = inp_len > 6 ? stack_pop(ints) : 0;
-  Sint register x5 __asm__("x5")       = inp_len > 5 ? stack_pop(ints) : 0;
-  Sint register x4 __asm__("x4")       = inp_len > 4 ? stack_pop(ints) : 0;
-  Sint register x3 __asm__("x3")       = inp_len > 3 ? stack_pop(ints) : 0;
-  Sint register x2 __asm__("x2")       = inp_len > 2 ? stack_pop(ints) : 0;
-  Sint register x1 __asm__("x1")       = inp_len > 1 ? stack_pop(ints) : 0;
-  Sint register x0 __asm__("x0")       = inp_len > 0 ? stack_pop(ints) : 0;
+  Sint register x7 __asm__("x7")       = inp_len > 7 ? stack_pop(cells) : 0;
+  Sint register x6 __asm__("x6")       = inp_len > 6 ? stack_pop(cells) : 0;
+  Sint register x5 __asm__("x5")       = inp_len > 5 ? stack_pop(cells) : 0;
+  Sint register x4 __asm__("x4")       = inp_len > 4 ? stack_pop(cells) : 0;
+  Sint register x3 __asm__("x3")       = inp_len > 3 ? stack_pop(cells) : 0;
+  Sint register x2 __asm__("x2")       = inp_len > 2 ? stack_pop(cells) : 0;
+  Sint register x1 __asm__("x1")       = inp_len > 1 ? stack_pop(cells) : 0;
+  Sint register x0 __asm__("x0")       = inp_len > 0 ? stack_pop(cells) : 0;
   auto register ctx_reg __asm__("x28") = interp;
 
   /*
@@ -106,14 +106,14 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
 
   const auto reg_out_len = sym->has_err ? out_len - 1 : out_len;
 
-  if (reg_out_len > 0) try(int_stack_push(ints, x0));
-  if (reg_out_len > 1) try(int_stack_push(ints, x1));
-  if (reg_out_len > 2) try(int_stack_push(ints, x2));
-  if (reg_out_len > 3) try(int_stack_push(ints, x3));
-  if (reg_out_len > 4) try(int_stack_push(ints, x4));
-  if (reg_out_len > 5) try(int_stack_push(ints, x5));
-  if (reg_out_len > 6) try(int_stack_push(ints, x6));
-  if (reg_out_len > 7) try(int_stack_push(ints, x7));
+  if (reg_out_len > 0) try(cell_stack_push(cells, x0));
+  if (reg_out_len > 1) try(cell_stack_push(cells, x1));
+  if (reg_out_len > 2) try(cell_stack_push(cells, x2));
+  if (reg_out_len > 3) try(cell_stack_push(cells, x3));
+  if (reg_out_len > 4) try(cell_stack_push(cells, x4));
+  if (reg_out_len > 5) try(cell_stack_push(cells, x5));
+  if (reg_out_len > 6) try(cell_stack_push(cells, x6));
+  if (reg_out_len > 7) try(cell_stack_push(cells, x7));
 
   Err err = nullptr;
 
@@ -162,7 +162,7 @@ static Err asm_call_norm(Interp *interp, const Sym *sym) {
 TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
   try_assert(sym->type == SYM_INTRIN);
 
-  const auto ints = &interp->ints;
+  const auto cells = &interp->cells;
 
   Sint inps[ASM_INP_PARAM_REG_LEN] = {};
   Sint outs[ASM_OUT_PARAM_REG_LEN] = {};
@@ -174,7 +174,7 @@ TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
   while (inp < sym->inp_len) {
     // Pop in backward order.
     const auto ind = sym->inp_len - 1 - inp;
-    try(int_stack_pop(ints, &inps[ind]));
+    try(cell_stack_pop(cells, &inps[ind]));
     inp++;
   }
 
@@ -201,7 +201,7 @@ TRUST_FUN_ABI static Err asm_call_intrin(Interp *interp, const Sym *sym) {
 
   out = 0;
   while (out < reg_out_len) {
-    try(int_stack_push(ints, outs[out++]));
+    try(cell_stack_push(cells, outs[out++]));
   }
   return nullptr;
 }

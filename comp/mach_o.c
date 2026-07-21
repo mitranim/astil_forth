@@ -10,11 +10,9 @@ External addresses are located in a GOT section, patched by the OS dylinker.
 
 See `../clib/mach_o.h` for many useful links.
 
-This is supported only for the register-based calling convention,
-where interpreter state and Forth stack are not (supposed to be)
-used by compiled code reachable from `.main`. For stack-CC, we'd
-need to setup the stack, which is easily doable via a dedicated
-Mach-O section; maybe later.
+This is supported only for the register-based calling convention.
+The executable sets up the backing memory for the main cell stack
+but stack-CC still lacks the needed runtime setup.
 */
 #pragma once
 #include "../clib/mach_o.h"
@@ -184,7 +182,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   */
 
   // Must match the commands below.
-  constexpr U8 cmd_count = 12;
+  constexpr U8 cmd_count = 13;
 
   // Must match the commands below.
   constexpr U32 cmd_size = 0 +                      //
@@ -193,6 +191,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __DATA
     sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __DATA_CONST
     sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __ARENA
+    sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect) + // __CELLS
     sizeof(Mach_load_cmd_seg) +                     // __LINKEDIT
     sizeof(Mach_load_cmd_dylinker) +                // MLC_LOAD_DYLINKER
     sizeof(Mach_cmd_dylib) +                        // MLC_LOAD_DYLIB
@@ -401,15 +400,23 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   constexpr auto arena_real_size = MAIN_ARENA_LEN;
   constexpr auto arena_vm_size   = mem_align_page(arena_real_size);
 
+  constexpr auto cells_vm_off = text_code_vm_off + offsetof(Comp_heap, cells) -
+    offsetof(Comp_heap, exec.instrs);
+  constexpr auto cells_real_size = sizeof(((Comp_heap *)nullptr)->cells);
+  constexpr auto cells_vm_size   = mem_align_page(cells_real_size);
+  static_assert(cells_vm_size == cells_real_size);
+
   /*
   MacOS reserves the address range beginning at `SHARED_REGION_BASE` for the
   dyld shared cache. Our fixed AOT layout must end before it: unlike ordinary
   VM allocations, Mach-O segments cannot be moved around the shared region.
 
-  `__LINKEDIT` immediately follows `__ARENA`. Its exact size is dynamic, but
-  every nonempty segment occupies at least one page; check exact end below.
+  `__CELLS` follows `__ARENA`, with an unmapped guard page on each side.
+  `__LINKEDIT` follows the second guard. Its size is dynamic; check its
+  exact end below.
   */
-  static_assert(arena_vm_off + arena_vm_size + MEM_PAGE <= SHARED_REGION_BASE);
+  static_assert(arena_vm_off + arena_vm_size + MEM_PAGE == cells_vm_off);
+  static_assert(cells_vm_off + cells_vm_size + MEM_PAGE <= SHARED_REGION_BASE);
 
   try_assert(got_vm_off + got_vm_size <= arena_vm_off);
   try_assert(is_aligned_to(arena_vm_off, MEM_PAGE));
@@ -444,15 +451,48 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     }
   );
 
+  try_assert(is_aligned_to(cells_vm_off, MEM_PAGE));
+  try_assert(is_aligned_to(cells_vm_size, MEM_PAGE));
+
+  buf_append(
+    buf,
+    (Mach_load_cmd_seg){
+      .head.cmd     = MLC_SEGMENT_64,
+      .head.cmdsize = sizeof(Mach_load_cmd_seg) + sizeof(Mach_sect),
+      .segname      = "__CELLS",
+      .vmaddr       = cells_vm_off,
+      .vmsize       = cells_vm_size,
+      .fileoff      = file_off,
+      .filesize     = 0,
+      .maxprot      = MP_READ | MP_WRITE,
+      .initprot     = MP_READ | MP_WRITE,
+      .nsects       = 1,
+    }
+  );
+
+  buf_append(
+    buf,
+    (Mach_sect){
+      .sectname = "__cells",
+      .segname  = "__CELLS",
+      .addr     = cells_vm_off,
+      .size     = cells_real_size,
+      .offset   = 0,
+      .align    = 3, // 2^3
+      .flags    = MST_ZEROFILL,
+    }
+  );
+
   deferred(buf_deinit) Buf linkedit = {};
   encode_linkedit_section(comp, text_seg_vm_off, got_vm_off, &linkedit);
 
   const auto linkedit_file_off  = file_off;
   const auto linkedit_real_size = linkedit.len;
   const auto linkedit_file_size = mem_align_page(linkedit_real_size);
-  const auto linkedit_vm_off    = arena_vm_off + arena_vm_size;
+  const auto linkedit_vm_off    = cells_vm_off + cells_vm_size + MEM_PAGE;
   const auto linkedit_vm_size   = linkedit_file_size;
 
+  try_assert(cells_vm_off + cells_vm_size + MEM_PAGE == linkedit_vm_off);
   try_assert(linkedit_vm_off + linkedit_vm_size <= SHARED_REGION_BASE);
 
   file_off += linkedit_file_size;

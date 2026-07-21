@@ -1375,60 +1375,58 @@ end
 \ provided by the outer interpreter. We also allocate additional stacks
 \ for auxiliary control information, such as `LOOP_AUX`.
 \
-\ Each stack is represented with an address of the struct below.
-\ The definition matches `Stack` in our C code. The default data
-\ stack provided by the interpreter is one of these. We hardcode
-\ the offsets below, because `struct:` is not yet available.
+\ Most stack-related functions below don't need a full `Stack`,
+\ and accept `Span`, or simply the address of the top address.
+\
+\ The default control stack provided by the interpreter is a `Span`.
+\
+\ `Span` is a view over memory:
+\
+\   \ SYNC[span_fields].
+\   struct: Span
+\     Adr 1 field: .Span_top   \ Next value address.
+\     Adr 1 field: .Span_ceil  \ Next address outside span range.
+\     Adr 1 field: .Span_floor \ Lowest address.
+\   end
+\
+\ `Stack` owns memory, begins with a `Span`, and has additional
+\ fields used only for deallocation. See `.stack_init` below.
 \
 \   \ SYNC[stack_field_offsets].
 \   struct: Stack
-\     Cell 1 field: .Stack_bytelen \ Total size with guards.
+\     Adr  1 field: .Stack_top
+\     Adr  1 field: .Stack_ceil
+\     Adr  1 field: .Stack_floor
 \     Adr  1 field: .Stack_cellar  \ Lower guard.
-\     Adr  1 field: .Stack_floor   \ First data cell.
-\     Adr  1 field: .Stack_top     \ Next data cell.
-\     Adr  1 field: .Stack_ceil    \ Higher guard.
+\     Cell 1 field: .Stack_bytelen \ Total size with guards.
 \   end
 \
 \ See `.stack_init` for guarded allocation via memory mapping.
-\ A stack can also be allocated without guards, if so desired.
 \
 \ The stack operations below have somewhat suboptimal performance.
 \ They're meant primarily for control frames, used in compilation
 \ and testing.
 \
-\ Because the interpreter's stack is accessible on the interpreter object,
-\ we get away with not having to reserve any special registers for stacks.
-\
-\ The default stack is available ONLY in interpreted and JIT-compiled code.
-\ AOT-compiled executables do not have the Forth interpreter or data stack.
+\ The default cell stack is a `Span` immediately after the context header.
 \
 \ All our stacks are empty-ascending.
+\
+\ We hardcode the offsets below, because `struct:` is not yet available.
 
-\ SYNC[stack_field_offsets].
-24 let: STACK_OFF_TOP
-24 let: INTERP_INTS_OFF
+\ SYNC[ctx_cells_top].
+24 let: CTX_CELLS_TOP
 
-\ Default Forth stack provided by the interpreter.
-\ Not available when running in AOT-compiled mode.
+\ Default Forth cell stack provided by the current context.
 \
 \ SYNC[interp_fields].
 fun_comp: STACK { -- err } ( E: -- adr ) [ .plain_call ]
-  \ mov <reg>, x28 ; add <reg>, <reg>, <offsetof(Interp, ints)>
+  \ mov <reg>, x28 ; add <reg>, <reg>, <offsetof(Interp, cells)>
   .comp_alloc_next_reg { reg }
   reg ASM_REG_CTX .asm_mov_reg .comp_instr
-  reg reg INTERP_INTS_OFF .asm_add_imm .comp_instr
-  true .interp_only
+  reg reg CTX_CELLS_TOP .asm_add_imm .comp_instr
 end
 
 fun: STACK { -- adr } [ .plain_call ] STACK end
-
-fun: .asm_stack_top_load { out stk -> instr }
-  STACK_OFF_TOP .asm_load_unscaled_off \ ldur <out>, [<stk>, STACK_OFF_TOP]
-end
-
-fun: .asm_stack_top_store { out stk -> instr }
-  STACK_OFF_TOP .asm_store_unscaled_off \ stur <out>, [<stk>, STACK_OFF_TOP]
-end
 
 \ Pops a cell from a stack. Usage:
 \
@@ -1441,25 +1439,24 @@ end
 \   stack s> .show \ 20
 \   stack s> .show \ 10
 \
-\ Also see `stack{` which is more convenient and less error-prone.
-fun: s> { _stk -> val } [
+fun: s> { _top -> val } [
   0 .comp_realloc_reg
   1 .comp_realloc_reg
   1 0      .asm_mov_reg         .comp_instr \ mov x1, x0
-  0 1      .asm_stack_top_load  .comp_instr \ ldur x0, [x1, STACK_OFF_TOP]
+  0 1 0    .asm_load_off        .comp_instr \ ldr x0, [x1]
   0 0 CELL .asm_sub_imm         .comp_instr \ sub x0, x0, CELL
-  0 1      .asm_stack_top_store .comp_instr \ stur x0, [x1, STACK_OFF_TOP]
+  0 1 0    .asm_store_off       .comp_instr \ str x0, [x1]
   0 0 0    .asm_load_off        .comp_instr \ ldr x0, [x0]
   1 .comp_args_set
 ] end
 
 \ Pushes a cell to a stack.
-fun: >s { _val _stk } [
+fun: >s { _val _top } [
   2 .comp_realloc_reg
-  2 1      .asm_stack_top_load  .comp_instr \ ldur x2, [x1, STACK_OFF_TOP]
+  2 1 0    .asm_load_off        .comp_instr \ ldr x2, [x1]
   0 2 0    .asm_store_off       .comp_instr \ str x0, [x2]
   2 2 CELL .asm_add_imm         .comp_instr \ add x2, x2, CELL
-  2 1      .asm_stack_top_store .comp_instr \ stur x2, [x1, STACK_OFF_TOP]
+  2 1 0    .asm_store_off       .comp_instr \ str x2, [x1]
   0 .comp_args_set
 ] end
 
@@ -1789,20 +1786,14 @@ fun: interp { -- adr } [ .plain_call ] interp end
 \
 \ This looks ridiculously unsafe and it is, but I'm a firm believer
 \ that the best API is a stable ABI. Just don't break your offsets.
-224 let: INTERP_COMP_CODE_WRITE_OFF
+\ SYNC[interp_comp_code_write_off].
+208 let: INTERP_COMP_CODE_WRITE_OFF
 
 fun: .interp_instrs { -- adr }
   INTERP_COMP_CODE_WRITE_OFF interp + @ PAGE_SIZE +
 end
 
 fun: .instr_off { adr -- off } .interp_instrs { instrs } adr instrs - end
-
-\ SYNC[main_arena_off].
-\ Offset from `Comp_heap` to `Comp_heap.arena`.
-0x2041c000 let: MAIN_ARENA_OFF
-
-\ SYNC[main_arena_len].
-1 30 .lsl let: MAIN_ARENA_LEN
 
 \ ## Control flow metadata
 \
@@ -2367,18 +2358,18 @@ end
 \
 \ SYNC[stack_field_offsets].
 struct: Stack
-  Cell 1 field: .Stack_bytelen
-  Adr  1 field: .Stack_cellar
-  Adr  1 field: .Stack_floor
   Adr  1 field: .Stack_top
   Adr  1 field: .Stack_ceil
+  Adr  1 field: .Stack_floor
+  Adr  1 field: .Stack_cellar
+  Cell 1 field: .Stack_bytelen
 end
 
 \ SYNC[span_fields].
 struct: Span
-  Adr 1 field: .Span_floor
   Adr 1 field: .Span_top
   Adr 1 field: .Span_ceil
+  Adr 1 field: .Span_floor
 end
 
 \ SYNC[set_fields].
@@ -2495,16 +2486,6 @@ struct: Interp_module_ctx
   \ ... other fields ...
 end
 
-\ Partial mirror of C `Comp_code`.
-\
-\ SYNC[comp_code_fields].
-\ SYNC[comp_code_size].
-struct: Interp_comp_code
-  Adr 1   field: .Interp_comp_code_write
-  Adr 1   field: .Interp_comp_code_heap
-  U8  272 field: .Interp_comp_code_tail_field \ ... other fields ...
-end
-
 \ Partial mirror of C `Comp_ctx`. Defines only what we use.
 \ SYNC[comp_ctx_fields].
 struct: Interp_comp_ctx
@@ -2512,10 +2493,9 @@ struct: Interp_comp_ctx
   \ ... other fields ...
 end
 
-\ SYNC[comp_fields].
 struct: Interp_comp
-  Interp_comp_code 1 field: .Interp_comp_code_field
-  Interp_comp_ctx  1 field: .Interp_comp_ctx_field
+  U8              288 field: .Interp_comp_code_field \ SYNC[comp_code_size].
+  Interp_comp_ctx 1   field: .Interp_comp_ctx_field
 end
 
 \ SYNC[ctx_fields].
@@ -2525,13 +2505,20 @@ struct: Ctx
   Adr 1 field: .Ctx_ceil
 end
 
-\ Partial mirror of the outer C-based interpreter. Caution: only fields actually
-\ read from Forth are defined; unused tail fields are omitted.
+\ Default context in both JIT and AOT.
+\
+\ SYNC[interp_fields].
+struct: Main_ctx
+  Ctx  1 field: .Main_ctx_ctx
+  Span 1 field: .Main_ctx_cells
+end
+
+\ Partial mirror of the outer C-based interpreter. Caution: only fields
+\ actually read from Forth are defined; unused tail fields are omitted.
 \
 \ SYNC[interp_fields].
 struct: Interp
-  Ctx         1 field: .Interp_ctx
-  Stack       1 field: .Interp_ints
+  Main_ctx    1 field: .Interp_main_ctx
   Cell        1 field: .Interp_argc
   Adr         1 field: .Interp_argv
   Interp_dict 1 field: .Interp_dict_exec
@@ -3803,11 +3790,11 @@ fun: .stack_init { size stk -- Err }
     err .ret
   end
 
-  bytelen stk !
-  cellar  stk .Stack_cellar !
-  floor   stk .Stack_floor !
   floor   stk .Stack_top !
   ceil    stk .Stack_ceil !
+  floor   stk .Stack_floor !
+  cellar  stk .Stack_cellar !
+  bytelen stk .Stack_bytelen !
 end
 
 \ Returned error, if any, must come from static storage.
@@ -3815,34 +3802,48 @@ end
 fun: .stack_deinit { stk -- err }
   stk =0 .then .ret end
 
-  stk @ { bytelen }
+  stk .Stack_bytelen @ { bytelen }
   stk .Stack_cellar @ { cellar }
 
-  nil stk !
-  nil stk .Stack_cellar !
-  nil stk .Stack_floor !
   nil stk .Stack_top !
   nil stk .Stack_ceil !
+  nil stk .Stack_floor !
+  nil stk .Stack_cellar !
+  nil stk .Stack_bytelen !
 
   cellar .then cellar bytelen .mem_unmap end
 end
 
-fun: stack? { stk -> bool } @ <>0 end
+fun: stack? { stk -> bool } .Stack_cellar @ <>0 end
+
+\ Initialize a span over borrowed memory.
+fun: .span_init { buf len span }
+  buf       span .Span_top !
+  buf len + span .Span_ceil !
+  buf       span .Span_floor !
+end
 
 \ Length in BYTES, not cells.
-fun: .stack_len { stk -- len } stk .Stack_top @ stk .Stack_floor @ - end
+fun: .span_len { span -- len } span .Span_top @ span .Span_floor @ - end
 
-fun: .stack_trunc { stk } stk .then stk .Stack_floor @ stk .Stack_top ! end end
+fun: .span_slice { span -- buf len }
+  span .Span_floor @ { buf }
+  buf span .Span_ceil @ buf -
+end
+
+fun: .span_trunc { span }
+  span .then span .Span_floor @ span .Span_top ! end
+end
 
 fun: .stack_repr { stk }
   stk =0 .then " [debug] stack is nil" .elog .elf .ret end
 
   " [debug] stack           " .elog stk .debug_arg
-  " [debug] Stack_bytelen @ " .elog stk @ .debug_arg
-  " [debug] Stack_cellar  @ " .elog stk .Stack_cellar @ .debug_arg
-  " [debug] Stack_floor   @ " .elog stk .Stack_floor @ .debug_arg
   " [debug] Stack_top     @ " .elog stk .Stack_top @ .debug_arg
   " [debug] Stack_ceil    @ " .elog stk .Stack_ceil @ .debug_arg
+  " [debug] Stack_floor   @ " .elog stk .Stack_floor @ .debug_arg
+  " [debug] Stack_cellar  @ " .elog stk .Stack_cellar @ .debug_arg
+  " [debug] Stack_bytelen @ " .elog stk .Stack_bytelen @ .debug_arg
 end
 
 \ For JIT use only. TODO: AOT compatibility.
@@ -3866,7 +3867,7 @@ end
 
 \ Default per-arena memory capacity we use internally.
 \ Apps are free to choose their own arena capacities.
-MAIN_ARENA_LEN let: CTX_CAP
+1 30 .lsl let: CTX_CAP
 
 \ Initialize context with borrowed memory.
 fun: .ctx_init { buf len ctx }
@@ -4003,7 +4004,7 @@ fun: .loop_frame_adr { -- adr err }
   LOOP_IND @ { frame }
   frame =0 .then " missing loop frame" .throw end
   frame .cells { off }
-  STACK .Stack_floor @ off +
+  STACK .Span_floor @ off +
 end
 
 fun: .loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
@@ -4016,7 +4017,7 @@ fun: .loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
   \ Stash prev loop info; record where caller's `meta` will land.
   LOOP_IND @            STACK >s
   xt' .loop_frame_end_xt STACK >s
-  STACK .Stack_top @ STACK .Stack_floor @ - /cells LOOP_IND !
+  STACK .span_len /cells LOOP_IND !
 
   \ Terminator for `.loop_frame_end_xt`.
   xt' .nop LOOP_AUX >s
@@ -4427,64 +4428,14 @@ end
 
 fun: .fatal { err } " fatal: %s" err .elogf .elf .abort end
 
-\ ## Stack manipulation continued
-
-\ Variadic assignment of locals from a stack. Example:
-\
-\   10 some_stack >s 20 some_stack >s 30 some_stack >s
-\   some_stack stack{ ten twenty thirty }
-fun_comp: stack{ { -- err } ( E: stack -- )
-  .comp_args_get { len }
-
-  len 1 <> .then
-    " unable to use `stack{`: exactly one argument is required (stack address)"
-    .throw
-  end
-
-  0 { locs }
-
-  loop
-    .read_word { str len }
-
-    " }" 1 str len str= .then leave end
-
-    " --" 2 str len str= .then
-      " unsupported `--` in `stack{`" .throw
-    end
-
-    str len .comp_local STACK >s
-    inc: locs
-  end
-
-  locs =0 .then 0 .comp_args_set .ret end
-
-  0 { stk_reg }
-  .comp_alloc_next_reg { top_reg }
-
-  top_reg stk_reg .asm_stack_top_load .comp_instr \ ldur <top>, [<stk>, STACK_OFF_TOP]
-
-  locs { ind }
-  loop
-    ind .while
-    dec: ind
-    STACK s> { loc }
-    .comp_alloc_next_reg { val_reg }
-    val_reg top_reg -8 .asm_load_pre .comp_instr \ ldr <val>, [<top>, -8]!
-    loc .comp_pop_into_local                     \ mov <loc>, xN | str xN, [FP, <loc>]
-  end
-
-  top_reg stk_reg .asm_stack_top_store .comp_instr \ stur <top>, [<stk>, STACK_OFF_TOP]
-  0 .comp_args_set
-end
-
 \ ## Stack printing
 
 fun: .log_int  { num } " %zd" num .logf end
 fun: .log_cell { num } " 0x%zx %zd" num num .logf end
 fun: .show     { num -> } .log_cell .lf end
 
-fun: .stack_log_cells { stack }
-  stack .Stack_top @ stack .Stack_floor @ - /cells { len }
+fun: .span_log_cells { span }
+  span .span_len /cells { len }
 
   len =0 .then
     " stack is empty" .log .lf
@@ -4502,15 +4453,15 @@ fun: .stack_log_cells { stack }
   loop
     ind len < .while
     .space .space
-    stack .Stack_floor @ ind .cells + @ .log_cell
+    span .Span_floor @ ind .cells + @ .log_cell
     "  <%zd>" ind .logf
     .lf
     inc: ind
   end
 end
 
-fun: .s STACK .stack_log_cells end
-fun: .sc .s STACK .stack_trunc end
+fun: .s STACK .span_log_cells end
+fun: .sc .s STACK .span_trunc end
 
 \ ## Dictionary introspection
 
@@ -4870,18 +4821,31 @@ end
 
 fun_comp: main_arena { -- err } ( E: -- adr len )
   [ .plain_call ]
-  interp .Interp_comp_field .Interp_comp_code_field .Interp_comp_code_heap @
-  MAIN_ARENA_OFF + .comp_next_page_addr
-  MAIN_ARENA_LEN .comp_push
+  interp { ctx }
+  ctx .Ctx_top @ { top }
+  top .comp_next_page_addr
+  ctx .Ctx_ceil @ top - .comp_push
 end
 
 fun: main_arena { -- adr len } [ .plain_call ] main_arena end
+
+fun_comp: main_cells { -- err } ( E: -- adr len )
+  [ .plain_call ]
+  interp .Main_ctx_cells .span_slice .comp_slice
+end
+
+fun: main_cells { -- adr len } [ .plain_call ] main_cells end
+
+fun: .main_ctx_init { arena arena_len cells cells_len ctx }
+  arena arena_len ctx .Main_ctx_ctx .ctx_init
+  cells cells_len ctx .Main_ctx_cells .span_init
+end
 
 \ ldp x28, xzr, [sp], #16
 \ add sp, sp, #frame
 fun: .with_main_ctx_end { -- err }
   call'' .ctx_pop
-  ASM_REG_SP ASM_REG_SP size' Ctx FUND_ALIGN .align_up .asm_add_imm .comp_instr
+  ASM_REG_SP ASM_REG_SP size' Main_ctx FUND_ALIGN .align_up .asm_add_imm .comp_instr
 end
 
 \ Recommended wrapper for AOT-compiled programs.
@@ -4895,6 +4859,7 @@ end
 \
 \ Runtime effects:
 \ - Inner code sees default / main ambient context.
+\ - The context includes the default cell-stack span.
 \ - Outer code doesn't get its registers clobbered.
 \ - Words like `.errf` can allocate memory for text.
 \
@@ -4914,9 +4879,9 @@ end
 \ Main arena's memory remains valid after `end`;
 \ we have no way to relinquish it to the OS.
 fun_comp: .with_main_ctx { -- end_xt err }
-  size' Ctx FUND_ALIGN .align_up { size }
+  size' Main_ctx FUND_ALIGN .align_up { size }
   ASM_REG_SP ASM_REG_SP size .asm_sub_imm .comp_instr \ sub sp, sp, #frame
-  call'' main_arena call'' systack_ptr compile' .ctx_init
+  call'' main_arena call'' main_cells call'' systack_ptr compile' .main_ctx_init
   call'' systack_ptr \ mov x0, sp
   call'' .ctx_push   \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
   xt' .with_main_ctx_end
@@ -4925,7 +4890,7 @@ end
 \ ## Strings with escape sequences
 
 \ SYNC[interp_data_off].
-fun: .interp_data { -- data } interp 288 + end
+fun: .interp_data { -- data } interp 272 + end
 
 fun: .interp_data_alloc { data len }
   data .Span_top @ len + data .Span_top !

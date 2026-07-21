@@ -117,10 +117,10 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->auto_try   = prev->auto_try;
   next->slop       = prev->slop;
 
-  stack_rewind(&prev->locals, &next->locals);
+  span_rewind(&prev->locals, &next->locals);
   dict_trunc((Dict *)&next->local_dict);
-  stack_rewind(&prev->asm_fix, &next->asm_fix);
-  stack_rewind(&prev->loc_fix, &next->loc_fix);
+  span_rewind(&prev->asm_fix, &next->asm_fix);
+  span_rewind(&prev->loc_fix, &next->loc_fix);
 
   static constexpr U8 ceil = arr_cap(next->args);
   for (U8 ind = 0; ind < ceil; ind++) {

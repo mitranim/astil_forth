@@ -109,17 +109,17 @@ static Sym *interp_semicolon_sym(Interp *interp) { return interp->syms.floor; }
 
 static Err interp_semicolon_push(Interp *interp) {
   const auto sym = interp_semicolon_sym(interp);
-  return int_stack_push(&interp->ints, (Sint)sym);
+  return cell_stack_push(&interp->cells, (Sint)sym);
 }
 
 static Err intrin_end(Interp *interp) {
-  if (!stack_len(&interp->ints)) {
+  if (!stack_len(&interp->cells)) {
     return err_str("unexpected `end`: no structure to close");
   }
 
   Sint ptr;
   Sym *sym;
-  try(int_stack_pop(&interp->ints, &ptr));
+  try(cell_stack_pop(&interp->cells, &ptr));
   try(interp_sym_by_ptr(interp, ptr, &sym));
   try(interp_call_sym(interp, sym));
   return nullptr;
@@ -200,27 +200,27 @@ static void debug_flush(void *) {
 static Err debug_throw() { return "debug_throw"; }
 
 static void debug_stack_len(Interp *interp) {
-  const auto ints = &interp->ints;
-  const auto len  = stack_len(ints);
+  const auto cells = &interp->cells;
+  const auto len   = stack_len(cells);
   if (!len) {
-    eprintf("[debug] stack is empty (%p)\n", ints->floor);
+    eprintf("[debug] stack is empty (%p)\n", cells->floor);
     return;
   }
-  eprintf("[debug] stack length (%p): " FMT_SINT "\n", ints->floor, len);
+  eprintf("[debug] stack length (%p): " FMT_SINT "\n", cells->floor, len);
 }
 
 static void debug_stack(Interp *interp) {
-  const auto ints = &interp->ints;
-  const auto len  = stack_len(ints);
+  const auto cells = &interp->cells;
+  const auto len   = stack_len(cells);
 
   if (!len) {
-    eprintf("[debug] stack is empty (%p)\n", ints->floor);
+    eprintf("[debug] stack is empty (%p)\n", cells->floor);
     return;
   }
 
-  eprintf("[debug] stack (%p) (" FMT_SINT "):\n", ints->floor, len);
+  eprintf("[debug] stack (%p) (" FMT_SINT "):\n", cells->floor, len);
 
-  for (stack_range(auto, ptr, ints)) {
+  for (stack_range(auto, ptr, cells)) {
     eprintf(
       "[debug]   %p -- " FMT_UINT_HEX " " FMT_SINT "\n", ptr, (Uint)*ptr, *ptr
     );
@@ -228,11 +228,11 @@ static void debug_stack(Interp *interp) {
 }
 
 static void debug_depth(Interp *interp) {
-  eprintf("[debug] stack depth: " FMT_SINT "\n", stack_len(&interp->ints));
+  eprintf("[debug] stack depth: " FMT_SINT "\n", stack_len(&interp->cells));
 }
 
 static void debug_top_int(Interp *interp) {
-  const auto val = stack_head(&interp->ints);
+  const auto val = stack_head(&interp->cells);
   eprintf(
     "[debug] stack top int: " FMT_SINT " " FMT_UINT_HEX " %s\n",
     val,
@@ -242,10 +242,10 @@ static void debug_top_int(Interp *interp) {
 }
 
 static void debug_top_ptr(Interp *interp) {
-  const auto ints = &interp->ints;
+  const auto cells = &interp->cells;
 
-  if (stack_len(ints)) {
-    eprintf("[debug] stack top ptr: %p\n", (void *)stack_head(ints));
+  if (stack_len(cells)) {
+    eprintf("[debug] stack top ptr: %p\n", (void *)stack_head(cells));
   }
   else {
     eputs("[debug] stack top ptr: none (empty)");
@@ -254,7 +254,7 @@ static void debug_top_ptr(Interp *interp) {
 
 static void debug_top_str(Interp *interp) {
   eprintf(
-    "[debug] stack top string: %s\n", (const char *)stack_head(&interp->ints)
+    "[debug] stack top string: %s\n", (const char *)stack_head(&interp->cells)
   );
 }
 

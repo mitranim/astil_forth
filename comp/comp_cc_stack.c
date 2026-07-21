@@ -91,9 +91,9 @@ static void comp_ctx_rewind(const Comp_ctx *prev, Comp_ctx *next) {
   next->compiling  = prev->compiling;
   next->has_alloca = prev->has_alloca;
 
-  stack_rewind(&prev->locals, &next->locals);
+  span_rewind(&prev->locals, &next->locals);
   dict_trunc((Dict *)&next->local_dict);
-  stack_rewind(&prev->asm_fix, &next->asm_fix);
+  span_rewind(&prev->asm_fix, &next->asm_fix);
 }
 
 static Err comp_append_push_imm(Comp *comp, Sint imm) {

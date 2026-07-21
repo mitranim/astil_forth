@@ -18,8 +18,8 @@ static Err comp_snapshot(const Comp *prev, Comp *next) {
 
 static Err interp_snapshot(Interp *interp) {
   try(comp_snapshot(&interp->comp, &interp->snap.comp));
-  interp->snap.ints = interp->ints;
-  interp->snap.syms = interp->syms;
+  interp->snap.cells = interp->cells;
+  interp->snap.syms  = interp->syms;
   return nullptr;
 }
 
@@ -35,8 +35,8 @@ static Err interp_rewind(Interp *interp) {
   const auto sym  = interp->comp.ctx.sym;
 
   comp_rewind(&prev->comp, &interp->comp);
-  stack_rewind(&prev->ints, &interp->ints);
-  stack_rewind(&prev->syms, &interp->syms);
+  span_rewind(&prev->cells, &interp->cells);
+  span_rewind(&prev->syms, &interp->syms);
 
   /*
   TODO: support deletion in dicts. For now, accessing a partially
@@ -100,7 +100,7 @@ Chuck circa June 1970 (PPOL): "type the offending word"; "reset all stacks".
 
 We can afford slightly more informative error messages.
 
-Truncating the integer stack is technically optional
+Truncating the cell stack is technically optional
 but it makes REPL behavior less weird. For example:
 
   10 20 30 : word ; stack_clear .
@@ -112,7 +112,7 @@ static Err interp_on_tty_err(Interp *interp, Err err) {
   eprintf(TTY_RED_BEG "error:" TTY_RED_END " %s\n", err);
   if (TRACE) backtrace_print();
   try(interp_rewind(interp));
-  stack_trunc(&interp->ints);
+  stack_trunc(&interp->cells);
   return nullptr;
 }
 
@@ -185,12 +185,12 @@ static Err read_interp_num(Interp *interp) {
     return comp_append_push_imm(comp, num);
   }
 
-  stack_push(&interp->ints, num);
+  stack_push(&interp->cells, num);
 
   IF_DEBUG(eprintf(
     "[system] pushed number " FMT_SINT "; stack len: " FMT_SINT "\n",
     num,
-    stack_len(&interp->ints)
+    stack_len(&interp->cells)
   ));
   return nullptr;
 }
@@ -225,7 +225,7 @@ static Err interp_call_intrin(Interp *interp, const Sym *sym) {
     " at address %p; stack pointer before call: %p\n",
     sym->name.buf,
     sym->intrin,
-    interp->ints.top
+    interp->cells.top
   ));
 
   const auto err = comp_call_intrin(interp, sym);
@@ -234,7 +234,7 @@ static Err interp_call_intrin(Interp *interp, const Sym *sym) {
     "[system] done called intrinsic word " FMT_QUOTED
     "; stack pointer after call: %p; error: %p\n",
     sym->name.buf,
-    interp->ints.top,
+    interp->cells.top,
     err
   ));
   return err;
@@ -250,7 +250,7 @@ static Err interp_call_extern(Interp *interp, const Sym *sym) {
     sym->out_len
   ));
 
-  const auto err = asm_call_extern(&interp->ints, sym);
+  const auto err = asm_call_extern(&interp->cells, sym);
 
   IF_DEBUG(eprintf(
     "[system] done called extern function " FMT_QUOTED "\n", sym->name.buf

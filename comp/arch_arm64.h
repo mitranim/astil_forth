@@ -116,8 +116,8 @@ static constexpr U8 ASM_REG_CTX = 28;
   SYNC[asm_arm64_cc_stack_special_regs].
   */
   static constexpr U8 ASM_REG_ERR         = ASM_PARAM_REG_0;
-  static constexpr U8 ASM_REG_INT_TOP     = 27; // Interp.ints.top
-  static constexpr U8 ASM_REG_INT_FLOOR   = 26; // Interp.ints.floor
+  static constexpr U8 ASM_REG_CELL_TOP    = 27; // Interp.cells.top
+  static constexpr U8 ASM_REG_CELL_FLOOR  = 26; // Interp.cells.floor
   static constexpr U8 ASM_STABLE_REG_LAST = 25;
   static constexpr Bits ASM_REGS_STABLE   = 0b1111111'0000000000000000000;
 

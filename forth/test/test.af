@@ -133,118 +133,171 @@ end
 
 \ Stack operations are tested early because they're used by conditionals and
 \ loops, which makes testing kinda cyclic.
-fun: .test_stack_len_bytes { stack -- len }
-  stack .Stack_top @ stack .Stack_floor @ -
+fun: .test_span_len_bytes { span -- len }
+  span .Span_top @ span .Span_floor @ -
 end
 
-fun: .test_stack_cap_bytes { stack -- len }
-  stack .Stack_ceil @ stack .Stack_floor @ -
+fun: .test_span_cap_bytes { span -- len }
+  span .Span_ceil @ span .Span_floor @ -
 end
 
-fun: .test_stack_len_cells { stack -- len } stack .test_stack_len_bytes /cells end
-fun: .test_stack_cap_cells { stack -- len } stack .test_stack_cap_bytes /cells end
+fun: .test_span_len_cells { span -- len } span .test_span_len_bytes /cells end
+fun: .test_span_cap_cells { span -- len } span .test_span_cap_bytes /cells end
 
 fun: .test_stack_primitives { -- err }
+  assert= size' Span 24 end
   assert= size' Stack 40 end
+
+  alloca' Span  { span }
+  alloca' Stack { stack }
+  assert= span .Span_top span end
+  assert= stack .Stack_top stack end
 
   alloca' Stack { stk }
   stk size' Stack .memzero
 
-  assert= stk .test_stack_len_cells 0 end
-  assert= stk .test_stack_cap_cells 0 end
+  assert= stk .test_span_len_cells 0 end
+  assert= stk .test_span_cap_cells 0 end
 
   32 stk .stack_init
 
-  assert= stk .test_stack_len_cells 0 end
-  assert= stk .test_stack_cap_cells 2048 end \ Adjusted to mem page size.
+  assert= stk .test_span_len_cells 0 end
+  assert= stk .test_span_cap_cells 2048 end \ Adjusted to mem page size.
 
   10 stk >s
-  assert= stk .test_stack_len_cells 1 end
+  assert= stk .test_span_len_cells 1 end
   assert= stk s> 10 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   20 stk >s
   30 stk >s
-  assert= stk .test_stack_len_cells 2 end
+  assert= stk .test_span_len_cells 2 end
   assert= stk .Stack_top @ -cell @ 30 end
   assert= stk .Stack_top @ -cell -cell @ 20 end
   assert= stk s> 30 end
-  assert= stk .test_stack_len_cells 1 end
+  assert= stk .test_span_len_cells 1 end
   assert= stk s> 20 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   stk .stack_deinit
 end
 .test_stack_primitives
 
-fun: .test_to_stack_sequence { -- err }
+fun: .test_main_ctx_views { -- err }
+  interp { ip }
+  ip .Interp_main_ctx { main }
+  main .Main_ctx_cells { cells }
+  main_arena { arena_buf arena_len }
+  main_cells { cells_buf cells_len }
+
+  assert= main ip end
+  assert= arena_buf arena_len + main .Main_ctx_ctx .Ctx_ceil @ end
+  assert= cells_buf cells .Span_floor @ end
+  assert= cells_buf cells_len + cells .Span_ceil @ end
+end
+.test_main_ctx_views
+
+fun: .test_span_sequence { -- err }
   alloca' Stack { stk }
   32 stk .stack_init
 
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   10 stk >s
-  assert= stk .test_stack_len_cells 1 end
+  assert= stk .test_span_len_cells 1 end
   assert= stk s> 10 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   666 stk >s
-  assert= stk .test_stack_len_cells 1 end
+  assert= stk .test_span_len_cells 1 end
   assert= stk s> 666 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   20 stk >s 30 stk >s
-  assert= stk .test_stack_len_cells 2 end
+  assert= stk .test_span_len_cells 2 end
   assert= stk s> 30 end
-  assert= stk .test_stack_len_cells 1 end
+  assert= stk .test_span_len_cells 1 end
   assert= stk s> 20 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   40 stk >s 50 stk >s 60 stk >s
-  assert= stk .test_stack_len_cells 3 end
+  assert= stk .test_span_len_cells 3 end
   assert= stk s> 60 end
-  assert= stk .test_stack_len_cells 2 end
+  assert= stk .test_span_len_cells 2 end
   assert= stk s> 50 end
-  assert= stk .test_stack_len_cells 1 end
+  assert= stk .test_span_len_cells 1 end
   assert= stk s> 40 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   stk .stack_deinit
 end
-.test_to_stack_sequence
+.test_span_sequence
 
-fun: .test_stack_braces { -- err }
+fun: .test_span_consumers { -- err }
   alloca' Stack { stk }
+  alloca' Span  { span }
   32 stk .stack_init
 
-  assert= stk .test_stack_len_cells 0 end
-  stk stack{ }
-  assert= stk .test_stack_len_cells 0 end
+  stk .Stack_top @   span .Span_top !
+  stk .Stack_ceil @  span .Span_ceil !
+  stk .Stack_floor @ span .Span_floor !
 
-  10 stk >s
-  assert= stk .test_stack_len_cells 1 end
-  stk stack{ one }
-  assert= stk .test_stack_len_cells 0 end
-  assert= one 10 end
+  assert= span .span_len 0 end
+  10 span >s 20 span >s 30 span >s
+  assert= span .span_len 3 .cells end
+  assert= span s> 30 end
+  assert= span s> 20 end
+  assert= span s> 10 end
+  assert= span .span_len 0 end
 
-  10 stk >s 20 stk >s
-  assert= stk .test_stack_len_cells 2 end
-  stk stack{ one two }
-  assert= stk .test_stack_len_cells 0 end
-  assert= one 10 end
-  assert= two 20 end
-
-  10 stk >s 20 stk >s 30 stk >s
-  assert= stk .test_stack_len_cells 3 end
-  stk stack{ one two three }
-  assert= stk .test_stack_len_cells 0 end
-  assert= one 10 end
-  assert= two 20 end
-  assert= three 30 end
+  40 span >s
+  span .span_trunc
+  assert= span .span_len 0 end
 
   stk .stack_deinit
 end
-.test_stack_braces
+.test_span_consumers
+
+fun: .test_span_init { -- err }
+  4 .cells .alloca { buf }
+  alloca' Span { span }
+  alloca' Main_ctx { main }
+
+  assert= size' Main_ctx size' Ctx size' Span + end
+  assert= main .Main_ctx_ctx main end
+  assert= main .Main_ctx_cells main size' Ctx + end
+
+  buf 4 .cells span .span_init
+  assert= span .Span_top @ buf end
+  assert= span .Span_ceil @ buf 4 .cells + end
+  assert= span .Span_floor @ buf end
+  assert= span .span_len 0 end
+
+  10 span >s 20 span >s
+  assert= span .span_len 2 .cells end
+  span .span_trunc
+  assert= span .span_len 0 end
+end
+.test_span_init
+
+fun: .test_default_cells { -- err }
+  STACK { cells }
+  cells .Span_top @ { prev_top }
+  cells .span_len { prev_len }
+
+  10 cells >s 20 cells >s
+  assert= cells .span_len prev_len 2 .cells + end
+  assert= cells s> 20 end
+  assert= cells s> 10 end
+  assert= cells .Span_top @ prev_top end
+
+  .has_interp =0 .then
+    30 cells >s
+    cells .span_trunc
+    assert= cells .span_len 0 end
+  end
+end
+.test_default_cells
 
 fun: .bang_with_more_inputs { val adr _x2 _x3 _x4 } val adr ! end
 
@@ -2175,13 +2228,13 @@ fun: .test_comptime_arg_stack_mod_scratch { -- err }
 end
 .test_comptime_arg_stack_mod_scratch
 
-fun: .test_stack_push_9 { -- err }
+fun: .test_span_push_9 { -- err }
   alloca' Stack { stk }
   32 stk .stack_init
 
   0 stk >s 1 stk >s 2 stk >s 3 stk >s 4 stk >s
   5 stk >s 6 stk >s 7 stk >s 8 stk >s
-  assert= stk .test_stack_len_cells 9 end
+  assert= stk .test_span_len_cells 9 end
   assert= stk s> 8 end
   assert= stk s> 7 end
   assert= stk s> 6 end
@@ -2191,11 +2244,11 @@ fun: .test_stack_push_9 { -- err }
   assert= stk s> 2 end
   assert= stk s> 1 end
   assert= stk s> 0 end
-  assert= stk .test_stack_len_cells 0 end
+  assert= stk .test_span_len_cells 0 end
 
   stk .stack_deinit
 end
-.test_stack_push_9
+.test_span_push_9
 
 fun: .fallback_high_regs_fun { keep one two -- keep out } keep one two .fallback end
 
@@ -3298,31 +3351,31 @@ fun: .test_arena_alloc { -- err }
   alloca' Arena { arn }
   arn .arena_init
 
-  assert= arn .test_stack_len_bytes 0 end
+  assert= arn .test_span_len_bytes 0 end
   assert= arn .Arena_low @ nil end
 
   1 arn .arena_alloc { adr0 }
   arn .Arena_low @ { page0 }
 
-  assert= page0 .test_stack_cap_bytes ARENA_PAGE_MIN end
-  assert= page0 .test_stack_len_bytes 1 end
-  assert= arn .test_stack_len_bytes size' Stack end
+  assert= page0 .test_span_cap_bytes ARENA_PAGE_MIN end
+  assert= page0 .test_span_len_bytes 1 end
+  assert= arn .test_span_len_bytes size' Stack end
 
   7 arn .arena_alloc { adr1 }
 
   assert= arn .Arena_low @ page0 end
   assert= adr1 adr0 - FUND_ALIGN end
-  assert= page0 .test_stack_len_bytes FUND_ALIGN 7 + end
-  assert= arn .test_stack_len_bytes size' Stack end
+  assert= page0 .test_span_len_bytes FUND_ALIGN 7 + end
+  assert= arn .test_span_len_bytes size' Stack end
 
   ARENA_PAGE_MIN arn .arena_alloc { adr2 }
   arn .Arena_low @ { page1 }
 
   assert<> page1 page0 end
-  assert= page1 .test_stack_cap_bytes ARENA_PAGE_MIN end
-  assert= page1 .test_stack_len_bytes ARENA_PAGE_MIN end
+  assert= page1 .test_span_cap_bytes ARENA_PAGE_MIN end
+  assert= page1 .test_span_len_bytes ARENA_PAGE_MIN end
   assert= adr2 page1 .Stack_floor @ end
-  assert= arn .test_stack_len_bytes size' Stack 2 * end
+  assert= arn .test_span_len_bytes size' Stack 2 * end
 
   arn .arena_deinit
 end
@@ -3339,22 +3392,22 @@ fun: .test_arena_trunc { -- err }
   ARENA_PAGE_MIN arn .arena_alloc { _adr1 }
   arn .Arena_low @ { page1 }
 
-  assert= arn .test_stack_len_bytes size' Stack 2 * end
-  assert= page0 .test_stack_len_bytes 7 end
-  assert= page1 .test_stack_len_bytes ARENA_PAGE_MIN end
+  assert= arn .test_span_len_bytes size' Stack 2 * end
+  assert= page0 .test_span_len_bytes 7 end
+  assert= page1 .test_span_len_bytes ARENA_PAGE_MIN end
 
   arn .arena_trunc
 
-  assert= arn .test_stack_len_bytes size' Stack 2 * end
+  assert= arn .test_span_len_bytes size' Stack 2 * end
   assert= arn .Arena_low @ page0 end
-  assert= page0 .test_stack_len_bytes 0 end
-  assert= page1 .test_stack_len_bytes 0 end
+  assert= page0 .test_span_len_bytes 0 end
+  assert= page1 .test_span_len_bytes 0 end
 
   11 arn .arena_alloc { adr2 }
 
   assert= adr2 floor0 end
   assert= arn .Arena_low @ page0 end
-  assert= arn .test_stack_len_bytes size' Stack 2 * end
+  assert= arn .test_span_len_bytes size' Stack 2 * end
 
   arn .arena_deinit
 end
@@ -3369,7 +3422,7 @@ fun: .test_arena_deinit { -- err }
 
   arn .arena_deinit
 
-  assert= arn .test_stack_len_bytes 0 end
+  assert= arn .test_span_len_bytes 0 end
   assert= arn .Arena_low @ nil end
 
   adr1 .test_arena_unprot_err { err }
@@ -3450,8 +3503,10 @@ fun: .main_run { -- err }
   .test_test
   .test_locals
   .test_stack_primitives
-  .test_to_stack_sequence
-  .test_stack_braces
+  .test_span_sequence
+  .test_span_consumers
+  .test_span_init
+  .test_default_cells
   .test_conditionals
   .test_recursion
   .test_recur_with_err
@@ -3504,7 +3559,7 @@ fun: .main_run { -- err }
   .test_cint_to_cell
   .test_comptime_arg_stack_sum16
   .test_comptime_arg_stack_mod_scratch
-  .test_stack_push_9
+  .test_span_push_9
   .test_fallback
   .test_errf
   .test_strf_into

@@ -7,7 +7,7 @@
 
 static Err interp_pop_data_ptr(Interp *interp, const U8 **out) {
   Sint buf;
-  try(int_stack_pop(&interp->ints, &buf));
+  try(cell_stack_pop(&interp->cells, &buf));
   try(interp_validate_data_ptr(buf));
   if (out) *out = (const U8 *)buf;
   return nullptr;
@@ -15,7 +15,7 @@ static Err interp_pop_data_ptr(Interp *interp, const U8 **out) {
 
 static Err interp_pop_data_ptr_opt(Interp *interp, const U8 **out) {
   Sint buf;
-  try(int_stack_pop(&interp->ints, &buf));
+  try(cell_stack_pop(&interp->cells, &buf));
   if (buf) try(interp_validate_data_ptr(buf));
   if (out) *out = (const U8 *)buf;
   return nullptr;
@@ -23,19 +23,19 @@ static Err interp_pop_data_ptr_opt(Interp *interp, const U8 **out) {
 
 static Err interp_pop_data_len(Interp *interp, Ind *out) {
   Sint len;
-  try(int_stack_pop(&interp->ints, &len));
+  try(cell_stack_pop(&interp->cells, &len));
   try(interp_validate_data_len(len));
   if (out) *out = (Ind)len;
   return nullptr;
 }
 
 static Err interp_pop_str(Interp *interp, const char **out_buf, Ind *out_len) {
-  const auto ints = &interp->ints;
+  const auto cells = &interp->cells;
 
   Sint len;
   Sint buf;
-  try(int_stack_pop(ints, &len));
-  try(int_stack_pop(ints, &buf));
+  try(cell_stack_pop(cells, &len));
+  try(cell_stack_pop(cells, &buf));
   try(interp_validate_buf_len(buf, len));
 
   if (out_buf) *out_buf = (const char *)buf;
@@ -45,7 +45,7 @@ static Err interp_pop_str(Interp *interp, const char **out_buf, Ind *out_len) {
 
 static Err interp_pop_reg(Interp *interp, U8 *out) {
   Sint reg;
-  try(int_stack_pop(&interp->ints, &reg));
+  try(cell_stack_pop(&interp->cells, &reg));
   try(asm_validate_reg(reg));
   if (out) *out = (U8)reg;
   return nullptr;
@@ -154,7 +154,7 @@ static Err interp_catch(Interp *interp, Wordlist wordlist) {
 
 static Err intrin_catch(Interp *interp) {
   Sint wordlist;
-  try(int_stack_pop(&interp->ints, &wordlist));
+  try(cell_stack_pop(&interp->cells, &wordlist));
   try(interp_catch(interp, (Wordlist)wordlist));
   return nullptr;
 }
@@ -163,7 +163,7 @@ static Err intrin_throws(Interp *interp) {
   Sym *sym;
   try(interp_require_current_sym(interp, &sym));
   Sint val;
-  try(int_stack_pop(&interp->ints, &val));
+  try(cell_stack_pop(&interp->cells, &val));
   try(sym_has_err_set(sym, !!val, "set `throws`"));
   return nullptr;
 }
@@ -173,7 +173,7 @@ static Err intrin_comp_only(Interp *interp) {
   try(interp_require_current_sym(interp, &sym));
 
   Sint val;
-  try(int_stack_pop(&interp->ints, &val));
+  try(cell_stack_pop(&interp->cells, &val));
 
   sym->comp_only = !!val;
   return nullptr;
@@ -184,7 +184,7 @@ static Err intrin_interp_only(Interp *interp) {
   try(interp_require_current_sym(interp, &sym));
 
   Sint val;
-  try(int_stack_pop(&interp->ints, &val));
+  try(cell_stack_pop(&interp->cells, &val));
 
   sym->interp_only = !!val;
   return nullptr;
@@ -205,8 +205,8 @@ a word is finalized, by copying its instructions to the executable heap,
 any further modifications of its range in the writable heap become nops.
 */
 static Err intrin_here_write(Interp *interp) {
-  try(int_stack_push(
-    &interp->ints, (Sint)(comp_code_next_writable_instr(&interp->comp.code))
+  try(cell_stack_push(
+    &interp->cells, (Sint)(comp_code_next_writable_instr(&interp->comp.code))
   ));
   return nullptr;
 }
@@ -217,15 +217,15 @@ in the writable heap during word compilation. The returned address does NOT yet
 contain a valid instruction, but may be stashed for later use.
 */
 static Err intrin_here_exec(Interp *interp) {
-  try(int_stack_push(
-    &interp->ints, (Sint)(comp_code_next_prog_counter(&interp->comp.code))
+  try(cell_stack_push(
+    &interp->cells, (Sint)(comp_code_next_prog_counter(&interp->comp.code))
   ));
   return nullptr;
 }
 
 static Err intrin_comp_instr(Interp *interp) {
   Sint val;
-  try(int_stack_pop(&interp->ints, &val));
+  try(cell_stack_pop(&interp->cells, &val));
   try(asm_append_instr_from_int(&interp->comp, val));
   return nullptr;
 }
@@ -236,7 +236,7 @@ static Err intrin_comp_load(Interp *interp) {
   Sint imm;
   U8   reg;
   try(interp_pop_reg(interp, &reg));
-  try(int_stack_pop(&interp->ints, &imm));
+  try(cell_stack_pop(&interp->cells, &imm));
 
   asm_append_imm_to_reg(&interp->comp, (U8)reg, imm);
   return nullptr;
@@ -246,10 +246,10 @@ static Err intrin_comp_alloc_data(Interp *interp) {
   Sint      align;
   Ind       size;
   const U8 *adr;
-  try(int_stack_pop(&interp->ints, &align));
+  try(cell_stack_pop(&interp->cells, &align));
   try(interp_pop_data_len(interp, &size));
   try(comp_alloc_data(&interp->comp, size, (Ind)align, &adr));
-  try(int_stack_push(&interp->ints, (Sint)adr));
+  try(cell_stack_push(&interp->cells, (Sint)adr));
   return nullptr;
 }
 
@@ -274,7 +274,7 @@ static Err intrin_comp_page_load(Interp *interp) {
 static Err intrin_comp_call(Interp *interp) {
   Sint ptr;
   Sym *sym;
-  try(int_stack_pop(&interp->ints, &ptr));
+  try(cell_stack_pop(&interp->cells, &ptr));
   try(interp_sym_by_ptr(interp, ptr, &sym));
   try(comp_append_call_sym(&interp->comp, sym));
   return nullptr;
@@ -283,7 +283,7 @@ static Err intrin_comp_call(Interp *interp) {
 static Err intrin_read_char(Interp *interp) {
   char out;
   try(interp_read_char(interp, &out));
-  try(int_stack_push(&interp->ints, out));
+  try(cell_stack_push(&interp->cells, out));
   return nullptr;
 }
 
@@ -297,28 +297,28 @@ TODO: use `intrin_read_char` in Forth to implement a more powerful version
 which uses a string rather than a char as a delimiter.
 */
 static Err intrin_read_until_char(Interp *interp) {
-  const auto ints = &interp->ints;
+  const auto cells = &interp->cells;
 
   Sint delim;
-  try(int_stack_pop(ints, &delim));
+  try(cell_stack_pop(cells, &delim));
   try(validate_ascii_printable(delim));
 
   const char *buf;
   Ind         len;
   try(interp_parse_until(interp, (U8)delim, &buf, &len));
-  try(int_stack_push(ints, (Sint)buf));
-  try(int_stack_push(ints, (Sint)len));
+  try(cell_stack_push(cells, (Sint)buf));
+  try(cell_stack_push(cells, (Sint)len));
   return nullptr;
 }
 
 // Technically not fundamental. TODO implement in Forth via intrinsic `char`.
 static Err intrin_read_word(Interp *interp) {
-  const auto  ints = &interp->ints;
+  const auto  cells = &interp->cells;
   const char *buf;
   Ind         len;
   try(interp_parse_word(interp, &buf, &len));
-  try(int_stack_push(ints, (Sint)buf));
-  try(int_stack_push(ints, (Sint)len));
+  try(cell_stack_push(cells, (Sint)buf));
+  try(cell_stack_push(cells, (Sint)len));
   return nullptr;
 }
 
@@ -354,12 +354,12 @@ static Err intrin_comp_extern_adr(Interp *interp) {
 }
 
 static Err intrin_extern_fun(Interp *interp) {
-  const auto ints = &interp->ints;
+  const auto cells = &interp->cells;
 
   Sint out_len;
   Sint inp_len;
-  try(int_stack_pop(ints, &out_len));
-  try(int_stack_pop(ints, &inp_len));
+  try(cell_stack_pop(cells, &out_len));
+  try(cell_stack_pop(cells, &inp_len));
 
   Word_str link_name;
   try(interp_valid_name(interp, &link_name));
@@ -374,11 +374,11 @@ static Err intrin_find_word(Interp *interp) {
   try(interp_valid_name(interp, &name));
 
   Sint wordlist;
-  try(int_stack_pop(&interp->ints, &wordlist));
+  try(cell_stack_pop(&interp->cells, &wordlist));
 
   const Sym *sym;
   try(interp_find_word(interp, name.buf, (Wordlist)wordlist, &sym));
-  try(int_stack_push(&interp->ints, (Sint)sym));
+  try(cell_stack_push(&interp->cells, (Sint)sym));
   return nullptr;
 }
 
@@ -388,7 +388,7 @@ static Err intrin_inline_word(Interp *interp) {
   Sym           *caller;
   Sym           *callee;
 
-  try(int_stack_pop(&interp->ints, &ptr));
+  try(cell_stack_pop(&interp->cells, &ptr));
   try(interp_require_current_sym(interp, &caller));
   try(interp_sym_by_ptr(interp, ptr, &callee));
   try(comp_inline_sym(&interp->comp, caller, callee, catch));
@@ -398,12 +398,12 @@ static Err intrin_inline_word(Interp *interp) {
 static Err intrin_call_xt(Interp *interp) { return intrin_end(interp); }
 
 static Err intrin_comp_local(Interp *interp) {
-  const auto ints = &interp->ints;
+  const auto cells = &interp->cells;
 
   Sint len;
   Sint name;
-  try(int_stack_pop(ints, &len));
-  try(int_stack_pop(ints, &name));
+  try(cell_stack_pop(cells, &len));
+  try(cell_stack_pop(cells, &name));
 
   const auto comp = &interp->comp;
 
@@ -419,19 +419,19 @@ static Err intrin_comp_local(Interp *interp) {
       loc->inited = true;
     }
 
-    try(int_stack_push(&interp->ints, loc->fp_off));
+    try(cell_stack_push(&interp->cells, loc->fp_off));
     return nullptr;
   }
 
   const auto loc = comp_local_anon(comp);
   comp_local_alloc_mem(comp, loc);
-  try(int_stack_push(&interp->ints, loc->fp_off));
+  try(cell_stack_push(&interp->cells, loc->fp_off));
   return nullptr;
 }
 
 static Err debug_mem(Interp *interp) {
   Sint adr;
-  try(int_stack_pop(&interp->ints, &adr));
+  try(cell_stack_pop(&interp->cells, &adr));
   debug_mem_at((const Uint *)adr);
   return nullptr;
 }
@@ -439,7 +439,7 @@ static Err debug_mem(Interp *interp) {
 static Err debug_word(Interp *interp) {
   Sint ptr;
   Sym *sym;
-  try(int_stack_pop(&interp->ints, &ptr));
+  try(cell_stack_pop(&interp->cells, &ptr));
   try(interp_sym_by_ptr(interp, ptr, &sym));
   interp_repr_sym(interp, sym);
   return nullptr;

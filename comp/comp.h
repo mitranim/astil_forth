@@ -49,8 +49,9 @@ typedef stack_of(Asm_fixup) Asm_fixups;
 // SYNC[instr_heap_len].
 static constexpr Uint INSTR_HEAP_LEN = (1u << 22u) / sizeof(Instr);
 
-// SYNC[main_arena_len].
 static constexpr Uint MAIN_ARENA_LEN = 1u << 30u;
+
+static constexpr Uint MAIN_CELLS_LEN = 4096;
 
 /*
 Fixed-size code heap. Stupid, simple solution.
@@ -86,11 +87,15 @@ typedef struct {
   U8         guard_2[MEM_PAGE];               // PROT_NONE
   U8         arena[MAIN_ARENA_LEN];           // Main arena for ambient context.
   U8         guard_3[MEM_PAGE];               // PROT_NONE
+  Sint       cells[MAIN_CELLS_LEN];           // Main cell stack backing memory.
+  U8         guard_4[MEM_PAGE];               // PROT_NONE
 } Comp_heap;
 
-// SYNC[main_arena_off].
 static constexpr Uint MAIN_ARENA_OFF = offsetof(Comp_heap, arena);
 static_assert(MAIN_ARENA_OFF == 0x2041C000);
+
+static constexpr Uint MAIN_CELLS_OFF = offsetof(Comp_heap, cells);
+static_assert(MAIN_CELLS_OFF == MAIN_ARENA_OFF + MAIN_ARENA_LEN + MEM_PAGE);
 
 // Invariants: `stack_len(.addrs) == stack_len(.names) == .inds.len`.
 //

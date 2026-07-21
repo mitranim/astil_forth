@@ -7,9 +7,9 @@
 
 // SYNC[interp_snap_fields].
 typedef struct {
-  Comp       comp;
-  Sint_stack ints;
-  Sym_stack  syms;
+  Comp      comp;
+  Sint_span cells;
+  Sym_stack syms;
 } Interp_snap;
 
 /*
@@ -50,7 +50,7 @@ SYNC[interp_fields].
 */
 typedef struct {
   Ctx          ctx;       // Ambient Forth context; must be first.
-  Sint_stack   ints;      // Forth integer stack.
+  Sint_span    cells;     // Forth cell stack; views `Comp_heap.cells`.
   Uint         argc;      // Interpreter CLI arg count.
   const char **argv;      // Interpreter CLI args.
   Sym_dict     dict_exec; // Wordlist `WORDLIST_EXEC`.
@@ -65,9 +65,21 @@ typedef struct {
 } Interp;
 
 static_assert(!offsetof(Interp, ctx));
+static_assert(offsetof(Interp, cells) == sizeof(Ctx));
 
-static constexpr auto INTERP_INTS_FLOOR = offsetof(Interp, ints.floor);
-static constexpr auto INTERP_INTS_TOP   = offsetof(Interp, ints.top);
+static constexpr auto CTX_CELLS_FLOOR = offsetof(Interp, cells.floor);
+static_assert(CTX_CELLS_FLOOR == 40);
+
+// SYNC[ctx_cells_top].
+static constexpr auto CTX_CELLS_TOP = offsetof(Interp, cells.top);
+static_assert(CTX_CELLS_TOP == 24);
+
+// SYNC[interp_comp_code_write_off].
+static constexpr auto INTERP_COMP_CODE_WRITE_OFF = offsetof(
+  Interp, comp.code.write
+);
+static_assert(INTERP_COMP_CODE_WRITE_OFF == 208);
+
 // SYNC[interp_data_off].
 static constexpr auto INTERP_DATA_OFF = offsetof(Interp, comp.code.data);
-static_assert(INTERP_DATA_OFF == 288);
+static_assert(INTERP_DATA_OFF == 272);

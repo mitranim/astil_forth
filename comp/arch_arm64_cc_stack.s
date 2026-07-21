@@ -41,11 +41,12 @@ asm_call_forth:
   ldr x2, [x2]
   stp x26, x2, [sp, -16]!
 
-  ldp x26, x27, [x28, INTERP_INTS_FLOOR]
+  ldr x26, [x28, CTX_CELLS_FLOOR]
+  ldr x27, [x28, CTX_CELLS_TOP]
   blr x1
 
 asm_call_forth_epilogue:
-  str x27, [x28, INTERP_INTS_TOP]
+  str x27, [x28, CTX_CELLS_TOP]
   ldp x26, x2, [sp], 16
   ldp x27, x28, [sp], 16
   ldp x29, x30, [sp], 16

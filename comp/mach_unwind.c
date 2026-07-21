@@ -5,7 +5,7 @@ the calling C code; this is relevant for the REPL mode, where otherwise the
 whole program would crash. Currently supports only Arm64 + Mach.
 
 We only need this for hardware-triggered "bad memory access" exceptions.
-When modifying the Forth integer stack in the interpreter code, we check
+When modifying the Forth cell stack in the interpreter code, we validate
 bounds in software. Additionally, regular "exceptions" in Forth code use
 local "gotos" and don't involve this at all.
 */

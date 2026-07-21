@@ -279,7 +279,7 @@ any functions with multiple outputs.
 
 Note: this works identically for both of our callventions.
 */
-static Err asm_call_extern(Sint_stack *stack, const Sym *sym) {
+static Err asm_call_extern(Sint_span *stack, const Sym *sym) {
   try_assert(sym->type == SYM_EXTERN);
 
   const auto fun     = (Extern_fun *)sym->exter;
@@ -297,18 +297,18 @@ static Err asm_call_extern(Sint_stack *stack, const Sym *sym) {
   Sint x5 = 0;
   Sint x6 = 0;
   Sint x7 = 0;
-  if (inp_len > 7) try(int_stack_pop(stack, &x7));
-  if (inp_len > 6) try(int_stack_pop(stack, &x6));
-  if (inp_len > 5) try(int_stack_pop(stack, &x5));
-  if (inp_len > 4) try(int_stack_pop(stack, &x4));
-  if (inp_len > 3) try(int_stack_pop(stack, &x3));
-  if (inp_len > 2) try(int_stack_pop(stack, &x2));
-  if (inp_len > 1) try(int_stack_pop(stack, &x1));
-  if (inp_len > 0) try(int_stack_pop(stack, &x0));
+  if (inp_len > 7) try(cell_stack_pop(stack, &x7));
+  if (inp_len > 6) try(cell_stack_pop(stack, &x6));
+  if (inp_len > 5) try(cell_stack_pop(stack, &x5));
+  if (inp_len > 4) try(cell_stack_pop(stack, &x4));
+  if (inp_len > 3) try(cell_stack_pop(stack, &x3));
+  if (inp_len > 2) try(cell_stack_pop(stack, &x2));
+  if (inp_len > 1) try(cell_stack_pop(stack, &x1));
+  if (inp_len > 0) try(cell_stack_pop(stack, &x0));
 
   // Unused inputs are harmless.
   const Sint out = fun(x0, x1, x2, x3, x4, x5, x6, x7);
-  if (out_len) try(int_stack_push(stack, out));
+  if (out_len) try(cell_stack_push(stack, out));
   return nullptr;
 }
 

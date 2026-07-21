@@ -111,7 +111,8 @@ static bool comp_heap_valid(const Comp_heap *val) {
     is_aligned_to(val->data, MEM_PAGE) &&
     is_aligned_to(val->externs, MEM_PAGE) &&
     is_aligned_to(val->intrins, MEM_PAGE) &&
-    is_aligned_to(val->arena, MEM_PAGE)
+    is_aligned_to(val->arena, MEM_PAGE) &&
+    is_aligned_to(val->cells, MEM_PAGE)
   );
 }
 
@@ -189,6 +190,7 @@ static Err comp_heap_init(Comp_heap **out) {
   try(mem_protect(heap->externs, sizeof(heap->externs), PROT_READ | PROT_WRITE));
   try(mem_protect(heap->intrins, sizeof(heap->intrins), PROT_READ | PROT_WRITE));
   try(mem_protect(heap->arena, sizeof(heap->arena), PROT_READ | PROT_WRITE));
+  try(mem_protect(heap->cells, sizeof(heap->cells), PROT_READ | PROT_WRITE));
   return nullptr;
 }
 

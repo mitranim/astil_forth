@@ -6,8 +6,8 @@ Compare `./arch_arm64_cc_reg.c` which uses the native reg-based callvention.
 
 Special registers:
 - `x28` = interpreter / ambient context pointer
-- `x27` = top of integer stack
-- `x26` = floor of integer stack
+- `x27` = top of cell stack
+- `x26` = floor of cell stack
 - `x0`  = error string pointer
 
 The special registers are also hardcoded in `lang_s.af`.
@@ -42,11 +42,11 @@ static Err asm_append_instr_from_int(Comp *comp, Sint val) {
 }
 
 static void asm_append_stack_push_from(Comp *comp, U8 reg) {
-  asm_append_store_pre_post(comp, reg, ASM_REG_INT_TOP, 8);
+  asm_append_store_pre_post(comp, reg, ASM_REG_CELL_TOP, 8);
 }
 
 static void asm_append_stack_pop_into(Comp *comp, U8 reg) {
-  asm_append_load_pre_post(comp, reg, ASM_REG_INT_TOP, -8);
+  asm_append_load_pre_post(comp, reg, ASM_REG_CELL_TOP, -8);
 }
 
 static void asm_append_stack_push_imm(Comp *comp, Sint imm) {
@@ -139,13 +139,13 @@ static Err asm_append_try_catch(
 
 static void asm_append_call_intrin_before(Comp *comp) {
   asm_append_store_scaled_offset(
-    comp, ASM_REG_INT_TOP, ASM_REG_CTX, INTERP_INTS_TOP
+    comp, ASM_REG_CELL_TOP, ASM_REG_CTX, CTX_CELLS_TOP
   );
 }
 
 static void asm_append_call_intrin_after(Comp *comp) {
   asm_append_load_scaled_offset(
-    comp, ASM_REG_INT_TOP, ASM_REG_CTX, INTERP_INTS_TOP
+    comp, ASM_REG_CELL_TOP, ASM_REG_CTX, CTX_CELLS_TOP
   );
 }
 

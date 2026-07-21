@@ -534,8 +534,10 @@ Segments:
     __TEXT       -- offset 0
     __DATA       -- offset 0
     __DATA_CONST -- need fixup
-The trailing `__ARENA` and `__LINKEDIT` segments need no entries.
+
 The `__DATA_CONST` offset is from the start of this struct.
+
+Other trailing segments need no fixup, thus no entries.
 */
 typedef struct {
   U32 seg_count;          // 4
