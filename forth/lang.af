@@ -1791,19 +1791,11 @@ fun: interp { -- adr } [ .plain_call ] interp end
 \ that the best API is a stable ABI. Just don't break your offsets.
 224 let: INTERP_COMP_CODE_WRITE_OFF
 
-fun_comp: interp_instrs { -- err } ( E: -- adr )
-  [ .plain_call ]
-  call'' interp
-  INTERP_COMP_CODE_WRITE_OFF .comp_push
-  call'' +
-  call'' @
-  PAGE_SIZE .comp_push
-  call'' +
+fun: .interp_instrs { -- adr }
+  INTERP_COMP_CODE_WRITE_OFF interp + @ PAGE_SIZE +
 end
 
-fun: interp_instrs {     -- adr } [ .plain_call ] interp_instrs end
-fun: .instr_off    { adr -> off } interp_instrs - end
-fun: .instr_adr    { off -> adr } interp_instrs + end
+fun: .instr_off { adr -- off } .interp_instrs { instrs } adr instrs - end
 
 \ SYNC[main_arena_off].
 \ Offset from `Comp_heap` to `Comp_heap.arena`.
@@ -1868,8 +1860,8 @@ fun: .cont_meta_instr_set { off type info meta -- meta }
 end
 
 fun: .cont_meta_instr_adr { meta -- adr }
-  meta CONT_MASK_INSTR_OFF .bit_mask_get
-  .instr_off_unpack .instr_adr
+  meta CONT_MASK_INSTR_OFF .bit_mask_get .instr_off_unpack { off }
+  .interp_instrs off +
 end
 
 fun: .reserve_instr { -- off err }

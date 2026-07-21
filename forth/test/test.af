@@ -418,7 +418,7 @@ fun: .test_control_meta { -- err }
   assert= meta CONT_MASK_OUT_LEN .bit_mask_get 0 end
   assert meta CONT_MASK_HAS_OUT .and end
 
-  interp_instrs { instr_adr }
+  .interp_instrs { instr_adr }
   instr_adr .instr_off meta .cont_meta_instr_off_set { meta }
   assert= meta .cont_meta_instr_adr instr_adr end
 
