@@ -92,11 +92,11 @@ typedef struct {
 static constexpr Uint MAIN_ARENA_OFF = offsetof(Comp_heap, arena);
 static_assert(MAIN_ARENA_OFF == 0x2041C000);
 
-// Invariants: `.addrs.len == stack_len(.names) == .inds.len`.
+// Invariants: `stack_len(.addrs) == stack_len(.names) == .inds.len`.
 //
 // SYNC[comp_syms_fields].
 typedef struct {
-  U64_list           addrs; // References `Comp_heap.intrins` or `.externs`.
+  U64_span           addrs; // References `Comp_heap.intrins` or `.externs`.
   stack_of(Word_str) names; // Backing storage for keys in `.inds`.
   Ind_dict           inds;  // Indexes in `.vals`; keys come from `.names`.
 } Comp_syms;
@@ -105,13 +105,16 @@ typedef struct {
 typedef struct {
   Instr_heap *write;           // Writable non-executable instructions.
   Comp_heap  *heap;            // Executable code and data.
-  Instr_list  code_write;      // References `.code.instrs`.
-  Instr_list  code_exec;       // References `.heap.code.instrs`.
-  Buf         data;            // References `.heap.data`.
+  Instr_span  code_write;      // References `.code.instrs`.
+  Instr_span  code_exec;       // References `.heap.code.instrs`.
+  U8_span     data;            // References `.heap.data`.
   Comp_syms   externs;         // Extern symbols in `.heap.externs`.
   Comp_syms   intrins;         // Intrin symbols in `.heap.intrins`.
   Ind         valid_instr_len; // Further instructions may be unpatched.
 } Comp_code;
+
+// SYNC[comp_code_size].
+static_assert(sizeof(Comp_code) == 288);
 
 // SYNC[comp_fields].
 typedef struct {

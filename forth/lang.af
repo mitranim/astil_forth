@@ -2374,6 +2374,13 @@ struct: Stack
   Adr  1 field: .Stack_ceil
 end
 
+\ SYNC[span_fields].
+struct: Span
+  Adr 1 field: .Span_floor
+  Adr 1 field: .Span_top
+  Adr 1 field: .Span_ceil
+end
+
 \ SYNC[set_fields].
 struct: Interp_set
   U32 1 field: .Interp_set_len
@@ -2491,10 +2498,11 @@ end
 \ Partial mirror of C `Comp_code`.
 \
 \ SYNC[comp_code_fields].
+\ SYNC[comp_code_size].
 struct: Interp_comp_code
   Adr 1   field: .Interp_comp_code_write
   Adr 1   field: .Interp_comp_code_heap
-  U8  232 field: .Interp_comp_code_tail_field \ ... other fields ...
+  U8  272 field: .Interp_comp_code_tail_field \ ... other fields ...
 end
 
 \ Partial mirror of C `Comp_ctx`. Defines only what we use.
@@ -4917,23 +4925,10 @@ end
 \ ## Strings with escape sequences
 
 \ SYNC[interp_data_off].
-272 let: INTERP_DATA_OFF
+fun: .interp_data { -- data } interp 288 + end
 
-\ SYNC[list_fields].
-struct: Interp_data
-  Adr 1 field: .Interp_data_dat
-  U32 1 field: .Interp_data_len
-  U32 1 field: .Interp_data_cap
-end
-
-fun: .interp_data { -- data } interp INTERP_DATA_OFF + end
-
-fun: .interp_data_top { data -- buf }
-  data .Interp_data_dat @ data .Interp_data_len @u32 +
-end
-
-fun: .interp_data_advance { data len }
-  data .Interp_data_len @u32 len + data .Interp_data_len !32
+fun: .interp_data_alloc { data len }
+  data .Span_top @ len + data .Span_top !
 end
 
 fun: .char_unescape { esc -- char err }
@@ -5002,7 +4997,7 @@ fun: .read_str_staged { delim unescape -- cstr len err }
   interp .Interp_module @ .Interp_module_reader { read }
   read .Interp_reader_src @ { beg }
   beg read .Interp_reader_pos @u32 + .inc { src }
-  .interp_data .interp_data_top { buf }
+  .interp_data .Span_top @ { buf }
   delim unescape src buf .str_until buf - { src len }
   src beg - read .Interp_reader_pos !32
   buf len
@@ -5011,7 +5006,7 @@ end
 \ Read string until delimiter; commit to compiler-managed data region.
 fun: .read_str_until { delim unescape -> cstr len err }
   .read_str_staged { buf len }
-  .interp_data len .inc .interp_data_advance
+  .interp_data len .inc .interp_data_alloc
   buf len
 end
 
@@ -5045,9 +5040,9 @@ fun_comp: rs` { -- err } char' ` false .read_str_until .comp_slice end
 fun: str: { buf len -- err } ( E: -- cstr len )
   .interp_data { data }
 
-  data .interp_data_top buf = .then
+  data .Span_top @ buf = .then
     nil buf len + !b
-    data len .inc .interp_data_advance
+    data len .inc .interp_data_alloc
     buf
   else
     buf len .comp_alloc_cstr

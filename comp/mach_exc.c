@@ -203,13 +203,13 @@ kern_return_t catch_mach_exception_raise_state(
     );
     eprintf(
       SYS_REC_FMT "  writable   instructions: [%p,%p)\n",
-      comp->code.code_write.dat,
-      list_len_ceil(&comp->code.code_write)
+      comp->code.code_write.floor,
+      comp->code.code_write.top
     );
     eprintf(
       SYS_REC_FMT "  executable instructions: [%p,%p)\n",
-      comp->code.code_exec.dat,
-      list_len_ceil(&comp->code.code_exec)
+      comp->code.code_exec.floor,
+      comp->code.code_exec.top
     );
     recovery_log_ctx(interp);
     fflush(stderr);

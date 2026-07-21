@@ -130,9 +130,9 @@ static bool comp_code_valid(const Comp_code *code) {
     is_aligned(&code->valid_instr_len) &&
     instr_heap_valid(code->write) &&
     comp_heap_valid(code->heap) &&
-    list_valid((const List *)&code->code_write) &&
-    list_valid((const List *)&code->code_exec) &&
-    list_valid((const List *)&code->data)
+    span_valid((const Span *)&code->code_write) &&
+    span_valid((const Span *)&code->code_exec) &&
+    span_valid((const Span *)&code->data)
   );
 }
 
@@ -205,49 +205,49 @@ static Err comp_code_deinit(Comp_code *code) {
   return err;
 }
 
-static void comp_code_init_lists(Comp_code *code) {
+static void comp_code_init_spans(Comp_code *code) {
   ptr_set(
     &code->code_write,
     {
-      .dat = code->write->instrs,
-      .len = 0,
-      .cap = arr_cap(code->write->instrs),
+      .floor = code->write->instrs,
+      .top   = code->write->instrs,
+      .ceil  = arr_ceil(code->write->instrs),
     }
   );
 
   ptr_set(
     &code->code_exec,
     {
-      .dat = code->heap->exec.instrs,
-      .len = 0,
-      .cap = arr_cap(code->heap->exec.instrs),
+      .floor = code->heap->exec.instrs,
+      .top   = code->heap->exec.instrs,
+      .ceil  = arr_ceil(code->heap->exec.instrs),
     }
   );
 
   ptr_set(
     &code->data,
     {
-      .dat = code->heap->data,
-      .len = 0,
-      .cap = arr_cap(code->heap->data),
+      .floor = code->heap->data,
+      .top   = code->heap->data,
+      .ceil  = arr_ceil(code->heap->data),
     }
   );
 
   ptr_set(
     &code->externs.addrs,
     {
-      .dat = code->heap->externs,
-      .len = 0,
-      .cap = arr_cap(code->heap->externs),
+      .floor = code->heap->externs,
+      .top   = code->heap->externs,
+      .ceil  = arr_ceil(code->heap->externs),
     }
   );
 
   ptr_set(
     &code->intrins.addrs,
     {
-      .dat = code->heap->intrins,
-      .len = 0,
-      .cap = arr_cap(code->heap->intrins),
+      .floor = code->heap->intrins,
+      .top   = code->heap->intrins,
+      .ceil  = arr_ceil(code->heap->intrins),
     }
   );
 }
@@ -257,7 +257,7 @@ static Err comp_code_init(Comp_code *code) {
 
   try(instr_heap_init(&code->write));
   try(comp_heap_init(&code->heap));
-  comp_code_init_lists(code);
+  comp_code_init_spans(code);
 
   auto opt = (Stack_opt){.len = arr_cap(code->heap->externs)};
   try(stack_init(&code->externs.names, &opt));
@@ -303,15 +303,15 @@ static const char *comp_register_dysym(
   auto got_ind = dict_get_or(inds, name, INVALID_IND);
   if (got_ind != INVALID_IND) return names->floor[got_ind].buf;
 
-  got_ind = addrs->len;
-  assert_fatal(stack_len(names) == got_ind);
+  got_ind = stack_len_valid(addrs);
+  assert_fatal(stack_len_valid(names) == got_ind);
   assert_fatal(inds->len == got_ind);
 
   const auto got_name = names->top;
   try_fatal(str_set(got_name, name));
 
   names->top++;
-  list_push(addrs, addr);
+  stack_push(addrs, addr);
   dict_set(inds, got_name->buf, got_ind);
   return got_name->buf;
 }
@@ -321,7 +321,7 @@ static void *comp_find_extern(Comp *comp, const char *name) {
   const auto inds = &syms->inds;
   const auto ind  = dict_get_or(inds, name, INVALID_IND);
   if (ind == INVALID_IND) return nullptr;
-  return list_elem_ptr(&syms->addrs, ind);
+  return &syms->addrs.floor[ind];
 }
 
 static Err comp_append_call_sym(Comp *comp, Sym *callee) {
@@ -397,8 +397,8 @@ static void comp_debug_print_sym_instrs(
 
   {
     const auto instrs = &code->code_write;
-    const auto floor  = &instrs->dat[spans->prologue];
-    const auto ceil   = &instrs->dat[spans->ceil];
+    const auto floor  = &instrs->floor[spans->prologue];
+    const auto ceil   = &instrs->floor[spans->ceil];
 
     eprintf(
       "%swritable code address: %p\n"
@@ -415,8 +415,8 @@ static void comp_debug_print_sym_instrs(
 
   if (comp_code_is_sym_ready(code, sym)) {
     const auto instrs = &code->code_exec;
-    const auto floor  = &instrs->dat[spans->prologue];
-    const auto ceil   = &instrs->dat[spans->ceil];
+    const auto floor  = &instrs->floor[spans->prologue];
+    const auto ceil   = &instrs->floor[spans->ceil];
 
     eprintf(
       "%sexecutable code address: %p\n"
@@ -442,8 +442,8 @@ static Err comp_sym_instr_range(
   try(comp_code_ensure_sym_ready(code, sym));
   try_assert(spans->ret >= spans->prologue);
 
-  if (floor) *floor = &instrs->dat[spans->prologue];
-  if (ceil) *ceil = &instrs->dat[spans->ret + 1];
+  if (floor) *floor = &instrs->floor[spans->prologue];
+  if (ceil) *ceil = &instrs->floor[spans->ret + 1];
   return nullptr;
 }
 
@@ -510,12 +510,14 @@ static Err err_out_of_space_data() {
 // code, and needs to be accessed via the `adrp & add/ldr` idiom.
 static Err comp_alloc_data(Comp *comp, Ind size, Ind align, const U8 **out) {
   const auto data = &comp->code.data;
-  data->len       = __builtin_align_up(data->len, align);
+  const auto len  = __builtin_align_up(stack_len_valid(data), align);
+  const auto cap  = stack_cap_valid(data);
 
-  if (size > list_rem_bytes(data)) return err_out_of_space_data();
+  if (len > cap || size > cap - len) return err_out_of_space_data();
 
-  const auto adr = list_next_ptr(data);
-  data->len += size;
+  data->top      = data->floor + len;
+  const auto adr = data->top;
+  data->top += size;
 
   if (out) *out = adr;
 

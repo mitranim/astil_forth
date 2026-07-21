@@ -39,12 +39,15 @@ typedef struct {
   Ind len;
 } Stack_opt;
 
+// SYNC[span_fields].
 #define span_of(Elem) \
   struct {            \
     Elem *floor;      \
     Elem *top;        \
     Elem *ceil;       \
   }
+
+typedef span_of(void) Span;
 
 typedef stack_of(Uint) Uint_stack;
 typedef stack_of(Sint) Sint_stack;
@@ -78,6 +81,23 @@ typedef span_of(F64)  F64_span;
 #define stack_cap(stack) ((Sint)((stack)->ceil - (stack)->floor))
 #define stack_len(stack) ((Sint)((stack)->top - (stack)->floor))
 #define stack_rem(stack) ((Sint)((stack)->ceil - (stack)->top))
+
+#define stack_delta_valid_inner(tmp, delta) \
+  ({                                        \
+    const Sint tmp = delta;                 \
+    assert_fatal(tmp >= 0);                 \
+    assert_fatal((Uint)tmp <= IND_MAX);     \
+    (Ind) tmp;                              \
+  })
+
+#define stack_cap_valid(stack) \
+  stack_delta_valid_inner(UNIQ_IDENT, stack_cap(stack))
+
+#define stack_len_valid(stack) \
+  stack_delta_valid_inner(UNIQ_IDENT, stack_len(stack))
+
+#define stack_rem_valid(stack) \
+  stack_delta_valid_inner(UNIQ_IDENT, stack_rem(stack))
 
 #define stack_val_type(stack) typeof((stack)->floor[0])
 #define stack_val_size(stack) (Ind)sizeof((stack)->floor[0])
@@ -136,7 +156,7 @@ typedef span_of(F64)  F64_span;
 #define stack_push_from_inner(tmp, out, src)                            \
   ({                                                                    \
     static_assert(sizeof(*(out)->top) == sizeof(*(src)->top));          \
-    const auto tmp = stack_len(src);                                    \
+    const auto tmp = stack_len_valid(src);                              \
     if (tmp > 0) {                                                      \
       memcpy((out)->top, (src)->floor, tmp * (Ind)sizeof(*(out)->top)); \
       (out)->top += tmp;                                                \

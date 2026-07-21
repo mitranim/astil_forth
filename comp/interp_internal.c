@@ -42,7 +42,7 @@ static Err interp_rewind(Interp *interp) {
   TODO: support deletion in dicts. For now, accessing a partially
   defined word after recovering from an error is UB.
 
-    const auto len_next = (Ind)stack_len(syms);
+    const auto len_next = stack_len_valid(syms);
     const auto words = &interp->words;
     for (Ind ind = len_prev; ind < len_next; ind++) {
       const auto sym = &syms->floor[ind];

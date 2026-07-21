@@ -538,13 +538,13 @@ static Err intrin_comp_instr_drop(Interp *interp) {
   try(interp_require_current_sym(interp, &sym));
 
   const auto instrs = &interp->comp.code.code_write;
-  if (instrs->len <= sym->norm.spans.inner) {
+  if (stack_len_valid(instrs) <= sym->norm.spans.inner) {
     return err_str(
       "unable to drop instruction: current word has no body instructions"
     );
   }
 
-  instrs->len--;
+  instrs->top--;
   return nullptr;
 }
 

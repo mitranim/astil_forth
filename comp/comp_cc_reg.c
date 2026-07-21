@@ -214,22 +214,22 @@ static Err comp_args_fold(
   Uint       consumed = 0;
 
   if (argc == 1) {
-    if (has0 && instrs->len == src0.ceil) {
-      instrs->len = src0.floor;
-      *arg0       = comp_arg_unknown();
-      consumed    = 1;
+    if (has0 && stack_len_valid(instrs) == src0.ceil) {
+      stack_trunc_to(instrs, src0.floor);
+      *arg0    = comp_arg_unknown();
+      consumed = 1;
     }
   }
   else {
-    if (has1 && instrs->len == src1.ceil) {
-      instrs->len = src1.floor;
-      *arg1       = comp_arg_unknown();
-      consumed    = 1;
+    if (has1 && stack_len_valid(instrs) == src1.ceil) {
+      stack_trunc_to(instrs, src1.floor);
+      *arg1    = comp_arg_unknown();
+      consumed = 1;
 
-      if (has0 && instrs->len == src0.ceil) {
-        instrs->len = src0.floor;
-        *arg0       = comp_arg_unknown();
-        consumed    = 2;
+      if (has0 && stack_len_valid(instrs) == src0.ceil) {
+        stack_trunc_to(instrs, src0.floor);
+        *arg0    = comp_arg_unknown();
+        consumed = 2;
       }
     }
   }
@@ -550,13 +550,13 @@ static Err comp_append_imm_to_reg(Comp *comp, U8 reg, Sint imm) {
   try(comp_register_clobber(comp, reg));
 
   const auto instrs = &comp->code.code_write;
-  const auto floor  = instrs->len;
+  const auto floor  = stack_len_valid(instrs);
 
   asm_append_imm_to_reg(comp, reg, imm);
 
   comp->ctx.args[reg] = (Comp_arg){
     .type = COMP_ARG_IMM,
-    .imm  = {.num = imm, .floor = floor, .ceil = instrs->len},
+    .imm  = {.num = imm, .floor = floor, .ceil = stack_len_valid(instrs)},
   };
 
   IF_DEBUG(eprintf(

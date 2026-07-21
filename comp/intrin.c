@@ -41,8 +41,8 @@ static Err interp_word_begin(Interp *interp, Wordlist wordlist, Word_str name) {
 
   const auto syms = &interp->syms;
 
-  if (stack_rem(syms) <= 0) {
-    return err_wordlist_at_capacity(name.buf, wordlist, stack_cap(syms));
+  if (!stack_rem_valid(syms)) {
+    return err_wordlist_at_capacity(name.buf, wordlist, stack_cap_valid(syms));
   }
 
   /*

@@ -113,8 +113,8 @@ static Err interp_init_syms(Interp *interp) {
   IF_DEBUG({
     const auto syms = &comp->code.intrins;
 
-    try_assert(syms->addrs.len == intrin_len);
-    try_assert(stack_len(&syms->names) == intrin_len);
+    try_assert(stack_len_valid(&syms->addrs) == intrin_len);
+    try_assert(stack_len_valid(&syms->names) == intrin_len);
     try_assert(syms->inds.len == intrin_len);
   });
   return nullptr;
@@ -143,11 +143,11 @@ static Err interp_init(Interp *interp) {
     eprintf("[system] integer stack floor: %p\n", interp->ints.floor);
     eprintf(
       "[system] instruction floor (writable): %p\n",
-      interp->comp.code.code_write.dat
+      interp->comp.code.code_write.floor
     );
     eprintf(
       "[system] instruction floor (executable): %p\n",
-      interp->comp.code.code_exec.dat
+      interp->comp.code.code_exec.floor
     );
   });
   return nullptr;

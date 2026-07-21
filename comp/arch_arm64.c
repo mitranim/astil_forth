@@ -56,7 +56,7 @@ bitfield layout is implementation-defined and non-portable.
 #include "./sym.c"
 
 static bool comp_code_is_instr_ours(const Comp_code *code, const Instr *addr) {
-  return is_list_elem(&code->code_exec, addr);
+  return is_stack_elem(&code->code_exec, addr);
 }
 
 /*
@@ -65,32 +65,37 @@ The executable heap is outdated while assembling,
 so we have to adjust it against the writable heap.
 */
 static Instr *comp_code_next_prog_counter(const Comp_code *code) {
-  return list_spare_ptr(&code->code_exec, code->code_write.len);
+  const auto exec = &code->code_exec;
+  const auto len  = stack_len_valid(&code->code_write);
+  return len < stack_cap_valid(exec) ? &exec->floor[len] : nullptr;
 }
 
 static U8 *comp_code_next_data(const Comp_code *code) {
-  return list_next_ptr(&code->data);
+  return code->data.top < code->data.ceil ? code->data.top : nullptr;
 }
 
 static Instr *comp_code_next_writable_instr(const Comp_code *code) {
-  return list_next_ptr(&code->code_write);
+  const auto write = &code->code_write;
+  return write->top < write->ceil ? write->top : nullptr;
 }
 
 static const Instr *comp_sym_exec_instr(const Comp *comp, const Sym *sym) {
   IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
-  return list_elem_ptr(&comp->code.code_exec, sym->norm.spans.prologue);
+  const auto exec = &comp->code.code_exec;
+  const auto ind  = sym->norm.spans.prologue;
+  return ind < stack_len_valid(exec) ? &exec->floor[ind] : nullptr;
 }
 
 static Err comp_code_sync(Comp_code *code) {
   const auto valid_len = code->valid_instr_len;
   const auto write     = &code->code_write;
   const auto exec      = &code->code_exec;
-  const auto exec_len  = exec->len;
+  const auto exec_len  = stack_len_valid(exec);
   const auto diff      = valid_len - exec_len;
 
   if (diff <= 0) return nullptr;
 
-  const auto beg = &exec->dat[exec_len];
+  const auto beg = exec->top;
   const auto end = beg + diff;
   const auto len = (U8 *)end - (U8 *)beg;
   try_assert(len > 0 && len < IND_MAX);
@@ -102,24 +107,24 @@ static Err comp_code_sync(Comp_code *code) {
   try_assert(page_len > 0 && page_len < IND_MAX);
 
   IF_DEBUG({
-    try_assert(page_beg >= exec->dat);
-    try_assert(page_end <= exec->dat + exec->cap);
+    try_assert(page_beg >= exec->floor);
+    try_assert(page_end <= exec->ceil);
     try_assert(page_len > 0);
     try_assert(page_beg <= beg);
     try_assert(end <= page_end);
   });
 
   try(jit_before_write(page_beg, (Ind)page_len));
-  memcpy(beg, &write->dat[exec_len], (Ind)len);
+  memcpy(beg, &write->floor[exec_len], (Ind)len);
   try(jit_after_write(page_beg, (Ind)page_len));
 
-  exec->len = valid_len;
+  exec->top = exec->floor + valid_len;
   return nullptr;
 }
 
 static bool comp_code_is_sym_ready(const Comp_code *code, const Sym *sym) {
   IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
-  return code->code_exec.len >= sym->norm.spans.ceil;
+  return stack_len_valid(&code->code_exec) >= sym->norm.spans.ceil;
 }
 
 static Err err_sym_not_ready(const char *name) {
@@ -308,7 +313,7 @@ static Err asm_call_extern(Sint_stack *stack, const Sym *sym) {
 }
 
 static Instr *asm_append_instr(Comp *comp, Instr val) {
-  return list_push(&comp->code.code_write, val);
+  return stack_push(&comp->code.code_write, val);
 }
 
 /*
@@ -619,14 +624,14 @@ static void asm_append_compare_branch_zero(Comp *comp, U8 reg, Sint off) {
 
 static Instr *asm_sym_prologue_writable(const Comp *comp, const Sym *sym) {
   assert_fatal(sym->type == SYM_NORM);
-  return list_elem_ptr(&comp->code.code_write, sym->norm.spans.prologue);
+  return &comp->code.code_write.floor[sym->norm.spans.prologue];
 }
 
 static Instr *asm_sym_prologue_executable(const Comp *comp, const Sym *sym) {
   assert_fatal(sym->type == SYM_NORM);
-  const auto list = &comp->code.code_exec;
-  assert_fatal(sym->norm.spans.prologue < list->cap);
-  return &list->dat[sym->norm.spans.prologue];
+  const auto span = &comp->code.code_exec;
+  assert_fatal(sym->norm.spans.prologue < stack_cap_valid(span));
+  return &span->floor[sym->norm.spans.prologue];
 }
 
 /*
@@ -648,7 +653,7 @@ static void asm_fixup_ret(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
   IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
 
   const auto code = &comp->code.code_write;
-  const auto epi  = list_elem_ptr(code, sym->norm.spans.epi_ok);
+  const auto epi  = &code->floor[sym->norm.spans.epi_ok];
   const auto tar  = fix->ret;
   const auto off  = epi - tar;
 
@@ -671,7 +676,7 @@ static void asm_fixup_try(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
   IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
 
   const auto code  = &comp->code.code_write;
-  const auto epi   = list_elem_ptr(code, sym->norm.spans.epi_err);
+  const auto epi   = &code->floor[sym->norm.spans.epi_err];
   const auto instr = fix->try.instr;
   const auto off   = epi - instr;
 
@@ -825,7 +830,7 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
   const auto instrs = &code->code_write;
   const auto sp_off = asm_sp_off(ctx->fp_off);
   const auto spans  = &sym->norm.spans;
-  const auto inner  = &instrs->dat[spans->inner];
+  const auto inner  = &instrs->floor[spans->inner];
   const bool frame  = !is_sym_leaf(sym) || sp_off || sym->norm.has_alloca;
   auto       floor  = inner;
 
@@ -837,7 +842,7 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
 
   IF_DEBUG({
     const auto brk = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
-    const auto pro = &instrs->dat[spans->prologue];
+    const auto pro = &instrs->floor[spans->prologue];
 
     assert_fatal((inner - pro) == len);
     for (U8 ind = 0; ind < len; ind++) assert_fatal(pro[ind] == brk);
@@ -896,7 +901,7 @@ static void asm_fixup_sym_prologue(Comp *comp, Sym *sym, Ind *instr_floor) {
 
 #endif // CALL_CONV_STACK
 
-  *instr_floor = (Ind)(floor - instrs->dat);
+  *instr_floor = (Ind)(floor - instrs->floor);
 }
 
 /*
@@ -910,7 +915,7 @@ SYNC[asm_prologue].
 static bool asm_skipped_prologue_instr(Comp *comp, Sym *sym, Instr *instr) {
   const auto spans = &sym->norm.spans;
   const auto write = &comp->code.code_write;
-  if (&write->dat[spans->inner] != instr) return false;
+  if (&write->floor[spans->inner] != instr) return false;
 
   *instr = asm_instr_breakpoint(ASM_CODE_PROLOGUE);
 
@@ -929,9 +934,9 @@ static void asm_append_sym_epilogue(Comp *comp, Sym *sym) {
   const auto spans  = &sym->norm.spans;
   const auto write  = &comp->code.code_write;
 
-  spans->epi_ok = write->len;
+  spans->epi_ok = stack_len_valid(write);
   asm_append_sym_epilogue_ok(comp, sym);
-  spans->epi_err = write->len;
+  spans->epi_err = stack_len_valid(write);
 
   // SYNC[asm_sp_off].
   if (frame) {
@@ -1120,7 +1125,7 @@ static void asm_append_dysym_load(
   const auto got_ind = dict_get_or(inds, name, INVALID_IND);
   assert_fatal(got_ind != INVALID_IND);
 
-  const auto got_addr = syms->addrs.dat + got_ind;
+  const auto got_addr = syms->addrs.floor + got_ind;
   asm_append_page_load(comp, reg, (Uint)got_addr);
 }
 
@@ -1179,7 +1184,7 @@ static Err asm_inline_sym(
   const auto ceil   = spans->ret;
 
   for (Ind ind = floor; ind < ceil; ind++) {
-    list_push(instrs, instrs->dat[ind]);
+    stack_push(instrs, instrs->floor[ind]);
   }
 
 #ifdef CALL_CONV_STACK
@@ -1202,7 +1207,9 @@ static Err asm_inline_sym(
         callee->name.buf,
         ceil - floor
       );
-      eprint_byte_range_hex((U8 *)&instrs->dat[floor], (U8 *)&instrs->dat[ceil]);
+      eprint_byte_range_hex(
+        (U8 *)&instrs->floor[floor], (U8 *)&instrs->floor[ceil]
+      );
       fputc('\n', stderr);
     }
   });
@@ -1214,7 +1221,7 @@ static void asm_fixup_throw(Comp *comp, const Asm_fixup *fix, const Sym *sym) {
   IF_DEBUG(assert_fatal(sym->type == SYM_NORM));
 
   const auto code  = &comp->code.code_write;
-  const auto epi   = list_elem_ptr(code, sym->norm.spans.epi_err);
+  const auto epi   = &code->floor[sym->norm.spans.epi_err];
   const auto instr = fix->throw;
   const auto off   = epi - instr;
 
@@ -1250,10 +1257,10 @@ static void asm_sym_beg(Comp *comp, Sym *sym) {
   const auto instrs = &comp->code.code_write;
   const auto spans  = &sym->norm.spans;
 
-  spans->floor    = instrs->len;
-  spans->prologue = instrs->len;
+  spans->floor    = stack_len_valid(instrs);
+  spans->prologue = stack_len_valid(instrs);
   asm_reserve_sym_prologue(comp);
-  spans->inner = instrs->len;
+  spans->inner = stack_len_valid(instrs);
 }
 
 static void asm_sym_end(Comp *comp, Sym *sym) {
@@ -1274,16 +1281,16 @@ static void asm_sym_end(Comp *comp, Sym *sym) {
   asm_fixup_sym_prologue(comp, sym, &spans->prologue);
   asm_append_sym_epilogue(comp, sym);
 
-  spans->ret = write->len;
+  spans->ret = stack_len_valid(write);
   asm_append_instr(comp, ASM_INSTR_RET);
 
-  spans->data = write->len;
+  spans->data = stack_len_valid(write);
   asm_fixup(comp, sym);
 
   // Execution never reaches this. Makes it easier to tell functions apart.
-  spans->ceil = write->len;
+  spans->ceil = stack_len_valid(write);
   IF_DEBUG(asm_append_breakpoint(comp, ASM_CODE_PROC_DELIM));
 
-  code->valid_instr_len = write->len;
+  code->valid_instr_len = stack_len_valid(write);
   sym->norm.exec        = asm_sym_prologue_executable(comp, sym);
 }

@@ -54,7 +54,7 @@ static Err validate_callees_can_compile(Sym_set *visited, const Sym *sym) {
 }
 
 static void encode_got_section(const Comp *comp, Buf *buf) {
-  const auto cap = comp->code.externs.addrs.len;
+  const auto cap = stack_len_valid(&comp->code.externs.addrs);
 
   for (Ind ind = 0; ind < cap; ind++) {
     // 4-byte distance to next fixup; 0 = end of chain.
@@ -87,7 +87,7 @@ static void encode_linkedit_section(
 ) {
   const auto code         = &comp->code;
   const auto exts         = &code->externs;
-  const auto extern_count = code->externs.addrs.len;
+  const auto extern_count = stack_len_valid(&code->externs.addrs);
   const auto base_len     = buf->len;
 
   constexpr U32 img_off = sizeof(Mach_fixup_head);
@@ -257,7 +257,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   constexpr U64 text_code_vm_off = text_seg_vm_off + text_code_file_off;
 
   const auto instrs              = &code->code_exec;
-  const U32  text_code_real_size = instrs->len * sizeof(Instr);
+  const U32  text_code_real_size = stack_len_valid(instrs) * sizeof(Instr);
 
   const U32 text_seg_size = mem_align_page(
     text_code_file_off + text_code_real_size
@@ -300,7 +300,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   U32 file_off = text_seg_size;
 
   const auto data_file_off  = file_off;
-  const auto data_real_size = code->data.len;
+  const auto data_real_size = stack_len_valid(&code->data);
   const auto data_file_size = mem_align_page(data_real_size);
   const auto data_vm_size   = data_file_size;
 
@@ -349,7 +349,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     }
   );
 
-  const auto extern_count  = code->externs.addrs.len;
+  const auto extern_count  = stack_len_valid(&code->externs.addrs);
   const auto got_file_off  = file_off;
   const auto got_real_size = extern_count * sizeof(U64);
   const auto got_file_size = mem_align_page(got_real_size);
@@ -553,16 +553,16 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   buf_zeropad_to(buf, text_code_file_off);
   try_assert(buf->len == text_code_file_off);
 
-  try_assert(text_code_real_size == instrs->len * sizeof(Instr));
-  buf_append_bytes(buf, (const U8 *)instrs->dat, text_code_real_size);
+  try_assert(text_code_real_size == stack_len_valid(instrs) * sizeof(Instr));
+  buf_append_bytes(buf, (const U8 *)instrs->floor, text_code_real_size);
   try_assert(buf->len == text_code_file_off + text_code_real_size);
 
   try_assert(buf->len <= data_file_off);
   buf_zeropad_to(buf, data_file_off);
   try_assert(buf->len == data_file_off);
 
-  try_assert(data_real_size == code->data.len);
-  buf_append_bytes(buf, code->data.dat, data_real_size);
+  try_assert(data_real_size == stack_len_valid(&code->data));
+  buf_append_bytes(buf, code->data.floor, data_real_size);
   try_assert(buf->len == data_file_off + data_real_size);
 
   try_assert(buf->len <= got_file_off);

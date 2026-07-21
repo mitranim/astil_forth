@@ -521,5 +521,5 @@ static void asm_fixup_locals(Comp *comp, Sym *sym) {
 
 static void asm_backtrack_instrs_opt(Comp *comp, Ind floor, Ind ceil) {
   const auto instrs = &comp->code.code_write;
-  if (instrs->len == ceil) instrs->len = floor;
+  if (stack_len_valid(instrs) == ceil) stack_trunc_to(instrs, floor);
 }

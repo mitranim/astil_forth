@@ -100,6 +100,11 @@ static bool stack_valid(Stack const *stack) {
 
 // clang-format on
 
+static bool span_valid(const Span *span) {
+  return span && span->floor && span->floor <= span->top &&
+    span->top <= span->ceil;
+}
+
 static void stack_rewind_impl(const Stack *prev, Stack *next) {
   assert_fatal(next->floor == prev->floor);
   next->top = prev->top;
@@ -128,6 +133,12 @@ static Err int_stack_push(Sint_stack *tar, Sint val) {
   if (stack_rem(tar) <= 0) return err_str("integer stack overflow");
   stack_push(tar, val);
   return nullptr;
+}
+
+static void stack_valid_count_type_test() {
+  static_assert_type(stack_cap_valid((U8_span *)nullptr), Ind);
+  static_assert_type(stack_len_valid((U8_span *)nullptr), Ind);
+  static_assert_type(stack_rem_valid((U8_span *)nullptr), Ind);
 }
 
 /*
