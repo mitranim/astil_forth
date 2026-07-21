@@ -409,12 +409,12 @@ static Err interp_loop(Interp *interp) {
 static void interp_welcome(Interp *interp) {
   if (interp->welcomed) return;
 
-  const auto name = "words";
+  const auto name = ".words";
 
   puts("Running Astil Forth REPL.");
 
   if (dict_has(&interp->dict_exec, name) || dict_has(&interp->dict_comp, name)) {
-    printf("Type " FMT_QUOTED " to list the available words.\n", name);
+    printf("Type " FMT_QUOTED " to display available words.\n", name);
   }
 
   puts(
