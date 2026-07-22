@@ -4,6 +4,6 @@ Core files which bootstrap Forth via self-assembly:
 - `lang.af` — the default calling convention.
 - `lang_s.af` — stack CC; considered legacy.
 
-The rest are mostly library files: interfaces to `libc` with very thin wrapping for nicer errors.
+The rest are mostly library files: interfaces to `libc` with very thin wrapping for nicer errors; various other small utils.
 
 The outer interpreter / compiler is written in C and located in `../comp`.

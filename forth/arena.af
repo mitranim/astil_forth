@@ -1,4 +1,4 @@
-use' lang.af
+use' ./lang.af
 
 \ Simple arena allocator. Maps memory pages on demand.
 \ Supports truncating while keeping full capacity.

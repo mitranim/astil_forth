@@ -1,6 +1,8 @@
 use' ./lang.af
 
 \ BOT-ASSISTED
+\
+\ Some Arm64 assembly utils extracted from our SIMD benchmark.
 
 \ ld1 {Vt.16b}, [Xn]
 fun: .asm_ld1_16b { Vt Xn -> instr }
