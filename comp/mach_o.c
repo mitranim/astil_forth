@@ -635,18 +635,6 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   });
 
   return nullptr;
-
-  /*
-  Also possible to codesign like this, but we prefer not shelling out:
-  {
-    char *const argv[] = {"codesign", "-s", "-", "-f", "out.exe", nullptr};
-    pid_t       pid;
-    int         status;
-    try(spawn_with_stdin(argv, nullptr, 0, &pid));
-    try(wait_pid(pid, &status));
-    if (status) return errf("codesign exited with status %d", status);
-  }
-  */
 }
 
 static Err compile_mach_executable_to(

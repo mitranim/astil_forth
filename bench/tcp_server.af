@@ -23,12 +23,7 @@ fun: .run { -- err }
   " 19777" { port }
   port SOMAXCONN .net_listen { listener }
   loop
-    listener nil nil .accept .cint_to_cell { conn }
-    conn <0 .then
-      .errno { code }
-      code EINTR = .then again end
-      code " unable to accept connection" .os_err .throw
-    end
+    listener nil nil .sock_accept { conn }
     instr' .handle conn .thread_spawn_detached { -- }
   end
 end

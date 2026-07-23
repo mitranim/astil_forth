@@ -24,14 +24,10 @@ fun: .net_accept_loop { sock handler }
   loop
     addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
-    sock addr size .accept .cint_to_cell { conn }
+    sock addr size .sock_accept { conn err }
 
-    conn <0 .then
-      .errno { code }
-      code EINTR = .then again end
-      code .strerror { msg }
-      " [srv] unable to accept connection %zd; code: %zd; msg: %s\n"
-      conn code msg .elogf
+    err .then
+      " [srv] %s\n" err .elogf
       again
     end
 
@@ -53,13 +49,10 @@ fun: .net_accept_loop_threaded { sock handler }
 
     addr size' Sockaddr_storage .memzero
     size' Sockaddr_storage size !cuint
-    sock addr size .accept .cint_to_cell { conn }
+    sock addr size .sock_accept { conn err }
 
-    conn <0 .then
-      .errno { code }
-      code EINTR = .then again end
-      code .strerror { msg }
-      " [srv] unable to accept connection; code: %zd; msg: %s\n" code msg .elogf
+    err .then
+      " [srv] %s\n" err .elogf
       again
     end
 

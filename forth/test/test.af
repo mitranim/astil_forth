@@ -4012,9 +4012,13 @@ end
 
 fun: .main { -- exit }
   .with_main_ctx .main_run end { err }
-  err .then " error: %s\n" err .elogf 1 .ret end
-  " [test] [aot] ok\n" .elog
-  0
+  err .then
+    " [test] [aot] error: %s\n" err .elogf
+    1
+  else
+    " [test] [aot] ok\n" .elog
+    0
+  end
 end
 
 " [test] [jit] ok\n" .elog

@@ -283,24 +283,17 @@ static Err write_all(int file, const U8 *buf, Uint len, int *out_err) {
       continue;
     }
 
-    const auto err = errno;
-    if (err == EINTR) continue;
+    const auto code = errno;
+    if (code == EINTR) continue;
 
-    /*
-    File closed early. This branch is reached only if `SIGPIPE` is ignored,
-    blocked, or caught; otherwise our process is terminated via `SIGPIPE`
-    before `write` returns. Opt-out example: `signal(SIGPIPE, SIG_IGN);`.
-    */
-    if (err == EPIPE) return nullptr;
-
-    if (out_err) *out_err = err;
-    const auto msg = strerror(err);
+    if (out_err) *out_err = code;
+    const auto msg = strerror(code);
 
     if (!msg) {
-      return errf("unable to fully write to file %d; code: %d", file, err);
+      return errf("unable to fully write to file %d; code: %d", file, code);
     }
     return errf(
-      "unable to fully write to file %d; code: %d; msg: %s", file, err, msg
+      "unable to fully write to file %d; code: %d; msg: %s", file, code, msg
     );
   }
   return nullptr;

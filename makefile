@@ -26,6 +26,7 @@ MAIN_SRC ?= $(COMP_DIR)/main.c
 MAIN_S ?= astil_s.exe
 MAIN ?= astil.exe
 TEST_EXE ?= test.exe
+TEST_PROC_EXE ?= test_proc.exe
 FILE_EXE ?= $(and $(file),$(basename $(file)).exe)
 DISASM ?= --disassemble-all --headers --private-headers --reloc --dynamic-reloc --syms --dynamic-syms
 WATCH_IGNORE ?= -i=$(GEN_DIR)
@@ -83,20 +84,30 @@ RLWRAP := $(and $(RLWRAP),rlwrap --no-warnings)
 
 # We use sandboxing to prevent buggy JIT-ted code from accidentally
 # deleting the entire filesystem, launching nuclear missiles, etc..
-# However, we whitelist a few child executables used for debugging.
-EXE0 = $(shell realpath $$(which llvm-mc))
-EXE1 = $(shell realpath $$(xcrun --find llvm-symbolizer))
-EXE2 = $(shell realpath $$(xcrun --find atos))
+# However, we allow child executables used for debugging and tests.
+LLVM_MC = $(shell realpath $$(which llvm-mc))
+LLVM_SYMBOLIZER = $(shell realpath $$(xcrun --find llvm-symbolizer))
+ATOS = $(shell realpath $$(xcrun --find atos))
+TEST_CAT = $(shell realpath $$(which cat))
+TEST_ECHO = $(shell realpath $$(which echo))
+TEST_FALSE = $(shell realpath $$(which false))
+TEST_GREP = $(shell realpath $$(which grep))
+TEST_SLEEP = $(shell realpath $$(which sleep))
 
 .PHONY: run_boxed
 run_boxed:
 	$(RLWRAP) sandbox-exec \
 		-f sandbox.sb \
-		-D MAIN="$(PWD)/$(file)" \
-		-D OUT="$(PWD)/$(TEST_EXE)" \
-		-D EXE0=$(EXE0) \
-		-D EXE1=$(EXE1) \
-		-D EXE2=$(EXE2) \
+		-D MAIN="$(abspath $(file))" \
+		-D OUT="$(abspath $(or $(out),$(TEST_EXE)))" \
+		-D LLVM_MC=$(LLVM_MC) \
+		-D LLVM_SYMBOLIZER=$(LLVM_SYMBOLIZER) \
+		-D ATOS=$(ATOS) \
+		-D TEST_CAT=$(TEST_CAT) \
+		-D TEST_ECHO=$(TEST_ECHO) \
+		-D TEST_FALSE=$(TEST_FALSE) \
+		-D TEST_GREP=$(TEST_GREP) \
+		-D TEST_SLEEP=$(TEST_SLEEP) \
 		$(abspath $(file)) $(args)
 
 # Register-CC version.
@@ -149,8 +160,17 @@ repl_s:
 test:
 	$(MAKE) run args='./forth/test/test.af --build=$(TEST_EXE)'
 	./$(TEST_EXE)
+	$(MAKE) test_proc
 
-# 	$(MAKE) test_repl
+.PHONY: test_proc
+test_proc:
+	$(MAKE) run out=$(TEST_PROC_EXE) \
+		args='forth/lang.af forth/test/test_proc.af --build=$(TEST_PROC_EXE)'
+	./$(TEST_PROC_EXE)
+	./$(TEST_PROC_EXE) <&-
+	./$(TEST_PROC_EXE) >&-
+	./$(TEST_PROC_EXE) 2>&-
+	./$(TEST_PROC_EXE) <&- >&- 2>&-
 
 .PHONY: test_repl
 test_repl: $(MAIN)

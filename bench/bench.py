@@ -177,7 +177,7 @@ def deadline_expired(_signum, _frame) -> None:
 
 @contextmanager
 def alarm(seconds: float):
-    """Interrupt one owned-child wait without polling or a helper thread."""
+    """Interrupt one owned-child wait without polling or using a thread."""
     previous = signal.signal(signal.SIGALRM, deadline_expired)
     signal.setitimer(signal.ITIMER_REAL, seconds)
     try:

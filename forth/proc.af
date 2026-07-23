@@ -20,6 +20,14 @@ use' ./os.af
 8     let: POSIX_SPAWN_SETSIGMASK
 0x400 let: POSIX_SPAWN_SETSID
 
+\ Darwin extension. With this set, child spawns with all FDs closed by default.
+\ Parent process uses spawn actions to explicitly configure child stdio, or any
+\ other FDs the child needs.
+\
+\ Non-Darwin targets instead need to create every descriptor
+\ atomically with `FD_CLOEXEC`, including pipes via `pipe2`.
+0x4000 let: POSIX_SPAWN_CLOEXEC_DEFAULT
+
 \ Darwin does not export POSIX spawn scheduling-attribute functions or their
 \ `POSIX_SPAWN_SETSCHED*` flags because Priority Scheduling is unsupported.
 
@@ -32,8 +40,12 @@ use' ./os.af
 3 1 extern: .posix_spawn_file_actions_adddup2  posix_spawn_file_actions_adddup2  ( actions fdes new_fdes -- err :Cint )
 5 1 extern: .posix_spawn_file_actions_addopen  posix_spawn_file_actions_addopen  ( actions fdes path flags mode -- err :Cint )
 
-\ POSIX.1-2024 standardized these without `_np`; Darwin still exports old ABI
-\ spellings. AF names follow POSIX; linked C symbols follow Darwin.
+\ Darwin extension used with `POSIX_SPAWN_CLOEXEC_DEFAULT`
+\ to preserve an existing descriptor explicitly.
+2 1 extern: .posix_spawn_file_actions_addinherit posix_spawn_file_actions_addinherit_np ( actions fdes -- err :Cint )
+
+\ POSIX.1-2024 standardized these without `_np`; Darwin still exports old
+\ ABI spellings. AF names follow POSIX; linked C symbols follow Darwin.
 2 1 extern: .posix_spawn_file_actions_addchdir  posix_spawn_file_actions_addchdir_np  ( actions path -- err :Cint )
 2 1 extern: .posix_spawn_file_actions_addfchdir posix_spawn_file_actions_addfchdir_np ( actions fdes -- err :Cint )
 
@@ -70,3 +82,271 @@ end
 \ Darwin does not export optional POSIX process-scheduling calls such as
 \ `sched_getparam`, `sched_setparam`, `sched_getscheduler`, or
 \ `sched_setscheduler`; thin bindings cannot declare them here.
+
+\ ## Higher-level shortcuts
+
+\ Under Darwin close-by-default spawn policy, preserve `fdes` if it's open.
+\ Closed parent stdio remains closed in the child; adding an inherit action
+\ for a closed descriptor would instead make `posix_spawn` fail with `EBADF`.
+fun: .proc_actions_inherit_if_open { actions fdes -- Err }
+  fdes F_GETFD 0 .fcntl_int .cint_to_cell <0 .then
+    .errno { code }
+    code EBADF = .then .ret end
+    code " unable to inspect inherited descriptor" .os_err .throw
+  end
+
+  actions fdes .posix_spawn_file_actions_addinherit
+  " unable to inherit child descriptor" ?posix_err
+end
+
+\ `waitpid` wrapper which:
+\ - Returns wait failures as descriptive messages.
+\ - Unpacks exit code and signal, returning them separately.
+\ - Retries interrupted syscalls.
+fun: .pid_wait { pid -- exit sig err }
+  .slot { inout }
+
+  loop
+    pid inout nil .waitpid .cint_to_cell >=0 .then
+      inout @cint { wstat }
+      wstat .WIFEXITED .then wstat .WEXITSTATUS 0 .ret end
+      wstat .WIFSIGNALED .then
+        wstat .WTERMSIG { sig }
+        0 sig .ret
+      end
+      " unexpected wait status for PID %zd: %zx" pid wstat .errf { err }
+      0 0 err .ret
+    end
+
+    .errno { code }
+    code EINTR = .then again end
+
+    code .strerror { msg }
+    " unable to wait on PID %zd; code: %zd; msg: %s" pid code msg .errf { err }
+    0 0 err .ret
+  end
+
+  .unreachable nil nil
+end
+
+\ Shortcut for callers which only care about full success.
+fun: .pid_wait_ok { pid -- Err }
+  pid .pid_wait .try { exit sig }
+  sig .then " PID %zd terminated with signal %zd" pid sig .errf .ret end
+  exit .then " PID %zd exited with code %zd" pid exit .errf .ret end
+end
+
+\ `posix_spawnp` wrapper which converts failure to descriptive message.
+\ `argv[0]` is the command name. Due to `.posix_spawnp`, if the command
+\ does not contain a slash, this searches the caller's `PATH`, ignoring
+\ `PATH` specified in `envp`, if any, during the search.
+\
+\ If `actions` is nil, the child spawns with ALL FDs closed, including stdio.
+\ Normally, the caller should pass non-nil actions which set up child stdio,
+\ either by inheriting from parent, or using pipes, or some combination.
+fun: .proc_spawn_env { argv envp actions -- pid Err }
+  alloca' Cint { pid }
+  .slot { attr }
+  argv @ { cmd }
+
+  attr .posix_spawnattr_init " unable to init spawn attributes"
+  ?posix_err { err }
+  err .then -1 err .ret end
+
+  \ Darwin-specific extension.
+  attr POSIX_SPAWN_CLOEXEC_DEFAULT .posix_spawnattr_setflags
+  " unable to enable close-by-default spawning" ?posix_err { err }
+
+  -1 { out }
+  err =0 .then
+    pid cmd actions attr argv envp .posix_spawnp { code }
+    code .then
+      code .strerror { msg }
+      " unable to spawn `%s`; code: %zd; msg: %s" cmd code msg .errf { err }
+    else
+      pid @cint { out }
+    end
+  end
+
+  attr .posix_spawnattr_destroy { -- }
+  out err
+end
+
+\ Shortcut for spawning with empty environment.
+fun: .proc_spawn { argv actions -- pid Err }
+  argv nil >slot actions .proc_spawn_env
+end
+
+\ Runs `argv` with `/dev/null` as stdin and an empty environment.
+\ Captures stdout and stderr, merged in their pipe-write order,
+\ allocating in current memory context. `buf len` outputs are
+\ always defined, so callers can report diagnostics. If context
+\ was OOM, `buf` is nil. Otherwise, `buf` is null-terminated.
+fun: .proc_run_capture { argv -- buf len exit sig Err }
+  0 { len }
+  1 1 .ctx_alloc { buf err }
+  err .then buf len 0 0 err .ret end
+
+  1 .ctx_avail { _ cap }
+  nil buf !b
+
+  .fd_pipe { fd_read fd_write err }
+  err .then buf len 0 0 err .ret end
+  .slot { act }
+
+  act .posix_spawn_file_actions_init " unable to init spawn file actions"
+  ?posix_err { err }
+  err .then
+    fd_read .close { -- }
+    fd_write .close { -- }
+    buf len 0 0 err .ret
+  end
+
+  \ If child reads stdin, it receives EOF instead of blocking.
+  \ Assumes that `.fd_pipe` normalizes FDs to above stdio FDs.
+  act STDIN " /dev/null" O_RDONLY 0 .posix_spawn_file_actions_addopen
+  " unable to set child stdin" ?posix_err { err }
+
+  err =0 .then
+    act fd_write STDOUT .posix_spawn_file_actions_adddup2
+    " unable to capture child stdout" ?posix_err { err }
+  end
+
+  err =0 .then
+    act fd_write STDERR .posix_spawn_file_actions_adddup2
+    " unable to capture child stderr" ?posix_err { err }
+  end
+
+  -1 { pid }
+  err =0 .then
+    argv act .proc_spawn { pid err }
+  end
+
+  act .posix_spawn_file_actions_destroy { -- }
+  fd_write .close { -- }
+
+  err .then
+    fd_read .close { -- }
+    buf len 0 0 err .ret
+  end
+
+  loop
+    cap len - { rem }
+    buf len + { tar }
+    1 max: rem \ Use terminator byte as overflow probe when payload is full.
+
+    fd_read tar rem .fd_read { got read_err }
+    read_err .then read_err { err } leave end
+    got =0 .then leave end
+
+    len cap = .then
+      nil buf len + !b \ Overflow probe replaced the terminator.
+      " unable to capture subprocess output: context out of space" { err }
+      leave
+    end
+
+    got +: len
+    nil buf len + !b
+    buf len .inc + .ctx_top_set
+  end
+
+  fd_read .close { -- }
+  pid .pid_wait { exit sig wait_err }
+  err wait_err .coalesce { err }
+
+  buf len exit sig err
+end
+
+fun: .proc_run_capture_ok { argv -- buf len Err }
+  argv .proc_run_capture { buf len exit sig err }
+  err .then buf len err .ret end
+
+  argv @ { cmd }
+  sig .then
+    " subprocess `%s` terminated with signal %zd" cmd sig .errf { err }
+    buf len err .ret
+  end
+  exit .then
+    " subprocess `%s` exited with code %zd" cmd exit .errf { err }
+    buf len err .ret
+  end
+
+  buf len
+end
+
+\ Spawns with child `STDIN` connected to a pipe. On success, caller owns
+\ returned resources; close `fd_write` to deliver EOF, and wait on `pid`.
+\ On failure, no child exists and all pipe descriptors are closed.
+fun: .proc_spawn_stdin { argv -- pid fd_write Err }
+  .fd_pipe { fd_read fd_write err }
+  err .then -1 -1 err .ret end
+
+  \ Darwin-specific. If the child closes stdin early, writes must return
+  \ `EPIPE`, not terminate the parent with `SIGPIPE`.
+  fd_write .fd_nosigpipe { err }
+  err .then
+    fd_read .close { -- }
+    fd_write .close { -- }
+    -1 -1 err .ret
+  end
+
+  .slot { act }
+  act .posix_spawn_file_actions_init " unable to init spawn file actions"
+  ?posix_err { err }
+  err .then
+    fd_read .close { -- }
+    fd_write .close { -- }
+    -1 -1 err .ret
+  end
+
+  \ Define child `STDIN` as read end of our pipe.
+  act fd_read STDIN .posix_spawn_file_actions_adddup2
+  " unable to add spawn action" ?posix_err { err }
+
+  -1 { pid }
+
+  \ Preserve open parent `STDOUT STDERR` explicitly; Darwin's
+  \ `POSIX_SPAWN_CLOEXEC_DEFAULT` closes every unmentioned FD.
+  err =0 .then act STDOUT .proc_actions_inherit_if_open { err } end
+  err =0 .then act STDERR .proc_actions_inherit_if_open { err } end
+  err =0 .then argv act .proc_spawn { pid err } end
+  act .posix_spawn_file_actions_destroy { -- }
+
+  err .then
+    fd_read .close { -- }
+    fd_write .close { -- }
+    -1 -1 err .ret
+  end
+
+  \ Child is now the only reader. If it closes stdin, `.fd_nosigpipe`
+  \ makes parent writes return `EPIPE` rather than causing `SIGPIPE`.
+  fd_read .close { -- }
+  pid fd_write
+end
+
+\ Spawn child with inherited `STDOUT STDERR`, fully write buffer
+\ to stdin, wait, and require fully successful child termination.
+fun: .proc_run_with_stdin_ok { argv buf len -- Err }
+  argv .proc_spawn_stdin .try { pid fd_write }
+  fd_write buf len .fd_write_all { err }
+  fd_write .close { -- } \ Deliver EOF to child process.
+  pid .pid_wait_ok err .fallback
+end
+
+fun: .print_disasm { src len }
+  .ctx_top { top }
+
+  \ `llvm-mc` doesn't seem to support disassembling
+  \ raw bytes, so we have to convert them to hex.
+  src len .bytes_to_hex_str { src len err }
+
+  err =0 .then
+    4 .cells .alloca { argv }
+    " llvm-mc" " --disassemble" " --hex" argv !cellz
+
+    argv src len .proc_run_with_stdin_ok { err }
+  end
+
+  err .then " [debug] unable to disassemble: %s\n" err .elogf end
+  top .ctx_top_set
+end

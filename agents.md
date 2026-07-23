@@ -18,6 +18,8 @@ Naming the last output parameter exactly `err` or `Err` enables use of `.throw` 
 
 `.try` is like `.throw` but conditional: consume top argument; test and return as error if non-zero.
 
+Worse: `err .then err .throw end`. Better: `.try`. Worse: `.call { val err } err .then err .throw end`. Better: `.call .try { val }`.
+
 Trailing `err` output (unlike `Err`) also enables local auto-try. Inside a word whose trailing output is named exactly `err`, when calling words with `Sym.has_err = true`, compiler inserts an equivalent of `.try` after each call.
 
 Callers don't care whether callee uses `err` or `Err`; both are just "callee has trailing error output".

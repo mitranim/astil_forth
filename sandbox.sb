@@ -18,13 +18,17 @@
 (allow file-write-data (literal (param "OUT")))
 (allow file-write-mode (literal (param "OUT")))
 
-; We whitelist a few executables for debugging: disassembler,
-; symbolizer, etc. See the makefile for the listing.
+; Fixed executables used by debugging and tests.
 (allow process-fork)
 (allow signal (target children))
-(allow process-exec (literal (param "EXE0")))
-(allow process-exec (literal (param "EXE1")))
-(allow process-exec (literal (param "EXE2")))
+(allow process-exec (literal (param "LLVM_MC")))
+(allow process-exec (literal (param "LLVM_SYMBOLIZER")))
+(allow process-exec (literal (param "ATOS")))
+(allow process-exec (literal (param "TEST_CAT")))
+(allow process-exec (literal (param "TEST_ECHO")))
+(allow process-exec (literal (param "TEST_FALSE")))
+(allow process-exec (literal (param "TEST_GREP")))
+(allow process-exec (literal (param "TEST_SLEEP")))
 
 ; Bots like to use this for scratch; also `/tmp` symlinks to this.
 (allow file-read* (subpath "/private/tmp"))

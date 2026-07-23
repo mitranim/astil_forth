@@ -189,6 +189,8 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 1  let: F_RDLCK
 2  let: F_UNLCK
 3  let: F_WRLCK
+73 let: F_SETNOSIGPIPE \ Darwin: return EPIPE without generating SIGPIPE.
+74 let: F_GETNOSIGPIPE \ Darwin: query F_SETNOSIGPIPE state.
 
 \ `<sys/stat.h>` file types and permissions.
 0o170000 let: S_IFMT
@@ -523,10 +525,66 @@ fun: .path_stat { path stat_adr -> err }
   .stat .then .errno " stat" path .io_err .throw end
 end
 
-fun: .fd_open { path mode -> fdes err }
-  .open .cint_to_cell { out }
-  out <0 .then .errno " open" path .io_err .throw end
+\ Darwin-only. Make writes to a widowed pipe or socket
+\ return `EPIPE` without generating `SIGPIPE`.
+fun: .fd_nosigpipe { fdes -- Err }
+  fdes F_SETNOSIGPIPE 1 .fcntl_int .cint_to_cell <0 .then
+    .errno " unable to suppress SIGPIPE for descriptor" .os_err .throw
+  end
+end
+
+\ Return a descriptor above the stdio FD range. This keeps pipe endpoints
+\ disjoint from child stdio descriptors when parent stdio FDs are closed.
+fun: .fd_above_stdio { fdes -- fdes Err }
+  fdes STDERR > .then fdes .ret end
+
+  fdes F_DUPFD STDERR .inc .fcntl_int .cint_to_cell { out }
+  out <0 .then
+    .errno { code }
+    code " unable to move descriptor above standard descriptors" .os_err { err }
+    fdes err .ret
+  end
+
+  fdes .close { -- }
   out
+end
+
+\ Init pipe read/write ends above the stdio FD range.
+\
+\ On Darwin: our subprocess utils use `POSIX_SPAWN_CLOEXEC_DEFAULT`,
+\ so these pipe descriptors don't need `FD_CLOEXEC`.
+\
+\ On future non-Darwin targets: all FDs must be created via newer
+\ constructors with atomic CLOEXEC like `pipe2 dup3 accept4` etc.
+\
+\ We're not interested in non-atomic open->`fcntl` fallbacks.
+fun: .fd_pipe { -- fd_read fd_write Err }
+  size' Cint 1 .lsl .alloca { pipes }
+
+  pipes .pipe .then
+    .errno " unable to create pipe" .os_err { err }
+    -1 -1 err .ret
+  end
+
+  pipes @cint { fd_read }
+  pipes size' Cint + @cint { fd_write }
+
+  fd_read .fd_above_stdio { fd_read err }
+  err =0 .then fd_write .fd_above_stdio { fd_write err } end
+
+  err .then
+    fd_read .close { -- }
+    fd_write .close { -- }
+    -1 -1 err .ret
+  end
+
+  fd_read fd_write
+end
+
+fun: .fd_open { path mode -> fdes err }
+  O_CLOEXEC .or .open .cint_to_cell nil { out err }
+  out <0 .then .errno " open" path .io_err { err } end
+  out err
 end
 
 \ TODO dedup with `.fd_write`.
@@ -598,6 +656,8 @@ fun: .file_err { code action -- err_str }
   " file error: %s; code: %zd; msg: %s" action code msg .errf
 end
 
+\ Posix specifies an `e` mode extension for setting `FD_CLOEXEC` atomically.
+\ Darwin documents it, but does not actually set it on the system we tested.
 fun: .file_open { path mode -> file err }
   .fopen { file }
   file =0 .then .errno " open" path .io_err .throw end

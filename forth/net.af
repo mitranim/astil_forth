@@ -219,18 +219,46 @@ fun: .net_addr_info { port -- ainf err }
   ainf @
 end
 
+\ On Darwin: our subprocess functions use `POSIX_SPAWN_CLOEXEC_DEFAULT`.
+\ On future non-Darwin targets: should add `SOCK_CLOEXEC` or equivalent.
+fun: .sock_open { fam type prot -- sock Err }
+  fam type prot .socket .cint_to_cell { sock }
+
+  sock <0 .then
+    .errno " unable to create network socket" .os_err { err }
+    -1 err .ret
+  end
+
+  sock
+end
+
+\ Same policy as `.sock_open`: assume default CLOEXEC on Darwin;
+\ future non-Darwin targets require opt-in atomic CLOEXEC here.
+fun: .sock_accept { sock addr len_adr -- conn Err }
+  loop
+    sock addr len_adr .accept .cint_to_cell { conn }
+    conn >=0 .then conn .ret end
+
+    .errno { code }
+    code EINTR = .then again end
+    code " unable to accept connection" .os_err { err }
+    -1 err .ret
+  end
+
+  .unreachable nil
+end
+
 fun: .sock_bind { info backlog -- sock Err }
   info .Addrinfo_family   @ { fam  }
   info .Addrinfo_socktype @ { type }
   info .Addrinfo_protocol @ { prot }
-  fam type prot .socket .cint_to_cell { sock }
 
-  sock <0 .then .errno " unable to create network socket" .os_err .throw end
+  fam type prot .sock_open { sock err }
+  err .then sock err .ret end
 
   alloca' Cint { opt } \ `.setsockopt` requires non-nil option address.
   true opt !cint       \ Enable options like `SO_REUSEADDR`.
 
-  nil { err }
   sock SOL_SOCKET SO_REUSEADDR opt size' Cint .setsockopt .then
     .errno " unable to `.setsockopt`" .os_err { err }
   end
@@ -239,17 +267,17 @@ fun: .sock_bind { info backlog -- sock Err }
     sock info .Addrinfo_addr @ info .Addrinfo_addrlen @ .bind .then
       .errno " unable to bind socket" .os_err { err }
     end
+  end
 
-    err =0 .then
-      sock backlog .listen .then
-        .errno " unable to listen on socket" .os_err { err }
-      end
+  err =0 .then
+    sock backlog .listen .then
+      .errno " unable to listen on socket" .os_err { err }
     end
   end
 
   \ Best-effort cleanup; keep the primary setup error.
-  err .then sock .close { -- } end
-  sock err
+  err .then sock .close { -- } -1 err .ret end
+  sock
 end
 
 fun: .net_listen { port backlog -- sock Err }

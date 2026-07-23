@@ -6,25 +6,40 @@
 #include <spawn.h>
 #include <stddefer.h>
 
-static Err spawn_with_stdin(
-  char *const argv[], const U8 *buf, Ind len, pid_t *pid
-) {
+/*
+Outdated implementation. Missing features:
+- Normalize pipe descriptors above stderr before adding file actions.
+- Use Darwin `POSIX_SPAWN_CLOEXEC_DEFAULT` and manually preserve stdio.
+- Pass a valid null-terminated `envp` array instead of nil `envp` pointer.
+*/
+static Err spawn_stdin(char *const argv[], pid_t *pid, int *out_fd_write) {
   int pipes[2] = {-1, -1};
   try_errno(pipe(pipes));
 
   deferred(fd_deinit) int fd_read  = pipes[0];
   deferred(fd_deinit) int fd_write = pipes[1];
 
+#ifdef __APPLE__
+  // Darwin-specific. Report an early child-stdin close as
+  // EPIPE instead of terminating the parent with SIGPIPE.
+  try_errno(fcntl(fd_write, F_SETNOSIGPIPE, 1));
+#endif
+
   posix_spawn_file_actions_t act;
   try_errno_posix(posix_spawn_file_actions_init(&act));
   defer posix_spawn_file_actions_destroy(&act);
 
-  // Replace the child's stdin with our pipe.
+  // Define child stdin as read end of our pipe.
   // Stdout and stderr are inherited by default.
   try_errno_posix(posix_spawn_file_actions_adddup2(&act, fd_read, STDIN_FILENO));
 
-  // Closing the read pipe is optional.
-  // Closing the write pipe in the child allows to deliver EOF.
+  // Closing `fd_read` in child leaves only child's stdin as a reference
+  // to the read end of the pipe. If child also closes stdin prematurely,
+  // parent writes receive `EPIPE` due to `F_SETNOSIGPIPE` on Darwin, or
+  // `SIGPIPE` otherwise. Without this close, parent write can deadlock.
+  //
+  // Closing `fd_write` in child allows parent to deliver EOF
+  // to child's `fd_read` by closing parent-side `fd_write`.
   try_errno_posix(posix_spawn_file_actions_addclose(&act, fd_read));
   try_errno_posix(posix_spawn_file_actions_addclose(&act, fd_write));
 
@@ -36,14 +51,15 @@ static Err spawn_with_stdin(
   if (err) return err_wrapf("unable to spawn `%2$s`: %1$s", err, cmd);
 
   /*
-  If the child closes stdin early, closing our read end prevents our own fd from
-  masking the broken pipe. `write` then raises `SIGPIPE` by default, or returns
-  `EPIPE` if `SIGPIPE` is ignored, blocked, or caught.
+  If the child closes stdin early, closing our read end prevents our own FD
+  from masking the broken pipe. F_SETNOSIGPIPE makes `write` return `EPIPE`
+  rather than generating `SIGPIPE`.
   */
   fd_deinit(&fd_read);
 
-  try(write_all(fd_write, buf, len, nullptr));
-  fd_deinit(&fd_write); // Deliver EOF to child process.
+  // Transfer ownership, skip deinit.
+  *out_fd_write = fd_write;
+  fd_write      = -1;
   return nullptr;
 }
 
@@ -87,8 +103,20 @@ static Err print_disasm(const void *src, Ind len) {
   pid_t       pid;
   int         status;
 
-  try(spawn_with_stdin(argv, (U8 *)buf, str_len, &pid));
-  try(wait_pid(pid, &status));
+  deferred(fd_deinit) int fd_write = -1;
+
+  try(spawn_stdin(argv, &pid, &fd_write));
+
+  const auto write_err = err_wrapf(
+    "unable to write subprocess stdin: %s",
+    write_all(fd_write, (U8 *)buf, str_len, nullptr)
+  );
+
+  fd_deinit(&fd_write); // Deliver EOF.
+
+  const auto wait_err = wait_pid(pid, &status);
+  if (write_err) return write_err;
+  if (wait_err) return wait_err;
 
   if (status || DEBUG) {
     eprintf("[debug] %s exited with code %d\n", exe, status);
