@@ -750,38 +750,22 @@ end
 
 \ ## Arithmetic continued
 \
-\ This section adds comptime versions of arithmetic words,
-\ which respect the comptime "argument / register stack".
-\ In addition, we ensure they all have runtime versions.
+\ Comptime arithmetic words which respect the comptime register stack,
+\ plus runtime versions which haven't been defined earlier.
 \
-\ Some runtime redefinitions here are redundant with earlier versions,
-\ but tracking the redundancies is effort. Redefining all is easier.
+\ These comptime words are also used internally in `## Constant folding`,
+\ both inline in full folding, and indirectly via `xt''` as fallbacks.
 
 fun_comp: .or { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
-
-fun: .or { i0 i1 -> i2 } [ .redefine ] .or end
-
 fun_comp: .and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
-
-fun: .and { i0 i1 -> i2 } [ .redefine ] .and end
-
 fun_comp: .xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
-
-fun: .xor { i0 i1 -> i2 } [ .redefine ] .xor end
-
 fun_comp: .lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
-
-fun: .lsl { i0 bits -> i1 } [ .redefine ] .lsl end
-
 fun_comp: .lsr { -- err } ASM_OP_LSR_REG .comp_args2_arith_reg end
-
-fun: .lsr { i0 bits -> i1 } [ .redefine ] .lsr end
+fun_comp: .asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
 
 fun_comp: .negate { -- err }
   .comp_args1_reg .asm_neg .comp_instr \ neg Xd, Xn
 end
-
-fun: .negate { i0 -> i1 } [ .redefine ] .negate end
 
 fun: ?invert { val cond -> out } .negate .xor end
 
@@ -790,38 +774,20 @@ fun_comp: .inc { -- err }
   reg reg 1 .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
 end
 
-fun: .inc { i0 -> i1 } [ .redefine ] .inc end
-
 fun_comp: .dec { -- err }
   .comp_args1_reg { reg }
   reg reg 1 .asm_sub_imm .comp_instr \ sub Xd, Xn, #imm12
 end
 
-fun: .dec { i0 -> i1 } [ .redefine ] .dec end
-
 fun_comp: + { -- err } ASM_OP_ADD_REG .comp_args2_arith_reg end
-
-\ fun: + { i0 i1 -> i2 } [ .redefine ] + end
-
 fun_comp: - { -- err } ASM_OP_SUB_REG .comp_args2_arith_reg end
-
-fun: - { i0 i1 -> i2 } [ .redefine ] - end
-
 fun_comp: * { -- err } ASM_OP_MUL_REG .comp_args2_arith_reg end
-
-fun: * { i0 i1 -> i2 } * end
-
 fun_comp: / { -- err } ASM_OP_SDIV_REG .comp_args2_arith_reg end
-
-fun: / { i0 i1 -> i2 } / end
-
 fun_comp: u/ { -- err } ASM_OP_UDIV_REG .comp_args2_arith_reg end
 
+fun: * { i0 i1 -> i2 } * end
+fun: / { i0 i1 -> i2 } / end
 fun: u/ { i0 i1 -> i2 } u/ end
-
-fun_comp: .asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
-
-fun: .asr { i0 bits -> i1 } [ .redefine ] .asr end
 
 fun: .comp_emit_mod { out dividend divisor div_op -- err }
   .comp_alloc_next_reg { quotient }
@@ -918,13 +884,22 @@ end
 
 fun: .umax { i0 i1 -> i0|i1 } .umax end
 
+fun_comp: .coalesce { -- err }
+  .comp_args2_regs { reg0 reg1 }
+  reg0 reg0 reg1 ASM_NE .comp_emit_csel_nonzero
+  reg1 .comp_args_set
+end
+
+\ Chooses first non-zero input.
+fun: .coalesce { one two -> out } .coalesce end
+
 fun_comp: .fallback { -- err }
   .comp_args2_regs { reg0 reg1 }
   reg0 reg1 reg0 ASM_NE .comp_emit_csel_nonzero
   reg1 .comp_args_set
 end
 
-\ Chooses a non-zero value, preferring the second input.
+\ Chooses last non-zero input.
 fun: .fallback { one two -> out } .fallback end
 
 fun_comp: .is_aligned_to { -- err }
@@ -966,8 +941,6 @@ fun_comp: .invert { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
 end
-
-fun: .invert { i0 -> i1 } [ .redefine ] .invert end
 
 \ 1-based index of the highest bit.
 fun: .comp_emit_bit_len { reg tmp -- err }
@@ -1036,8 +1009,6 @@ fun_comp: .low_bits { -- err }
   reg .inc .comp_args_set
 end
 
-fun: .low_bits { len -> bits } [ .redefine ] .low_bits end
-
 fun_comp: .bits_trunc { -- err }
   .comp_args2_regs     { imm len }
   .comp_alloc_next_reg { tmp }
@@ -1047,8 +1018,6 @@ fun_comp: .bits_trunc { -- err }
   imm imm tmp .asm_and_reg .comp_instr \ and Xd, Xn, Xm
   len .comp_args_set
 end
-
-fun: .bits_trunc { imm len -> imm } [ .redefine ] .bits_trunc end
 
 fun_comp: .bits_clear { -- err }
   .comp_args2_regs { imm mask }
@@ -1085,9 +1054,9 @@ end
 
 fun_comp: .bit_mask_set { -- err }
   3 nil .comp_args_min
-  .comp_args_get .dec { mask }
-  mask .dec { src }
-  src .dec { inp }
+  .comp_args_get .dec { src }
+  src .dec { mask }
+  mask .dec { inp }
   inp .comp_realloc_reg
   src .comp_realloc_reg
   mask .comp_realloc_reg
@@ -1095,7 +1064,7 @@ fun_comp: .bit_mask_set { -- err }
   inp .inc .comp_args_set
 end
 
-fun: .bit_mask_set { inp src mask -> out } .bit_mask_set end
+fun: .bit_mask_set { inp mask src -> out } .bit_mask_set end
 
 8 let: CELL
 
@@ -1847,12 +1816,12 @@ let: CONT_MASK_INSTR_INFO
 32 .low_bits .invert let: CONT_MASK_INSTR_OFF
 
 fun: .cont_meta_instr_off_set { off meta -- meta }
-  off .instr_off_pack meta CONT_MASK_INSTR_OFF .bit_mask_set
+  off .instr_off_pack CONT_MASK_INSTR_OFF meta .bit_mask_set
 end
 
 fun: .cont_meta_instr_set { off type info meta -- meta }
-  type meta CONT_MASK_BRANCH_TYPE .bit_mask_set { meta }
-  info meta CONT_MASK_INSTR_INFO .bit_mask_set { meta }
+  type CONT_MASK_BRANCH_TYPE meta .bit_mask_set { meta }
+  info CONT_MASK_INSTR_INFO meta .bit_mask_set { meta }
   off meta .cont_meta_instr_off_set
 end
 
@@ -1873,7 +1842,7 @@ fun: .asm_cond_branch { reg off type info -- instr }
   reg off type ASM_BRANCH_TYPE_CBNZ = .asm_cmp_branch { cmp_instr }
   off info .asm_branch_cond { cond_instr }
   \ Branchlessly select the instruction; don't have `.then` yet.
-  cmp_instr cond_instr type ASM_BRANCH_TYPE_COND = * .fallback
+  cond_instr type ASM_BRANCH_TYPE_COND = * cmp_instr .coalesce
 end
 
 \ Decode `cset`, returning its destination register and asm condition.
@@ -2020,7 +1989,7 @@ fun_comp: .then { prev_xt -- meta end_xt err } ( E: …args… pred -- …args�
   continued =0 .then
     1 msg .comp_args_min
     .comp_args_get .dec { len }
-    len nil CONT_MASK_INP_LEN .bit_mask_set { meta }
+    len CONT_MASK_INP_LEN nil .bit_mask_set { meta }
     prev_xt  STACK >s
     xt' .nop STACK >s
   end
@@ -2054,7 +2023,7 @@ fun_comp: else { meta then_end_xt -- meta end_xt err }
     " branch outputs" .comp_args_valid
   end
   has =0 .then
-    .comp_args_get meta CONT_MASK_OUT_LEN .bit_mask_set
+    .comp_args_get CONT_MASK_OUT_LEN meta .bit_mask_set
     CONT_MASK_HAS_OUT .or { meta }
   end
 
@@ -3030,14 +2999,19 @@ fun: .comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun: .comp_loc_mut_csel { zero cond -- err } ( C: "name" -- ) ( E: candidate -- )
+fun: .comp_loc_mut_csel { local_first zero cond -- err }
+  ( C: "name" -- ) ( E: candidate -- )
   .comp_args1_reg { candidate }
   .read_word .comp_local { loc }
   loc .comp_push_from_local
   candidate .inc { cur }
 
   zero .then
-    candidate candidate cur cond .comp_emit_csel_nonzero
+    local_first .then
+      candidate cur candidate cond .comp_emit_csel_nonzero
+    else
+      candidate candidate cur cond .comp_emit_csel_nonzero
+    end
   else
     candidate cur candidate cur candidate cond .comp_emit_csel_reg
   end
@@ -3323,7 +3297,7 @@ end
 
 \ Minimum into a local: `candidate min: some_val`.
 fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false ASM_LT .comp_loc_mut_csel
+  false false ASM_LT .comp_loc_mut_csel
 end
 
 fun_comp: .umin { -- err } [ .redefine ]
@@ -3332,7 +3306,7 @@ end
 
 \ Unsigned minimum into a local: `candidate umin: some_val`.
 fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false ASM_LO .comp_loc_mut_csel
+  false false ASM_LO .comp_loc_mut_csel
 end
 
 fun_comp: .max { -- err } [ .redefine ]
@@ -3341,7 +3315,7 @@ end
 
 \ Maximum into a local: `candidate max: some_val`.
 fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false ASM_GT .comp_loc_mut_csel
+  false false ASM_GT .comp_loc_mut_csel
 end
 
 fun_comp: .umax { -- err } [ .redefine ]
@@ -3350,7 +3324,18 @@ end
 
 \ Unsigned maximum into a local: `candidate umax: some_val`.
 fun_comp: umax: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false ASM_HI .comp_loc_mut_csel
+  false false ASM_HI .comp_loc_mut_csel
+end
+
+\ No partial CF: adopted child of the min/max family.
+fun_comp: .coalesce { -- err } [ .redefine ]
+  .cf_fold_cleared2 .then .coalesce .cf_fold_done
+  else { -- } call'' .coalesce end
+end
+
+\ Coalesce into a local: `candidate coalesce: some_val`.
+fun_comp: coalesce: { -- err } ( C: "name" -- ) ( E: candidate -- )
+  false true ASM_NE .comp_loc_mut_csel
 end
 
 \ No partial CF: adopted child of the min/max family.
@@ -3359,9 +3344,9 @@ fun_comp: .fallback { -- err } [ .redefine ]
   else { -- } call'' .fallback end
 end
 
-\ Fallback into a local: `candidate fallback: some_val`.
+\ `candidate fallback: some_val` is `candidate some_val .fallback { some_val }`.
 fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  true ASM_NE .comp_loc_mut_csel
+  true true ASM_NE .comp_loc_mut_csel
 end
 
 fun_comp: .cint_to_cell { -- err } [ .redefine ]
@@ -4047,7 +4032,7 @@ fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
   [ .plain_call ]
   .comp_barrier
   .loop_frame_init
-  .comp_args_get nil CONT_MASK_INP_LEN .bit_mask_set { meta }
+  .comp_args_get CONT_MASK_INP_LEN nil .bit_mask_set { meta }
   .here_write .instr_off meta .cont_meta_instr_off_set xt' .loop_end_xt
 end
 
@@ -4204,7 +4189,7 @@ fun: .compare { str0 len0 str1 len1 -- cmp }
   0 { cmp }
   len0 len1 .min { len }
   len .then str0 str1 len .memcmp .cint_to_cell { cmp } end
-  len0 len1 - cmp .fallback
+  cmp len0 len1 - .coalesce
 end
 
 \ `.strcmp` doesn't like null string pointers.

@@ -528,6 +528,18 @@ T{ -123 0 .max <T> 0 }T
 T{ -123 234 .max <T> 234 }T
 T{ 234 -123 .max <T> 234 }T
 
+T{ 0 0 .coalesce <T> 0 }T
+T{ 0 10 .coalesce <T> 10 }T
+T{ 10 0 .coalesce <T> 10 }T
+T{ 10 20 .coalesce <T> 10 }T
+T{ 20 10 .coalesce <T> 20 }T
+
+T{ 0 0 .fallback <T> 0 }T
+T{ 0 10 .fallback <T> 10 }T
+T{ 10 0 .fallback <T> 10 }T
+T{ 10 20 .fallback <T> 20 }T
+T{ 20 10 .fallback <T> 10 }T
+
 T{ 10 20 30 .swap_over <T> 20 10 30 }T
 
 T{ 0xffffffff .cint_to_cell <T> -1 }T

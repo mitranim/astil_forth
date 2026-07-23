@@ -757,7 +757,15 @@ fun: .max ( i1 i2 -- i1|i2 ) [
                .asm_push_x1   .comp_instr \ str x1, [x27], 8
 ] end
 
-\ Chooses a non-zero value, preferring the second input.
+\ Chooses the first input unless it is zero.
+fun: .coalesce ( one two -- out ) [
+               .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
+    1          .asm_cmp_zero  .comp_instr \ cmp x1, 0
+  1 1 2 ASM_NE .asm_csel      .comp_instr \ csel x1, x1, x2, ne
+               .asm_push_x1   .comp_instr \ str x1, [x27], 8
+] end
+
+\ Chooses the second input unless it is zero.
 fun: .fallback ( one two -- out ) [
                .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
     2          .asm_cmp_zero  .comp_instr \ cmp x2, 0
@@ -1048,9 +1056,9 @@ fun: .compare ( str0 len0 str1 len1 -- direction )
   to: str1
   to: len0
   to: str0
-  len0 len1 -
   str0 str1 len0 len1 .min .memcmp .cint_to_cell
-  .fallback
+  len0 len1 -
+  .coalesce
 end
 fun: str=  ( str0 len0 str1 len1 -- bool ) .compare =0 end
 fun: str<  ( str0 len0 str1 len1 -- bool ) .compare <0 end
@@ -1178,7 +1186,7 @@ end
 fun_comp: .then ( C: prev_fun -- … if_adr if_fun ) ( E: pred -- )
   \ Select `.drop` after `elif`; otherwise append a chain terminator.
   .dup xt' .elif_invalid_end =
-  xt' .then_open .swap xt' .drop * .fallback .call_xt
+  xt' .drop * xt' .then_open .coalesce .call_xt
   .reserve_cond xt' .if_pop
 end
 

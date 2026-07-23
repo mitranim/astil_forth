@@ -628,7 +628,7 @@ fun: .const_fold_derived_fun { -- out0 out1 out2 out3 out4 out5 out6 out7 }
   5 .odd
   37 8 .align_down
   37 8 .align_up
-  0 42 .fallback
+  42 0 .coalesce
 end
 
 fun: .test_const_fold_derived { -- err }

@@ -464,8 +464,8 @@ fun: .test_control_meta { -- err }
     cond_instr
   end
 
-  3 nil CONT_MASK_INP_LEN .bit_mask_set { meta }
-  0 meta CONT_MASK_OUT_LEN .bit_mask_set
+  3 CONT_MASK_INP_LEN nil .bit_mask_set { meta }
+  0 CONT_MASK_OUT_LEN meta .bit_mask_set
   CONT_MASK_HAS_OUT .or { meta }
   assert= meta CONT_MASK_INP_LEN .bit_mask_get 3 end
   assert= meta CONT_MASK_OUT_LEN .bit_mask_get 0 end
@@ -1453,12 +1453,449 @@ fun: .test_asm_csel_order { -- err }
 end
 .test_asm_csel_order
 
+fun: .test_or { -- err }
+  assert= 0b110101 0b001010 .or 0b111111 end
+  0b110101 { val }
+  assert= val 0b001010 .or 0b111111 end
+  assert= 0b001010 val .or 0b111111 end
+  0b001010 or: val
+  assert= val 0b111111 end
+end
+.test_or
+
+fun: .test_and { -- err }
+  assert= 0b110101 0b101010 .and 0b100000 end
+  0b110101 { val }
+  assert= val 0b101010 .and 0b100000 end
+  assert= 0b101010 val .and 0b100000 end
+  0b101010 and: val
+  assert= val 0b100000 end
+end
+.test_and
+
+fun: .test_xor { -- err }
+  assert= 0b110101 0b101010 .xor 0b011111 end
+  0b110101 { val }
+  assert= val 0b101010 .xor 0b011111 end
+  assert= 0b101010 val .xor 0b011111 end
+  0b101010 xor: val
+  assert= val 0b011111 end
+end
+.test_xor
+
+fun: .test_lsl { -- err }
+  assert= 3 4 .lsl 48 end
+end
+.test_lsl
+
+fun: .test_lsr { -- err }
+  assert= 48 4 .lsr 3 end
+end
+.test_lsr
+
+fun: .test_asr { -- err }
+  assert= -128 2 .asr -32 end
+end
+.test_asr
+
+fun: .test_add { -- err }
+  assert= 234 123 + 357 end
+  234 { val }
+  assert= val 123 + 357 end
+  assert= 123 val + 357 end
+  123 +: val
+  assert= val 357 end
+end
+.test_add
+
+fun: .test_sub { -- err }
+  assert= 234 123 - 111 end
+end
+.test_sub
+
+fun: .test_mul { -- err }
+  assert= 234 123 * 28782 end
+  234 { val }
+  assert= val 123 * 28782 end
+  assert= 123 val * 28782 end
+  123 *: val
+  assert= val 28782 end
+end
+.test_mul
+
+fun: .test_div { -- err }
+  assert= 234 123 / 1 end
+end
+.test_div
+
+fun: .test_udiv { -- err }
+  assert= -1 2 u/ 9223372036854775807 end
+end
+.test_udiv
+
+fun: .test_mod { -- err }
+  assert= 12 2 .mod 0 end
+  assert= 12 3 .mod 0 end
+  assert= 12 4 .mod 0 end
+  assert= 12 5 .mod 2 end
+  assert= 12 6 .mod 0 end
+  assert= 12 7 .mod 5 end
+  assert= 12 8 .mod 4 end
+  assert= 12 9 .mod 3 end
+end
+.test_mod
+
+fun: .test_umod { -- err }
+  assert= -1 2 .umod 1 end
+end
+.test_umod
+
+fun: .test_div_mod { -- err }
+  12 2 /mod { rem quo }
+  assert= rem 0 end
+  assert= quo 6 end
+  12 3 /mod { rem quo }
+  assert= rem 0 end
+  assert= quo 4 end
+  12 4 /mod { rem quo }
+  assert= rem 0 end
+  assert= quo 3 end
+  12 5 /mod { rem quo }
+  assert= rem 2 end
+  assert= quo 2 end
+  12 6 /mod { rem quo }
+  assert= rem 0 end
+  assert= quo 2 end
+  12 7 /mod { rem quo }
+  assert= rem 5 end
+  assert= quo 1 end
+  12 8 /mod { rem quo }
+  assert= rem 4 end
+  assert= quo 1 end
+  12 9 /mod { rem quo }
+  assert= rem 3 end
+  assert= quo 1 end
+end
+.test_div_mod
+
+fun: .test_udiv_mod { -- err }
+  -1 2 u/mod { rem quo }
+  assert= rem 1 end
+  assert= quo 9223372036854775807 end
+end
+.test_udiv_mod
+
+fun: .test_inc { -- err }
+  assert= 41 .inc 42 end
+  41 { val }
+  assert= val .inc 42 end
+  inc: val
+  assert= val 42 end
+end
+.test_inc
+
+fun: .test_dec { -- err }
+  assert= 42 .dec 41 end
+  42 { val }
+  assert= val .dec 41 end
+  dec: val
+  assert= val 41 end
+end
+.test_dec
+
 fun: .test_negate { -- err }
   assert= 0 .negate 0 end
   assert= 123 .negate -123 end
   assert= -123 .negate 123 end
+  123 { val }
+  assert= val .negate -123 end
+  negate: val
+  assert= val -123 end
 end
 .test_negate
+
+fun: .test_abs { -- err }
+  assert= 0 .abs 0 end
+  assert= -123 .abs 123 end
+  assert= 123 .abs 123 end
+  -123 { val }
+  assert= val .abs 123 end
+  abs: val
+  assert= val 123 end
+end
+.test_abs
+
+fun: .test_bit_clz { -- err }
+  assert= 0 .bit_clz 64 end
+  assert= 1 .bit_clz 63 end
+  assert=
+    0b1000000000000000000000000000000000000000000000000000000000000000 .bit_clz
+    0
+  end
+  60 { val }
+  assert= val .bit_clz 58 end
+  bit_clz: val
+  assert= val 58 end
+end
+.test_bit_clz
+
+fun: .test_bit_ctz { -- err }
+  assert= 0 .bit_ctz 64 end
+  assert= 1 .bit_ctz 0 end
+  assert= 8 .bit_ctz 3 end
+  assert=
+    0b1000000000000000000000000000000000000000000000000000000000000000 .bit_ctz
+    63
+  end
+  40 { val }
+  assert= val .bit_ctz 3 end
+  bit_ctz: val
+  assert= val 3 end
+end
+.test_bit_ctz
+
+fun: .test_bit_len { -- err }
+  assert= 0 .bit_len 0 end
+  assert= 1 .bit_len 1 end
+  assert= 2 .bit_len 2 end
+  assert= 3 .bit_len 2 end
+  assert= 8 .bit_len 4 end
+  assert= 255 .bit_len 8 end
+  assert= 256 .bit_len 9 end
+  40 { val }
+  assert= val .bit_len 6 end
+  bit_len: val
+  assert= val 6 end
+end
+.test_bit_len
+
+fun: .test_pow2_ceil { -- err }
+  assert= 0 .pow2_ceil 1 end
+  assert= 1 .pow2_ceil 1 end
+  assert= 2 .pow2_ceil 2 end
+  assert= 3 .pow2_ceil 4 end
+  assert= 4 .pow2_ceil 4 end
+  assert= 4095 .pow2_ceil 4096 end
+  assert= 4096 .pow2_ceil 4096 end
+  assert= 4097 .pow2_ceil 8192 end
+  4097 { val }
+  assert= val .pow2_ceil 8192 end
+  pow2_ceil: val
+  assert= val 8192 end
+end
+.test_pow2_ceil
+
+fun: .test_min { -- err }
+  assert= 123 234 .min 123 end
+  assert= 234 123 .min 123 end
+  assert= 0 123 .min 0 end
+  assert= 123 0 .min 0 end
+  assert= 0 -123 .min -123 end
+  assert= -123 0 .min -123 end
+  assert= -123 234 .min -123 end
+  assert= 234 -123 .min -123 end
+  -123 { val }
+  assert= val 234 .min -123 end
+  assert= 234 val .min -123 end
+  234 min: val
+  assert= val -123 end
+end
+.test_min
+
+fun: .test_umin { -- err }
+  assert= 123 234 .umin 123 end
+  assert= 234 123 .umin 123 end
+  assert= 0 -123 .umin 0 end
+  assert= -123 0 .umin 0 end
+  assert= -123 234 .umin 234 end
+  assert= 234 -123 .umin 234 end
+  -123 { val }
+  assert= val 234 .umin 234 end
+  assert= 234 val .umin 234 end
+  234 umin: val
+  assert= val 234 end
+end
+.test_umin
+
+fun: .test_max { -- err }
+  assert= 123 234 .max 234 end
+  assert= 234 123 .max 234 end
+  assert= 0 123 .max 123 end
+  assert= 123 0 .max 123 end
+  assert= 0 -123 .max 0 end
+  assert= -123 0 .max 0 end
+  assert= -123 234 .max 234 end
+  assert= 234 -123 .max 234 end
+  -123 { val }
+  assert= val 234 .max 234 end
+  assert= 234 val .max 234 end
+  234 max: val
+  assert= val 234 end
+end
+.test_max
+
+fun: .test_umax { -- err }
+  assert= 123 234 .umax 234 end
+  assert= 234 123 .umax 234 end
+  assert= 0 -123 .umax -123 end
+  assert= -123 0 .umax -123 end
+  assert= -123 234 .umax -123 end
+  assert= 234 -123 .umax -123 end
+  -123 { val }
+  assert= val 234 .umax -123 end
+  assert= 234 val .umax -123 end
+  234 umax: val
+  assert= val -123 end
+end
+.test_umax
+
+fun: .coalesce_high_regs_fun { keep one two -- keep out }
+  keep one two .coalesce
+end
+
+fun: .test_coalesce { -- err }
+  assert= 0 0 .coalesce 0 end
+  assert= 0 10 .coalesce 10 end
+  assert= 10 0 .coalesce 10 end
+  assert= 10 20 .coalesce 10 end
+  assert= 20 10 .coalesce 20 end
+
+  assert= 0 { val } val 10 .coalesce 10 end
+  assert= 0 { val } 10 val .coalesce 10 end
+  assert= 0 { val } 10 coalesce: val val 10 end
+
+  assert= 10 { val } val 0 .coalesce 10 end
+  assert= 10 { val } 0 val .coalesce 10 end
+  assert= 10 { val } 0 coalesce: val val 10 end
+
+  assert= 10 { val } val 20 .coalesce 10 end
+  assert= 10 { val } 20 val .coalesce 20 end
+  assert= 10 { val } 20 coalesce: val val 20 end
+
+  \ The redundant-looking low operand lets us test preservation
+  \ of the register stack and avoidance of accidental clobbering.
+  99 0 1 .coalesce_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 1 end
+
+  99 7 0 .coalesce_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 7 end
+end
+.test_coalesce
+
+fun: .fallback_high_regs_fun { keep one two -- keep out }
+  keep one two .fallback
+end
+
+fun: .test_fallback { -- err }
+  assert= 0 0 .fallback 0 end
+  assert= 0 10 .fallback 10 end
+  assert= 10 0 .fallback 10 end
+  assert= 10 20 .fallback 20 end
+  assert= 20 10 .fallback 10 end
+
+  assert= 0 { val } val 10 .fallback 10 end
+  assert= 0 { val } 10 val .fallback 10 end
+  assert= 0 { val } 10 fallback: val val 10 end
+
+  assert= 10 { val } val 0 .fallback 10 end
+  assert= 10 { val } 0 val .fallback 10 end
+  assert= 10 { val } 0 fallback: val val 10 end
+
+  assert= 10 { val } val 20 .fallback 20 end
+  assert= 10 { val } 20 val .fallback 10 end
+  assert= 10 { val } 20 fallback: val val 10 end
+
+  99 0 1 .fallback_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 1 end
+
+  99 7 0 .fallback_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 7 end
+end
+.test_fallback
+
+fun: .int32_negative { -- val } [
+  0b0_00_100101_00_0000000000000000_00000 .comp_instr \ mov w0, -1
+  1 .comp_args_set
+] end
+
+fun: .test_cint_to_cell { -- err }
+  assert= 0xffffffff .cint_to_cell -1 end
+  assert= 0x7fffffff .cint_to_cell 2147483647 end
+  assert= .int32_negative 0xffff_ffff end
+  assert= .int32_negative .cint_to_cell 0xffff_ffff_ffff_ffff end
+  assert= .int32_negative .cint_to_cell -1 end
+  0xffffffff { val }
+  assert= val .cint_to_cell -1 end
+  cint_to_cell: val
+  assert= val -1 end
+end
+.test_cint_to_cell
+
+fun: .test_eq_zero { -- err }
+  assert= 0 =0 1 end
+  assert= 7 =0 0 end
+  0 { val }
+  assert= val =0 1 end
+  =0: val
+  assert= val 1 end
+end
+.test_eq_zero
+
+fun: .test_ne_zero { -- err }
+  assert= 0 <>0 0 end
+  assert= 7 <>0 1 end
+  7 { val }
+  assert= val <>0 1 end
+  <>0: val
+  assert= val 1 end
+end
+.test_ne_zero
+
+fun: .test_lt_zero { -- err }
+  assert= -7 <0 1 end
+  assert= 0 <0 0 end
+  -7 { val }
+  assert= val <0 1 end
+  <0: val
+  assert= val 1 end
+end
+.test_lt_zero
+
+fun: .test_gt_zero { -- err }
+  assert= 7 >0 1 end
+  assert= 0 >0 0 end
+  7 { val }
+  assert= val >0 1 end
+  >0: val
+  assert= val 1 end
+end
+.test_gt_zero
+
+fun: .test_le_zero { -- err }
+  assert= -7 <=0 1 end
+  assert= 0 <=0 1 end
+  assert= 7 <=0 0 end
+  0 { val }
+  assert= val <=0 1 end
+  <=0: val
+  assert= val 1 end
+end
+.test_le_zero
+
+fun: .test_ge_zero { -- err }
+  assert= -7 >=0 0 end
+  assert= 0 >=0 1 end
+  assert= 7 >=0 1 end
+  0 { val }
+  assert= val >=0 1 end
+  >=0: val
+  assert= val 1 end
+end
+.test_ge_zero
 
 \ This mostly verifies the normal word path; assertion comparisons use their own
 \ emitted branches.
@@ -1471,6 +1908,11 @@ fun: .test_equal { -- err }
   assert= 123 -123 = 0 end
   assert= -123 -123 = 1 end
   assert= 123 123 = 1 end
+  7 { val }
+  assert= val 7 = 1 end
+  assert= 7 val = 1 end
+  7 =: val
+  assert= val 1 end
 end
 .test_equal
 
@@ -1483,6 +1925,11 @@ fun: .test_not_equal { -- err }
   assert= 123 -123 <> 1 end
   assert= -123 -123 <> 0 end
   assert= 123 123 <> 0 end
+  7 { val }
+  assert= val 8 <> 1 end
+  assert= 8 val <> 1 end
+  8 <>: val
+  assert= val 1 end
 end
 .test_not_equal
 
@@ -1534,18 +1981,168 @@ fun: .test_greater_equal { -- err }
 end
 .test_greater_equal
 
-fun: .test_unsigned_compare { -- err }
+fun: .test_unsigned_greater { -- err }
+  assert= -1 0 u> 1 end
+  assert= 0 -1 u> 0 end
+end
+.test_unsigned_greater
+
+fun: .test_unsigned_lesser { -- err }
   assert= 0 0 u< 0 end
   assert= 0 1 u< 1 end
   assert= -1 0 u< 0 end
   assert= 0 -1 u< 1 end
-  assert= -1 0 u> 1 end
-  assert= 0 -1 u> 0 end
+end
+.test_unsigned_lesser
+
+fun: .test_unsigned_lesser_equal { -- err }
   assert= 0 -1 u<= 1 end
   assert= -1 0 u<= 0 end
+end
+.test_unsigned_lesser_equal
+
+fun: .test_unsigned_greater_equal { -- err }
   assert= -1 0 u>= 1 end
   assert= 0 -1 u>= 0 end
+end
+.test_unsigned_greater_equal
 
+fun: .test_cells { -- err }
+  assert= 7 .cells 56 end
+  7 { val }
+  assert= val .cells 56 end
+  cells: val
+  assert= val 56 end
+end
+.test_cells
+
+fun: .test_div_cells { -- err }
+  assert= 56 /cells 7 end
+  56 { val }
+  assert= val /cells 7 end
+  /cells: val
+  assert= val 7 end
+end
+.test_div_cells
+
+fun: .test_add_cell { -- err }
+  assert= 100 +cell 108 end
+  100 { val }
+  assert= val +cell 108 end
+  +cell: val
+  assert= val 108 end
+end
+.test_add_cell
+
+fun: .test_sub_cell { -- err }
+  assert= 100 -cell 92 end
+  100 { val }
+  assert= val -cell 92 end
+  -cell: val
+  assert= val 92 end
+end
+.test_sub_cell
+
+fun: .test_odd { -- err }
+  assert= 100 .odd 0 end
+  assert= 101 .odd 1 end
+  101 { val }
+  assert= val .odd 1 end
+  odd: val
+  assert= val 1 end
+end
+.test_odd
+
+fun: .test_is_aligned_to { -- err }
+  assert= 0x1238 8 .is_aligned_to 1 end
+  assert= 0x1234 8 .is_aligned_to 0 end
+end
+.test_is_aligned_to
+
+fun: .test_align_down { -- err }
+  assert= 0x1234 16 .align_down 0x1230 end
+end
+.test_align_down
+
+fun: .test_align_up { -- err }
+  assert= 0x1234 16 .align_up 0x1240 end
+end
+.test_align_up
+
+fun: .test_invert { -- err }
+  assert= 0b101010 .invert -43 end
+  0b101010 { val }
+  assert= val .invert -43 end
+  invert: val
+  assert= val -43 end
+end
+.test_invert
+
+fun: .test_low_bits { -- err }
+  assert= 5 .low_bits 31 end
+  5 { val }
+  assert= val .low_bits 31 end
+  low_bits: val
+  assert= val 31 end
+end
+.test_low_bits
+
+fun: .test_bits_trunc { -- err }
+  assert= 0x1234 8 .bits_trunc 0x34 end
+end
+.test_bits_trunc
+
+fun: .test_bits_clear { -- err }
+  assert= 0b1001000110100 0b11110000 .bits_clear 0b1001000000100 end
+end
+.test_bits_clear
+
+fun: .test_bit_mask_get { -- err }
+  assert= 0b1001000110100 0b111111110000 .bit_mask_get 0b100011 end
+end
+.test_bit_mask_get
+
+fun: .test_bit_mask_set { -- err }
+  assert=
+    0b10101011 0b111111110000 0b1001000110100 .bit_mask_set
+    0b1101010110100
+  end
+  assert=
+    0b0 0b111111110000 0b1001000110100 .bit_mask_set
+    0b1000000000100
+  end
+
+  0b10101011 { val }
+  assert=
+    val 0b111111110000 0b1001000110100 .bit_mask_set
+    0b1101010110100
+  end
+
+  0b111111110000 { val }
+  assert=
+    0b10101011 val 0b1001000110100 .bit_mask_set
+    0b1101010110100
+  end
+
+  0b1001000110100 { val }
+  assert=
+    0b10101011 0b111111110000 val .bit_mask_set
+    0b1101010110100
+  end
+  0b10101011 0b111111110000 bit_mask_set: val
+  assert= val 0b1101010110100 end
+
+  \ The redundant-looking low operand lets us test preservation
+  \ of the register stack and avoidance of accidental clobbering.
+  99
+  0b10101011 0b111111110000 0b1001000110100 .bit_mask_set
+  { keep out }
+  assert= keep 99 end
+  assert= out 0b1101010110100 end
+end
+.test_bit_mask_set
+
+fun: .test_within { -- err }
   assert= -1 0 10 .within 0 end
   assert= 0 0 10 .within 1 end
   assert= 5 0 10 .within 1 end
@@ -1556,7 +2153,7 @@ fun: .test_unsigned_compare { -- err }
   assert= 5 0 10 .uwithin 1 end
   assert= 10 0 10 .uwithin 0 end
 end
-.test_unsigned_compare
+.test_within
 
 fun: .test_compare_many { -- err }
   \ Keep these direct. The multi-check words below lower directly to compare
@@ -1655,242 +2252,6 @@ fun: .test_assert { -- err }
   err " assertion failed: 123 456 =" .assert_str_has
 end
 .test_assert
-
-fun: .test_arith { -- err }
-  assert= 234 123 - 111 end
-  assert= 234 123 + 357 end
-  assert= 234 123 * 28782 end
-  assert= 234 123 / 1 end
-end
-.test_arith
-
-fun: .test_comptime_stack_arith { -- err }
-  assert= 234 123 - 111 end
-  assert= 234 123 + 357 end
-  assert= 234 123 * 28782 end
-  assert= 10 20 + 30 40 - * -300 end
-  assert= 10 20 + 100 30 - * 2100 end
-  assert= 24 4 / 64 8 u/ + 14 end
-  assert= 29 5 .mod 20 6 .mod + 6 end
-  assert= 29 5 /mod 20 6 /mod + + + 14 end
-  assert= 1 4 .lsl 128 3 .lsr + 32 end
-  assert= -128 2 .asr 0xff .and 224 end
-  assert= 0b1010 0b1100 .or 0b0110 .xor 0b1000 end
-  assert= 10 20 < 30 5 > + 2 end
-  assert= 20 30 + =0 false end
-  assert= 10 20 30 + <>0 + 11 end
-  assert= -123 .abs 10 20 .min 30 40 .max + + 173 end
-  assert= 255 .bit_len 256 .bit_len + 17 end
-end
-.test_comptime_stack_arith
-
-fun: .test_mod { -- err }
-  assert= 12 2 .mod 0 end
-  assert= 12 3 .mod 0 end
-  assert= 12 4 .mod 0 end
-  assert= 12 5 .mod 2 end
-  assert= 12 6 .mod 0 end
-  assert= 12 7 .mod 5 end
-  assert= 12 8 .mod 4 end
-  assert= 12 9 .mod 3 end
-end
-.test_mod
-
-fun: .test_slash_mod { -- err }
-  12 2 /mod { mod div }
-  assert= mod 0 end
-  assert= div 6 end
-  12 3 /mod { mod div }
-  assert= mod 0 end
-  assert= div 4 end
-  12 4 /mod { mod div }
-  assert= mod 0 end
-  assert= div 3 end
-  12 5 /mod { mod div }
-  assert= mod 2 end
-  assert= div 2 end
-  12 6 /mod { mod div }
-  assert= mod 0 end
-  assert= div 2 end
-  12 7 /mod { mod div }
-  assert= mod 5 end
-  assert= div 1 end
-  12 8 /mod { mod div }
-  assert= mod 4 end
-  assert= div 1 end
-  12 9 /mod { mod div }
-  assert= mod 3 end
-  assert= div 1 end
-end
-.test_slash_mod
-
-fun: .test_unsigned_div_mod { -- err }
-  assert= -1 2 u/ 9223372036854775807 end
-  assert= -1 2 .umod 1 end
-  -1 2 u/mod { mod div }
-  assert= mod 1 end
-  assert= div 9223372036854775807 end
-end
-.test_unsigned_div_mod
-
-fun: .test_abs { -- err }
-  assert= 0 .abs 0 end
-  assert= -123 .abs 123 end
-  assert= 123 .abs 123 end
-end
-.test_abs
-
-fun: .test_min { -- err }
-  assert= 123 234 .min 123 end
-  assert= 234 123 .min 123 end
-  assert= 0 123 .min 0 end
-  assert= 123 0 .min 0 end
-  assert= 0 -123 .min -123 end
-  assert= -123 0 .min -123 end
-  assert= -123 234 .min -123 end
-  assert= 234 -123 .min -123 end
-end
-.test_min
-
-fun: .test_umin { -- err }
-  assert= 123 234 .umin 123 end
-  assert= 234 123 .umin 123 end
-  assert= 0 -123 .umin 0 end
-  assert= -123 0 .umin 0 end
-  assert= -123 234 .umin 234 end
-  assert= 234 -123 .umin 234 end
-end
-.test_umin
-
-fun: .test_max { -- err }
-  assert= 123 234 .max 234 end
-  assert= 234 123 .max 234 end
-  assert= 0 123 .max 123 end
-  assert= 123 0 .max 123 end
-  assert= 0 -123 .max 0 end
-  assert= -123 0 .max 0 end
-  assert= -123 234 .max 234 end
-  assert= 234 -123 .max 234 end
-end
-.test_max
-
-fun: .test_umax { -- err }
-  assert= 123 234 .umax 234 end
-  assert= 234 123 .umax 234 end
-  assert= 0 -123 .umax -123 end
-  assert= -123 0 .umax -123 end
-  assert= -123 234 .umax -123 end
-  assert= 234 -123 .umax -123 end
-end
-.test_umax
-
-fun: .test_bit_len { -- err }
-  assert= 0 .bit_len 0 end
-  assert= 1 .bit_len 1 end
-  assert= 2 .bit_len 2 end
-  assert= 3 .bit_len 2 end
-  assert= 8 .bit_len 4 end
-  assert= 255 .bit_len 8 end
-  assert= 256 .bit_len 9 end
-end
-.test_bit_len
-
-fun: .test_pow2_ceil { -- err }
-  assert= 0 .pow2_ceil 1 end
-  assert= 1 .pow2_ceil 1 end
-  assert= 2 .pow2_ceil 2 end
-  assert= 3 .pow2_ceil 4 end
-  assert= 4 .pow2_ceil 4 end
-  assert= 4095 .pow2_ceil 4096 end
-  assert= 4096 .pow2_ceil 4096 end
-  assert= 4097 .pow2_ceil 8192 end
-end
-.test_pow2_ceil
-
-fun: .test_bit_counts { -- err }
-  assert= 0 .bit_clz 64 end
-  assert= 1 .bit_clz 63 end
-  assert=
-    0b1000000000000000000000000000000000000000000000000000000000000000 .bit_clz
-    0
-  end
-
-  assert= 0 .bit_ctz 64 end
-  assert= 1 .bit_ctz 0 end
-  assert= 8 .bit_ctz 3 end
-  assert=
-    0b1000000000000000000000000000000000000000000000000000000000000000 .bit_ctz
-    63
-  end
-end
-.test_bit_counts
-
-fun: .test_bit_masks { -- err }
-  assert= 5 .low_bits 31 end
-  assert= 0x1238 8 .is_aligned_to 1 end
-  assert= 0x1234 8 .is_aligned_to 0 end
-  assert= 0x1234 16 .align_down 0x1230 end
-  assert= 0x1234 16 .align_up 0x1240 end
-  assert= 0x1234 8 .bits_trunc 0x34 end
-  assert= 0b1001000110100 0b111111110000 .bit_mask_get 0b100011 end
-  assert= 0b1001000110100 0b11110000 .bits_clear 0b1001000000100 end
-  assert=
-    0b10101011 0b1001000110100 0b111111110000 .bit_mask_set
-    0b1101010110100
-  end
-  assert=
-    0b0 0b1001000110100 0b111111110000 .bit_mask_set
-    0b1000000000100
-  end
-  99 0b10101011 0b1001000110100 0b111111110000 .bit_mask_set { val mask }
-  assert= val 99 end
-  assert= mask 0b1101010110100 end
-end
-.test_bit_masks
-
-fun: .test_local_mutators { -- err }
-  10 { val } 7 +: val assert= val 17 end
-  7 { val } 3 *: val assert= val 21 end
-  0b110101 { val } 0b101010 and: val assert= val 0b100000 end
-  0b110101 { val } 0b001010 or: val assert= val 0b111111 end
-  0b110101 { val } 0b101010 xor: val assert= val 0b011111 end
-
-  -100 { val } 6 min: val assert= val -100 end
-  -1 { val } 10 umin: val assert= val 10 end
-  81 { val } -10 max: val assert= val 81 end
-  -1 { val } 10 umax: val assert= val -1 end
-  42 { val } 99 fallback: val assert= val 99 end
-  7 { val } 7 =: val assert= val 1 end
-  7 { val } 8 <>: val assert= val 1 end
-
-  41 { val } inc: val assert= val 42 end dec: val assert= val 41 end
-  42 { val } negate: val assert= val -42 end
-  -42 { val } abs: val assert= val 42 end
-  0b101010 { val } invert: val assert= val 0b101010 .invert end
-  60 { val } bit_clz: val assert= val 58 end
-  40 { val } bit_ctz: val assert= val 3 end
-  40 { val } bit_len: val assert= val 6 end
-  4097 { val } pow2_ceil: val assert= val 8192 end
-  0xffffffff { val } cint_to_cell: val assert= val -1 end
-  7 { val } cells: val assert= val 56 end
-  56 { val } /cells: val assert= val 7 end
-  100 { val } +cell: val assert= val 108 end
-  100 { val } -cell: val assert= val 92 end
-  101 { val } odd: val assert= val 1 end
-  5 { val } low_bits: val assert= val 31 end
-
-  0 { val } =0: val assert= val 1 end
-  7 { val } <>0: val assert= val 1 end
-  -7 { val } <0: val assert= val 1 end
-  7 { val } >0: val assert= val 1 end
-  0 { val } <=0: val assert= val 1 end
-  0 { val } >=0: val assert= val 1 end
-
-  0b100000000001 { val }
-  0b0110 0b11110000 bit_mask_set: val
-  assert= val 0b100001100001 end
-end
-.test_local_mutators
 
 fun: .test_asm_new_bits { -- err }
   assert= 2 3 4 .asm_bic 0b10001010001001000000000001100010 end
@@ -2185,18 +2546,6 @@ fun: .test_call_name_failures { -- Err }
 end
 .test_call_name_failures
 
-fun: .int32_negative { -- val } [
-  0b0_00_100101_00_0000000000000000_00000 .comp_instr \ mov w0, -1
-  1 .comp_args_set
-] end
-
-fun: .test_cint_to_cell { -- err }
-  assert= .int32_negative 0xffff_ffff end
-  assert= .int32_negative .cint_to_cell 0xffff_ffff_ffff_ffff end
-  assert= .int32_negative .cint_to_cell -1 end
-end
-.test_cint_to_cell
-
 fun: .test_comptime_arg_stack_sum16_fun { -- val }
   100 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
   + + + + + + + + + + + + + + +
@@ -2249,28 +2598,6 @@ fun: .test_span_push_9 { -- err }
   stk .stack_deinit
 end
 .test_span_push_9
-
-fun: .fallback_high_regs_fun { keep one two -- keep out } keep one two .fallback end
-
-fun: .test_fallback { -- err }
-  assert= 0 0 .fallback 0 end
-  assert= 0 1 .fallback 1 end
-  assert= 1 0 .fallback 1 end
-  assert= 0 -1 .fallback -1 end
-  assert= -1 0 .fallback -1 end
-  assert= 0 10 .fallback 10 end
-  assert= 10 0 .fallback 10 end
-  assert= 10 20 .fallback 20 end
-  assert= 20 10 .fallback 10 end
-
-  99 0 1 .fallback_high_regs_fun { keep out }
-  assert= keep 99 end
-  assert= out 1 end
-  99 7 0 .fallback_high_regs_fun { keep out }
-  assert= keep 99 end
-  assert= out 7 end
-end
-.test_fallback
 
 fun: .test_errf { -- err }
   " codes: %zd %zd %zd" 10 20 30 .errf { buf0 }
@@ -3543,41 +3870,78 @@ fun: .main_run { -- err }
   .test_load_store_typed
   .test_load_store_exec
   .test_load_store_pair_swap
+  .test_or
+  .test_and
+  .test_xor
+  .test_lsl
+  .test_lsr
+  .test_asr
+  .test_add
+  .test_sub
+  .test_mul
+  .test_div
+  .test_udiv
+  .test_mod
+  .test_umod
+  .test_div_mod
+  .test_udiv_mod
+  .test_inc
+  .test_dec
   .test_negate
+  .test_abs
+  .test_bit_clz
+  .test_bit_ctz
+  .test_bit_len
+  .test_pow2_ceil
+  .test_min
+  .test_umin
+  .test_max
+  .test_umax
+  .test_coalesce
+  .test_fallback
+  .test_cint_to_cell
+  .test_eq_zero
+  .test_ne_zero
+  .test_lt_zero
+  .test_gt_zero
+  .test_le_zero
+  .test_ge_zero
   .test_equal
   .test_not_equal
   .test_greater
   .test_lesser
   .test_lesser_equal
   .test_greater_equal
-  .test_unsigned_compare
+  .test_unsigned_greater
+  .test_unsigned_lesser
+  .test_unsigned_lesser_equal
+  .test_unsigned_greater_equal
+  .test_cells
+  .test_div_cells
+  .test_add_cell
+  .test_sub_cell
+  .test_odd
+  .test_is_aligned_to
+  .test_align_down
+  .test_align_up
+  .test_invert
+  .test_low_bits
+  .test_bits_trunc
+  .test_bits_clear
+  .test_bit_mask_get
+  .test_bit_mask_set
+  .test_within
   .test_compare_many
   .test_assert
-  .test_arith
-  .test_comptime_stack_arith
-  .test_mod
-  .test_slash_mod
-  .test_unsigned_div_mod
-  .test_abs
-  .test_min
-  .test_umin
-  .test_max
-  .test_umax
-  .test_bit_len
-  .test_pow2_ceil
-  .test_bit_counts
-  .test_bit_masks
   .test_asm_new_bits
   .test_asm_cmp_branch
   .test_asm_append_imm_to_reg
   .test_cstr_eq
   .test_cstr_less
   .test_call_names
-  .test_cint_to_cell
   .test_comptime_arg_stack_sum16
   .test_comptime_arg_stack_mod_scratch
   .test_span_push_9
-  .test_fallback
   .test_errf
   .test_strf_into
   .test_errf_exact_fill

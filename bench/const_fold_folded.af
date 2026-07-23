@@ -8,7 +8,7 @@ use' lang.af
 fun: .folded_step { acc -- out }
   acc
   11 22 + 333 + 44 - 5 * 6 / 7 .mod 8 .lsl 9 .or 10 .xor 3 .and
-  40 .max 50 .min 4 .cells + 24 /cells + 0 99 .fallback + 37 8 .align_up +
+  40 .max 50 .min 4 .cells + 24 /cells + 99 0 .coalesce + 37 8 .align_up +
   +
 end
 
