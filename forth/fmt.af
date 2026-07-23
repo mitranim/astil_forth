@@ -1,0 +1,21 @@
+use' lang.af
+
+fun: .bytes_to_hex_str { src len -- tar len err }
+  len 1 .lsl { tar_len }
+  tar_len .inc 1 .ctx_alloc { tar }
+  tar { cur }
+  src len + { ceil }
+  " 0123456789abcdef" { digs }
+
+  loop
+    src ceil < .while
+    src @b { byte }
+    byte 4 .lsr 0b1111 .and digs + @b cur      !b \ high bits digit
+    byte        0b1111 .and digs + @b cur .inc !b \ low  bits digit
+    inc: src
+    2 +: cur
+  end
+
+  nil cur !b \ null terminator
+  tar tar_len
+end

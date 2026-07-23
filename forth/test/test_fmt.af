@@ -1,0 +1,30 @@
+use' ../fmt.af
+
+fun: .bytes_to_hex_str_with_mem { src len buf cap -- out len err top }
+  alloca' Ctx { ctx }
+  buf cap ctx .ctx_init
+  ctx .with_ctx src len .bytes_to_hex_str end
+  ctx .Ctx_top @
+end
+
+fun: .test_fmt { -- err }
+  16 { cap }
+  cap .alloca { buf }
+
+  buf cap 0xff .memfill
+  s" ab" buf 5 .bytes_to_hex_str_with_mem { out len err top }
+  err .try
+
+  out " 6162" .assert_str_eq
+  assert= len 4 end
+  assert= top buf 5 + end
+  assert= buf 5 + @b 0xff end
+
+  buf cap 0xff .memfill
+  s" ab" buf 4 .bytes_to_hex_str_with_mem { out len err top }
+
+  err " unable to allocate context memory: out of space" .assert_str_eq
+  assert= top buf end
+  assert= buf 4 + @b 0xff end
+end
+.test_fmt

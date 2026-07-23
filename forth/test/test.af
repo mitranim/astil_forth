@@ -3511,6 +3511,7 @@ s" ./test_import_empty.af" .use
 
 use' ./test_const_fold.af
 use' ./test_simd.af
+use' ./test_fmt.af
 
 \ For AOT-compiled testing. Must call every test which is also called above
 \ during the initial interpretation, except for any tests which depend on
@@ -3642,6 +3643,7 @@ fun: .main_run { -- err }
   .test_escaped_literals
   .test_const_fold_all
   .test_simd_asm
+  .test_fmt
 end
 
 fun: .main { -- exit }
