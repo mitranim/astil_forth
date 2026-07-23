@@ -1,0 +1,72 @@
+use' ./lang.af
+use' ./errno.af
+use' ./fmt.af
+use' ./io.af
+use' ./os.af
+
+\ ## POSIX process spawning
+\
+\ Darwin defines both public spawn types as opaque pointer-sized handles.
+\ Other Unix ABIs use different representations. If we ever add support
+\ for other targets, we'll have to define the types conditionally.
+
+8 8 opaque: Posix_spawn_attr
+8 8 opaque: Posix_spawn_file_actions
+
+\ Standard flags. Numeric values are Darwin ABI choices.
+1     let: POSIX_SPAWN_RESETIDS
+2     let: POSIX_SPAWN_SETPGROUP
+4     let: POSIX_SPAWN_SETSIGDEF
+8     let: POSIX_SPAWN_SETSIGMASK
+0x400 let: POSIX_SPAWN_SETSID
+
+\ Darwin does not export POSIX spawn scheduling-attribute functions or their
+\ `POSIX_SPAWN_SETSCHED*` flags because Priority Scheduling is unsupported.
+
+6 1 extern: .posix_spawn  posix_spawn  ( pid path actions attr argv env -- err :Cint )
+6 1 extern: .posix_spawnp posix_spawnp ( pid file actions attr argv env -- err :Cint )
+
+1 1 extern: .posix_spawn_file_actions_init     posix_spawn_file_actions_init     ( actions -- err :Cint )
+1 1 extern: .posix_spawn_file_actions_destroy  posix_spawn_file_actions_destroy  ( actions -- err :Cint )
+2 1 extern: .posix_spawn_file_actions_addclose posix_spawn_file_actions_addclose ( actions fdes -- err :Cint )
+3 1 extern: .posix_spawn_file_actions_adddup2  posix_spawn_file_actions_adddup2  ( actions fdes new_fdes -- err :Cint )
+5 1 extern: .posix_spawn_file_actions_addopen  posix_spawn_file_actions_addopen  ( actions fdes path flags mode -- err :Cint )
+
+\ POSIX.1-2024 standardized these without `_np`; Darwin still exports old ABI
+\ spellings. AF names follow POSIX; linked C symbols follow Darwin.
+2 1 extern: .posix_spawn_file_actions_addchdir  posix_spawn_file_actions_addchdir_np  ( actions path -- err :Cint )
+2 1 extern: .posix_spawn_file_actions_addfchdir posix_spawn_file_actions_addfchdir_np ( actions fdes -- err :Cint )
+
+1 1 extern: .posix_spawnattr_init          posix_spawnattr_init          ( attr          -- err :Cint )
+1 1 extern: .posix_spawnattr_destroy       posix_spawnattr_destroy       ( attr          -- err :Cint )
+2 1 extern: .posix_spawnattr_getflags      posix_spawnattr_getflags      ( attr flags    -- err :Cint )
+2 1 extern: .posix_spawnattr_setflags      posix_spawnattr_setflags      ( attr flags    -- err :Cint )
+2 1 extern: .posix_spawnattr_getpgroup     posix_spawnattr_getpgroup     ( attr pgroup   -- err :Cint )
+2 1 extern: .posix_spawnattr_setpgroup     posix_spawnattr_setpgroup     ( attr pgroup   -- err :Cint )
+2 1 extern: .posix_spawnattr_getsigdefault posix_spawnattr_getsigdefault ( attr sigset   -- err :Cint )
+2 1 extern: .posix_spawnattr_setsigdefault posix_spawnattr_setsigdefault ( attr sigset   -- err :Cint )
+2 1 extern: .posix_spawnattr_getsigmask    posix_spawnattr_getsigmask    ( attr sigset   -- err :Cint )
+2 1 extern: .posix_spawnattr_setsigmask    posix_spawnattr_setsigmask    ( attr sigset   -- err :Cint )
+
+\ ## Process scheduling
+\
+\ Policy values and `Sched_param` layout are Darwin ABI choices.
+\ Linux uses different policy values. Darwin exposes only this
+\ subset of `<sched.h>`.
+
+1 let: SCHED_OTHER
+2 let: SCHED_RR
+4 let: SCHED_FIFO
+
+struct: Sched_param
+  S32 1 field: .Sched_param_priority
+  U8  4 field: .Sched_param_opaque
+end
+
+0 1 extern: .sched_yield            sched_yield            (        -- 0|-1 :Cint )
+1 1 extern: .sched_get_priority_min sched_get_priority_min ( policy -- min  :Cint )
+1 1 extern: .sched_get_priority_max sched_get_priority_max ( policy -- max  :Cint )
+
+\ Darwin does not export optional POSIX process-scheduling calls such as
+\ `sched_getparam`, `sched_setparam`, `sched_getscheduler`, or
+\ `sched_setscheduler`; thin bindings cannot declare them here.

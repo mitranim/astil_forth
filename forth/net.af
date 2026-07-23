@@ -11,28 +11,114 @@ use' ./io.af
 \ Caution: see notes in `./io.af` about normalizing
 \ C `int` outputs to machine words before using them.
 
+\ Numeric socket-family and option values are Darwin ABI choices. Several
+\ differ on Linux; another target must supply its own constant translation.
 1      let: AI_PASSIVE   \ Any host IP is fine.
-0      let: AF_UNSPEC    \ Both IPv4 and IPv6.
+2      let: AI_CANONNAME
+4      let: AI_NUMERICHOST
+0x400  let: AI_ADDRCONFIG
+0x800  let: AI_V4MAPPED
+0x1000 let: AI_NUMERICSERV
+
+0       let: AF_UNSPEC    \ Both IPv4 and IPv6.
+1       let: AF_UNIX
+AF_UNIX let: AF_LOCAL
+2       let: AF_INET
+30      let: AF_INET6
+
 1      let: SOCK_STREAM  \ TCP.
+2      let: SOCK_DGRAM
+3      let: SOCK_RAW
+5      let: SOCK_SEQPACKET
 128    let: SOMAXCONN    \ Darwin's maximum listen backlog.
 0xffff let: SOL_SOCKET   \ Tells `.setsockopt` to configure socket itself.
+1      let: SO_DEBUG
+2      let: SO_ACCEPTCONN
 4      let: SO_REUSEADDR \ Enables local address reuse.
+8      let: SO_KEEPALIVE
+0x10   let: SO_DONTROUTE
+0x20   let: SO_BROADCAST
+0x80   let: SO_LINGER
+0x100  let: SO_OOBINLINE
+0x200  let: SO_REUSEPORT
+0x1001 let: SO_SNDBUF
+0x1002 let: SO_RCVBUF
+0x1003 let: SO_SNDLOWAT
+0x1004 let: SO_RCVLOWAT
+0x1005 let: SO_SNDTIMEO
+0x1006 let: SO_RCVTIMEO
+0x1007 let: SO_ERROR
+0x1008 let: SO_TYPE
+
+0 let: SHUT_RD
+1 let: SHUT_WR
+2 let: SHUT_RDWR
+
+0   let: IPPROTO_IP
+1   let: IPPROTO_ICMP
+6   let: IPPROTO_TCP
+17  let: IPPROTO_UDP
+41  let: IPPROTO_IPV6
+58  let: IPPROTO_ICMPV6
+255 let: IPPROTO_RAW
+
+0                let: INADDR_ANY
+0x7f000001       let: INADDR_LOOPBACK
+0xffffffff       let: INADDR_BROADCAST
+INADDR_BROADCAST let: INADDR_NONE
+16               let: INET_ADDRSTRLEN
+46               let: INET6_ADDRSTRLEN
+
+1    let: NI_NOFQDN
+2    let: NI_NUMERICHOST
+4    let: NI_NAMEREQD
+8    let: NI_NUMERICSERV
+0x10 let: NI_DGRAM
+1025 let: NI_MAXHOST
+32   let: NI_MAXSERV
 
 \ Flags for `.recv`.
 1        let: MSG_OOB
 1 1 .lsl let: MSG_PEEK
+4        let: MSG_DONTROUTE
+8        let: MSG_EOR
+0x10     let: MSG_TRUNC
+0x20     let: MSG_CTRUNC
 1 6 .lsl let: MSG_WAITALL
+0x80     let: MSG_DONTWAIT
+0x80000  let: MSG_NOSIGNAL
 
 4 1 extern: .getaddrinfo  getaddrinfo  ( node service hints res -- code :Cint )
-1 0 extern: .freeaddrinfo freeaddrinfo
-1 1 extern: .gai_strerror gai_strerror
+1 0 extern: .freeaddrinfo freeaddrinfo ( info --          )
+1 1 extern: .gai_strerror gai_strerror ( code -- msg      )
+7 1 extern: .getnameinfo  getnameinfo  ( addr len host hostcap serv servcap flags -- code :Cint )
+2 1 extern: .gethostname  gethostname  ( buf cap              -- 0|-1    :Cint )
+0 1 extern: .gethostid    gethostid    (                      -- id            )
 5 1 extern: .setsockopt   setsockopt   ( sock lvl opt val len -- 0|-1    :Cint )
 3 1 extern: .socket       socket       ( fam type prot        -- sock|-1 :Cint )
 3 1 extern: .bind         bind         ( sock addr len        -- 0|-1    :Cint )
 2 1 extern: .listen       listen       ( sock backlog         -- 0|-1    :Cint )
 3 1 extern: .accept       accept       ( sock addr len_adr    -- sock|-1 :Cint )
+3 1 extern: .connect      connect      ( sock addr len        -- 0|-1    :Cint )
+3 1 extern: .getpeername  getpeername  ( sock addr len_adr    -- 0|-1    :Cint )
+3 1 extern: .getsockname  getsockname  ( sock addr len_adr    -- 0|-1    :Cint )
+5 1 extern: .getsockopt   getsockopt   ( sock lvl opt val len -- 0|-1    :Cint )
+4 1 extern: .socketpair   socketpair   ( fam type prot fdes   -- 0|-1    :Cint )
+2 1 extern: .shutdown     shutdown     ( sock how             -- 0|-1    :Cint )
 4 1 extern: .send         send         ( sock buf len flags   -- len|-1        )
+6 1 extern: .sendto       sendto       ( sock buf len flags addr addrlen -- len|-1 )
+3 1 extern: .sendmsg      sendmsg      ( sock msg flags       -- len|-1        )
 4 1 extern: .recv         recv         ( sock buf len flags   -- len|-1        )
+6 1 extern: .recvfrom     recvfrom     ( sock buf len flags addr addrlen -- len|-1 )
+3 1 extern: .recvmsg      recvmsg      ( sock msg flags       -- len|-1        )
+1 1 extern: .sockatmark   sockatmark   ( sock                 -- yes|-1 :Cint  )
+
+1 1 extern: .htonl     htonl     ( host            -- net    :Cuint )
+1 1 extern: .htons     htons     ( host            -- net    :Cuint )
+1 1 extern: .ntohl     ntohl     ( net             -- host   :Cuint )
+1 1 extern: .ntohs     ntohs     ( net             -- host   :Cuint )
+3 1 extern: .inet_pton inet_pton ( fam src dst     -- status :Cint  )
+4 1 extern: .inet_ntop inet_ntop ( fam src dst cap -- str           )
 
 struct: Sockaddr
   U8 1  field: .Sockaddr_len
@@ -51,7 +137,63 @@ struct: Addrinfo
   Adr   1 field: .Addrinfo_next      \ Addrinfo *
 end
 
-U8 128 arr: Sockaddr_storage
+128 8 opaque: Sockaddr_storage
+
+struct: In_addr
+  U32 1 field: .In_addr_addr
+end
+
+16 4 opaque: In6_addr
+
+struct: Sockaddr_in
+  U8      1 field: .Sockaddr_in_len
+  U8      1 field: .Sockaddr_in_family
+  U16     1 field: .Sockaddr_in_port
+  In_addr 1 field: .Sockaddr_in_addr
+  U8      8 field: .Sockaddr_in_zero
+end
+
+struct: Sockaddr_in6
+  U8       1 field: .Sockaddr_in6_len
+  U8       1 field: .Sockaddr_in6_family
+  U16      1 field: .Sockaddr_in6_port
+  U32      1 field: .Sockaddr_in6_flowinfo
+  In6_addr 1 field: .Sockaddr_in6_addr
+  U32      1 field: .Sockaddr_in6_scope_id
+end
+
+struct: Sockaddr_un
+  U8  1   field: .Sockaddr_un_len
+  U8  1   field: .Sockaddr_un_family
+  U8  104 field: .Sockaddr_un_path
+end
+
+struct: Iovec
+  Adr 1 field: .Iovec_base
+  U64 1 field: .Iovec_len
+end
+
+\ Darwin `msghdr`; Linux uses different scalar widths for two length fields.
+struct: Msghdr
+  Adr  1 field: .Msghdr_name
+  U32  1 field: .Msghdr_namelen
+  Adr  1 field: .Msghdr_iov
+  S32  1 field: .Msghdr_iovlen
+  Adr  1 field: .Msghdr_control
+  U32  1 field: .Msghdr_controllen
+  S32  1 field: .Msghdr_flags
+end
+
+struct: Cmsghdr
+  U32 1 field: .Cmsghdr_len
+  S32 1 field: .Cmsghdr_level
+  S32 1 field: .Cmsghdr_type
+end
+
+struct: Linger
+  S32 1 field: .Linger_onoff
+  S32 1 field: .Linger_linger
+end
 
 \ Result is `Addrinfo *` and should be freed with `.freeaddrinfo`.
 fun: .net_addr_info { port -- ainf err }

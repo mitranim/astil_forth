@@ -59,6 +59,40 @@ struct: Iov
   Cell 1 field: .Iov_len  \ [XSI] Size of region iov_base points to
 end
 
+\ macOS 15.5 ABI layouts used by common IO interfaces.
+struct: Flock
+  S64 1 field: .Flock_start
+  S64 1 field: .Flock_len
+  S32 1 field: .Flock_pid
+  S16 1 field: .Flock_type
+  S16 1 field: .Flock_whence
+end
+
+struct: Pollfd
+  S32 1 field: .Pollfd_fd
+  S16 1 field: .Pollfd_events
+  S16 1 field: .Pollfd_revents
+end
+
+struct: Dirent
+  U64 1    field: .Dirent_ino
+  U64 1    field: .Dirent_seekoff
+  U16 1    field: .Dirent_reclen
+  U16 1    field: .Dirent_namlen
+  U8  1    field: .Dirent_type
+  U8  1024 field: .Dirent_name
+end
+
+struct: Termios
+  U64 1  field: .Termios_iflag
+  U64 1  field: .Termios_oflag
+  U64 1  field: .Termios_cflag
+  U64 1  field: .Termios_lflag
+  U8  20 field: .Termios_cc
+  U64 1  field: .Termios_ispeed
+  U64 1  field: .Termios_ospeed
+end
+
 \ When C _thinks_ it returns `-1`, the actual output register
 \ sometimes contains zeros in upper bits, depending on how the
 \ result was produced. Sometimes we may have to compare with a
@@ -71,22 +105,59 @@ end
 1 let: STDOUT_FILENO
 2 let: STDERR_FILENO
 
+\ `<unistd.h>` access modes.
+0 let: F_OK \ Test existence.
+1 let: X_OK \ Test execute/search permission.
+2 let: W_OK \ Test write permission.
+4 let: R_OK \ Test read permission.
+
+\ `<unistd.h>` seek origins.
+0 let: SEEK_SET
+1 let: SEEK_CUR
+2 let: SEEK_END
+
+\ `<unistd.h>` `lockf` operations; XSI.
+0 let: F_ULOCK
+1 let: F_LOCK
+2 let: F_TLOCK
+3 let: F_TEST
+
+\ `<unistd.h>` `pathconf` / `fpathconf` selectors.
+\ Numeric values are from the macOS 15.5 ABI.
+1  let: PC_LINK_MAX
+2  let: PC_MAX_CANON
+3  let: PC_MAX_INPUT
+4  let: PC_NAME_MAX
+5  let: PC_PATH_MAX
+6  let: PC_PIPE_BUF
+7  let: PC_CHOWN_RESTRICTED
+8  let: PC_NO_TRUNC
+9  let: PC_VDISABLE
+15 let: PC_2_SYMLINKS
+16 let: PC_ALLOC_SIZE_MIN
+17 let: PC_ASYNC_IO
+18 let: PC_FILESIZEBITS
+19 let: PC_PRIO_IO
+20 let: PC_REC_INCR_XFER_SIZE
+21 let: PC_REC_MAX_XFER_SIZE
+22 let: PC_REC_MIN_XFER_SIZE
+23 let: PC_REC_XFER_ALIGN
+24 let: PC_SYMLINK_MAX
+25 let: PC_SYNC_IO
+
+0x00000003 let: O_ACCMODE
 0x00000004 let: O_NONBLOCK        \ do not block on open or for data to become available
 0x00000008 let: O_APPEND          \ append on each write
 0x00000200 let: O_CREAT           \ create file if it does not exist
 0x00000400 let: O_TRUNC           \ truncate size to 0
 0x00000800 let: O_EXCL            \ error if O_CREAT and the file exists
-0x00000010 let: O_SHLOCK          \ atomically obtain a shared lock
-0x00000020 let: O_EXLOCK          \ atomically obtain an exclusive lock
-0x00000040 let: O_DIRECTORY       \ restrict open to a directory
+0x00100000 let: O_DIRECTORY       \ restrict open to a directory
 0x0080     let: O_SYNC            \ synch I/O file integrity
-0x00000100 let: O_ASYNC           \ signal pgrp when data ready
-0x00100000 let: O_NOFOLLOW        \ do not follow symlinks
-0x00200000 let: O_SYMLINK         \ allow open of symlinks
-0x00008000 let: O_EVTONLY         \ descriptor requested for event notifications only
+0x00400000 let: O_DSYNC           \ synchronized data integrity
+0x00000040 let: O_ASYNC           \ signal pgrp when data ready
+0x00000100 let: O_NOFOLLOW        \ do not follow final symlink
+0x00020000 let: O_NOCTTY          \ do not acquire controlling terminal
 0x01000000 let: O_CLOEXEC         \ mark as close-on-exec
-0x20000000 let: O_NOFOLLOW_ANY    \ do not follow symlinks in the entire path
-0x00001000 let: O_RESOLVE_BENEATH \ path must reside in the hierarchy beneath the starting directory
 
 \ Exactly one of these must be `.or`d into flags in `.open`.
 \ Note that `.fopen` and `.fdopen` take a STRING as mode!
@@ -96,17 +167,265 @@ end
 0x40000000             let: O_EXEC    \ open file for execute only
 O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 
-2 1 extern: .open  open  ( path flag -- fdes|-1 :Cint )
-1 1 extern: .close close ( fdes      -- 0|-1    :Cint )
-2 1 extern: .fstat fstat ( fdes stat -- 0|-1    :Cint )
-2 1 extern: .lstat lstat ( path stat -- 0|-1    :Cint )
-2 1 extern: .stat  stat  ( path stat -- 0|-1    :Cint )
+\ `<fcntl.h>` descriptor and record-lock operations; macOS 15.5 ABI.
+-2     let: AT_FDCWD
+0x0010 let: AT_EACCESS
+0x0020 let: AT_SYMLINK_NOFOLLOW
+0x0040 let: AT_SYMLINK_FOLLOW
+0x0080 let: AT_REMOVEDIR
+
+1  let: FD_CLOEXEC
+0  let: F_DUPFD
+67 let: F_DUPFD_CLOEXEC
+1  let: F_GETFD
+2  let: F_SETFD
+3  let: F_GETFL
+4  let: F_SETFL
+5  let: F_GETOWN
+6  let: F_SETOWN
+7  let: F_GETLK
+8  let: F_SETLK
+9  let: F_SETLKW
+1  let: F_RDLCK
+2  let: F_UNLCK
+3  let: F_WRLCK
+
+\ `<sys/stat.h>` file types and permissions.
+0o170000 let: S_IFMT
+0o010000 let: S_IFIFO
+0o020000 let: S_IFCHR
+0o040000 let: S_IFDIR
+0o060000 let: S_IFBLK
+0o100000 let: S_IFREG
+0o120000 let: S_IFLNK
+0o140000 let: S_IFSOCK
+0o4000   let: S_ISUID
+0o2000   let: S_ISGID
+0o1000   let: S_ISVTX
+0o700    let: S_IRWXU
+0o400    let: S_IRUSR
+0o200    let: S_IWUSR
+0o100    let: S_IXUSR
+0o070    let: S_IRWXG
+0o040    let: S_IRGRP
+0o020    let: S_IWGRP
+0o010    let: S_IXGRP
+0o007    let: S_IRWXO
+0o004    let: S_IROTH
+0o002    let: S_IWOTH
+0o001    let: S_IXOTH
+
+fun: .S_ISFIFO { mode -> bool } S_IFMT .and S_IFIFO  = end
+fun: .S_ISCHR  { mode -> bool } S_IFMT .and S_IFCHR  = end
+fun: .S_ISDIR  { mode -> bool } S_IFMT .and S_IFDIR  = end
+fun: .S_ISBLK  { mode -> bool } S_IFMT .and S_IFBLK  = end
+fun: .S_ISREG  { mode -> bool } S_IFMT .and S_IFREG  = end
+fun: .S_ISLNK  { mode -> bool } S_IFMT .and S_IFLNK  = end
+fun: .S_ISSOCK { mode -> bool } S_IFMT .and S_IFSOCK = end
+
+\ `<dirent.h>` entry kinds.
+0  let: DT_UNKNOWN
+1  let: DT_FIFO
+2  let: DT_CHR
+4  let: DT_DIR
+6  let: DT_BLK
+8  let: DT_REG
+10 let: DT_LNK
+12 let: DT_SOCK
+
+\ `<poll.h>` portable events.
+0x0001 let: POLLIN
+0x0002 let: POLLPRI
+0x0004 let: POLLOUT
+0x0008 let: POLLERR
+0x0010 let: POLLHUP
+0x0020 let: POLLNVAL
+0x0040 let: POLLRDNORM
+0x0080 let: POLLRDBAND
+0x0100 let: POLLWRBAND
+POLLOUT let: POLLWRNORM
+
+\ `<termios.h>` portable flags and controls; macOS 15.5 ABI.
+0x00000001 let: IGNBRK
+0x00000002 let: BRKINT
+0x00000004 let: IGNPAR
+0x00000008 let: PARMRK
+0x00000010 let: INPCK
+0x00000020 let: ISTRIP
+0x00000040 let: INLCR
+0x00000080 let: IGNCR
+0x00000100 let: ICRNL
+0x00000200 let: IXON
+0x00000400 let: IXOFF
+0x00000800 let: IXANY
+
+0x00000001 let: OPOST
+0x00000002 let: ONLCR
+0x00000010 let: OCRNL
+0x00000020 let: ONOCR
+0x00000040 let: ONLRET
+0x00000080 let: OFILL
+0x00020000 let: OFDEL
+
+0x00000300 let: CSIZE
+0x00000000 let: CS5
+0x00000100 let: CS6
+0x00000200 let: CS7
+0x00000300 let: CS8
+0x00000400 let: CSTOPB
+0x00000800 let: CREAD
+0x00001000 let: PARENB
+0x00002000 let: PARODD
+0x00004000 let: HUPCL
+0x00008000 let: CLOCAL
+
+0x00000008 let: ECHO
+0x00000010 let: ECHONL
+0x00000080 let: ISIG
+0x00000100 let: ICANON
+0x00000400 let: IEXTEN
+0x00400000 let: TOSTOP
+0x80000000 let: NOFLSH
+
+0  let: VEOF
+1  let: VEOL
+3  let: VERASE
+5  let: VKILL
+8  let: VINTR
+9  let: VQUIT
+10 let: VSUSP
+12 let: VSTART
+13 let: VSTOP
+16 let: VMIN
+17 let: VTIME
+
+0 let: TCSANOW
+1 let: TCSADRAIN
+2 let: TCSAFLUSH
+1 let: TCIFLUSH
+2 let: TCOFLUSH
+3 let: TCIOFLUSH
+1 let: TCOOFF
+2 let: TCOON
+3 let: TCIOFF
+4 let: TCION
+
+0      let: B0
+50     let: B50
+75     let: B75
+110    let: B110
+134    let: B134
+150    let: B150
+200    let: B200
+300    let: B300
+600    let: B600
+1200   let: B1200
+1800   let: B1800
+2400   let: B2400
+4800   let: B4800
+9600   let: B9600
+19200  let: B19200
+38400  let: B38400
+57600  let: B57600
+115200 let: B115200
+
+2 1 extern: .open    open    ( path flag          -- fdes|-1 :Cint )
+3 1 extern: .openat  openat  ( dir path flag      -- fdes|-1 :Cint )
+2 1 extern: .creat   creat   ( path mode          -- fdes|-1 :Cint )
+2 1 extern: .fcntl   fcntl   ( fdes cmd           -- val|-1  :Cint )
+1 1 extern: .close   close   ( fdes               -- 0|-1    :Cint )
+2 1 extern: .fstat   fstat   ( fdes stat          -- 0|-1    :Cint )
+4 1 extern: .fstatat fstatat ( dir path stat flag -- 0|-1    :Cint )
+2 1 extern: .lstat   lstat   ( path stat          -- 0|-1    :Cint )
+2 1 extern: .stat    stat    ( path stat          -- 0|-1    :Cint )
+
+2 1 extern: .chmod     chmod     ( path mode           -- 0|-1 :Cint  )
+2 1 extern: .fchmod    fchmod    ( fdes mode           -- 0|-1 :Cint  )
+4 1 extern: .fchmodat  fchmodat  ( dir path mode flag  -- 0|-1 :Cint  )
+2 1 extern: .mkdir     mkdir     ( path mode           -- 0|-1 :Cint  )
+3 1 extern: .mkdirat   mkdirat   ( dir path mode       -- 0|-1 :Cint  )
+2 1 extern: .mkfifo    mkfifo    ( path mode           -- 0|-1 :Cint  )
+3 1 extern: .mkfifoat  mkfifoat  ( dir path mode       -- 0|-1 :Cint  )
+3 1 extern: .mknod     mknod     ( path mode dev       -- 0|-1 :Cint  )
+4 1 extern: .mknodat   mknodat   ( dir path mode dev   -- 0|-1 :Cint  )
+1 1 extern: .umask     umask     ( mask                -- old  :Cuint )
+2 1 extern: .futimens  futimens  ( fdes times          -- 0|-1 :Cint  )
+4 1 extern: .utimensat utimensat ( dir path times flag -- 0|-1 :Cint  )
+
+\ Portable `<unistd.h>` filesystem, descriptor, path, and terminal surface.
+2 1 extern: .access    access    ( path mode                -- 0|-1 :Cint )
+4 1 extern: .faccessat faccessat ( fdes path mode flag      -- 0|-1 :Cint )
+1 1 extern: .chdir     chdir     ( path                     -- 0|-1 :Cint )
+1 1 extern: .fchdir    fchdir    ( fdes                     -- 0|-1 :Cint )
+3 1 extern: .chown     chown     ( path uid gid             -- 0|-1 :Cint )
+3 1 extern: .fchown    fchown    ( fdes uid gid             -- 0|-1 :Cint )
+5 1 extern: .fchownat  fchownat  ( fdes path uid gid flag   -- 0|-1 :Cint )
+3 1 extern: .lchown    lchown    ( path uid gid             -- 0|-1 :Cint )
+2 1 extern: .getcwd    getcwd    ( buf cap                  -- buf|nil    )
+
+1 1 extern: .dup  dup  ( fdes          -- new_fdes|-1 :Cint )
+2 1 extern: .dup2 dup2 ( fdes new_fdes -- new_fdes|-1 :Cint )
+1 1 extern: .pipe pipe ( pipes         -- 0|-1        :Cint )
+
+2 1 extern: .fpathconf fpathconf ( fdes selector -- val|-1 )
+2 1 extern: .pathconf  pathconf  ( path selector -- val|-1 )
+3 1 extern: .lseek     lseek     ( fdes off from -- off|-1 )
+2 1 extern: .ftruncate ftruncate ( fdes len      -- 0|-1 :Cint )
+2 1 extern: .truncate  truncate  ( path len      -- 0|-1 :Cint )
+1 1 extern: .fsync     fsync     ( fdes          -- 0|-1 :Cint )
+0 0 extern: .sync      sync      (               --            )
+
+5 1 extern: .linkat     linkat     ( old_fd old_path new_fd new_path flag -- 0|-1 :Cint )
+2 1 extern: .link       link       ( old_path new_path -- 0|-1 :Cint )
+2 1 extern: .symlink    symlink    ( target path       -- 0|-1 :Cint )
+3 1 extern: .symlinkat  symlinkat  ( target fdes path  -- 0|-1 :Cint )
+1 1 extern: .unlink     unlink     ( path              -- 0|-1 :Cint )
+3 1 extern: .unlinkat   unlinkat   ( fdes path flag    -- 0|-1 :Cint )
+1 1 extern: .rmdir      rmdir      ( path              -- 0|-1 :Cint )
+3 1 extern: .readlink   readlink   ( path buf cap      -- len|-1     )
+4 1 extern: .readlinkat readlinkat ( fdes path buf cap -- len|-1     )
+
+3 1 extern: .lockf     lockf     ( fdes fun size -- 0|-1 :Cint )
+1 1 extern: .isatty    isatty    ( fdes          -- bool :Cint )
+3 1 extern: .ttyname_r ttyname_r ( fdes buf cap  -- err :Cint  )
+1 1 extern: .ttyname   ttyname   ( fdes          -- str        )
+3 0 extern: .swab      swab      ( inp out len   --            )
+
+3 1 extern: .poll poll ( fdes_ary len timeout_ms -- ready|-1 :Cint )
+
+\ Directory streams. `DIR` is an incomplete C type and stays behind pointers.
+1 1 extern: .opendir   opendir   ( path                -- dir )
+1 1 extern: .fdopendir fdopendir ( fdes                -- dir )
+1 1 extern: .closedir  closedir  ( dir                 -- 0|-1 :Cint )
+1 1 extern: .readdir   readdir   ( dir                 -- entry )
+1 0 extern: .rewinddir rewinddir ( dir                 -- )
+2 0 extern: .seekdir   seekdir   ( dir pos             -- )
+1 1 extern: .telldir   telldir   ( dir                 -- pos )
+1 1 extern: .dirfd     dirfd     ( dir                 -- fdes :Cint )
+2 1 extern: .alphasort alphasort ( ent0_adr ent1_adr   -- cmp :Cint )
+4 1 extern: .scandir   scandir   ( path out filter cmp -- len|-1 :Cint )
+
+\ Terminal attributes and pseudo-terminal support.
+1 1 extern: .cfgetispeed  cfgetispeed  ( termios             -- speed         )
+1 1 extern: .cfgetospeed  cfgetospeed  ( termios             -- speed         )
+2 1 extern: .cfsetispeed  cfsetispeed  ( termios speed       -- 0|-1    :Cint )
+2 1 extern: .cfsetospeed  cfsetospeed  ( termios speed       -- 0|-1    :Cint )
+2 1 extern: .tcgetattr    tcgetattr    ( fdes termios        -- 0|-1    :Cint )
+3 1 extern: .tcsetattr    tcsetattr    ( fdes action termios -- 0|-1    :Cint )
+1 1 extern: .tcdrain      tcdrain      ( fdes                -- 0|-1    :Cint )
+2 1 extern: .tcflow       tcflow       ( fdes action         -- 0|-1    :Cint )
+2 1 extern: .tcflush      tcflush      ( fdes queue          -- 0|-1    :Cint )
+2 1 extern: .tcsendbreak  tcsendbreak  ( fdes duration       -- 0|-1    :Cint )
+1 1 extern: .posix_openpt posix_openpt ( flags               -- fdes|-1 :Cint )
+1 1 extern: .grantpt      grantpt      ( fdes                -- 0|-1    :Cint )
+1 1 extern: .unlockpt     unlockpt     ( fdes                -- 0|-1    :Cint )
+1 1 extern: .ptsname      ptsname      ( fdes                -- str           )
+3 1 extern: .ptsname_r    ptsname_r    ( fdes buf cap        -- err     :Cint )
 
 1 1 extern: .fgetc            fgetc            ( file -- char|-1 :Cint )
 1 1 extern: .getc_unlocked    getc_unlocked    ( file -- char|-1 :Cint )
 1 1 extern: .getchar          getchar          ( file -- char|-1 :Cint )
 1 1 extern: .getchar_unlocked getchar_unlocked ( file -- char|-1 :Cint )
-1 1 extern: .getw             getw             ( file -- char|-1 :Cint )
 
 3 1 extern: .read   read   ( fdes buf len         -- len|-1 )
 4 1 extern: .pread  pread  ( fdes buf len off     -- len|-1 )
@@ -119,11 +438,15 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 4 1 extern: .pwritev pwritev ( fdes iov iov_len off -- len|-1 )
 
 \ Note: `.fread`, `.fwrite` and some other funcs are defined in `lang.af`.
-2 1 extern: .fopen    fopen    ( path mode      -- file )
-2 1 extern: .fdopen   fdopen   ( fdes mode      -- file )
-3 1 extern: .freopen  freopen  ( path mode file -- file )
-3 1 extern: .fmemopen fmemopen ( buf cap mode   -- file )
-1 1 extern: .fclose   fclose   ( file           -- 0|-1 :Cint )
+2 1 extern: .fopen          fopen          ( path mode       -- file )
+2 1 extern: .fdopen         fdopen         ( fdes mode       -- file )
+3 1 extern: .freopen        freopen        ( path mode file  -- file )
+3 1 extern: .fmemopen       fmemopen       ( buf cap mode    -- file )
+2 1 extern: .open_memstream open_memstream ( buf_adr len_adr -- file )
+1 1 extern: .fclose         fclose         ( file            -- 0|-1 :Cint )
+0 1 extern: .tmpfile        tmpfile        (                 -- file )
+2 1 extern: .popen          popen          ( command mode    -- file )
+1 1 extern: .pclose         pclose         ( file            -- status|-1 :Cint )
 
 2 1 extern: .fgetpos fgetpos ( file pos_adr    -- 0|-1 :Cint )
 2 1 extern: .fsetpos fsetpos ( file pos_adr    -- 0|-1 :Cint )
@@ -132,6 +455,28 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 1 1 extern: .ftell   ftell   ( file            -- off|-1     )
 1 1 extern: .ftello  ftello  ( file            -- off|-1     )
 1 0 extern: .rewind  rewind  ( file            --            )
+
+3 1 extern: .fgets    fgets    ( buf cap file               -- buf|nil )
+4 1 extern: .getdelim getdelim ( buf_adr cap_adr delim file -- len|-1 )
+3 1 extern: .getline  getline  ( buf_adr cap_adr file       -- len|-1 )
+2 1 extern: .ungetc   ungetc   ( char file                  -- char|EOF :Cint )
+
+1 0 extern: .flockfile    flockfile    ( file -- )
+1 1 extern: .ftrylockfile ftrylockfile ( file -- 0|busy :Cint )
+1 0 extern: .funlockfile  funlockfile  ( file -- )
+
+2 0 extern: .setbuf  setbuf  ( file buf          -- )
+4 1 extern: .setvbuf setvbuf ( file buf mode cap -- 0|nonzero :Cint )
+
+1 0 extern: .perror   perror   ( prefix                  -- )
+1 1 extern: .remove   remove   ( path                    -- 0|-1 :Cint )
+2 1 extern: .rename   rename   ( old new                 -- 0|-1 :Cint )
+4 1 extern: .renameat renameat ( old_dir old new_dir new -- 0|-1 :Cint )
+1 1 extern: .ctermid  ctermid  ( buf                     -- str )
+
+1 1 extern: .mkstemp  mkstemp  ( template      -- fdes|-1 :Cint )
+1 1 extern: .mkdtemp  mkdtemp  ( template      -- path )
+2 1 extern: .realpath realpath ( path resolved -- resolved|nil )
 
 1 0 extern: .clearerr          clearerr          ( file --               )
 1 0 extern: .clearerr_unlocked clearerr_unlocked ( file --               )
@@ -142,7 +487,25 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 1 1 extern: .fileno            fileno            ( file -- fdes|-1 :Cint )
 1 1 extern: .fileno_unlocked   fileno_unlocked   ( file -- fdes|-1 :Cint )
 
-\ TODO: translate `<unistd.h>`.
+\ ## Fixed-arity FFI wrappers for variadic functions
+
+fun: .open_mode { path flag mode -> fdes|-1 }
+  [ 2 .comp_va_beg ] .open [ .comp_va_end ]
+end
+
+fun: .openat_mode { dir path flag mode -> fdes|-1 }
+  [ 3 .comp_va_beg ] .openat [ .comp_va_end ]
+end
+
+fun: .fcntl_int { fdes cmd val -> val|-1 }
+  [ 2 .comp_va_beg ] .fcntl [ .comp_va_end ]
+end
+
+fun: .fcntl_ptr { fdes cmd ptr -> val|-1 }
+  [ 2 .comp_va_beg ] .fcntl [ .comp_va_end ]
+end
+
+\ ## IO wrappers
 
 \ `code` usually comes from `.errno`. Sometimes the caller
 \ has to save it before some intermediary errno-clobbering

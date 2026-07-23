@@ -1,0 +1,434 @@
+use' ./lang.af
+use' ./time.af
+
+\ ## Portable operating-system interfaces
+\
+\ POSIX process, identity, credential, and config decls from `<unistd.h>`.
+\ Constant values and scalar ABI assumptions come from macOS 15.5.
+\ Other targets may require different values and sizes.
+
+\ `sysconf` selectors. Numeric values are macOS 15.5 ABI.
+1   let: SC_ARG_MAX
+2   let: SC_CHILD_MAX
+3   let: SC_CLK_TCK
+4   let: SC_NGROUPS_MAX
+5   let: SC_OPEN_MAX
+6   let: SC_JOB_CONTROL
+7   let: SC_SAVED_IDS
+8   let: SC_VERSION
+9   let: SC_BC_BASE_MAX
+10  let: SC_BC_DIM_MAX
+11  let: SC_BC_SCALE_MAX
+12  let: SC_BC_STRING_MAX
+13  let: SC_COLL_WEIGHTS_MAX
+14  let: SC_EXPR_NEST_MAX
+15  let: SC_LINE_MAX
+16  let: SC_RE_DUP_MAX
+17  let: SC_2_VERSION
+18  let: SC_2_C_BIND
+19  let: SC_2_C_DEV
+20  let: SC_2_CHAR_TERM
+21  let: SC_2_FORT_DEV
+22  let: SC_2_FORT_RUN
+23  let: SC_2_LOCALEDEF
+24  let: SC_2_SW_DEV
+25  let: SC_2_UPE
+26  let: SC_STREAM_MAX
+27  let: SC_TZNAME_MAX
+28  let: SC_ASYNCHRONOUS_IO
+29  let: SC_PAGESIZE
+SC_PAGESIZE let: SC_PAGE_SIZE
+30  let: SC_MEMLOCK
+31  let: SC_MEMLOCK_RANGE
+32  let: SC_MEMORY_PROTECTION
+33  let: SC_MESSAGE_PASSING
+34  let: SC_PRIORITIZED_IO
+35  let: SC_PRIORITY_SCHEDULING
+36  let: SC_REALTIME_SIGNALS
+37  let: SC_SEMAPHORES
+38  let: SC_FSYNC
+39  let: SC_SHARED_MEMORY_OBJECTS
+40  let: SC_SYNCHRONIZED_IO
+41  let: SC_TIMERS
+42  let: SC_AIO_LISTIO_MAX
+43  let: SC_AIO_MAX
+44  let: SC_AIO_PRIO_DELTA_MAX
+45  let: SC_DELAYTIMER_MAX
+46  let: SC_MQ_OPEN_MAX
+47  let: SC_MAPPED_FILES
+48  let: SC_RTSIG_MAX
+49  let: SC_SEM_NSEMS_MAX
+50  let: SC_SEM_VALUE_MAX
+51  let: SC_SIGQUEUE_MAX
+52  let: SC_TIMER_MAX
+56  let: SC_IOV_MAX
+59  let: SC_2_PBS
+60  let: SC_2_PBS_ACCOUNTING
+61  let: SC_2_PBS_CHECKPOINT
+62  let: SC_2_PBS_LOCATE
+63  let: SC_2_PBS_MESSAGE
+64  let: SC_2_PBS_TRACK
+65  let: SC_ADVISORY_INFO
+66  let: SC_BARRIERS
+67  let: SC_CLOCK_SELECTION
+68  let: SC_CPUTIME
+69  let: SC_FILE_LOCKING
+70  let: SC_GETGR_R_SIZE_MAX
+71  let: SC_GETPW_R_SIZE_MAX
+72  let: SC_HOST_NAME_MAX
+73  let: SC_LOGIN_NAME_MAX
+74  let: SC_MONOTONIC_CLOCK
+75  let: SC_MQ_PRIO_MAX
+76  let: SC_READER_WRITER_LOCKS
+77  let: SC_REGEXP
+78  let: SC_SHELL
+79  let: SC_SPAWN
+80  let: SC_SPIN_LOCKS
+81  let: SC_SPORADIC_SERVER
+82  let: SC_THREAD_ATTR_STACKADDR
+83  let: SC_THREAD_ATTR_STACKSIZE
+84  let: SC_THREAD_CPUTIME
+85  let: SC_THREAD_DESTRUCTOR_ITERATIONS
+86  let: SC_THREAD_KEYS_MAX
+87  let: SC_THREAD_PRIO_INHERIT
+88  let: SC_THREAD_PRIO_PROTECT
+89  let: SC_THREAD_PRIORITY_SCHEDULING
+90  let: SC_THREAD_PROCESS_SHARED
+91  let: SC_THREAD_SAFE_FUNCTIONS
+92  let: SC_THREAD_SPORADIC_SERVER
+93  let: SC_THREAD_STACK_MIN
+94  let: SC_THREAD_THREADS_MAX
+95  let: SC_TIMEOUTS
+96  let: SC_THREADS
+97  let: SC_TRACE
+98  let: SC_TRACE_EVENT_FILTER
+99  let: SC_TRACE_INHERIT
+100 let: SC_TRACE_LOG
+101 let: SC_TTY_NAME_MAX
+102 let: SC_TYPED_MEMORY_OBJECTS
+103 let: SC_V6_ILP32_OFF32
+104 let: SC_V6_ILP32_OFFBIG
+105 let: SC_V6_LP64_OFF64
+106 let: SC_V6_LPBIG_OFFBIG
+107 let: SC_ATEXIT_MAX
+109 let: SC_XOPEN_ENH_I18N
+110 let: SC_XOPEN_LEGACY
+111 let: SC_XOPEN_REALTIME
+112 let: SC_XOPEN_REALTIME_THREADS
+113 let: SC_XOPEN_SHM
+114 let: SC_XOPEN_STREAMS
+115 let: SC_XOPEN_UNIX
+116 let: SC_XOPEN_VERSION
+118 let: SC_IPV6
+119 let: SC_RAW_SOCKETS
+120 let: SC_SYMLOOP_MAX
+121 let: SC_XOPEN_XCU_VERSION
+126 let: SC_SS_REPL_MAX
+127 let: SC_TRACE_EVENT_NAME_MAX
+128 let: SC_TRACE_NAME_MAX
+129 let: SC_TRACE_SYS_MAX
+130 let: SC_TRACE_USER_EVENT_MAX
+
+\ `confstr` selectors. Numeric values are macOS 15.5 ABI.
+1  let: CS_PATH
+2  let: CS_POSIX_V6_ILP32_OFF32_CFLAGS
+3  let: CS_POSIX_V6_ILP32_OFF32_LDFLAGS
+4  let: CS_POSIX_V6_ILP32_OFF32_LIBS
+5  let: CS_POSIX_V6_ILP32_OFFBIG_CFLAGS
+6  let: CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS
+7  let: CS_POSIX_V6_ILP32_OFFBIG_LIBS
+8  let: CS_POSIX_V6_LP64_OFF64_CFLAGS
+9  let: CS_POSIX_V6_LP64_OFF64_LDFLAGS
+10 let: CS_POSIX_V6_LP64_OFF64_LIBS
+11 let: CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS
+12 let: CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS
+13 let: CS_POSIX_V6_LPBIG_OFFBIG_LIBS
+14 let: CS_POSIX_V6_WIDTH_RESTRICTED_ENVS
+
+\ Process creation and execution. Variadic `execl*` forms omitted: AF callers
+\ can build argv explicitly and use vector forms without variadic FFI.
+2 1 extern: .execv  execv  ( path argv     -- -1     :Cint )
+3 1 extern: .execve execve ( path argv env -- -1     :Cint )
+2 1 extern: .execvp execvp ( file argv     -- -1     :Cint )
+0 1 extern: .fork   fork   (               -- pid|-1 :Cint )
+
+\ Process identity, groups, sessions, and terminal ownership.
+0 1 extern: .getpid    getpid    (           -- pid     :Cint )
+0 1 extern: .getppid   getppid   (           -- pid     :Cint )
+0 1 extern: .getpgrp   getpgrp   (           -- pgrp    :Cint )
+1 1 extern: .getpgid   getpgid   ( pid       -- pgrp|-1 :Cint )
+1 1 extern: .getsid    getsid    ( pid       -- sid|-1  :Cint )
+0 1 extern: .setpgrp   setpgrp   (           -- pgrp|-1 :Cint )
+2 1 extern: .setpgid   setpgid   ( pid pgrp  -- 0|-1    :Cint )
+0 1 extern: .setsid    setsid    (           -- sid|-1  :Cint )
+1 1 extern: .tcgetpgrp tcgetpgrp ( fdes      -- pgrp|-1 :Cint )
+2 1 extern: .tcsetpgrp tcsetpgrp ( fdes pgrp -- 0|-1    :Cint )
+
+\ Process credentials and login identity.
+0 1 extern: .getuid     getuid     (            -- uid    :Cuint )
+0 1 extern: .geteuid    geteuid    (            -- uid    :Cuint )
+0 1 extern: .getgid     getgid     (            -- gid    :Cuint )
+0 1 extern: .getegid    getegid    (            -- gid    :Cuint )
+2 1 extern: .getgroups  getgroups  ( cap groups -- len|-1 :Cint  )
+0 1 extern: .getlogin   getlogin   (            -- str           )
+2 1 extern: .getlogin_r getlogin_r ( buf cap    -- err    :Cint  )
+1 1 extern: .setuid     setuid     ( uid        -- 0|-1   :Cint  )
+1 1 extern: .seteuid    seteuid    ( uid        -- 0|-1   :Cint  )
+2 1 extern: .setreuid   setreuid   ( real eff   -- 0|-1   :Cint  )
+1 1 extern: .setgid     setgid     ( gid        -- 0|-1   :Cint  )
+1 1 extern: .setegid    setegid    ( gid        -- 0|-1   :Cint  )
+2 1 extern: .setregid   setregid   ( real eff   -- 0|-1   :Cint  )
+
+1 1 extern: .nice    nice    ( incr             -- priority|-1 :Cint )
+0 1 extern: .pause   pause   (                  -- -1          :Cint )
+1 1 extern: .sysconf sysconf ( selector         -- val|-1            )
+3 1 extern: .confstr confstr ( selector buf cap -- len               )
+
+\ ## Environment
+
+1 1 extern: .getenv   getenv   ( name     -- val          )
+2 1 extern: .setenv   setenv   ( name val -- 0|-1 :Cint   )
+1 1 extern: .unsetenv unsetenv ( name     -- 0|-1 :Cint   )
+1 1 extern: .putenv   putenv   ( str      -- 0|-1 :Cint   )
+
+\ ## Process termination
+
+1 0 extern: .exit          exit          ( code --            )
+1 0 extern: ._Exit         _Exit         ( code --            )
+1 0 extern: ._exit         _exit         ( code --            )
+1 0 extern: .quick_exit    quick_exit    ( code --            )
+1 1 extern: .atexit        atexit        ( fun  -- 0|-1 :Cint )
+1 1 extern: .at_quick_exit at_quick_exit ( fun  -- 0|-1 :Cint )
+
+\ Execute a command through the host shell.
+1 1 extern: .system system ( command -- wstat :Cint )
+
+\ ## Signals
+\
+\ Signal numbers and structure layouts below are Darwin ABI choices. Signal
+\ numbers are not portable constants; callers targeting another OS need its
+\ own values. `Sigaction`, `Siginfo`, and `Sigstack` are passed by address.
+
+U32 int: Sigset
+
+1  let: SIGHUP
+2  let: SIGINT
+3  let: SIGQUIT
+4  let: SIGILL
+5  let: SIGTRAP
+6  let: SIGABRT
+8  let: SIGFPE
+9  let: SIGKILL
+10 let: SIGBUS
+11 let: SIGSEGV
+12 let: SIGSYS
+13 let: SIGPIPE
+14 let: SIGALRM
+15 let: SIGTERM
+16 let: SIGURG
+17 let: SIGSTOP
+18 let: SIGTSTP
+19 let: SIGCONT
+20 let: SIGCHLD
+21 let: SIGTTIN
+22 let: SIGTTOU
+23 let: SIGIO
+24 let: SIGXCPU
+25 let: SIGXFSZ
+26 let: SIGVTALRM
+27 let: SIGPROF
+28 let: SIGWINCH
+29 let: SIGINFO
+30 let: SIGUSR1
+31 let: SIGUSR2
+
+1 let: SIG_BLOCK
+2 let: SIG_UNBLOCK
+3 let: SIG_SETMASK
+
+0  let: SIG_DFL
+1  let: SIG_IGN
+-1 let: SIG_ERR
+
+1    let: SA_ONSTACK
+2    let: SA_RESTART
+4    let: SA_RESETHAND
+8    let: SA_NOCLDSTOP
+0x10 let: SA_NODEFER
+0x20 let: SA_NOCLDWAIT
+0x40 let: SA_SIGINFO
+
+1 let: SS_ONSTACK
+4 let: SS_DISABLE
+
+struct: Sigaction
+  Adr 1 field: .Sigaction_handler
+  U32 1 field: .Sigaction_mask
+  S32 1 field: .Sigaction_flags
+end
+
+struct: Siginfo
+  S32  1 field: .Siginfo_signo
+  S32  1 field: .Siginfo_errno
+  S32  1 field: .Siginfo_code
+  S32  1 field: .Siginfo_pid
+  U32  1 field: .Siginfo_uid
+  S32  1 field: .Siginfo_status
+  Adr  1 field: .Siginfo_addr
+  Cell 1 field: .Siginfo_value
+  S64  1 field: .Siginfo_band
+  U64  7 field: .Siginfo_pad
+end
+
+struct: Sigstack
+  Adr  1 field: .Sigstack_sp
+  U64  1 field: .Sigstack_size
+  S32  1 field: .Sigstack_flags
+end
+
+2 1 extern: .signal      signal      ( sig handler      -- old_handler  )
+1 1 extern: .raise       raise       ( sig              -- 0|-1   :Cint )
+2 1 extern: .kill        kill        ( pid sig          -- 0|-1   :Cint )
+3 1 extern: .sigaction   sigaction   ( sig act old      -- 0|-1   :Cint )
+2 1 extern: .sigaddset   sigaddset   ( set sig          -- 0|-1   :Cint )
+2 1 extern: .sigdelset   sigdelset   ( set sig          -- 0|-1   :Cint )
+1 1 extern: .sigemptyset sigemptyset ( set              -- 0|-1   :Cint )
+1 1 extern: .sigfillset  sigfillset  ( set              -- 0|-1   :Cint )
+2 1 extern: .sigismember sigismember ( set sig          -- yes|-1 :Cint )
+1 1 extern: .sigpending  sigpending  ( set              -- 0|-1   :Cint )
+3 1 extern: .sigprocmask sigprocmask ( how set old      -- 0|-1   :Cint )
+1 1 extern: .sigsuspend  sigsuspend  ( mask             -- -1     :Cint )
+2 1 extern: .sigwait     sigwait     ( set sig_adr      -- err    :Cint )
+2 1 extern: .sigaltstack sigaltstack ( stack old        -- 0|-1   :Cint )
+2 0 extern: .psignal     psignal     ( sig prefix       --              )
+
+\ ## Waiting and resource accounting
+
+1    let: WNOHANG
+2    let: WUNTRACED
+4    let: WEXITED
+8    let: WSTOPPED
+0x10 let: WCONTINUED
+0x20 let: WNOWAIT
+
+0 let: P_ALL
+1 let: P_PID
+2 let: P_PGID
+
+0   let: PRIO_PROCESS
+1   let: PRIO_PGRP
+2   let: PRIO_USER
+-20 let: PRIO_MIN
+20  let: PRIO_MAX
+
+0 let: RLIMIT_CPU
+1 let: RLIMIT_FSIZE
+2 let: RLIMIT_DATA
+3 let: RLIMIT_STACK
+4 let: RLIMIT_CORE
+5 let: RLIMIT_AS
+6 let: RLIMIT_MEMLOCK
+7 let: RLIMIT_NPROC
+8 let: RLIMIT_NOFILE
+0x7fffffffffffffff let: RLIM_INFINITY
+
+0  let: RUSAGE_SELF
+-1 let: RUSAGE_CHILDREN
+
+struct: Rusage
+  Timeval 1 field: .Rusage_utime
+  Timeval 1 field: .Rusage_stime
+  S64     1 field: .Rusage_maxrss \ Note: bytes on Darwin; KiB on Linux.
+  S64     1 field: .Rusage_ixrss
+  S64     1 field: .Rusage_idrss
+  S64     1 field: .Rusage_isrss
+  S64     1 field: .Rusage_minflt
+  S64     1 field: .Rusage_majflt
+  S64     1 field: .Rusage_nswap
+  S64     1 field: .Rusage_inblock
+  S64     1 field: .Rusage_oublock
+  S64     1 field: .Rusage_msgsnd
+  S64     1 field: .Rusage_msgrcv
+  S64     1 field: .Rusage_nsignals
+  S64     1 field: .Rusage_nvcsw
+  S64     1 field: .Rusage_nivcsw
+end
+
+struct: Rlimit
+  U64 1 field: .Rlimit_cur
+  U64 1 field: .Rlimit_max
+end
+
+\ Translations of C macros for unpacking wait-status from `waitpid`.
+\ Wait-status layout is platform-defined; these are Darwin-specific.
+fun: .WSTATUS     { wstat -> val  } 0o177 .and end
+fun: .WEXITSTATUS { wstat -> code } 8 .lsr 0xff .and end
+fun: .WTERMSIG    { wstat -> sig  } .WSTATUS end
+fun: .WSTOPSIG    { wstat -> sig  } 8 .lsr end
+fun: .WIFEXITED   { wstat -> yes  } .WSTATUS =0 end
+
+fun: .WIFSIGNALED { wstat -- yes  }
+  wstat .WSTATUS 0o177 <> { val }
+  wstat .WSTATUS <>0
+  val .and
+end
+
+fun: .WIFSTOPPED { wstat -- yes }
+  wstat .WSTATUS 0o177 = { val }
+  wstat .WSTOPSIG SIGCONT <>
+  val .and
+end
+
+fun: .WIFCONTINUED { wstat -- yes }
+  wstat .WSTATUS 0o177 = { val }
+  wstat .WSTOPSIG SIGCONT =
+  val .and
+end
+
+1 1 extern: .wait        wait        ( wstat                 -- pid|-1      :Cint )
+3 1 extern: .waitpid     waitpid     ( pid wstat opts        -- pid|-1      :Cint )
+4 1 extern: .waitid      waitid      ( idtype id info opts   -- 0|-1        :Cint )
+3 1 extern: .wait3       wait3       ( wstat opts usage      -- pid|-1      :Cint )
+4 1 extern: .wait4       wait4       ( pid wstat opts usage  -- pid|-1      :Cint )
+2 1 extern: .getpriority getpriority ( which who             -- priority|-1 :Cint )
+3 1 extern: .setpriority setpriority ( which who priority    -- 0|-1        :Cint )
+2 1 extern: .getrlimit   getrlimit   ( resource limit        -- 0|-1        :Cint )
+2 1 extern: .setrlimit   setrlimit   ( resource limit        -- 0|-1        :Cint )
+2 1 extern: .getrusage   getrusage   ( who usage             -- 0|-1        :Cint )
+
+\ ## Memory mapping and shared memory
+\ Basic `PROT_*`, `MAP_*`, `.mmap`, `.mprotect`, and `.munmap` live in lang.af.
+
+1    let: MS_ASYNC
+2    let: MS_INVALIDATE
+0x10 let: MS_SYNC
+1    let: MCL_CURRENT
+2    let: MCL_FUTURE
+0    let: POSIX_MADV_NORMAL
+1    let: POSIX_MADV_RANDOM
+2    let: POSIX_MADV_SEQUENTIAL
+3    let: POSIX_MADV_WILLNEED
+4    let: POSIX_MADV_DONTNEED
+
+3 1 extern: .msync         msync         ( adr len flags   -- 0|-1  :Cint )
+2 1 extern: .mlock         mlock         ( adr len         -- 0|-1  :Cint )
+2 1 extern: .munlock       munlock       ( adr len         -- 0|-1  :Cint )
+1 1 extern: .mlockall      mlockall      ( flags           -- 0|-1  :Cint )
+0 1 extern: .munlockall    munlockall    (                 -- 0|-1  :Cint )
+3 1 extern: .madvise       madvise       ( adr len advice  -- 0|-1  :Cint )
+3 1 extern: .posix_madvise posix_madvise ( adr len advice  -- err   :Cint )
+3 1 extern: .mincore       mincore       ( adr len vec     -- 0|-1  :Cint )
+3 1 extern: .shm_open      shm_open      ( name flags mode -- fd|-1 :Cint )
+1 1 extern: .shm_unlink    shm_unlink    ( name            -- 0|-1  :Cint )
+
+\ ## Dynamic loading
+
+1 let: RTLD_LAZY
+2 let: RTLD_NOW
+4 let: RTLD_LOCAL
+8 let: RTLD_GLOBAL
+
+2 1 extern: .dlopen  dlopen  ( path mode  -- handle )
+1 1 extern: .dlclose dlclose ( handle     -- 0|-1 :Cint )
+2 1 extern: .dlsym   dlsym   ( handle sym -- adr )
+0 1 extern: .dlerror dlerror (            -- str )

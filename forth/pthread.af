@@ -1,4 +1,5 @@
 use' ./lang.af
+use' ./os.af
 
 \ ## Posix threads
 \
@@ -48,9 +49,6 @@ CELL int: Pthread_key
 \ `pthread_rwlock_t`; used by reference.
 200 8 opaque: Pthread_rwlock
 
-\ `sigset_t`; sometimes used by reference.
-U32 int: Sigset
-
 \ ## Constants
 
 1 let: PTHREAD_CREATE_JOINABLE
@@ -80,9 +78,6 @@ U32 int: Sigset
 1 let: PTHREAD_MUTEX_ERRORCHECK
 2 let: PTHREAD_MUTEX_RECURSIVE
 PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
-
-1 let: PTHREAD_MUTEX_POLICY_FAIRSHARE_NP
-3 let: PTHREAD_MUTEX_POLICY_FIRSTFIT_NP
 
 \ ## Procedures
 \
@@ -125,12 +120,10 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 2 1 extern: .pthread_condattr_setpshared pthread_condattr_setpshared ( attr shared     -- err :Cint )
 
 4 1 extern: .pthread_create              pthread_create              ( thread_adr attr fun inp -- err :Cint )
-4 1 extern: .pthread_create_suspended_np pthread_create_suspended_np ( thread_adr attr fun inp -- err :Cint )
 1 1 extern: .pthread_cancel              pthread_cancel              ( thread                  -- err :Cint )
 2 1 extern: .pthread_kill                pthread_kill                ( thread sig              -- err :Cint )
 2 1 extern: .pthread_join                pthread_join                ( thread out_adr          -- err :Cint )
 1 1 extern: .pthread_detach              pthread_detach              ( thread                  -- err :Cint )
-2 1 extern: .pthread_threadid_np         pthread_threadid_np         ( thread id_adr           -- err :Cint )
 3 1 extern: .pthread_getschedparam       pthread_getschedparam       ( thread policy_adr param -- err :Cint )
 3 1 extern: .pthread_setschedparam       pthread_setschedparam       ( thread policy     param -- err :Cint )
 
@@ -138,9 +131,8 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 2 1 extern: .pthread_once           pthread_once           ( once_ctrl init_fun   -- err :Cint  )
 3 1 extern: .pthread_sigmask        pthread_sigmask        ( how set_adr oset_adr -- err :Cint  )
 1 0 extern: .pthread_exit           pthread_exit           ( out_adr              --            )
-0 0 extern: .pthread_yield_np       pthread_yield_np       (                      --            )
-0 1 extern: .pthread_is_threaded_np pthread_is_threaded_np (                      -- bool :Cint )
 2 1 extern: .pthread_equal          pthread_equal          ( thread0 thread1      -- bool :Cint )
+0 1 extern: .pthread_self           pthread_self           (                      -- thread     )
 
 0 1 extern: .pthread_getconcurrency pthread_getconcurrency (     -- lvl :Cint )
 1 1 extern: .pthread_setconcurrency pthread_setconcurrency ( lvl -- err :Cint )
@@ -165,8 +157,6 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 2 1 extern: .pthread_mutexattr_setpshared     pthread_mutexattr_setpshared     ( attr shared     -- err :Cint )
 2 1 extern: .pthread_mutexattr_gettype        pthread_mutexattr_gettype        ( attr type_adr   -- err :Cint )
 2 1 extern: .pthread_mutexattr_settype        pthread_mutexattr_settype        ( attr type       -- err :Cint )
-2 1 extern: .pthread_mutexattr_getpolicy_np   pthread_mutexattr_getpolicy_np   ( attr pol_adr    -- err :Cint )
-2 1 extern: .pthread_mutexattr_setpolicy_np   pthread_mutexattr_setpolicy_np   ( attr pol        -- err :Cint )
 
 2 1 extern: .pthread_mutex_init    pthread_mutex_init    ( mut attr -- err :Cint )
 1 1 extern: .pthread_mutex_destroy pthread_mutex_destroy ( mut      -- err :Cint )
@@ -189,18 +179,6 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 1 1 extern: .pthread_rwlock_rdlock    pthread_rwlock_rdlock    ( lock      -- err :Cint )
 1 1 extern: .pthread_rwlock_wrlock    pthread_rwlock_wrlock    ( lock      -- err :Cint )
 1 1 extern: .pthread_rwlock_unlock    pthread_rwlock_unlock    ( lock      -- err :Cint )
-
-2 1 extern: .pthread_cond_signal_thread_np pthread_cond_signal_thread_np ( cond thread -- err :Cint )
-
-\ `Timespec` is defined in `./time.af`.
-3 1 extern: .pthread_cond_timedwait_relative_np pthread_cond_timedwait_relative_np ( cond mutex timespec -- err :Cint )
-
-0 1 extern: .pthread_jit_write_protect_supported_np pthread_jit_write_protect_supported_np (         -- bool :Cint )
-1 0 extern: .pthread_jit_write_protect_np           pthread_jit_write_protect_np           ( enabled --            )
-0 0 extern: .pthread_jit_write_freeze_callbacks_np  pthread_jit_write_freeze_callbacks_np  (         --            )
-
-\ Not found via `dlsym`.
-\ 2 1 extern: .pthread_jit_write_with_callback_np pthread_jit_write_with_callback_np
 
 \ Internal closure used by `.thread_run_with_ctx`.
 struct: Thread_run

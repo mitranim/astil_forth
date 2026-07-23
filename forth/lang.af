@@ -1543,31 +1543,86 @@ end
 
 \ ## Memory
 \
-\ The program is implicitly linked with `libc`,
-\ so we get to use C stdlib functions.
+\ The program is implicitly linked with `libc` / `libSystem`,
+\ in both JIT and AOT modes. We can use whatever it provides.
 \
 \ Compiler also provides `.alloca` intrinsically.
 
 \ Maximum alignment needed for any value on Arm64.
 16 let: FUND_ALIGN
 
-2 1 extern: .calloc  calloc  ( len size -- addr )
-1 1 extern: .malloc  malloc  ( size -- addr )
-2 1 extern: .realloc realloc ( addr size -- addr )
-1 0 extern: .free    free    ( addr -- )
-3 0 extern: .memset  memset  ( buf char len -- )
-3 0 extern: .memcpy  memcpy  ( out src len -- )
-3 0 extern: .memmove memmove ( out src len -- )
-3 1 extern: .memcmp  memcmp  ( adr0 adr1 len -- cmp :Cint )
+2 1 extern: .calloc         calloc         ( len size -- addr )
+1 1 extern: .malloc         malloc         ( size -- addr )
+2 1 extern: .realloc        realloc        ( addr size -- addr )
+1 0 extern: .free           free           ( addr -- )
+2 1 extern: .aligned_alloc  aligned_alloc  ( align size -- addr )
+3 1 extern: .posix_memalign posix_memalign ( out align size -- err  :Cint )
+3 0 extern: .memset         memset         ( buf char len -- )
+3 0 extern: .memcpy         memcpy         ( out src len -- )
+3 0 extern: .memmove        memmove        ( out src len -- )
+3 1 extern: .memcmp         memcmp         ( adr0 adr1 len -- cmp :Cint )
+4 1 extern: .memccpy        memccpy        ( out src char len -- end|nil )
+3 1 extern: .memchr         memchr         ( buf char len -- found )
+4 1 extern: .memmem         memmem         ( buf len sub slen -- found )
 
-1 1 extern: .strdup  strdup  ( cstr -- cstr )
-2 1 extern: .strndup strndup ( cstr len -- cstr )
-1 1 extern: .strlen  strlen  ( cstr -- len )
-2 1 extern: .strcmp  strcmp  ( cstr0 cstr1 -- cmp :Cint )
-3 1 extern: .strncmp strncmp ( str0 str1 len -- cmp :Cint )
-3 0 extern: .strncpy strncpy ( out src str_len -- )
-3 0 extern: .strlcpy strlcpy ( out src buf_len -- )
-2 1 extern: .strstr  strstr  ( cstr0 cstr0 -- adr )
+1 1 extern: .strdup     strdup     ( cstr -- cstr )
+2 1 extern: .strndup    strndup    ( cstr len -- cstr )
+1 1 extern: .strlen     strlen     ( cstr -- len )
+2 1 extern: .strnlen    strnlen    ( cstr cap -- len )
+2 1 extern: .strcmp     strcmp     ( cstr0 cstr1 -- cmp :Cint )
+3 1 extern: .strncmp    strncmp    ( str0 str1 len -- cmp :Cint )
+3 0 extern: .strncpy    strncpy    ( out src str_len -- )
+3 1 extern: .strlcpy    strlcpy    ( out src buf_len -- src_len )
+3 1 extern: .strlcat    strlcat    ( out src buf_len -- wanted_len )
+2 1 extern: .strstr     strstr     ( cstr0 cstr0 -- adr )
+2 1 extern: .strcat     strcat     ( out src -- out )
+2 1 extern: .strchr     strchr     ( cstr char -- found )
+2 1 extern: .strcoll    strcoll    ( cstr0 cstr1 -- cmp :Cint )
+2 1 extern: .strcpy     strcpy     ( out src -- out )
+2 1 extern: .strcspn    strcspn    ( cstr reject -- len )
+3 1 extern: .strncat    strncat    ( out src len -- out )
+2 1 extern: .strpbrk    strpbrk    ( cstr accept -- found )
+2 1 extern: .strrchr    strrchr    ( cstr char -- found )
+2 1 extern: .strspn     strspn     ( cstr accept -- len )
+2 1 extern: .strtok     strtok     ( str sep -- token )
+3 1 extern: .strtok_r   strtok_r   ( str sep state -- token )
+3 1 extern: .strxfrm    strxfrm    ( out src cap -- len )
+2 1 extern: .stpcpy     stpcpy     ( out src -- end )
+3 1 extern: .stpncpy    stpncpy    ( out src len -- end )
+1 1 extern: .strsignal  strsignal  ( sig -- str )
+3 1 extern: .strerror_r strerror_r ( code buf cap -- err :Cint )
+
+\ GPR-compatible math from `<stdlib.h>`.
+1 1 extern: .labs     labs     ( val                   -- abs       )
+1 1 extern: .llabs    llabs    ( val                   -- abs       )
+1 1 extern: .atoi     atoi     ( str                   -- val :Cint )
+1 1 extern: .atol     atol     ( str                   -- val       )
+1 1 extern: .atoll    atoll    ( str                   -- val       )
+3 1 extern: .strtol   strtol   ( str end_adr base      -- val       )
+3 1 extern: .strtoll  strtoll  ( str end_adr base      -- val       )
+3 1 extern: .strtoul  strtoul  ( str end_adr base      -- val       )
+3 1 extern: .strtoull strtoull ( str end_adr base      -- val       )
+5 1 extern: .bsearch  bsearch  ( key base len size cmp -- found     )
+4 0 extern: .qsort    qsort    ( base len size cmp     --           )
+0 1 extern: .rand     rand     (                       -- val :Cint )
+1 0 extern: .srand    srand    ( seed                  --           )
+1 1 extern: .rand_r   rand_r   ( seed_adr              -- val :Cint )
+
+\ Byte-oriented `<ctype.h>` surface. Arguments must be `EOF` or unsigned byte.
+1 1 extern: .isalnum  isalnum  ( char -- bool :Cint )
+1 1 extern: .isalpha  isalpha  ( char -- bool :Cint )
+1 1 extern: .isblank  isblank  ( char -- bool :Cint )
+1 1 extern: .iscntrl  iscntrl  ( char -- bool :Cint )
+1 1 extern: .isdigit  isdigit  ( char -- bool :Cint )
+1 1 extern: .isgraph  isgraph  ( char -- bool :Cint )
+1 1 extern: .islower  islower  ( char -- bool :Cint )
+1 1 extern: .isprint  isprint  ( char -- bool :Cint )
+1 1 extern: .ispunct  ispunct  ( char -- bool :Cint )
+1 1 extern: .isspace  isspace  ( char -- bool :Cint )
+1 1 extern: .isupper  isupper  ( char -- bool :Cint )
+1 1 extern: .isxdigit isxdigit ( char -- bool :Cint )
+1 1 extern: .tolower  tolower  ( char -- char :Cint )
+1 1 extern: .toupper  toupper  ( char -- char :Cint )
 
 fun: .move    { src out len  } out src len .strncpy end
 fun: .memfill { buf len char } buf char len .memset end
@@ -1701,9 +1756,7 @@ end
 2 1 extern: .putc_unlocked    putc_unlocked    ( char file         -- char|-1 :Cint )
 1 1 extern: .putchar          putchar          ( char              -- char|-1 :Cint )
 1 1 extern: .putchar_unlocked putchar_unlocked ( char              -- char|-1 :Cint )
-2 1 extern: .putw             putw             ( char file         -- 0|-1    :Cint )
 1 1 extern: .fflush           fflush           ( file              -- 0|-1    :Cint )
-1 1 extern: .fpurge           fpurge           ( file              -- 0|-1    :Cint )
 
 \ Variadic formatting words; see varg support below.
 1 1 extern: .printf    printf    ( fmt               … -- len|-1 :Cint )
@@ -2069,7 +2122,7 @@ fun: .type_beg { name len -- type err }
   len .inc { cap }
   2 .cells cap + { size }
   size CELL .comp_alloc_data { type }
-  2 .cells type + name cap .strlcpy
+  2 .cells type + name cap .strlcpy { -- }
   type
 end
 
@@ -3737,9 +3790,13 @@ fun:      !culong { val adr -> } ! end
 4 let: PROT_EXEC
 5 let: PROT_RE
 
-2    let: MAP_PRIVATE
-4096 let: MAP_ANON
-4098 let: MAP_DEFAULT
+1                        let: MAP_SHARED
+2                        let: MAP_PRIVATE
+0x10                     let: MAP_FIXED
+4096                     let: MAP_ANON
+MAP_ANON                 let: MAP_ANONYMOUS
+MAP_PRIVATE MAP_ANON .or let: MAP_DEFAULT
+-1                       let: MAP_FAILED
 
 fun: .mem_map { size pflag -- addr err }
   0 size pflag MAP_DEFAULT -1 0 .mmap { addr }
