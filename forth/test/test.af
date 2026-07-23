@@ -2543,6 +2543,22 @@ fun: .test_alloca_dynamic_non_x0 { keep size -- err }
 end
 77 32 .test_alloca_dynamic_non_x0
 
+fun: .test_to_slot_non_x0_fun {
+  keep0 keep1 keep2 val -- keep0 keep1 keep2 out
+}
+  keep0 keep1 keep2 val >slot { keep0 keep1 keep2 adr }
+  keep0 keep1 keep2 adr @
+end
+
+fun: .test_to_slot_non_x0 { -- err }
+  10 20 30 40 .test_to_slot_non_x0_fun { keep0 keep1 keep2 out }
+  assert= keep0 10 end
+  assert= keep1 20 end
+  assert= keep2 30 end
+  assert= out 40 end
+end
+.test_to_slot_non_x0
+
 1 1 opaque: Opaq_1_1
 2 2 opaque: Opaq_2_2
 3 1 opaque: Opaq_3_1

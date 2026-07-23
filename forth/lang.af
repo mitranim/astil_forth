@@ -1360,13 +1360,19 @@ fun: on!  { adr } true  adr ! end
 fun_comp: .slot { -- err } ( E: -- adr ) call'' CELL call'' .alloca end
 
 \ Shortcut for stack-allocating a slot and immediately setting a value.
-\ Replaces the need for taking references to locals we had before.
+\ Replaces the need for taking references to locals that we had before.
 fun_comp: >slot { -- err } ( E: val -- adr )
+  1 nil .comp_args_min
+  .comp_args_get { len }
+  len .dec { val }
+
   call'' .slot
-  compile'  !
-  0 .comp_realloc_reg
-  0 1 .asm_mov_reg .comp_instr \ mov x0, x1
-  1 .comp_args_set
+  len { adr }
+
+  val adr 0 .asm_store_off .comp_instr \ str <val>, [<adr>]
+  val .comp_realloc_reg
+  val adr .asm_mov_reg .comp_instr \ mov <val>, <adr>
+  len .comp_args_set
 end
 
 \ ## Stacks
