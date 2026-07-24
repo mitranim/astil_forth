@@ -1,4 +1,10 @@
 [
+  {
+    "keys": ["ctrl+c"],
+    "command": "astil_forth_eval_selection",
+    "args": {"cancel": true},
+    "context": [{"key": "panel", "operand": "output.astil_forth"}],
+  },
   // Suppress auto-pairing of single quotes.
   {
     "keys": ["'"],

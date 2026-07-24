@@ -19,7 +19,7 @@
       "cmd": ["astil", "--trace=true", "$file"],
     },
     {
-      "name": "stack-cc",
+      "name": "stack-CC",
       "cmd": ["astil_s", "$file"],
     },
   ]

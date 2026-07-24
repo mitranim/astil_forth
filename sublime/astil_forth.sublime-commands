@@ -1,0 +1,6 @@
+[
+  {
+    "caption": "Astil Forth: eval selection",
+    "command": "astil_forth_eval_selection",
+  },
+]
