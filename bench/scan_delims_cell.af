@@ -1,0 +1,73 @@
+use' lang.af
+
+\ BOT-ASSISTED
+
+65536      let: CAP
+32768      let: RUNS
+1207959552 let: WANT
+
+s" {a,b:c[d]e} \n\tfg" str: SRC
+
+256 mem: DELS
+DELS 256 .memzero
+
+1 char' {  DELS + !b
+1 char' }  DELS + !b
+1 char' [  DELS + !b
+1 char' ]  DELS + !b
+1 char' :  DELS + !b
+1 char' ,  DELS + !b
+1 char' \s DELS + !b
+1 char' \n DELS + !b
+1 char' \t DELS + !b
+
+fun: .init { buf len }
+  buf len + { ceil }
+  SRC { src len }
+  0 { ind }
+  loop
+    buf ceil < .while
+    ind len .mod src + @b buf !b
+    inc: buf
+    inc: ind
+  end
+end
+
+fun: .scan { buf len dels -- out }
+  buf len + { ceil }
+  0
+  loop
+    buf ceil < .while
+    buf @ { val }
+    val         0xff .and dels + @b +
+    val  8 .lsr 0xff .and dels + @b +
+    val 16 .lsr 0xff .and dels + @b +
+    val 24 .lsr 0xff .and dels + @b +
+    val 32 .lsr 0xff .and dels + @b +
+    val 40 .lsr 0xff .and dels + @b +
+    val 48 .lsr 0xff .and dels + @b +
+    val 56 .lsr           dels + @b +
+    +cell: buf
+  end
+end
+
+fun: .run { -- err }
+  CAP .alloca { buf }
+  buf CAP .init
+  0 { out }
+  RUNS { runs }
+
+  loop
+    runs .while
+    dec: runs
+    buf CAP DELS .scan +: out
+  end
+
+  assert= out WANT end
+end
+.run
+
+fun: .main { -- exit }
+  .with_main_ctx .run end { err }
+  err .then " error: %s\n" err .elogf 1 else 0 end
+end

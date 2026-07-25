@@ -193,7 +193,7 @@ class MetricTest(unittest.TestCase):
         slow = bench("slow")
         plan = driver.SectionPlan(
             "S",
-            metrics=(driver.CPU, driver.RSS),
+            metrics=(driver.CPU, driver.MEM),
             primary=driver.CPU,
         )
 
@@ -214,6 +214,24 @@ class MetricTest(unittest.TestCase):
 
 
 class CliTest(unittest.TestCase):
+    def test_scan_delims_aot_benchmarks_smoke_validate(self) -> None:
+        self.assertEqual(
+            driver.main_for([
+                "--smoke",
+                "scan_delims_astil_cell_aot scan_delims_astil_naive_aot",
+            ]),
+            0,
+        )
+
+    def test_scan_delims_cell_benchmark_smoke_validates(self) -> None:
+        self.assertEqual(
+            driver.main_for([
+                "--smoke",
+                "scan_delims_astil_cell_reg",
+            ]),
+            0,
+        )
+
     def test_smoke_does_not_touch_existing_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "bench.md"
