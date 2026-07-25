@@ -45,8 +45,8 @@ local function handle(client)
   end
 end
 
-assert(server:listen(128, function(accept_error)
-  assert(not accept_error, accept_error)
+assert(server:listen(128, function(err)
+  assert(not err, err)
   local client = uv.new_tcp()
   assert(server:accept(client))
   resume(coroutine.create(handle), client)

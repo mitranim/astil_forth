@@ -36,6 +36,30 @@ class PlanningTest(unittest.TestCase):
             ],
         )
 
+    def test_js_coroutine_tcp_benchmark_is_selectable(self) -> None:
+        items = bench.selected_benches(["tcp_conn_js_bun_coro"])
+        self.assertEqual(
+            [(item.file, item.cmd) for item in items],
+            [
+                (
+                    "bench/tcp_server_coro.mjs",
+                    ("bun", "run", "bench/tcp_server_coro.mjs"),
+                )
+            ],
+        )
+
+    def test_python_thread_tcp_benchmark_is_selectable(self) -> None:
+        items = bench.selected_benches(["tcp_conn_python_thread"])
+        self.assertEqual(
+            [(item.file, item.cmd) for item in items],
+            [
+                (
+                    "bench/tcp_server_thread.py",
+                    ("python3", "bench/tcp_server_thread.py"),
+                )
+            ],
+        )
+
 
 class MeasurementTest(unittest.TestCase):
     def test_measure_keeps_user_and_kernel_cpu(self) -> None:
@@ -307,6 +331,49 @@ class TcpServerTest(unittest.TestCase):
             sample = bench.measure(item, timeout_seconds=10)
         self.assertGreater(sample.wall_seconds, 0)
 
+    def test_python_thread_server_scales_without_gil_convoy(self) -> None:
+        item = bench.selected_benches(["tcp_conn_python_thread"])[0]
+        with (
+            mock.patch.object(bench.tcp_conn, "CONNECTIONS", 2048),
+            mock.patch.object(bench.tcp_conn, "EXCHANGES", 2),
+        ):
+            try:
+                sample = bench.measure(item, timeout_seconds=5)
+            except bench.MeasurementDeadline:
+                self.fail("Python thread server hit GIL scheduling convoy")
+        self.assertGreater(sample.wall_seconds, 0)
+
+    def test_js_coroutine_server_handles_tcp_protocol(self) -> None:
+        script = """
+import { handlers } from "./bench/tcp_server_coro.mjs"
+const bytes = []
+let ended = false
+const socket = {
+  write(data) { bytes.push(...data) },
+  end(data) {
+    bytes.push(...data)
+    ended = true
+  },
+}
+handlers.open(socket)
+handlers.data(socket, Uint8Array.of(68))
+await Promise.resolve()
+handlers.data(socket, Uint8Array.of(81))
+await socket.data.task
+console.log(JSON.stringify({ bytes, ended }))
+"""
+        result = subprocess.run(
+            ("bun", "-e", script),
+            cwd=bench.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.strip(),
+            '{"bytes":[82,68,81],"ended":true}',
+        )
+
 
 class ValidationTest(unittest.TestCase):
     def test_reports_through_progress(self) -> None:
@@ -346,11 +413,11 @@ class SmokeTest(unittest.TestCase):
             item.name: item.cmd
             for item in bench.BENCHES
             if item.name in {
-                "none_astil_reg",
+                "none_astil_jit",
                 "none_astil_stack",
                 "baseline_js_bun",
             }
         }
-        self.assertEqual(commands["none_astil_reg"], ("./astil.exe", "--eval="))
+        self.assertEqual(commands["none_astil_jit"], ("./astil.exe", "--eval="))
         self.assertEqual(commands["none_astil_stack"], ("./astil_s.exe", "--eval="))
         self.assertEqual(commands["baseline_js_bun"], ("bun", "-e", ";"))

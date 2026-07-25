@@ -18,12 +18,12 @@ assert(server:listen(128, function(err)
   assert(server:accept(client))
   assert(client:write(READY))
 
-  client:read_start(function(read_error, bytes)
-    assert(not read_error, read_error)
+  client:read_start(function(err, bytes)
+    assert(not err, err)
     assert(bytes == DATA or bytes == CLOSE, "bad data byte")
 
-    client:write(bytes, function(write_error)
-      assert(not write_error, write_error)
+    client:write(bytes, function(err)
+      assert(not err, err)
       if bytes == CLOSE then
         client:read_stop()
         client:close()
