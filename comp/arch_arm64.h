@@ -75,10 +75,11 @@ static constexpr U8 ASM_SCRATCH_REG_14 = 14;
 static constexpr U8 ASM_SCRATCH_REG_15 = 15;
 
 /*
-Registers x16 x17 are reserved for debuggers; x18 is reserved for the OS.
-MacOS uses x18 for syscall numbers. x19 … x28 are callee-saved registers,
-which must be stashed and restored when used by a callee. We also reserve
-some of these for special roles; see below.
+x16 is volatile scratch. XNU also uses it for syscall numbers.
+x17 is volatile scratch. x18 is platform-specific; reserved on XNU.
+
+x19 … x31 are callee-saved: stable across calls; callee must stash and restore.
+We also reserve some of these for special roles; see below.
 */
 static constexpr U8 ASM_STABLE_REG_19    = 19;
 static constexpr U8 ASM_STABLE_REG_20    = 20;
