@@ -11,15 +11,15 @@ s" {a,b:c[d]e} \n\tfg" str: SRC
 256 mem: DELS
 DELS 256 .memzero
 
-1 char' { DELS + !b
-1 char' } DELS + !b
-1 char' [ DELS + !b
-1 char' ] DELS + !b
-1 char' : DELS + !b
-1 char' , DELS + !b
-1 SPACE   DELS + !b
-1 LF      DELS + !b
-1 TAB     DELS + !b
+1 char' {  DELS + !b
+1 char' }  DELS + !b
+1 char' [  DELS + !b
+1 char' ]  DELS + !b
+1 char' :  DELS + !b
+1 char' ,  DELS + !b
+1 char' \s DELS + !b
+1 char' \n DELS + !b
+1 char' \t DELS + !b
 
 fun: .init { buf len }
   buf len + { ceil }
