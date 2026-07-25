@@ -4388,17 +4388,31 @@ fun: .errno { -- code } .__error @s32 end
 \ ## String formatting continued
 
 \ Formats `.snprintf`-style into current ambient context; see `## Context`.
-\ Error formatting must be infallible, so failures return fallback strings.
-fun: .errf { fmt vlist -- str }
+fun: .strf { fmt vlist -- str err }
   1 .ctx_avail { buf cap }
-  cap =0 .then " <unable to format string: out of space>" .ret end
+  cap .then
+    buf cap fmt vlist .vsnprintf .cint_to_cell { len }
+    len >=0 .then
+      cap len .inc .min { len } \ Include terminating nil byte.
+      buf len + .ctx_top_set
+      buf .ret
+    end
+  end
+  nil " unable to format string"
+end
 
-  buf cap fmt vlist .vsnprintf .cint_to_cell { len }
-  len <0 .then " <unable to format string>" .ret end
+fun_comp: .strf { -- err } ( E: fmt …vargs… -- str err )
+  1 .comp_va_beg { len }
+  call'' systack_ptr
+  compile' .strf
+  len .comp_va_end
+end
 
-  cap len .inc .min { len } \ Include terminating nil byte.
-  buf len + .ctx_top_set
-  buf
+\ Error formatting must be infallible, so failures
+\ become a distinct in-band fallback string.
+fun: .errf { fmt vlist -> str }
+  instr' .strf .call [ 2 .comp_args_set ] { str err }
+  err .then " <unable to format error>" else str end
 end
 
 fun_comp: .errf { -- err } ( E: fmt …vargs… -- err )

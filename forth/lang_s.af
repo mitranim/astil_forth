@@ -1726,7 +1726,7 @@ fun: .errf { fmt vlist -- str }
   cap =0 .then " <unable to format string: out of space>" .ret end
 
   buf cap fmt vlist .vsnprintf .cint_to_cell { len }
-  len <0 .then " <unable to format string>" .ret end
+  len <0 .then " <unable to format error>" .ret end
 
   cap len .inc .min { len } \ Include terminating nil byte.
   buf len + .ctx_top_set

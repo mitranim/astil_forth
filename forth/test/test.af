@@ -2631,6 +2631,23 @@ fun: .test_errf { -- err }
 end
 .test_errf
 
+fun: .test_strf { -- Err }
+  " codes: %zd %zd %zd" 10 20 30 .strf { out err }
+  assert= err nil end .try
+  out " codes: 10 20 30" .assert_str_eq .try
+
+  alloca' Ctx { ctx }
+  nil 0 ctx .ctx_init
+
+  ctx .with_ctx
+    " ignored" .strf { out err }
+  end
+
+  assert= out nil end .try
+  err " unable to format string" .assert_str_eq
+end
+.test_strf
+
 fun: .strf_into_infallible { out -- buf cap }
   out 4 " abcdef" .strf_into
 end
@@ -2686,7 +2703,7 @@ fun: .test_errf_out_of_space { -- err }
     " codes: %zd %zd %zd" 10 20 30 .errf { out }
   end
 
-  out " <unable to format string: out of space>" .assert_str_eq
+  out " <unable to format error>" .assert_str_eq
 end
 .test_errf_out_of_space
 
@@ -3974,6 +3991,7 @@ fun: .main_run { -- err }
   .test_comptime_arg_stack_mod_scratch
   .test_span_push_9
   .test_errf
+  .test_strf
   .test_strf_into
   .test_errf_exact_fill
   .test_errf_out_of_space
