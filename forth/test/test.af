@@ -2697,6 +2697,20 @@ fun: .test_thread_custom_ctx_child { _ -- val }
   context .Test_req_ctx_val @
 end
 
+fun: .test_thread_attr_child { inp -- out } inp end
+
+fun: .test_thread_attr { -- err }
+  alloca' Pthread_attr { attr }
+
+  assert= attr .pthread_attr_init 0 end
+  instr' .test_thread_attr_child 123 attr .thread_spawn_attr { thread }
+  assert= attr .pthread_attr_destroy 0 end
+
+  thread .thread_join { out }
+  assert= out 123 end
+end
+.test_thread_attr
+
 fun: .test_thread_custom_ctx { -- err }
   alloca' Stack { mem }
 

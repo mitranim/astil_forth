@@ -7,25 +7,38 @@ use' pthread.af
 
 char' R let: READY
 char' D let: DATA
+char' Q let: CLOSE
 
 fun: .handle { conn -- out }
   1 .alloca { byte }
   READY byte !b
   conn byte 1 0 .send 1 <> .then .abort end
-  conn byte 1 MSG_WAITALL .recv 1 <> .then .abort end
-  byte @b DATA <> .then .abort end
-  conn byte 1 0 .send 1 <> .then .abort end
+  loop
+    conn byte 1 MSG_WAITALL .recv 1 <> .then .abort end
+    byte @b { input }
+    input DATA <> input CLOSE <> .and .then .abort end
+    conn byte 1 0 .send 1 <> .then .abort end
+    input CLOSE = .then leave end
+  end
   conn .close { -- }
   nil
 end
 
-fun: .run { -- err }
+fun: .serve { attr -- err }
   " 19777" { port }
   port SOMAXCONN .net_listen { listener }
   loop
     listener nil nil .sock_accept { conn }
-    instr' .handle conn .thread_spawn_detached { -- }
+    instr' .handle conn attr .thread_spawn_attr { -- }
   end
+end
+
+fun: .run { -- Err }
+  alloca' Pthread_attr { attr }
+  attr .thread_attr_init_detached .try
+  attr .serve { err }
+  attr .pthread_attr_destroy { -- }
+  err
 end
 
 fun: .main { -- exit }

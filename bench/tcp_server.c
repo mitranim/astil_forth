@@ -11,15 +11,19 @@
 
 static constexpr uint8_t READY = 'R';
 static constexpr uint8_t DATA  = 'D';
+static constexpr uint8_t CLOSE = 'Q';
 static constexpr int     PORT  = 19777;
 
 static void *handle_connection(void *inp) {
   const int conn = (int)(intptr_t)inp;
   uint8_t   byte = READY;
 
-  const bool ok = send(conn, &byte, 1, 0) == 1 &&
-    recv(conn, &byte, 1, MSG_WAITALL) == 1 && byte == DATA &&
-    send(conn, &byte, 1, 0) == 1;
+  bool ok = send(conn, &byte, 1, 0) == 1;
+  while (ok) {
+    ok = recv(conn, &byte, 1, MSG_WAITALL) == 1 &&
+      (byte == DATA || byte == CLOSE) && send(conn, &byte, 1, 0) == 1;
+    if (byte == CLOSE) break;
+  }
 
   if (close(conn) || !ok) exit(1);
   return nullptr;

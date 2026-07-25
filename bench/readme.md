@@ -55,214 +55,217 @@ python 3.14.4
 
 ## NONE
 
-| Command | Wall [ms] | CPU [µs] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [µs] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `none_astil_reg` | 1.065 ± 0.056 | 776.4 ± 33.7 | 1.423 ± 0.005 | 1.00 |
-| `none_astil_stack` | 1.066 ± 0.048 | 761.4 ± 31.7 | 1.329 ± 0.003 | 1.00 |
+| `none_astil_reg` | 1.153 ± 0.046 | 867.8 ± 38.3 | 1.413 ± 0.014 | 1.00 |
+| `none_astil_stack` | 2.25 ± 0.74 | 1551.0 ± 612.2 | 1.341 ± 0.017 | 1.95 |
 
 ## BASELINE
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [µs] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `baseline_luajit` | 1.94 ± 0.12 | 0.740 ± 0.027 | 1.416 ± 0.014 | 1.00 |
-| `baseline_gforth` | 2.521 ± 0.038 | 1.714 ± 0.028 | 2.075 ± 0.024 | 1.30 |
-| `baseline_astil_stack` | 3.092 ± 0.058 | 2.762 ± 0.048 | 1.744 ± 0.019 | 1.59 |
-| `baseline_js_bun` | 6.69 ± 0.40 | 5.32 ± 0.17 | 19.202 ± 0.074 | 3.44 |
-| `baseline_cl_sbcl` | 12.19 ± 0.19 | 10.23 ± 0.20 | 39.202 ± 0.042 | 6.27 |
-| `baseline_astil_reg` | 12.83 ± 0.24 | 12.44 ± 0.24 | 2.360 ± 0.005 | 6.59 |
-| `baseline_pypy` | 13.81 ± 0.33 | 12.63 ± 0.28 | 28.035 ± 0.040 | 7.10 |
-| `baseline_python` | 14.92 ± 0.45 | 13.07 ± 0.27 | 11.557 ± 0.035 | 7.67 |
-| `baseline_java` | 37.72 ± 0.98 | 40.30 ± 0.89 | 34.95 ± 0.14 | 19.39 |
+| `baseline_luajit` | 1.522 ± 0.087 | 793.2 ± 50.0 | 1.4 ± 0.0 | 1.00 |
+| `baseline_gforth` | 2.477 ± 0.059 | 1788.6 ± 39.4 | 2.062 ± 0.016 | 1.63 |
+| `baseline_astil_stack` | 3.285 ± 0.092 | 2942.2 ± 73.1 | 1.7 ± 0.0 | 2.16 |
+| `baseline_js_bun` | 7.13 ± 0.34 | 5860.4 ± 299.0 | 19.137 ± 0.007 | 4.68 |
+| `baseline_cl_sbcl` | 11.77 ± 0.27 | 10212.2 ± 181.5 | 39.209 ± 0.034 | 7.73 |
+| `baseline_pypy` | 14.52 ± 0.30 | 13305.6 ± 322.3 | 28.028 ± 0.090 | 9.54 |
+| `baseline_astil_reg` | 15.2 ± 1.8 | 14745.2 ± 1797.8 | 2.4 ± 0.0 | 9.98 |
+| `baseline_python` | 16.4 ± 1.5 | 14707.2 ± 1100.7 | 11.57 ± 0.18 | 10.79 |
+| `baseline_java` | 35.92 ± 0.93 | 38308.4 ± 1054.4 | 34.909 ± 0.030 | 23.60 |
 
 ## BUBBLE
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `bubble_clang` | 294.5 ± 6.9 | 294.0 ± 6.9 | 1.3 ± 0.0 | 1.00 |
-| `bubble_js_bun` | 431.4 ± 3.8 | 432.8 ± 4.4 | 28.631 ± 0.072 | 1.46 |
-| `bubble_astil_aot` | 433.78 ± 0.69 | 433.06 ± 0.80 | 1.363 ± 0.017 | 1.47 |
-| `bubble_astil_reg` | 454.3 ± 16.3 | 453.6 ± 16.3 | 2.6 ± 0.0 | 1.54 |
-| `bubble_cl_sbcl` | 499.0 ± 1.5 | 496.1 ± 1.3 | 40.337 ± 0.041 | 1.69 |
-| `bubble_java` | 534.2 ± 2.1 | 537.5 ± 2.6 | 35.591 ± 0.073 | 1.81 |
-| `bubble_luajit` | 580.4 ± 12.0 | 578.3 ± 11.7 | 1.988 ± 0.017 | 1.97 |
-| `bubble_pypy` | 1134.2 ± 1.9 | 1131.7 ± 1.6 | 31.37 ± 0.12 | 3.85 |
-| `bubble_astil_stack` | 1533.9 ± 9.4 | 1533.0 ± 9.4 | 1.994 ± 0.021 | 5.21 |
-| `bubble_gforth` | 3821.0 ± 221.5 | 3819.4 ± 221.6 | 2.331 ± 0.040 | 12.97 |
-| `bubble_python` | 26821.9 ± 236.8 | 26818.5 ± 235.0 | 12.961 ± 0.033 | 91.06 |
+| `bubble_clang` | 317.3 ± 4.6 | 316.5 ± 4.3 | 1.334 ± 0.014 | 1.00 |
+| `bubble_js_bun` | 418.5 ± 9.1 | 420.3 ± 9.3 | 28.597 ± 0.064 | 1.32 |
+| `bubble_astil_aot` | 431.4 ± 13.8 | 430.8 ± 13.9 | 1.3 ± 0.0 | 1.36 |
+| `bubble_astil_reg` | 433.6 ± 18.5 | 432.7 ± 18.5 | 2.6 ± 0.0 | 1.37 |
+| `bubble_cl_sbcl` | 491.3 ± 5.6 | 488.6 ± 5.5 | 40.369 ± 0.021 | 1.55 |
+| `bubble_java` | 530.9 ± 2.5 | 534.4 ± 2.8 | 35.67 ± 0.10 | 1.67 |
+| `bubble_luajit` | 571.0 ± 13.4 | 569.3 ± 13.2 | 1.975 ± 0.014 | 1.80 |
+| `bubble_pypy` | 1135.2 ± 1.2 | 1133.3 ± 1.1 | 31.38 ± 0.16 | 3.58 |
+| `bubble_astil_stack` | 1541.9 ± 16.1 | 1541.1 ± 16.1 | 2.0 ± 0.0 | 4.86 |
+| `bubble_gforth` | 3848.1 ± 270.8 | 3846.7 ± 270.9 | 2.341 ± 0.039 | 12.13 |
+| `bubble_python` | 26732.3 ± 90.5 | 26728.6 ± 88.6 | 12.953 ± 0.022 | 84.25 |
 
 ## PRIME SIEVE
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `sieve_clang` | 144.58 ± 0.50 | 144.07 ± 0.47 | 1.2 ± 0.0 | 1.00 |
-| `sieve_cl_sbcl` | 185.7 ± 5.5 | 183.4 ± 5.4 | 40.2 ± 0.0 | 1.28 |
-| `sieve_js_bun` | 212.4 ± 5.6 | 212.1 ± 5.5 | 27.348 ± 0.064 | 1.47 |
-| `sieve_astil_aot` | 225.0 ± 5.3 | 224.2 ± 5.2 | 1.2 ± 0.0 | 1.56 |
-| `sieve_astil_reg` | 235.8 ± 5.1 | 235.2 ± 5.1 | 2.4 ± 0.0 | 1.63 |
-| `sieve_luajit` | 247.74 ± 0.54 | 246.19 ± 0.49 | 1.6 ± 0.0 | 1.71 |
-| `sieve_java` | 251.00 ± 0.65 | 259.33 ± 0.86 | 36.100 ± 0.098 | 1.74 |
-| `sieve_pypy` | 582.0 ± 1.0 | 580.4 ± 1.0 | 31.672 ± 0.066 | 4.03 |
-| `sieve_astil_stack` | 707.1 ± 3.7 | 706.5 ± 3.7 | 1.7 ± 0.0 | 4.89 |
-| `sieve_gforth` | 1736.9 ± 22.7 | 1735.4 ± 22.6 | 2.094 ± 0.027 | 12.01 |
-| `sieve_python` | 15283.9 ± 28.3 | 15281.4 ± 28.3 | 11.677 ± 0.063 | 105.71 |
+| `sieve_clang` | 144.93 ± 0.15 | 144.27 ± 0.14 | 1.163 ± 0.014 | 1.00 |
+| `sieve_cl_sbcl` | 178.8 ± 1.4 | 176.3 ± 1.4 | 40.2 ± 0.0 | 1.23 |
+| `sieve_js_bun` | 220.1 ± 7.9 | 219.9 ± 8.0 | 27.331 ± 0.046 | 1.52 |
+| `sieve_astil_aot` | 223.6 ± 2.0 | 222.9 ± 2.0 | 1.2 ± 0.0 | 1.54 |
+| `sieve_astil_reg` | 236.96 ± 0.84 | 236.24 ± 0.84 | 2.4 ± 0.0 | 1.63 |
+| `sieve_luajit` | 250.0 ± 1.7 | 248.6 ± 1.8 | 1.6 ± 0.0 | 1.73 |
+| `sieve_java` | 251.43 ± 0.69 | 259.80 ± 0.54 | 36.17 ± 0.11 | 1.73 |
+| `sieve_pypy` | 583.43 ± 0.70 | 581.62 ± 0.63 | 31.64 ± 0.17 | 4.03 |
+| `sieve_astil_stack` | 703.4 ± 2.4 | 702.6 ± 2.4 | 1.7 ± 0.0 | 4.85 |
+| `sieve_gforth` | 1763.3 ± 32.4 | 1762.2 ± 32.5 | 2.072 ± 0.009 | 12.17 |
+| `sieve_python` | 15315.0 ± 22.4 | 15312.0 ± 22.2 | 11.794 ± 0.083 | 105.67 |
 
 ## REVERSE STRING
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `reverse_string_clang` | 95.98 ± 0.55 | 95.49 ± 0.50 | 1.2 ± 0.0 | 1.00 |
-| `reverse_string_java` | 134.67 ± 0.81 | 141.77 ± 0.65 | 36.25 ± 0.21 | 1.40 |
-| `reverse_string_js_bun` | 220.6 ± 1.2 | 224.1 ± 1.2 | 30.847 ± 0.057 | 2.30 |
-| `reverse_string_astil_aot` | 232.1 ± 1.1 | 231.5 ± 1.1 | 1.2 ± 0.0 | 2.42 |
-| `reverse_string_astil_reg` | 245.1 ± 2.2 | 244.5 ± 2.2 | 2.4 ± 0.0 | 2.55 |
-| `reverse_string_luajit` | 322.24 ± 0.38 | 320.58 ± 0.28 | 1.7 ± 0.0 | 3.36 |
-| `reverse_string_cl_sbcl` | 687.63 ± 0.95 | 685.03 ± 0.99 | 39.962 ± 0.021 | 7.16 |
-| `reverse_string_pypy` | 917.5 ± 7.5 | 915.7 ± 7.5 | 32.37 ± 0.20 | 9.56 |
-| `reverse_string_astil_stack` | 1803.4 ± 10.5 | 1802.6 ± 10.5 | 1.7 ± 0.0 | 18.79 |
-| `reverse_string_gforth` | 4172.8 ± 3.9 | 4171.4 ± 3.8 | 2.081 ± 0.026 | 43.47 |
-| `reverse_string_python` | 13249.4 ± 20.5 | 13247.0 ± 20.5 | 11.703 ± 0.026 | 138.04 |
+| `reverse_string_clang` | 97.59 ± 0.53 | 96.96 ± 0.52 | 1.2 ± 0.0 | 1.00 |
+| `reverse_string_java` | 135.14 ± 0.31 | 141.95 ± 0.27 | 36.13 ± 0.15 | 1.38 |
+| `reverse_string_js_bun` | 220.53 ± 0.27 | 224.22 ± 0.19 | 30.869 ± 0.063 | 2.26 |
+| `reverse_string_astil_aot` | 238.07 ± 0.81 | 237.33 ± 0.81 | 1.2 ± 0.0 | 2.44 |
+| `reverse_string_astil_reg` | 249.3 ± 1.7 | 248.5 ± 1.7 | 2.4 ± 0.0 | 2.55 |
+| `reverse_string_luajit` | 323.03 ± 0.66 | 321.19 ± 0.63 | 1.7 ± 0.0 | 3.31 |
+| `reverse_string_cl_sbcl` | 720.8 ± 25.0 | 717.9 ± 25.0 | 39.97 ± 0.10 | 7.39 |
+| `reverse_string_pypy` | 926.3 ± 4.2 | 924.4 ± 4.3 | 32.23 ± 0.14 | 9.49 |
+| `reverse_string_astil_stack` | 1803.1 ± 8.3 | 1802.2 ± 8.3 | 1.7 ± 0.0 | 18.48 |
+| `reverse_string_gforth` | 4174.0 ± 18.0 | 4172.7 ± 18.0 | 2.072 ± 0.014 | 42.77 |
+| `reverse_string_python` | 13301.6 ± 16.9 | 13298.8 ± 17.3 | 11.63 ± 0.14 | 136.30 |
 
 ## FIB_LOOP
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `fib_loop_clang` | 100.46 ± 0.69 | 99.99 ± 0.64 | 1.153 ± 0.016 | 1.00 |
-| `fib_loop_astil_asm_aot` | 102.37 ± 0.72 | 101.90 ± 0.72 | 1.188 ± 0.016 | 1.02 |
-| `fib_loop_java` | 140.9 ± 1.5 | 145.4 ± 1.4 | 35.471 ± 0.072 | 1.40 |
-| `fib_loop_astil_aot` | 158.2 ± 1.3 | 157.5 ± 1.1 | 1.2 ± 0.0 | 1.57 |
-| `fib_loop_astil_reg` | 193.0 ± 16.0 | 192.5 ± 16.0 | 2.369 ± 0.020 | 1.92 |
-| `fib_loop_cl_sbcl` | 193.7 ± 1.7 | 191.1 ± 1.7 | 92.372 ± 0.055 | 1.93 |
-| `fib_loop_js_bun` | 273.75 ± 0.56 | 275.17 ± 0.47 | 27.938 ± 0.043 | 2.73 |
-| `fib_loop_luajit` | 369.84 ± 0.49 | 368.24 ± 0.35 | 1.591 ± 0.017 | 3.68 |
-| `fib_loop_pypy` | 789.9 ± 54.9 | 788.0 ± 55.0 | 31.23 ± 0.42 | 7.86 |
-| `fib_loop_astil_stack` | 1107.8 ± 8.6 | 1107.0 ± 8.6 | 1.744 ± 0.021 | 11.03 |
-| `fib_loop_gforth` | 2304.7 ± 37.8 | 2303.2 ± 37.8 | 2.072 ± 0.024 | 22.94 |
-| `fib_loop_python` | 12829.2 ± 55.7 | 12826.7 ± 55.7 | 11.57 ± 0.13 | 127.71 |
-
-> Warning: unstable wall time: `fib_loop_astil_reg` (middle 50% spans 16.3%).
+| `fib_loop_clang` | 101.02 ± 0.38 | 100.47 ± 0.36 | 1.1 ± 0.0 | 1.00 |
+| `fib_loop_astil_asm_aot` | 102.79 ± 0.29 | 102.14 ± 0.23 | 1.178 ± 0.014 | 1.02 |
+| `fib_loop_java` | 144.3 ± 1.2 | 148.57 ± 0.81 | 35.57 ± 0.13 | 1.43 |
+| `fib_loop_astil_aot` | 159.9 ± 1.1 | 159.2 ± 1.2 | 1.178 ± 0.014 | 1.58 |
+| `fib_loop_astil_reg` | 183.3 ± 15.7 | 182.7 ± 15.7 | 2.4 ± 0.0 | 1.81 |
+| `fib_loop_cl_sbcl` | 195.0 ± 1.5 | 192.3 ± 1.4 | 92.338 ± 0.039 | 1.93 |
+| `fib_loop_js_bun` | 273.07 ± 0.67 | 274.0 ± 1.0 | 27.77 ± 0.13 | 2.70 |
+| `fib_loop_luajit` | 371.77 ± 0.88 | 369.95 ± 0.82 | 1.6 ± 0.0 | 3.68 |
+| `fib_loop_pypy` | 805.4 ± 3.0 | 803.6 ± 3.1 | 31.69 ± 0.54 | 7.97 |
+| `fib_loop_astil_stack` | 1138.9 ± 31.2 | 1138.0 ± 31.2 | 1.744 ± 0.021 | 11.27 |
+| `fib_loop_gforth` | 2301.8 ± 96.1 | 2300.5 ± 96.1 | 2.106 ± 0.028 | 22.79 |
+| `fib_loop_python` | 12865.9 ± 100.2 | 12862.5 ± 100.4 | 11.51 ± 0.16 | 127.36 |
 
 ## FIB_LOOP_BIG
 
-| Command | Wall [s] | CPU [s] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `fib_loop_big_clang` | 0.118 ± 0.004 | 0.118 ± 0.004 | 1.1 ± 0.0 | 1.00 |
-| `fib_loop_big_astil_asm_aot` | 0.137 ± 0.001 | 0.136 ± 2.5e-04 | 1.2 ± 0.0 | 1.16 |
-| `fib_loop_big_astil_asm_reg` | 0.149 ± 0.001 | 0.148 ± 0.001 | 2.4 ± 0.0 | 1.26 |
-| `fib_loop_big_astil_aot` | 0.501 ± 0.006 | 0.500 ± 0.006 | 1.2 ± 0.0 | 4.25 |
-| `fib_loop_big_astil_reg` | 0.516 ± 0.006 | 0.516 ± 0.006 | 2.4 ± 0.0 | 4.37 |
-| `fib_loop_big_cl_sbcl` | 1.975 ± 0.004 | 1.974 ± 0.004 | 96.706 ± 0.047 | 16.74 |
-| `fib_loop_big_java` | 2.495 ± 0.009 | 2.569 ± 0.006 | 456.2 ± 65.9 | 21.14 |
-| `fib_loop_big_pypy` | 2.753 ± 0.022 | 2.751 ± 0.022 | 35.856 ± 0.093 | 23.33 |
-| `fib_loop_big_js_bun` | 3.253 ± 0.018 | 3.271 ± 0.019 | 60.888 ± 0.056 | 27.56 |
-| `fib_loop_big_python` | 13.485 ± 0.057 | 13.483 ± 0.057 | 11.652 ± 0.030 | 114.27 |
+| `fib_loop_big_clang` | 117.4 ± 3.5 | 116.7 ± 3.4 | 1.153 ± 0.017 | 1.00 |
+| `fib_loop_big_astil_asm_aot` | 131.6 ± 3.2 | 131.0 ± 3.3 | 1.191 ± 0.017 | 1.12 |
+| `fib_loop_big_astil_asm_reg` | 145.4 ± 4.2 | 144.8 ± 4.1 | 2.416 ± 0.021 | 1.24 |
+| `fib_loop_big_astil_aot` | 506.0 ± 2.3 | 505.2 ± 2.2 | 1.191 ± 0.017 | 4.31 |
+| `fib_loop_big_astil_reg` | 521.3 ± 1.2 | 520.5 ± 1.3 | 2.416 ± 0.028 | 4.44 |
+| `fib_loop_big_cl_sbcl` | 1991.7 ± 4.2 | 1990.7 ± 4.0 | 96.697 ± 0.032 | 16.96 |
+| `fib_loop_big_java` | 2525.7 ± 11.4 | 2597.8 ± 8.6 | 480.5 ± 53.6 | 21.51 |
+| `fib_loop_big_pypy` | 2742.4 ± 11.0 | 2740.5 ± 10.9 | 35.90 ± 0.12 | 23.36 |
+| `fib_loop_big_js_bun` | 3280.7 ± 56.0 | 3300.5 ± 56.9 | 61.00 ± 0.11 | 27.94 |
+| `fib_loop_big_python` | 13525.3 ± 44.2 | 13522.0 ± 43.0 | 11.51 ± 0.18 | 115.21 |
 
 ## FIB_RECURSIVE: fib(39)
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `fib_rec_clang` | 154.1 ± 5.5 | 153.6 ± 5.5 | 1.148 ± 0.014 | 1.00 |
-| `fib_rec_java` | 196.4 ± 1.8 | 199.5 ± 1.9 | 35.28 ± 0.16 | 1.27 |
-| `fib_rec_astil_aot` | 233.0 ± 2.5 | 232.3 ± 2.8 | 1.191 ± 0.017 | 1.51 |
-| `fib_rec_astil_reg` | 244.4 ± 3.5 | 243.8 ± 3.5 | 2.378 ± 0.026 | 1.59 |
-| `fib_rec_js_bun` | 258.3 ± 3.4 | 257.2 ± 3.2 | 26.053 ± 0.089 | 1.68 |
-| `fib_rec_luajit` | 277.1 ± 12.6 | 275.5 ± 12.6 | 1.661 ± 0.011 | 1.80 |
-| `fib_rec_cl_sbcl` | 334.1 ± 8.0 | 331.5 ± 8.0 | 39.003 ± 0.025 | 2.17 |
-| `fib_rec_pypy` | 463.8 ± 2.7 | 462.1 ± 2.6 | 46.68 ± 0.14 | 3.01 |
-| `fib_rec_astil_stack` | 1005.3 ± 24.4 | 1004.7 ± 24.4 | 1.758 ± 0.019 | 6.52 |
-| `fib_rec_gforth` | 1421.4 ± 16.5 | 1419.9 ± 16.4 | 2.075 ± 0.032 | 9.22 |
-| `fib_rec_python` | 6494.7 ± 33.3 | 6492.2 ± 33.3 | 11.666 ± 0.097 | 42.14 |
+| `fib_rec_clang` | 160.0 ± 7.2 | 159.3 ± 7.1 | 1.147 ± 0.014 | 1.00 |
+| `fib_rec_java` | 195.7 ± 1.4 | 198.4 ± 1.4 | 35.33 ± 0.13 | 1.22 |
+| `fib_rec_astil_aot` | 234.9 ± 9.5 | 234.2 ± 9.5 | 1.184 ± 0.017 | 1.47 |
+| `fib_rec_astil_reg` | 246.5 ± 2.8 | 245.7 ± 2.8 | 2.403 ± 0.020 | 1.54 |
+| `fib_rec_js_bun` | 259.7 ± 3.4 | 259.0 ± 3.4 | 26.066 ± 0.049 | 1.62 |
+| `fib_rec_luajit` | 276.8 ± 6.4 | 275.3 ± 6.4 | 1.669 ± 0.017 | 1.73 |
+| `fib_rec_cl_sbcl` | 329.7 ± 8.1 | 326.9 ± 7.9 | 38.997 ± 0.023 | 2.06 |
+| `fib_rec_pypy` | 465.2 ± 1.6 | 463.5 ± 1.6 | 46.68 ± 0.18 | 2.91 |
+| `fib_rec_astil_stack` | 999.4 ± 20.1 | 998.7 ± 20.1 | 1.778 ± 0.026 | 6.25 |
+| `fib_rec_gforth` | 1414.3 ± 12.4 | 1412.8 ± 12.6 | 2.122 ± 0.068 | 8.84 |
+| `fib_rec_python` | 6534.3 ± 36.1 | 6531.7 ± 36.0 | 11.694 ± 0.026 | 40.84 |
 
 ## CONST FOLD
 
-| Command | Wall [s] | CPU [s] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `const_fold_folded_astil_aot` | 0.142 ± 0.004 | 0.141 ± 0.004 | 1.2 ± 0.0 | 1.00 |
-| `const_fold_folded_astil_reg` | 0.154 ± 0.004 | 0.154 ± 0.004 | 2.393 ± 0.047 | 1.09 |
-| `const_fold_runtime_astil_aot` | 2.710 ± 0.002 | 2.709 ± 0.002 | 1.2 ± 0.0 | 19.13 |
-| `const_fold_runtime_astil_reg` | 2.717 ± 0.009 | 2.716 ± 0.009 | 2.4 ± 0.0 | 19.18 |
+| `const_fold_folded_astil_aot` | 138.5 ± 3.6 | 137.8 ± 3.6 | 1.184 ± 0.017 | 1.00 |
+| `const_fold_folded_astil_reg` | 148.5 ± 1.8 | 147.9 ± 1.7 | 2.394 ± 0.007 | 1.07 |
+| `const_fold_runtime_astil_aot` | 2719.3 ± 4.0 | 2718.4 ± 4.0 | 1.184 ± 0.017 | 19.64 |
+| `const_fold_runtime_astil_reg` | 2725.03 ± 0.72 | 2724.16 ± 0.72 | 2.394 ± 0.007 | 19.68 |
 
 ## FNV-1A 64
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `fnv1a64_clang` | 135.09 ± 0.78 | 134.55 ± 0.71 | 1.2 ± 0.0 | 1.00 |
-| `fnv1a64_astil_aot` | 139.6 ± 4.8 | 139.0 ± 4.7 | 1.2 ± 0.0 | 1.03 |
-| `fnv1a64_cl_sbcl` | 149.8 ± 3.6 | 147.6 ± 3.6 | 39.7 ± 0.0 | 1.11 |
-| `fnv1a64_astil_reg` | 150.0 ± 5.1 | 149.5 ± 5.1 | 2.4 ± 0.0 | 1.11 |
-| `fnv1a64_java` | 173.68 ± 0.98 | 180.56 ± 0.89 | 35.97 ± 0.16 | 1.29 |
-| `fnv1a64_pypy` | 277.1 ± 1.3 | 275.3 ± 1.2 | 31.225 ± 0.096 | 2.05 |
-| `fnv1a64_gforth` | 534.1 ± 8.7 | 532.9 ± 8.9 | 2.125 ± 0.011 | 3.95 |
-| `fnv1a64_astil_stack` | 643.0 ± 51.6 | 642.3 ± 51.6 | 1.808 ± 0.020 | 4.76 |
-| `fnv1a64_luajit` | 1107.6 ± 6.6 | 1105.9 ± 6.7 | 1.8 ± 0.0 | 8.20 |
-| `fnv1a64_js_bun` | 1545.0 ± 17.6 | 1546.8 ± 17.9 | 29.087 ± 0.089 | 11.44 |
-| `fnv1a64_python` | 9744.3 ± 19.7 | 9741.7 ± 19.6 | 11.778 ± 0.046 | 72.13 |
+| `fnv1a64_astil_aot` | 135.26 ± 0.36 | 134.64 ± 0.38 | 1.200 ± 0.017 | 1.00 |
+| `fnv1a64_clang` | 135.28 ± 0.51 | 134.67 ± 0.45 | 1.2 ± 0.0 | 1.00 |
+| `fnv1a64_astil_reg` | 147.23 ± 0.14 | 146.61 ± 0.13 | 2.434 ± 0.026 | 1.09 |
+| `fnv1a64_cl_sbcl` | 147.24 ± 0.19 | 144.81 ± 0.12 | 39.681 ± 0.028 | 1.09 |
+| `fnv1a64_java` | 172.7 ± 1.3 | 179.0 ± 1.3 | 35.928 ± 0.089 | 1.28 |
+| `fnv1a64_pypy` | 278.24 ± 0.94 | 276.52 ± 0.94 | 31.19 ± 0.20 | 2.06 |
+| `fnv1a64_gforth` | 527.3 ± 7.4 | 525.9 ± 7.5 | 2.131 ± 0.014 | 3.90 |
+| `fnv1a64_astil_stack` | 602.2 ± 21.9 | 601.5 ± 21.9 | 1.8 ± 0.0 | 4.45 |
+| `fnv1a64_luajit` | 1109.8 ± 7.6 | 1107.5 ± 6.9 | 1.803 ± 0.014 | 8.21 |
+| `fnv1a64_js_bun` | 1542.1 ± 21.5 | 1544.4 ± 20.9 | 29.084 ± 0.079 | 11.40 |
+| `fnv1a64_python` | 9779.9 ± 7.8 | 9777.2 ± 7.7 | 11.73 ± 0.18 | 72.31 |
 
 ## SCAN DELIMS
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `scan_delims_c_simd` | 143.54 ± 0.38 | 143.02 ± 0.34 | 1.2 ± 0.0 | 1.00 |
-| `scan_delims_astil_simd_aot` | 144.50 ± 0.80 | 143.84 ± 0.41 | 1.2 ± 0.0 | 1.01 |
-| `scan_delims_astil_simd_reg` | 156.90 ± 0.24 | 156.37 ± 0.28 | 2.417 ± 0.071 | 1.09 |
-| `scan_delims_java_simd` | 305.0 ± 3.3 | 403.0 ± 3.9 | 178.90 ± 0.71 | 2.13 |
-| `scan_delims_c_naive` | 397.66 ± 0.60 | 396.82 ± 0.28 | 1.2 ± 0.0 | 2.77 |
-| `scan_delims_luajit` | 666.22 ± 0.34 | 664.55 ± 0.36 | 1.741 ± 0.014 | 4.64 |
-| `scan_delims_java` | 670.35 ± 0.83 | 678.43 ± 0.59 | 36.08 ± 0.11 | 4.67 |
-| `scan_delims_js_bun` | 952.4 ± 1.6 | 956.0 ± 1.3 | 30.637 ± 0.096 | 6.64 |
-| `scan_delims_astil_naive_reg` | 1091.2 ± 1.5 | 1090.5 ± 1.5 | 2.397 ± 0.014 | 7.60 |
-| `scan_delims_cl_sbcl` | 1162.0 ± 9.9 | 1159.3 ± 10.0 | 40.350 ± 0.024 | 8.10 |
-| `scan_delims_pypy` | 1413.04 ± 0.46 | 1410.88 ± 0.42 | 31.25 ± 0.19 | 9.84 |
-| `scan_delims_python` | 5105.7 ± 75.2 | 5103.3 ± 75.2 | 11.700 ± 0.045 | 35.57 |
+| `scan_delims_c_simd` | 142.4 ± 2.5 | 141.7 ± 2.5 | 1.2 ± 0.0 | 1.00 |
+| `scan_delims_astil_simd_aot` | 144.6 ± 1.6 | 143.9 ± 1.5 | 1.2 ± 0.0 | 1.02 |
+| `scan_delims_astil_simd_reg` | 158.88 ± 0.36 | 158.22 ± 0.37 | 2.4 ± 0.0 | 1.12 |
+| `scan_delims_java_simd` | 300.9 ± 1.4 | 399.0 ± 1.9 | 178.61 ± 0.68 | 2.11 |
+| `scan_delims_c_naive` | 398.93 ± 0.33 | 398.08 ± 0.30 | 1.2 ± 0.0 | 2.80 |
+| `scan_delims_luajit` | 668.8 ± 1.1 | 667.0 ± 1.2 | 1.7 ± 0.0 | 4.70 |
+| `scan_delims_java` | 672.8 ± 3.5 | 680.1 ± 3.4 | 36.55 ± 0.76 | 4.72 |
+| `scan_delims_js_bun` | 940.9 ± 10.1 | 944.9 ± 10.2 | 30.625 ± 0.069 | 6.61 |
+| `scan_delims_astil_naive_reg` | 1095.0 ± 1.7 | 1094.2 ± 1.7 | 2.409 ± 0.007 | 7.69 |
+| `scan_delims_cl_sbcl` | 1139.3 ± 21.3 | 1136.4 ± 21.1 | 40.337 ± 0.034 | 8.00 |
+| `scan_delims_pypy` | 1415.0 ± 1.1 | 1413.0 ± 1.1 | 31.28 ± 0.10 | 9.94 |
+| `scan_delims_python` | 4987.5 ± 70.7 | 4984.8 ± 70.6 | 11.68 ± 0.13 | 35.02 |
 
 ## BINARY TREE
 
-| Command | Wall [s] | CPU [s] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `bin_tree_java` | 0.296 ± 0.004 | 0.371 ± 0.017 | 911.0 ± 38.6 | 1.00 |
-| `bin_tree_cl_sbcl` | 0.301 ± 3.7e-04 | 0.298 ± 3.3e-04 | 112.481 ± 0.039 | 1.02 |
-| `bin_tree_astil_aot` | 0.319 ± 0.012 | 0.318 ± 0.012 | 25.207 ± 0.011 | 1.08 |
-| `bin_tree_astil_reg` | 0.328 ± 0.005 | 0.327 ± 0.005 | 26.400 ± 0.021 | 1.11 |
-| `bin_tree_js_bun_lucky` | 0.398 ± 0.008 | 0.582 ± 0.028 | 198.0 ± 14.9 | 1.34 |
-| `bin_tree_zig` | 0.416 ± 2.7e-04 | 0.416 ± 2.4e-04 | 25.934 ± 0.026 | 1.41 |
-| `bin_tree_clang` | 1.047 ± 0.012 | 1.047 ± 0.012 | 27.131 ± 0.014 | 3.54 |
-| `bin_tree_js_bun` | 1.050 ± 0.007 | 1.244 ± 0.015 | 180.4 ± 20.2 | 3.55 |
-| `bin_tree_go` | 1.124 ± 0.004 | 4.865 ± 0.026 | 44.55 ± 0.31 | 3.80 |
-| `bin_tree_luajit` | 2.021 ± 0.009 | 2.019 ± 0.009 | 277.4 ± 13.7 | 6.83 |
-| `bin_tree_astil_stack` | 2.204 ± 0.005 | 2.203 ± 0.005 | 25.778 ± 0.026 | 7.45 |
-| `bin_tree_pypy` | 2.604 ± 0.021 | 2.602 ± 0.021 | 142.13 ± 0.22 | 8.80 |
-| `bin_tree_gforth` | 4.722 ± 0.012 | 4.720 ± 0.012 | 28.069 ± 0.014 | 15.96 |
-| `bin_tree_python` | 8.166 ± 0.048 | 8.164 ± 0.048 | 84.084 ± 0.030 | 27.60 |
+| `bin_tree_cl_sbcl` | 300.92 ± 0.67 | 297.63 ± 0.55 | 112.509 ± 0.032 | 1.00 |
+| `bin_tree_java` | 308.0 ± 1.4 | 387.8 ± 7.5 | 908.8 ± 28.5 | 1.02 |
+| `bin_tree_astil_aot` | 318.3 ± 2.7 | 317.0 ± 2.8 | 25.2 ± 0.0 | 1.06 |
+| `bin_tree_astil_reg` | 330.6 ± 5.4 | 329.9 ± 5.4 | 26.394 ± 0.007 | 1.10 |
+| `bin_tree_js_bun_lucky` | 402.9 ± 8.5 | 596.6 ± 21.2 | 189.0 ± 15.2 | 1.34 |
+| `bin_tree_zig` | 417.32 ± 0.81 | 416.57 ± 0.79 | 25.934 ± 0.026 | 1.39 |
+| `bin_tree_js_bun` | 1051.0 ± 6.7 | 1231.6 ± 20.5 | 186.5 ± 16.5 | 3.49 |
+| `bin_tree_clang` | 1071.3 ± 27.6 | 1063.8 ± 18.6 | 27.1 ± 0.0 | 3.56 |
+| `bin_tree_go` | 1125.2 ± 4.7 | 4801.9 ± 57.5 | 44.08 ± 0.89 | 3.74 |
+| `bin_tree_luajit` | 2031.9 ± 6.7 | 2030.4 ± 6.8 | 273.3 ± 22.7 | 6.75 |
+| `bin_tree_astil_stack` | 2135.0 ± 68.2 | 2134.3 ± 68.1 | 25.8 ± 0.0 | 7.09 |
+| `bin_tree_pypy` | 2595.8 ± 16.3 | 2592.8 ± 16.4 | 181.0 ± 25.9 | 8.63 |
+| `bin_tree_gforth` | 4713.5 ± 26.5 | 4712.1 ± 26.7 | 28.050 ± 0.026 | 15.66 |
+| `bin_tree_python` | 8208.7 ± 10.1 | 8206.2 ± 10.1 | 84.06 ± 0.16 | 27.28 |
 
 ## BINARY TREE BULK
 
-| Command | Wall [ms] | CPU [ms] | Peak mem [MiB] | Relative |
+| Command | Wall [ms] ↓ | CPU [ms] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `bin_tree_clang_bulk` | 146.6 ± 2.2 | 145.9 ± 2.2 | 35.873 ± 0.023 | 1.00 |
-| `bin_tree_astil_aot_bulk` | 196.8 ± 2.9 | 195.9 ± 2.5 | 25.224 ± 0.013 | 1.34 |
-| `bin_tree_astil_reg_bulk` | 207.40 ± 0.78 | 206.84 ± 0.77 | 26.400 ± 0.021 | 1.41 |
-| `bin_tree_go_bulk` | 374.9 ± 12.6 | 719.0 ± 9.3 | 58.8 ± 8.1 | 2.56 |
-| `bin_tree_gforth_bulk` | 1615.6 ± 12.5 | 1614.2 ± 12.5 | 36.750 ± 0.037 | 11.02 |
-| `bin_tree_astil_stack_bulk` | 1620.3 ± 47.6 | 1619.6 ± 47.5 | 25.764 ± 0.023 | 11.05 |
+| `bin_tree_clang_bulk` | 145.6 ± 3.5 | 144.8 ± 3.5 | 35.878 ± 0.042 | 1.00 |
+| `bin_tree_astil_aot_bulk` | 193.3 ± 2.8 | 192.4 ± 2.8 | 25.2 ± 0.0 | 1.33 |
+| `bin_tree_astil_reg_bulk` | 207.5 ± 2.7 | 206.8 ± 2.6 | 26.4 ± 0.0 | 1.42 |
+| `bin_tree_go_bulk` | 376.2 ± 10.9 | 722.5 ± 13.2 | 57.5 ± 3.8 | 2.58 |
+| `bin_tree_gforth_bulk` | 1598.6 ± 15.5 | 1597.2 ± 15.5 | 36.741 ± 0.009 | 10.98 |
+| `bin_tree_astil_stack_bulk` | 1599.0 ± 17.9 | 1598.4 ± 17.9 | 25.8 ± 0.0 | 10.98 |
 
 ## TCP CONNECTIONS
 
-Measures 4096 concurrent connections with basic send + receive.
+Measures 4096 concurrent connections with 32 one-byte request/echo exchanges per connection.
 
-Wall time includes Python TCP driver work. After every connection closes, the driver kills and reaps the idle server; this work is also included in wall time. CPU time and peak mem/RSS measure only the server subprocess. Measurements use at most 5 runs.
+Wall time includes Python TCP driver work. After every connection closes, the driver kills and reaps the idle server; this work is also included in wall time. CPU time and peak mem/RSS measure only the server subprocess. Each implementation is measured 5 times.
 
-| Command | Wall [ms] | CPU [ms] ↓ | Peak mem [MiB] | Relative |
-| --- | ---: | ---: | ---: | ---: |
-| `tcp_conn_luajit_luv_coro` | 336.9 ± 8.8 | 65.2 ± 3.8 | 9.422 ± 0.072 | 1.00 |
-| `tcp_conn_luajit_luv_evented` | 339.6 ± 11.3 | 65.7 ± 5.2 | 5.82 ± 0.14 | 1.01 |
-| `tcp_conn_js_bun_evented` | 344.8 ± 15.9 | 78.3 ± 7.5 | 26.98 ± 0.12 | 1.20 |
-| `tcp_conn_zig_pthread` | 469.0 ± 84.4 | 139.1 ± 18.2 | 65.878 ± 0.060 | 2.13 |
-| `tcp_conn_astil_aot_pthread` | 610.7 ± 126.2 | 147.3 ± 33.1 | 65.80 ± 0.14 | 2.26 |
-| `tcp_conn_astil_reg_pthread` | 392.8 ± 119.8 | 149.2 ± 7.1 | 67.25 ± 0.11 | 2.29 |
-| `tcp_conn_clang_pthread` | 408.5 ± 176.0 | 162.7 ± 37.8 | 65.181 ± 0.018 | 2.50 |
-| `tcp_conn_go_goroutine` | 371.0 ± 49.5 | 214.1 ± 11.5 | 18.41 ± 0.11 | 3.28 |
-| `tcp_conn_python_asyncio` | 360.2 ± 21.3 | 239.1 ± 6.6 | 43.32 ± 0.28 | 3.67 |
-| `tcp_conn_java_vthread` | 394.4 ± 13.6 | 495.1 ± 11.5 | 72.33 ± 0.93 | 7.59 |
-| `tcp_conn_pypy_asyncio` | 830.5 ± 47.6 | 530.7 ± 14.2 | 88.6 ± 1.6 | 8.14 |
-| `tcp_conn_java_thread` | 448.3 ± 121.4 | 705.8 ± 68.2 | 452.1 ± 47.3 | 10.82 |
-| `tcp_conn_cl_sbcl_thread` | 567.4 ± 43.2 | 791.2 ± 179.4 | 725.5 ± 32.5 | 12.13 |
-| `tcp_conn_gforth_task` | 3429.1 ± 77.5 | 3350.5 ± 71.7 | 68.694 ± 0.046 | 51.38 |
+This benchmark is noisier than others, especially when using pthreads. Results vary more between reruns.
+
+Results are sorted by total user+kernel CPU time.
+
+| Command | Wall [ms] | User CPU [ms] | Kernel CPU [ms] | Peak mem [MiB] | CPU relative ↓ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `tcp_conn_js_bun_evented` | 928.9 ± 15.4 | 95.0 ± 1.2 | 334.8 ± 4.8 | 30.53 ± 0.11 | 1.00 |
+| `tcp_conn_luajit_luv_evented` | 911.2 ± 13.7 | 151.1 ± 2.0 | 279.7 ± 2.8 | 6.89 ± 0.20 | 1.00 |
+| `tcp_conn_luajit_luv_coro` | 947.9 ± 31.5 | 246.8 ± 9.1 | 296.3 ± 6.2 | 13.41 ± 0.14 | 1.26 |
+| `tcp_conn_astil_aot_pthread` | 1309.7 ± 19.0 | 63.19 ± 0.60 | 720.0 ± 16.0 | 65.847 ± 0.040 | 1.82 |
+| `tcp_conn_astil_reg_pthread` | 1272.5 ± 14.3 | 124.7 ± 4.0 | 696.1 ± 2.1 | 67.84 ± 0.11 | 1.91 |
+| `tcp_conn_zig_pthread` | 1306.3 ± 117.2 | 107.1 ± 2.4 | 731.7 ± 27.5 | 65.975 ± 0.061 | 1.95 |
+| `tcp_conn_clang_pthread` | 1228.6 ± 195.3 | 65.9 ± 14.4 | 914.2 ± 442.3 | 65.25 ± 0.12 | 2.28 |
+| `tcp_conn_python_asyncio` | 1141.1 ± 33.7 | 632.7 ± 3.3 | 366.6 ± 10.9 | 44.17 ± 0.35 | 2.33 |
+| `tcp_conn_java_thread` | 1225.3 ± 102.0 | 533.7 ± 19.1 | 1031.6 ± 39.1 | 547.6 ± 15.8 | 3.64 |
+| `tcp_conn_pypy_asyncio` | 2128.1 ± 136.7 | 1248.2 ± 48.0 | 555.0 ± 8.6 | 123.9 ± 7.1 | 4.20 |
+| `tcp_conn_cl_sbcl_thread` | 1457.5 ± 84.2 | 560.1 ± 63.5 | 1313.9 ± 197.6 | 1347.5 ± 585.3 | 4.36 |
+| `tcp_conn_go_goroutine` | 1274.7 ± 99.8 | 365.8 ± 6.3 | 1904.1 ± 79.9 | 18.84 ± 0.50 | 5.28 |
+| `tcp_conn_java_async` | 984.9 ± 40.1 | 739.8 ± 24.3 | 2573.5 ± 274.5 | 85.1 ± 2.8 | 7.71 |
+| `tcp_conn_gforth_task` | 3848.0 ± 110.6 | 1605.4 ± 45.8 | 2160.9 ± 66.3 | 68.672 ± 0.058 | 8.76 |
+| `tcp_conn_java_vthread` | 1085.7 ± 132.9 | 979.8 ± 86.7 | 4623.6 ± 61.5 | 104.2 ± 2.2 | 13.04 |

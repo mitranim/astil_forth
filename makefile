@@ -15,6 +15,7 @@ LOCAL ?= local
 CLIB_DIR ?= clib
 COMP_DIR ?= comp
 GEN_DIR ?= generated
+TMP_DIR ?= .tmp
 ASM_GEN_SRC ?= $(COMP_DIR)/asm_gen.c
 ASM_GEN_OUT ?= $(GEN_DIR)/asm_generated.s
 MACH_GEN_SRC ?= mach/mach_exc.defs
@@ -263,7 +264,7 @@ disasm:
 
 .PHONY: clean
 clean:
-	rm -rf $(GEN_DIR) $(wildcard $(ARTIF))
+	rm -rf $(GEN_DIR) $(TMP_DIR) $(wildcard $(ARTIF))
 
 # The MIG's output is much worse than this.
 $(MACH_GEN_OUT): $(MACH_GEN_SRC)

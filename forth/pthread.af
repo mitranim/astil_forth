@@ -197,22 +197,28 @@ fun: .thread_run_with_ctx { run -- out }
   end
 end
 
-\ Wraps `.pthread_create` with descriptive error on failure.
-\ The parent must either `.thread_join` or `.pthread_detach`.
-\ If error, parent owns `inp`. Otherwise thread owns `inp`.
+\ Spawns a thread using caller-owned attributes.
+\ Parent must either `.thread_join` or `.pthread_detach`.
+\ If error, parent owns `inp`. Otherwise child owns `inp`.
+\
+\ `attr` may be nil. If non-nil, it must be initialized and remain valid until
+\ this call returns. Destroying or changing it afterwards doesn't affect thread.
 \
 \ Caution: this doesn't set up memory context for the child thread.
 \ If the callback depends on context either directly or indirectly,
 \ such as by calling `.os_err` / `?posix_err` / `.errf` / etc., then
 \ caller must allocate an arena and use `.thread_spawn_ctx` instead.
 \ See `../examples/thread.af`.
-fun: .thread_spawn { fun inp -- thread err }
-  nil { attr }
+fun: .thread_spawn_attr { fun inp attr -- thread err }
   .slot { thread }
-
   thread attr fun inp .pthread_create
   " unable to spawn thread" ?posix_err { err }
   thread @ err
+end
+
+\ Wraps `.pthread_create` with descriptive error on failure.
+fun: .thread_spawn { fun inp -- thread err }
+  fun inp nil .thread_spawn_attr
 end
 
 \ Spawns joinable thread with parent-created memory context.
@@ -255,7 +261,21 @@ fun: .thread_spawn_ctx { fun inp ctx -- thread Err }
   \ by parent's context. Rewind could invalidate error before parent reads it.
 end
 
-\ Wraps `.pthread_create` with `PTHREAD_CREATE_DETACHED`.
+\ Initializes caller-owned attributes for detached threads.
+\ Caller must destroy `attr` after success. Error leaves no
+\ initialized `attr`.
+fun: .thread_attr_init_detached { attr -- Err }
+  attr .pthread_attr_init
+  " unable to init thread attributes" ?posix_err .try
+
+  attr PTHREAD_CREATE_DETACHED .pthread_attr_setdetachstate
+  " unable to mark thread as detached" ?posix_err { err }
+
+  err .then attr .pthread_attr_destroy { -- } end
+  err
+end
+
+\ Wraps `.pthread_create` with detached attributes.
 \ The parent must not `.thread_join` or `.pthread_detach`.
 \ If error, parent owns `inp`. Otherwise thread owns it.
 \
@@ -263,24 +283,16 @@ end
 \ Detached threads tend to use their own context.
 \ See `../examples/http_echo.af`.
 fun: .thread_spawn_detached { fun inp -- thread Err }
-  alloca' Pthread_attr { attr   }
-  .slot                { thread }
+  alloca' Pthread_attr { attr }
+  nil                  { thread }
 
-  attr .pthread_attr_init
-  " unable to init thread attributes" ?posix_err .try
-
-  attr PTHREAD_CREATE_DETACHED .pthread_attr_setdetachstate
-  " unable to mark thread as detached" ?posix_err { err }
-
-  err =0 .then
-    thread attr fun inp .pthread_create
-    " unable to spawn detached thread" ?posix_err { err }
-  end
+  attr .thread_attr_init_detached .try
+  fun inp attr .thread_spawn_attr { thread err }
 
   \ After successful spawn, returning attr cleanup failure
   \ would lie about thread state and input ownership.
   attr .pthread_attr_destroy { -- }
-  thread @ err
+  thread err
 end
 
 \ Wraps `.pthread_join`, throwing a descriptive error on failure.

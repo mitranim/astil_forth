@@ -37,9 +37,13 @@ create tcp-byte 1 allot
   >r
   [char] R tcp-byte c!
   r@ tcp-byte 1 0 send 1 <> abort" short READY write"
-  r@ recv-byte
-  1 <> tcp-byte c@ [char] D <> or abort" bad DATA byte"
-  r@ tcp-byte 1 0 send 1 <> abort" short echo write"
+  begin
+    r@ recv-byte
+    1 <> tcp-byte c@ dup [char] D <> swap [char] Q <> and or
+    abort" bad data byte"
+    r@ tcp-byte 1 0 send 1 <> abort" short echo write"
+    tcp-byte c@ [char] Q =
+  until
   r> closesocket drop
 ;
 

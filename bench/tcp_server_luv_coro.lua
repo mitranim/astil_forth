@@ -4,6 +4,7 @@ local uv = require("luv")
 
 local READY = "R"
 local DATA = "D"
+local CLOSE = "Q"
 local PORT = 19777
 
 local server = uv.new_tcp()
@@ -33,10 +34,15 @@ end
 
 local function handle(client)
   write(client, READY)
-  local bytes = read(client)
-  assert(bytes == DATA, "bad DATA byte")
-  write(client, bytes)
-  client:close()
+  while true do
+    local bytes = read(client)
+    assert(bytes == DATA or bytes == CLOSE, "bad data byte")
+    write(client, bytes)
+    if bytes == CLOSE then
+      client:close()
+      return
+    end
+  end
 end
 
 assert(server:listen(128, function(accept_error)

@@ -1,0 +1,853 @@
+"""Benchmark declarations and low-level subprocess measurement."""
+
+# BOT-GENERATED
+
+import argparse
+import fnmatch
+import math
+import os
+import signal
+import statistics
+import subprocess
+import sys
+import time
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
+from pathlib import Path
+from . import tcp_conn
+
+ROOT = Path(__file__).resolve().parent.parent
+GEN = ROOT / "generated"
+DEFAULT_OUTPUT = GEN / "bench.md"
+
+RUN_TIMEOUT_SECONDS = 60.0
+
+# Darwin reports ru_maxrss in bytes; Linux and the other supported Unixes use KiB.
+RSS_UNIT_BYTES = 1 if sys.platform == "darwin" else 1024
+
+CLEAN = ("make", "clean")
+BUILD = ("make", "build")
+
+TOOLS = {
+    "clang": ("clang", "--version"),
+    "go": ("go", "version"),
+    "zig": ("zig", "version"),
+    "java": ("java", "-version"),
+    "gforth": ("gforth", "--version"),
+    "luajit": ("luajit", "-v"),
+    "luv": (
+        "luajit",
+        "-e",
+        'print("luv " .. require("luv").version_string())',
+    ),
+    "bun": ("bun", "--version"),
+    "sbcl": ("sbcl", "--version"),
+    "pypy3": ("pypy3", "--version"),
+    "python3": ("python3", "--version"),
+}
+
+
+@dataclass(frozen=True)
+class Bench:
+    section: str
+    name: str
+    file: str
+    cmd: tuple[str, ...]
+    setup: tuple[tuple[str, ...], ...] = ()
+    tools: tuple[str, ...] = ()
+    tcp: bool = False
+
+
+@dataclass(frozen=True)
+class Sample:
+    wall_seconds: float
+    user_cpu_seconds: float
+    kernel_cpu_seconds: float
+    peak_rss_bytes: int
+
+    @property
+    def cpu_seconds(self) -> float:
+        return self.user_cpu_seconds + self.kernel_cpu_seconds
+
+
+@dataclass(frozen=True)
+class Result:
+    item: Bench
+    samples: list[Sample]
+
+
+@dataclass(frozen=True)
+class Section:
+    title: str
+    note: str | None = None
+    sort_by: str = "wall_seconds"
+
+
+BENCHES: list[Bench] = []
+SECTIONS: list[Section] = []
+
+
+def section(
+    title: str,
+    *,
+    note: str | None = None,
+    sort_by: str = "wall_seconds",
+) -> None:
+    SECTIONS.append(Section(title, note, sort_by))
+
+
+def bench(
+    name: str,
+    file: str,
+    cmd: tuple[str, ...],
+    *,
+    setup: tuple[tuple[str, ...], ...] = (),
+    tools: tuple[str, ...] = (),
+    tcp: bool = False,
+) -> None:
+    BENCHES.append(
+        Bench(
+            SECTIONS[-1].title,
+            name,
+            file,
+            cmd,
+            setup,
+            tools,
+            tcp,
+        )
+    )
+
+
+class MeasurementDeadline(BaseException):
+    """Escape generic wait-error wrapping so the caller can discard this run."""
+
+
+def deadline_expired(_signum, _frame) -> None:
+    raise MeasurementDeadline
+
+
+@contextmanager
+def alarm(seconds: float):
+    """Interrupt one owned-child wait without polling or using a thread."""
+    previous = signal.signal(signal.SIGALRM, deadline_expired)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def terminate_and_reap(pid: int) -> None:
+    # Probe ownership before signaling: wait4 may already have reaped the child.
+    try:
+        while True:
+            try:
+                waited, _ = os.waitpid(pid, os.WNOHANG)
+                break
+            except InterruptedError:
+                continue
+    except OSError:
+        return
+    if waited:
+        return
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+    try:
+        while True:
+            try:
+                os.waitpid(pid, 0)
+                break
+            except InterruptedError:
+                continue
+    except OSError:
+        pass
+
+
+def wait4_owned(
+    item: Bench,
+    pid: int,
+    cmd: tuple[str, ...],
+    timeout_seconds: float | None,
+):
+    try:
+        alarm_context = (
+            alarm(timeout_seconds)
+            if timeout_seconds is not None
+            else nullcontext()
+        )
+        with alarm_context:
+            while True:
+                try:
+                    return os.wait4(pid, 0)
+                except InterruptedError:
+                    continue
+    except BaseException as err:
+        # ECHILD means ownership is gone; signaling this PID could hit its reuse.
+        if not isinstance(err, ChildProcessError):
+            terminate_and_reap(pid)
+        if not isinstance(err, Exception):
+            raise
+        raise RuntimeError(
+            f"benchmark {item.name!r} failed while waiting for command: "
+            f"{cmd!r}"
+        ) from err
+
+
+def measure_tcp_conn(
+    item: Bench, timeout_seconds: float | None
+) -> Sample:
+    if not item.tcp:
+        raise ValueError("TCP connection measurement requires a TCP benchmark")
+    tcp_conn.ensure_fd_capacity()
+    timeout_seconds = (
+        timeout_seconds
+        if timeout_seconds is not None
+        else RUN_TIMEOUT_SECONDS
+    )
+    if timeout_seconds <= 0:
+        raise MeasurementDeadline
+    started = time.perf_counter_ns()
+    cmd = item.cmd
+    try:
+        pid = os.posix_spawnp(cmd[0], cmd, os.environ)
+    except OSError as err:
+        raise RuntimeError(
+            f"benchmark {item.name!r} failed to spawn command: "
+            f"{cmd!r}"
+        ) from err
+    timeout_seconds -= (
+        time.perf_counter_ns() - started
+    ) / 1_000_000_000
+    if timeout_seconds <= 0:
+        terminate_and_reap(pid)
+        raise MeasurementDeadline
+    try:
+        with alarm(timeout_seconds):
+            tcp_conn.drive()
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            _, status, usage = wait4_owned(item, pid, cmd, None)
+    except BaseException:
+        terminate_and_reap(pid)
+        raise
+
+    wall_seconds = (time.perf_counter_ns() - started) / 1_000_000_000
+    exit_code = os.waitstatus_to_exitcode(status)
+    if exit_code != -signal.SIGKILL:
+        raise RuntimeError(
+            f"benchmark {item.name!r} command exited before driver kill "
+            f"with exit status {exit_code}: {cmd!r}"
+        )
+    return Sample(
+        wall_seconds,
+        usage.ru_utime,
+        usage.ru_stime,
+        usage.ru_maxrss * RSS_UNIT_BYTES,
+    )
+
+
+def measure(
+    item: Bench, timeout_seconds: float | None = None
+) -> Sample:
+    if item.tcp:
+        return measure_tcp_conn(item, timeout_seconds)
+    cmd = item.cmd
+    started = time.perf_counter_ns()
+    if timeout_seconds is not None and timeout_seconds <= 0:
+        raise MeasurementDeadline
+    try:
+        pid = os.posix_spawnp(cmd[0], cmd, os.environ)
+    except OSError as err:
+        raise RuntimeError(
+            f"benchmark {item.name!r} failed to spawn command: {cmd!r}"
+        ) from err
+    if timeout_seconds is not None:
+        timeout_seconds -= (
+            time.perf_counter_ns() - started
+        ) / 1_000_000_000
+        if timeout_seconds <= 0:
+            terminate_and_reap(pid)
+            raise MeasurementDeadline
+    _, status, usage = wait4_owned(item, pid, cmd, timeout_seconds)
+    wall_seconds = (time.perf_counter_ns() - started) / 1_000_000_000
+    exit_code = os.waitstatus_to_exitcode(status)
+    if exit_code:
+        raise RuntimeError(
+            f"benchmark {item.name!r} command exited with exit status "
+            f"{exit_code}: {cmd!r}"
+        )
+    return Sample(
+        wall_seconds,
+        usage.ru_utime,
+        usage.ru_stime,
+        usage.ru_maxrss * RSS_UNIT_BYTES,
+    )
+
+
+def c_exe(exe: str) -> tuple[tuple[str, ...], ...]:
+    return (("make", exe),)
+
+
+def go_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
+    return (("go", "build", "-o", exe, f"./{src}"),)
+
+
+def zig_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
+    return (("zig", "build-exe", "-O", "ReleaseFast", f"-femit-bin={exe}", src),)
+
+
+def java_class(src: str) -> tuple[tuple[str, ...], ...]:
+    return (("javac", src),)
+
+
+def aot(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
+    return (BUILD, ("./astil.exe", src, f"--build={exe}"))
+
+
+TCP_TMP = ROOT / ".tmp"
+TCP_HOME = str(TCP_TMP / "forth-tcp-bench-home")
+TCP_ZIG_GLOBAL_CACHE = str(TCP_TMP / "forth-tcp-bench-zig-global")
+TCP_ZIG_LOCAL_CACHE = str(TCP_TMP / "forth-tcp-bench-zig-local")
+TCP_ZIG_ENV = (
+    "env",
+    f"ZIG_GLOBAL_CACHE_DIR={TCP_ZIG_GLOBAL_CACHE}",
+    f"ZIG_LOCAL_CACHE_DIR={TCP_ZIG_LOCAL_CACHE}",
+)
+TCP_ZIG_CLEAN = ("rm", "-rf", TCP_ZIG_GLOBAL_CACHE, TCP_ZIG_LOCAL_CACHE)
+TCP_GO_ENV = ("env", f"GOCACHE={TCP_TMP / 'forth-tcp-bench-go-cache'}")
+TCP_GFORTH_ENV = ("env", f"HOME={TCP_HOME}")
+TCP_JAVA_SETUP = (
+    (
+        "javac",
+        "bench/tcp_server.java",
+    ),
+)
+GFORTH_SOCKET_SETUP = (
+    (
+        "/bin/sh",
+        "-c",
+        f'mkdir -p "{TCP_HOME}"; '
+        'gf="$(realpath "$(command -v gforth)")"; '
+        'root="$(dirname "$(dirname "$gf")")"; '
+        f'HOME="{TCP_HOME}" CPATH="$root/include${{CPATH:+:$CPATH}}" '
+        "gforth -e 'require unix/socket.fs "
+        "require bench/tcp_reuse_g.fs bye'",
+    ),
+)
+
+
+def tcp_connection_bench(
+    name: str,
+    file: str,
+    cmd: tuple[str, ...],
+    *,
+    setup: tuple[tuple[str, ...], ...] = (),
+    tools: tuple[str, ...] = (),
+) -> None:
+    bench(name, file, cmd, setup=setup, tools=(*tools, "python3"), tcp=True)
+
+
+def tcp_connection_benches() -> None:
+    tcp_connection_bench(
+        "tcp_conn_clang_pthread",
+        "bench/tcp_server.c",
+        ("bench/tcp_server.exe",),
+        setup=c_exe("bench/tcp_server.exe"),
+        tools=("clang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_astil_aot_pthread",
+        "bench/tcp_server.af",
+        ("bench/tcp_server_astil.exe",),
+        setup=aot("bench/tcp_server.af", "bench/tcp_server_astil.exe"),
+        tools=("clang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_astil_reg_pthread",
+        "bench/tcp_server.af",
+        ("./astil.exe", "bench/tcp_server.af", "--eval=.run"),
+        setup=(BUILD,),
+        tools=("clang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_gforth_task",
+        "bench/tcp_server_g.fs",
+        TCP_GFORTH_ENV + ("gforth", "bench/tcp_server_g.fs", "--"),
+        setup=GFORTH_SOCKET_SETUP,
+        tools=("gforth",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_zig_pthread",
+        "bench/tcp_server.zig",
+        ("bench/tcp_server_zig.exe",),
+        setup=(
+            TCP_ZIG_CLEAN,
+            (
+                *TCP_ZIG_ENV,
+                "zig",
+                "build-exe",
+                "-O",
+                "ReleaseFast",
+                "-lc",
+                "-femit-bin=bench/tcp_server_zig.exe",
+                "bench/tcp_server.zig",
+            ),
+        ),
+        tools=("zig",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_go_goroutine",
+        "bench/tcp_server.go",
+        ("bench/tcp_server_go.exe",),
+        setup=(
+            TCP_GO_ENV
+            + (
+                "go",
+                "build",
+                "-o",
+                "bench/tcp_server_go.exe",
+                "./bench/tcp_server.go",
+            ),
+        ),
+        tools=("go",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_luajit_luv_evented",
+        "bench/tcp_server_luv.lua",
+        ("luajit", "bench/tcp_server_luv.lua"),
+        tools=("luajit", "luv"),
+    )
+    tcp_connection_bench(
+        "tcp_conn_luajit_luv_coro",
+        "bench/tcp_server_luv_coro.lua",
+        ("luajit", "bench/tcp_server_luv_coro.lua"),
+        tools=("luajit", "luv"),
+    )
+    tcp_connection_bench(
+        "tcp_conn_js_bun_evented",
+        "bench/tcp_server.mjs",
+        ("bun", "run", "bench/tcp_server.mjs"),
+        tools=("bun",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_java_vthread",
+        "bench/tcp_server.java",
+        ("java", "-cp", "bench", "tcp_server"),
+        setup=TCP_JAVA_SETUP,
+        tools=("java",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_java_thread",
+        "bench/tcp_server.java",
+        ("java", "-cp", "bench", "tcp_server_thread"),
+        setup=TCP_JAVA_SETUP,
+        tools=("java",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_java_async",
+        "bench/tcp_server_async.java",
+        ("java", "-cp", "bench", "tcp_server_async"),
+        setup=java_class("bench/tcp_server_async.java"),
+        tools=("java",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_cl_sbcl_thread",
+        "bench/tcp_server.lisp",
+        (
+            "sbcl",
+            "--dynamic-space-size",
+            "2048",
+            "--script",
+            "bench/tcp_server.lisp",
+        ),
+        tools=("sbcl",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_pypy_asyncio",
+        "bench/tcp_server.py",
+        ("pypy3", "bench/tcp_server.py"),
+        tools=("pypy3",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_python_asyncio",
+        "bench/tcp_server.py",
+        ("python3", "bench/tcp_server.py"),
+    )
+
+
+section("NONE")
+bench("none_astil_reg", "astil.exe", ("./astil.exe", "--eval="), setup=(BUILD,), tools=("clang",))
+bench("none_astil_stack", "astil_s.exe", ("./astil_s.exe", "--eval="), setup=(BUILD,), tools=("clang",))
+
+section("BASELINE")
+bench("baseline_astil_reg", "forth/lang.af", ("./astil.exe", "forth/lang.af"), setup=(BUILD,), tools=("clang",))
+bench("baseline_astil_stack", "forth/lang_s.af", ("./astil_s.exe", "forth/lang_s.af"), setup=(BUILD,), tools=("clang",))
+bench("baseline_gforth", "gforth", ("gforth", "-e", "bye"), tools=("gforth",))
+bench("baseline_luajit", "luajit", ("luajit", "-e", ""), tools=("luajit",))
+bench("baseline_js_bun", "bun", ("bun", "-e", ";"), tools=("bun",))
+bench("baseline_java", "bench/baseline.java", ("java", "-cp", "bench", "baseline"), setup=java_class("bench/baseline.java"), tools=("java",))
+bench("baseline_cl_sbcl", "sbcl", ("sbcl", "--noinform", "--non-interactive"), tools=("sbcl",))
+bench("baseline_pypy", "pypy3", ("pypy3", "-c", ""), tools=("pypy3",))
+bench("baseline_python", "python3", ("python3", "-c", ""), tools=("python3",))
+
+section("BUBBLE")
+bench("bubble_clang", "bench/bubble.c", ("bench/bubble.exe",), setup=c_exe("bench/bubble.exe"), tools=("clang",))
+bench("bubble_astil_aot", "bench/bubble.af", ("bench/bubble_astil.exe",), setup=aot("bench/bubble.af", "bench/bubble_astil.exe"), tools=("clang",))
+bench("bubble_astil_reg", "bench/bubble.af", ("./astil.exe", "bench/bubble.af"), setup=(BUILD,), tools=("clang",))
+bench("bubble_astil_stack", "bench/bubble_s.af", ("./astil_s.exe", "bench/bubble_s.af"), setup=(BUILD,), tools=("clang",))
+bench("bubble_gforth", "bench/bubble_g.fs", ("gforth", "bench/bubble_g.fs", "-e", "bye"), tools=("gforth",))
+bench("bubble_luajit", "bench/bubble.lua", ("luajit", "bench/bubble.lua"), tools=("luajit",))
+bench("bubble_js_bun", "bench/bubble.mjs", ("bun", "run", "bench/bubble.mjs"), tools=("bun",))
+bench("bubble_java", "bench/bubble.java", ("java", "-cp", "bench", "bubble"), setup=java_class("bench/bubble.java"), tools=("java",))
+bench("bubble_cl_sbcl", "bench/bubble.lisp", ("sbcl", "--script", "bench/bubble.lisp"), tools=("sbcl",))
+bench("bubble_pypy", "bench/bubble.py", ("pypy3", "bench/bubble.py"), tools=("pypy3",))
+bench("bubble_python", "bench/bubble.py", ("python3", "bench/bubble.py"), tools=("python3",))
+
+section("PRIME SIEVE")
+bench("sieve_clang", "bench/sieve.c", ("bench/sieve.exe",), setup=c_exe("bench/sieve.exe"), tools=("clang",))
+bench("sieve_astil_aot", "bench/sieve.af", ("bench/sieve_astil.exe",), setup=aot("bench/sieve.af", "bench/sieve_astil.exe"), tools=("clang",))
+bench("sieve_astil_reg", "bench/sieve.af", ("./astil.exe", "bench/sieve.af"), setup=(BUILD,), tools=("clang",))
+bench("sieve_astil_stack", "bench/sieve_s.af", ("./astil_s.exe", "bench/sieve_s.af"), setup=(BUILD,), tools=("clang",))
+bench("sieve_gforth", "bench/sieve_g.fs", ("gforth", "bench/sieve_g.fs", "-e", "bye"), tools=("gforth",))
+bench("sieve_luajit", "bench/sieve.lua", ("luajit", "bench/sieve.lua"), tools=("luajit",))
+bench("sieve_js_bun", "bench/sieve.mjs", ("bun", "run", "bench/sieve.mjs"), tools=("bun",))
+bench("sieve_java", "bench/sieve.java", ("java", "-cp", "bench", "sieve"), setup=java_class("bench/sieve.java"), tools=("java",))
+bench("sieve_cl_sbcl", "bench/sieve.lisp", ("sbcl", "--script", "bench/sieve.lisp"), tools=("sbcl",))
+bench("sieve_pypy", "bench/sieve.py", ("pypy3", "bench/sieve.py"), tools=("pypy3",))
+bench("sieve_python", "bench/sieve.py", ("python3", "bench/sieve.py"), tools=("python3",))
+
+section("REVERSE STRING")
+bench("reverse_string_clang", "bench/reverse_string.c", ("bench/reverse_string.exe",), setup=c_exe("bench/reverse_string.exe"), tools=("clang",))
+bench("reverse_string_astil_aot", "bench/reverse_string.af", ("bench/reverse_string_astil.exe",), setup=aot("bench/reverse_string.af", "bench/reverse_string_astil.exe"), tools=("clang",))
+bench("reverse_string_astil_reg", "bench/reverse_string.af", ("./astil.exe", "bench/reverse_string.af"), setup=(BUILD,), tools=("clang",))
+bench("reverse_string_astil_stack", "bench/reverse_string_s.af", ("./astil_s.exe", "bench/reverse_string_s.af"), setup=(BUILD,), tools=("clang",))
+bench("reverse_string_gforth", "bench/reverse_string_g.fs", ("gforth", "bench/reverse_string_g.fs", "-e", "bye"), tools=("gforth",))
+bench("reverse_string_luajit", "bench/reverse_string.lua", ("luajit", "bench/reverse_string.lua"), tools=("luajit",))
+bench("reverse_string_js_bun", "bench/reverse_string.mjs", ("bun", "run", "bench/reverse_string.mjs"), tools=("bun",))
+bench("reverse_string_java", "bench/reverse_string.java", ("java", "-cp", "bench", "reverse_string"), setup=java_class("bench/reverse_string.java"), tools=("java",))
+bench("reverse_string_cl_sbcl", "bench/reverse_string.lisp", ("sbcl", "--script", "bench/reverse_string.lisp"), tools=("sbcl",))
+bench("reverse_string_pypy", "bench/reverse_string.py", ("pypy3", "bench/reverse_string.py"), tools=("pypy3",))
+bench("reverse_string_python", "bench/reverse_string.py", ("python3", "bench/reverse_string.py"), tools=("python3",))
+
+section("FIB_LOOP")
+bench("fib_loop_clang", "bench/fib_loop.c", ("bench/fib_loop.exe",), setup=c_exe("bench/fib_loop.exe"), tools=("clang",))
+bench("fib_loop_astil_aot", "bench/fib_loop.af", ("bench/fib_loop_astil.exe",), setup=aot("bench/fib_loop.af", "bench/fib_loop_astil.exe"), tools=("clang",))
+bench("fib_loop_astil_reg", "bench/fib_loop.af", ("./astil.exe", "bench/fib_loop.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_loop_astil_asm_aot", "bench/fib_asm.af", ("bench/fib_loop_astil_asm.exe",), setup=aot("bench/fib_asm.af", "bench/fib_loop_astil_asm.exe"), tools=("clang",))
+bench("fib_loop_astil_stack", "bench/fib_loop_s.af", ("./astil_s.exe", "bench/fib_loop_s.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_loop_gforth", "bench/fib_loop_g.fs", ("gforth", "bench/fib_loop_g.fs", "-e", "bye"), tools=("gforth",))
+bench("fib_loop_luajit", "bench/fib_loop.lua", ("luajit", "bench/fib_loop.lua"), tools=("luajit",))
+bench("fib_loop_js_bun", "bench/fib_loop.mjs", ("bun", "run", "bench/fib_loop.mjs"), tools=("bun",))
+bench("fib_loop_java", "bench/fib_loop.java", ("java", "-cp", "bench", "fib_loop"), setup=java_class("bench/fib_loop.java"), tools=("java",))
+bench("fib_loop_cl_sbcl", "bench/fib_loop.lisp", ("sbcl", "--script", "bench/fib_loop.lisp"), tools=("sbcl",))
+bench("fib_loop_pypy", "bench/fib_loop.py", ("pypy3", "bench/fib_loop.py"), tools=("pypy3",))
+bench("fib_loop_python", "bench/fib_loop.py", ("python3", "bench/fib_loop.py"), tools=("python3",))
+
+section("FIB_LOOP_BIG")
+bench("fib_loop_big_clang", "bench/fib_loop_big.c", ("bench/fib_loop_big.exe",), setup=c_exe("bench/fib_loop_big.exe"), tools=("clang",))
+bench("fib_loop_big_astil_asm_aot", "bench/fib_loop_big_asm.af", ("bench/fib_loop_big_astil_asm.exe",), setup=aot("bench/fib_loop_big_asm.af", "bench/fib_loop_big_astil_asm.exe"), tools=("clang",))
+bench("fib_loop_big_astil_asm_reg", "bench/fib_loop_big_asm.af", ("./astil.exe", "bench/fib_loop_big_asm.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_loop_big_astil_aot", "bench/fib_loop_big.af", ("bench/fib_loop_big_astil.exe",), setup=aot("bench/fib_loop_big.af", "bench/fib_loop_big_astil.exe"), tools=("clang",))
+bench("fib_loop_big_astil_reg", "bench/fib_loop_big.af", ("./astil.exe", "bench/fib_loop_big.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_loop_big_js_bun", "bench/fib_loop_big.mjs", ("bun", "run", "bench/fib_loop_big.mjs"), tools=("bun",))
+bench("fib_loop_big_java", "bench/fib_loop_big.java", ("java", "-cp", "bench", "fib_loop_big"), setup=java_class("bench/fib_loop_big.java"), tools=("java",))
+bench("fib_loop_big_cl_sbcl", "bench/fib_loop_big.lisp", ("sbcl", "--script", "bench/fib_loop_big.lisp"), tools=("sbcl",))
+bench("fib_loop_big_pypy", "bench/fib_loop_big.py", ("pypy3", "bench/fib_loop_big.py"), tools=("pypy3",))
+bench("fib_loop_big_python", "bench/fib_loop_big.py", ("python3", "bench/fib_loop_big.py"), tools=("python3",))
+
+section("FIB_RECURSIVE: fib(39)")
+bench("fib_rec_clang", "bench/fib_rec.c", ("bench/fib_rec.exe",), setup=c_exe("bench/fib_rec.exe"), tools=("clang",))
+bench("fib_rec_astil_aot", "bench/fib_rec.af", ("bench/fib_rec_astil.exe",), setup=aot("bench/fib_rec.af", "bench/fib_rec_astil.exe"), tools=("clang",))
+bench("fib_rec_astil_reg", "bench/fib_rec.af", ("./astil.exe", "bench/fib_rec.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_rec_astil_stack", "bench/fib_rec_s.af", ("./astil_s.exe", "bench/fib_rec_s.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_rec_gforth", "bench/fib_rec_g.fs", ("gforth", "bench/fib_rec_g.fs", "-e", "bye"), tools=("gforth",))
+bench("fib_rec_luajit", "bench/fib_rec.lua", ("luajit", "bench/fib_rec.lua"), tools=("luajit",))
+bench("fib_rec_js_bun", "bench/fib_rec.mjs", ("bun", "run", "bench/fib_rec.mjs"), tools=("bun",))
+bench("fib_rec_java", "bench/fib_rec.java", ("java", "-cp", "bench", "fib_rec"), setup=java_class("bench/fib_rec.java"), tools=("java",))
+bench("fib_rec_cl_sbcl", "bench/fib_rec.lisp", ("sbcl", "--script", "bench/fib_rec.lisp"), tools=("sbcl",))
+bench("fib_rec_pypy", "bench/fib_rec.py", ("pypy3", "bench/fib_rec.py"), tools=("pypy3",))
+bench("fib_rec_python", "bench/fib_rec.py", ("python3", "bench/fib_rec.py"), tools=("python3",))
+
+section("CONST FOLD")
+bench("const_fold_folded_astil_aot", "bench/const_fold_folded.af", ("bench/const_fold_folded_astil.exe",), setup=aot("bench/const_fold_folded.af", "bench/const_fold_folded_astil.exe"), tools=("clang",))
+bench("const_fold_runtime_astil_aot", "bench/const_fold_runtime.af", ("bench/const_fold_runtime_astil.exe",), setup=aot("bench/const_fold_runtime.af", "bench/const_fold_runtime_astil.exe"), tools=("clang",))
+bench("const_fold_folded_astil_reg", "bench/const_fold_folded.af", ("./astil.exe", "bench/const_fold_folded.af"), setup=(BUILD,), tools=("clang",))
+bench("const_fold_runtime_astil_reg", "bench/const_fold_runtime.af", ("./astil.exe", "bench/const_fold_runtime.af"), setup=(BUILD,), tools=("clang",))
+
+section("FNV-1A 64")
+bench("fnv1a64_clang", "bench/fnv1a64.c", ("bench/fnv1a64.exe",), setup=c_exe("bench/fnv1a64.exe"), tools=("clang",))
+bench("fnv1a64_astil_aot", "bench/fnv1a64.af", ("bench/fnv1a64_astil.exe",), setup=aot("bench/fnv1a64.af", "bench/fnv1a64_astil.exe"), tools=("clang",))
+bench("fnv1a64_astil_reg", "bench/fnv1a64.af", ("./astil.exe", "bench/fnv1a64.af"), setup=(BUILD,), tools=("clang",))
+bench("fnv1a64_astil_stack", "bench/fnv1a64_s.af", ("./astil_s.exe", "bench/fnv1a64_s.af"), setup=(BUILD,), tools=("clang",))
+bench("fnv1a64_gforth", "bench/fnv1a64_g.fs", ("gforth", "bench/fnv1a64_g.fs", "-e", "bye"), tools=("gforth",))
+bench("fnv1a64_luajit", "bench/fnv1a64.lua", ("luajit", "bench/fnv1a64.lua"), tools=("luajit",))
+bench("fnv1a64_js_bun", "bench/fnv1a64.mjs", ("bun", "run", "bench/fnv1a64.mjs"), tools=("bun",))
+bench("fnv1a64_java", "bench/fnv1a64.java", ("java", "-cp", "bench", "fnv1a64"), setup=java_class("bench/fnv1a64.java"), tools=("java",))
+bench("fnv1a64_cl_sbcl", "bench/fnv1a64.lisp", ("sbcl", "--script", "bench/fnv1a64.lisp"), tools=("sbcl",))
+bench("fnv1a64_pypy", "bench/fnv1a64.py", ("pypy3", "bench/fnv1a64.py"), tools=("pypy3",))
+bench("fnv1a64_python", "bench/fnv1a64.py", ("python3", "bench/fnv1a64.py"), tools=("python3",))
+
+section("SCAN DELIMS")
+bench("scan_delims_c_simd", "bench/scan_delims_simd.c", ("bench/scan_delims_simd.exe",), setup=c_exe("bench/scan_delims_simd.exe"), tools=("clang",))
+bench("scan_delims_c_naive", "bench/scan_delims_naive.c", ("bench/scan_delims_naive.exe",), setup=c_exe("bench/scan_delims_naive.exe"), tools=("clang",))
+bench("scan_delims_astil_simd_aot", "bench/scan_delims_simd.af", ("bench/scan_delims_simd_astil.exe",), setup=aot("bench/scan_delims_simd.af", "bench/scan_delims_simd_astil.exe"), tools=("clang",))
+bench("scan_delims_astil_simd_reg", "bench/scan_delims_simd.af", ("./astil.exe", "bench/scan_delims_simd.af"), setup=(BUILD,), tools=("clang",))
+bench("scan_delims_astil_naive_reg", "bench/scan_delims_naive.af", ("./astil.exe", "bench/scan_delims_naive.af"), setup=(BUILD,), tools=("clang",))
+bench("scan_delims_luajit", "bench/scan_delims.lua", ("luajit", "bench/scan_delims.lua"), tools=("luajit",))
+bench("scan_delims_js_bun", "bench/scan_delims.mjs", ("bun", "run", "bench/scan_delims.mjs"), tools=("bun",))
+bench("scan_delims_java", "bench/scan_delims.java", ("java", "-cp", "bench", "scan_delims"), setup=java_class("bench/scan_delims.java"), tools=("java",))
+bench("scan_delims_java_simd", "bench/scan_delims_simd.java", ("java", "--add-modules", "jdk.incubator.vector", "-cp", "bench", "scan_delims_simd"), setup=(("javac", "--add-modules", "jdk.incubator.vector", "bench/scan_delims.java", "bench/scan_delims_simd.java"),), tools=("java",))
+bench("scan_delims_cl_sbcl", "bench/scan_delims.lisp", ("sbcl", "--script", "bench/scan_delims.lisp"), tools=("sbcl",))
+bench("scan_delims_pypy", "bench/scan_delims.py", ("pypy3", "bench/scan_delims.py"), tools=("pypy3",))
+bench("scan_delims_python", "bench/scan_delims_cpython.py", ("python3", "bench/scan_delims_cpython.py"), tools=("python3",))
+
+section("BINARY TREE")
+bench("bin_tree_clang", "bench/bin_tree.c", ("bench/bin_tree.exe",), setup=c_exe("bench/bin_tree.exe"), tools=("clang",))
+bench("bin_tree_astil_aot", "bench/bin_tree.af", ("bench/bin_tree_astil.exe",), setup=aot("bench/bin_tree.af", "bench/bin_tree_astil.exe"), tools=("clang",))
+bench("bin_tree_astil_reg", "bench/bin_tree.af", ("./astil.exe", "bench/bin_tree.af"), setup=(BUILD,), tools=("clang",))
+bench("bin_tree_astil_stack", "bench/bin_tree_s.af", ("./astil_s.exe", "bench/bin_tree_s.af"), setup=(BUILD,), tools=("clang",))
+bench("bin_tree_gforth", "bench/bin_tree_g.fs", ("gforth", "bench/bin_tree_g.fs", "-e", "bye"), tools=("gforth",))
+bench("bin_tree_zig", "bench/bin_tree.zig", ("bench/bin_tree_zig.exe",), setup=zig_exe("bench/bin_tree.zig", "bench/bin_tree_zig.exe"), tools=("zig",))
+bench("bin_tree_go", "bench/bin_tree.go", ("bench/bin_tree_go.exe",), setup=go_exe("bench/bin_tree.go", "bench/bin_tree_go.exe"), tools=("go",))
+bench("bin_tree_luajit", "bench/bin_tree.lua", ("luajit", "bench/bin_tree.lua"), tools=("luajit",))
+bench("bin_tree_js_bun", "bench/bin_tree.mjs", ("bun", "run", "bench/bin_tree.mjs"), tools=("bun",))
+bench("bin_tree_js_bun_lucky", "bench/bin_tree_lucky.mjs", ("bun", "run", "bench/bin_tree_lucky.mjs"), tools=("bun",))
+bench("bin_tree_java", "bench/bin_tree.java", ("java", "-cp", "bench", "bin_tree"), setup=java_class("bench/bin_tree.java"), tools=("java",))
+bench("bin_tree_cl_sbcl", "bench/bin_tree.lisp", ("sbcl", "--script", "bench/bin_tree.lisp"), tools=("sbcl",))
+bench("bin_tree_pypy", "bench/bin_tree.py", ("pypy3", "bench/bin_tree.py"), tools=("pypy3",))
+bench("bin_tree_python", "bench/bin_tree.py", ("python3", "bench/bin_tree.py"), tools=("python3",))
+
+section("BINARY TREE BULK")
+bench("bin_tree_clang_bulk", "bench/bin_tree_bulk.c", ("bench/bin_tree_bulk.exe",), setup=c_exe("bench/bin_tree_bulk.exe"), tools=("clang",))
+bench("bin_tree_astil_aot_bulk", "bench/bin_tree_bulk.af", ("bench/bin_tree_bulk_astil.exe",), setup=aot("bench/bin_tree_bulk.af", "bench/bin_tree_bulk_astil.exe"), tools=("clang",))
+bench("bin_tree_astil_reg_bulk", "bench/bin_tree_bulk.af", ("./astil.exe", "bench/bin_tree_bulk.af"), setup=(BUILD,), tools=("clang",))
+bench("bin_tree_astil_stack_bulk", "bench/bin_tree_bulk_s.af", ("./astil_s.exe", "bench/bin_tree_bulk_s.af"), setup=(BUILD,), tools=("clang",))
+bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk_g.fs", ("gforth", "bench/bin_tree_bulk_g.fs", "-e", "bye"), tools=("gforth",))
+bench("bin_tree_go_bulk", "bench/bin_tree_bulk.go", ("bench/bin_tree_go_bulk.exe",), setup=go_exe("bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe"), tools=("go",))
+
+TCP_NOTE = f"""
+Measures {tcp_conn.CONNECTIONS} concurrent connections with {tcp_conn.EXCHANGES} one-byte request/echo exchanges per connection.
+
+Wall time includes Python TCP driver work. After every connection closes, the driver kills and reaps the idle server; this work is also included in wall time. CPU time and peak mem/RSS measure only the server subprocess.
+
+This benchmark is noisier than others, especially when using pthreads. Results vary more between reruns.
+
+Results are sorted by total user+kernel CPU time.
+""".strip()
+
+section("TCP CONNECTIONS", note=TCP_NOTE, sort_by="cpu_seconds")
+tcp_connection_benches()
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("filters", nargs="*", help="AND filters; spaces inside one arg are OR; globs supported")
+    parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="default: generated/bench.md")
+    parser.add_argument("--smoke", action="store_true")
+    return parser.parse_args(argv)
+
+
+def matches_pattern(value: str, pattern: str) -> bool:
+    if fnmatch.fnmatchcase(value, pattern):
+        return True
+    if not any(char in pattern for char in "*?["):
+        return fnmatch.fnmatchcase(value, f"*{pattern}*")
+    return False
+
+
+def matches_any(value: str, patterns: list[str]) -> bool:
+    return any(matches_pattern(value, pattern) for pattern in patterns)
+
+
+def matches_filter(item: Bench, group: str) -> bool:
+    patterns = group.split()
+    base = Path(item.file).name
+    return (
+        matches_any(item.file, patterns)
+        or matches_any(base, patterns)
+        or matches_any(item.name, patterns)
+    )
+
+
+def selected_benches(filters: list[str]) -> list[Bench]:
+    groups = filters or ["*"]
+    return [item for item in BENCHES if all(matches_filter(item, group) for group in groups)]
+
+
+def run(cmd: tuple[str, ...], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            cmd,
+            cwd=ROOT,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.STDOUT if capture else None,
+        )
+    except subprocess.CalledProcessError as err:
+        if err.stdout:
+            print(err.stdout, file=sys.stderr, end="" if err.stdout.endswith("\n") else "\n")
+        raise
+
+
+def progress(msg: str) -> None:
+    print(f"[bench] {msg}", file=sys.stderr)
+
+
+def unique_setup(items: list[Bench]) -> list[tuple[str, ...]]:
+    seen: set[tuple[str, ...]] = set()
+    result: list[tuple[str, ...]] = []
+    for item in items:
+        for cmd in item.setup:
+            if cmd in seen:
+                continue
+            seen.add(cmd)
+            result.append(cmd)
+    return result
+
+
+def uses_astil(items: list[Bench]) -> bool:
+    return any("astil" in item.name for item in items)
+
+
+def selected_tools(items: list[Bench]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        for tool in item.tools:
+            if tool in seen:
+                continue
+            seen.add(tool)
+            result.append(tool)
+    return result
+
+
+def write_versions(out, items: list[Bench]) -> None:
+    out.write("## VERSIONS\n\n```\n")
+    for tool in selected_tools(items):
+        progress(f"version {tool}")
+        out.write(run(TOOLS[tool], capture=True).stdout.strip())
+        out.write("\n\n")
+    out.write("```\n")
+    out.flush()
+
+
+def summarize(
+    samples: list[Sample], field: str
+) -> tuple[float, float | None]:
+    values = [getattr(sample, field) for sample in samples]
+    # One run has a mean but no sample standard deviation.
+    deviation = statistics.stdev(values) if len(values) > 1 else None
+    return statistics.mean(values), deviation
+
+
+def format_seconds(seconds: float) -> str:
+    if seconds < 0.001:
+        return f"{seconds * 1_000_000:.1f} µs"
+    if seconds < 1:
+        return f"{seconds * 1_000:.1f} ms"
+    return f"{seconds:.1f} s"
+
+
+def duration_unit(seconds: float) -> tuple[str, float]:
+    """Choose one readable unit from a table column's typical mean."""
+    if seconds < 0.001:
+        return "µs", 1_000_000
+    if seconds < 1:
+        return "ms", 1_000
+    return "s", 1
+
+
+def format_scaled_measurement(
+    mean: float,
+    deviation: float | None,
+    unit: str,
+    scale: float,
+    *,
+    include_unit: bool,
+) -> str:
+    suffix = f" {unit}" if include_unit else ""
+    if deviation is None:
+        return f"{mean * scale:.1f}{suffix} ± —"
+    scaled_deviation = deviation * scale
+    if not scaled_deviation:
+        return f"{mean * scale:.1f}{suffix} ± 0.0{suffix}"
+    wanted_places = max(
+        1,
+        1 - math.floor(math.log10(abs(scaled_deviation))),
+    )
+    decimal_places = min(wanted_places, 3)
+    formatted_mean = f"{mean * scale:.{decimal_places}f}"
+    formatted_deviation = f"{scaled_deviation:.{decimal_places}f}"
+    return (
+        f"{formatted_mean}{suffix} ± "
+        f"{formatted_deviation}{suffix}"
+    )
+
+
+def format_measurement(
+    mean: float, deviation: float | None, formatter
+) -> str:
+    formatted_mean = formatter(mean)
+    unit = formatted_mean.split()[1]
+    scale = {"µs": 1_000_000, "ms": 1_000, "s": 1, "MiB": 1 / 1024**2}[unit]
+    return format_scaled_measurement(
+        mean,
+        deviation,
+        unit,
+        scale,
+        include_unit=True,
+    )
+
+
+def format_table_measurement(
+    mean: float,
+    deviation: float | None,
+    unit: str,
+    scale: float,
+) -> str:
+    return format_scaled_measurement(
+        mean,
+        deviation,
+        unit,
+        scale,
+        include_unit=False,
+    )
+
+
+def format_mib(bytes_: float) -> str:
+    return f"{bytes_ / 1024**2:.1f} MiB"
+
+
+def format_runs(count: int) -> str:
+    return f"{count} run" + ("" if count == 1 else "s")
+
+
+def format_done(result: Result) -> str:
+    wall_mean, wall_deviation = summarize(result.samples, "wall_seconds")
+    cpu_mean, cpu_deviation = summarize(result.samples, "cpu_seconds")
+    rss_mean, rss_deviation = summarize(result.samples, "peak_rss_bytes")
+    return (
+        f"[bench] [{result.item.name}] done: "
+        f"wall {format_measurement(wall_mean, wall_deviation, format_seconds)}, "
+        f"CPU {format_measurement(cpu_mean, cpu_deviation, format_seconds)}, "
+        f"mem {format_measurement(rss_mean, rss_deviation, format_mib)}; "
+        f"{format_runs(len(result.samples))}"
+    )
+
+
+def validate(items: list[Bench]) -> None:
+    for item in items:
+        progress(f"[{item.name}] validation")
+        try:
+            measure(item, RUN_TIMEOUT_SECONDS)
+        except MeasurementDeadline:
+            raise RuntimeError(
+                f"benchmark {item.name!r} validation exceeded "
+                f"{RUN_TIMEOUT_SECONDS:g} seconds: {item.cmd!r}"
+            ) from None

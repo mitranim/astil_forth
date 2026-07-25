@@ -6,6 +6,7 @@
 
 (defconstant +ready+ (char-code #\R))
 (defconstant +data+ (char-code #\D))
+(defconstant +close+ (char-code #\Q))
 (defconstant +port+ 19777)
 
 (defun handle-connection (socket)
@@ -13,11 +14,19 @@
     (let
       ((buffer (make-array 1 :element-type '(unsigned-byte 8) :initial-element +ready+)))
       (assert (= 1 (sb-bsd-sockets:socket-send socket buffer 1)))
-      (let
-        ((length (nth-value 1 (sb-bsd-sockets:socket-receive socket buffer 1))))
-        (assert (and (= length 1) (= (aref buffer 0) +data+)))
+      (loop
+        (let
+          ((length (nth-value 1 (sb-bsd-sockets:socket-receive socket buffer 1))))
+          (assert
+            (and
+              (= length 1)
+              (or (= (aref buffer 0) +data+) (= (aref buffer 0) +close+))
+            )
+          )
+        )
+        (assert (= 1 (sb-bsd-sockets:socket-send socket buffer 1)))
+        (when (= (aref buffer 0) +close+) (return))
       )
-      (assert (= 1 (sb-bsd-sockets:socket-send socket buffer 1)))
     )
     (sb-bsd-sockets:socket-close socket)
   )

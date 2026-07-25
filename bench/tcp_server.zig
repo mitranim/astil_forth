@@ -28,11 +28,15 @@ fn serve(ctx: *Ctx) !void {
     var writer = ctx.stream.writer(ctx.io, &write_buffer);
     try writer.interface.writeAll("R");
     try writer.interface.flush();
-    if (try reader.interface.takeByte() != 'D') {
-        return error.InvalidData;
+    while (true) {
+        const byte = try reader.interface.takeByte();
+        if (byte != 'D' and byte != 'Q') {
+            return error.InvalidData;
+        }
+        try writer.interface.writeAll(if (byte == 'D') "D" else "Q");
+        try writer.interface.flush();
+        if (byte == 'Q') return;
     }
-    try writer.interface.writeAll("D");
-    try writer.interface.flush();
 }
 
 fn start(raw: ?*anyopaque) callconv(.c) ?*anyopaque {

@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 final class tcp_server {
   private static final int READY = 'R';
   private static final int DATA = 'D';
+  private static final int CLOSE = 'Q';
   private static final int PORT = 19777;
 
   private static void handle(Socket socket) {
@@ -17,8 +18,14 @@ final class tcp_server {
       final var out = socket.getOutputStream();
       final var in = socket.getInputStream();
       out.write(READY);
-      if (in.read() != DATA) throw new AssertionError("bad DATA byte");
-      out.write(DATA);
+      while (true) {
+        final int data = in.read();
+        if (data != DATA && data != CLOSE) {
+          throw new AssertionError("bad data byte");
+        }
+        out.write(data);
+        if (data == CLOSE) break;
+      }
     } catch (Exception error) {
       throw new RuntimeException(error);
     }

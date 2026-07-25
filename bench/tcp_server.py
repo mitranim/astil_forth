@@ -7,6 +7,7 @@ import asyncio
 
 READY = b"R"
 DATA = b"D"
+CLOSE = b"Q"
 PORT = 19777
 
 
@@ -16,9 +17,13 @@ async def handle(
 ) -> None:
     try:
         writer.write(READY)
-        if await reader.readexactly(1) != DATA:
-            raise RuntimeError("bad DATA byte")
-        writer.write(DATA)
+        while True:
+            data = await reader.readexactly(1)
+            if data not in (DATA, CLOSE):
+                raise RuntimeError("bad data byte")
+            writer.write(data)
+            if data == CLOSE:
+                break
     finally:
         writer.close()
         await writer.wait_closed()

@@ -9,8 +9,10 @@ import time
 
 READY = b"R"
 DATA = b"D"
+CLOSE = b"Q"
 PORT = 19777
 CONNECTIONS = 4096
+EXCHANGES = 32
 FD_HEADROOM = 256
 
 
@@ -34,6 +36,8 @@ def recv_byte(sock: socket.socket) -> bytes:
 
 
 def drive() -> None:
+    if EXCHANGES < 1:
+        raise ValueError("TCP benchmark needs at least one exchange")
     clients: list[socket.socket] = []
     try:
         for index in range(CONNECTIONS):
@@ -55,11 +59,13 @@ def drive() -> None:
         for client in clients:
             if recv_byte(client) != READY:
                 raise RuntimeError("bad TCP READY byte")
-        for client in clients:
-            client.sendall(DATA)
-        for client in clients:
-            if recv_byte(client) != DATA:
-                raise RuntimeError("bad TCP echo")
+        for exchange in range(EXCHANGES):
+            byte = CLOSE if exchange == EXCHANGES - 1 else DATA
+            for client in clients:
+                client.sendall(byte)
+            for client in clients:
+                if recv_byte(client) != byte:
+                    raise RuntimeError("bad TCP echo")
         for client in clients:
             if client.recv(1) != b"":
                 raise RuntimeError("expected TCP EOF")

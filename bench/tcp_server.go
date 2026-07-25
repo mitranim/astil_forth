@@ -9,6 +9,7 @@ import (
 
 const ready = byte('R')
 const data = byte('D')
+const closeConnection = byte('Q')
 
 func handle(conn net.Conn) {
 	defer conn.Close()
@@ -16,14 +17,19 @@ func handle(conn net.Conn) {
 		panic(err)
 	}
 	var buf [1]byte
-	if _, err := io.ReadFull(conn, buf[:]); err != nil {
-		panic(err)
-	}
-	if buf[0] != data {
-		panic("bad DATA byte")
-	}
-	if _, err := conn.Write(buf[:]); err != nil {
-		panic(err)
+	for {
+		if _, err := io.ReadFull(conn, buf[:]); err != nil {
+			panic(err)
+		}
+		if buf[0] != data && buf[0] != closeConnection {
+			panic("bad data byte")
+		}
+		if _, err := conn.Write(buf[:]); err != nil {
+			panic(err)
+		}
+		if buf[0] == closeConnection {
+			return
+		}
 	}
 }
 
