@@ -499,7 +499,7 @@ In reg-CC:
 
 ## Register allocation and greediness
 
-In reg-CC, inside each word, the compiler uses volatile registers `x0 … x15` as a stack. Example: `10 20 30` lands in `x0 x1 x2`.
+In reg-CC, inside each word, the compiler uses volatile registers `x0 … x17` as a stack. Example: `10 20 30` lands in `x0 x1 x2`.
 
 This matches the platform call ABI (Arm64 only for now). Runtime calls are greedy: a 3-input call requires the current stack to be exactly `x0 x1 x2`, consumes it, and resets the stack to the callee's visible outputs, again starting at `x0`.
 

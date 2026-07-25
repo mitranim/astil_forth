@@ -237,10 +237,10 @@ For me, the tradeoff is well worth it. Forward-execution is preserved, while err
 
 ## Control flow analysis (how to not)
 
-Control structures simply clobber the entire "stack" (parameter registers). This was sufficient for avoiding data flow analysis. The "stack" is only `x0 x1 x2 x3 x4 x5 x6 x7`, and the other registers can be used for locals. Simplicity is nice:
+Control structures simply invalidate the current register stack. This was sufficient for avoiding data flow analysis. The "stack" is `x0 … x17`; registers not otherwise clobbered by the function can still become stable locations for locals. Simplicity is nice:
 
 ```forth
-: .word { cond }    \ Assigned to x2: non-param location.
+: .word { cond }   \ Assigned to x2: non-param location.
   123      { val } \ Assigned to x0: param location.
   val cond { -- }
 ;
@@ -252,7 +252,7 @@ Control structures simply clobber the entire "stack" (parameter registers). This
 
 
 : .word { cond } \ Assigned to x8: non-param location.
-  123 { val }   \ Assigned to x9: non-param location.
+  123 { val }    \ Assigned to x9: non-param location.
 
   \ `.then` and `end` clobber param registers and relocate `val`.
   if cond .then 234 { val } end

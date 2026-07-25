@@ -849,7 +849,7 @@ static Err comp_alloca_dynamic(Comp *comp, U8 reg) {
 static Err comp_alloca(Comp *comp) {
   Sym *sym;
   try(comp_require_current_sym(comp, &sym));
-  try(comp_validate_args(comp, "unable to `alloca`", 1, ASM_REGS_VOLATILE));
+  try(comp_validate_args(comp, "unable to `alloca`", 1, ASM_ARG_LEN_MAX));
 
   const auto ctx = &comp->ctx;
   const U8   reg = (U8)(ctx->arg_len - 1);

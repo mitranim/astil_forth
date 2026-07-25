@@ -311,7 +311,7 @@ dis' .example_caller_with_locals
 \ ret
 ```
 
-Branching simply relocates locals from parameter registers to the other, more "stable", registers. On Arm64, this is `x8 … x15` (caller-saved) and `x19 … x28` (callee-saved); we reserve some of the callee-saved registers for special purposes.
+Branching simply relocates locals from argument registers to available volatile registers and then callee-saved registers. On Arm64, the volatile pool is `x0 … x17`; the callee-saved pool is `x19 … x28`; we reserve some of it for special purposes.
 
 ```forth
 : .example_reloc_due_to_branching

@@ -17,15 +17,15 @@
 
 GPR usage in the procedure call standard:
 
-- r0-r7   = volatile (caller-saved), used for input and output parameters.
-- r8      = volatile, used for indirect output parameters.
-- r9-r15  = volatile, local scratch.
-- r16-r17 = reserved for debuggers.
-- r18     = reserved by the OS.
-- r19-r28 = stable (callee-saved), used for long-lived local variables.
-- r29     = address of current frame record (on the stack).
-- r30     = address of calling code ("link register" or "LR").
-- r31     = reserved: stack pointer ("SP") or zero register ("ZR").
+- x0-x7   = volatile (caller-saved), used for input and output parameters.
+- x8      = volatile, used for indirect output parameters.
+- x9-x15  = volatile, local scratch.
+- x16-x17 = volatile intra-procedure-call scratch; linkers may use them.
+- x18     = reserved by the OS.
+- x19-x28 = stable (callee-saved), used for long-lived local variables.
+- x29     = address of current frame record (on the stack).
+- x30     = address of calling code ("link register" or "LR").
+- x31     = reserved: stack pointer ("SP") or zero register ("ZR").
 
 We also dedicate a few registers to special roles, depending on the
 calling convention: stack vs regs (or "callvention" if you will).

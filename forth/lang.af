@@ -107,7 +107,7 @@ end
 
 4      let: ASM_INSTR_SIZE
 8      let: ASM_PARAM_LEN_MAX
-16     let: ASM_ARG_LEN_MAX
+18     let: ASM_ARG_LEN_MAX
 29     let: ASM_REG_FP
 30     let: ASM_REG_LR
 31     let: ASM_REG_SP
@@ -2590,6 +2590,8 @@ fun: .comp_realloc_regs { -- err }
   13 .comp_realloc_reg \ x13
   14 .comp_realloc_reg \ x14
   15 .comp_realloc_reg \ x15
+  16 .comp_realloc_reg \ x16
+  17 .comp_realloc_reg \ x17
 end
 
 \ blr x0

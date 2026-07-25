@@ -43,14 +43,14 @@ In instruction encoding, registers 0-31 are represented with corresponding
 For example, `x31` and `q31` are `0b11111`.
 */
 
-// 0x0 ... x15
-static constexpr Bits ASM_REGS_VOLATILE = 0b11111111'11111111;
+// x0 ... x17
+static constexpr Bits ASM_REGS_VOLATILE = 0b11'11111111'11111111;
 
 // x0 ... x7
 static constexpr Bits ASM_PARAM_REGS = 0b11111111;
 
 static constexpr U8 ASM_REG_LEN           = 32;
-static constexpr U8 ASM_VOLATILE_REG_LEN  = 16;
+static constexpr U8 ASM_VOLATILE_REG_LEN  = 18;
 static constexpr U8 ASM_INP_PARAM_REG_LEN = 8;
 static constexpr U8 ASM_OUT_PARAM_REG_LEN = 8;
 static constexpr U8 ASM_ALL_PARAM_REG_LEN = 8;
@@ -73,10 +73,15 @@ static constexpr U8 ASM_SCRATCH_REG_12 = 12;
 static constexpr U8 ASM_SCRATCH_REG_13 = 13;
 static constexpr U8 ASM_SCRATCH_REG_14 = 14;
 static constexpr U8 ASM_SCRATCH_REG_15 = 15;
+static constexpr U8 ASM_SCRATCH_REG_16 = 16;
+static constexpr U8 ASM_SCRATCH_REG_17 = 17;
 
 /*
-x16 is volatile scratch. XNU also uses it for syscall numbers.
-x17 is volatile scratch. x18 is platform-specific; reserved on XNU.
+x16 and x17 are volatile scratch registers designated as IP0/IP1
+(intra-procedure-call). Linker-inserted veneers may clobber them
+around calls. XNU also uses x16 for syscall numbers.
+
+x18 is platform-specific; reserved on XNU.
 
 x19 … x31 are callee-saved: stable across calls; callee must stash and restore.
 We also reserve some of these for special roles; see below.
