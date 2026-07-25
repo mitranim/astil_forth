@@ -1,0 +1,166 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Load replaces address; store consumes value and address</title>
+  <desc>
+    Comptime load selects the top register as an address, loads memory into
+    that same register, and leaves argument length unchanged. Comptime store
+    selects the second-top register as value and top register as address,
+    writes the value to memory, and reduces argument length by two. Both words
+    ask the outer compiler for current slots and tell it which instruction and
+    resulting argument length to record.
+  </desc>
+
+  <defs>
+    <linearGradient id="live-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".08"/>
+    </linearGradient>
+    <linearGradient id="load-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="store-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <marker id="arrow-load" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#A3F5A3"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-store" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#A8A8F0"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#C3C3B6"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="61" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="35" font-weight="700">
+    <tspan x="44" dy="0">Load replaces address;</tspan>
+    <tspan x="44" dy="43">store consumes value and address</tspan>
+  </text>
+
+  <!-- Load. -->
+  <rect x="44" y="140" width="712" height="355" rx="16"
+        fill="url(#load-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="180" fill="#A3F5A3"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="19" font-weight="700">COMPTIME @</text>
+  <text x="70" y="212" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22" font-weight="700">Memory replaces top address in the same slot</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <!-- Input stack. -->
+    <text x="70" y="250" fill="#C3C3B6" font-size="14">BEFORE</text>
+    <rect x="70" y="265" width="180" height="62" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="250" y="265" width="180" height="62" rx="8"
+          fill="url(#live-fill)" stroke="#A3F5A3" stroke-width="2"/>
+    <text x="86" y="303" fill="#C3C3B6" font-size="15">x0</text>
+    <text x="232" y="303" fill="#FFFFFF" text-anchor="end" font-size="20">keep</text>
+    <text x="266" y="303" fill="#A3F5A3" font-size="15">x1</text>
+    <text x="412" y="303" fill="#FFFFFF" text-anchor="end" font-size="20">adr</text>
+
+    <!-- Memory and load direction. -->
+    <rect x="530" y="254" width="200" height="84" rx="10"
+          fill="#FFFFFF" fill-opacity=".045" stroke="#A3F5A3"/>
+    <text x="630" y="282" fill="#A3F5A3" text-anchor="middle" font-size="15">MEMORY</text>
+    <text x="630" y="315" fill="#FFFFFF" text-anchor="middle" font-size="18">[adr] = val</text>
+    <path d="M514 296H450" fill="none" stroke="#A3F5A3"
+          stroke-width="2.4" marker-end="url(#arrow-load)"/>
+    <text x="482" y="280" fill="#A3F5A3" text-anchor="middle" font-size="14">load</text>
+
+    <!-- Output stack. -->
+    <text x="70" y="365" fill="#C3C3B6" font-size="14">AFTER</text>
+    <rect x="70" y="380" width="180" height="58" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="250" y="380" width="180" height="58" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <text x="86" y="416" fill="#C3C3B6" font-size="15">x0</text>
+    <text x="232" y="416" fill="#FFFFFF" text-anchor="end" font-size="19">keep</text>
+    <text x="266" y="416" fill="#C3C3B6" font-size="15">x1</text>
+    <text x="412" y="416" fill="#FFFFFF" text-anchor="end" font-size="19">val</text>
+
+    <!-- Negotiation. -->
+    <text x="470" y="383" fill="#A3F5A3" font-size="13">ASK</text>
+    <text x="514" y="383" fill="#FFFFFF" font-size="13">arg_len 2 → adr x1</text>
+    <text x="470" y="414" fill="#A3F5A3" font-size="13">TELL</text>
+    <text x="522" y="414" fill="#FFFFFF" font-size="13">load x1,[x1]</text>
+    <text x="470" y="440" fill="#C3C3B6" font-size="13">arg_len stays 2</text>
+  </g>
+
+  <!-- Store. -->
+  <rect x="44" y="525" width="712" height="373" rx="16"
+        fill="url(#store-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="565" fill="#A8A8F0"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="19" font-weight="700">COMPTIME <tspan fill="#A3F5A3">!</tspan></text>
+  <text x="70" y="597" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22" font-weight="700">Value flows to memory; both inputs are consumed</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <!-- Input stack. -->
+    <text x="70" y="635" fill="#C3C3B6" font-size="14">BEFORE</text>
+    <rect x="70" y="650" width="142" height="62" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="212" y="650" width="142" height="62"
+          fill="url(#live-fill)" stroke="#A8A8F0" stroke-width="2"/>
+    <rect x="354" y="650" width="142" height="62" rx="8"
+          fill="url(#live-fill)" stroke="#A8A8F0" stroke-width="2"/>
+    <text x="84" y="688" fill="#C3C3B6" font-size="14">x0</text>
+    <text x="198" y="688" fill="#FFFFFF" text-anchor="end" font-size="18">keep</text>
+    <text x="226" y="688" fill="#A8A8F0" font-size="14">x1</text>
+    <text x="340" y="688" fill="#FFFFFF" text-anchor="end" font-size="18">val</text>
+    <text x="368" y="688" fill="#A8A8F0" font-size="14">x2</text>
+    <text x="482" y="688" fill="#FFFFFF" text-anchor="end" font-size="18">adr</text>
+
+    <!-- Memory and store direction. -->
+    <path d="M512 681H552" fill="none" stroke="#A8A8F0"
+          stroke-width="2.4" marker-end="url(#arrow-store)"/>
+    <text x="532" y="663" fill="#A8A8F0" text-anchor="middle" font-size="14">store</text>
+    <rect x="570" y="639" width="160" height="84" rx="10"
+          fill="#FFFFFF" fill-opacity=".045" stroke="#A8A8F0"/>
+    <text x="650" y="667" fill="#A8A8F0" text-anchor="middle" font-size="15">MEMORY</text>
+    <text x="650" y="700" fill="#FFFFFF" text-anchor="middle" font-size="18">[adr] ← val</text>
+
+    <!-- Output stack, including physical residue. -->
+    <text x="70" y="755" fill="#C3C3B6" font-size="14">AFTER</text>
+    <rect x="70" y="770" width="142" height="58" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="222" y="770" width="132" height="58" rx="8"
+          fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D"/>
+    <rect x="364" y="770" width="132" height="58" rx="8"
+          fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D"/>
+    <text x="84" y="806" fill="#C3C3B6" font-size="14">x0</text>
+    <text x="198" y="806" fill="#FFFFFF" text-anchor="end" font-size="18">keep</text>
+    <text x="236" y="806" fill="#666666" font-size="14">x1</text>
+    <text x="340" y="806" fill="#777777" text-anchor="end" font-size="18">val</text>
+    <text x="378" y="806" fill="#666666" font-size="14">x2</text>
+    <text x="482" y="806" fill="#777777" text-anchor="end" font-size="18">adr</text>
+
+    <!-- Negotiation. -->
+    <text x="532" y="770" fill="#A8A8F0" font-size="13">ASK</text>
+    <text x="576" y="770" fill="#FFFFFF" font-size="13">arg_len 3</text>
+    <text x="532" y="796" fill="#C3C3B6" font-size="13">val x1 · adr x2</text>
+    <text x="532" y="827" fill="#A8A8F0" font-size="13">TELL</text>
+    <text x="584" y="827" fill="#FFFFFF" font-size="13">store x1,[x2]</text>
+    <text x="532" y="853" fill="#C3C3B6" font-size="13">set arg_len 1</text>
+  </g>
+
+  <text x="400" y="957" fill="#C3C3B6" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="17">
+    Selected stack slots may require local relocation first
+  </text>
+</svg>

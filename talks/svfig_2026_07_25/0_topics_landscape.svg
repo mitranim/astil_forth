@@ -1,0 +1,124 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Redesigning Forth for two different readers</title>
+  <desc>
+    Talk roadmap. First half maps stack-style programming directly to Arm64 registers
+    and performs optimization at compile time. After a hard topic change, second half
+    uses plain-ASCII spelling and syntax colors to expose semantic roles.
+  </desc>
+
+  <defs>
+    <linearGradient id="left-glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".015"/>
+    </linearGradient>
+    <linearGradient id="right-glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".015"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Opaque background: white text must remain readable in GitHub light mode. -->
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <!-- Title -->
+  <text x="72" y="112" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="40" font-weight="700">Redesigning Forth for two different readers</text>
+
+  <!-- Topic panels -->
+  <rect x="72" y="180" width="520" height="430" rx="18"
+        fill="url(#left-glow)" stroke="#333333" stroke-width="2"/>
+  <rect x="688" y="180" width="520" height="430" rx="18"
+        fill="url(#right-glow)" stroke="#333333" stroke-width="2"/>
+
+  <!-- Left: CPU -->
+  <text x="112" y="228" fill="#66FFE6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="22" font-weight="700">01 / THE CPU</text>
+  <text x="112" y="286" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="34" font-weight="700">Stack code → Arm64</text>
+  <text x="112" y="325" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22">Numbered registers become the stack.</text>
+
+  <!-- Register strip -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+     font-size="18" text-anchor="middle">
+    <rect x="112" y="366" width="72" height="56" rx="7" fill="#66FFE6" fill-opacity=".16"
+          stroke="#66FFE6" stroke-width="2"/>
+    <rect x="190" y="366" width="72" height="56" rx="7" fill="#66FFE6" fill-opacity=".16"
+          stroke="#66FFE6" stroke-width="2"/>
+    <rect x="268" y="366" width="72" height="56" rx="7" fill="#66FFE6" fill-opacity=".16"
+          stroke="#66FFE6" stroke-width="2"/>
+    <rect x="346" y="366" width="72" height="56" rx="7" fill="#66FFE6" fill-opacity=".07"
+          stroke="#66FFE6" stroke-opacity=".55" stroke-width="2"/>
+    <rect x="424" y="366" width="128" height="56" rx="7" fill="#66FFE6" fill-opacity=".07"
+          stroke="#66FFE6" stroke-opacity=".55" stroke-width="2"/>
+
+    <text x="148" y="401" fill="#FFFFFF">x0</text>
+    <text x="226" y="401" fill="#FFFFFF">x1</text>
+    <text x="304" y="401" fill="#FFFFFF">x2</text>
+    <text x="382" y="401" fill="#C3C3B6">x3</text>
+    <text x="488" y="401" fill="#C3C3B6">… x17</text>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="21">
+    <circle cx="120" cy="477" r="5" fill="#A3F5A3"/>
+    <text x="140" y="485" fill="#FFFFFF">comptime register stack</text>
+    <circle cx="120" cy="523" r="5" fill="#A3F5A3"/>
+    <text x="140" y="531" fill="#FFFFFF">constant folding + instruction fusion</text>
+    <circle cx="120" cy="569" r="5" fill="#A3F5A3"/>
+    <text x="140" y="577" fill="#FFFFFF">simple compiler; concrete machine</text>
+  </g>
+
+  <!-- Hard topic cut -->
+  <line x1="640" y1="207" x2="640" y2="583"
+        stroke="#4D4D4D" stroke-width="2" stroke-dasharray="7 10"/>
+  <rect x="613" y="357" width="54" height="70" rx="27" fill="#181A1B" stroke="#4D4D4D" stroke-width="2"/>
+  <path d="M630 379 L650 392 L630 405" fill="none" stroke="#FFFFFF"
+        stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right: human -->
+  <text x="728" y="228" fill="#A8A8F0"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="22" font-weight="700">02 / THE HUMAN</text>
+  <text x="728" y="286" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="34" font-weight="700">Meaning → visible syntax</text>
+  <text x="728" y="325" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22">Plain ASCII already contains semantic roles.</text>
+
+  <!-- Syntax sample -->
+  <rect x="728" y="366" width="440" height="116" rx="9" fill="#FFFFFF" fill-opacity=".06"/>
+  <foreignObject x="756" y="378" width="388" height="96">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:17px/29px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace"><span style="color:#A3F5A3">fun</span><span style="color:#A8A8F0">:</span> <span style="color:#D2DFF9;font-style:italic">some_word</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">value</span><span style="color:#C3C3B6"> -- </span><span style="color:#D2DFF9;font-style:italic">out</span><span style="color:#C3C3B6"> }</span>
+  value <span style="color:#A3F5A3">.transform</span> <span style="color:#66FFE6">2</span> <span style="color:#A3F5A3">*</span>
+<span style="color:#A3F5A3">end</span></pre>
+    </div>
+  </foreignObject>
+
+  <!-- Role key -->
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20">
+    <circle cx="736" cy="528" r="5" fill="#FFFFFF"/>
+    <text x="756" y="535" fill="#FFFFFF">value-like noun</text>
+
+    <circle cx="964" cy="528" r="5" fill="#A3F5A3"/>
+    <text x="984" y="535" fill="#FFFFFF">call-like action</text>
+
+    <circle cx="736" cy="570" r="5" fill="#D2DFF9"/>
+    <text x="756" y="577" fill="#FFFFFF">declared name</text>
+
+    <circle cx="964" cy="570" r="5" fill="#66FFE6"/>
+    <text x="984" y="577" fill="#FFFFFF">numeric literal</text>
+  </g>
+
+  <!-- Footer -->
+  <line x1="72" y1="650" x2="1208" y2="650" stroke="#333333" stroke-width="2"/>
+  <text x="72" y="689" fill="#C3C3B6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="19">same Forth · two unrelated redesigns · hardware first, readability second</text>
+</svg>

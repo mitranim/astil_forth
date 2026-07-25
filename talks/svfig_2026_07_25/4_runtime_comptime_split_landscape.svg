@@ -1,0 +1,184 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Runtime calls replace the whole stack; comptime words target selected registers</title>
+  <desc>
+    An empty-ascending register stack contains 10, 20, and 30 in x0, x1,
+    and x2, with argument length three and x3 as the next free register.
+    A runtime add word has fixed arity two and cannot accept the three-value
+    stack. A comptime add word reads stack length three, selects x1 and x2,
+    emits an add targeting those registers, and reduces stack length to two.
+  </desc>
+
+  <defs>
+    <linearGradient id="live-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".08"/>
+    </linearGradient>
+    <linearGradient id="runtime-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="comptime-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".025"/>
+    </linearGradient>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#C3C3B6"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#A3F5A3"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <text x="48" y="58" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="31" font-weight="700">
+    <tspan x="48" dy="0">Runtime calls replace the whole stack;</tspan>
+    <tspan x="48" dy="38">comptime words target selected registers</tspan>
+  </text>
+
+  <!-- Shared empty-ascending starting state. -->
+  <text x="48" y="145" fill="#C3C3B6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">AFTER <tspan fill="#66FFE6">10 20 30</tspan></text>
+  <g transform="translate(286 120)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="160" height="62" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6" stroke-width="2"/>
+    <rect x="160" y="0" width="160" height="62"
+          fill="url(#live-fill)" stroke="#66FFE6" stroke-width="2"/>
+    <rect x="320" y="0" width="160" height="62"
+          fill="url(#live-fill)" stroke="#66FFE6" stroke-width="2"/>
+    <rect x="492" y="0" width="160" height="62" rx="8"
+          fill="#FFFFFF" fill-opacity=".018" stroke="#4D4D4D"
+          stroke-dasharray="6 6"/>
+
+    <text x="18" y="38" fill="#C3C3B6" font-size="15">x0</text>
+    <text x="142" y="38" fill="#66FFE6" text-anchor="end" font-size="21">10</text>
+    <text x="178" y="38" fill="#C3C3B6" font-size="15">x1</text>
+    <text x="302" y="38" fill="#66FFE6" text-anchor="end" font-size="21">20</text>
+    <text x="338" y="38" fill="#C3C3B6" font-size="15">x2</text>
+    <text x="462" y="38" fill="#66FFE6" text-anchor="end" font-size="21">30</text>
+    <text x="510" y="27" fill="#666666" font-size="15">x3</text>
+    <text x="634" y="45" fill="#777777" text-anchor="end" font-size="13">next free</text>
+
+    <line x1="480" y1="-8" x2="480" y2="70" stroke="#A3F5A3"
+          stroke-width="2" stroke-dasharray="4 5"/>
+    <text x="480" y="-15" fill="#A3F5A3" text-anchor="middle" font-size="14">arg_len = 3</text>
+  </g>
+
+  <text x="1030" y="145" fill="#C3C3B6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="14">EMPTY-ASCENDING</text>
+
+  <!-- Runtime panel. -->
+  <rect x="48" y="222" width="568" height="408" rx="16"
+        fill="url(#runtime-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="76" y="264" fill="#A8A8F0"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">RUNTIME CALL</text>
+  <text x="76" y="297" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22" font-weight="700">Compiles with hardcoded registers</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="76" y="328" width="278" height="70" rx="9"
+          fill="#FFFFFF" fill-opacity=".045" stroke="#A8A8F0"/>
+    <text x="215" y="357" fill="#FFFFFF" text-anchor="middle" font-size="17"><tspan fill="#A3F5A3">.add</tspan><tspan fill="#C3C3B6"> { i0 i1 → out }</tspan></text>
+    <text x="215" y="384" fill="#C3C3B6" text-anchor="middle" font-size="14">fixed x0, x1</text>
+
+    <path d="M374 363H411" fill="none" stroke="#C3C3B6"
+          stroke-width="2" marker-end="url(#arrow-muted)"/>
+
+    <rect x="430" y="328" width="146" height="70" rx="9"
+          fill="#A8A8F0" fill-opacity=".10" stroke="#A8A8F0"/>
+    <text x="503" y="357" fill="#FFFFFF" text-anchor="middle" font-size="16">requires 2</text>
+    <text x="503" y="384" fill="#C3C3B6" text-anchor="middle" font-size="14">provided 3</text>
+
+    <line x1="258" y1="438" x2="300" y2="480" stroke="#FF6666"
+          stroke-width="4" stroke-linecap="round"/>
+    <line x1="300" y1="438" x2="258" y2="480" stroke="#FF6666"
+          stroke-width="4" stroke-linecap="round"/>
+    <text x="323" y="467" fill="#FF6666" font-size="18">arity mismatch</text>
+
+    <rect x="76" y="513" width="500" height="52" rx="8"
+          fill="#FFFFFF" fill-opacity=".035"/>
+    <text x="326" y="545" fill="#C3C3B6" text-anchor="middle" font-size="16"><tspan fill="#66FFE6">10 20 30</tspan><tspan> </tspan><tspan fill="#A3F5A3">.add</tspan><tspan fill="#FF6666"> ✕</tspan></text>
+  </g>
+
+  <circle cx="82" cy="595" r="5" fill="#A8A8F0"/>
+  <text x="100" y="602" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17">all inputs consumed; outputs replace entire stack</text>
+
+  <!-- Comptime panel. -->
+  <rect x="664" y="222" width="568" height="408" rx="16"
+        fill="url(#comptime-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="692" y="264" fill="#A3F5A3"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">COMPTIME WORD</text>
+  <text x="692" y="297" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22" font-weight="700">Selects registers from current length</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <!-- Selected registers. -->
+    <rect x="692" y="328" width="108" height="60" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="800" y="328" width="108" height="60"
+          fill="url(#live-fill)" stroke="#A3F5A3" stroke-width="2"/>
+    <rect x="908" y="328" width="108" height="60" rx="8"
+          fill="url(#live-fill)" stroke="#A3F5A3" stroke-width="2"/>
+    <text x="706" y="365" fill="#C3C3B6" font-size="14">x0</text>
+    <text x="786" y="365" fill="#66FFE6" text-anchor="end" font-size="18">10</text>
+    <text x="814" y="365" fill="#A3F5A3" font-size="14">x1</text>
+    <text x="894" y="365" fill="#66FFE6" text-anchor="end" font-size="18">20</text>
+    <text x="922" y="365" fill="#A3F5A3" font-size="14">x2</text>
+    <text x="1002" y="365" fill="#66FFE6" text-anchor="end" font-size="18">30</text>
+
+    <path d="M1034 358H1065" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+    <rect x="1080" y="328" width="124" height="60" rx="8"
+          fill="#A3F5A3" fill-opacity=".10" stroke="#A3F5A3"/>
+    <text x="1142" y="353" fill="#FFFFFF" text-anchor="middle" font-size="14">length 3</text>
+    <text x="1142" y="374" fill="#A3F5A3" text-anchor="middle" font-size="12">select x1, x2</text>
+
+    <!-- Emitted instruction. -->
+    <path d="M948 403V425" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+    <rect x="801" y="436" width="294" height="52" rx="8"
+          fill="#FFFFFF" fill-opacity=".05"/>
+    <text x="948" y="468" fill="#A3F5A3" text-anchor="middle" font-size="17">add x1, x1, x2</text>
+
+    <!-- Resulting state. -->
+    <rect x="692" y="513" width="164" height="52" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="856" y="513" width="164" height="52"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="1030" y="513" width="174" height="52" rx="8"
+          fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D"/>
+    <text x="708" y="546" fill="#C3C3B6" font-size="14">x0</text>
+    <text x="840" y="546" fill="#66FFE6" text-anchor="end" font-size="18">10</text>
+    <text x="872" y="546" fill="#C3C3B6" font-size="14">x1</text>
+    <text x="1004" y="546" fill="#66FFE6" text-anchor="end" font-size="18">50</text>
+    <text x="1046" y="546" fill="#666666" font-size="14">x2</text>
+    <text x="1188" y="546" fill="#777777" text-anchor="end" font-size="18">30</text>
+  </g>
+
+  <circle cx="698" cy="595" r="5" fill="#A3F5A3"/>
+  <text x="716" y="602" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17">local stack edit: arg_len 3 → 2</text>
+
+  <text x="640" y="684" fill="#C3C3B6" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18">
+    runtime: whole-stack boundary · comptime: local stack edit
+  </text>
+</svg>

@@ -1,0 +1,170 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Comptime arithmetic negotiates register slots with the compiler</title>
+  <desc>
+    Runtime arithmetic exposes a fixed two-input, one-output contract using
+    fixed registers and does not inspect caller compiler state. Comptime
+    addition asks the outer compiler for current register-stack state, receives
+    argument length three and top slots x1 and x2, then requests emission of
+    add x1 x1 x2 and updates argument length to two. The same dialogue later
+    supports inspecting constant values.
+  </desc>
+
+  <defs>
+    <linearGradient id="live-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".08"/>
+    </linearGradient>
+    <linearGradient id="runtime-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="comptime-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".025"/>
+    </linearGradient>
+    <marker id="arrow-right" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#A3F5A3"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#66FFE6"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#C3C3B6"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="64" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="36" font-weight="700">
+    <tspan x="44" dy="0">Comptime arithmetic negotiates</tspan>
+    <tspan x="44" dy="43">register slots with the compiler</tspan>
+  </text>
+
+  <!-- Thin runtime contrast. -->
+  <rect x="44" y="142" width="712" height="170" rx="15"
+        fill="url(#runtime-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="180" fill="#A8A8F0"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">RUNTIME WORD</text>
+  <text x="70" y="211" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">Fixed contract; no call-site negotiation</text>
+
+  <g transform="translate(70 232)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="116" height="54" rx="8"
+          fill="#A8A8F0" fill-opacity=".10" stroke="#A8A8F0"/>
+    <text x="58" y="34" fill="#FFFFFF" text-anchor="middle" font-size="16">x0</text>
+    <rect x="126" y="0" width="116" height="54" rx="8"
+          fill="#A8A8F0" fill-opacity=".10" stroke="#A8A8F0"/>
+    <text x="184" y="34" fill="#FFFFFF" text-anchor="middle" font-size="16">x1</text>
+    <path d="M260 27H300" fill="none" stroke="#C3C3B6"
+          stroke-width="2" marker-end="url(#arrow-muted)"/>
+    <rect x="318" y="0" width="126" height="54" rx="8"
+          fill="#FFFFFF" fill-opacity=".045" stroke="#A8A8F0"/>
+    <text x="381" y="23" fill="#FFFFFF" text-anchor="middle" font-size="16">runtime <tspan fill="#A3F5A3">+</tspan></text>
+    <text x="381" y="43" fill="#C3C3B6" text-anchor="middle" font-size="13">fixed x0, x1</text>
+    <path d="M462 27H502" fill="none" stroke="#C3C3B6"
+          stroke-width="2" marker-end="url(#arrow-muted)"/>
+    <rect x="520" y="0" width="116" height="54" rx="8"
+          fill="#A8A8F0" fill-opacity=".10" stroke="#A8A8F0"/>
+    <text x="578" y="34" fill="#FFFFFF" text-anchor="middle" font-size="16">x0</text>
+  </g>
+
+  <!-- Comptime protocol. -->
+  <rect x="44" y="342" width="712" height="560" rx="16"
+        fill="url(#comptime-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="383" fill="#A3F5A3"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">COMPTIME +</text>
+  <text x="70" y="414" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">Runs while its caller is being compiled</text>
+
+  <!-- Initial register stack. -->
+  <g transform="translate(70 438)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="206" height="58" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="206" y="0" width="206" height="58"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="412" y="0" width="206" height="58" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <text x="16" y="36" fill="#C3C3B6" font-size="15">x0</text>
+    <text x="188" y="36" fill="#66FFE6" text-anchor="end" font-size="20">10</text>
+    <text x="222" y="36" fill="#C3C3B6" font-size="15">x1</text>
+    <text x="394" y="36" fill="#66FFE6" text-anchor="end" font-size="20">20</text>
+    <text x="428" y="36" fill="#C3C3B6" font-size="15">x2</text>
+    <text x="600" y="36" fill="#66FFE6" text-anchor="end" font-size="20">30</text>
+  </g>
+
+  <!-- Actors. -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="70" y="527" width="248" height="82" rx="11"
+          fill="#A3F5A3" fill-opacity=".10" stroke="#A3F5A3" stroke-width="2"/>
+    <text x="194" y="558" fill="#A3F5A3" text-anchor="middle"
+          font-size="17" font-weight="700">COMPTIME WORD</text>
+    <text x="194" y="586" fill="#A3F5A3" text-anchor="middle" font-size="20">+</text>
+
+    <rect x="482" y="527" width="248" height="82" rx="11"
+          fill="#66FFE6" fill-opacity=".08" stroke="#66FFE6" stroke-width="2"/>
+    <text x="606" y="558" fill="#66FFE6" text-anchor="middle"
+          font-size="17" font-weight="700">OUTER COMPILER</text>
+    <text x="606" y="584" fill="#C3C3B6" text-anchor="middle" font-size="14">stack state + code buffer</text>
+
+    <!-- Ask. -->
+    <text x="400" y="633" fill="#A3F5A3" text-anchor="middle"
+          font-size="14">ASK: stack length + two usable slots</text>
+    <path d="M318 646H482" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-right)"/>
+
+    <!-- Answer. -->
+    <text x="400" y="679" fill="#66FFE6" text-anchor="middle"
+          font-size="14">COMPILER: arg_len 3; x1, x2 ready</text>
+    <path d="M482 692H318" fill="none" stroke="#66FFE6"
+          stroke-width="2" marker-end="url(#arrow-cyan)"/>
+
+    <!-- Update. -->
+    <text x="400" y="725" fill="#A3F5A3" text-anchor="middle"
+          font-size="14">TELL: emit instruction + set arg_len 2</text>
+    <path d="M318 738H482" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-right)"/>
+
+    <rect x="172" y="754" width="456" height="48" rx="8"
+          fill="#FFFFFF" fill-opacity=".045"/>
+    <text x="400" y="784" fill="#A3F5A3" text-anchor="middle"
+          font-size="17">add x1, x1, x2</text>
+  </g>
+
+  <!-- Updated register stack. -->
+  <g transform="translate(70 822)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="206" height="56" rx="8"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="206" y="0" width="206" height="56"
+          fill="url(#live-fill)" stroke="#66FFE6"/>
+    <rect x="422" y="0" width="196" height="56" rx="8"
+          fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D"/>
+    <text x="16" y="35" fill="#C3C3B6" font-size="15">x0</text>
+    <text x="188" y="35" fill="#66FFE6" text-anchor="end" font-size="19">10</text>
+    <text x="222" y="35" fill="#C3C3B6" font-size="15">x1</text>
+    <text x="394" y="35" fill="#66FFE6" text-anchor="end" font-size="19">50</text>
+    <text x="438" y="35" fill="#666666" font-size="15">x2</text>
+    <text x="600" y="35" fill="#777777" text-anchor="end" font-size="19">30</text>
+  </g>
+
+  <text x="400" y="949" fill="#C3C3B6" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18">
+    Later: ask about values, not only slots
+  </text>
+</svg>

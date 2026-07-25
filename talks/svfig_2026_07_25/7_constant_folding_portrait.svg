@@ -1,0 +1,231 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Constant folding rewinds instructions as abstract values collapse</title>
+  <desc>
+    Four constant literals first create parallel abstract-value and emitted-
+    instruction stacks. Addition, subtraction, and multiplication each consume
+    two abstract values, rewind two emitted instructions, and push one folded
+    constant instruction. Both stacks collapse to negative five hundred and
+    mov x0, negative five hundred.
+  </desc>
+
+  <defs>
+    <linearGradient id="state-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="fold-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".035"/>
+    </linearGradient>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#A3F5A3"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="61" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="35" font-weight="700">
+    <tspan x="44" dy="0">Constant folding rewinds instructions</tspan>
+    <tspan x="44" dy="43">as abstract values collapse</tspan>
+  </text>
+
+  <!-- Source sequence. -->
+  <rect x="44" y="136" width="712" height="68" rx="12"
+        fill="#FFFFFF" fill-opacity=".035" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="177" fill="#C3C3B6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">SOURCE</text>
+  <text x="730" y="178" fill="#FFFFFF" text-anchor="end"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="24"><tspan fill="#66FFE6">10 20 30 40</tspan><tspan fill="#A3F5A3"> + - *</tspan></text>
+
+  <!-- Parallel stack headings. -->
+  <text x="60" y="246" fill="#66FFE6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="16" font-weight="700">ABSTRACT STACK</text>
+  <text x="304" y="246" fill="#66FFE6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="16" font-weight="700">EMITTED INSTR STACK</text>
+  <line x1="276" y1="226" x2="276" y2="772" stroke="#4D4D4D" stroke-width="2"/>
+
+  <!-- State 0: four literals. -->
+  <g transform="translate(60 272)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="204" height="62" rx="9"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <path d="M51 0V62M102 0V62M153 0V62" stroke="#66FFE6"/>
+    <text x="25.5" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">10</text>
+    <text x="76.5" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">20</text>
+    <text x="127.5" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">30</text>
+    <text x="178.5" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">40</text>
+
+    <rect x="244" y="0" width="416" height="62" rx="9"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <path d="M348 0V62M452 0V62M556 0V62" stroke="#66FFE6"/>
+    <text x="296" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x0</text>
+    <text x="296" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">10</text>
+    <text x="400" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x1</text>
+    <text x="400" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">20</text>
+    <text x="504" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x2</text>
+    <text x="504" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">30</text>
+    <text x="608" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x3</text>
+    <text x="608" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">40</text>
+  </g>
+
+  <!-- Fold +. -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <path d="M162 340V348H264V340M213 348V356"
+          fill="none" stroke="#A3F5A3" stroke-width="2"/>
+    <circle cx="213" cy="371" r="14" fill="#181A1B"
+            stroke="#A3F5A3" stroke-width="2"/>
+    <text x="213" y="378" fill="#A3F5A3" text-anchor="middle"
+          font-size="22" font-weight="700">+</text>
+    <path d="M213 385V402" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+
+    <path d="M512 340V348H720V340M616 348V358"
+          fill="none" stroke="#A3F5A3" stroke-width="2"/>
+    <path d="M650 369H582" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+    <text x="616" y="391" fill="#C3C3B6" text-anchor="middle"
+          font-size="15">rewind 2</text>
+  </g>
+
+  <!-- State 1. -->
+  <g transform="translate(60 410)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="204" height="62" rx="9"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <path d="M68 0V62M136 0V62" stroke="#66FFE6"/>
+    <text x="34" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">10</text>
+    <text x="102" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">20</text>
+    <text x="170" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">70</text>
+
+    <rect x="244" y="0" width="416" height="62" rx="9"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <path d="M382.67 0V62M521.33 0V62" stroke="#66FFE6"/>
+    <text x="313.33" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x0</text>
+    <text x="313.33" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">10</text>
+    <text x="452" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x1</text>
+    <text x="452" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">20</text>
+    <text x="590.67" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x2</text>
+    <text x="590.67" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">70</text>
+  </g>
+
+  <!-- Fold -. -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <path d="M128 478V486H264V478M196 486V494"
+          fill="none" stroke="#A3F5A3" stroke-width="2"/>
+    <circle cx="196" cy="509" r="14" fill="#181A1B"
+            stroke="#A3F5A3" stroke-width="2"/>
+    <text x="196" y="516" fill="#A3F5A3" text-anchor="middle"
+          font-size="22" font-weight="700">-</text>
+    <path d="M196 523V540" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+
+    <path d="M442.67 478V486H720V478M581.33 486V496"
+          fill="none" stroke="#A3F5A3" stroke-width="2"/>
+    <path d="M615.33 507H547.33" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+    <text x="581.33" y="529" fill="#C3C3B6" text-anchor="middle"
+          font-size="15">rewind 2</text>
+  </g>
+
+  <!-- State 2. -->
+  <g transform="translate(60 548)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="204" height="62" rx="9"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <path d="M102 0V62" stroke="#66FFE6"/>
+    <text x="51" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">10</text>
+    <text x="153" y="39" fill="#66FFE6" text-anchor="middle" font-size="17">-50</text>
+
+    <rect x="244" y="0" width="416" height="62" rx="9"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <path d="M452 0V62" stroke="#66FFE6"/>
+    <text x="348" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x0</text>
+    <text x="348" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">10</text>
+    <text x="556" y="22" fill="#C3C3B6" text-anchor="middle" font-size="13">x1</text>
+    <text x="556" y="46" fill="#66FFE6" text-anchor="middle" font-size="18">-50</text>
+  </g>
+
+  <!-- Fold *. -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <path d="M60 616V624H264V616M162 624V632"
+          fill="none" stroke="#A3F5A3" stroke-width="2"/>
+    <circle cx="162" cy="647" r="14" fill="#181A1B"
+            stroke="#A3F5A3" stroke-width="2"/>
+    <text x="162" y="654" fill="#A3F5A3" text-anchor="middle"
+          font-size="22" font-weight="700">*</text>
+    <path d="M162 661V678" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+
+    <path d="M304 616V624H720V616M512 624V634"
+          fill="none" stroke="#A3F5A3" stroke-width="2"/>
+    <path d="M546 645H478" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+    <text x="512" y="667" fill="#C3C3B6" text-anchor="middle"
+          font-size="15">rewind 2</text>
+  </g>
+
+  <!-- Final state. -->
+  <g transform="translate(60 686)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <rect x="0" y="0" width="204" height="70" rx="9"
+          fill="url(#fold-fill)" stroke="#A3F5A3" stroke-width="2"/>
+    <text x="102" y="44" fill="#66FFE6" text-anchor="middle"
+          font-size="19" font-weight="700">-500</text>
+
+    <rect x="244" y="0" width="416" height="70" rx="9"
+          fill="url(#fold-fill)" stroke="#A3F5A3" stroke-width="2"/>
+    <text x="452" y="25" fill="#C3C3B6" text-anchor="middle" font-size="13">x0</text>
+    <text x="452" y="52" fill="#66FFE6" text-anchor="middle"
+          font-size="19" font-weight="700">-500</text>
+  </g>
+
+  <!-- Result and mechanism. -->
+  <rect x="44" y="810" width="712" height="112" rx="14"
+        fill="#A3F5A3" fill-opacity=".06" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="849" fill="#C3C3B6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">FINAL CODE</text>
+  <text x="730" y="851" fill="#A3F5A3" text-anchor="end"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="23">mov x0, <tspan fill="#66FFE6">#-500</tspan></text>
+  <text x="70" y="892" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18">Inspect values → consume two → rewind code → emit constant</text>
+
+  <!-- Partial-fold side note. -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+    <text x="44" y="966" fill="#C3C3B6" font-size="14" font-weight="700">
+      PARTIAL FOLD
+    </text>
+
+    <rect x="166" y="938" width="82" height="46" rx="8"
+          fill="url(#state-fill)" stroke="#66FFE6"/>
+    <text x="189" y="956" fill="#C3C3B6" text-anchor="middle" font-size="11">x0</text>
+    <text x="207" y="975" fill="#FFFFFF" text-anchor="middle" font-size="15">any</text>
+
+    <text x="267" y="968" fill="#A3F5A3" text-anchor="middle"
+          font-size="20" font-weight="700">+</text>
+
+    <rect x="286" y="938" width="72" height="46" rx="8"
+          fill="url(#fold-fill)" stroke="#A3F5A3"/>
+    <text x="305" y="956" fill="#C3C3B6" text-anchor="middle" font-size="11">x1</text>
+    <text x="329" y="975" fill="#66FFE6" text-anchor="middle" font-size="16">10</text>
+
+    <text x="402" y="946" fill="#C3C3B6" text-anchor="middle" font-size="11">
+      rewind mov
+    </text>
+    <path d="M374 965H430" fill="none" stroke="#A3F5A3"
+          stroke-width="2" marker-end="url(#arrow-green)"/>
+
+    <text x="450" y="971" fill="#A3F5A3" font-size="18">add x0, x0, <tspan fill="#66FFE6">#10</tspan></text>
+  </g>
+</svg>

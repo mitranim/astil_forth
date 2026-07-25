@@ -1,0 +1,156 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Apple Arm64 ABI and Astil register allocation</title>
+  <desc>
+    Two aligned register maps. Apple Arm64 assigns x0 through x17 as volatile
+    parameter and temporary registers, reserves x18, preserves x19 through x29,
+    and gives special roles to x29, x30, and x31. Astil Forth uses x0 through x17
+    as its register stack and locals, x19 through x27 for spilled locals, and x28
+    for the current context. Its standard header always provides a bump allocator;
+    the JIT main thread uses the interpreter object, while programs may define
+    their own context objects.
+  </desc>
+
+  <defs>
+    <linearGradient id="stack-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".08"/>
+    </linearGradient>
+    <linearGradient id="local-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".07"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <!-- Title -->
+  <text x="72" y="108" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="40" font-weight="700">Apple Arm64 ABI and Astil register allocation</text>
+
+  <!-- Apple ABI row -->
+  <text x="72" y="181" fill="#C3C3B6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">APPLE ARM64 ABI</text>
+
+  <g stroke="#4D4D4D" stroke-width="2">
+    <rect x="72" y="202" width="260" height="100" rx="10" fill="#FFFFFF" fill-opacity=".07"/>
+    <rect x="332" y="202" width="260" height="100" fill="#FFFFFF" fill-opacity=".055"/>
+    <rect x="592" y="202" width="100" height="100" fill="#FFFFFF" fill-opacity=".05"/>
+    <rect x="692" y="202" width="62" height="100" fill="#FF3333" fill-opacity=".08"/>
+    <rect x="754" y="202" width="260" height="100" fill="#A8A8F0" fill-opacity=".09"/>
+    <rect x="1014" y="202" width="64" height="100" fill="#FFFFFF" fill-opacity=".055"/>
+    <rect x="1078" y="202" width="64" height="100" fill="#FFFFFF" fill-opacity=".055"/>
+    <rect x="1142" y="202" width="66" height="100" rx="10" fill="#FFFFFF" fill-opacity=".055"/>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+     text-anchor="middle">
+    <text x="202" y="241" fill="#FFFFFF" font-size="23" font-weight="700">x0 … x7</text>
+    <text x="202" y="273" fill="#FFFFFF" font-size="16">input/output params</text>
+
+    <text x="462" y="241" fill="#FFFFFF" font-size="23" font-weight="700">x8 … x15</text>
+    <text x="462" y="273" fill="#FFFFFF" font-size="16"><tspan fill="#A8A8F0">volatile</tspan><tspan> scratch</tspan></text>
+
+    <text x="642" y="238" fill="#FFFFFF" font-size="20" font-weight="700">x16 x17</text>
+    <text x="642" y="265" fill="#A8A8F0" font-size="14">volatile</text>
+    <text x="642" y="286" fill="#FFFFFF" font-size="13">scratch</text>
+
+    <text x="723" y="239" fill="#FF6666" font-size="19" font-weight="700">x18</text>
+    <text x="723" y="264" fill="#C3C3B6" font-size="13">Apple</text>
+    <text x="723" y="283" fill="#C3C3B6" font-size="13">reserved</text>
+
+    <text x="884" y="241" fill="#FFFFFF" font-size="23" font-weight="700">x19 … x28</text>
+    <text x="884" y="273" fill="#A8A8F0" font-size="16">callee-saved</text>
+
+    <text x="1046" y="238" fill="#FFFFFF" font-size="18" font-weight="700">x29</text>
+    <text x="1046" y="268" fill="#C3C3B6" font-size="15">FP</text>
+
+    <text x="1110" y="238" fill="#FFFFFF" font-size="18" font-weight="700">x30</text>
+    <text x="1110" y="268" fill="#C3C3B6" font-size="15">LR</text>
+
+    <text x="1175" y="238" fill="#FFFFFF" font-size="18" font-weight="700">x31</text>
+    <text x="1175" y="264" fill="#C3C3B6" font-size="13">SP</text>
+    <text x="1175" y="283" fill="#C3C3B6" font-size="13">or ZR</text>
+  </g>
+
+  <!-- Call volatility brackets -->
+  <line x1="72" y1="321" x2="692" y2="321" stroke="#A8A8F0" stroke-width="2"/>
+  <line x1="72" y1="314" x2="72" y2="328" stroke="#A8A8F0" stroke-width="2"/>
+  <line x1="692" y1="314" x2="692" y2="328" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="382" y="345" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">volatile across calls</text>
+
+  <line x1="754" y1="321" x2="1078" y2="321" stroke="#A8A8F0" stroke-width="2"/>
+  <line x1="754" y1="314" x2="754" y2="328" stroke="#A8A8F0" stroke-width="2"/>
+  <line x1="1078" y1="314" x2="1078" y2="328" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="916" y="345" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">preserved across calls</text>
+
+  <!-- Astil allocation row -->
+  <text x="72" y="391" fill="#66FFE6"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">ASTIL FORTH OVERLAY</text>
+
+  <g stroke="#4D4D4D" stroke-width="2">
+    <rect x="72" y="412" width="620" height="116" rx="10"
+          fill="url(#stack-fill)" stroke="#66FFE6"/>
+    <rect x="692" y="412" width="62" height="116"
+          fill="#FF3333" fill-opacity=".055"/>
+    <rect x="754" y="412" width="210" height="116"
+          fill="url(#local-fill)" stroke="#A8A8F0"/>
+    <rect x="964" y="412" width="50" height="116"
+          fill="#A3F5A3" fill-opacity=".16" stroke="#A3F5A3"/>
+    <rect x="1014" y="412" width="64" height="116" fill="#FFFFFF" fill-opacity=".035"/>
+    <rect x="1078" y="412" width="64" height="116" fill="#FFFFFF" fill-opacity=".035"/>
+    <rect x="1142" y="412" width="66" height="116" rx="10" fill="#FFFFFF" fill-opacity=".035"/>
+  </g>
+  <line x1="332" y1="413" x2="332" y2="527" stroke="#66FFE6" stroke-opacity=".5"
+        stroke-width="2" stroke-dasharray="6 7"/>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+     text-anchor="middle">
+    <text x="202" y="453" fill="#FFFFFF" font-size="23" font-weight="700">x0 … x7</text>
+    <text x="202" y="482" fill="#FFFFFF" font-size="16">stack + locals</text>
+    <text x="202" y="506" fill="#C3C3B6" font-size="14">input/output params</text>
+
+    <text x="512" y="453" fill="#FFFFFF" font-size="23" font-weight="700">x8 … x17</text>
+    <text x="512" y="482" fill="#FFFFFF" font-size="16">stack + locals</text>
+    <text x="512" y="506" fill="#A8A8F0" font-size="14">only inside words</text>
+
+    <text x="723" y="459" fill="#FF6666" font-size="18" font-weight="700">x18</text>
+    <text x="723" y="489" fill="#C3C3B6" font-size="13">unused</text>
+
+    <text x="859" y="453" fill="#FFFFFF" font-size="22" font-weight="700">x19 … x27</text>
+    <text x="859" y="482" fill="#FFFFFF" font-size="16">spilled locals</text>
+    <text x="859" y="506" fill="#A8A8F0" font-size="14">save / restore</text>
+
+    <text x="989" y="459" fill="#FFFFFF" font-size="15" font-weight="700">x28</text>
+    <text x="989" y="487" fill="#A3F5A3" font-size="12">addr</text>
+
+    <text x="1046" y="461" fill="#C3C3B6" font-size="17">FP</text>
+    <text x="1110" y="461" fill="#C3C3B6" font-size="17">LR</text>
+    <text x="1175" y="461" fill="#C3C3B6" font-size="15">SP/ZR</text>
+  </g>
+
+  <!-- Consequences -->
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <circle cx="82" cy="581" r="5" fill="#66FFE6"/>
+    <text x="100" y="588" fill="#FFFFFF" font-size="18">
+      inside words, x0…x17 hold stack values and locals; register stack never spills
+    </text>
+
+    <circle cx="82" cy="621" r="5" fill="#A8A8F0"/>
+    <text x="100" y="628" fill="#FFFFFF" font-size="18">
+      more locals use x19…x27; prologue and epilogue pay save/restore cost
+    </text>
+
+    <circle cx="82" cy="661" r="5" fill="#A3F5A3"/>
+    <text x="100" y="668" fill="#FFFFFF" font-size="17">
+      x28 context: bump allocator header + extra state; JIT main thread: interpreter object
+    </text>
+  </g>
+</svg>
