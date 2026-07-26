@@ -298,7 +298,18 @@ def go_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
 
 
 def zig_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
-    return (("zig", "build-exe", "-O", "ReleaseFast", f"-femit-bin={exe}", src),)
+    return (
+        (
+            "zig",
+            "build-exe",
+            "--color",
+            "off",
+            "-O",
+            "ReleaseFast",
+            f"-femit-bin={exe}",
+            src,
+        ),
+    )
 
 
 def java_class(src: str) -> tuple[tuple[str, ...], ...]:
@@ -391,6 +402,8 @@ def tcp_connection_benches() -> None:
                 *TCP_ZIG_ENV,
                 "zig",
                 "build-exe",
+                "--color",
+                "off",
                 "-O",
                 "ReleaseFast",
                 "-lc",
