@@ -11,7 +11,7 @@ end
 
 fun: .parent { -- Err }
   alloca' Stack { mem } \ Child thread memory.
-  instr' .child  { fun } \ Child thread function.
+  instr' .child { fun } \ Child thread function.
   " parent msg" { inp } \ Child thread input.
   nil           { out } \ Child thread output.
 

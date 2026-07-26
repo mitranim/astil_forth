@@ -5,7 +5,7 @@ fun: .fib { _src -- _out } [
   0 1        .asm_cmp_imm     .comp_instr \ cmp x0, 1
   12  ASM_GT .asm_branch_cond .comp_instr \ b.gt <init>
   0 1        .asm_mov_imm     .comp_instr \ mov x0, 1
-             asm_ret          .comp_instr \ ret
+             ASM_RET          .comp_instr \ ret
   2 0        .asm_mov_reg     .comp_instr \ mov x2, x0 -- <init>
   1 1        .asm_mov_imm     .comp_instr \ mov x1, 1
   0 1        .asm_mov_imm     .comp_instr \ mov x0, 1

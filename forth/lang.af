@@ -712,12 +712,12 @@ fun: .asm_tst { Xn Xm -- instr }
 end
 
 \ `.ret x30`; requires caution with SP / FP.
-0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 let: asm_ret
+0b110_101_1_0_0_10_11111_0000_0_0_11110_00000 let: ASM_RET
 
-0b110_101_01000000110010_0000_000_11111 let: asm_nop
+0b110_101_01000000110010_0000_000_11111 let: ASM_NOP
 
 \ svc 666
-0b110_101_00_000_0000001010011010_000_01 let: asm_svc
+0b110_101_00_000_0000001010011010_000_01 let: ASM_SVC
 
 \ ## Assembler: register selection
 
@@ -2522,8 +2522,8 @@ struct: Interp_comp_ctx
 end
 
 struct: Interp_comp
-  U8              288 field: .Interp_comp_code_field \ SYNC[comp_code_size].
-  Interp_comp_ctx 1   field: .Interp_comp_ctx_field
+  U8              288 field: .Interp_comp_code \ SYNC[comp_code_size].
+  Interp_comp_ctx 1   field: .Interp_comp_ctx
 end
 
 \ SYNC[ctx_fields].
@@ -2554,7 +2554,7 @@ struct: Interp
   Stack       1 field: .Interp_sym
   Adr         1 field: .Interp_module \ Interp_module_ctx*
   Interp_dict 1 field: .Interp_imports
-  Interp_comp 1 field: .Interp_comp_field
+  Interp_comp 1 field: .Interp_comp
   \ ... other fields ...
 end
 
@@ -2634,7 +2634,7 @@ fun_comp: .call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
 
   \ Emit frame record as workaround for leaf callers without their own.
   \ Current word may become non-leaf later, but we don't know it yet.
-  interp .Interp_comp_field .Interp_comp_ctx_field .Interp_comp_ctx_sym @ { sym }
+  interp .Interp_comp .Interp_comp_ctx .Interp_comp_ctx_sym @ { sym }
   sym .Sym_callees .Interp_set_len @u32 0 = { leaf }
 
   leaf .then

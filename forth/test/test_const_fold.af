@@ -79,7 +79,7 @@ fun: .cf_want_load { reg imm }
   reg neg hw 3 bits .cf_want_movk_if
 end
 
-fun: .cf_want_ret asm_ret .cf_want_instr end
+fun: .cf_want_ret ASM_RET .cf_want_instr end
 
 fun: .cf_want_load_word { imm XT -- err }
   .cf_want_clear

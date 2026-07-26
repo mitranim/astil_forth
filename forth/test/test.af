@@ -3071,22 +3071,22 @@ fun: .test_struct_field_peephole { -- err }
   xt' .test_struct_field_load_peephole_fun { load_xt }
   0 0 2 0b11 0b01 .asm_load_store_off { load_instr }
   load_xt 0 load_instr .test_struct_field_peephole_expect_instr
-  load_xt 1 asm_ret .test_struct_field_peephole_expect_instr
+  load_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
 
   xt' .test_struct_field_store_peephole_fun { store_xt }
   0 1 2 0b11 0b00 .asm_load_store_off { store_instr }
   store_xt 0 store_instr .test_struct_field_peephole_expect_instr
-  store_xt 1 asm_ret .test_struct_field_peephole_expect_instr
+  store_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
 
   xt' .test_struct_field_byte_peephole_fun { byte_xt }
   0 0 8 0b00 0b01 .asm_load_store_off { byte_instr }
   byte_xt 0 byte_instr .test_struct_field_peephole_expect_instr
-  byte_xt 1 asm_ret .test_struct_field_peephole_expect_instr
+  byte_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
 
   xt' .test_struct_field_unscaled_peephole_fun { unscaled_xt }
   0 0 1 .asm_load_unscaled_off { unscaled_instr }
   unscaled_xt 0 unscaled_instr .test_struct_field_peephole_expect_instr
-  unscaled_xt 1 asm_ret .test_struct_field_peephole_expect_instr
+  unscaled_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
 end
 .test_struct_field_peephole
 

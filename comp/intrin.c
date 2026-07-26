@@ -371,6 +371,7 @@ static void interp_repr_sym(const Interp *interp, const Sym *sym) {
   }
 }
 
+// TODO support disassembling intrinsics and externals by taking size as input.
 static Err interp_disasm_sym(Interp *interp, const Sym *sym) {
   switch (sym->type) {
     case SYM_NORM: break;

@@ -3,6 +3,13 @@ use' ./lang.af
 \ Simple arena allocator. Maps memory pages on demand.
 \ Supports truncating while keeping full capacity.
 \ Pages are NOT contiguous with each other.
+\
+\ Most programs don't want this. The preferred way of allocating memory
+\ is via the ambient context, which always contains an arena-style bump
+\ allocator, ostensibly without support for resizing. However, resizing
+\ is supported by the OS via virtual memory. Just ask for enough memory
+\ when mapping it for your context. The OS lazily allocates real memory
+\ in page-sized chunks, on demand via page faults.
 
 1 22 .lsl let: ARENA_PAGE_MIN
 4096      let: ARENA_PAGES

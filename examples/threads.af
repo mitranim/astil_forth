@@ -33,7 +33,7 @@ struct: Child_ctx
   Cell 1 field: .Child_ctx_inout
 end
 
-fun: .spawn { id inp mem -- thread inout ok }
+fun: .child_spawn { id inp mem -- thread inout ok }
   " [parent] spawning thread %zd...\n" id .logf
 
   CTX_CAP Child_ctx mem .stack_init_ctx { ctx err }
@@ -59,7 +59,7 @@ fun: .spawn { id inp mem -- thread inout ok }
   thread inout true
 end
 
-fun: .wait { id path out thread -- ok }
+fun: .child_wait { id path out thread -- ok }
   " [parent] waiting on thread %zd...\n" id .logf
   thread .thread_join { err join_err }
 
@@ -83,13 +83,13 @@ fun: .parent
   alloca' Stack    { mem0  } \ Backing memory of `thread0`.
   alloca' Stack    { mem1  } \ Backing memory of `thread1`.
 
-  0 path0 mem0 .spawn { thread0 val0 ok0 }
-  1 path1 mem1 .spawn { thread1 val1 ok1 }
+  0 path0 mem0 .child_spawn { thread0 val0 ok0 }
+  1 path1 mem1 .child_spawn { thread1 val1 ok1 }
 
   \ After spawning a thread, we must either join or detach it.
 
-  ok0 .then 0 path0 val0 thread0 .wait { ok0 } end
-  ok1 .then 1 path1 val1 thread1 .wait { ok1 } end
+  ok0 .then 0 path0 val0 thread0 .child_wait { ok0 } end
+  ok1 .then 1 path1 val1 thread1 .child_wait { ok1 } end
 
   \ Unmap child thread memory on join success.
   \
