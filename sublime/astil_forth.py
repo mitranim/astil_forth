@@ -1,5 +1,6 @@
 # BOT-ASSISTED
 
+import sublime
 import sublime_plugin
 import codecs
 import os
@@ -64,11 +65,14 @@ class Eval(threading.Thread):
       if not self.canceled:
         self.append(f"{err}\n")
     finally:
+      failed = False
       if self.proc:
-        self.proc.wait()
+        failed = self.proc.wait() != 0
         self.proc = None
       if self.announce:
         self.append("[canceled]\n")
+      if not self.canceled:
+        sublime.status_message("Eval failed" if failed else "Eval finished")
 
 class astil_forth_eval_selection(sublime_plugin.WindowCommand):
   eval = None
@@ -91,6 +95,7 @@ class astil_forth_eval_selection(sublime_plugin.WindowCommand):
 
   def queue_eval(self, panel, src, cwd):
     self.cancel()
+    sublime.status_message("")
     self.eval = Eval(panel, src, cwd)
     self.eval.start()
 
