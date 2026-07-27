@@ -474,6 +474,11 @@ fun: .asm_adds_reg { Xd Xn Xm -> instr }
   .asm_add_reg 0b0_0_1_00000000000000000000000000000 .or
 end
 
+\ adc Xd, Xn, Xm
+fun: .asm_adc_reg { Xd Xn Xm -> instr }
+  .asm_pattern_arith_reg 0b1_0_0_11010000_00000_000000_00000_00000 .or
+end
+
 \ sub Xd, Xn, #imm12
 0b1_1_0_100010_0_000000000000_00000_00000 let: ASM_OP_SUB_IMM
 fun: .asm_addsub_imm { Xd Xn imm12 imm add -- instr }
@@ -779,12 +784,29 @@ fun_comp: .dec { -- err }
   reg reg 1 .asm_sub_imm .comp_instr \ sub Xd, Xn, #imm12
 end
 
+\ Adds two low/high pairs. Conceptually, this adds together
+\ two `int128` numbers. Executionally, this is identical to
+\ what Clang generates for `__int128 + __int128`.
+fun_comp: d+ { -- err } ( E: lo0 hi0 lo1 hi1 -- lo hi )
+  4 nil .comp_args_min
+  .comp_args_get 4 - { lo0 }
+  lo0 .inc { hi0 }
+  hi0 .inc { lo1 }
+  lo1 .inc { hi1 }
+  lo0 .comp_realloc_reg
+  hi0 .comp_realloc_reg
+  lo0 lo0 lo1 .asm_adds_reg .comp_instr \ adds Xd, Xn, Xm
+  hi0 hi0 hi1 .asm_adc_reg  .comp_instr \ adc  Xd, Xn, Xm
+  hi0 .inc .comp_args_set
+end
+
 fun_comp: + { -- err } ASM_OP_ADD_REG .comp_args2_arith_reg end
 fun_comp: - { -- err } ASM_OP_SUB_REG .comp_args2_arith_reg end
 fun_comp: * { -- err } ASM_OP_MUL_REG .comp_args2_arith_reg end
 fun_comp: / { -- err } ASM_OP_SDIV_REG .comp_args2_arith_reg end
 fun_comp: u/ { -- err } ASM_OP_UDIV_REG .comp_args2_arith_reg end
 
+fun: d+ { lo0 hi0 lo1 hi1 -> lo hi } d+ end
 fun: * { i0 i1 -> i2 } * end
 fun: / { i0 i1 -> i2 } / end
 fun: u/ { i0 i1 -> i2 } u/ end

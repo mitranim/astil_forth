@@ -4,20 +4,13 @@ use' lang.af
 \
 \ Emulates 128-bit integers in 64-bit GPRs.
 
-fun: .int128_add { lo0 hi0 lo1 hi1 -- lo hi }
-  lo0 lo1 + { lo }
-  lo lo0 u< { carry }
-  hi0 hi1 + carry + { hi }
-  lo hi
-end
-
 fun: .fib { depth -- lo hi }
   0 0 1 0 { prev_lo prev_hi next_lo next_hi }
   depth { ind }
   loop
     ind .while
     dec: ind
-    prev_lo prev_hi next_lo next_hi .int128_add { sum_lo sum_hi }
+    prev_lo prev_hi next_lo next_hi d+ { sum_lo sum_hi }
     next_lo next_hi { prev_lo prev_hi }
     sum_lo sum_hi { next_lo next_hi }
   end
