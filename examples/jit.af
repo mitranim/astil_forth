@@ -1,0 +1,32 @@
+use' lang.af
+use' proc.af
+
+\ Trivial example of your own compilation and execution.
+
+2 0 extern: .clear_cache __clear_cache ( floor ceil )
+
+fun: .instr_push { instr buf -> buf } !32 buf ASM_INSTR_SIZE + end
+
+fun: .run { -- err }
+  PAGE_SIZE PROT_RW .mem_map { instrs }
+
+  instrs                           { top }
+  1 234 top .asm_append_imm_to_reg { top } \ mov x1, 234
+  0 0 1 .asm_mul top .instr_push   { top } \ mul x0, x0, x1
+  ASM_RET        top .instr_push   { top } \ ret
+
+  instrs PAGE_SIZE PROT_RE .mem_prot    \ Make instrs read-execute.
+  instrs top               .clear_cache \ Flush CPU instruction cache.
+
+  " disasm:\n" .elog
+  instrs top instrs - .print_disasm
+
+  123 instrs .call [ 1 .comp_args_set ] { val } \ 123 234 *
+  " val: %zd\n" val .logf
+  assert= val 28782 end
+
+  345 instrs .call [ 1 .comp_args_set ] { val } \ 345 234 *
+  " val: %zd\n" val .logf
+  assert= val 80730 end
+end
+.run
