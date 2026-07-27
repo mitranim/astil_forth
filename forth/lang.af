@@ -5102,3 +5102,15 @@ fun: str: { buf len -- err } ( E: -- cstr len )
   .read_word buf len .init_slice_word
   [ false .comp_only ]
 end
+
+\ Redef of `\` which allows EOF.
+fun_comp: \ [ .redefine ]
+  interp .Interp_module @ .Interp_module_reader { read }
+  read .Interp_reader_src @ { floor }
+  floor read .Interp_reader_pos @u32 + { cur }
+  loop
+    cur @b 0 255 char' \n =none .while
+    inc: cur
+  end
+  cur floor - read .Interp_reader_pos !32
+end

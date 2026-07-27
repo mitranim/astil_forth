@@ -17,8 +17,7 @@ end
 fun: .test_empty_comment { -- err }
   \ `\` immediately followed by newline: this used to skip the NEXT line.
   \
-  10 20 30
-  { one two three }
+  10 20 30 { one two three }
   assert= one 10 end
   assert= two 20 end
   assert= three 30 end
