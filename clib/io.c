@@ -1,6 +1,7 @@
 #pragma once
 #include "./err.c"
 #include "./fmt.c"
+#include "./mem.c"
 #include "./misc.h"
 #include "./num.h"
 #include <fcntl.h>

@@ -269,7 +269,10 @@ static Err init_exception_handling() {
   try(env_bool("RECOVERY", &recovery));
   if (!recovery) return nullptr;
 
-  const auto err = mach_exception_init(EXC_MASK_BAD_ACCESS | EXC_BAD_INSTRUCTION);
+  mach_port_t port;
+  const auto  err = mach_exception_init(
+    EXC_MASK_BAD_ACCESS | EXC_BAD_INSTRUCTION, &port
+  );
 
   // Delivering exceptions to Mach ports is optional...
   if (err) {
@@ -278,7 +281,7 @@ static Err init_exception_handling() {
   }
 
   // ...but if the OS agrees, the handling thread must actually run.
-  try(mach_exception_server_init(nullptr));
+  try(mach_exception_server_init(port, nullptr));
   IF_DEBUG(eputs("[system] inited mach exception handling"));
   return nullptr;
 }

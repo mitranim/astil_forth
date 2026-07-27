@@ -13,9 +13,10 @@ Some links:
 #include "./mach_exc_msg.c"
 #include <mach/mach.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 
-static mach_port_t mach_exc_port;
+static_assert(sizeof(mach_port_t) <= sizeof(uintptr_t));
 
 /*
 Definitions:
@@ -108,26 +109,28 @@ static Err err_mach_port_send(kern_return_t code) {
 `mach_msg_server` is provided by Apple's libSystem.
 See `./mach_exc_msg.c` for the actual messaging.
 */
-static void *mach_on_exceptions(void *) {
-  mach_msg_server(mach_on_exception, MACH_EXC_MSG_MAX_SIZE, mach_exc_port, 0);
+static void *mach_on_exceptions(void *arg) {
+  const auto port = (mach_port_t)(uintptr_t)arg;
+  mach_msg_server(mach_on_exception, MACH_EXC_MSG_MAX_SIZE, port, 0);
   return nullptr;
 }
 
 /*
-Set up AF-specific Mach exception handling for entire current process.
 Should be followed by `mach_exception_server_init` or some equivalent.
 Failure is non-lethal; caller may continue without exception handling.
 */
-static Err mach_exception_init(exception_mask_t exception_types) {
+static Err mach_exception_init(
+  exception_mask_t exception_types, mach_port_t *out
+) {
   const auto task_port = mach_task_self(); // Current process.
 
   try(err_mach_port_alloc(
-    mach_port_allocate(task_port, MACH_PORT_RIGHT_RECEIVE, &mach_exc_port)
+    mach_port_allocate(task_port, MACH_PORT_RIGHT_RECEIVE, out)
   ));
 
-  try(err_mach_port_send(mach_port_insert_right(
-    task_port, mach_exc_port, mach_exc_port, MACH_MSG_TYPE_MAKE_SEND
-  )));
+  try(err_mach_port_send(
+    mach_port_insert_right(task_port, *out, *out, MACH_MSG_TYPE_MAKE_SEND)
+  ));
 
   /*
   `MACH_EXCEPTION_CODES` -> 64-bit mode.
@@ -138,11 +141,7 @@ static Err mach_exception_init(exception_mask_t exception_types) {
   const auto flags = MACH_EXCEPTION_CODES | EXCEPTION_STATE;
 
   const auto code = task_set_exception_ports(
-    task_port,
-    exception_types,
-    mach_exc_port,
-    (exception_behavior_t)flags,
-    ARM_THREAD_STATE64
+    task_port, exception_types, *out, (exception_behavior_t)flags, ARM_THREAD_STATE64
   );
 
   if (code == KERN_SUCCESS) return nullptr;
@@ -158,11 +157,11 @@ static Err mach_exception_init(exception_mask_t exception_types) {
 Spawns a long-lived process-wide "server" thread for Mach exceptions.
 Caller may pass nil to skip the thread handle; process exit kills it.
 */
-static Err mach_exception_server_init(pthread_t *out) {
+static Err mach_exception_server_init(mach_port_t port, pthread_t *out) {
   pthread_t tmp;
   if (!out) out = &tmp;
   return err_errno_posix(
-    pthread_create(out, nullptr, mach_on_exceptions, nullptr)
+    pthread_create(out, nullptr, mach_on_exceptions, (void *)(uintptr_t)port)
   );
 }
 
