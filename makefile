@@ -281,6 +281,10 @@ $(MACH_GEN_OUT): $(MACH_GEN_SRC)
 bench:
 	python3 -m bench.bench $(args)
 
+.PHONY: test_bench
+test_bench:
+	python3 -m unittest bench.test_catalog bench.test_bench -v
+
 .PHONY: fmt
 fmt:
 	clang-format -i $(FMTABLE)

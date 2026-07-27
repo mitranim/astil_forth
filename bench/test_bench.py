@@ -19,6 +19,24 @@ def sample(wall: float, cpu: float) -> catalog.Sample:
 
 
 class RunPolicyTest(unittest.TestCase):
+    def test_cat_group_gets_unmeasured_warmup_without_validation(self) -> None:
+        item = catalog.Bench(
+            "S",
+            "cat",
+            "cat",
+            ("cat",),
+            cat=catalog.CatIO(1, (catalog.cat_bench.STDIN,)),
+        )
+        with (
+            mock.patch.object(driver, "measure", return_value=sample(0.1, 0.05))
+            as measure,
+            mock.patch.object(catalog, "validate") as validate,
+        ):
+            driver.warmup(item)
+
+        measure.assert_called_once_with(item)
+        validate.assert_not_called()
+
     def test_timed_out_run_fails_with_benchmark_context(self) -> None:
         item = bench("slow")
         with (
@@ -141,6 +159,37 @@ class RunPolicyTest(unittest.TestCase):
 
 
 class MetricTest(unittest.TestCase):
+    def test_cat_section_splits_cpu_and_orders_by_wall(self) -> None:
+        section = next(
+            section
+            for section in catalog.SECTIONS
+            if section.title == "CAT SMALL"
+        )
+        plan = driver.plan_for(section)
+        wall_fast = catalog.Result(
+            bench("wall_fast"),
+            [catalog.Sample(0.1, 0.4, 0.4, 1024)],
+        )
+        wall_slow = catalog.Result(
+            bench("wall_slow"),
+            [catalog.Sample(0.2, 0.1, 0.1, 1024)],
+        )
+
+        text = driver.render_section(plan, [wall_slow, wall_fast])
+
+        self.assertEqual(
+            plan.metrics,
+            (driver.WALL, driver.USER_CPU, driver.KERNEL_CPU, driver.MEM),
+        )
+        self.assertIs(plan.primary, driver.WALL)
+        self.assertIn(
+            "| Command | Wall [ms] ↓ | User CPU [ms] | Kernel CPU [ms] | "
+            "Peak mem [MiB] | Relative |",
+            text,
+        )
+        self.assertNotIn("| CPU [", text)
+        self.assertLess(text.index("`wall_fast`"), text.index("`wall_slow`"))
+
     def test_tcp_section_omits_total_cpu_column(self) -> None:
         item = bench("tcp")
         result_sample = SimpleNamespace(
@@ -227,7 +276,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(
             driver.main_for([
                 "--smoke",
-                "scan_delims_astil_cell_reg",
+                "scan_delims_astil_cell_jit",
             ]),
             0,
         )

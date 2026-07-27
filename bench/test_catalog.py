@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+from bench import cat_bench
 from bench import catalog as bench
 
 
@@ -17,6 +18,52 @@ def samples(*walls: float) -> list[bench.Sample]:
 
 
 class PlanningTest(unittest.TestCase):
+    def test_cat_sections_immediately_precede_tcp(self) -> None:
+        titles = [section.title for section in bench.SECTIONS]
+        tcp_index = titles.index("TCP CONNECTIONS")
+        self.assertEqual(
+            titles[tcp_index - 2 : tcp_index + 1],
+            ["CAT SMALL", "CAT LARGE", "TCP CONNECTIONS"],
+        )
+
+    def test_cat_implementations_follow_language_order(self) -> None:
+        self.assertEqual(
+            [
+                item.name.removeprefix("cat_").removesuffix("_small")
+                for item in bench.BENCHES
+                if item.section == "CAT SMALL"
+            ],
+            [
+                "global",
+                "clang",
+                "astil_aot",
+                "astil_jit",
+                "gforth",
+                "zig",
+                "go",
+                "luajit",
+                "js_bun",
+                "java",
+                "cl_sbcl",
+                "pypy",
+                "python",
+            ],
+        )
+
+    def test_astil_cat_aot_setup_does_not_wait_for_stdin(self) -> None:
+        item = bench.selected_benches(["cat_astil_aot_small"])[0]
+        self.assertEqual(item.setup[-1][-2:], ("--", bench.os.devnull))
+
+    def test_zig_cat_uses_one_source_for_both_sizes(self) -> None:
+        items = bench.selected_benches(["cat_zig"])
+        self.assertEqual(
+            [(item.name, item.file) for item in items],
+            [
+                ("cat_zig_small", "bench/cat.zig"),
+                ("cat_zig_large", "bench/cat.zig"),
+            ],
+        )
+
     def test_filters_are_combined_as_and_groups(self) -> None:
         names = [
             item.name
@@ -62,6 +109,58 @@ class PlanningTest(unittest.TestCase):
 
 
 class MeasurementTest(unittest.TestCase):
+    def test_cat_measurement_reads_fixture_and_discards_stdout(self) -> None:
+        item = bench.Bench(
+            "TEST",
+            "cat_timed",
+            "cat",
+            ("cat", "fixture", "-", "fixture"),
+            cat=bench.CatIO(
+                4,
+                (cat_bench.FILE, cat_bench.STDIN, cat_bench.FILE),
+            ),
+        )
+        usage = SimpleNamespace(ru_utime=0.0, ru_stime=0.0, ru_maxrss=0)
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch.object(
+                cat_bench,
+                "input_path",
+                return_value=Path(directory) / "input",
+            ),
+            mock.patch.object(
+                bench.os, "posix_spawnp", return_value=1234
+            ) as spawn,
+            mock.patch.object(
+                bench.os,
+                "wait4",
+                return_value=(1234, 0, usage),
+            ),
+        ):
+            bench.measure(item)
+
+        spawn.assert_called_once_with(
+            "cat",
+            item.cmd,
+            bench.os.environ,
+            file_actions=(
+                (
+                    bench.os.POSIX_SPAWN_OPEN,
+                    0,
+                    str(Path(directory) / "input"),
+                    bench.os.O_RDONLY,
+                    0,
+                ),
+                (
+                    bench.os.POSIX_SPAWN_OPEN,
+                    1,
+                    bench.os.devnull,
+                    bench.os.O_WRONLY,
+                    0,
+                ),
+            ),
+        )
+
     def test_measure_keeps_user_and_kernel_cpu(self) -> None:
         item = bench.Bench("TEST", "cpu_split", "cpu_split", ("cpu_split",))
         usage = SimpleNamespace(ru_utime=2.0, ru_stime=3.0, ru_maxrss=4)
@@ -376,6 +475,94 @@ console.log(JSON.stringify({ bytes, ended }))
 
 
 class ValidationTest(unittest.TestCase):
+    def test_expected_cat_output_is_cached_by_workload(self) -> None:
+        expected_output = cat_bench.expected_output
+        self.assertTrue(
+            hasattr(expected_output, "cache_info"),
+            "expected_output has no workload cache",
+        )
+        expected_output.cache_clear()
+        self.addCleanup(expected_output.cache_clear)
+        cat = bench.CatIO(
+            4,
+            (cat_bench.FILE, cat_bench.STDIN, cat_bench.FILE),
+        )
+
+        first = expected_output(cat)
+        before = expected_output.cache_info()
+        second = expected_output(cat)
+        after = expected_output.cache_info()
+
+        self.assertEqual(second, first)
+        self.assertEqual(after.hits, before.hits + 1)
+
+    def test_cat_validation_rejects_replacing_stdin_with_file(self) -> None:
+        cat = bench.CatIO(
+            4,
+            (cat_bench.FILE, cat_bench.STDIN, cat_bench.FILE),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "file"
+            stdin_path = Path(directory) / "stdin"
+            input_path.write_bytes(cat_bench.PATTERNS[cat_bench.FILE][:4])
+            stdin_path.write_bytes(cat_bench.PATTERNS[cat_bench.STDIN][:4])
+            item = bench.Bench(
+                "TEST",
+                "bad_cat_sources",
+                "python3",
+                (
+                    "python3",
+                    "-c",
+                    "import pathlib, sys; "
+                    "data = pathlib.Path(sys.argv[1]).read_bytes(); "
+                    "sys.stdout.buffer.write(data * 3)",
+                    str(input_path),
+                    "-",
+                    str(input_path),
+                ),
+                cat=cat,
+            )
+            with (
+                mock.patch.object(
+                    cat_bench,
+                    "input_path",
+                    side_effect=lambda _cat, source: (
+                        stdin_path
+                        if source == cat_bench.STDIN
+                        else input_path
+                    ),
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "bad_cat_sources.*output mismatch",
+                ),
+            ):
+                bench.validate([item])
+
+    def test_cat_validation_rejects_wrong_output(self) -> None:
+        item = bench.Bench(
+            "TEST",
+            "bad_cat",
+            "python3",
+            ("python3", "-c", "import sys; sys.stdout.write('wrong')"),
+            cat=bench.CatIO(4, (cat_bench.STDIN,)),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "input"
+            input_path.write_bytes(cat_bench.PATTERNS[cat_bench.STDIN][:4])
+            with (
+                mock.patch.object(
+                    cat_bench,
+                    "input_path",
+                    return_value=input_path,
+                ),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    "bad_cat.*output mismatch",
+                ),
+            ):
+                bench.validate([item])
+
     def test_reports_through_progress(self) -> None:
         item = bench.Bench("TEST", "working", "working", ("working",))
         with (

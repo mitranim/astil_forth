@@ -14,7 +14,8 @@ import time
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from . import tcp_conn
+from . import cat_bench, tcp_conn
+from .cat_bench import CatIO
 
 ROOT = Path(__file__).resolve().parent.parent
 GEN = ROOT / "generated"
@@ -56,6 +57,7 @@ class Bench:
     setup: tuple[tuple[str, ...], ...] = ()
     tools: tuple[str, ...] = ()
     tcp: bool = False
+    cat: CatIO | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +106,7 @@ def bench(
     setup: tuple[tuple[str, ...], ...] = (),
     tools: tuple[str, ...] = (),
     tcp: bool = False,
+    cat: CatIO | None = None,
 ) -> None:
     BENCHES.append(
         Bench(
@@ -114,6 +117,7 @@ def bench(
             setup,
             tools,
             tcp,
+            cat,
         )
     )
 
@@ -260,8 +264,34 @@ def measure(
     started = time.perf_counter_ns()
     if timeout_seconds is not None and timeout_seconds <= 0:
         raise MeasurementDeadline
+    file_actions = ()
+    if item.cat is not None:
+        file_actions = (
+            (
+                os.POSIX_SPAWN_OPEN,
+                0,
+                str(cat_bench.input_path(item.cat, cat_bench.STDIN)),
+                os.O_RDONLY,
+                0,
+            ),
+            (
+                os.POSIX_SPAWN_OPEN,
+                1,
+                os.devnull,
+                os.O_WRONLY,
+                0,
+            ),
+        )
     try:
-        pid = os.posix_spawnp(cmd[0], cmd, os.environ)
+        if file_actions:
+            pid = os.posix_spawnp(
+                cmd[0],
+                cmd,
+                os.environ,
+                file_actions=file_actions,
+            )
+        else:
+            pid = os.posix_spawnp(cmd[0], cmd, os.environ)
     except OSError as err:
         raise RuntimeError(
             f"benchmark {item.name!r} failed to spawn command: {cmd!r}"
@@ -294,7 +324,17 @@ def c_exe(exe: str) -> tuple[tuple[str, ...], ...]:
 
 
 def go_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
-    return (("go", "build", "-o", exe, f"./{src}"),)
+    return (
+        (
+            "env",
+            f"GOCACHE={ROOT / '.tmp' / 'go-cache'}",
+            "go",
+            "build",
+            "-o",
+            exe,
+            f"./{src}",
+        ),
+    )
 
 
 def zig_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
@@ -304,6 +344,10 @@ def zig_exe(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
             "build-exe",
             "--color",
             "off",
+            "--cache-dir",
+            ".tmp/zig-cache",
+            "--global-cache-dir",
+            ".tmp/zig-global-cache",
             "-O",
             "ReleaseFast",
             f"-femit-bin={exe}",
@@ -657,6 +701,126 @@ bench("bin_tree_astil_stack_bulk", "bench/bin_tree_bulk_s.af", ("./astil_s.exe",
 bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk_g.fs", ("gforth", "bench/bin_tree_bulk_g.fs", "-e", "bye"), tools=("gforth",))
 bench("bin_tree_go_bulk", "bench/bin_tree_bulk.go", ("bench/bin_tree_go_bulk.exe",), setup=go_exe("bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe"), tools=("go",))
 
+CAT_IMPLEMENTATIONS = [
+    cat_bench.Implementation("global", "cat", ("cat",)),
+    cat_bench.Implementation(
+        "clang",
+        "bench/cat.c",
+        ("bench/cat.exe",),
+        setup=c_exe("bench/cat.exe"),
+        tools=("clang",),
+    ),
+    cat_bench.Implementation(
+        "astil_aot",
+        "examples/cat.af",
+        ("bench/cat_astil.exe",),
+        setup=(
+            BUILD,
+            (
+                "./astil.exe",
+                "examples/cat.af",
+                "--build=bench/cat_astil.exe",
+                "--",
+                os.devnull,
+            ),
+        ),
+        tools=("clang",),
+    ),
+    cat_bench.Implementation(
+        "astil_jit",
+        "examples/cat.af",
+        ("./astil.exe", "examples/cat.af", "--"),
+        setup=(BUILD,),
+        tools=("clang",),
+    ),
+    cat_bench.Implementation(
+        "gforth",
+        "bench/cat.fs",
+        ("gforth", "bench/cat.fs"),
+        tools=("gforth",),
+    ),
+    cat_bench.Implementation(
+        "zig",
+        "bench/cat.zig",
+        ("bench/cat_zig.exe",),
+        setup=zig_exe("bench/cat.zig", "bench/cat_zig.exe"),
+        tools=("zig",),
+    ),
+    cat_bench.Implementation(
+        "go",
+        "bench/cat.go",
+        ("bench/cat_go.exe",),
+        setup=go_exe("bench/cat.go", "bench/cat_go.exe"),
+        tools=("go",),
+    ),
+    cat_bench.Implementation(
+        "luajit",
+        "bench/cat.lua",
+        ("luajit", "bench/cat.lua"),
+        tools=("luajit",),
+    ),
+    cat_bench.Implementation(
+        "js_bun",
+        "bench/cat.mjs",
+        ("bun", "run", "bench/cat.mjs"),
+        tools=("bun",),
+    ),
+    cat_bench.Implementation(
+        "java",
+        "bench/cat.java",
+        ("java", "-cp", "bench", "cat"),
+        setup=java_class("bench/cat.java"),
+        tools=("java",),
+    ),
+    cat_bench.Implementation(
+        "cl_sbcl",
+        "bench/cat.lisp",
+        ("sbcl", "--script", "bench/cat.lisp"),
+        tools=("sbcl",),
+    ),
+    cat_bench.Implementation(
+        "pypy",
+        "bench/cat.py",
+        ("pypy3", "bench/cat.py"),
+        tools=("pypy3",),
+    ),
+    cat_bench.Implementation(
+        "python",
+        "bench/cat.py",
+        ("python3", "bench/cat.py"),
+        tools=("python3",),
+    ),
+]
+
+cat_bench.declare_section(
+    section,
+    bench,
+    ROOT,
+    CAT_IMPLEMENTATIONS,
+    "CAT SMALL",
+    "small",
+    CatIO(
+        4 * 1024,
+        (cat_bench.FILE, cat_bench.STDIN, cat_bench.FILE),
+    ),
+    ("{}", "-", "{}"),
+    "Copies a 4 KiB file, 4 KiB stdin, then the file again (12 KiB total).",
+)
+cat_bench.declare_section(
+    section,
+    bench,
+    ROOT,
+    CAT_IMPLEMENTATIONS,
+    "CAT LARGE",
+    "large",
+    CatIO(
+        512 * 1024**2,
+        (cat_bench.FILE, cat_bench.STDIN),
+    ),
+    ("{}", "-"),
+    "Copies a warmed 512 MiB file and 512 MiB stdin (1 GiB total).",
+)
+
 TCP_NOTE = f"""
 Measures {tcp_conn.CONNECTIONS} concurrent connections with {tcp_conn.EXCHANGES} one-byte request/echo exchanges per connection.
 
@@ -871,6 +1035,15 @@ def format_done(result: Result) -> str:
 def validate(items: list[Bench]) -> None:
     for item in items:
         progress(f"[{item.name}] validation")
+        if item.cat is not None:
+            try:
+                cat_bench.validate(item, RUN_TIMEOUT_SECONDS, alarm)
+            except MeasurementDeadline:
+                raise RuntimeError(
+                    f"benchmark {item.name!r} validation exceeded "
+                    f"{RUN_TIMEOUT_SECONDS:g} seconds: {item.cmd!r}"
+                ) from None
+            continue
         try:
             measure(item, RUN_TIMEOUT_SECONDS)
         except MeasurementDeadline:

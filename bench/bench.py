@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from . import catalog
+from . import cat_bench, catalog
 
 
 RUNS = 5
@@ -194,6 +194,7 @@ def render_section(
 
 
 TCP_TITLE = "TCP CONNECTIONS"
+CAT_TITLES = ("CAT SMALL", "CAT LARGE")
 TCP_SECTION = next(
     section
     for section in catalog.SECTIONS
@@ -219,6 +220,14 @@ SECTION_PLANS = {
 def plan_for(section: catalog.Section) -> SectionPlan:
     if section.title in SECTION_PLANS:
         return SECTION_PLANS[section.title]
+    if section.title in CAT_TITLES:
+        return SectionPlan(
+            section.title,
+            note=section.note,
+            metrics=(WALL, USER_CPU, KERNEL_CPU, MEM),
+            primary=WALL,
+            runner=grouped,
+        )
     primary = CPU if section.sort_by == "cpu_seconds" else WALL
     return SectionPlan(
         section.title,
@@ -239,6 +248,14 @@ def measure(item: catalog.Bench) -> catalog.Sample:
         ) from None
 
 
+def warmup(item: catalog.Bench) -> None:
+    if item.cat is None:
+        catalog.validate([item])
+        return
+    catalog.progress(f"[{item.name}] warmup")
+    measure(item)
+
+
 def run_section(out, section, items) -> None:
     if not items:
         return
@@ -248,7 +265,7 @@ def run_section(out, section, items) -> None:
         items,
         measure,
         catalog.progress,
-        lambda item: catalog.validate([item]),
+        warmup,
     )
     for result in results:
         print(catalog.format_done(result), file=sys.stderr, flush=True)
@@ -267,6 +284,8 @@ def main_for(argv: list[str]) -> int:
     if catalog.uses_astil(items):
         catalog.progress("setup " + " ".join(catalog.CLEAN))
         catalog.run(catalog.CLEAN)
+
+    cat_bench.prepare_inputs(items)
 
     output = Path(args.output)
     if not output.is_absolute():
