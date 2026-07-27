@@ -397,14 +397,19 @@ The context acts as a bump-allocator over borrowed caller-owned memory. It's use
 The outer compiler automatically sets up the main arena. In JIT, it also sets up the main context. In AOT, the main arena is memory-mapped automatically, but the context requires extra setup. General AOT pattern:
 
 ```forth
-fun: .run { -- exit }
-  " hello %s" " world" .errf .log .lf
-  0
+fun: .run { -- err }
+  " hello %s" " world" .errf
 end
 
 fun: .main { -- exit }
-  .with_main_ctx .run end
+  .with_main_ctx .run end { err }
+  err .then " error: %s\n" err .elogf 1 else 0 end
 end
+
+\ Optionally run the program now.
+\
+\ Another option: `--eval=.run` via CLI.
+.run
 ```
 
 The main arena can't be freed, but may be rewound by saving `.ctx_top` and restoring it via `.ctx_top_set`. Other arenas are caller-owned; callees may allocate, or restore a prior top; caller frees the whole thing:
