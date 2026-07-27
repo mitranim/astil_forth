@@ -343,7 +343,6 @@ fun: .print_disasm { src len }
   err =0 .then
     4 .cells .alloca { argv }
     " llvm-mc" " --disassemble" " --hex" argv !cellz
-
     argv src len .proc_run_with_stdin_ok { err }
   end
 

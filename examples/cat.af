@@ -12,38 +12,15 @@ use' io.af
 \   printf "" | astil examples/cat.af --build=cat.exe
 \   ./cat.exe file0 file1
 
-fun: .echo_stdin { -- err }
-  0xffff { cap }
-  cap .alloca { buf }
-  loop
-    STDIN_FILENO buf cap .fd_read { len }
-    len =0 .then leave end
-    len >0 .then
-      STDOUT_FILENO buf len .fd_write_all
-      again
-    end
-  end
-end
-
-fun: .echo_file_loop { fdes -- err }
-  0xffff { cap }
-  cap .alloca { buf }
-  loop
-    fdes buf cap .fd_read { len }
-    len =0 .then leave end
-    STDOUT_FILENO buf len .fd_write_all
-  end
-end
-
-fun: .echo_file { path -- Err }
+fun: .echo_file_at { path -- Err }
   path O_RDONLY .fd_open .try { fdes }
-  fdes .echo_file_loop { err }
+  fdes STDOUT .fd_copy { err }
   fdes .close { -- }
   err
 end
 
 fun: .cat { argc argv -- err }
-  argc 1 <= .then .echo_stdin .ret end
+  argc 1 <= .then STDIN STDOUT .fd_copy .ret end
   argc .cells argv + { ceil }
 
   loop
@@ -52,9 +29,9 @@ fun: .cat { argc argv -- err }
     argv @ { arg }
 
     arg " -" cstr= .then
-      .echo_stdin
+      STDIN STDOUT .fd_copy
     else
-      arg .echo_file
+      arg .echo_file_at
     end
   end
 end

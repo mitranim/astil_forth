@@ -101,10 +101,6 @@ end
 0xff       let: EOF8
 0xffffffff let: EOF32
 
-0 let: STDIN_FILENO
-1 let: STDOUT_FILENO
-2 let: STDERR_FILENO
-
 \ `<unistd.h>` access modes.
 0 let: F_OK \ Test existence.
 1 let: X_OK \ Test execute/search permission.
@@ -643,8 +639,21 @@ fun: .fd_write_all { fdes buf len -- err }
   end
 end
 
-\ Writes `\r\n`; for use in HTTP.
+\ Writes `\r\n`; mainly for HTTP.
 fun: .fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
+
+fun: .fd_copy_with { src_fd out_fd buf cap -- err }
+  loop
+    src_fd buf cap .fd_read { len }
+    len =0 .then leave end
+    out_fd buf len .fd_write_all
+  end
+end
+
+fun: .fd_copy { src_fd out_fd -- err }
+  1 16 .lsl { cap }
+  src_fd out_fd cap .alloca cap .fd_copy_with
+end
 
 fun: .file_err_code { file -- code }
   file .ferror .then .errno else 0 end
