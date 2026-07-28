@@ -95,21 +95,22 @@ TEST_FALSE = $(shell realpath $$(which false))
 TEST_GREP = $(shell realpath $$(which grep))
 TEST_SLEEP = $(shell realpath $$(which sleep))
 
+SANDBOX = $(if $(filter seatbelt,$(CODEX_SANDBOX)),,sandbox-exec \
+	-f sandbox.sb \
+	-D MAIN="$(abspath $(file))" \
+	-D OUT="$(abspath $(or $(out),$(TEST_EXE)))" \
+	-D LLVM_MC=$(LLVM_MC) \
+	-D LLVM_SYMBOLIZER=$(LLVM_SYMBOLIZER) \
+	-D ATOS=$(ATOS) \
+	-D TEST_CAT=$(TEST_CAT) \
+	-D TEST_ECHO=$(TEST_ECHO) \
+	-D TEST_FALSE=$(TEST_FALSE) \
+	-D TEST_GREP=$(TEST_GREP) \
+	-D TEST_SLEEP=$(TEST_SLEEP))
+
 .PHONY: run_boxed
 run_boxed:
-	$(RLWRAP) sandbox-exec \
-		-f sandbox.sb \
-		-D MAIN="$(abspath $(file))" \
-		-D OUT="$(abspath $(or $(out),$(TEST_EXE)))" \
-		-D LLVM_MC=$(LLVM_MC) \
-		-D LLVM_SYMBOLIZER=$(LLVM_SYMBOLIZER) \
-		-D ATOS=$(ATOS) \
-		-D TEST_CAT=$(TEST_CAT) \
-		-D TEST_ECHO=$(TEST_ECHO) \
-		-D TEST_FALSE=$(TEST_FALSE) \
-		-D TEST_GREP=$(TEST_GREP) \
-		-D TEST_SLEEP=$(TEST_SLEEP) \
-		$(abspath $(file)) $(args)
+	$(RLWRAP) $(SANDBOX) $(abspath $(file)) $(args)
 
 # Register-CC version.
 .PHONY: run
