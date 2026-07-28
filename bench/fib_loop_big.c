@@ -1,5 +1,6 @@
 // BOT-TRANSLATED
 
+#include "./util.c"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,28 +20,18 @@ static U128 fib(uint64_t depth) {
   return next;
 }
 
-static uint64_t escape(uint64_t val) {
-  register uint64_t x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0));
-  return x0;
-}
-
-static U128 escape128(U128 val) {
-  uint64_t low = (uint64_t)val;
-  uint64_t high = (uint64_t)(val >> 64);
-  __asm__ volatile("" : "+r"(low), "+r"(high));
-  return ((U128)high << 64) | low;
-}
-
 int main() {
-  const uint64_t count = escape(1 << 21);
-  U128 out = 0;
+  const uint64_t count = escape_u64(1 << 21);
+  const uint64_t depth = escape_u64(184);
+  U128           out   = 0;
+
   for (uint64_t ind = 0; ind < count; ind++) {
-    out = escape128(fib(escape(184)));
+    out = escape_u128(fib(depth));
   }
-  const U128 want =
-    ((U128)UINT64_C(0x9abfd87547c0e48c) << 64) |
-    UINT64_C(0x30173357e778cd8d);
+
+  const U128 want = ((U128)UINT64_C(0x9ABFD87547C0E48C) << 64) |
+    UINT64_C(0x30173357E778CD8D);
+
   if (out != want) {
     fprintf(
       stderr,

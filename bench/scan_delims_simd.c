@@ -1,6 +1,7 @@
 // BOT-ASSISTED
 
 #include "../clib/num.h"
+#include "./util.c"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,14 +17,8 @@ typedef U8   u8x8 __attribute__((vector_size(8)));
 typedef U16  u16x8 __attribute__((vector_size(16)));
 static U8    buf[CAP];
 
-static const U8 *escape_ptr(const U8 *val) {
-  register const U8 *x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0) : : "memory");
-  return x0;
-}
-
-static void init(void) {
-  for (Ind ind = 0; ind < CAP; ind++) buf[ind] = "{a,b:c[d]e} \n\tfg"[ind & 15];
+static void init(Ind cap) {
+  for (Ind ind = 0; ind < cap; ind++) buf[ind] = "{a,b:c[d]e} \n\tfg"[ind & 15];
 }
 
 __attribute__((noinline)) static Uint scan(const U8 *buf, Ind len) {
@@ -54,8 +49,16 @@ __attribute__((noinline)) static Uint scan(const U8 *buf, Ind len) {
 }
 
 int main(void) {
-  init();
-  Uint out = 0;
-  for (Uint run = 0; run < RUNS; run++) out += scan(escape_ptr(buf), CAP);
+  const Ind  cap  = (Ind)escape_u64(CAP);
+  const Uint runs = (Uint)escape_u64(RUNS);
+
+  init(cap);
+
+  const U8 *const input = escape_ptr(buf);
+  Uint            out   = 0;
+
+  for (Uint run = 0; run < runs; run++) {
+    out += escape_u64(scan(input, cap));
+  }
   if (out != WANT) abort();
 }

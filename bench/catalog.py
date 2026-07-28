@@ -28,6 +28,8 @@ RSS_UNIT_BYTES = 1 if sys.platform == "darwin" else 1024
 
 CLEAN = ("make", "clean")
 BUILD = ("make", "build")
+ERLANG_SERIAL = ("erl", "+S", "1:1", "-noshell", "-pa", "bench")
+ERLANG_DEFAULT = ("erl", "-noshell", "-pa", "bench")
 
 TOOLS = {
     "clang": ("clang", "--version"),
@@ -45,6 +47,12 @@ TOOLS = {
     "sbcl": ("sbcl", "--version"),
     "pypy3": ("pypy3", "--version"),
     "python3": ("python3", "--version"),
+    "erlang": (
+        "erl",
+        "-noshell",
+        "-eval",
+        'io:format("~s", [erlang:system_info(system_version)]), halt().',
+    ),
 }
 
 
@@ -360,6 +368,31 @@ def java_class(src: str) -> tuple[tuple[str, ...], ...]:
     return (("javac", src),)
 
 
+def erlang_module(src: str) -> tuple[tuple[str, ...], ...]:
+    return (("erlc", "-Werror", "-o", "bench", src),)
+
+
+def erlang_run(
+    module: str,
+    *,
+    serial: bool = True,
+    extra: bool = False,
+    runtime_flags: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    prefix = ERLANG_SERIAL if serial else ERLANG_DEFAULT
+    cmd = (
+        *prefix,
+        *runtime_flags,
+        "-s",
+        module,
+        "main",
+        "-s",
+        "erlang",
+        "halt",
+    )
+    return (*cmd, "-extra") if extra else cmd
+
+
 def aot(src: str, exe: str) -> tuple[tuple[str, ...], ...]:
     return (BUILD, ("./astil.exe", src, f"--build={exe}"))
 
@@ -519,6 +552,28 @@ def tcp_connection_benches() -> None:
         tools=("java",),
     )
     tcp_connection_bench(
+        "tcp_conn_erlang_passive",
+        "bench/tcp_server_passive.erl",
+        erlang_run(
+            "tcp_server_passive",
+            serial=False,
+            runtime_flags=("+sbwt", "none"),
+        ),
+        setup=erlang_module("bench/tcp_server_passive.erl"),
+        tools=("erlang",),
+    )
+    tcp_connection_bench(
+        "tcp_conn_erlang_active_n",
+        "bench/tcp_server_active_n.erl",
+        erlang_run(
+            "tcp_server_active_n",
+            serial=False,
+            runtime_flags=("+sbwt", "none"),
+        ),
+        setup=erlang_module("bench/tcp_server_active_n.erl"),
+        tools=("erlang",),
+    )
+    tcp_connection_bench(
         "tcp_conn_cl_sbcl_thread",
         "bench/tcp_server.lisp",
         (
@@ -555,6 +610,18 @@ bench("none_astil_stack", "astil_s.exe", ("./astil_s.exe", "--eval="), setup=(BU
 section("BASELINE")
 bench("baseline_astil_jit", "forth/lang.af", ("./astil.exe", "forth/lang.af"), setup=(BUILD,), tools=("clang",))
 bench("baseline_astil_stack", "forth/lang_s.af", ("./astil_s.exe", "forth/lang_s.af"), setup=(BUILD,), tools=("clang",))
+bench(
+    "baseline_erlang_single",
+    "erl",
+    (*ERLANG_SERIAL, "-s", "erlang", "halt"),
+    tools=("erlang",),
+)
+bench(
+    "baseline_erlang_default",
+    "erl",
+    (*ERLANG_DEFAULT, "-s", "erlang", "halt"),
+    tools=("erlang",),
+)
 bench("baseline_gforth", "gforth", ("gforth", "-e", "bye"), tools=("gforth",))
 bench("baseline_luajit", "luajit", ("luajit", "-e", ""), tools=("luajit",))
 bench("baseline_js_bun", "bun", ("bun", "-e", ";"), tools=("bun",))
@@ -575,6 +642,13 @@ bench("bubble_java", "bench/bubble.java", ("java", "-cp", "bench", "bubble"), se
 bench("bubble_cl_sbcl", "bench/bubble.lisp", ("sbcl", "--script", "bench/bubble.lisp"), tools=("sbcl",))
 bench("bubble_pypy", "bench/bubble.py", ("pypy3", "bench/bubble.py"), tools=("pypy3",))
 bench("bubble_python", "bench/bubble.py", ("python3", "bench/bubble.py"), tools=("python3",))
+bench(
+    "bubble_erlang_atomics",
+    "bench/bubble_atomics.erl",
+    erlang_run("bubble_atomics"),
+    setup=erlang_module("bench/bubble_atomics.erl"),
+    tools=("erlang",),
+)
 
 section("PRIME SIEVE")
 bench("sieve_clang", "bench/sieve.c", ("bench/sieve.exe",), setup=c_exe("bench/sieve.exe"), tools=("clang",))
@@ -588,6 +662,13 @@ bench("sieve_java", "bench/sieve.java", ("java", "-cp", "bench", "sieve"), setup
 bench("sieve_cl_sbcl", "bench/sieve.lisp", ("sbcl", "--script", "bench/sieve.lisp"), tools=("sbcl",))
 bench("sieve_pypy", "bench/sieve.py", ("pypy3", "bench/sieve.py"), tools=("pypy3",))
 bench("sieve_python", "bench/sieve.py", ("python3", "bench/sieve.py"), tools=("python3",))
+bench(
+    "sieve_erlang_atomics",
+    "bench/sieve_atomics.erl",
+    erlang_run("sieve_atomics"),
+    setup=erlang_module("bench/sieve_atomics.erl"),
+    tools=("erlang",),
+)
 
 section("REVERSE STRING")
 bench("reverse_string_clang", "bench/reverse_string.c", ("bench/reverse_string.exe",), setup=c_exe("bench/reverse_string.exe"), tools=("clang",))
@@ -601,6 +682,20 @@ bench("reverse_string_java", "bench/reverse_string.java", ("java", "-cp", "bench
 bench("reverse_string_cl_sbcl", "bench/reverse_string.lisp", ("sbcl", "--script", "bench/reverse_string.lisp"), tools=("sbcl",))
 bench("reverse_string_pypy", "bench/reverse_string.py", ("pypy3", "bench/reverse_string.py"), tools=("pypy3",))
 bench("reverse_string_python", "bench/reverse_string.py", ("python3", "bench/reverse_string.py"), tools=("python3",))
+bench(
+    "reverse_string_erlang_list",
+    "bench/reverse_string_list.erl",
+    erlang_run("reverse_string_list"),
+    setup=erlang_module("bench/reverse_string_list.erl"),
+    tools=("erlang",),
+)
+bench(
+    "reverse_string_erlang_binary",
+    "bench/reverse_string_binary.erl",
+    erlang_run("reverse_string_binary"),
+    setup=erlang_module("bench/reverse_string_binary.erl"),
+    tools=("erlang",),
+)
 
 section("FIB_LOOP")
 bench("fib_loop_clang", "bench/fib_loop.c", ("bench/fib_loop.exe",), setup=c_exe("bench/fib_loop.exe"), tools=("clang",))
@@ -615,8 +710,20 @@ bench("fib_loop_java", "bench/fib_loop.java", ("java", "-cp", "bench", "fib_loop
 bench("fib_loop_cl_sbcl", "bench/fib_loop.lisp", ("sbcl", "--script", "bench/fib_loop.lisp"), tools=("sbcl",))
 bench("fib_loop_pypy", "bench/fib_loop.py", ("pypy3", "bench/fib_loop.py"), tools=("pypy3",))
 bench("fib_loop_python", "bench/fib_loop.py", ("python3", "bench/fib_loop.py"), tools=("python3",))
+bench(
+    "fib_loop_erlang",
+    "bench/fib_loop.erl",
+    erlang_run("fib_loop"),
+    setup=erlang_module("bench/fib_loop.erl"),
+    tools=("erlang",),
+)
 
-section("FIB_LOOP_BIG")
+section(
+    "FIB_LOOP_BIG",
+    note=(
+        "C and Astil use `uint128`. Other languages use actual bigints."
+    ),
+)
 bench("fib_loop_big_clang", "bench/fib_loop_big.c", ("bench/fib_loop_big.exe",), setup=c_exe("bench/fib_loop_big.exe"), tools=("clang",))
 bench("fib_loop_big_astil_asm_aot", "bench/fib_loop_big_asm.af", ("bench/fib_loop_big_astil_asm.exe",), setup=aot("bench/fib_loop_big_asm.af", "bench/fib_loop_big_astil_asm.exe"), tools=("clang",))
 bench("fib_loop_big_astil_asm_jit", "bench/fib_loop_big_asm.af", ("./astil.exe", "bench/fib_loop_big_asm.af"), setup=(BUILD,), tools=("clang",))
@@ -627,6 +734,13 @@ bench("fib_loop_big_java", "bench/fib_loop_big.java", ("java", "-cp", "bench", "
 bench("fib_loop_big_cl_sbcl", "bench/fib_loop_big.lisp", ("sbcl", "--script", "bench/fib_loop_big.lisp"), tools=("sbcl",))
 bench("fib_loop_big_pypy", "bench/fib_loop_big.py", ("pypy3", "bench/fib_loop_big.py"), tools=("pypy3",))
 bench("fib_loop_big_python", "bench/fib_loop_big.py", ("python3", "bench/fib_loop_big.py"), tools=("python3",))
+bench(
+    "fib_loop_big_erlang",
+    "bench/fib_loop_big.erl",
+    erlang_run("fib_loop_big"),
+    setup=erlang_module("bench/fib_loop_big.erl"),
+    tools=("erlang",),
+)
 
 section("FIB_RECURSIVE: fib(39)")
 bench("fib_rec_clang", "bench/fib_rec.c", ("bench/fib_rec.exe",), setup=c_exe("bench/fib_rec.exe"), tools=("clang",))
@@ -640,6 +754,13 @@ bench("fib_rec_java", "bench/fib_rec.java", ("java", "-cp", "bench", "fib_rec"),
 bench("fib_rec_cl_sbcl", "bench/fib_rec.lisp", ("sbcl", "--script", "bench/fib_rec.lisp"), tools=("sbcl",))
 bench("fib_rec_pypy", "bench/fib_rec.py", ("pypy3", "bench/fib_rec.py"), tools=("pypy3",))
 bench("fib_rec_python", "bench/fib_rec.py", ("python3", "bench/fib_rec.py"), tools=("python3",))
+bench(
+    "fib_rec_erlang",
+    "bench/fib_rec.erl",
+    erlang_run("fib_rec"),
+    setup=erlang_module("bench/fib_rec.erl"),
+    tools=("erlang",),
+)
 
 section("CONST FOLD")
 bench("const_fold_folded_astil_aot", "bench/const_fold_folded.af", ("bench/const_fold_folded_astil.exe",), setup=aot("bench/const_fold_folded.af", "bench/const_fold_folded_astil.exe"), tools=("clang",))
@@ -659,6 +780,13 @@ bench("fnv1a64_java", "bench/fnv1a64.java", ("java", "-cp", "bench", "fnv1a64"),
 bench("fnv1a64_cl_sbcl", "bench/fnv1a64.lisp", ("sbcl", "--script", "bench/fnv1a64.lisp"), tools=("sbcl",))
 bench("fnv1a64_pypy", "bench/fnv1a64.py", ("pypy3", "bench/fnv1a64.py"), tools=("pypy3",))
 bench("fnv1a64_python", "bench/fnv1a64.py", ("python3", "bench/fnv1a64.py"), tools=("python3",))
+bench(
+    "fnv1a64_erlang",
+    "bench/fnv1a64.erl",
+    erlang_run("fnv1a64"),
+    setup=erlang_module("bench/fnv1a64.erl"),
+    tools=("erlang",),
+)
 
 section("SCAN DELIMS")
 bench("scan_delims_c_simd", "bench/scan_delims_simd.c", ("bench/scan_delims_simd.exe",), setup=c_exe("bench/scan_delims_simd.exe"), tools=("clang",))
@@ -676,6 +804,13 @@ bench("scan_delims_java_simd", "bench/scan_delims_simd.java", ("java", "--add-mo
 bench("scan_delims_cl_sbcl", "bench/scan_delims.lisp", ("sbcl", "--script", "bench/scan_delims.lisp"), tools=("sbcl",))
 bench("scan_delims_pypy", "bench/scan_delims.py", ("pypy3", "bench/scan_delims.py"), tools=("pypy3",))
 bench("scan_delims_python", "bench/scan_delims_cpython.py", ("python3", "bench/scan_delims_cpython.py"), tools=("python3",))
+bench(
+    "scan_delims_erlang_naive",
+    "bench/scan_delims_naive.erl",
+    erlang_run("scan_delims_naive"),
+    setup=erlang_module("bench/scan_delims_naive.erl"),
+    tools=("erlang",),
+)
 
 section("BINARY TREE")
 bench("bin_tree_clang", "bench/bin_tree.c", ("bench/bin_tree.exe",), setup=c_exe("bench/bin_tree.exe"), tools=("clang",))
@@ -692,6 +827,13 @@ bench("bin_tree_java", "bench/bin_tree.java", ("java", "-cp", "bench", "bin_tree
 bench("bin_tree_cl_sbcl", "bench/bin_tree.lisp", ("sbcl", "--script", "bench/bin_tree.lisp"), tools=("sbcl",))
 bench("bin_tree_pypy", "bench/bin_tree.py", ("pypy3", "bench/bin_tree.py"), tools=("pypy3",))
 bench("bin_tree_python", "bench/bin_tree.py", ("python3", "bench/bin_tree.py"), tools=("python3",))
+bench(
+    "bin_tree_erlang",
+    "bench/bin_tree.erl",
+    erlang_run("bin_tree"),
+    setup=erlang_module("bench/bin_tree.erl"),
+    tools=("erlang",),
+)
 
 section("BINARY TREE BULK")
 bench("bin_tree_clang_bulk", "bench/bin_tree_bulk.c", ("bench/bin_tree_bulk.exe",), setup=c_exe("bench/bin_tree_bulk.exe"), tools=("clang",))
@@ -700,6 +842,20 @@ bench("bin_tree_astil_bulk_jit", "bench/bin_tree_bulk.af", ("./astil.exe", "benc
 bench("bin_tree_astil_stack_bulk", "bench/bin_tree_bulk_s.af", ("./astil_s.exe", "bench/bin_tree_bulk_s.af"), setup=(BUILD,), tools=("clang",))
 bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk.fs", ("gforth", "bench/bin_tree_bulk.fs", "-e", "bye"), tools=("gforth",))
 bench("bin_tree_go_bulk", "bench/bin_tree_bulk.go", ("bench/bin_tree_go_bulk.exe",), setup=go_exe("bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe"), tools=("go",))
+bench(
+    "bin_tree_bulk_erlang_atomics",
+    "bench/bin_tree_bulk_atomics.erl",
+    erlang_run("bin_tree_bulk_atomics"),
+    setup=erlang_module("bench/bin_tree_bulk_atomics.erl"),
+    tools=("erlang",),
+)
+bench(
+    "bin_tree_bulk_erlang_binary",
+    "bench/bin_tree_bulk_binary.erl",
+    erlang_run("bin_tree_bulk_binary"),
+    setup=erlang_module("bench/bin_tree_bulk_binary.erl"),
+    tools=("erlang",),
+)
 
 CAT_IMPLEMENTATIONS = [
     cat_bench.Implementation("global", "cat", ("cat",)),
@@ -771,6 +927,13 @@ CAT_IMPLEMENTATIONS = [
         ("java", "-cp", "bench", "cat"),
         setup=java_class("bench/cat.java"),
         tools=("java",),
+    ),
+    cat_bench.Implementation(
+        "erlang_loop",
+        "bench/cat_loop.erl",
+        erlang_run("cat_loop", extra=True),
+        setup=erlang_module("bench/cat_loop.erl"),
+        tools=("erlang",),
     ),
     cat_bench.Implementation(
         "cl_sbcl",

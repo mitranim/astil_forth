@@ -1,15 +1,11 @@
 // BOT-TRANSLATED (with tweaks).
 
+#include "./util.c"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 static constexpr int32_t LEN = 32768;
-
-static void escape_ptr(void *val) {
-  register void *x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0) : : "memory");
-}
 
 static int64_t pseudo_random(int64_t seed) {
   return (seed * 1309 + 13849) & 65535;
@@ -44,10 +40,11 @@ static void bubble(int64_t *list, int32_t len) {
 }
 
 int main() {
-  int64_t list[LEN];
+  int64_t       list[LEN];
+  const int32_t len = (int32_t)escape_u64(LEN);
 
-  list_init(list, LEN);
-  bubble(list, LEN);
+  list_init(list, len);
+  bubble(list, len);
   escape_ptr(list);
-  list_verify(list, LEN);
+  list_verify(list, len);
 }

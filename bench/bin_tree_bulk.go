@@ -5,7 +5,11 @@ package main
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 )
+
+var minDepthInput int64 = 4
+var maxDepthInput int64 = 18
 
 type Node struct {
 	left  *Node
@@ -36,9 +40,9 @@ func (self *Node) count() int {
 }
 
 func main() {
-	const minDepth = 4
-	const maxDepth = 18
-	const stretchDepth = maxDepth + 1
+	minDepth := int(atomic.LoadInt64(&minDepthInput))
+	maxDepth := int(atomic.LoadInt64(&maxDepthInput))
+	stretchDepth := maxDepth + 1
 
 	var out strings.Builder
 

@@ -38,6 +38,7 @@
 !/bench/*.mjs
 !/bench/*.lisp
 !/bench/*.py
+!/bench/*.erl
 
 .*
 

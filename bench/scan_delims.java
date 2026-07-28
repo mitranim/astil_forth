@@ -38,7 +38,7 @@ final class scan_delims {
     return out;
   }
 
-  static void run(int runs) {
+  static void run(byte[] input, int runs) {
     long out = 0;
 
     while (runs-- > 0) out += scan(input, DELIMITERS);
@@ -50,6 +50,6 @@ final class scan_delims {
 
   public static void main(String[] args) {
     input = initInput(capacity);
-    run(runs);
+    run(input, runs);
   }
 }

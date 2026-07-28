@@ -2,6 +2,7 @@
 
 final class fib_loop {
   static volatile int depth = 91;
+  static volatile int runs = 1 << 22;
 
   static long fib(int depth) {
     long prev = 0;
@@ -17,7 +18,8 @@ final class fib_loop {
   }
 
   public static void main(String[] args) {
-    int runs = 1 << 22;
+    final int depth = fib_loop.depth;
+    int runs = fib_loop.runs;
     long out = 0;
 
     while (runs-- > 0) out = fib(depth);

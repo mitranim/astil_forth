@@ -1,21 +1,11 @@
 // BOT-TRANSLATED (with tweaks).
 
+#include "./util.c"
 #include <stdint.h>
 #include <stdlib.h>
 
 static constexpr uint16_t RUNS = 16384;
 static constexpr uint16_t CAP  = 8192;
-
-static int64_t escape(int64_t val) {
-  register int64_t x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0));
-  return x0;
-}
-
-static void escape_ptr(void *val) {
-  register void *x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0) : : "memory");
-}
 
 static void reset(uint8_t *flags, int32_t cap) {
   for (int32_t ind = 0; ind < cap; ind++) {
@@ -45,11 +35,13 @@ static int64_t find_prime(uint8_t *flags, int32_t cap) {
 }
 
 int main() {
-  uint8_t flags[CAP];
-  int64_t out = 0;
+  uint8_t       flags[CAP];
+  const int32_t cap  = (int32_t)escape_u64(CAP);
+  const int32_t runs = (int32_t)escape_u64(RUNS);
+  int64_t       out  = 0;
 
-  for (int32_t ind = 0; ind < RUNS; ind++) {
-    out = escape(find_prime(flags, CAP));
+  for (int32_t ind = 0; ind < runs; ind++) {
+    out = (int64_t)escape_u64((uint64_t)find_prime(flags, cap));
   }
   if (out != 1899) abort();
 }

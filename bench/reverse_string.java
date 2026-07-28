@@ -1,6 +1,7 @@
 // BOT-TRANSLATED
 
 final class reverse_string {
+  static volatile String input = "0123456789abcdef";
   static volatile int runs = 1 << 25;
 
   static void reverse(char[] str) {
@@ -22,6 +23,6 @@ final class reverse_string {
   }
 
   public static void main(String[] args) {
-    run("0123456789abcdef".toCharArray(), runs);
+    run(input.toCharArray(), runs);
   }
 }

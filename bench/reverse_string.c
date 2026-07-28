@@ -1,3 +1,4 @@
+#include "./util.c"
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,19 +10,17 @@ static void reverse(char *str, unsigned len) {
   }
 }
 
-static void *escape_ptr(void *val) {
-  register void *x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0) : : "memory");
-  return x0;
-}
-
 // #include <stdio.h>
 
 int main() {
-  char str[] = "0123456789abcdef";
-  for (unsigned ind = 0; ind < (1 << 25); ind++) {
-    reverse(escape_ptr(str), sizeof(str) - 1);
+  char        str[] = "0123456789abcdef";
+  char *const input = escape_ptr(str);
+  const auto  len   = (unsigned)escape_u64(sizeof(str) - 1);
+  const auto  runs  = (unsigned)escape_u64(1 << 25);
+
+  for (unsigned ind = 0; ind < runs; ind++) {
+    reverse(input, len);
   }
-  reverse(escape_ptr(str), sizeof(str) - 1);
+  reverse(input, len);
   if (strcmp(str, "fedcba9876543210")) abort();
 }

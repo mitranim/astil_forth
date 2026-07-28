@@ -1,11 +1,12 @@
 // BOT-TRANSLATED from reg-CC file.
 
+#include "./util.c"
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stddefer.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stddefer.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,7 +22,8 @@ static Node *node_tree_init(int64_t depth) {
   if (depth) {
     node->left  = node_tree_init(depth - 1);
     node->right = node_tree_init(depth - 1);
-  } else {
+  }
+  else {
     node->left  = nullptr;
     node->right = nullptr;
   }
@@ -43,11 +45,7 @@ static int64_t node_tree_count(const Node *node) {
 
 [[gnu::format(printf, 4, 5)]]
 static void strf_into(
-  char *buf,
-  size_t cap,
-  size_t *len,
-  const char *format,
-  ...
+  char *buf, size_t cap, size_t *len, const char *format, ...
 ) {
   va_list args;
   va_start(args, format);
@@ -59,11 +57,11 @@ static void strf_into(
 }
 
 int main(void) {
-  static const int64_t min_depth = 4;
-  static const int64_t max_depth = 18;
-  const int64_t stretch_depth    = max_depth + 1;
+  const int64_t min_depth     = (int64_t)escape_u64(4);
+  const int64_t max_depth     = (int64_t)escape_u64(18);
+  const int64_t stretch_depth = max_depth + 1;
 
-  char out[1024];
+  char   out[1024];
   size_t out_len = 0;
 
   Node *long_lived_tree = node_tree_init(max_depth);
@@ -84,7 +82,7 @@ int main(void) {
   }
 
   for (int64_t depth = min_depth; depth <= max_depth; depth += 2) {
-    int64_t count       = 0;
+    int64_t       count = 0;
     const int64_t iters = INT64_C(1) << (max_depth - depth + min_depth);
 
     for (int64_t run = 0; run < iters; run++) {

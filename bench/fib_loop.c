@@ -1,5 +1,6 @@
 // BOT-TRANSLATED (with tweaks).
 
+#include "./util.c"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -16,19 +17,14 @@ static uint64_t fib(uint64_t cap) {
   return next;
 }
 
-static uint64_t escape(uint64_t val) {
-  register uint64_t x0 __asm__("x0") = val;
-  __asm__ volatile("" : "+r"(x0));
-  return x0;
-}
-
 // #include <stdio.h>
 
 int main() {
-  const uint64_t count = 1 << 22;
-  uint64_t out = 0;
-  for (uint64_t ind = 0; ind < escape(count); ind++) {
-    out = escape(fib(escape(91)));
+  const uint64_t count = escape_u64(1 << 22);
+  const uint64_t depth = escape_u64(91);
+  uint64_t       out   = 0;
+  for (uint64_t ind = 0; ind < count; ind++) {
+    out = escape_u64(fib(depth));
   }
   if (out != UINT64_C(7540113804746346429)) abort();
 }

@@ -23,10 +23,13 @@ final class Node {
 }
 
 final class bin_tree {
+  static volatile int minDepthInput = 4;
+  static volatile int maxDepthInput = 18;
+
   public static void main(String[] args) {
     final var out = new StringBuilder();
-    final int minDepth = 4;
-    final int maxDepth = 18;
+    final int minDepth = minDepthInput;
+    final int maxDepth = maxDepthInput;
     final int stretchDepth = maxDepth + 1;
     final Node longLivedTree = Node.make(maxDepth);
     final Node stretchTree = Node.make(stretchDepth);

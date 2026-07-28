@@ -14,6 +14,7 @@ CFLAGS ?= $(COMPILE_FLAGS) $(STRICT_FLAGS) $(BUILD_FLAGS) $(CRASH_FLAGS)
 LOCAL ?= local
 CLIB_DIR ?= clib
 COMP_DIR ?= comp
+BENCH_DIR ?= bench
 GEN_DIR ?= generated
 TMP_DIR ?= .tmp
 ASM_GEN_SRC ?= $(COMP_DIR)/asm_gen.c
@@ -37,8 +38,8 @@ WATCH_COMP ?= $(WATCH) -e=c,h,s
 WATCH_PROG ?= $(WATCH) -e=af
 WATCH_ALL ?= $(WATCH) -e=c,h,s,af
 WATCH_IMM ?= $(WATCH) --no-vcs-ignore -w=forth -w=$(MAIN) -w=$(MAIN_S)
-FMTABLE ?= $(shell find $(CLIB_DIR) $(COMP_DIR) -type f \( -name '*.h' -or -name '*.c' \))
-ARTIF ?= $(shell find . \( -type d \( -name '*.dSYM' -or -name '__pycache__' \) \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' -or -name '*.class' -or -name '*.plist' \) \))
+FMTABLE ?= $(shell find $(CLIB_DIR) $(COMP_DIR) $(BENCH_DIR) -type f \( -name '*.h' -or -name '*.c' \))
+ARTIF ?= $(shell find . \( -type d \( -name '*.dSYM' -or -name '__pycache__' \) \) -or \( -type f \( -name '.DS_Store' -or -name '*.o' -or -name '*.exe' -or -name '*.class' -or -name '*.beam' -or -name '*.plist' \) \))
 
 ifeq ($(verb),true)
 	OK = echo [$@] ok

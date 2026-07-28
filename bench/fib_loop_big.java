@@ -21,7 +21,7 @@ final class fib_loop_big {
     return next;
   }
 
-  static void run(int runs) {
+  static void run(int depth, int runs) {
     BigInteger out = BigInteger.ZERO;
 
     while (runs-- > 0) out = fib(depth);
@@ -32,6 +32,6 @@ final class fib_loop_big {
   }
 
   public static void main(String[] args) {
-    run(runs);
+    run(depth, runs);
   }
 }

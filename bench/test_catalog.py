@@ -18,6 +18,17 @@ def samples(*walls: float) -> list[bench.Sample]:
 
 
 class PlanningTest(unittest.TestCase):
+    def test_fib_loop_big_note_explains_integer_representation(self) -> None:
+        section = next(
+            section
+            for section in bench.SECTIONS
+            if section.title == "FIB_LOOP_BIG"
+        )
+        self.assertEqual(
+            section.note,
+            "C and Astil use `uint128`. Other languages use actual bigints.",
+        )
+
     def test_cat_sections_immediately_precede_tcp(self) -> None:
         titles = [section.title for section in bench.SECTIONS]
         tcp_index = titles.index("TCP CONNECTIONS")
@@ -44,6 +55,7 @@ class PlanningTest(unittest.TestCase):
                 "luajit",
                 "js_bun",
                 "java",
+                "erlang_loop",
                 "cl_sbcl",
                 "pypy",
                 "python",
@@ -71,42 +83,55 @@ class PlanningTest(unittest.TestCase):
         ]
         self.assertEqual(names, ["bin_tree_java"])
 
-    def test_java_async_tcp_benchmark_is_selectable(self) -> None:
-        items = bench.selected_benches(["tcp_conn_java_async"])
+    def test_erlang_commands_encode_scheduler_policy(self) -> None:
+        baselines = bench.selected_benches(["baseline_erlang"])
         self.assertEqual(
-            [(item.file, item.cmd) for item in items],
+            [(item.name, item.cmd) for item in baselines],
             [
                 (
-                    "bench/tcp_server_async.java",
-                    ("java", "-cp", "bench", "tcp_server_async"),
-                )
-            ],
-        )
-
-    def test_js_coroutine_tcp_benchmark_is_selectable(self) -> None:
-        items = bench.selected_benches(["tcp_conn_js_bun_coro"])
-        self.assertEqual(
-            [(item.file, item.cmd) for item in items],
-            [
+                    "baseline_erlang_single",
+                    (*bench.ERLANG_SERIAL, "-s", "erlang", "halt"),
+                ),
                 (
-                    "bench/tcp_server_coro.mjs",
-                    ("bun", "run", "bench/tcp_server_coro.mjs"),
-                )
+                    "baseline_erlang_default",
+                    (*bench.ERLANG_DEFAULT, "-s", "erlang", "halt"),
+                ),
             ],
         )
-
-    def test_python_thread_tcp_benchmark_is_selectable(self) -> None:
-        items = bench.selected_benches(["tcp_conn_python_thread"])
         self.assertEqual(
-            [(item.file, item.cmd) for item in items],
-            [
-                (
-                    "bench/tcp_server_thread.py",
-                    ("python3", "bench/tcp_server_thread.py"),
-                )
-            ],
+            bench.erlang_module("bench/example.erl"),
+            (("erlc", "-Werror", "-o", "bench", "bench/example.erl"),),
         )
-
+        self.assertEqual(
+            bench.erlang_run("tcp_server_passive", serial=False),
+            (
+                *bench.ERLANG_DEFAULT,
+                "-s",
+                "tcp_server_passive",
+                "main",
+                "-s",
+                "erlang",
+                "halt",
+            ),
+        )
+        self.assertEqual(
+            bench.erlang_run(
+                "tcp_server_passive",
+                serial=False,
+                runtime_flags=("+sbwt", "none"),
+            ),
+            (
+                *bench.ERLANG_DEFAULT,
+                "+sbwt",
+                "none",
+                "-s",
+                "tcp_server_passive",
+                "main",
+                "-s",
+                "erlang",
+                "halt",
+            ),
+        )
 
 class MeasurementTest(unittest.TestCase):
     def test_cat_measurement_reads_fixture_and_discards_stdout(self) -> None:
@@ -379,6 +404,25 @@ class RenderingTest(unittest.TestCase):
         )
 
 class TcpServerTest(unittest.TestCase):
+    def test_erlang_active_n_server_rearms_after_batch(self) -> None:
+        item = bench.selected_benches(["tcp_conn_erlang_active_n"])[0]
+        compiled = subprocess.run(
+            item.setup[0],
+            cwd=bench.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        with (
+            mock.patch.object(bench.tcp_conn, "CONNECTIONS", 64),
+            mock.patch.object(bench.tcp_conn, "EXCHANGES", 65),
+        ):
+            try:
+                sample = bench.measure(item, timeout_seconds=3)
+            except bench.MeasurementDeadline:
+                self.fail("Erlang active-N server did not rearm")
+        self.assertGreater(sample.wall_seconds, 0)
+
     def test_driver_reuses_connections_for_all_exchanges(self) -> None:
         clients = []
 

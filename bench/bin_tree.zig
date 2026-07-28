@@ -4,6 +4,9 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+var min_depth_input: u32 = 4;
+var max_depth_input: u32 = 18;
+
 const Node = struct {
     left: ?*Node,
     right: ?*Node,
@@ -29,8 +32,10 @@ const Node = struct {
 };
 
 pub fn main() !void {
-    const min_depth = 4;
-    const max_depth = 18;
+    const min_depth_ptr: *volatile u32 = &min_depth_input;
+    const max_depth_ptr: *volatile u32 = &max_depth_input;
+    const min_depth = min_depth_ptr.*;
+    const max_depth = max_depth_ptr.*;
     const stretch_depth = max_depth + 1;
 
     var long_lived_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);

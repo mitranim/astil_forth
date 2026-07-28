@@ -35,7 +35,7 @@ final class scan_delims_simd {
     return out;
   }
 
-  static void run(int runs) {
+  static void run(byte[] input, int runs) {
     long out = 0;
 
     while (runs-- > 0) out += scan(input);
@@ -49,6 +49,6 @@ final class scan_delims_simd {
 
   public static void main(String[] args) {
     input = scan_delims.initInput(capacity);
-    run(runs);
+    run(input, runs);
   }
 }
