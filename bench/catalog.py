@@ -391,7 +391,7 @@ GFORTH_SOCKET_SETUP = (
         'root="$(dirname "$(dirname "$gf")")"; '
         f'HOME="{TCP_HOME}" CPATH="$root/include${{CPATH:+:$CPATH}}" '
         "gforth -e 'require unix/socket.fs "
-        "require bench/tcp_reuse_g.fs bye'",
+        "require bench/tcp_reuse.fs bye'",
     ),
 )
 
@@ -431,8 +431,8 @@ def tcp_connection_benches() -> None:
     )
     tcp_connection_bench(
         "tcp_conn_gforth_task",
-        "bench/tcp_server_g.fs",
-        TCP_GFORTH_ENV + ("gforth", "bench/tcp_server_g.fs", "--"),
+        "bench/tcp_server.fs",
+        TCP_GFORTH_ENV + ("gforth", "bench/tcp_server.fs", "--"),
         setup=GFORTH_SOCKET_SETUP,
         tools=("gforth",),
     )
@@ -568,7 +568,7 @@ bench("bubble_clang", "bench/bubble.c", ("bench/bubble.exe",), setup=c_exe("benc
 bench("bubble_astil_aot", "bench/bubble.af", ("bench/bubble_astil.exe",), setup=aot("bench/bubble.af", "bench/bubble_astil.exe"), tools=("clang",))
 bench("bubble_astil_jit", "bench/bubble.af", ("./astil.exe", "bench/bubble.af"), setup=(BUILD,), tools=("clang",))
 bench("bubble_astil_stack", "bench/bubble_s.af", ("./astil_s.exe", "bench/bubble_s.af"), setup=(BUILD,), tools=("clang",))
-bench("bubble_gforth", "bench/bubble_g.fs", ("gforth", "bench/bubble_g.fs", "-e", "bye"), tools=("gforth",))
+bench("bubble_gforth", "bench/bubble.fs", ("gforth", "bench/bubble.fs", "-e", "bye"), tools=("gforth",))
 bench("bubble_luajit", "bench/bubble.lua", ("luajit", "bench/bubble.lua"), tools=("luajit",))
 bench("bubble_js_bun", "bench/bubble.mjs", ("bun", "run", "bench/bubble.mjs"), tools=("bun",))
 bench("bubble_java", "bench/bubble.java", ("java", "-cp", "bench", "bubble"), setup=java_class("bench/bubble.java"), tools=("java",))
@@ -581,7 +581,7 @@ bench("sieve_clang", "bench/sieve.c", ("bench/sieve.exe",), setup=c_exe("bench/s
 bench("sieve_astil_aot", "bench/sieve.af", ("bench/sieve_astil.exe",), setup=aot("bench/sieve.af", "bench/sieve_astil.exe"), tools=("clang",))
 bench("sieve_astil_jit", "bench/sieve.af", ("./astil.exe", "bench/sieve.af"), setup=(BUILD,), tools=("clang",))
 bench("sieve_astil_stack", "bench/sieve_s.af", ("./astil_s.exe", "bench/sieve_s.af"), setup=(BUILD,), tools=("clang",))
-bench("sieve_gforth", "bench/sieve_g.fs", ("gforth", "bench/sieve_g.fs", "-e", "bye"), tools=("gforth",))
+bench("sieve_gforth", "bench/sieve.fs", ("gforth", "bench/sieve.fs", "-e", "bye"), tools=("gforth",))
 bench("sieve_luajit", "bench/sieve.lua", ("luajit", "bench/sieve.lua"), tools=("luajit",))
 bench("sieve_js_bun", "bench/sieve.mjs", ("bun", "run", "bench/sieve.mjs"), tools=("bun",))
 bench("sieve_java", "bench/sieve.java", ("java", "-cp", "bench", "sieve"), setup=java_class("bench/sieve.java"), tools=("java",))
@@ -594,7 +594,7 @@ bench("reverse_string_clang", "bench/reverse_string.c", ("bench/reverse_string.e
 bench("reverse_string_astil_aot", "bench/reverse_string.af", ("bench/reverse_string_astil.exe",), setup=aot("bench/reverse_string.af", "bench/reverse_string_astil.exe"), tools=("clang",))
 bench("reverse_string_astil_jit", "bench/reverse_string.af", ("./astil.exe", "bench/reverse_string.af"), setup=(BUILD,), tools=("clang",))
 bench("reverse_string_astil_stack", "bench/reverse_string_s.af", ("./astil_s.exe", "bench/reverse_string_s.af"), setup=(BUILD,), tools=("clang",))
-bench("reverse_string_gforth", "bench/reverse_string_g.fs", ("gforth", "bench/reverse_string_g.fs", "-e", "bye"), tools=("gforth",))
+bench("reverse_string_gforth", "bench/reverse_string.fs", ("gforth", "bench/reverse_string.fs", "-e", "bye"), tools=("gforth",))
 bench("reverse_string_luajit", "bench/reverse_string.lua", ("luajit", "bench/reverse_string.lua"), tools=("luajit",))
 bench("reverse_string_js_bun", "bench/reverse_string.mjs", ("bun", "run", "bench/reverse_string.mjs"), tools=("bun",))
 bench("reverse_string_java", "bench/reverse_string.java", ("java", "-cp", "bench", "reverse_string"), setup=java_class("bench/reverse_string.java"), tools=("java",))
@@ -608,7 +608,7 @@ bench("fib_loop_astil_aot", "bench/fib_loop.af", ("bench/fib_loop_astil.exe",), 
 bench("fib_loop_astil_jit", "bench/fib_loop.af", ("./astil.exe", "bench/fib_loop.af"), setup=(BUILD,), tools=("clang",))
 bench("fib_loop_astil_asm_aot", "bench/fib_asm.af", ("bench/fib_loop_astil_asm.exe",), setup=aot("bench/fib_asm.af", "bench/fib_loop_astil_asm.exe"), tools=("clang",))
 bench("fib_loop_astil_stack", "bench/fib_loop_s.af", ("./astil_s.exe", "bench/fib_loop_s.af"), setup=(BUILD,), tools=("clang",))
-bench("fib_loop_gforth", "bench/fib_loop_g.fs", ("gforth", "bench/fib_loop_g.fs", "-e", "bye"), tools=("gforth",))
+bench("fib_loop_gforth", "bench/fib_loop.fs", ("gforth", "bench/fib_loop.fs", "-e", "bye"), tools=("gforth",))
 bench("fib_loop_luajit", "bench/fib_loop.lua", ("luajit", "bench/fib_loop.lua"), tools=("luajit",))
 bench("fib_loop_js_bun", "bench/fib_loop.mjs", ("bun", "run", "bench/fib_loop.mjs"), tools=("bun",))
 bench("fib_loop_java", "bench/fib_loop.java", ("java", "-cp", "bench", "fib_loop"), setup=java_class("bench/fib_loop.java"), tools=("java",))
@@ -633,7 +633,7 @@ bench("fib_rec_clang", "bench/fib_rec.c", ("bench/fib_rec.exe",), setup=c_exe("b
 bench("fib_rec_astil_aot", "bench/fib_rec.af", ("bench/fib_rec_astil.exe",), setup=aot("bench/fib_rec.af", "bench/fib_rec_astil.exe"), tools=("clang",))
 bench("fib_rec_astil_jit", "bench/fib_rec.af", ("./astil.exe", "bench/fib_rec.af"), setup=(BUILD,), tools=("clang",))
 bench("fib_rec_astil_stack", "bench/fib_rec_s.af", ("./astil_s.exe", "bench/fib_rec_s.af"), setup=(BUILD,), tools=("clang",))
-bench("fib_rec_gforth", "bench/fib_rec_g.fs", ("gforth", "bench/fib_rec_g.fs", "-e", "bye"), tools=("gforth",))
+bench("fib_rec_gforth", "bench/fib_rec.fs", ("gforth", "bench/fib_rec.fs", "-e", "bye"), tools=("gforth",))
 bench("fib_rec_luajit", "bench/fib_rec.lua", ("luajit", "bench/fib_rec.lua"), tools=("luajit",))
 bench("fib_rec_js_bun", "bench/fib_rec.mjs", ("bun", "run", "bench/fib_rec.mjs"), tools=("bun",))
 bench("fib_rec_java", "bench/fib_rec.java", ("java", "-cp", "bench", "fib_rec"), setup=java_class("bench/fib_rec.java"), tools=("java",))
@@ -652,7 +652,7 @@ bench("fnv1a64_clang", "bench/fnv1a64.c", ("bench/fnv1a64.exe",), setup=c_exe("b
 bench("fnv1a64_astil_aot", "bench/fnv1a64.af", ("bench/fnv1a64_astil.exe",), setup=aot("bench/fnv1a64.af", "bench/fnv1a64_astil.exe"), tools=("clang",))
 bench("fnv1a64_astil_jit", "bench/fnv1a64.af", ("./astil.exe", "bench/fnv1a64.af"), setup=(BUILD,), tools=("clang",))
 bench("fnv1a64_astil_stack", "bench/fnv1a64_s.af", ("./astil_s.exe", "bench/fnv1a64_s.af"), setup=(BUILD,), tools=("clang",))
-bench("fnv1a64_gforth", "bench/fnv1a64_g.fs", ("gforth", "bench/fnv1a64_g.fs", "-e", "bye"), tools=("gforth",))
+bench("fnv1a64_gforth", "bench/fnv1a64.fs", ("gforth", "bench/fnv1a64.fs", "-e", "bye"), tools=("gforth",))
 bench("fnv1a64_luajit", "bench/fnv1a64.lua", ("luajit", "bench/fnv1a64.lua"), tools=("luajit",))
 bench("fnv1a64_js_bun", "bench/fnv1a64.mjs", ("bun", "run", "bench/fnv1a64.mjs"), tools=("bun",))
 bench("fnv1a64_java", "bench/fnv1a64.java", ("java", "-cp", "bench", "fnv1a64"), setup=java_class("bench/fnv1a64.java"), tools=("java",))
@@ -682,7 +682,7 @@ bench("bin_tree_clang", "bench/bin_tree.c", ("bench/bin_tree.exe",), setup=c_exe
 bench("bin_tree_astil_aot", "bench/bin_tree.af", ("bench/bin_tree_astil.exe",), setup=aot("bench/bin_tree.af", "bench/bin_tree_astil.exe"), tools=("clang",))
 bench("bin_tree_astil_jit", "bench/bin_tree.af", ("./astil.exe", "bench/bin_tree.af"), setup=(BUILD,), tools=("clang",))
 bench("bin_tree_astil_stack", "bench/bin_tree_s.af", ("./astil_s.exe", "bench/bin_tree_s.af"), setup=(BUILD,), tools=("clang",))
-bench("bin_tree_gforth", "bench/bin_tree_g.fs", ("gforth", "bench/bin_tree_g.fs", "-e", "bye"), tools=("gforth",))
+bench("bin_tree_gforth", "bench/bin_tree.fs", ("gforth", "bench/bin_tree.fs", "-e", "bye"), tools=("gforth",))
 bench("bin_tree_zig", "bench/bin_tree.zig", ("bench/bin_tree_zig.exe",), setup=zig_exe("bench/bin_tree.zig", "bench/bin_tree_zig.exe"), tools=("zig",))
 bench("bin_tree_go", "bench/bin_tree.go", ("bench/bin_tree_go.exe",), setup=go_exe("bench/bin_tree.go", "bench/bin_tree_go.exe"), tools=("go",))
 bench("bin_tree_luajit", "bench/bin_tree.lua", ("luajit", "bench/bin_tree.lua"), tools=("luajit",))
@@ -698,7 +698,7 @@ bench("bin_tree_clang_bulk", "bench/bin_tree_bulk.c", ("bench/bin_tree_bulk.exe"
 bench("bin_tree_astil_bulk_aot", "bench/bin_tree_bulk.af", ("bench/bin_tree_bulk_astil.exe",), setup=aot("bench/bin_tree_bulk.af", "bench/bin_tree_bulk_astil.exe"), tools=("clang",))
 bench("bin_tree_astil_bulk_jit", "bench/bin_tree_bulk.af", ("./astil.exe", "bench/bin_tree_bulk.af"), setup=(BUILD,), tools=("clang",))
 bench("bin_tree_astil_stack_bulk", "bench/bin_tree_bulk_s.af", ("./astil_s.exe", "bench/bin_tree_bulk_s.af"), setup=(BUILD,), tools=("clang",))
-bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk_g.fs", ("gforth", "bench/bin_tree_bulk_g.fs", "-e", "bye"), tools=("gforth",))
+bench("bin_tree_gforth_bulk", "bench/bin_tree_bulk.fs", ("gforth", "bench/bin_tree_bulk.fs", "-e", "bye"), tools=("gforth",))
 bench("bin_tree_go_bulk", "bench/bin_tree_bulk.go", ("bench/bin_tree_go_bulk.exe",), setup=go_exe("bench/bin_tree_bulk.go", "bench/bin_tree_go_bulk.exe"), tools=("go",))
 
 CAT_IMPLEMENTATIONS = [
