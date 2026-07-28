@@ -29,6 +29,7 @@ in some Forth examples, and must be kept in sync.
 SYNC[sym_fields].
 */
 typedef struct Sym {
+  // SYNC[sym_type].
   enum { SYM_NORM = 1, SYM_INTRIN, SYM_EXTERN } type;
 
   Word_str name;

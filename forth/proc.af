@@ -349,3 +349,8 @@ fun: .print_disasm { src len }
   err .then " [debug] unable to disassemble: %s\n" err .elogf end
   top .ctx_top_set
 end
+
+\ Prints disassembly of a limited range of instructions for any XT.
+\ Intended for intrinsics and externals, whose instruction count is
+\ generally unknown. For internal words, use `dis' <name>`.
+fun: .xt_dis { XT size } XT .Sym_union @ size .print_disasm end

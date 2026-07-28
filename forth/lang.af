@@ -2478,6 +2478,11 @@ struct: Sym
   U8         1 field: .Sym_plain_call
 end
 
+\ SYNC[sym_type].
+1 let: SYM_NORM
+2 let: SYM_INTRIN
+3 let: SYM_EXTERN
+
 \ SYNC[sym_fields].
 fun_comp: .xt_instr { -- err } ( E: XT -- instr ) call'' .Sym_union call'' @ end
 
