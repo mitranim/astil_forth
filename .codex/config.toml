@@ -1,0 +1,21 @@
+approval_policy     = "never"
+default_permissions = "custom"
+
+[permissions.custom.filesystem]
+":root"      = "read"
+":slash_tmp" = "write"
+":tmpdir"    = "write"
+
+[permissions.custom.filesystem.":workspace_roots"]
+"."       = "write"
+".git"    = "write"
+".agents" = "read"
+".codex"  = "read"
+
+[permissions.custom.network]
+enabled = true
+allow_local_binding = true
+
+[permissions.custom.network.domains]
+"127.0.0.1" = "allow"
+"localhost" = "allow"

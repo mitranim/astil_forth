@@ -39,8 +39,13 @@
 !/bench/*.lisp
 !/bench/*.py
 
-# Should be listed last.
 .*
+
+!/.codex
+/.codex/*
+!/.codex/*.toml
+
+# Should be listed last.
 *.exe
 *.dSYM
 *.plist
