@@ -3291,6 +3291,34 @@ fun: .test_struct_11 { -- err }
 end
 .test_struct_11
 
+struct: Typ_unnamed
+  U8  1 field: .Typ_unnamed_head
+  U64 1 field: _reserved_struct
+  U8  1 field: .Typ_unnamed_tail
+end
+
+fun: .test_struct_unnamed { -- err }
+  assert= size' Typ_unnamed 24 end
+  assert= align' Typ_unnamed 8 end
+  assert= 0 .Typ_unnamed_head 0 end
+  assert= 0 .Typ_unnamed_tail 16 end
+end
+.test_struct_unnamed
+
+struct: Typ_unnamed_aligned
+  U8 1    field: .Typ_unnamed_aligned_head
+  U8 1 16 field_aligned: _reserved_aligned
+  U8 1    field: .Typ_unnamed_aligned_tail
+end
+
+fun: .test_struct_unnamed_aligned { -- err }
+  assert= size' Typ_unnamed_aligned 32 end
+  assert= align' Typ_unnamed_aligned 16 end
+  assert= 0 .Typ_unnamed_aligned_head 0 end
+  assert= 0 .Typ_unnamed_aligned_tail 17 end
+end
+.test_struct_unnamed_aligned
+
 union: Typ_union
   U8   1 field: .Typ_union_byte
   Cell 1 field: .Typ_union_cell
@@ -3322,6 +3350,18 @@ fun: .test_union_named_small { -- err }
   assert= 0 .Typ_union_small_short 0 end
 end
 .test_union_named_small
+
+union: Typ_union_unnamed
+  U8  1 field: .Typ_union_unnamed_byte
+  U64 2 field: _reserved_union
+end
+
+fun: .test_union_unnamed { -- err }
+  assert= size' Typ_union_unnamed 16 end
+  assert= align' Typ_union_unnamed 8 end
+  assert= 0 .Typ_union_unnamed_byte 0 end
+end
+.test_union_unnamed
 
 struct: Typ_union_wrap
   U8        1 field: .Typ_union_wrap_tag
@@ -3360,6 +3400,13 @@ fun: .test_discard_param_read { -- Err }
   .assert_str_has
 end
 .test_discard_param_read
+
+fun: .test_unnamed_field_read { -- Err }
+  use' ./fail/test_unnamed_field_read.af
+  " undefined word"
+  .assert_str_has
+end
+.test_unnamed_field_read
 
 fun: .discard_param_push_suffix { val _ignored -> out } end
 
@@ -4052,8 +4099,11 @@ fun: .main_run { -- err }
   .test_struct_9
   .test_struct_10
   .test_struct_11
+  .test_struct_unnamed
+  .test_struct_unnamed_aligned
   .test_union_named_basic
   .test_union_named_small
+  .test_union_unnamed
   .test_union_named_embedded
   .test_explicit_err_0
   .test_explicit_err_1_fun_throwing

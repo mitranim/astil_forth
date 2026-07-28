@@ -1,0 +1,5 @@
+\ Must fail to compile.
+struct: Test_unnamed_field_read
+  U8 1 field: _reserved_field
+end
+fun: .test_unnamed_field_read_fail { ptr -- out } ptr _reserved_field end

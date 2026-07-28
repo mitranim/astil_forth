@@ -2355,14 +2355,15 @@ fun: .define_agg_field
   \ We still need more comprehensive tests.
   \ SYNC[type_fields].
   type @ len * { size }
+  name @b 0x5f <> { named } \ `_` prefix skips field word definition.
 
   mode AGG_UNION = .then
-    name name_len 0 .define_field_word
+    named .then name name_len 0 .define_field_word end
     mode agg_align align .max off size .max .ret
   end
 
   off align .align_up { off }
-  name name_len off .define_field_word
+  named .then name name_len off .define_field_word end
   mode agg_align align .max size off +
 
   [ false .comp_only ]
