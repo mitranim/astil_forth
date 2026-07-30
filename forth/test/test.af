@@ -445,48 +445,217 @@ fun: .test_cond_skip_predicates { -- err }
 end
 .test_cond_skip_predicates
 
-fun: .test_control_meta { -- err }
-  3 16 .asm_cbz { cbz_instr }
-  3 16 .asm_cbnz { cbnz_instr }
-  16 ASM_EQ .asm_branch_cond { cond_instr }
+0 var: TEST_BOOL_EXPR_HITS
 
-  assert=
-    3 16 ASM_BRANCH_TYPE_CBZ nil .asm_cond_branch
-    cbz_instr
-  end
-  assert=
-    3 16 ASM_BRANCH_TYPE_CBNZ nil .asm_cond_branch
-    cbnz_instr
-  end
-  assert=
-    3 16 ASM_BRANCH_TYPE_COND ASM_EQ .asm_cond_branch
-    cond_instr
-  end
+fun: .test_bool_expr_mark { val -- val }
+  TEST_BOOL_EXPR_HITS @ .inc TEST_BOOL_EXPR_HITS !
+  val
+end
 
-  3 CONT_MASK_INP_LEN nil .bit_mask_set { meta }
-  0 CONT_MASK_OUT_LEN meta .bit_mask_set
-  CONT_MASK_HAS_OUT .bit_or { meta }
-  assert= meta CONT_MASK_INP_LEN .bit_mask_get 3 end
-  assert= meta CONT_MASK_OUT_LEN .bit_mask_get 0 end
-  assert meta CONT_MASK_HAS_OUT .bit_and end
+fun: .test_bool_expr_and2 { left right -- out }
+  left  .test_bool_expr_mark .and
+  right .test_bool_expr_mark end
+end
 
-  .interp_instrs { instr_adr }
-  instr_adr .instr_off meta .cont_meta_instr_off_set { meta }
-  assert= meta .cont_meta_instr_adr instr_adr end
+fun: .test_bool_expr_or2 { left right -- out }
+  left  .test_bool_expr_mark .or
+  right .test_bool_expr_mark end
+end
 
-  assert= CONT_MASK_INSTR_OFF .bit_ctz 32 end
-  assert= CONT_MASK_INSTR_OFF 32 .low_bits .bit_and 0 end
-  assert=
-    CONT_MASK_INP_LEN
-    CONT_MASK_OUT_LEN .bit_or
-    CONT_MASK_HAS_OUT .bit_or
-    CONT_MASK_BRANCH_TYPE .bit_or
-    CONT_MASK_INSTR_INFO .bit_or
-    32 .low_bits
+fun: .test_bool_expr_cmp_and { lhs rhs -- out }
+  lhs rhs < .and
+  99 end
+end
+
+fun: .test_bool_expr_cmp_or { lhs rhs -- out }
+  lhs rhs < .or
+  99 end
+end
+
+fun: .test_bool_expr_eq0_and { val -- out }
+  val =0 .and
+  99 end
+end
+
+fun: .test_bool_expr_eq0_or { val -- out }
+  val =0 .or
+  99 end
+end
+
+fun: .test_bool_expr_two_values { -- err }
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 9 .test_bool_expr_and2 0 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 9 .test_bool_expr_and2 9 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= -7 -4 .test_bool_expr_and2 -4 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 9 .test_bool_expr_or2 7 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= -7 9 .test_bool_expr_or2 -7 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 -4 .test_bool_expr_or2 -4 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  \ Comparison-produced predicates, including fusion-sensitive `=0` shape.
+  assert= 1 0 .test_bool_expr_cmp_and 0 end
+  assert= 0 1 .test_bool_expr_cmp_and 99 end
+  assert= 0 1 .test_bool_expr_cmp_or 1 end
+  assert= 1 0 .test_bool_expr_cmp_or 99 end
+  assert= 7 .test_bool_expr_eq0_and 0 end
+  assert= 0 .test_bool_expr_eq0_and 99 end
+  assert= 0 .test_bool_expr_eq0_or 1 end
+  assert= 7 .test_bool_expr_eq0_or 99 end
+end
+.test_bool_expr_two_values
+
+fun: .test_bool_expr_and3 { A B C -- out }
+  A .test_bool_expr_mark .and
+  B .test_bool_expr_mark .and
+  C .test_bool_expr_mark end
+end
+
+fun: .test_bool_expr_or3 { A B C -- out }
+  A .test_bool_expr_mark .or
+  B .test_bool_expr_mark .or
+  C .test_bool_expr_mark end
+end
+
+fun: .test_bool_expr_and_or { A B C -- out }
+  A .test_bool_expr_mark .and
+  B .test_bool_expr_mark .or
+  C .test_bool_expr_mark end
+end
+
+fun: .test_bool_expr_or_and { A B C -- out }
+  A .test_bool_expr_mark .or
+  B .test_bool_expr_mark .and
+  C .test_bool_expr_mark end
+end
+
+fun: .test_bool_expr_alternating { A B C D -- out }
+  A .test_bool_expr_mark .and
+  B .test_bool_expr_mark .or
+  C .test_bool_expr_mark .and
+  D .test_bool_expr_mark end
+end
+
+fun: .test_bool_expr_ambient { S0 S1 A B -- S0 S1 out }
+  S0 S1 A .or B end
+end
+
+fun: .test_bool_expr_sequential { A B C D -- one two }
+  A .or B end { one }
+  C .and D end { two }
+  one two
+end
+
+fun: .test_bool_expr_nested { flag A B C D -- out }
+  flag .then
+    A .or B end
+  else
+    C .and D end
   end
 end
-.test_control_meta
 
+fun: .test_bool_expr_then { A B -- out }
+  A .or B end
+  .then 10 else 20 end
+end
+
+fun: .test_bool_expr_stacked { -- err }
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 8 9 .test_bool_expr_and3 0 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 0 9 .test_bool_expr_and3 0 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 8 9 .test_bool_expr_and3 9 end
+  assert= TEST_BOOL_EXPR_HITS @ 3 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 8 9 .test_bool_expr_or3 7 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 8 9 .test_bool_expr_or3 8 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 0 9 .test_bool_expr_or3 9 end
+  assert= TEST_BOOL_EXPR_HITS @ 3 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 8 9 .test_bool_expr_and_or 0 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 8 9 .test_bool_expr_and_or 8 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 0 9 .test_bool_expr_and_or 9 end
+  assert= TEST_BOOL_EXPR_HITS @ 3 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 0 9 .test_bool_expr_or_and 7 end
+  assert= TEST_BOOL_EXPR_HITS @ 1 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 0 9 .test_bool_expr_or_and 0 end
+  assert= TEST_BOOL_EXPR_HITS @ 2 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 0 8 9 .test_bool_expr_or_and 9 end
+  assert= TEST_BOOL_EXPR_HITS @ 3 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 0 0 9 .test_bool_expr_alternating 0 end
+  assert= TEST_BOOL_EXPR_HITS @ 3 end
+
+  0 TEST_BOOL_EXPR_HITS !
+  assert= 7 0 8 9 .test_bool_expr_alternating 9 end
+  assert= TEST_BOOL_EXPR_HITS @ 4 end
+
+  11 22 7 9 .test_bool_expr_ambient { S0 S1 out0 }
+  assert= S0 11 end
+  assert= S1 22 end
+  assert= out0 7 end
+
+  11 22 0 9 .test_bool_expr_ambient { s2 s3 out1 }
+  assert= s2 11 end
+  assert= s3 22 end
+  assert= out1 9 end
+
+  7 9 0 8 .test_bool_expr_sequential { one two }
+  assert= one 7 end
+  assert= two 0 end
+
+  assert= true 7 9 0 8 .test_bool_expr_nested 7 end
+  assert= true 0 9 0 8 .test_bool_expr_nested 9 end
+  assert= false 7 9 0 8 .test_bool_expr_nested 0 end
+  assert= false 7 9 6 8 .test_bool_expr_nested 8 end
+
+  assert= 7 0 .test_bool_expr_then 10 end
+  assert= 0 9 .test_bool_expr_then 10 end
+  assert= 0 0 .test_bool_expr_then 20 end
+end
+.test_bool_expr_stacked
+
+\ Super outdated naming here and below; TODO revise.
 fun: .cond_input_if { val flag -- out } val flag .then end end
 fun: .cond_input_ifn { val flag -- out } val flag =0 .then end end
 fun: .cond_input_if_else { val flag -- out } val flag .then else end end
@@ -645,53 +814,53 @@ fun: .test_indirect_forward_target_0 { -- out err } [ .redefine ] 100 end
 TEST_INDIRECT_FORWARD_0 indirect_to' .test_indirect_forward_target_0
 
 2 2 true indirect: TEST_INDIRECT_FORWARD_2 .test_indirect_forward_target_2
-fun: .test_indirect_forward_caller_2 { a b -- out err } a b .test_indirect_forward_target_2 end
-fun: .test_indirect_forward_target_2 { a b -- out err } [ .redefine ] a b + end
+fun: .test_indirect_forward_caller_2 { A B -- out err } A B .test_indirect_forward_target_2 end
+fun: .test_indirect_forward_target_2 { A B -- out err } [ .redefine ] A B + end
 TEST_INDIRECT_FORWARD_2 indirect_to' .test_indirect_forward_target_2
 
 3 2 true indirect: TEST_INDIRECT_FORWARD_3 .test_indirect_forward_target_3
-fun: .test_indirect_forward_caller_3 { a b c -- out err } a b c .test_indirect_forward_target_3 end
-fun: .test_indirect_forward_target_3 { a b c -- out err } [ .redefine ] a b + c + end
+fun: .test_indirect_forward_caller_3 { A B C -- out err } A B C .test_indirect_forward_target_3 end
+fun: .test_indirect_forward_target_3 { A B C -- out err } [ .redefine ] A B + C + end
 TEST_INDIRECT_FORWARD_3 indirect_to' .test_indirect_forward_target_3
 
 4 2 true indirect: TEST_INDIRECT_FORWARD_4 .test_indirect_forward_target_4
-fun: .test_indirect_forward_caller_4 { a b c d -- out err } a b c d .test_indirect_forward_target_4 end
-fun: .test_indirect_forward_target_4 { a b c d -- out err } [ .redefine ] a b + c + d + end
+fun: .test_indirect_forward_caller_4 { A B C D -- out err } A B C D .test_indirect_forward_target_4 end
+fun: .test_indirect_forward_target_4 { A B C D -- out err } [ .redefine ] A B + C + D + end
 TEST_INDIRECT_FORWARD_4 indirect_to' .test_indirect_forward_target_4
 
 5 2 true indirect: TEST_INDIRECT_FORWARD_5 .test_indirect_forward_target_5
-fun: .test_indirect_forward_caller_5 { a b c d e -- out err } a b c d e .test_indirect_forward_target_5 end
-fun: .test_indirect_forward_target_5 { a b c d e -- out err } [ .redefine ] a b + c + d + e + end
+fun: .test_indirect_forward_caller_5 { A B C D E -- out err } A B C D E .test_indirect_forward_target_5 end
+fun: .test_indirect_forward_target_5 { A B C D E -- out err } [ .redefine ] A B + C + D + E + end
 TEST_INDIRECT_FORWARD_5 indirect_to' .test_indirect_forward_target_5
 
 6 2 true indirect: TEST_INDIRECT_FORWARD_6 .test_indirect_forward_target_6
-fun: .test_indirect_forward_caller_6 { a b c d e f -- out err } a b c d e f .test_indirect_forward_target_6 end
-fun: .test_indirect_forward_target_6 { a b c d e f -- out err } [ .redefine ] a b + c + d + e + f + end
+fun: .test_indirect_forward_caller_6 { A B C D E F -- out err } A B C D E F .test_indirect_forward_target_6 end
+fun: .test_indirect_forward_target_6 { A B C D E F -- out err } [ .redefine ] A B + C + D + E + F + end
 TEST_INDIRECT_FORWARD_6 indirect_to' .test_indirect_forward_target_6
 
 7 2 true indirect: TEST_INDIRECT_FORWARD_7 .test_indirect_forward_target_7
-fun: .test_indirect_forward_caller_7 { a b c d e f g -- out err } a b c d e f g .test_indirect_forward_target_7 end
-fun: .test_indirect_forward_target_7 { a b c d e f g -- out err } [ .redefine ] a b + c + d + e + f + g + end
+fun: .test_indirect_forward_caller_7 { A B C D E F G -- out err } A B C D E F G .test_indirect_forward_target_7 end
+fun: .test_indirect_forward_target_7 { A B C D E F G -- out err } [ .redefine ] A B + C + D + E + F + G + end
 TEST_INDIRECT_FORWARD_7 indirect_to' .test_indirect_forward_target_7
 
 8 2 true indirect: TEST_INDIRECT_FORWARD_8 .test_indirect_forward_target_8
-fun: .test_indirect_forward_caller_8 { a b c d e f g h -- out err } a b c d e f g h .test_indirect_forward_target_8 end
-fun: .test_indirect_forward_target_8 { a b c d e f g h -- out err } [ .redefine ] a b + c + d + e + f + g + h + end
+fun: .test_indirect_forward_caller_8 { A B C D E F G H -- out err } A B C D E F G H .test_indirect_forward_target_8 end
+fun: .test_indirect_forward_target_8 { A B C D E F G H -- out err } [ .redefine ] A B + C + D + E + F + G + H + end
 TEST_INDIRECT_FORWARD_8 indirect_to' .test_indirect_forward_target_8
 
 0 3 true indirect: TEST_INDIRECT_FORWARD_OUT2 .test_indirect_forward_out2
-fun: .test_indirect_forward_caller_out2 { -- a b err } .test_indirect_forward_out2 end
-fun: .test_indirect_forward_out2 { -- a b err } [ .redefine ] 11 22 end
+fun: .test_indirect_forward_caller_out2 { -- A B err } .test_indirect_forward_out2 end
+fun: .test_indirect_forward_out2 { -- A B err } [ .redefine ] 11 22 end
 TEST_INDIRECT_FORWARD_OUT2 indirect_to' .test_indirect_forward_out2
 
 0 7 false indirect: TEST_INDIRECT_FORWARD_OUT7 .test_indirect_forward_out7
-fun: .test_indirect_forward_caller_out7 { -- a b c d e f g } .test_indirect_forward_out7 end
-fun: .test_indirect_forward_out7 { -- a b c d e f g } [ .redefine ] 0 1 2 3 4 5 6 end
+fun: .test_indirect_forward_caller_out7 { -- A B C D E F G } .test_indirect_forward_out7 end
+fun: .test_indirect_forward_out7 { -- A B C D E F G } [ .redefine ] 0 1 2 3 4 5 6 end
 TEST_INDIRECT_FORWARD_OUT7 indirect_to' .test_indirect_forward_out7
 
 0 8 false indirect: TEST_INDIRECT_FORWARD_OUT8 .test_indirect_forward_out8
-fun: .test_indirect_forward_caller_out8 { -- a b c d e f g h } .test_indirect_forward_out8 end
-fun: .test_indirect_forward_out8 { -- a b c d e f g h } [ .redefine ] 0 1 2 3 4 5 6 7 end
+fun: .test_indirect_forward_caller_out8 { -- A B C D E F G H } .test_indirect_forward_out8 end
+fun: .test_indirect_forward_out8 { -- A B C D E F G H } [ .redefine ] 0 1 2 3 4 5 6 7 end
 TEST_INDIRECT_FORWARD_OUT8 indirect_to' .test_indirect_forward_out8
 
 fun: .test_indirect_forward_eq { act exp -- err }
@@ -718,28 +887,28 @@ fun: .test_indirect_forward { -- err }
   1 2 3 4 5 6 7 .test_indirect_forward_caller_7 28 .test_indirect_forward_eq
   1 2 3 4 5 6 7 8 .test_indirect_forward_caller_8 36 .test_indirect_forward_eq
 
-  .test_indirect_forward_caller_out2 { a b }
-  a 11 .test_indirect_forward_eq
-  b 22 .test_indirect_forward_eq
+  .test_indirect_forward_caller_out2 { A B }
+  A 11 .test_indirect_forward_eq
+  B 22 .test_indirect_forward_eq
 
-  .test_indirect_forward_caller_out7 { a b c d e f g }
-  a 0 .test_indirect_forward_eq
-  b 1 .test_indirect_forward_eq
-  c 2 .test_indirect_forward_eq
-  d 3 .test_indirect_forward_eq
-  e 4 .test_indirect_forward_eq
-  f 5 .test_indirect_forward_eq
-  g 6 .test_indirect_forward_eq
+  .test_indirect_forward_caller_out7 { A B C D E F G }
+  A 0 .test_indirect_forward_eq
+  B 1 .test_indirect_forward_eq
+  C 2 .test_indirect_forward_eq
+  D 3 .test_indirect_forward_eq
+  E 4 .test_indirect_forward_eq
+  F 5 .test_indirect_forward_eq
+  G 6 .test_indirect_forward_eq
 
-  .test_indirect_forward_caller_out8 { a0 b0 c0 d0 e0 f0 g0 h0 }
-  a0 0 .test_indirect_forward_eq
-  b0 1 .test_indirect_forward_eq
-  c0 2 .test_indirect_forward_eq
-  d0 3 .test_indirect_forward_eq
-  e0 4 .test_indirect_forward_eq
-  f0 5 .test_indirect_forward_eq
-  g0 6 .test_indirect_forward_eq
-  h0 7 .test_indirect_forward_eq
+  .test_indirect_forward_caller_out8 { A0 B0 C0 D0 E0 F0 G0 H0 }
+  A0 0 .test_indirect_forward_eq
+  B0 1 .test_indirect_forward_eq
+  C0 2 .test_indirect_forward_eq
+  D0 3 .test_indirect_forward_eq
+  E0 4 .test_indirect_forward_eq
+  F0 5 .test_indirect_forward_eq
+  G0 6 .test_indirect_forward_eq
+  H0 7 .test_indirect_forward_eq
 end
 .test_indirect_forward
 
@@ -3810,6 +3979,78 @@ fun: .test_cond_arity_no_else_more { -- Err }
 end
 .test_cond_arity_no_else_more
 
+fun: .test_bool_expr_missing_and { -- Err }
+  use' ./fail/test_bool_expr_missing_and.af
+  " arguments before boolean conditional expression: arity mismatch: required: 1, provided: 0"
+  .assert_str_has
+end
+.test_bool_expr_missing_and
+
+fun: .test_bool_expr_missing_or { -- Err }
+  use' ./fail/test_bool_expr_missing_or.af
+  " arguments before boolean conditional expression: arity mismatch: required: 1, provided: 0"
+  .assert_str_has
+end
+.test_bool_expr_missing_or
+
+fun: .test_bool_expr_else_and { -- Err }
+  use' ./fail/test_bool_expr_else_and.af
+  " current control structure does not accept `else`" .assert_str_has
+end
+.test_bool_expr_else_and
+
+fun: .test_bool_expr_else_or { -- Err }
+  use' ./fail/test_bool_expr_else_or.af
+  " current control structure does not accept `else`" .assert_str_has
+end
+.test_bool_expr_else_or
+
+fun: .test_bool_expr_elif { -- Err }
+  use' ./fail/test_bool_expr_elif.af
+  " current control structure does not accept `else`" .assert_str_has
+end
+.test_bool_expr_elif
+
+fun: .test_bool_expr_nested_else { -- Err }
+  use' ./fail/test_bool_expr_nested_else.af
+  " current control structure does not accept `else`" .assert_str_has
+end
+.test_bool_expr_nested_else
+
+fun: .test_cond_double_else { -- Err }
+  use' ./fail/test_cond_double_else.af
+  " current control structure does not accept `else`" .assert_str_has
+end
+.test_cond_double_else
+
+fun: .test_bool_expr_final_less { -- Err }
+  use' ./fail/test_bool_expr_final_less.af
+  " arguments before ending boolean conditional expression: arity mismatch: required: 2, provided: 1"
+  .assert_str_has
+end
+.test_bool_expr_final_less
+
+fun: .test_bool_expr_final_more { -- Err }
+  use' ./fail/test_bool_expr_final_more.af
+  " arguments before ending boolean conditional expression: arity mismatch: required: 2, provided: 3"
+  .assert_str_has
+end
+.test_bool_expr_final_more
+
+fun: .test_bool_expr_intermediate_less { -- Err }
+  use' ./fail/test_bool_expr_intermediate_less.af
+  " arguments before boolean conditional expression: arity mismatch: required: 2, provided: 1"
+  .assert_str_has
+end
+.test_bool_expr_intermediate_less
+
+fun: .test_bool_expr_intermediate_more { -- Err }
+  use' ./fail/test_bool_expr_intermediate_more.af
+  " arguments before boolean conditional expression: arity mismatch: required: 2, provided: 3"
+  .assert_str_has
+end
+.test_bool_expr_intermediate_more
+
 fun: .test_arena_unprot { adr -- err } adr ARENA_PAGE_MIN .mem_unprot end
 fun: .test_arena_unprot_err { adr -- err_str } adr .test_arena_unprot end
 fun: .arena_alloc_err { size arn -- adr err_str } size arn .arena_alloc end
@@ -3966,9 +4207,9 @@ use' ./test_const_fold.af
 use' ./test_simd.af
 use' ./test_fmt.af
 
-\ For AOT-compiled testing. Must call every test which is also called above
-\ during the initial interpretation, except for any tests which depend on
-\ interpreter-only features (currently none).
+\ For AOT-compiled testing. Must call every runtime test which is also called
+\ above during initial interpretation. Compiler-only and expected-failure
+\ checks remain interpreter-only.
 fun: .main_run { -- err }
   .test_test
   .test_locals
@@ -3978,6 +4219,8 @@ fun: .main_run { -- err }
   .test_span_init
   .test_default_cells
   .test_conditionals
+  .test_bool_expr_two_values
+  .test_bool_expr_stacked
   .test_recursion
   .test_recur_with_err
   .test_indirect_forward

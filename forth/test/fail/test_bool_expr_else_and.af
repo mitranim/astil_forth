@@ -1,0 +1,5 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_else_and_fail { -- out }
+  0 .and 10 else 20 end
+end

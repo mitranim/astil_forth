@@ -1,0 +1,7 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_elif_fail { -- out }
+  0 .and 10
+  elif true .then 20
+  end
+end

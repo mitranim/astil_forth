@@ -1,0 +1,9 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_nested_else_fail { -- out }
+  true .then
+    0 .and 10 else 20 end
+  else
+    30
+  end
+end

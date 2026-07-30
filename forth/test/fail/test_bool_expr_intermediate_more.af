@@ -1,0 +1,7 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_intermediate_more_fail { -- keep out }
+  10 20 .and
+  30 40 .or
+  50 end
+end

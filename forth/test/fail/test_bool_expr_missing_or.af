@@ -1,0 +1,6 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_missing_or_fail { -- out }
+  .or
+  10 end
+end

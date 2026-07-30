@@ -129,8 +129,8 @@ end
 0b1011 let: ASM_LT
 0b1100 let: ASM_GT
 0b1101 let: ASM_LE
-0b1110 let: ASM_AL
-0b1111 let: ASM_NV
+0b1110 let: ASM_AL \ "always"
+0b1111 let: ASM_NV \ Also "always"; equivalent to `ASM_AL`.
 666    let: ASM_PLACEHOLDER
 
 16384 let: PAGE_SIZE
@@ -207,10 +207,17 @@ fun: - { i0 i1 -> i2 } [
   0b1_1_0_01011_00_0_00001_000000_00000_00000 .comp_out0 \ sub x0, x0, x1
 ] end
 
-fun: .low_bits   { len     -- bits } 1 len .bit_lsl .dec end
+fun: .low_bits  { len     -- bits } 1 len .bit_lsl .dec end
 fun: .bit_trunc { imm len -- imm  } len .low_bits imm .bit_and end
 
 \ ## Early assembler
+
+\ Arm64 condition patterns are encoded in such a way that
+\ flipping the lower bit logically inverts the condition:
+\ `ASM_EQ <-> ASM_NE`, `ASM_LT <-> ASM_GE`, and so on.
+\
+\ Effectively nop for `ASM_AL <-> ASM_NV` which are equivalent.
+fun: .asm_cond_invert { cond -> cond } 0b1 .bit_xor end
 
 \ cmp Xn, #imm12
 fun: .asm_cmp_imm { Xn imm12 -- instr }
@@ -226,7 +233,7 @@ fun: .asm_cmp_zero { Xn -> instr } 0 .asm_cmp_imm end
 0b1_0_0_11010100_11111_0000_0_1_11111_00000 let: ASM_OP_CSET
 
 fun: .asm_cset { Xd cond -- instr }
-  cond 1 .bit_xor 12 .bit_lsl { cond }
+  cond .asm_cond_invert 12 .bit_lsl { cond }
   Xd cond .bit_or ASM_OP_CSET .bit_or
 end
 
@@ -1088,6 +1095,12 @@ end
 
 fun: .bit_mask_set { inp mask src -> out } .bit_mask_set end
 
+\ No comptime version yet; too few uses.
+fun: .bit_mask_pop { src mask -- out val }
+  src mask .bits_clear
+  src mask .bit_mask_get
+end
+
 8 let: CELL
 
 fun_comp: .cells { -- err }
@@ -1457,18 +1470,20 @@ fun: >s { _val _top } [
   0 .comp_args_set
 ] end
 
+\ Shortcuts for push/pop on default control stack.
+fun: ctrl> { -- val } STACK s> end
+fun: >ctrl { val -> } STACK >s end
+
 \ ## System stack stuff
 
-fun_comp: systack_ptr { -- err } ( E: -- sp )
-  [ .plain_call ]
+fun_comp: systack_ptr { -- err } ( E: -- sp ) [ .plain_call ]
   \ add <reg>, sp, 0 | mov <reg>, sp
   .comp_alloc_next_reg ASM_REG_SP 0 .asm_add_imm .comp_instr
 end
 
 fun: systack_ptr { -- sp } [ .plain_call ] systack_ptr end
 
-fun_comp: sysstack_frame_ptr { -- err } ( E: -- fp )
-  [ .plain_call ]
+fun_comp: sysstack_frame_ptr { -- err } ( E: -- fp ) [ .plain_call ]
   \ mov <reg>, x29
   .comp_alloc_next_reg ASM_REG_FP .asm_mov_reg .comp_instr
 end
@@ -1849,23 +1864,23 @@ fun: .instr_off { adr -- off } .interp_instrs { instrs } adr instrs - end
 \
 \ All control structures pass around a "meta" cell.
 \
-\ Lower 32 bits: inp_len, out_len, has_out, branch_type,
-\ backend-defined instruction info.
+\ Structure:
 \
-\ Above 32 bits: packed instruction offset.
+\   inp_len     -- input stack length
+\   out_len     -- output stack length
+\   has_out     -- has output arity been inferred yet?
+\   branch_type -- cbz / cbnz / b.<cond>
+\   instr_info  -- asm-specific stuff, like branch condition code
+\   32...63     -- instruction offset from beginning of code heap
 \
 \ Instruction offset describes start of some conditional branch or loop.
 \ It's used to compile PC-relative branch instructions at branch points.
 \
-\ `inp_len` and `out_len` record "register stack length" or "arg length"
-\ at branch entry and exit points. `has_out` distinguishes unknown output
-\ length from a known zero output length.
-\
-\ Output arity remains shared across a conditional chain so each completed
-\ branch can be diagnosed at its closing `elif` or `else`.
-\
-\ Single-bit masks are used with `.bit_or .bit_and`.
-\ Multi-bit masks must be used with `.bit_mask_get .bit_mask_set`.
+\ Masks must be used via `.bit_mask_get .bit_mask_set`.
+
+0 let: ASM_BRANCH_TYPE_CBZ
+1 let: ASM_BRANCH_TYPE_CBNZ
+2 let: ASM_BRANCH_TYPE_COND
 
 ASM_ARG_LEN_MAX .bit_len .low_bits let: CONT_MASK_INP_LEN
 
@@ -1876,12 +1891,11 @@ let: CONT_MASK_OUT_LEN
 1 CONT_MASK_OUT_LEN .bit_len .bit_lsl
 let: CONT_MASK_HAS_OUT
 
-0 let: ASM_BRANCH_TYPE_CBZ
-1 let: ASM_BRANCH_TYPE_CBNZ
-2 let: ASM_BRANCH_TYPE_COND
+1 CONT_MASK_HAS_OUT .bit_len .bit_lsl
+let: CONT_MASK_ENABLE_ELSE
 
 ASM_BRANCH_TYPE_COND .bit_len .low_bits
-CONT_MASK_HAS_OUT .bit_len .bit_lsl
+CONT_MASK_ENABLE_ELSE .bit_len .bit_lsl
 let: CONT_MASK_BRANCH_TYPE
 
 32 .low_bits
@@ -1911,19 +1925,10 @@ fun: .reserve_instr { -- off err }
   off
 end
 
-\ `cbz|cbnz|b.<cond>` depending on branch type and instruction info.
-\ Not to be confused with `.asm_branch_cond` which is `b.<cond>`.
-fun: .asm_cond_branch { reg off type info -- instr }
-  reg off type ASM_BRANCH_TYPE_CBNZ = .asm_cmp_branch { cmp_instr }
-  off info .asm_branch_cond { cond_instr }
-  \ Branchlessly select the instruction; don't have `.then` yet.
-  cond_instr type ASM_BRANCH_TYPE_COND = * cmp_instr .coalesce
-end
-
 \ Decode `cset`, returning its destination register and asm condition.
 fun: .asm_cset_decode { instr -- reg cond ok }
   instr 0b11111 .bit_and { reg }
-  instr 12 .bit_lsr 0b1111 .bit_and 1 .bit_xor { cond }
+  instr 12 .bit_lsr 0b1111 .bit_and .asm_cond_invert { cond }
 
   \ `cset` with `Rd` and `cond` masked out.
   instr 0b1_1_1_11111111_11111_0000_1_1_11111_00000 .bit_and ASM_OP_CSET =
@@ -1935,49 +1940,66 @@ end
 
 \ ## Conditionals
 \
-\ General idea: reserve branching instructions, then patch them later via
-\ `else` and `end`. Instruction offsets and arities travel in control meta.
+\ Major improvements over "standard" Forth:
+\ - Names are `.then … else … end`, not `if … else … then`.
+\ - Support for chains of `elif … .then`.
+\ - Support for boolean conditional expressions `.and .or`.
+\ - Each conditional chain is terminated with one `end`.
 \
-\   pred .then \ cbz <outside>
-\     if_true
-\   end
-\   outside
+\ Example shapes:
 \
-\   pred .then \ cbz <if_false>
-\     if_true
-\   else       \ b <outside>
-\     if_false
-\   end
-\   outside
+\   10 .then end
+\   10 .then 20 else 30 end
+\   10 .then 20 elif 30 .then 40 else 50 end
+\   10 .and 20 .or 30 .or 40 .and 50 end
 \
-\ Unlike other Forth systems, we also support chains of `elif`, terminated
-\ with a single `end`. Generic `end` pops one XT from the control stack and
-\ calls it; that XT may chain into the previous frame.
+\ Conditional words reserve branching instructions then patch them later.
+\ They pass instruction offsets and other info through the control stack.
 \
-\ Conditional chains involving `elif` have two passes. In the forward pass,
-\ every `elif else` closes and validates one branch. `elif` leaves a frame
-\ for its unconditional jump plus a marker requiring `<predicate> .then`.
-\ In the backward pass, the final `end` follows prior frames, patching every
-\ unconditional jump to the common endpoint.
+\ Generic `end` pops one XT from the control stack and calls it.
+\ Many control XTs call prior XTs in a chain, terminated with a
+\ preceding `.nop` prepended when opening the control structure.
+\
+\ Conditionals have two passes. In the forward pass, we patch instructions
+\ which conditionally jump from predicate test to next branch, or to `end`
+\ from last branch. In the backward pass, we patch instructions which jump
+\ unconditionally from the end of each "successful" branch to actual `end`.
+\
+\ Notable differences between nestable conditionals involving `.then`
+\ and chainable boolean conditional expressions involving `.and .or`:
+\
+\ - `.then` logically consumes its predicate; may clobber its register.
+\ - `.then` is nestable; an inner `.then` begins its own chain.
+\ - `.and .or` preserve their predicate logically and physically.
+\ - `.and .or` are chainable rather than nestable.
+\
+\ Mixing `.then else` and `.and .or` is unsupported / undefined.
 
-fun: .cond_branch_patch { meta -- err }
+fun: .comp_patch_branch { meta -> err }
+  .cont_meta_instr_adr { adr }
+  .here_write adr - .asm_branch adr !32
+end
+
+fun: .comp_patch_branch_cond { meta -- err }
   meta .cont_meta_instr_adr { adr }
   meta CONT_MASK_INP_LEN .bit_mask_get { reg }
   meta CONT_MASK_BRANCH_TYPE .bit_mask_get { type }
   meta CONT_MASK_INSTR_INFO .bit_mask_get { info }
   .here_write adr - { off }
-  reg off type info .asm_cond_branch adr !32
+
+  \ Select between `cbz|cbnz|b.<cond>`. Branchless: don't have `.then` yet.
+  reg off type ASM_BRANCH_TYPE_CBNZ = .asm_cmp_branch { cmp }
+  off info .asm_branch_cond type ASM_BRANCH_TYPE_COND = *
+  cmp .coalesce adr !32
 end
 
-fun: .comp_branch_patch { meta -> err }
-  .cont_meta_instr_adr { adr }
-  .here_write adr - .asm_branch adr !32
-end
+fun: .comp_patch_chain_branch { meta -> err } .comp_patch_branch call'' end end
+fun: .comp_patch_chain_branch_cond { meta -> err } .comp_patch_branch_cond call'' end end
 
-fun: .then_end_xt { meta -- err }
+fun: .then_end { meta -- err }
   .comp_barrier
   0 " branch outputs" .comp_args_valid
-  meta .cond_branch_patch
+  meta .comp_patch_branch_cond
 end
 
 \ Early one-branch conditional, used only to bootstrap the final definitions.
@@ -1986,135 +2008,197 @@ fun_comp: .then { -- meta end_xt err } ( E: pred -- )
   1 " arguments before `.then`" .comp_args_valid
   0 .comp_args_set
   .reserve_instr ASM_BRANCH_TYPE_CBZ nil nil .cont_meta_instr_set
-  xt' .then_end_xt
+  xt' .then_end
 end
 
 \ Now that we have basic branching, we can define
 \ full-blown arity-aware condition expressions.
 
-fun: .cond_branch_beg { pred_reg meta -- meta err }
-  .here_write ASM_INSTR_SIZE - { cset_adr }
-  cset_adr ASM_INSTR_SIZE - { cmp_adr }
-  cset_adr @u32 { cset_instr }
+\ Conditional-specific version of `.reserve_instr` with limited support
+\ for peephole instruction fusion. Usable by words like `.then .while`,
+\ but not by `.and .or` which must preserve predicate's physical value.
+fun: .cond_reserve { pred_reg meta -- meta err }
+  .here_write ASM_INSTR_SIZE - { prev1 }
+  prev1 ASM_INSTR_SIZE - { prev2 }
 
-  \ Tiny peephole fusion: `val =0 .then|.while`:
+  \ Without fusion:
   \
-  \   cmp val, 0; cset val, eq
-  \   ->
-  \   cbnz val, out
-  pred_reg .asm_cmp_zero cmp_adr @u32 = { is_cmp_zero }
-  pred_reg ASM_EQ .asm_cset cset_instr = { is_cset_eq }
-  is_cset_eq is_cmp_zero .bit_and .then
-    .comp_instr_drop
-    ASM_PLACEHOLDER cmp_adr !32
-    cmp_adr .instr_off
-    ASM_BRANCH_TYPE_CBNZ
-    nil meta .cont_meta_instr_set .ret
+  \   cmp  x0, #0
+  \   cset x0, eq    -- <pred> =0
+  \   cbz  x0, <end>
+  \
+  \ With fusion:
+  \
+  \   cbnz x0, <end>
+  pred_reg        .asm_cmp_zero prev2 @u32 = { ok }
+  pred_reg ASM_EQ .asm_cset     prev1 @u32 = ok .bit_and .then
+    .comp_instr_drop \ TODO drop this intrinsic; used only here.
+    ASM_PLACEHOLDER prev2 !32
+    prev2 .instr_off ASM_BRANCH_TYPE_CBNZ nil meta .cont_meta_instr_set .ret
   end
 
-  \ Other comparisons: `cmp lhs, rhs; cset pred, lt` -> `cmp lhs, rhs; b.ge out`.
-  cset_instr .asm_cset_decode { cset_reg cond ok }
-  ok cset_reg pred_reg = .bit_and .then
-    cset_adr .instr_off
-    ASM_BRANCH_TYPE_COND cond 1 .bit_xor
-    meta .cont_meta_instr_set .ret
+  \ Without fusion:
+  \
+  \   cmp  <A>, <B>
+  \   cset <A>, <cond>    -- `<pred> 123 <>` and so on
+  \   cbz  <A>, <end>
+  \
+  \ With fusion:
+  \
+  \   cmp      <A>, <B>
+  \   b.<cond> <A>, <end>
+  \
+  \ Very minor but affects a lot of hot loops.
+  prev1 @u32 .asm_cset_decode { reg cond ok }
+  ok reg pred_reg = .bit_and .then
+    cond .asm_cond_invert { cond }
+    prev1 .instr_off ASM_BRANCH_TYPE_COND cond meta .cont_meta_instr_set .ret
   end
 
   .reserve_instr ASM_BRANCH_TYPE_CBZ nil meta .cont_meta_instr_set
 end
 
-fun: .then_end_xt { meta -- err } [ .redefine ]
+\ Finalizer for `.then`; invoked exclusively by `end`.
+\ `else` replaces this with its own finalizer.
+\
+\    …                .then … end
+\    … .then … elif … .then … end
+fun: .then_end { meta -- err } [ .redefine ]
   .comp_barrier
-  meta CONT_MASK_INP_LEN .bit_mask_get { len }
 
-  len " arguments before ending conditional without `else`" .comp_args_valid
-  meta CONT_MASK_HAS_OUT .bit_and .then
-    meta CONT_MASK_OUT_LEN .bit_mask_get
-    " branch outputs do not match conditional inputs" .comp_args_valid
-  end
+  meta CONT_MASK_INP_LEN .bit_mask_get
+  " arguments before ending conditional without `else`"
+  .comp_args_valid
 
-  meta .cond_branch_patch
+  meta .comp_patch_branch_cond
   call'' end
 end
 
-fun: .cond_chain_end_xt { meta -> err } .comp_branch_patch call'' end end
-
-fun: .else_end_xt { meta -- err }
-  .comp_barrier
-  meta CONT_MASK_OUT_LEN .bit_mask_get
-  " branch outputs" .comp_args_valid
-  meta .cond_chain_end_xt
-end
-
-fun: .elif_invalid_end_xt { _meta -- err }
+fun: .elif_invalid_end { _meta -- err }
   " unexpected end after `elif`; expected `elif <predicate> .then`"
 end
 
-fun_comp: .then { prev_xt -- meta end_xt err } ( E: …args… pred -- …args… )
-  [ .redefine ]
-  .comp_barrier
-
+fun_comp: .then { -- meta end_xt err } ( E: pred -- ) [ .redefine ]
   " arguments before `.then`" { msg }
+  .comp_args_get .dec { len }
+  ctrl> { prev }
+  nil { meta }
 
-  \ This XT-comparison hack lets us use `.then`
-  \ in two ways: bare and after `elif`.
-  xt' .elif_invalid_end_xt prev_xt = { continued }
+  \ The XT-comparison hack allows `.then` to have twin roles:
+  \ - Not following after `elif`: open new conditional chain.
+  \ - Yes following after `elif`: continue conditional chain.
+  \
+  \ This assumes `prev` is an XT, rather than some value
+  \ which could accidentally collide with an XT's value.
+  prev xt' .elif_invalid_end <> { new }
 
-  \ `<pred> .then` opener: infer arity.
-  continued =0 .then
+  new .then
+    prev     >ctrl \ Restore prior XT.
+    xt' .nop >ctrl \ Chain terminator.
     1 msg .comp_args_min
-    .comp_args_get .dec { len }
-    len CONT_MASK_INP_LEN nil .bit_mask_set { meta }
-    prev_xt  STACK >s
-    xt' .nop STACK >s
+    len CONT_MASK_INP_LEN meta .bit_mask_set { meta }
   end
 
-  \ `elif <pred> .then` continuation: validate arity.
-  continued .then
-    STACK s> { meta }
-    meta CONT_MASK_INP_LEN .bit_mask_get { len }
-    len .inc msg .comp_args_valid
-  end
-
-  len .comp_args_set
-  len meta .cond_branch_beg xt' .then_end_xt
-end
-
-fun_comp: else { meta then_end_xt -- meta end_xt err }
-  [ .plain_call ]
-
-  then_end_xt xt' .then_end_xt <> .then
-    then_end_xt xt' .elif_invalid_end_xt = .then
-      meta .elif_invalid_end_xt
-    end
-    " unexpected `else`: no branch to close" .throw
+  new =0 .then
+    ctrl> { meta } \ Passed on the control stack by `elif`.
+    meta CONT_MASK_INP_LEN .bit_mask_get .inc msg .comp_args_valid
   end
 
   .comp_barrier
-
-  meta CONT_MASK_HAS_OUT .bit_and { has }
-  has .then
-    meta CONT_MASK_OUT_LEN .bit_mask_get
-    " branch outputs" .comp_args_valid
-  end
-  has =0 .then
-    .comp_args_get CONT_MASK_OUT_LEN meta .bit_mask_set
-    CONT_MASK_HAS_OUT .bit_or { meta }
-  end
-
-  .reserve_instr { off }
-  meta .cond_branch_patch
-  meta CONT_MASK_INP_LEN .bit_mask_get .comp_args_set
-
-  off meta .cont_meta_instr_off_set
-  xt' .else_end_xt
+  len .comp_args_set \ Logically consume predicate.
+  len meta .cond_reserve { meta }
+  true CONT_MASK_ENABLE_ELSE meta .bit_mask_set { meta }
+  meta xt' .then_end
 end
 
-fun_comp: elif { meta then_end_xt -> chain_meta chain_end_xt meta end_xt err }
+fun: .else_end { meta -- err }
+  .comp_barrier
+  meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
+  meta .comp_patch_branch
+  call'' end
+end
+
+\ The end XT we discard is usually `.then_end`.
+fun_comp: else { meta _end_xt -- meta end_xt err } [ .plain_call ]
+  \ Prior control structures have to declare compatibility with `else`.
+  \ This is done to avoid programmer mistakes when refactoring between
+  \ control structures such as `.then` -> `.and .or`, and accidentally
+  \ leaving `else` whose behavior with those words is very unintuitive.
+  meta CONT_MASK_ENABLE_ELSE .bit_mask_pop { meta ok }
+  ok =0 .then
+    " current control structure does not accept `else`" .throw
+  end
+
+  \ Infer or validate output arity.
+  meta CONT_MASK_HAS_OUT .bit_mask_get { has }
+  has =0 .then
+    .comp_args_get CONT_MASK_OUT_LEN meta .bit_mask_set { meta }
+    true CONT_MASK_HAS_OUT meta .bit_mask_set { meta }
+  end
+  has .then
+    meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
+  end
+
+  .comp_barrier
+  .reserve_instr { off }
+  meta .comp_patch_branch_cond
+  meta CONT_MASK_INP_LEN .bit_mask_get .comp_args_set
+  off meta .cont_meta_instr_off_set xt' .else_end
+end
+
+fun_comp: elif { meta end_xt -> elif_meta elif_patch_xt meta end_xt err }
   [ .plain_call ]
-  call'' else { meta -- }
-  meta xt' .cond_chain_end_xt
-  meta xt' .elif_invalid_end_xt
+  call'' else { meta _else_xt }
+  meta xt' .comp_patch_chain_branch
+  meta xt' .elif_invalid_end
+end
+
+fun: .cond_bool_expr_end { meta -- err }
+  .comp_barrier
+
+  meta CONT_MASK_OUT_LEN .bit_mask_get
+  " arguments before ending boolean conditional expression"
+  .comp_args_valid
+
+  meta .comp_patch_branch_cond
+  call'' end
+end
+
+fun: .cond_bool_expr_beg { branch_type -- meta end_xt err }
+  \ The internal shape is very similar to `.then`, but with
+  \ just enough differences to be not worth deduplicating.
+
+  " arguments before boolean conditional expression" { msg }
+  .comp_args_get { len }
+  ctrl> { prev }
+  nil { meta }
+
+  \ Either begin or continue chain of expressions and control frames.
+  prev xt' .cond_bool_expr_end <> .then
+    prev     >ctrl \ Restore prior XT.
+    xt' .nop >ctrl \ Chain terminator.
+    1 msg .comp_args_min
+    len .dec CONT_MASK_INP_LEN meta .bit_mask_set { meta }
+    len      CONT_MASK_OUT_LEN meta .bit_mask_set { meta }
+  else
+    ctrl> { meta } meta >ctrl \ Don't have simple "load top val".
+    xt' .comp_patch_chain_branch_cond >ctrl \ Replace `.cond_bool_expr_end`.
+    meta CONT_MASK_INP_LEN .bit_mask_get .inc msg .comp_args_valid
+  end
+
+  .comp_barrier
+  len .dec .comp_args_set \ Logically consume predicate.
+  .reserve_instr meta .cont_meta_instr_off_set { meta }
+  branch_type CONT_MASK_BRANCH_TYPE meta .bit_mask_set { meta }
+  meta xt' .cond_bool_expr_end
+end
+
+fun_comp: .and { -- meta end_xt err }
+  ASM_BRANCH_TYPE_CBZ .cond_bool_expr_beg
+end
+
+fun_comp: .or { -- meta end_xt err }
+  ASM_BRANCH_TYPE_CBNZ .cond_bool_expr_beg
 end
 
 \ ## Types
@@ -2171,7 +2255,7 @@ end
 
 fun: size' { -- size err } ( C: "type" -- )
   \ SYNC[type_fields].
-  WORDLIST_EXEC .next_word .call_xt STACK s> @
+  WORDLIST_EXEC .next_word .call_xt ctrl> @
 end
 
 fun_comp: size' { -- err } ( C: "type" -- ) ( E: -- size )
@@ -2180,7 +2264,7 @@ end
 
 fun: align' { -- align err } ( C: "type" -- )
   \ SYNC[type_fields].
-  WORDLIST_EXEC .next_word .call_xt STACK s> +cell @
+  WORDLIST_EXEC .next_word .call_xt ctrl> +cell @
 end
 
 fun_comp: align' { -- err } ( C: "type" -- ) ( E: -- align )
@@ -2199,7 +2283,7 @@ end
 \ Shortcut for returning the shape of the type named by the next word.
 \ `size align` is often passed to allocation words, like `.ctx_alloc`.
 fun: shape' { -- size align err } ( C: "type" -- )
-  WORDLIST_EXEC .next_word .call_xt STACK s> { typ }
+  WORDLIST_EXEC .next_word .call_xt ctrl> { typ }
   \ SYNC[type_fields].
   typ @ typ +cell @
 end
@@ -2290,19 +2374,19 @@ end
 1 let: AGG_UNION
 
 \ For internal use, invoked by `end`.
-fun: .agg_end_xt { type _mode align off -- err } ( C: type mode align off -- )
+fun: .agg_end { type _mode align off -- err } ( C: type mode align off -- )
   off align .align_up { size }
   type size align .type_end
 end
 
 \ Begins a struct definition; terminate with `end`.
 fun: struct: { -- type mode align off end_xt err } ( C: "name" -- ) ( E: -- size )
-  .read_word .type_beg AGG_STRUCT 0 0 xt' .agg_end_xt
+  .read_word .type_beg AGG_STRUCT 0 0 xt' .agg_end
 end
 
 \ Begins a union definition; terminate with `end`.
 fun: union: { -- type mode align off end_xt err } ( C: "name" -- ) ( E: -- size )
-  .read_word .type_beg AGG_UNION 0 0 xt' .agg_end_xt
+  .read_word .type_beg AGG_UNION 0 0 xt' .agg_end
 end
 
 \ Compile field access, which computes address + offset.
@@ -3698,13 +3782,10 @@ fun_comp: .bit_mask_get { -- err } [ .redefine ]
   end
 end
 
-fun_comp: .bit_mask_set { -- err } [ .redefine ]
-  \ No partial CF: useful for constant masks, but requires ternary partial-CF.
-  \ Full CF alone is not worth keeping the ternary-only machinery.
-  call'' .bit_mask_set
-end
-
 \ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
+\
+\ No CF for `.bit_mask_set`: requires new ternary CF
+\ machinery and we have no other use cases for that.
 fun_comp: bit_mask_set: { -- err } ( C: "name" -- ) ( E: inp mask -- )
   .comp_args2_regs { inp mask }
   .read_word .comp_local { loc }
@@ -4045,8 +4126,8 @@ end
 \ ## Loops
 \
 \ Unlike other Forth impls, our reg-CC dialect provides exactly one
-\ loop form: `loop`, terminated with the same `end` as conditionals,
-\ and compatible with any amount of inner `leave` and `.while` words.
+\ loop form: `loop`, terminated with the same `end` as conditionals
+\ and compatible with any amount of inner `leave` / `.while` words.
 \
 \ Other loop forms got purged as unworthy for many reasons:
 \ impl overhead, mental overhead, unclear hidden semantics,
@@ -4054,9 +4135,8 @@ end
 \ of constant-folding optimizations.
 
 \ Control stack for auxiliary loop constructs like `leave` and `.while`.
-\ Each auxiliary construct pushes `aux_meta aux_pop`, and `.loop_frame_end_xt`
-\ repeatedly calls aux pops until it reaches the `.nop` terminator installed
-\ by `.loop_frame_init`.
+\ They push their control frames here; `.loop_end` pops the top `end_xt`
+\ which pops other in a chain, stopping at the terminating `.nop`.
 \
 \ TODO: since we never unmap this memory, this is a known leak
 \ in the theoretical case of repeatedly discarding and initing
@@ -4064,21 +4144,10 @@ end
 \ cleanup?
 1024 .cells stack: LOOP_AUX
 
-\ Position of the topmost loop metadata cell on the main control stack.
-\ Each loop pushes the following frame:
-\
-\   prev_loop_ind loop_frame_end_xt meta end_xt
-\                                   ^
-\                                   LOOP_IND points here
-\
-\ `meta` holds the loop start instruction offset and entry arity,
-\ as described by the control metadata section. Every loop exit point
-\ must have exactly this entry arity. Loops have no fallback/else
-\ branch and do not infer a separate output arity.
-\
-\ In stack signatures below, `prev_loop_ind loop_frame_end_xt` is often
-\ shortened to `<loop_prev>`, and `meta end_xt` is the part returned by
-\ each loop word for `end` to consume.
+\ Control stack index of the `meta` cell of the topmost loop frame.
+\ The meta holds offset of first loop instruction, as well as arity
+\ on loop entry. Every loop exit point must have exactly that arity
+\ because we currently don't support an "else" fallback for loops.
 0 var: LOOP_IND
 
 fun: .loop_frame_adr { -- adr err }
@@ -4088,84 +4157,78 @@ fun: .loop_frame_adr { -- adr err }
   STACK .Span_floor @ off +
 end
 
-fun: .loop_frame_end_xt { prev_loop_ind -- err } ( LOOP_AUX: …aux… -- )
-  .comp_barrier
-  LOOP_AUX s> .call_xt \ Pop all auxiliaries until a terminating `.nop`.
-  prev_loop_ind LOOP_IND !
-end
-
-fun: .loop_frame_init ( C: -- <loop_prev> ) ( LOOP_AUX: -- nop )
-  \ Stash prev loop info; record where caller's `meta` will land.
-  LOOP_IND @            STACK >s
-  xt' .loop_frame_end_xt STACK >s
-  STACK .span_len /cells LOOP_IND !
-
-  \ Terminator for `.loop_frame_end_xt`.
-  xt' .nop LOOP_AUX >s
-end
-
 fun: .loop_back { meta -> err }
   .cont_meta_instr_adr { adr }
   .here_write { out }
   adr out - .asm_branch .comp_instr \ b <beg>
 end
 
-fun: .loop_end_xt { meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
+\ TODO: store `prev` index in `meta`; rename `instr_info`
+\ to something more generic and use that region.
+fun: .loop_end { prev meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
   .comp_barrier
+
   meta CONT_MASK_INP_LEN .bit_mask_get
   " arguments before ending `loop`" .comp_args_valid
   meta .loop_back \ b <beg>
-  call'' end \ Run `.loop_frame_end_xt`.
+
+  LOOP_AUX s> .call_xt \ Pop auxiliaries like `again leave .while`.
+  prev LOOP_IND !
 end
 
-fun_comp: loop { -- meta end_xt err } ( C: -- <loop_prev> )
-  [ .plain_call ]
+fun_comp: loop { -- prev meta end_xt err } ( C: -- <loop_prev> ) [ .plain_call ]
   .comp_barrier
-  .loop_frame_init
   .comp_args_get CONT_MASK_INP_LEN nil .bit_mask_set { meta }
-  .here_write .instr_off meta .cont_meta_instr_off_set xt' .loop_end_xt
+  .here_write .instr_off meta .cont_meta_instr_off_set { meta }
+
+  LOOP_IND @ { prev }
+  STACK .span_len /cells .inc LOOP_IND ! \ Stack index of loop `meta`.
+  xt' .nop LOOP_AUX >s                   \ Auxiliary chain terminator.
+  prev meta xt' .loop_end
 end
 
-fun: .leave_end_xt { -- err }
-  LOOP_AUX s> .comp_branch_patch
+fun: .leave_end { -- err }
+  LOOP_AUX s> .comp_patch_branch
   LOOP_AUX s> .call_xt
-end
-
-\ Breaks out of any loop.
-fun_comp: leave { -- err } ( LOOP_AUX: -- leave_meta leave_end_xt )
-  [ .plain_call ]
-  .loop_frame_adr @ CONT_MASK_INP_LEN .bit_mask_get
-  " arguments before `leave`" .comp_args_valid
-
-  .comp_barrier
-  .reserve_instr 0 .cont_meta_instr_off_set LOOP_AUX >s
-  xt' .leave_end_xt LOOP_AUX >s
-end
-
-fun: .while_end_xt { -- err }
-  LOOP_AUX s> .cond_branch_patch
-  LOOP_AUX s> .call_xt
-end
-
-\ Tests a predicate; if predicate is 0, leaves the loop.
-fun_comp: .while { -- err } ( LOOP_AUX: -- while_meta while_end_xt )
-  .loop_frame_adr @ { meta }
-  meta CONT_MASK_INP_LEN .bit_mask_get { len }
-  len .inc " arguments before `.while`" .comp_args_valid
-  len .comp_args_set
-  .comp_barrier
-  len meta .cond_branch_beg LOOP_AUX >s
-  xt' .while_end_xt LOOP_AUX >s
 end
 
 \ Goes back to loop start.
-fun_comp: again { -- err }
-  [ .plain_call ]
-  .comp_barrier
+fun_comp: again { -- err } ( LOOP_AUX: -- meta end_xt ) [ .plain_call ]
   .loop_frame_adr @ { meta }
   meta CONT_MASK_INP_LEN .bit_mask_get { len }
   len " arguments before `again`" .comp_args_valid
+  .comp_barrier
   meta .loop_back
+end
+
+\ Breaks out of current loop.
+fun_comp: leave { -- err } ( LOOP_AUX: -- meta end_xt )
+  [ .plain_call ]
+
+  .loop_frame_adr @ CONT_MASK_INP_LEN .bit_mask_get
+  " arguments before `leave`"
+  .comp_args_valid
+
+  .comp_barrier
+  .reserve_instr 0 .cont_meta_instr_off_set LOOP_AUX >s
+  xt' .leave_end LOOP_AUX >s
+end
+
+fun: .while_end { -- err }
+  LOOP_AUX s> .comp_patch_branch_cond
+  LOOP_AUX s> .call_xt
+end
+
+\ Tests a predicate; if predicate is 0, leaves current loop.
+fun_comp: .while { -- err } ( LOOP_AUX: -- meta end_xt )
+  .loop_frame_adr @ { meta }
+  meta CONT_MASK_INP_LEN .bit_mask_get { len }
+  len .inc " arguments before `.while`" .comp_args_valid
+
+  .comp_barrier
+  len .comp_args_set \ Logically consume predicate.
+  len meta .cond_reserve LOOP_AUX >s
+  xt' .while_end LOOP_AUX >s
 end
 
 \ ## Memory stuff continued
@@ -4370,7 +4433,7 @@ fun: .comp_args_prepend { pre_len -- err } ( …pre… -- )
     reg 0 >= .while
     reg .comp_args_set
 
-    STACK s> { XT }
+    ctrl> { XT }
     XT .Sym_wordlist @b { wlist }
 
     wlist WORDLIST_EXEC = .then
@@ -4395,7 +4458,7 @@ end
 fun_comp: .elogf { -- err } ( E: fmt …vargs… -- )
   1 .comp_va_beg { len }
 
-  xt'' stderr STACK >s
+  xt'' stderr >ctrl
   1 .comp_args_prepend
   call'' systack_ptr
   compile' .vfprintf
@@ -4791,8 +4854,13 @@ fun: .assert_str_eq { act exp -- err }
 
   act exp cstr= .then .ret end
 
-  \ TODO format with newlines; our reader doesn't support escapes yet.
-  " expected string: %s; actual string: %s" exp act .errf
+  " expected string:
+
+> %s
+
+actual string:
+
+> %s" exp act .errf
 end
 
 fun: .assert_str_has { act exp -- err }
@@ -4803,7 +4871,13 @@ fun: .assert_str_has { act exp -- err }
 
   act exp .strstr .then .ret end
 
-  " expected string to have: %s; actual string: %s"
+  " expected string to have:
+
+> %s
+
+actual string:
+
+> %s"
   exp act .errf .throw
 end
 
@@ -4831,7 +4905,7 @@ fun: .assert_body { beg -- str len err }
   beg len
 end
 
-fun: .assert_end_xt { beg -- err }
+fun: .assert_end { beg -- err }
   1 " when compiling `assert`" .comp_args_valid
   beg .assert_body .comp_cstr
   compile' .assert_cond
@@ -4839,11 +4913,11 @@ end
 
 fun_comp: assert { -- beg end_xt err } ( E: cond -- )
   [ .plain_call ]
-  .assert_beg xt' .assert_end_xt
+  .assert_beg xt' .assert_end
   [ true .comp_only ]
 end
 
-fun: .assert_bin_end_xt { beg cond cmp_xt -- err }
+fun: .assert_bin_end { beg cond cmp_xt -- err }
   2 " when compiling binary assert" .comp_args_valid
   cmp_xt .Sym_name .Sym_word_buf { op }
   cmp_xt .Sym_name .Sym_word_len @u32 { op_len }
@@ -4871,7 +4945,7 @@ fun: .assert_bin_end_xt { beg cond cmp_xt -- err }
 end
 
 fun: .assert_bin_init { cond cmp_xt -- beg cond cmp_xt end_xt err }
-  .assert_beg cond cmp_xt xt' .assert_bin_end_xt
+  .assert_beg cond cmp_xt xt' .assert_bin_end
   [ true .comp_only ]
 end
 

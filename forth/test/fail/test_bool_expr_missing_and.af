@@ -1,0 +1,6 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_missing_and_fail { -- out }
+  .and
+  10 end
+end

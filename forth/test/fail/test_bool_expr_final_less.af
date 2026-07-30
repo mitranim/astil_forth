@@ -1,0 +1,6 @@
+use' ../../lang.af
+
+fun: .test_bool_expr_final_less_fail { -- keep out }
+  10 20 .and
+  end
+end

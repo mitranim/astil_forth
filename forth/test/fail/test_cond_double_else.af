@@ -1,0 +1,5 @@
+use' ../../lang.af
+
+fun: .test_cond_double_else_fail { -- out }
+  true .then 10 else 20 else 30 end
+end

@@ -574,7 +574,8 @@ end
 Control words which don't deal with runtime args stay plain. Control words which use or affect args have call-like names:
 
 ```forth
-123 .then 234 else 345 end
+10 .then 20 else 30 end
+40 .and 50 .or 60 end
 loop predicate .while body again end
 err .try
 err .throw
@@ -607,13 +608,13 @@ Words are preferred over punctuation (except delimiters):
 Many unclear words are replaced with clear ones.
 
 More ergonomic control flow structures:
-- All conditionals and loops are terminated with `end`. No need to remember other terminators.
-- Conditionals take the form `predicate .then else end`.
-- `elif` is supported.
-- Any amount of conditional branches is terminated with a single `end`.
+- Basic conditional form: `predicate .then … else … end`.
+- More conditional forms: chainable `elif .and .or`.
+- Conditional chains are terminated with a single `end`.
 - Any amount of `leave` or `.while` is terminated with the same `end` as the loop.
+- No need to remember other terminators.
 
-Reg-CC supports exactly _one_ loop form: `loop … end`, with `leave .while again` auxiliaries. Other loop forms don't buy anything.
+Reg-CC supports exactly _one_ loop form: `loop … end`, with `again leave .while` auxiliaries. Other loop forms don't buy anything.
 
 ```forth
 loop
