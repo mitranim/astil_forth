@@ -170,11 +170,11 @@ The following stack-based code was BRUTAL for me. Manipulation words like `.dup 
 
 ```forth
 : .asm_lsl_imm ( Xd Xn imm6 -- instr )
-  .dup .negate 64 .mod 6 .bits_trunc 16 .lsl     \ immr
-  63 .rot -            6 .bits_trunc 10 .lsl .or \ imms
-  .swap                               5 .lsl .or \ Xn
-                                             .or \ Xd
-  0b1_10_100110_1_000000_000000_00000_00000  .or
+  .dup .negate 64 .mod 6 .bit_trunc 16 .bit_lsl         \ immr
+  63 .rot -            6 .bit_trunc 10 .bit_lsl .bit_or \ imms
+  .swap                              5 .bit_lsl .bit_or \ Xn
+                                                .bit_or \ Xd
+  0b1_10_100110_1_000000_000000_00000_00000     .bit_or
 ;
 ```
 
@@ -182,11 +182,11 @@ Reg-CC doesn't support the above. The code must use locals. Note that this is eq
 
 ```forth
 : .asm_lsl_imm { Xd Xn imm6 -- instr }
-  imm6 .negate 64 .mod 6 .bits_trunc 16 .lsl { immr }
-  63 imm6 -            6 .bits_trunc 10 .lsl { imms }
-  Xn 5 .lsl
-  Xd .or imms .or immr .or \ Still kinda concatenative.
-  0b1_10_100110_1_000000_000000_00000_00000 .or
+  imm6 .negate 64 .mod 6 .bit_trunc 16 .bit_lsl { immr }
+  63 imm6 -            6 .bit_trunc 10 .bit_lsl { imms }
+  Xn 5 .bit_lsl
+  Xd .bit_or imms .bit_or immr .bit_or \ Still kinda concatenative.
+  0b1_10_100110_1_000000_000000_00000_00000 .bit_or
 ;
 ```
 

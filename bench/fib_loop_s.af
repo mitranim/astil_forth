@@ -10,7 +10,7 @@ end
 
 fun: .run
   0
-  1 22 .lsl .for .drop 91 .fib end
+  1 22 .bit_lsl .for .drop 91 .fib end
   7540113804746346429 <> .then
     " iterative Fibonacci output mismatch" .throw
   end

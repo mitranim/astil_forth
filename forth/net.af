@@ -78,15 +78,15 @@ INADDR_BROADCAST let: INADDR_NONE
 32   let: NI_MAXSERV
 
 \ Flags for `.recv`.
-1        let: MSG_OOB
-1 1 .lsl let: MSG_PEEK
-4        let: MSG_DONTROUTE
-8        let: MSG_EOR
-0x10     let: MSG_TRUNC
-0x20     let: MSG_CTRUNC
-1 6 .lsl let: MSG_WAITALL
-0x80     let: MSG_DONTWAIT
-0x80000  let: MSG_NOSIGNAL
+1            let: MSG_OOB
+1 1 .bit_lsl let: MSG_PEEK
+4            let: MSG_DONTROUTE
+8            let: MSG_EOR
+0x10         let: MSG_TRUNC
+0x20         let: MSG_CTRUNC
+1 6 .bit_lsl let: MSG_WAITALL
+0x80         let: MSG_DONTWAIT
+0x80000      let: MSG_NOSIGNAL
 
 4 1 extern: .getaddrinfo  getaddrinfo  ( node service hints res -- code :Cint )
 1 0 extern: .freeaddrinfo freeaddrinfo ( info --          )

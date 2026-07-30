@@ -9,7 +9,7 @@ use' lang_s.af
 fun: .Node_left  ( node -- field ) end
 fun: .Node_right ( node -- field ) CELL + end
 
-fun: .node_tree_len ( dep -- len ) 2 .swap .lsl .dec end
+fun: .node_tree_len ( dep -- len ) 2 .swap .bit_lsl .dec end
 
 fun: .node_tree_init { dep -- node }
   dep .node_tree_len { len }
@@ -22,7 +22,7 @@ fun: .node_tree_init { dep -- node }
   loop
     ind ceil < .while
     ind NODE_SIZE * root + { node }
-    ind 1 .lsl .inc NODE_SIZE * root + { next }
+    ind 1 .bit_lsl .inc NODE_SIZE * root + { next }
     next node .Node_left !
     next NODE_SIZE + node .Node_right !
     inc: ind
@@ -70,7 +70,7 @@ fun: .run
   min_dep { depth }
   loop
     depth max_dep <= .while
-    1 max_dep depth - min_dep + .lsl { iters }
+    1 max_dep depth - min_dep + .bit_lsl { iters }
 
     0
     iters .for

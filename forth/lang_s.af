@@ -75,37 +75,37 @@ end
 
 \ Bitwise arithmetic needed for the early stages of the self-assembler.
 
-fun: .or ( i1 i2 -- i3 ) [
+fun: .bit_or ( i1 i2 -- i3 ) [
   .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_01_01010_00_0_00010_000000_00001_00001 .comp_instr \ orr x1, x1, x2
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: .and ( i1 i2 -- i3 ) [
+fun: .bit_and ( i1 i2 -- i3 ) [
   .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_00_01010_00_0_00010_000000_00001_00001 .comp_instr \ and x1, x1, x2
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: .xor ( i1 i2 -- i3 ) [
+fun: .bit_xor ( i1 i2 -- i3 ) [
   .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_10_01010_00_0_00010_000000_00001_00001 .comp_instr \ eor x1, x1, x2
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: .lsl ( i1 bits -- i2 ) [
+fun: .bit_lsl ( i1 bits -- i2 ) [
   .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_0_0_11010110_00010_0010_00_00001_00001 .comp_instr \ lsl x1, x1, x2
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: .lsr ( i1 bits -- i2 ) [
+fun: .bit_lsr ( i1 bits -- i2 ) [
   .asm_pop_x1_x2                             .comp_instr \ ldp x1, x2, [x27, -16]!
   0b1_0_0_11010110_00010_0010_01_00001_00001 .comp_instr \ lsr x1, x1, x2
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: .invert ( i1 -- i2 ) [
+fun: .bit_invert ( i1 -- i2 ) [
   .asm_pop_x1                                .comp_instr \ ldr x1, [x27, -8]!
   0b1_01_01010_00_1_00001_000000_11111_00001 .comp_instr \ mvn x1, x1
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
@@ -130,14 +130,14 @@ fun: .swap ( i1 i2 -- i2 i1 ) [
   0b10_101_0_001_0_0000010_00001_11011_00010 .comp_instr \ stp x2, x1, [x27], 16
 ] end
 
-fun: .low_bits ( bit_len -- bits ) 1 .swap .lsl .dec end
-fun: .bits_trunc ( imm bit_len -- imm ) .low_bits .and end
+fun: .low_bits ( bit_len -- bits ) 1 .swap .bit_lsl .dec end
+fun: .bit_trunc ( imm bit_len -- imm ) .low_bits .bit_and end
 
 \ cmp Xn, <imm>
 fun: .asm_cmp_imm ( Xn imm -- instr )
-       10 .lsl     \ imm
-  .swap 5 .lsl .or \ Xn
-  0b1_1_1_100010_0_000000000000_00000_11111 .or
+       10 .bit_lsl         \ imm
+  .swap 5 .bit_lsl .bit_or \ Xn
+  0b1_1_1_100010_0_000000000000_00000_11111 .bit_or
 end
 
 \ cmp Xn, 0
@@ -146,15 +146,15 @@ fun: .asm_cmp_zero ( Xn -- instr ) 0 .asm_cmp_imm end
 \ cset Xd, <cond>
 fun: .asm_cset ( Xd cond -- instr )
   0b1_0_0_11010100_11111_0000_0_1_11111_00000
-  .swap 1 .xor 12 .lsl .or \ cond
-                       .or \ Xd
+  .swap 1 .bit_xor 12 .bit_lsl .bit_or \ cond
+                               .bit_or \ Xd
 end
 
 \ sxtw Xd, Xn | sbfm Xd, Xn, 0, 31
 fun: .asm_sign_extend_32 ( Xd Xn -- instr )
-  5 .lsl .or
-  31 10 .lsl .or
-  0b1_00_100110_1_000000_000000_00000_00000 .or
+  5 .bit_lsl .bit_or
+  31 10 .bit_lsl .bit_or
+  0b1_00_100110_1_000000_000000_00000_00000 .bit_or
 end
 
 fun: .cint_to_cell ( int32 -- cell ) [
@@ -179,91 +179,91 @@ fun: =0 ( int -- bool ) [
 
 \ Shared by a lot of load and store instructions. 64-bit only.
 fun: .asm_pattern_load_store_pair ( Xt1 Xt2 Xn imm7 -- instr_mask )
-  3 .lsr 7 .bits_trunc 15 .lsl    \ imm7
-  .swap                5  .lsl .or \ Xn
-  .swap                10 .lsl .or \ Xt2
-                               .or \ Xt1
+  3 .bit_lsr 7 .bit_trunc 15 .bit_lsl         \ imm7
+  .swap                   5  .bit_lsl .bit_or \ Xn
+  .swap                   10 .bit_lsl .bit_or \ Xt2
+                                      .bit_or \ Xt1
 end
 
 \ ldp Xt1, Xt2, [Xn, <imm>]!
 fun: .asm_load_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
   .asm_pattern_load_store_pair
-  0b10_101_0_011_1_0000000_00000_00000_00000 .or
+  0b10_101_0_011_1_0000000_00000_00000_00000 .bit_or
 end
 
 \ ldp Xt1, Xt2, [Xn], <imm>
 fun: .asm_load_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
   .asm_pattern_load_store_pair
-  0b10_101_0_001_1_0000000_00000_00000_00000 .or
+  0b10_101_0_001_1_0000000_00000_00000_00000 .bit_or
 end
 
 \ ldp Xt1, Xt2, [Xn, <imm>]
 fun: .asm_load_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
   .asm_pattern_load_store_pair
-  0b10_101_0_010_1_0000000_00000_00000_00000 .or
+  0b10_101_0_010_1_0000000_00000_00000_00000 .bit_or
 end
 
 \ stp Xt1, Xt2, [Xn, <imm>]!
 fun: .asm_store_pair_pre ( Xt1 Xt2 Xn imm7 -- instr )
   .asm_pattern_load_store_pair
-  0b10_101_0_011_0_0000000_00000_00000_00000 .or
+  0b10_101_0_011_0_0000000_00000_00000_00000 .bit_or
 end
 
 \ stp Xt1, Xt2, [Xn], <imm>
 fun: .asm_store_pair_post ( Xt1 Xt2 Xn imm7 -- instr )
   .asm_pattern_load_store_pair
-  0b10_101_0_001_0_0000000_00000_00000_00000 .or
+  0b10_101_0_001_0_0000000_00000_00000_00000 .bit_or
 end
 
 \ stp Xt1, Xt2, [Xn, <imm>]
 fun: .asm_store_pair_off ( Xt1 Xt2 Xn imm7 -- instr )
   .asm_pattern_load_store_pair
-  0b10_101_0_010_0_0000000_00000_00000_00000 .or
+  0b10_101_0_010_0_0000000_00000_00000_00000 .bit_or
 end
 
 \ Shared by a lot of load and store instructions.
 \ Patches these bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
 fun: .asm_pattern_load_store ( Xt Xn imm9 -- instr_mask )
-  9 .bits_trunc 12 .lsl     \ imm9
-  .swap         5  .lsl .or \ Xn
-                        .or \ Xt
+  9 .bit_trunc 12 .bit_lsl         \ imm9
+  .swap         5 .bit_lsl .bit_or \ Xn
+                           .bit_or \ Xt
 end
 
 \ ldr Xt, [Xn, <imm>]!
 fun: .asm_load_pre ( Xt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b11_111_0_00_01_0_000000000_11_00000_00000 .or
+  0b11_111_0_00_01_0_000000000_11_00000_00000 .bit_or
 end
 
 \ ldr Xt, [Xn], <imm>
 fun: .asm_load_post ( Xt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b11_111_0_00_01_0_000000000_01_00000_00000 .or
+  0b11_111_0_00_01_0_000000000_01_00000_00000 .bit_or
 end
 
 \ str Xt, [Xn, <imm>]!
 fun: .asm_store_pre ( Xt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b11_111_0_00_00_0_000000000_11_00000_00000 .or
+  0b11_111_0_00_00_0_000000000_11_00000_00000 .bit_or
 end
 
 \ str Xt, [Xn], <imm>
 fun: .asm_store_post ( Xt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b11_111_0_00_00_0_000000000_01_00000_00000 .or
+  0b11_111_0_00_00_0_000000000_01_00000_00000 .bit_or
 end
 
 \ ldur Xt, [Xn, <imm>]
 fun: .asm_load_off ( Xt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b11_111_0_00_01_0_000000000_00_00000_00000 .or
+  0b11_111_0_00_01_0_000000000_00_00000_00000 .bit_or
 end
 
 \ stur Xt, [Xn, <imm>]
 fun: .asm_store_off ( Xt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b11_111_0_00_00_0_000000000_00_00000_00000 .or
+  0b11_111_0_00_00_0_000000000_00_00000_00000 .bit_or
 end
 
 \ For unsigned ints only.
@@ -271,62 +271,62 @@ end
 \ ldur Wt, [Xn, <imm>]
 fun: .asm_load_off_32 ( Wt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b10_111_0_00_01_0_000000000_00_00000_00000 .or
+  0b10_111_0_00_01_0_000000000_00_00000_00000 .bit_or
 end
 
 \ stur Wt, [Xn, <imm>]
 fun: .asm_store_off_32 ( Wt Xn imm9 -- instr )
   .asm_pattern_load_store
-  0b10_111_0_00_00_0_000000000_00_00000_00000 .or
+  0b10_111_0_00_00_0_000000000_00_00000_00000 .bit_or
 end
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
 fun: .asm_pattern_load_store_with_register_off ( Xt Xn Xm scale -- instr_mask )
-  <>0  12  .lsl     \ lsl 3
-  .swap 16 .lsl .or \ Xm
-  .swap 5  .lsl .or \ Xn
-                .or \ Xt
+  <>0  12  .bit_lsl         \ lsl 3
+  .swap 16 .bit_lsl .bit_or \ Xm
+  .swap 5  .bit_lsl .bit_or \ Xn
+                    .bit_or \ Xt
 end
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
 fun: .asm_load_with_register_off ( Xt Xn Xm scale -- instr )
   .asm_pattern_load_store_with_register_off
-  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 .or
+  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 .bit_or
 end
 
 \ str Xt, [Xn, Xm, lsl <scale>]
 fun: .asm_store_with_register_off ( Xt Xn Xm scale -- instr )
   .asm_pattern_load_store_with_register_off
-  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 .or
+  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 .bit_or
 end
 
 \ Shared by some integer arithmetic instructions.
 fun: .asm_pattern_arith_reg ( Xd Xn Xm -- instr_mask )
-       16 .lsl    \ Xm
-  .swap 5  .lsl .or \ Xn
-              .or \ Xd
+       16 .bit_lsl         \ Xm
+  .swap 5 .bit_lsl .bit_or \ Xn
+                   .bit_or \ Xd
 end
 
 \ Shared by some integer arithmetic and load/store instructions.
 fun: .asm_pattern_arith_imm ( Xd Xn imm12 -- instr_mask )
-  12 .bits_trunc 10 .lsl     \ imm12
-  .swap           5 .lsl .or \ Xn
-                         .or \ Xd
+  12 .bit_trunc 10 .bit_lsl         \ imm12
+  .swap          5 .bit_lsl .bit_or \ Xn
+                            .bit_or \ Xd
 end
 
 \ Immediate offset must be unsigned.
 \ ldr Xt, [Xn, <imm>]
 fun: .asm_load_scaled_off ( Xt Xn imm9 -- instr )
-  3 .lsr .asm_pattern_arith_imm
-  0b11_111_0_01_01_000000000000_00000_00000 .or
+  3 .bit_lsr .asm_pattern_arith_imm
+  0b11_111_0_01_01_000000000000_00000_00000 .bit_or
 end
 
 \ Immediate offset must be unsigned.
 \ str Xt, [Xn, <imm>]
 fun: .asm_store_scaled_off ( Xt Xn imm9 -- instr )
-  3 .lsr .asm_pattern_arith_imm
-  0b11_111_0_01_00_000000000000_00000_00000 .or
+  3 .bit_lsr .asm_pattern_arith_imm
+  0b11_111_0_01_00_000000000000_00000_00000 .bit_or
 end
 
 \ For unsigned bytes only.
@@ -334,13 +334,13 @@ end
 \ ldrb Wt, [Xn, imm12]
 fun: .asm_load_byte_off ( Wt Xn imm12 -- instr )
   .asm_pattern_arith_imm
-  0b00_11_1_0_0_1_01_000000000000_00000_00000 .or
+  0b00_11_1_0_0_1_01_000000000000_00000_00000 .bit_or
 end
 
 \ strb Wt, [Xn, imm12]
 fun: .asm_store_byte_off ( Wt Xn imm12 -- instr )
   .asm_pattern_arith_imm
-  0b00_11_1_0_0_1_00_000000000000_00000_00000 .or
+  0b00_11_1_0_0_1_00_000000000000_00000_00000 .bit_or
 end
 
 \ str Xd, [x27], 8
@@ -358,68 +358,68 @@ fun: .asm_pop2 ( Xt1 Xt2 -- instr ) ASM_REG_DAT_SP -16 .asm_load_pair_pre end
 \ add Xd, Xn, <imm12>
 fun: .asm_add_imm ( Xd Xn imm12 -- instr )
   .asm_pattern_arith_imm
-  0b1_0_0_100010_0_000000000000_00000_00000 .or
+  0b1_0_0_100010_0_000000000000_00000_00000 .bit_or
 end
 
 \ add Xd, Xn, Xm
 fun: .asm_add_reg ( Xd Xn Xm -- instr )
   .asm_pattern_arith_reg
-  0b1_0_0_01011_00_0_00000_000000_00000_00000 .or
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 .bit_or
 end
 
 \ sub Xd, Xn, <imm12>
 fun: .asm_sub_imm ( Xd Xn imm12 -- instr )
   .asm_pattern_arith_imm
-  0b1_1_0_100010_0_000000000000_00000_00000 .or
+  0b1_1_0_100010_0_000000000000_00000_00000 .bit_or
 end
 
 \ sub Xd, Xn, Xm
 fun: .asm_sub_reg ( Xd Xn Xm -- instr )
   .asm_pattern_arith_reg
-  0b1_1_0_01011_00_0_00000_000000_00000_00000 .or
+  0b1_1_0_01011_00_0_00000_000000_00000_00000 .bit_or
 end
 
 \ sub Xd, Xn, Xm, lsl 3
 fun: .asm_sub_reg_words ( Xd Xn Xm -- instr )
   .asm_sub_reg
-  0b0_0_0_00000_00_0_00000_000011_00000_00000 .or
+  0b0_0_0_00000_00_0_00000_000011_00000_00000 .bit_or
 end
 
 \ mul Xd, Xn, Xm
 fun: .asm_mul ( Xd Xn Xm -- instr )
   .asm_pattern_arith_reg
-  0b1_00_11011_000_00000_0_11111_00000_00000 .or
+  0b1_00_11011_000_00000_0_11111_00000_00000 .bit_or
 end
 
 \ sdiv Xd, Xn, Xm
 fun: .asm_sdiv ( Xd Xn Xm -- instr )
   .asm_pattern_arith_reg
-  0b1_0_0_11010110_00000_00001_1_00000_00000 .or
+  0b1_0_0_11010110_00000_00001_1_00000_00000 .bit_or
 end
 
 \ msub Xd, Xn, Xm, Xa
 fun: .asm_msub ( Xd Xn Xm Xa -- instr )
   0b1_00_11011_000_00000_1_00000_00000_00000
-  .swap 10 .lsl .or \ Xa
-  .swap 16 .lsl .or \ Xm
-  .swap 5  .lsl .or \ Xn
-                .or \ Xd
+  .swap 10 .bit_lsl .bit_or \ Xa
+  .swap 16 .bit_lsl .bit_or \ Xm
+  .swap 5  .bit_lsl .bit_or \ Xn
+                    .bit_or \ Xd
 end
 
 \ asr Xd, Xn, imm6
 fun: .asm_asr_imm ( Xd Xn imm6 -- instr )
   .asm_pattern_arith_reg
-  0b1_00_100110_1_000000_111111_00000_00000 .or
+  0b1_00_100110_1_000000_111111_00000_00000 .bit_or
 end
 
 \ asr Xd, Xn, Xm
 fun: .asm_asr_reg ( Xd Xn Xm -- instr )
   .asm_pattern_arith_reg
-  0b1_0_0_11010110_00000_0010_10_00000_00000 .or
+  0b1_0_0_11010110_00000_0010_10_00000_00000 .bit_or
 end
 
 \ Arithmetic (sign-preserving) right shift.
-fun: .asr ( i1 bits -- i2 ) [
+fun: .bit_asr ( i1 bits -- i2 ) [
         .asm_pop_x1_x2 .comp_instr \ ldp x1, x2, [x27, -16]!
   1 1 2 .asm_asr_reg   .comp_instr \ asr x1, x1, x2
         .asm_push_x1   .comp_instr \ str x1, [x27], 8
@@ -428,65 +428,65 @@ fun: .asr ( i1 bits -- i2 ) [
 \ eor Xd, Xn, Xm
 fun: .asm_eor_reg ( Xd Xn Xm -- instr )
   .asm_pattern_arith_reg
-  0b1_10_01010_00_0_00000_000000_00000_00000 .or
+  0b1_10_01010_00_0_00000_000000_00000_00000 .bit_or
 end
 
 fun: .asm_pattern_arith_csel ( Xd Xn Xm cond -- instr_mask )
   [ 3 .asm_pop1 .comp_instr ]  \ Stash `cond`.
   .asm_pattern_arith_reg       \ Xd Xm Xn
   [ 3 .asm_push1 .comp_instr ] \ Pop `cond`.
-  12 .lsl .or                  \ cond
+  12 .bit_lsl .bit_or          \ cond
 end
 
 \ csel Xd, Xn, Xm, <cond>
 fun: .asm_csel ( Xd Xn Xm cond -- instr )
   .asm_pattern_arith_csel
-  0b1_0_0_11010100_00000_0000_0_0_00000_00000 .or
+  0b1_0_0_11010100_00000_0000_0_0_00000_00000 .bit_or
 end
 
 \ csneg Xd, Xn, Xm, <cond>
 fun: .asm_csneg ( Xd Xn Xm cond -- instr )
   .asm_pattern_arith_csel
-  0b1_1_0_11010100_00000_0000_0_1_00000_00000 .or
+  0b1_1_0_11010100_00000_0000_0_1_00000_00000 .bit_or
 end
 
 \ cmp Xn, Xm
 fun: .asm_cmp_reg ( Xn Xm -- instr )
-       16 .lsl    \ Xm
-  .swap 5  .lsl .or \ Xn
-  0b1_1_1_01011_00_0_00000_000_000_00000_11111 .or
+       16 .bit_lsl         \ Xm
+  .swap 5 .bit_lsl .bit_or \ Xn
+  0b1_1_1_01011_00_0_00000_000_000_00000_11111 .bit_or
 end
 
 \ b <off>
 fun: .asm_branch ( off26 -- instr )
-  2  .lsr        \ Offset is implicitly times 4.
-  26 .bits_trunc \ Offset may be negative.
-  0b0_00_101_00000000000000000000000000 .or
+  2  .bit_lsr   \ Offset is implicitly times 4.
+  26 .bit_trunc \ Offset may be negative.
+  0b0_00_101_00000000000000000000000000 .bit_or
 end
 
 \ b.<cond> <off>
 fun: .asm_branch_cond ( off19 cond -- instr )
-  .swap 2 .asr 19 .bits_trunc 5 .lsl \ `off19`; implicitly times 4.
-  .or                             \ cond
-  0b010_101_00_0000000000000000000_0_0000 .or
+  .swap 2 .bit_asr 19 .bit_trunc 5 .bit_lsl \ `off19`; implicitly times 4.
+  .bit_or                                   \ cond
+  0b010_101_00_0000000000000000000_0_0000 .bit_or
 end
 
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: .asm_pattern_cmp_branch ( Xt off19 -- instr_mask )
-  2 .lsr 19 .bits_trunc 5 .lsl \ off19
-                         .or \ Xt
+  2 .bit_lsr 19 .bit_trunc 5 .bit_lsl \ off19
+                             .bit_or  \ Xt
 end
 
 \ cbz x1, <off>
 fun: .asm_cbz ( Xt off19 -- instr )
   .asm_pattern_cmp_branch
-  0b1_011010_0_0000000000000000000_00000 .or
+  0b1_011010_0_0000000000000000000_00000 .bit_or
 end
 
 \ cbnz x1, <off>
 fun: .asm_cbnz ( Xt off19 -- instr )
   .asm_pattern_cmp_branch
-  0b1_011010_1_0000000000000000000_00000 .or
+  0b1_011010_1_0000000000000000000_00000 .bit_or
 end
 
 \ Same as `0 pick`.
@@ -497,8 +497,8 @@ fun: .dup ( i1 -- i1 i1 ) [
 
 \ neg Xd, Xd
 fun: .asm_neg ( Xd -- instr )
-  .dup 16 .lsl .or \ Xt
-  0b1_1_0_01011_00_0_00000_000000_11111_00000 .or
+  .dup 16 .bit_lsl .bit_or \ Xt
+  0b1_1_0_01011_00_0_00000_000000_11111_00000 .bit_or
 end
 
 \ eor <reg>, <reg>, <reg>
@@ -506,22 +506,22 @@ fun: .asm_zero_reg ( reg -- instr ) .dup .dup .asm_eor_reg end
 
 fun: .asm_mov_reg ( Xd Xm -- instr )
   0b1_01_01010_00_0_00000_000000_11111_00000
-  .swap 16 .lsl .or \ Xm
-                .or \ Xd
+  .swap 16 .bit_lsl .bit_or \ Xm
+                    .bit_or \ Xd
 end
 
 \ Immediate must be unsigned.
 fun: .asm_mov_imm ( Xd imm -- instr )
   0b1_10_100101_00_0000000000000000_00000
-  .swap 5 .lsl .or \ imm
-               .or \ Xd
+  .swap 5 .bit_lsl .bit_or \ imm
+                   .bit_or \ Xd
 end
 
 \ mvn Xd, Xm
 fun: .asm_mvn ( Xd Xm -- instr )
-  16 .lsl \ Xm
-      .or \ Xd
-  0b1_01_01010_00_1_00000_000000_11111_00000 .or
+  16 .bit_lsl \ Xm
+      .bit_or \ Xd
+  0b1_01_01010_00_1_00000_000000_11111_00000 .bit_or
 end
 
 \ `ret x30`; requires caution with SP / FP.
@@ -774,8 +774,8 @@ fun: .fallback ( one two -- out ) [
 ] end
 
 fun: CELL [ .plain_call ] 8 end
-fun: .cells  ( len  -- size ) 3 .lsl end
-fun: /cells ( size -- len  ) 3 .asr end
+fun: .cells  ( len  -- size ) 3 .bit_lsl end
+fun: /cells ( size -- len  ) 3 .bit_asr end
 fun: +cell  ( adr  -- adr  ) CELL + end
 fun: -cell  ( adr  -- adr  ) CELL - end
 
@@ -783,55 +783,55 @@ fun: -cell  ( adr  -- adr  ) CELL - end
 
 \ lsl Xd, Xn, <imm>
 fun: .asm_lsl_imm ( Xd Xn imm6 -- instr )
-  .dup .negate 64 .mod 6 .bits_trunc 16 .lsl     \ immr
-  63 .rot -            6 .bits_trunc 10 .lsl .or \ imms
-  .swap                               5 .lsl .or \ Xn
-                                             .or \ Xd
-  0b1_10_100110_1_000000_000000_00000_00000  .or
+  .dup .negate 64 .mod 6 .bit_trunc 16 .bit_lsl         \ immr
+  63 .rot -            6 .bit_trunc 10 .bit_lsl .bit_or \ imms
+  .swap                              5 .bit_lsl .bit_or \ Xn
+                                                .bit_or \ Xd
+  0b1_10_100110_1_000000_000000_00000_00000     .bit_or
 end
 
 \ tbz Xt, <bit>, <imm>
 fun: .asm_test_bit_branch_zero ( Xt bit imm14 -- instr )
-  2 .lsr 14 .bits_trunc 5 .lsl     \ imm14
-  .over         5 .lsr 31 .lsl .or \ b5
-  .swap  5 .bits_trunc 19 .lsl .or \ b40
-                               .or \ Xt
-  0b0_01_101_1_0_00000_00000000000000_00000 .or
+  2 .bit_lsr 14 .bit_trunc 5  .bit_lsl              \ imm14
+  .over       5 .bit_lsr   31 .bit_lsl      .bit_or \ b5
+  .swap       5 .bit_trunc 19 .bit_lsl      .bit_or \ b40
+                                            .bit_or \ Xt
+  0b0_01_101_1_0_00000_00000000000000_00000 .bit_or
 end
 
 \ br Xn
 fun: .asm_branch_to_reg ( Xn -- instr )
-  5 .lsl
-  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 .or
+  5 .bit_lsl
+  0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 .bit_or
 end
 
 \ blr Xn
 fun: .asm_branch_link_reg ( Xn -- instr )
-  5 .lsl
-  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 .or
+  5 .bit_lsl
+  0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 .bit_or
 end
 
 \ orr Xd, Xn, #(1 << bit)
 \ TODO add general-purpose `orr`.
 fun: .asm_orr_bit ( Xd Xn bit -- instr )
-  64 .swap - 16 .lsl     \ immr
-  .swap      5  .lsl .or \ Xn
-                     .or \ Xd
-  0b1_01_100100_1_000000_000000_00000_00000 .or
+  64 .swap - 16 .bit_lsl         \ immr
+  .swap      5  .bit_lsl .bit_or \ Xn
+                         .bit_or \ Xd
+  0b1_01_100100_1_000000_000000_00000_00000 .bit_or
 end
 
 fun: .asm_comp_cset_reg ( C: cond -- ) ( E: i1 i2 -- bool )
-  1 2    .asm_pop2      .comp_instr \ ldp x1, x2, [x27, -16]!
-  1 2    .asm_cmp_reg   .comp_instr \ cmp x1, x2
-  1 .swap .asm_cset     .comp_instr \ cset x1, <cond>
-  1      .asm_push1     .comp_instr \ str x1, [x27], 8
+  1 2     .asm_pop2    .comp_instr \ ldp x1, x2, [x27, -16]!
+  1 2     .asm_cmp_reg .comp_instr \ cmp x1, x2
+  1 .swap .asm_cset    .comp_instr \ cset x1, <cond>
+  1       .asm_push1   .comp_instr \ str x1, [x27], 8
 end
 
 fun: .asm_comp_cset_zero ( C: cond -- ) ( E: i1 i2 -- bool )
-  1      .asm_pop1     .comp_instr \ ldr x1, [x27, -8]!
-  1      .asm_cmp_zero .comp_instr \ cmp x1, 0
-  1 .swap .asm_cset    .comp_instr \ cset x1, <cond>
-  1      .asm_push1    .comp_instr \ str x1, [x27], 8
+  1       .asm_pop1     .comp_instr \ ldr x1, [x27, -8]!
+  1       .asm_cmp_zero .comp_instr \ cmp x1, 0
+  1 .swap .asm_cset     .comp_instr \ cset x1, <cond>
+  1       .asm_push1    .comp_instr \ str x1, [x27], 8
 end
 
 \ ## Numeric comparison
@@ -848,7 +848,7 @@ fun: >0  ( num   -- bool ) [ ASM_GT .asm_comp_cset_zero ] end
 fun: <=0 ( num   -- bool ) [ ASM_LE .asm_comp_cset_zero ] end
 fun: >=0 ( num   -- bool ) [ ASM_GE .asm_comp_cset_zero ] end \ Or `PL`.
 
-fun: .odd ( i1 -- bool ) 1 .and end
+fun: .odd ( i1 -- bool ) 1 .bit_and end
 
 \ ## Memory load / store
 
@@ -1484,7 +1484,7 @@ fun: .ccompare ( cstr0 cstr1 -- cmp )
   to: cstr1
   to: cstr0
 
-  cstr0 cstr1 .or =0 .then 0 .ret end
+  cstr0 cstr1 .bit_or =0 .then 0 .ret end
   cstr0 =0 .then -1 .ret end
   cstr1 =0 .then +1 .ret end
   cstr0 cstr1 .strcmp .cint_to_cell
@@ -1575,9 +1575,9 @@ end
 \ Placed here because requires braces.
 
 \ Non-standard and sane: no wraparound semantics.
-fun: .within { num floor ceil -- bool } num floor >= num ceil < .and end
+fun: .within { num floor ceil -- bool } num floor >= num ceil < .bit_and end
 
-fun: .align_down ( size width -- size ) .negate .and end
+fun: .align_down ( size width -- size ) .negate .bit_and end
 fun: .align_up   { size width -- size } width .dec size + width .align_down end
 
 \ ## Locals mutation
@@ -1808,7 +1808,7 @@ MAP_ANON let: MAP_ANONYMOUS
 -1       let: MAP_FAILED
 
 fun: .mem_map { size pflag -- addr }
-  MAP_ANON MAP_PRIVATE .or      to: mflag
+  MAP_ANON MAP_PRIVATE .bit_or      to: mflag
   0 size pflag mflag -1 0 .mmap to: addr
   addr -1 = .then
     " unable to map memory; code: %zd; message: %s"
@@ -1819,7 +1819,7 @@ fun: .mem_map { size pflag -- addr }
 end
 
 fun: .mem_unprot ( addr size -- )
-  PROT_READ PROT_WRITE .or .mprotect
+  PROT_READ PROT_WRITE .bit_or .mprotect
   .then
     " unable to unprotect memory; code: %zd; message: %s"
     .errno .dup .strerror [ 2 ] .errf
@@ -1832,10 +1832,10 @@ end
 \ aka underflow or overflow, triggers a segfault.
 \ The given size is rounded up to the page size.
 fun: .mem_alloc ( size1 -- addr size2 )
-        PAGE_SIZE .align_up to: size2
-  size2 PAGE_SIZE 1 .lsl +  to: size
-  size  PROT_NONE .mem_map  to: addr
-  addr  PAGE_SIZE +         to: addr
+        PAGE_SIZE .align_up    to: size2
+  size2 PAGE_SIZE 1 .bit_lsl + to: size
+  size  PROT_NONE .mem_map     to: addr
+  addr  PAGE_SIZE +            to: addr
   addr  size2 .mem_unprot
   addr  size2
 end

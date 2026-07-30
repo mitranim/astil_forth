@@ -161,27 +161,27 @@ fun: .comp_out0_2 { instr0 instr1 -- err }
   1 .comp_args_set
 end
 
-fun: .or { i0 i1 -> i2 } [
+fun: .bit_or { i0 i1 -> i2 } [
   0b1_01_01010_00_0_00001_000000_00000_00000 .comp_out0 \ orr x0, x0, x1
 ] end
 
-fun: .and { i0 i1 -> i2 } [
+fun: .bit_and { i0 i1 -> i2 } [
   0b1_00_01010_00_0_00001_000000_00000_00000 .comp_out0 \ and x0, x0, x1
 ] end
 
-fun: .xor { i0 i1 -> i2 } [
+fun: .bit_xor { i0 i1 -> i2 } [
   0b1_10_01010_00_0_00001_000000_00000_00000 .comp_out0 \ eor x0, x0, x1
 ] end
 
-fun: .lsl { i0 bits -> i1 } [
+fun: .bit_lsl { i0 bits -> i1 } [
   0b1_0_0_11010110_00001_0010_00_00000_00000 .comp_out0 \ lsl x0, x0, x1
 ] end
 
-fun: .lsr { i0 bits -> i1 } [
+fun: .bit_lsr { i0 bits -> i1 } [
   0b1_0_0_11010110_00001_0010_01_00000_00000 .comp_out0 \ lsr x0, x0, x1
 ] end
 
-fun: .invert { i0 -> i1 } [
+fun: .bit_invert { i0 -> i1 } [
   0b1_01_01010_00_1_00000_000000_11111_00000 .comp_out0 \ mvn x0, x0
 ] end
 
@@ -207,16 +207,16 @@ fun: - { i0 i1 -> i2 } [
   0b1_1_0_01011_00_0_00001_000000_00000_00000 .comp_out0 \ sub x0, x0, x1
 ] end
 
-fun: .low_bits   { len     -- bits } 1 len .lsl .dec end
-fun: .bits_trunc { imm len -- imm  } len .low_bits imm .and end
+fun: .low_bits   { len     -- bits } 1 len .bit_lsl .dec end
+fun: .bit_trunc { imm len -- imm  } len .low_bits imm .bit_and end
 
 \ ## Early assembler
 
 \ cmp Xn, #imm12
 fun: .asm_cmp_imm { Xn imm12 -- instr }
-  imm12  10 .lsl { imm12 }
-  Xn     5  .lsl
-  imm12 .or 0b1_1_1_100010_0_000000000000_00000_11111 .or
+  imm12  10 .bit_lsl { imm12 }
+  Xn     5  .bit_lsl
+  imm12 .bit_or 0b1_1_1_100010_0_000000000000_00000_11111 .bit_or
 end
 
 \ cmp Xn, 0
@@ -226,20 +226,20 @@ fun: .asm_cmp_zero { Xn -> instr } 0 .asm_cmp_imm end
 0b1_0_0_11010100_11111_0000_0_1_11111_00000 let: ASM_OP_CSET
 
 fun: .asm_cset { Xd cond -- instr }
-  cond 1 .xor 12 .lsl { cond }
-  Xd cond .or ASM_OP_CSET .or
+  cond 1 .bit_xor 12 .bit_lsl { cond }
+  Xd cond .bit_or ASM_OP_CSET .bit_or
 end
 
 \ ccmp Xd, Xm, <nzcv>, <cond>
 fun: .asm_ccmp_reg { Xn Xm nzcv cond -- instr }
-  Xm   16 .lsl { Xm }
-  cond 12 .lsl { cond }
-  Xn 5 .lsl Xm .or cond .or nzcv .or 0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 .or
+  Xm   16 .bit_lsl { Xm }
+  cond 12 .bit_lsl { cond }
+  Xn 5 .bit_lsl Xm .bit_or cond .bit_or nzcv .bit_or 0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 .bit_or
 end
 
 \ brk #imm16
 fun: .asm_brk { imm16 -> instr }
-  5 .lsl 0b110_101_00_001_0000000000000000_000_00 .or
+  5 .bit_lsl 0b110_101_00_001_0000000000000000_000_00 .bit_or
 end
 
 \ ## Early booleans
@@ -256,133 +256,133 @@ fun: =0 { int -> bool } [
 
 \ Arm64 instructions are 32-bit; PC-relative offsets tend
 \ to be encoded in packed form: implicitly times 4.
-fun: .instr_off_pack   { off -> packed } 2 .lsr end
-fun: .instr_off_unpack { packed -> off } 2 .lsl end
+fun: .instr_off_pack   { off -> packed } 2 .bit_lsr end
+fun: .instr_off_unpack { packed -> off } 2 .bit_lsl end
 
 \ Shared by a lot of load and store instructions. 64-bit only.
 fun: .asm_pattern_load_store_pair { Xt1 Xt2 Xn imm7 -- pattern }
-  Xt2 10 .lsl { Xt2 }
-  Xn  5  .lsl { Xn }
-  imm7 3 .lsr 7 .bits_trunc 15 .lsl Xt1 .or Xt2 .or Xn .or
+  Xt2 10 .bit_lsl { Xt2 }
+  Xn  5  .bit_lsl { Xn }
+  imm7 3 .bit_lsr 7 .bit_trunc 15 .bit_lsl Xt1 .bit_or Xt2 .bit_or Xn .bit_or
 end
 
 \ Shared by a lot of load and store instructions.
 \ Patches the X bits:
 \   0b00_000_0_00_00_0_XXXXXXXXX_00_XXXXX_XXXXX
 fun: .asm_pattern_load_store { Xt Xn imm9 -- instr_mask }
-  Xn 5 .lsl { Xn }
-  imm9 9 .bits_trunc 12 .lsl Xt .or Xn .or
+  Xn 5 .bit_lsl { Xn }
+  imm9 9 .bit_trunc 12 .bit_lsl Xt .bit_or Xn .bit_or
 end
 
 \ Shared by register-offset load and store instructions.
 \ `scale` must be 0 or 1; if 1, offset is multiplied by 8.
 fun: .asm_pattern_load_store_with_register_off { Xt Xn Xm scale -- instr_mask }
-  Xn        5  .lsl { Xn }
-  Xm        16 .lsl { Xm }
-  scale <>0 12 .lsl \ lsl 3
-  Xt .or Xn .or Xm .or
+  Xn        5   .bit_lsl { Xn }
+  Xm        16  .bit_lsl { Xm }
+  scale <>0 12  .bit_lsl \ lsl 3
+  Xt .bit_or Xn .bit_or Xm .bit_or
 end
 
 \ Shared by some integer arithmetic instructions.
 fun: .asm_pattern_arith_reg { Xd Xn Xm -- instr_mask }
-  Xn 5  .lsl { Xn }
-  Xm 16 .lsl Xd .or Xn .or
+  Xn 5  .bit_lsl { Xn }
+  Xm 16 .bit_lsl Xd .bit_or Xn .bit_or
 end
 
 \ Shared by some integer arithmetic and load/store instructions.
 fun: .asm_pattern_arith_imm { Xd Xn imm12 -- instr_mask }
-  Xn 5 .lsl { Xn }
-  imm12 12 .bits_trunc 10 .lsl Xd .or Xn .or
+  Xn 5 .bit_lsl { Xn }
+  imm12 12 .bit_trunc 10 .bit_lsl Xd .bit_or Xn .bit_or
 end
 
 fun: .asm_pattern_arith_csel { Xd Xn Xm cond -- instr_mask }
-  cond 12 .lsl { cond }
-  Xd Xn Xm .asm_pattern_arith_reg cond .or
+  cond 12 .bit_lsl { cond }
+  Xd Xn Xm .asm_pattern_arith_reg cond .bit_or
 end
 
 \ `off19` offset is implicitly times 4 and can be negative.
 fun: .asm_pattern_cmp_branch { Xt off19 -- instr_mask }
-  off19 .instr_off_pack 19 .bits_trunc 5 .lsl Xt .or
+  off19 .instr_off_pack 19 .bit_trunc 5 .bit_lsl Xt .bit_or
 end
 
 \ `off9` offset is implicitly times 4 and can be negative.
 fun: .asm_pattern_cmp_branch_cond { Xt off9 cond -- instr_mask }
-  off9 .instr_off_pack 9 .bits_trunc 5 .lsl { off9 }
-  cond 21 .lsl Xt .or off9 .or
+  off9 .instr_off_pack 9 .bit_trunc 5 .bit_lsl { off9 }
+  cond 21 .bit_lsl Xt .bit_or off9 .bit_or
 end
 
 \ ## Assembler: memory ops
 
 \ ldp Xt1, Xt2, [Xn, #imm7]!
 fun: .asm_load_pair_pre { Xt1 Xt2 Xn imm7 -> instr }
-  .asm_pattern_load_store_pair 0b10_101_0_011_1_0000000_00000_00000_00000 .or
+  .asm_pattern_load_store_pair 0b10_101_0_011_1_0000000_00000_00000_00000 .bit_or
 end
 
 \ ldp Xt1, Xt2, [Xn], #imm7
 fun: .asm_load_pair_post { Xt1 Xt2 Xn imm7 -> instr }
-  .asm_pattern_load_store_pair 0b10_101_0_001_1_0000000_00000_00000_00000 .or
+  .asm_pattern_load_store_pair 0b10_101_0_001_1_0000000_00000_00000_00000 .bit_or
 end
 
 \ ldp Xt1, Xt2, [Xn, #imm7]
 fun: .asm_load_pair_off { Xt1 Xt2 Xn imm7 -> instr }
-  .asm_pattern_load_store_pair 0b10_101_0_010_1_0000000_00000_00000_00000 .or
+  .asm_pattern_load_store_pair 0b10_101_0_010_1_0000000_00000_00000_00000 .bit_or
 end
 
 \ stp Xt1, Xt2, [Xn, #imm7]!
 fun: .asm_store_pair_pre { Xt1 Xt2 Xn imm7 -> instr }
-  .asm_pattern_load_store_pair 0b10_101_0_011_0_0000000_00000_00000_00000 .or
+  .asm_pattern_load_store_pair 0b10_101_0_011_0_0000000_00000_00000_00000 .bit_or
 end
 
 \ stp Xt1, Xt2, [Xn], #imm7
 fun: .asm_store_pair_post { Xt1 Xt2 Xn imm7 -> instr }
-  .asm_pattern_load_store_pair 0b10_101_0_001_0_0000000_00000_00000_00000 .or
+  .asm_pattern_load_store_pair 0b10_101_0_001_0_0000000_00000_00000_00000 .bit_or
 end
 
 \ stp Xt1, Xt2, [Xn, #imm7]
 fun: .asm_store_pair_off { Xt1 Xt2 Xn imm7 -> instr }
-  .asm_pattern_load_store_pair 0b10_101_0_010_0_0000000_00000_00000_00000 .or
+  .asm_pattern_load_store_pair 0b10_101_0_010_0_0000000_00000_00000_00000 .bit_or
 end
 
 \ ldr Xt, [Xn, #imm9]!
 fun: .asm_load_pre { Xt Xn imm9 -> instr }
-  .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_11_00000_00000 .or
+  .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_11_00000_00000 .bit_or
 end
 
 \ ldr Xt, [Xn], #imm9
 fun: .asm_load_post { Xt Xn imm9 -> instr }
-  .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_01_00000_00000 .or
+  .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_01_00000_00000 .bit_or
 end
 
 \ str Xt, [Xn, #imm9]!
 fun: .asm_store_pre { Xt Xn imm9 -> instr }
-  .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_11_00000_00000 .or
+  .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_11_00000_00000 .bit_or
 end
 
 \ str Xt, [Xn], #imm9
 fun: .asm_store_post { Xt Xn imm9 -> instr }
-  .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_01_00000_00000 .or
+  .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_01_00000_00000 .bit_or
 end
 
 \ ldur Xt, [Xn, #imm9]
 fun: .asm_load_unscaled_off { Xt Xn imm9 -> instr }
-  .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_00_00000_00000 .or
+  .asm_pattern_load_store 0b11_111_0_00_01_0_000000000_00_00000_00000 .bit_or
 end
 
 \ stur Xt, [Xn, #imm9]
 fun: .asm_store_unscaled_off { Xt Xn imm9 -> instr }
-  .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_00_00000_00000 .or
+  .asm_pattern_load_store 0b11_111_0_00_00_0_000000000_00_00000_00000 .bit_or
 end
 
 \ ldr Xt, [Xn, Xm, lsl <scale>]
 fun: .asm_load_with_register_off { Xt Xn Xm scale -> instr }
   .asm_pattern_load_store_with_register_off
-  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 .or
+  0b11_111_0_00_01_1_00000_011_0_10_00000_00000 .bit_or
 end
 
 \ str Xt, [Xn, Xm, lsl <scale>]
 fun: .asm_store_with_register_off { Xt Xn Xm scale -> instr }
   .asm_pattern_load_store_with_register_off
-  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 .or
+  0b11_111_0_00_00_1_00000_011_0_10_00000_00000 .bit_or
 end
 
 \ size:
@@ -402,18 +402,18 @@ end
 \ Base instruction variant: "immediate, unsigned offset". The Arm field is
 \ scaled by access width: for 64-bit loads, imm12 = 2 means byte offset 16.
 fun: .asm_load_store_off { Rt Xn imm12 size opc -- instr }
-  size 30 .lsl          { size }
-  opc  22 .lsl size .or { mask }
+  size 30 .bit_lsl          { size }
+  opc  22 .bit_lsl size .bit_or { mask }
   Rt Xn imm12 .asm_pattern_arith_imm
-  mask .or 0b00_111_0_01_00_000000000000_00000_00000 .or
+  mask .bit_or 0b00_111_0_01_00_000000000000_00000_00000 .bit_or
 end
 
 \ Generic unscaled load/store. Offset is a signed 9-bit byte offset.
 fun: .asm_load_store_unscaled_off { Rt Xn imm9 size opc -- instr }
-  size 30 .lsl          { size }
-  opc  22 .lsl size .or { mask }
+  size 30 .bit_lsl          { size }
+  opc  22 .bit_lsl size .bit_or { mask }
   Rt Xn imm9 .asm_pattern_load_store
-  mask .or 0b00_111_0_00_00_0_000000000_00_00000_00000 .or
+  mask .bit_or 0b00_111_0_00_00_0_000000000_00_00000_00000 .bit_or
 end
 
 \ Unsigned 8-bit.
@@ -457,7 +457,7 @@ fun: .asm_store_off { Xt Xn imm12 -> instr } 0b11 0b00 .asm_load_store_off end
 
 \ neg Xd, Xd
 fun: .asm_neg { Xd -> instr }
-  16 .lsl Xd .or 0b1_1_0_01011_00_0_00000_000000_11111_00000 .or
+  16 .bit_lsl Xd .bit_or 0b1_1_0_01011_00_0_00000_000000_11111_00000 .bit_or
 end
 
 \ add Xd, Xn, #imm12
@@ -466,26 +466,26 @@ end
 \ add Xd, Xn, Xm
 0b1_0_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_ADD_REG
 fun: .asm_add_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_ADD_REG .or
+  .asm_pattern_arith_reg ASM_OP_ADD_REG .bit_or
 end
 
 \ adds Xd, Xn, Xm
 fun: .asm_adds_reg { Xd Xn Xm -> instr }
-  .asm_add_reg 0b0_0_1_00000000000000000000000000000 .or
+  .asm_add_reg 0b0_0_1_00000000000000000000000000000 .bit_or
 end
 
 \ adc Xd, Xn, Xm
 fun: .asm_adc_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg 0b1_0_0_11010000_00000_000000_00000_00000 .or
+  .asm_pattern_arith_reg 0b1_0_0_11010000_00000_000000_00000_00000 .bit_or
 end
 
 \ sub Xd, Xn, #imm12
 0b1_1_0_100010_0_000000000000_00000_00000 let: ASM_OP_SUB_IMM
 fun: .asm_addsub_imm { Xd Xn imm12 imm add -- instr }
   \ Select `add` when `(imm >= 0) == add`, else `sub`.
-  imm 63 .lsr add .xor .negate { sel }
-  ASM_OP_ADD_IMM ASM_OP_SUB_IMM .xor sel .and ASM_OP_SUB_IMM .xor { op }
-  Xd Xn imm12 .asm_pattern_arith_imm op .or
+  imm 63 .bit_lsr add .bit_xor .negate { sel }
+  ASM_OP_ADD_IMM ASM_OP_SUB_IMM .bit_xor sel .bit_and ASM_OP_SUB_IMM .bit_xor { op }
+  Xd Xn imm12 .asm_pattern_arith_imm op .bit_or
 end
 
 fun: .asm_add_imm { Xd Xn imm12 -> instr } imm12 true  .asm_addsub_imm end
@@ -494,158 +494,158 @@ fun: .asm_sub_imm { Xd Xn imm12 -> instr } imm12 false .asm_addsub_imm end
 \ sub Xd, Xn, Xm
 0b1_1_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_SUB_REG
 fun: .asm_sub_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_SUB_REG .or
+  .asm_pattern_arith_reg ASM_OP_SUB_REG .bit_or
 end
 
 \ subs Xd, Xn, #imm12
 fun: .asm_subs_imm { Xd Xn imm12 -> instr }
-  .asm_sub_imm 0b0_0_1_00000000000000000000000000000 .or
+  .asm_sub_imm 0b0_0_1_00000000000000000000000000000 .bit_or
 end
 
 \ subs Xd, Xn, Xm
 fun: .asm_subs_reg { Xd Xn Xm -> instr }
-  .asm_sub_reg 0b0_0_1_00000000000000000000000000000 .or
+  .asm_sub_reg 0b0_0_1_00000000000000000000000000000 .bit_or
 end
 
 \ sub Xd, Xn, Xm, lsl 3
 fun: .asm_sub_reg_words { Xd Xn Xm -> instr }
-  .asm_sub_reg 0b0_0_0_00000_00_0_00000_000011_00000_00000 .or
+  .asm_sub_reg 0b0_0_0_00000_00_0_00000_000011_00000_00000 .bit_or
 end
 
 \ orr Xd, Xn, Xm
 0b1_01_01010_00_0_00000_000000_00000_00000 let: ASM_OP_ORR_REG
 fun: .asm_orr_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_ORR_REG .or
+  .asm_pattern_arith_reg ASM_OP_ORR_REG .bit_or
 end
 
 \ eor Xd, Xn, Xm
 0b1_10_01010_00_0_00000_000000_00000_00000 let: ASM_OP_EOR_REG
 fun: .asm_eor_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_EOR_REG .or
+  .asm_pattern_arith_reg ASM_OP_EOR_REG .bit_or
 end
 
 \ and Xd, Xn, Xm
 0b1_00_01010_00_0_00000_000000_00000_00000 let: ASM_OP_AND_REG
 fun: .asm_and_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_AND_REG .or
+  .asm_pattern_arith_reg ASM_OP_AND_REG .bit_or
 end
 
 \ bic Xd, Xn, Xm
 0b1_00_01010_00_1_00000_000000_00000_00000 let: ASM_OP_BIC_REG
 fun: .asm_bic { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_BIC_REG .or
+  .asm_pattern_arith_reg ASM_OP_BIC_REG .bit_or
 end
 
 \ mul Xd, Xn, Xm
 0b1_00_11011_000_00000_0_11111_00000_00000 let: ASM_OP_MUL_REG
 fun: .asm_mul { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_MUL_REG .or
+  .asm_pattern_arith_reg ASM_OP_MUL_REG .bit_or
 end
 
 \ udiv Xd, Xn, Xm
 0b1_0_0_11010110_00000_00001_0_00000_00000 let: ASM_OP_UDIV_REG
 fun: .asm_udiv { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_UDIV_REG .or
+  .asm_pattern_arith_reg ASM_OP_UDIV_REG .bit_or
 end
 
 \ sdiv Xd, Xn, Xm
 0b1_0_0_11010110_00000_00001_1_00000_00000 let: ASM_OP_SDIV_REG
 fun: .asm_sdiv { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_SDIV_REG .or
+  .asm_pattern_arith_reg ASM_OP_SDIV_REG .bit_or
 end
 
 \ msub Xd, Xn, Xm, Xa
 fun: .asm_msub { Xd Xn Xm Xa -- instr }
-  Xn  5 .lsl { Xn }
-  Xm 16 .lsl { Xm }
-  Xa 10 .lsl
-  Xd .or Xn .or Xm .or
-  0b1_00_11011_000_00000_1_00000_00000_00000 .or
+  Xn  5 .bit_lsl { Xn }
+  Xm 16 .bit_lsl { Xm }
+  Xa 10 .bit_lsl
+  Xd .bit_or Xn .bit_or Xm .bit_or
+  0b1_00_11011_000_00000_1_00000_00000_00000 .bit_or
 end
 
 \ csel Xd, Xn, Xm, <cond>
 fun: .asm_csel { Xd Xn Xm cond -> instr }
-  .asm_pattern_arith_csel 0b1_0_0_11010100_00000_0000_0_0_00000_00000 .or
+  .asm_pattern_arith_csel 0b1_0_0_11010100_00000_0000_0_0_00000_00000 .bit_or
 end
 
 \ csneg Xd, Xn, Xm, <cond>
 fun: .asm_csneg { Xd Xn Xm cond -> instr }
-  .asm_pattern_arith_csel 0b1_1_0_11010100_00000_0000_0_1_00000_00000 .or
+  .asm_pattern_arith_csel 0b1_1_0_11010100_00000_0000_0_1_00000_00000 .bit_or
 end
 
 0b1_00_100110_1_000000_000000_00000_00000 let: ASM_OP_SBFM
 0b1_10_100110_1_000000_000000_00000_00000 let: ASM_OP_UBFM
 
 fun: .asm_bitfield { Xd Xn immr imms op -- instr }
-  imms 10 .lsl { imms }
-  immr 16 .lsl { immr }
-  Xn   5  .lsl { Xn }
-  Xd Xn .or immr .or imms .or op .or
+  imms 10 .bit_lsl { imms }
+  immr 16 .bit_lsl { immr }
+  Xn   5  .bit_lsl { Xn }
+  Xd Xn   .bit_or  immr .bit_or imms .bit_or op .bit_or
 end
 
 \ asr Xd, Xn, #imm6
 fun: .asm_asr_imm { Xd Xn imm6 -- instr }
-  imm6 6 .bits_trunc { immr }
+  imm6 6 .bit_trunc { immr }
   Xd Xn immr 63 ASM_OP_SBFM .asm_bitfield
 end
 
 \ asr Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_10_00000_00000 let: ASM_OP_ASR_REG
 fun: .asm_asr_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_ASR_REG .or
+  .asm_pattern_arith_reg ASM_OP_ASR_REG .bit_or
 end
 
 \ Arithmetic (sign-preserving) right shift.
-fun: .asr { i0 bits -> i1 } [ 0 0 1 .asm_asr_reg .comp_out0 ] end \ asr x0, x0, x1
+fun: .bit_asr { i0 bits -> i1 } [ 0 0 1 .asm_asr_reg .comp_out0 ] end \ asr x0, x0, x1
 
 \ lsl Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_00_00000_00000 let: ASM_OP_LSL_REG
 fun: .asm_lsl_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_LSL_REG .or
+  .asm_pattern_arith_reg ASM_OP_LSL_REG .bit_or
 end
 
 \ lsl Xd, Xn, #imm6
 fun: .asm_lsl_imm { Xd Xn imm6 -- instr }
-  64 imm6 - 6 .bits_trunc { immr }
-  63 imm6 - 6 .bits_trunc { imms }
+  64 imm6 - 6 .bit_trunc { immr }
+  63 imm6 - 6 .bit_trunc { imms }
   Xd Xn immr imms ASM_OP_UBFM .asm_bitfield
 end
 
 \ lsr Xd, Xn, #imm6
 fun: .asm_lsr_imm { Xd Xn imm6 -- instr }
-  imm6 6 .bits_trunc { immr }
+  imm6 6 .bit_trunc { immr }
   Xd Xn immr 63 ASM_OP_UBFM .asm_bitfield
 end
 
 \ lsr Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_01_00000_00000 let: ASM_OP_LSR_REG
 fun: .asm_lsr_reg { Xd Xn Xm -> instr }
-  .asm_pattern_arith_reg ASM_OP_LSR_REG .or
+  .asm_pattern_arith_reg ASM_OP_LSR_REG .bit_or
 end
 
 \ cmp Xn, Xm
 fun: .asm_cmp_reg { Xn Xm -- instr }
-  Xn  5 .lsl { Xn }
-  Xm 16 .lsl Xn .or 0b1_1_1_01011_00_0_00000_000_000_00000_11111 .or
+  Xn  5 .bit_lsl { Xn }
+  Xm 16 .bit_lsl Xn .bit_or 0b1_1_1_01011_00_0_00000_000_000_00000_11111 .bit_or
 end
 
 \ b <off>
 fun: .asm_branch { off26 -> instr }
   .instr_off_pack \ Offset is implicitly times 4.
-  26 .bits_trunc  \ Offset may be negative.
-  0b0_00_101_00000000000000000000000000 .or
+  26 .bit_trunc  \ Offset may be negative.
+  0b0_00_101_00000000000000000000000000 .bit_or
 end
 
 \ b.<cond> <off>
 fun: .asm_branch_cond { off19 cond -- instr }
-  off19 .instr_off_pack 19 .bits_trunc 5 .lsl
-  cond .or 0b010_101_00_0000000000000000000_0_0000 .or
+  off19 .instr_off_pack 19 .bit_trunc 5 .bit_lsl
+  cond .bit_or 0b010_101_00_0000000000000000000_0_0000 .bit_or
 end
 
 fun: .asm_cmp_branch { Xt off19 not_zero -- instr }
-  not_zero <>0 24 .lsl { op_mask }
-  Xt off19 .asm_pattern_cmp_branch op_mask .or
-  0b1_011010_0_0000000000000000000_00000 .or
+  not_zero <>0 24 .bit_lsl { op_mask }
+  Xt off19 .asm_pattern_cmp_branch op_mask .bit_or
+  0b1_011010_0_0000000000000000000_00000 .bit_or
 end
 
 \ cbz x1, <off>
@@ -658,32 +658,32 @@ fun: .asm_cbnz { Xt off19 -> instr } 1 .asm_cmp_branch end
 \ cb.<cond> Xt, #imm6, #off9
 fun: .asm_cmp_imm_branch { Xt imm6 off9 cond -- instr }
   Xt off9 cond .asm_pattern_cmp_branch_cond { mask }
-  imm6 15 .lsl mask .or 0b1_1110101_000_000000_0_000000000_00000 .or
+  imm6 15 .bit_lsl mask .bit_or 0b1_1110101_000_000000_0_000000000_00000 .bit_or
 end
 
 \ Not supported on M3 Pro.
 \ cb.<cond> Xt, Xm, #off9
 fun: .asm_cmp_reg_branch { Xt Xm off9 cond -- instr }
   Xt off9 cond .asm_pattern_cmp_branch_cond { mask }
-  Xm 16 .lsl mask .or 0b1_1110100_000_00000_00_000000000_00000 .or
+  Xm 16 .bit_lsl mask .bit_or 0b1_1110100_000_00000_00_000000000_00000 .bit_or
 end
 
 \ eor Xd, Xd, Xd
 fun: .asm_zero_reg { Xd -- instr } Xd Xd Xd .asm_eor_reg end
 
 fun: .asm_mov_reg { Xd Xm -- instr }
-  Xm 16 .lsl Xd .or 0b1_01_01010_00_0_00000_000000_11111_00000 .or
+  Xm 16 .bit_lsl Xd .bit_or 0b1_01_01010_00_0_00000_000000_11111_00000 .bit_or
 end
 
 \ movn/movz/movk Xd, #imm16, lsl #hw*16
 fun: .asm_mov_wide { Xd opc hw imm16 -- instr }
-  opc   29 .lsl { opc }
-  hw    21 .lsl { hw }
-  imm16 5  .lsl
-  opc      .or
-  hw       .or
-  Xd       .or
-  0b1_00_100101_00_0000000000000000_00000 .or
+  opc   29 .bit_lsl { opc }
+  hw    21 .bit_lsl { hw }
+  imm16 5  .bit_lsl
+  opc      .bit_or
+  hw       .bit_or
+  Xd       .bit_or
+  0b1_00_100101_00_0000000000000000_00000 .bit_or
 end
 
 \ Immediate must be unsigned and within range.
@@ -691,29 +691,29 @@ fun: .asm_mov_imm { Xd imm -- instr } Xd 0b10 0 imm .asm_mov_wide end
 
 \ mvn Xd, Xm
 fun: .asm_mvn { Xd Xm -- instr }
-  Xm 16 .lsl Xd .or 0b1_01_01010_00_1_00000_000000_11111_00000 .or
+  Xm 16 .bit_lsl Xd .bit_or 0b1_01_01010_00_1_00000_000000_11111_00000 .bit_or
 end
 
 \ clz Xd, Xn
 fun: .asm_clz { Xd Xn -- instr }
-  Xn 5 .lsl Xd .or 0b1_1_0_11010110_00000_00010_0_00000_00000 .or
+  Xn 5 .bit_lsl Xd .bit_or 0b1_1_0_11010110_00000_00010_0_00000_00000 .bit_or
 end
 
 \ Requires Arm64 `FEAT_CSSC`; not supported on M3 Pro.
 \ ctz Xd, Xn
 fun: .asm_ctz { Xd Xn -- instr }
-  Xn 5 .lsl Xd .or 0b1_1_0_11010110_00000_000110_00000_00000 .or
+  Xn 5 .bit_lsl Xd .bit_or 0b1_1_0_11010110_00000_000110_00000_00000 .bit_or
 end
 
 \ rbit Xd, Xn
 fun: .asm_rbit { Xd Xn -- instr }
-  Xn 5 .lsl Xd .or 0b1_1_0_11010110_00000_00000_0_00000_00000 .or
+  Xn 5 .bit_lsl Xd .bit_or 0b1_1_0_11010110_00000_00000_0_00000_00000 .bit_or
 end
 
 \ TODO: support shift.
 fun: .asm_tst { Xn Xm -- instr }
-  Xm 16 .lsl { Xm }
-  Xn 5 .lsl Xm .or 0b1_11_01010_00_0_00000_000000_00000_11111 .or
+  Xm 16 .bit_lsl { Xm }
+  Xn 5 .bit_lsl Xm .bit_or 0b1_11_01010_00_0_00000_000000_00000_11111 .bit_or
 end
 
 \ `.ret x30`; requires caution with SP / FP.
@@ -743,7 +743,7 @@ end
 
 fun: .comp_args2_arith_reg { op -- err }
   .comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 .asm_pattern_arith_reg op .or .comp_instr \ <op> Xd, Xn, Xm
+  reg0 reg0 reg1 .asm_pattern_arith_reg op .bit_or .comp_instr \ <op> Xd, Xn, Xm
   reg1 .comp_args_set
 end
 
@@ -761,18 +761,18 @@ end
 \ These comptime words are also used internally in `## Constant folding`,
 \ both inline in full folding, and indirectly via `xt''` as fallbacks.
 
-fun_comp: .or { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
-fun_comp: .and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
-fun_comp: .xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
-fun_comp: .lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
-fun_comp: .lsr { -- err } ASM_OP_LSR_REG .comp_args2_arith_reg end
-fun_comp: .asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
+fun_comp: .bit_or { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
+fun_comp: .bit_and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
+fun_comp: .bit_xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
+fun_comp: .bit_lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
+fun_comp: .bit_lsr { -- err } ASM_OP_LSR_REG .comp_args2_arith_reg end
+fun_comp: .bit_asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
 
 fun_comp: .negate { -- err }
   .comp_args1_reg .asm_neg .comp_instr \ neg Xd, Xn
 end
 
-fun: ?invert { val cond -> out } .negate .xor end
+fun: ?bit_invert { val cond -> out } .negate .bit_xor end
 
 fun_comp: .inc { -- err }
   .comp_args1_reg { reg }
@@ -813,7 +813,7 @@ fun: u/ { i0 i1 -> i2 } u/ end
 
 fun: .comp_emit_mod { out dividend divisor div_op -- err }
   .comp_alloc_next_reg { quotient }
-  quotient dividend divisor .asm_pattern_arith_reg div_op .or .comp_instr \ sdiv|udiv Xd, Xn, Xm
+  quotient dividend divisor .asm_pattern_arith_reg div_op .bit_or .comp_instr \ sdiv|udiv Xd, Xn, Xm
   out quotient divisor dividend .asm_msub .comp_instr \ msub Xd, Xn, Xm, Xa
 end
 
@@ -837,7 +837,7 @@ fun: .comp_emit_divmod { reg0 reg1 div_op -- tmp err }
   reg0 reg1 reg0 reg1 { rem quo dividend divisor }
   .comp_alloc_next_reg { tmp }
   tmp divisor .asm_mov_reg .comp_instr \ mov Xd, Xm
-  quo dividend tmp .asm_pattern_arith_reg div_op .or .comp_instr \ sdiv|udiv Xd, Xn, Xm
+  quo dividend tmp .asm_pattern_arith_reg div_op .bit_or .comp_instr \ sdiv|udiv Xd, Xn, Xm
   rem quo tmp dividend .asm_msub .comp_instr \ msub Xd, Xn, Xm, Xa
   tmp
 end
@@ -959,7 +959,7 @@ end
 fun: .align_up { len wid -> len } .align_up end
 
 \ Flip all the bits.
-fun_comp: .invert { -- err }
+fun_comp: .bit_invert { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
 end
@@ -997,7 +997,7 @@ fun_comp: .pow2_ceil { -- err }
   reg .inc .comp_args_set
 end
 
-fun: .pow2_ceil { val -- pow2 } 1 val 1 .umax .dec .bit_len .lsl end
+fun: .pow2_ceil { val -- pow2 } 1 val 1 .umax .dec .bit_len .bit_lsl end
 
 \ "count leading zeros" (in high bits)
 fun_comp: .bit_clz { -- err }
@@ -1031,7 +1031,7 @@ fun_comp: .low_bits { -- err }
   reg .inc .comp_args_set
 end
 
-fun_comp: .bits_trunc { -- err }
+fun_comp: .bit_trunc { -- err }
   .comp_args2_regs     { imm len }
   .comp_alloc_next_reg { tmp }
   1 tmp .comp_load
@@ -1122,44 +1122,44 @@ fun: -cell { adr -> adr } -cell end
 
 \ tbz Xt, #bit, #imm14
 fun: .asm_test_bit_branch_zero { Xt bit imm14 -- instr }
-  imm14 .instr_off_pack 14 .bits_trunc 5 .lsl { imm14 }
-  bit 5 .lsr 31 .lsl { b5 }
-  bit 5 .bits_trunc 19 .lsl \ b40
-  Xt .or imm14 .or b5 .or
-  0b0_01_101_1_0_00000_00000000000000_00000 .or
+  imm14 .instr_off_pack 14 .bit_trunc 5 .bit_lsl { imm14 }
+  bit 5 .bit_lsr 31 .bit_lsl { b5 }
+  bit 5 .bit_trunc 19 .bit_lsl \ b40
+  Xt .bit_or imm14 .bit_or b5 .bit_or
+  0b0_01_101_1_0_00000_00000000000000_00000 .bit_or
 end
 
 \ adr Xd, #imm21
 fun: .asm_adr { Xd imm21 -- instr }
-  imm21 0b11 .and { low }
-  imm21 .instr_off_pack 19 .bits_trunc 5 .lsl { high }
-  high low .or Xd .or
-  0b0_00_100_00_0000000000000000000_00000 .or
+  imm21 0b11 .bit_and { low }
+  imm21 .instr_off_pack 19 .bit_trunc 5 .bit_lsl { high }
+  high low .bit_or Xd .bit_or
+  0b0_00_100_00_0000000000000000000_00000 .bit_or
 end
 
 fun: .asm_branch_to_reg { Xn -> instr }
-  5 .lsl 0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 .or \ br Xn
+  5 .bit_lsl 0b110_101_1_0_0_00_11111_0000_0_0_00000_00000 .bit_or \ br Xn
 end
 
 \ bl imm26
 \
 \ Requires caution to avoid messing up the link register.
 fun: .asm_branch_link_off { imm26 -> instr }
-  .instr_off_pack 26 .bits_trunc
-  0b100_101_00000000000000000000000000 .or
+  .instr_off_pack 26 .bit_trunc
+  0b100_101_00000000000000000000000000 .bit_or
 end
 
 \ Requires caution to avoid messing up the link register.
 fun: .asm_branch_link_reg { Xn -> instr }
-  5 .lsl 0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 .or \ blr Xn
+  5 .bit_lsl 0b110_101_1_0_0_01_11111_0000_0_0_00000_00000 .bit_or \ blr Xn
 end
 
 \ orr Xd, Xn, #(1 << bit)
 fun: .asm_orr_bit { Xd Xn bit -- instr }
-  64 bit - 16 .lsl { immr }
-  Xn 5 .lsl
-  Xd .or immr .or
-  0b1_01_100100_1_000000_000000_00000_00000 .or
+  64 bit - 16 .bit_lsl { immr }
+  Xn 5 .bit_lsl
+  Xd .bit_or immr .bit_or
+  0b1_01_100100_1_000000_000000_00000_00000 .bit_or
 end
 
 fun: .comp_emit_cmp_cset_reg { out lhs rhs cond -- err }
@@ -1239,8 +1239,8 @@ fun_comp: >=0 {       -- err  } ASM_GE .asm_comp_cset_zero end \ Or `PL`.
 fun:      >=0 { num   -> bool } >=0                        end
 
 \ Non-standard and sane: no wraparound semantics.
-fun: .within  { num floor ceil -- bool } num floor  >= num ceil  < .and end
-fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .and end
+fun: .within  { num floor ceil -- bool } num floor  >= num ceil  < .bit_and end
+fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .bit_and end
 
 \ ## Memory load / store
 \
@@ -1864,16 +1864,16 @@ fun: .instr_off { adr -- off } .interp_instrs { instrs } adr instrs - end
 \ Output arity remains shared across a conditional chain so each completed
 \ branch can be diagnosed at its closing `elif` or `else`.
 \
-\ Single-bit masks are used with `.or .and`.
+\ Single-bit masks are used with `.bit_or .bit_and`.
 \ Multi-bit masks must be used with `.bit_mask_get .bit_mask_set`.
 
 ASM_ARG_LEN_MAX .bit_len .low_bits let: CONT_MASK_INP_LEN
 
 CONT_MASK_INP_LEN
-CONT_MASK_INP_LEN .bit_len .lsl
+CONT_MASK_INP_LEN .bit_len .bit_lsl
 let: CONT_MASK_OUT_LEN
 
-1 CONT_MASK_OUT_LEN .bit_len .lsl
+1 CONT_MASK_OUT_LEN .bit_len .bit_lsl
 let: CONT_MASK_HAS_OUT
 
 0 let: ASM_BRANCH_TYPE_CBZ
@@ -1881,14 +1881,14 @@ let: CONT_MASK_HAS_OUT
 2 let: ASM_BRANCH_TYPE_COND
 
 ASM_BRANCH_TYPE_COND .bit_len .low_bits
-CONT_MASK_HAS_OUT .bit_len .lsl
+CONT_MASK_HAS_OUT .bit_len .bit_lsl
 let: CONT_MASK_BRANCH_TYPE
 
 32 .low_bits
 CONT_MASK_BRANCH_TYPE .bit_len .low_bits .bits_clear
 let: CONT_MASK_INSTR_INFO
 
-32 .low_bits .invert let: CONT_MASK_INSTR_OFF
+32 .low_bits .bit_invert let: CONT_MASK_INSTR_OFF
 
 fun: .cont_meta_instr_off_set { off meta -- meta }
   off .instr_off_pack CONT_MASK_INSTR_OFF meta .bit_mask_set
@@ -1922,13 +1922,13 @@ end
 
 \ Decode `cset`, returning its destination register and asm condition.
 fun: .asm_cset_decode { instr -- reg cond ok }
-  instr 0b11111 .and { reg }
-  instr 12 .lsr 0b1111 .and 1 .xor { cond }
+  instr 0b11111 .bit_and { reg }
+  instr 12 .bit_lsr 0b1111 .bit_and 1 .bit_xor { cond }
 
   \ `cset` with `Rd` and `cond` masked out.
-  instr 0b1_1_1_11111111_11111_0000_1_1_11111_00000 .and ASM_OP_CSET =
-  cond ASM_AL <> .and
-  cond ASM_NV <> .and { ok }
+  instr 0b1_1_1_11111111_11111_0000_1_1_11111_00000 .bit_and ASM_OP_CSET =
+  cond ASM_AL <> .bit_and
+  cond ASM_NV <> .bit_and { ok }
 
   reg cond ok
 end
@@ -2004,7 +2004,7 @@ fun: .cond_branch_beg { pred_reg meta -- meta err }
   \   cbnz val, out
   pred_reg .asm_cmp_zero cmp_adr @u32 = { is_cmp_zero }
   pred_reg ASM_EQ .asm_cset cset_instr = { is_cset_eq }
-  is_cset_eq is_cmp_zero .and .then
+  is_cset_eq is_cmp_zero .bit_and .then
     .comp_instr_drop
     ASM_PLACEHOLDER cmp_adr !32
     cmp_adr .instr_off
@@ -2014,9 +2014,9 @@ fun: .cond_branch_beg { pred_reg meta -- meta err }
 
   \ Other comparisons: `cmp lhs, rhs; cset pred, lt` -> `cmp lhs, rhs; b.ge out`.
   cset_instr .asm_cset_decode { cset_reg cond ok }
-  ok cset_reg pred_reg = .and .then
+  ok cset_reg pred_reg = .bit_and .then
     cset_adr .instr_off
-    ASM_BRANCH_TYPE_COND cond 1 .xor
+    ASM_BRANCH_TYPE_COND cond 1 .bit_xor
     meta .cont_meta_instr_set .ret
   end
 
@@ -2028,7 +2028,7 @@ fun: .then_end_xt { meta -- err } [ .redefine ]
   meta CONT_MASK_INP_LEN .bit_mask_get { len }
 
   len " arguments before ending conditional without `else`" .comp_args_valid
-  meta CONT_MASK_HAS_OUT .and .then
+  meta CONT_MASK_HAS_OUT .bit_and .then
     meta CONT_MASK_OUT_LEN .bit_mask_get
     " branch outputs do not match conditional inputs" .comp_args_valid
   end
@@ -2092,14 +2092,14 @@ fun_comp: else { meta then_end_xt -- meta end_xt err }
 
   .comp_barrier
 
-  meta CONT_MASK_HAS_OUT .and { has }
+  meta CONT_MASK_HAS_OUT .bit_and { has }
   has .then
     meta CONT_MASK_OUT_LEN .bit_mask_get
     " branch outputs" .comp_args_valid
   end
   has =0 .then
     .comp_args_get CONT_MASK_OUT_LEN meta .bit_mask_set
-    CONT_MASK_HAS_OUT .or { meta }
+    CONT_MASK_HAS_OUT .bit_or { meta }
   end
 
   .reserve_instr { off }
@@ -2677,49 +2677,49 @@ end
 \ ## Assembler continued -- logical immediates and other stuff
 
 fun: .asm_ror64 { val rot -- out }
-  rot 63 .and { rot }
+  rot 63 .bit_and { rot }
   rot =0 .then val .ret end
 
-  val rot .lsr
-  val 64 rot - .lsl
-  .or
+  val rot .bit_lsr
+  val 64 rot - .bit_lsl
+  .bit_or
 end
 
 fun: .asm_logical_imm_enc { imm -- N immr imms err }
   imm 0 = .then
     " unable to encode logical immediate: 0 is reserved" .throw
   end
-  imm .invert 0 = .then
+  imm .bit_invert 0 = .then
     " unable to encode logical immediate: all ones is reserved" .throw
   end
 
-  imm imm .inc .and .bit_ctz { rot }
+  imm imm .inc .bit_and .bit_ctz { rot }
   imm rot .asm_ror64 { norm }
   norm .bit_clz { zeros }
-  norm .invert .bit_ctz { ones }
+  norm .bit_invert .bit_ctz { ones }
   zeros ones + { size }
 
   imm size .asm_ror64 imm <> .then
     " unable to encode logical immediate: value is not a repeated bitmask" .throw
   end
 
-  size 6 .lsr
-  rot .negate size .dec .and
-  size 1 .lsl .negate ones .dec .or 0x3f .and
+  size 6 .bit_lsr
+  rot .negate size .dec .bit_and
+  size 1 .bit_lsl .negate ones .dec .bit_or 0x3f .bit_and
 end
 
 fun: .asm_logical_imm_mask { imm op -- mask err }
   imm .asm_logical_imm_enc { N immr imms }
   op
-  N    22 .lsl .or
-  immr 16 .lsl .or
-  imms 10 .lsl .or
+  N    22 .bit_lsl .bit_or
+  immr 16 .bit_lsl .bit_or
+  imms 10 .bit_lsl .bit_or
 end
 
 fun: .asm_logical_imm_instr { Xd Xn imm op -- instr err }
   imm op .asm_logical_imm_mask
-  Xn 5 .lsl .or
-  Xd .or
+  Xn 5 .bit_lsl .bit_or
+  Xd .bit_or
 end
 
 0b1_00_100100_0_000000_000000_00000_00000 let: ASM_OP_AND_IMM
@@ -2730,7 +2730,7 @@ end
 fun: .asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM .asm_logical_imm_instr end
 fun: .asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM .asm_logical_imm_instr end
 fun: .asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM .asm_logical_imm_instr end
-fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .invert ASM_OP_AND_IMM .asm_logical_imm_instr end
+fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .bit_invert ASM_OP_AND_IMM .asm_logical_imm_instr end
 fun: .asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM .asm_logical_imm_instr end
 
 fun: .asm_add_imm_decode { instr -- Xd Xn imm ok }
@@ -2738,11 +2738,11 @@ fun: .asm_add_imm_decode { instr -- Xd Xn imm ok }
   \ Not bothering to decode `sub`, shifted immediates, or flags ops.
   0b1_1_1_111111_1_000000000000_00000_00000 { mask }
 
-  instr 0b11111 .and { Xd }
-  instr 5 .lsr 0b11111 .and { Xn }
-  instr 10 .lsr 0xfff .and { imm }
+  instr 0b11111 .bit_and { Xd }
+  instr 5 .bit_lsr 0b11111 .bit_and { Xn }
+  instr 10 .bit_lsr 0xfff .bit_and { imm }
 
-  instr mask .and ASM_OP_ADD_IMM = { ok }
+  instr mask .bit_and ASM_OP_ADD_IMM = { ok }
   Xd Xn imm ok
 end
 
@@ -2753,7 +2753,7 @@ end
 fun: .asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
   \ Prefer unsigned scaled addressing: it has much larger range.
   off >=0 .then
-    1 size .lsl { width }
+    1 size .bit_lsl { width }
     off width .mod =0 .then
       off width / { imm }
       imm ASM_MAX_IMM12 <= .then
@@ -2763,7 +2763,7 @@ fun: .asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
   end
 
   \ Fall back to unscaled addressing for small byte-precision offsets.
-  off -256 >= off 255 <= .and .then
+  off -256 >= off 255 <= .bit_and .then
     Rt Xn off size opc .asm_load_store_unscaled_off true .ret
   end
 
@@ -2782,7 +2782,7 @@ end
 \ runtime arithmetic. When not possible, they fallback at runtime operations.
 
 fun: .cf_imm_u12 { imm -- ok }
-  imm 0 >= imm ASM_MAX_IMM12 <= .and
+  imm 0 >= imm ASM_MAX_IMM12 <= .bit_and
 end
 
 fun: .cf_emit_cmp_imm_cset { reg0 reg1 imm cond -- err }
@@ -2844,10 +2844,10 @@ fun: .cf_fold2_valid { lhs bad0 msg0 bad1 msg1 -- reg0 reg1 imm0 imm1 consumed o
 
   consumed 2 <> .then reg0 reg1 imm0 imm1 consumed false .ret end
 
-  imm1 bad0 = lhs imm0 bad0 = .and .or .then msg0 .throw end
+  imm1 bad0 = lhs imm0 bad0 = .bit_and .bit_or .then msg0 .throw end
 
   msg1 .then
-    imm1 bad1 = lhs imm0 bad1 = .and .or .then msg1 .throw end
+    imm1 bad1 = lhs imm0 bad1 = .bit_and .bit_or .then msg1 .throw end
   end
   reg0 reg1 imm0 imm1 consumed
   true
@@ -2881,35 +2881,38 @@ fun: .cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp valida
   fallback .call_xt
 end
 
-fun: .cf_shift_validate { imm reg_op -- aux ok err }
+fun: .cf_bit_shift_validate { imm reg_op -- aux ok err }
   imm =0 .then " redundant arithmetic" .throw end
-  reg_op imm 0 >= imm 63 <= .and
+  reg_op imm 0 >= imm 63 <= .bit_and
 end
 
-fun: .cf_shift_emit { reg0 reg1 imm reg_op -- err }
+fun: .cf_bit_shift_emit { reg0 reg1 imm reg_op -- err }
   reg_op ASM_OP_LSL_REG = .then
-    64 imm - 6 .bits_trunc { immr }
-    63 imm - 6 .bits_trunc { imms }
+    64 imm - 6 .bit_trunc { immr }
+    63 imm - 6 .bit_trunc { imms }
     reg0 reg1 immr imms ASM_OP_UBFM .asm_bitfield .comp_instr \ lsl Xd, Xn, #imm6
     .ret
   end
 
-  imm 6 .bits_trunc { immr }
-  ASM_OP_SBFM ASM_OP_UBFM ASM_OP_SBFM .xor reg_op ASM_OP_LSR_REG = .negate .and .xor { bitfield_op }
-  reg0 reg1 immr 63 bitfield_op .asm_bitfield .comp_instr \ lsr|asr Xd, Xn, #imm6
+  imm 6 .bit_trunc { immr }
+
+  ASM_OP_SBFM ASM_OP_UBFM ASM_OP_SBFM .bit_xor
+  reg_op ASM_OP_LSR_REG = .negate .bit_and .bit_xor { bit_op }
+
+  reg0 reg1 immr 63 bit_op .asm_bitfield .comp_instr \ lsr|asr Xd, Xn, #imm6
 end
 
-fun: .cf_logical_validate { imm aux -- aux ok Err }
-  aux 1 .and { inv }
+fun: .cf_bit_logical_validate { imm aux -- aux ok Err }
+  aux 1 .bit_and { inv }
   aux inv - { op }
-  imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .and .or { edge }
-  imm inv ?invert { imm }
+  imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .bit_and .bit_or { edge }
+  imm inv ?bit_invert { imm }
   edge .then " redundant arithmetic" .throw end
   imm op .asm_logical_imm_mask =0
 end
 
-fun: .cf_logical_emit { reg0 reg1 _imm mask -- err }
-  mask reg1 5 .lsl .or reg0 .or .comp_instr \ and|orr|eor Xd, Xn, #imm
+fun: .cf_bit_logical_emit { reg0 reg1 _imm mask -- err }
+  mask reg1 5 .bit_lsl .bit_or reg0 .bit_or .comp_instr \ and|orr|eor Xd, Xn, #imm
 end
 
 fun: .cf_align_validate { size _ -- aux ok Err }
@@ -2918,7 +2921,7 @@ fun: .cf_align_validate { size _ -- aux ok Err }
 end
 
 fun: .cf_align_emit { out adr _size mask -- err }
-  mask adr 5 .lsl .or 31 .or .comp_instr \ tst Xn, #imm
+  mask adr 5 .bit_lsl .bit_or 31 .bit_or .comp_instr \ tst Xn, #imm
   out ASM_EQ .asm_cset .comp_instr      \ cset Xd, eq
 end
 
@@ -2928,30 +2931,30 @@ fun: .cf_align_down_validate { size _ -- aux ok Err }
 end
 
 fun: .cf_align_down_emit { out len _size mask -- err }
-  mask len 5 .lsl .or out .or .comp_instr \ and Xd, Xn, #imm
+  mask len 5 .bit_lsl .bit_or out .bit_or .comp_instr \ and Xd, Xn, #imm
 end
 
 fun: .cf_align_up_validate { size _ -- aux ok Err }
   size 1 = .then " redundant arithmetic" .throw end
   size .dec .cf_imm_u12 { add_ok }
   size .negate ASM_OP_AND_IMM .asm_logical_imm_mask { mask mask_err }
-  mask add_ok mask_err =0 .and
+  mask add_ok mask_err =0 .bit_and
 end
 
 fun: .cf_align_up_emit { out len size mask -- err }
   out len size .dec .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
-  mask out 5 .lsl .or out .or .comp_instr  \ and Xd, Xn, #imm
+  mask out 5 .bit_lsl .bit_or out .bit_or .comp_instr  \ and Xd, Xn, #imm
 end
 
-fun: .cf_bits_trunc_validate { len _ -- aux ok Err }
-  len 0 <= len 64 >= .or .then " redundant arithmetic" .throw end
+fun: .cf_bit_trunc_validate { len _ -- aux ok Err }
+  len 0 <= len 64 >= .bit_or .then " redundant arithmetic" .throw end
   len .low_bits ASM_OP_AND_IMM .asm_logical_imm_mask =0
 end
 
 fun: .cf_bit_mask_validate { mask -- err }
   mask .then
-    mask mask .bit_ctz .lsr { packed }
-    packed packed .inc .and =0 .then .ret end
+    mask mask .bit_ctz .bit_lsr { packed }
+    packed packed .inc .bit_and =0 .then .ret end
   end
   " invalid bit mask: expected nonzero contiguous mask" .throw
 end
@@ -2961,13 +2964,13 @@ fun: .cf_bit_mask_get_validate { mask _ -- aux ok Err }
   mask .cf_bit_mask_validate .try
   mask ASM_OP_AND_IMM .asm_logical_imm_mask { instr_mask err }
   err .then nil false .ret end
-  mask .bit_ctz 32 .lsl instr_mask .or true
+  mask .bit_ctz 32 .bit_lsl instr_mask .bit_or true
 end
 
 fun: .cf_bit_mask_get_emit { out src _mask aux -- err }
-  aux 32 .bits_trunc { instr_mask }
-  aux 32 .lsr        { shift      }
-  instr_mask src 5 .lsl .or out .or .comp_instr \ and Xd, Xn, #imm
+  aux 32 .bit_trunc { instr_mask }
+  aux 32 .bit_lsr        { shift      }
+  instr_mask src 5 .bit_lsl .bit_or out .bit_or .comp_instr \ and Xd, Xn, #imm
   out out shift .asm_lsr_imm .comp_instr      \ lsr Xd, Xn, #imm6
 end
 
@@ -2985,17 +2988,17 @@ end
 fun: .cf_pow2_validate { imm flags -- aux ok err }
   " redundant arithmetic" { err }
   imm =0 .then
-    flags 1 .and .then err .throw end
+    flags 1 .bit_and .then err .throw end
     nil false .ret
   end
   imm 1 = .then err .throw end
   imm <0 { neg }
   neg .then
-    flags 1 .and =0 .then nil false .ret end
+    flags 1 .bit_and =0 .then nil false .ret end
     imm .negate { imm }
   end
-  imm imm .dec .and .then nil false .ret end
-  imm .bit_ctz neg 6 .lsl .or { aux }
+  imm imm .dec .bit_and .then nil false .ret end
+  imm .bit_ctz neg 6 .bit_lsl .bit_or { aux }
   aux true
 end
 
@@ -3005,19 +3008,19 @@ fun: .cf_pow2_validate_reject_1 { imm msg -- aux ok err }
 end
 
 fun: .cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
-  aux 0x3f .and { shift }
+  aux 0x3f .bit_and { shift }
   reg0 reg1 shift .asm_lsr_imm .comp_instr \ lsr Xd, Xn, #imm6
 end
 
 fun: .cf_umod_pow2_emit { reg0 reg1 _imm aux -- err }
-  aux 0x3f .and .low_bits { mask }
+  aux 0x3f .bit_and .low_bits { mask }
   reg0 reg1 mask .asm_and_imm .comp_instr \ and Xd, Xn, #imm
 end
 
 fun: .cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
-  aux 0x3f .and { shift }
+  aux 0x3f .bit_and { shift }
   reg0 reg1 shift .asm_lsl_imm .comp_instr \ lsl Xd, Xn, #imm6
-  aux 0x40 .and .then
+  aux 0x40 .bit_and .then
     reg0 .asm_neg .comp_instr \ neg Xd, Xn
   end
 end
@@ -3065,7 +3068,7 @@ fun: .comp_loc_mut_imm { reg_op validate_inp validate emit -- err }
 
   .comp_args1_reg { rhs_reg }
   loc .comp_push_from_local
-  rhs_reg rhs_reg .inc rhs_reg .asm_pattern_arith_reg reg_op .or .comp_instr \ <op> Xd, Xn, Xm
+  rhs_reg rhs_reg .inc rhs_reg .asm_pattern_arith_reg reg_op .bit_or .comp_instr \ <op> Xd, Xn, Xm
   loc rhs_reg .comp_loc_mut_store_prepared
 end
 
@@ -3122,74 +3125,74 @@ fun: .comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: r
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: .or { -- err } [ .redefine ]
+fun_comp: .bit_or { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .or .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_or .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_ORR_IMM
-  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .or
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bit_or
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise `.or` into a local: `mask or: some_val`.
-fun_comp: or: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Bitwise `.bit_or` into a local: `mask bit_or: some_val`.
+fun_comp: bit_or: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_ORR_REG ASM_OP_ORR_IMM
-  instr' .cf_logical_validate instr' .cf_logical_emit
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit
   .comp_loc_mut_imm
 end
 
-fun_comp: .and { -- err } [ .redefine ]
+fun_comp: .bit_and { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .and .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_and .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_AND_IMM
-  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .and
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bit_and
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise `.and` into a local: `mask and: some_val`.
-fun_comp: and: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Bitwise `.bit_and` into a local: `mask bit_and: some_val`.
+fun_comp: bit_and: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_AND_REG ASM_OP_AND_IMM
-  instr' .cf_logical_validate instr' .cf_logical_emit
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit
   .comp_loc_mut_imm
 end
 
-fun_comp: .xor { -- err } [ .redefine ]
+fun_comp: .bit_xor { -- err } [ .redefine ]
   true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .xor .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_xor .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_EOR_IMM
-  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .xor
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bit_xor
   .cf_fold2_partial_or_fallback
 end
 
-\ Bitwise `.xor` into a local: `mask xor: some_val`.
-fun_comp: xor: { -- err } ( C: "name" -- ) ( E: mask -- )
+\ Bitwise `.bit_xor` into a local: `mask bit_xor: some_val`.
+fun_comp: bit_xor: { -- err } ( C: "name" -- ) ( E: mask -- )
   ASM_OP_EOR_REG ASM_OP_EOR_IMM
-  instr' .cf_logical_validate instr' .cf_logical_emit
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit
   .comp_loc_mut_imm
 end
 
-fun_comp: .lsl { -- err } [ .redefine ]
+fun_comp: .bit_lsl { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .lsl .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_lsl .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_LSL_REG
-  instr' .cf_shift_validate instr' .cf_shift_emit xt'' .lsl
+  instr' .cf_bit_shift_validate instr' .cf_bit_shift_emit xt'' .bit_lsl
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: .lsr { -- err } [ .redefine ]
+fun_comp: .bit_lsr { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .lsr .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_lsr .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_LSR_REG
-  instr' .cf_shift_validate instr' .cf_shift_emit xt'' .lsr
+  instr' .cf_bit_shift_validate instr' .cf_bit_shift_emit xt'' .bit_lsr
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: .asr { -- err } [ .redefine ]
+fun_comp: .bit_asr { -- err } [ .redefine ]
   false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .asr .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_asr .cf_fold_done .ret end
   reg reg1 imm1 consumed ASM_OP_ASR_REG
-  instr' .cf_shift_validate instr' .cf_shift_emit xt'' .asr
+  instr' .cf_bit_shift_validate instr' .cf_bit_shift_emit xt'' .bit_asr
   .cf_fold2_partial_or_fallback
 end
 
@@ -3233,7 +3236,7 @@ fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
 end
 
 \ No partial CF: signed pow2 division needs several biasing instructions,
-\ because `.asr` rounds negative values down, while signed division rounds
+\ because `.bit_asr` rounds negative values down, while signed division rounds
 \ toward zero. Not worth the code size for now.
 fun_comp: / { -- err } [ .redefine ]
   " redundant arithmetic: division by 0 -> 0" { err0 }
@@ -3569,7 +3572,7 @@ end
 
 \ Scale a local by cell size: `cells: some_val`.
 fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
-  3 ASM_OP_LSL_REG instr' .cf_shift_emit .comp_loc_mut_fixed
+  3 ASM_OP_LSL_REG instr' .cf_bit_shift_emit .comp_loc_mut_fixed
 end
 
 fun_comp: /cells { -- err } [ .redefine ]
@@ -3578,7 +3581,7 @@ end
 
 \ Divide a local by cell size: `/cells: some_val`.
 fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
-  3 ASM_OP_ASR_REG instr' .cf_shift_emit .comp_loc_mut_fixed
+  3 ASM_OP_ASR_REG instr' .cf_bit_shift_emit .comp_loc_mut_fixed
 end
 
 fun_comp: +cell { -- err } [ .redefine ]
@@ -3600,7 +3603,7 @@ fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
 end
 
 fun_comp: .odd { -- err }
-  .cf_args_fold1 .then 1 .and .cf_fold_done
+  .cf_args_fold1 .then 1 .bit_and .cf_fold_done
   else
     { -- }
     .comp_args1_reg { reg }
@@ -3641,12 +3644,12 @@ fun_comp: .align_up { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: .invert { -- err } [ .redefine ]
-  .cf_args_fold1 .then .invert .cf_fold_done else { -- } call'' .invert end
+fun_comp: .bit_invert { -- err } [ .redefine ]
+  .cf_args_fold1 .then .bit_invert .cf_fold_done else { -- } call'' .bit_invert end
 end
 
-\ Invert a local: `invert: some_val`.
-fun_comp: invert: { -- err } ( C: "name" -- ) ( E: -- )
+\ Invert a local: `bit_invert: some_val`.
+fun_comp: bit_invert: { -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_unary_init { reg loc }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
   loc reg .comp_loc_mut_store_realloc
@@ -3664,12 +3667,12 @@ fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
   loc reg .comp_loc_mut_store_realloc
 end
 
-fun_comp: .bits_trunc { -- err } [ .redefine ]
+fun_comp: .bit_trunc { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   false 0 err 64 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bits_trunc .cf_fold_done .ret end
+  ok .then reg imm0 imm1 .bit_trunc .cf_fold_done .ret end
   reg reg1 imm1 consumed nil
-  instr' .cf_bits_trunc_validate instr' .cf_logical_emit xt'' .bits_trunc
+  instr' .cf_bit_trunc_validate instr' .cf_bit_logical_emit xt'' .bit_trunc
   .cf_fold2_partial_or_fallback
 end
 
@@ -3677,8 +3680,8 @@ fun_comp: .bits_clear { -- err } [ .redefine ]
   " redundant arithmetic" { err }
   false 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
   ok .then reg imm0 imm1 .bits_clear .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_AND_IMM 1 .or
-  instr' .cf_logical_validate instr' .cf_logical_emit xt'' .bits_clear
+  reg reg1 imm1 consumed ASM_OP_AND_IMM 1 .bit_or
+  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bits_clear
   .cf_fold2_partial_or_fallback
 end
 
@@ -3718,7 +3721,7 @@ fun: .comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
   \ with a load/store with an inline offset when it fits.
   .here_write ASM_INSTR_SIZE - { instr_adr }
   instr_adr .asm_add_imm_decode_at { Xd Xn0 off ok }
-  ok Xd Xn = .and Xn0 Xn = .and { ok }
+  ok Xd Xn = .bit_and Xn0 Xn = .bit_and { ok }
   ok =0 .then false .ret end
 
   Rt Xn off size opc .asm_load_store_byte_off { instr -- ok }
@@ -3820,17 +3823,17 @@ fun:      !culong { val adr -> } ! end
 4 let: PROT_EXEC
 5 let: PROT_RE
 
-1                        let: MAP_SHARED
-2                        let: MAP_PRIVATE
-0x10                     let: MAP_FIXED
-4096                     let: MAP_ANON
-MAP_ANON                 let: MAP_ANONYMOUS
-MAP_PRIVATE MAP_ANON .or let: MAP_DEFAULT
--1                       let: MAP_FAILED
+1                            let: MAP_SHARED
+2                            let: MAP_PRIVATE
+0x10                         let: MAP_FIXED
+4096                         let: MAP_ANON
+MAP_ANON                     let: MAP_ANONYMOUS
+MAP_PRIVATE MAP_ANON .bit_or let: MAP_DEFAULT
+-1                           let: MAP_FAILED
 
 fun: .mem_map { size pflag -- addr err }
   0 size pflag MAP_DEFAULT -1 0 .mmap { addr }
-  addr .invert =0 .then " unable to mmap" .throw end
+  addr .bit_invert =0 .then " unable to mmap" .throw end
   addr
 end
 
@@ -3856,7 +3859,7 @@ fun: .stack_init { size stk -- Err }
   stk size' Stack .memzero \ Ensure deinit-safe.
 
   size PAGE_SIZE .align_up        { size }
-  PAGE_SIZE 1 .lsl size +         { bytelen } \ + space for 2 guards
+  PAGE_SIZE 1 .bit_lsl size +     { bytelen } \ + space for 2 guards
   bytelen PROT_NONE .mem_map .try { cellar }
   cellar PAGE_SIZE +              { floor }
   floor size +                    { ceil }
@@ -3945,7 +3948,7 @@ end
 
 \ Default per-arena memory capacity we use internally.
 \ Apps are free to choose their own arena capacities.
-1 30 .lsl let: CTX_CAP
+1 30 .bit_lsl let: CTX_CAP
 
 \ Initialize context with borrowed memory.
 fun: .ctx_init { buf len ctx }
@@ -4243,8 +4246,8 @@ end
 \ ## Assembler continued
 
 fun: .asm_append_instr { instr out -- out } instr out !32 out 4 + end
-fun: .asm_imm16_lane { val hw -- lane } val hw 4 .lsl .lsr 0xffff .and end
-fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .and - <>0 end
+fun: .asm_imm16_lane { val hw -- lane } val hw 4 .bit_lsl .bit_lsr 0xffff .bit_and end
+fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .bit_and - <>0 end
 
 fun: .asm_append_movk_if_needed { reg neg hw imm out -- out }
   imm hw .asm_imm16_lane { lane }
@@ -4261,8 +4264,8 @@ fun: .asm_append_imm_to_reg { reg imm out -- out }
   imm 0 < { neg }
 
   imm 0 .asm_imm16_lane { lane }
-  lane neg ?invert 0xffff .and { lane }
-  neg =0 1 .lsl { opc }
+  lane neg ?bit_invert 0xffff .bit_and { lane }
+  neg =0 1 .bit_lsl { opc }
   reg opc 0 lane .asm_mov_wide out .asm_append_instr { out } \ movn|movz
 
   reg neg 1 imm out .asm_append_movk_if_needed { out }
@@ -4281,7 +4284,7 @@ end
 
 \ `.strcmp` doesn't like null string pointers.
 fun: .ccompare { cstr0 cstr1 -- cmp }
-  cstr0 cstr1 .or  =0 .then 0
+  cstr0 cstr1 .bit_or  =0 .then 0
   elif cstr0       =0 .then -1
   elif cstr1       =0 .then +1
   else cstr0 cstr1 .strcmp .cint_to_cell
@@ -4581,8 +4584,8 @@ fun: .wordlist_log { dict list_name }
     ind bitset_size / .cells { bitset_off }
     bitsets bitset_off + @   { bitset }
     ind bitset_size .mod     { bit_ind }
-    1 bit_ind .lsl           { bit_mask }
-    bitset bit_mask .and     { live }
+    1 bit_ind .bit_lsl       { bit_mask }
+    bitset bit_mask .bit_and { live }
 
     live =0 .then inc: ind again end
 
@@ -4815,7 +4818,7 @@ fun: .assert_body { beg -- str len err }
 
   ceil 3 - { ceil }
   ceil .dec @b .is_char_whitespace =0 { fail }
-  " end" 3 ceil 3 str<> fail .or { fail }
+  " end" 3 ceil 3 str<> fail .bit_or { fail }
 
   fail .then
     " invalid assertion shape: must be terminated with `end`" .throw
@@ -5004,8 +5007,8 @@ end
 fun: .read_decode_char { -- char err }
   .read_word { buf len }
   buf @b { char }
-  len 1 = char 0x5c <> .and .then char .ret end
-  len 2 = char 0x5c = .and .then buf .inc @b .char_unescape .ret end
+  len 1 = char 0x5c <> .bit_and .then char .ret end
+  len 2 = char 0x5c = .bit_and .then buf .inc @b .char_unescape .ret end
   nil " invalid character literal: expected one non-backslash byte or one escape"
 end
 
@@ -5031,7 +5034,7 @@ fun: .str_until { delim unescape src tar -- src tar err }
       " unexpected EOF while looking for delimiter" .throw
     end
 
-    char char' \\ = unescape .and .then
+    char char' \\ = unescape .bit_and .then
       src @b .char_unescape { char }
       inc: src
     end

@@ -43,7 +43,7 @@ fun: .cf_want_word { XT -- err }
 end
 
 fun: .cf_imm_lane { imm hw -- lane }
-  imm hw 16 * .lsr 0xffff .and
+  imm hw 16 * .bit_lsr 0xffff .bit_and
 end
 
 fun: .cf_base_hw { bits -- hw }
@@ -58,7 +58,7 @@ fun: .cf_want_movk_if { reg neg base_hw hw bits }
   bits hw .cf_imm_lane { lane }
   hw base_hw <> .then
     lane .then
-      neg .then lane .invert 0xffff .and else lane end { imm16 }
+      neg .then lane .bit_invert 0xffff .bit_and else lane end { imm16 }
       reg 0b11 hw imm16 .asm_mov_wide .cf_want_instr
     end
   end
@@ -66,7 +66,7 @@ end
 
 fun: .cf_want_load { reg imm }
   imm <0 { neg }
-  neg .then imm .invert else imm end { bits }
+  neg .then imm .bit_invert else imm end { bits }
   neg .then 0b00 else 0b10 end { opc }
 
   bits .cf_base_hw { hw }
@@ -174,7 +174,7 @@ fun: .const_fold_multi_out_fun { -- out0 out1 out2 out3 out4 out5 out6 }
   41 .inc
   43 .dec
   42 .negate
-  0 .invert
+  0 .bit_invert
   -42 .abs
   0 .bit_len
   255 .bit_len
@@ -280,24 +280,24 @@ end
 .test_const_fold_zero_cmp
 
 fun: .const_fold_bit_shift_fun { -- out0 out1 out2 out3 out4 out5 }
-  0b1010 0b1100 .or
-  0b1010 0b1100 .and
-  0b1010 0b1100 .xor
-  3 4 .lsl
-  64 3 .lsr
-  -64 2 .asr
+  0b1010 0b1100 .bit_or
+  0b1010 0b1100 .bit_and
+  0b1010 0b1100 .bit_xor
+  3 4 .bit_lsl
+  64 3 .bit_lsr
+  -64 2 .bit_asr
 end
 
-fun: .const_fold_lsl_imm_fun { val -- out } val 3 .lsl end
-fun: .const_fold_lsr_imm_fun { val -- out } val 3 .lsr end
-fun: .const_fold_asr_imm_fun { val -- out } val 2 .asr end
-fun: .const_fold_or_rhs_imm_fun { val -- out } val 0xff .or end
-fun: .const_fold_and_rhs_imm_fun { val -- out } val 0xff .and end
-fun: .const_fold_xor_rhs_imm_fun { val -- out } val 0xff .xor end
+fun: .const_fold_bit_lsl_imm_fun { val -- out } val 3 .bit_lsl end
+fun: .const_fold_bit_lsr_imm_fun { val -- out } val 3 .bit_lsr end
+fun: .const_fold_bit_asr_imm_fun { val -- out } val 2 .bit_asr end
+fun: .const_fold_bit_or_rhs_imm_fun { val -- out } val 0xff .bit_or end
+fun: .const_fold_bit_and_rhs_imm_fun { val -- out } val 0xff .bit_and end
+fun: .const_fold_bit_xor_rhs_imm_fun { val -- out } val 0xff .bit_xor end
 fun: .const_fold_is_aligned_rhs_imm_fun { val -- out } val 8 .is_aligned_to end
 fun: .const_fold_align_down_rhs_imm_fun { val -- out } val 16 .align_down end
 fun: .const_fold_align_up_rhs_imm_fun { val -- out } val 16 .align_up end
-fun: .const_fold_bits_trunc_rhs_imm_fun { val -- out } val 8 .bits_trunc end
+fun: .const_fold_bit_trunc_rhs_imm_fun { val -- out } val 8 .bit_trunc end
 fun: .const_fold_bit_mask_get_rhs_imm_fun { val -- out } val 0b111111110000 .bit_mask_get end
 
 fun: .test_const_fold_bit_shift { -- err }
@@ -320,13 +320,13 @@ fun: .test_const_fold_bit_shift { -- err }
   .cf_want_ret
   xt' .const_fold_bit_shift_fun .cf_want_word
 
-  0 0 3 .asm_lsl_imm xt' .const_fold_lsl_imm_fun .cf_want_word1
-  0 0 3 .asm_lsr_imm xt' .const_fold_lsr_imm_fun .cf_want_word1
-  0 0 2 .asm_asr_imm xt' .const_fold_asr_imm_fun .cf_want_word1
+  0 0 3 .asm_lsl_imm xt' .const_fold_bit_lsl_imm_fun .cf_want_word1
+  0 0 3 .asm_lsr_imm xt' .const_fold_bit_lsr_imm_fun .cf_want_word1
+  0 0 2 .asm_asr_imm xt' .const_fold_bit_asr_imm_fun .cf_want_word1
 
-  0 0 0xff .asm_orr_imm xt' .const_fold_or_rhs_imm_fun .cf_want_word1
-  0 0 0xff .asm_and_imm xt' .const_fold_and_rhs_imm_fun .cf_want_word1
-  0 0 0xff .asm_eor_imm xt' .const_fold_xor_rhs_imm_fun .cf_want_word1
+  0 0 0xff .asm_orr_imm xt' .const_fold_bit_or_rhs_imm_fun .cf_want_word1
+  0 0 0xff .asm_and_imm xt' .const_fold_bit_and_rhs_imm_fun .cf_want_word1
+  0 0 0xff .asm_eor_imm xt' .const_fold_bit_xor_rhs_imm_fun .cf_want_word1
 
   0 7 .asm_tst_imm { instr0 }
   0 ASM_EQ .asm_cset { instr1 }
@@ -336,7 +336,7 @@ fun: .test_const_fold_bit_shift { -- err }
   0 0 15 .asm_add_imm { instr0 }
   0 0 -16 .asm_and_imm { instr1 }
   instr0 instr1 xt' .const_fold_align_up_rhs_imm_fun .cf_want_word2
-  0 0 0xff .asm_and_imm xt' .const_fold_bits_trunc_rhs_imm_fun .cf_want_word1
+  0 0 0xff .asm_and_imm xt' .const_fold_bit_trunc_rhs_imm_fun .cf_want_word1
   0 0 0b111111110000 .asm_and_imm { instr0 }
   0 0 4 .asm_lsr_imm { instr1 }
   instr0 instr1 xt' .const_fold_bit_mask_get_rhs_imm_fun .cf_want_word2
@@ -350,16 +350,16 @@ end
 .test_const_fold_bit_mask_errors
 
 fun: .test_const_fold_redundant_arith_errors { -- Err }
-  use' ./fail/test_const_fold_redundant_logical.af
+  use' ./fail/test_const_fold_redundant_bit_logical.af
   " redundant arithmetic" .assert_str_has .try
 
   use' ./fail/test_const_fold_redundant_addsub.af
   " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_shift.af
+  use' ./fail/test_const_fold_redundant_bit_shift.af
   " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_const_shift.af
+  use' ./fail/test_const_fold_redundant_const_bit_shift.af
   " redundant arithmetic" .assert_str_has .try
 
   use' ./fail/test_const_fold_redundant_mul_zero.af
@@ -428,7 +428,7 @@ fun: .test_const_fold_redundant_arith_errors { -- Err }
   use' ./fail/test_const_fold_redundant_is_aligned.af
   " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_bits_trunc.af
+  use' ./fail/test_const_fold_redundant_bit_trunc.af
   " redundant arithmetic" .assert_str_has .try
 
   use' ./fail/test_const_fold_redundant_bits_clear.af
@@ -659,7 +659,7 @@ end
 
 
 fun: .const_fold_low_bits_fun { -- out } 5 .low_bits end
-fun: .const_fold_bits_trunc_fun { -- out } 0b10110101 4 .bits_trunc end
+fun: .const_fold_bit_trunc_fun { -- out } 0b10110101 4 .bit_trunc end
 fun: .const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 .bits_clear end
 fun: .const_fold_bits_clear_imm_fun { val -- out } val 0xff .bits_clear end
 fun: .const_fold_bit_mask_get_fun { -- out }
@@ -670,7 +670,7 @@ fun: .test_const_fold_bits { -- err }
   .has_interp =0 .then .ret end
 
   31 xt' .const_fold_low_bits_fun .cf_want_load_word
-  5 xt' .const_fold_bits_trunc_fun .cf_want_load_word
+  5 xt' .const_fold_bit_trunc_fun .cf_want_load_word
   0b11000011 xt' .const_fold_bits_clear_fun .cf_want_load_word
   0b100011 xt' .const_fold_bit_mask_get_fun .cf_want_load_word
 

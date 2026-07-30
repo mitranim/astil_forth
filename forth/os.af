@@ -361,28 +361,28 @@ end
 
 \ Translations of C macros for unpacking wait-status from `waitpid`.
 \ Wait-status layout is platform-defined; these are Darwin-specific.
-fun: .WSTATUS     { wstat -> val  } 0o177 .and end
-fun: .WEXITSTATUS { wstat -> code } 8 .lsr 0xff .and end
+fun: .WSTATUS     { wstat -> val  } 0o177 .bit_and end
+fun: .WEXITSTATUS { wstat -> code } 8 .bit_lsr 0xff .bit_and end
 fun: .WTERMSIG    { wstat -> sig  } .WSTATUS end
-fun: .WSTOPSIG    { wstat -> sig  } 8 .lsr end
+fun: .WSTOPSIG    { wstat -> sig  } 8 .bit_lsr end
 fun: .WIFEXITED   { wstat -> yes  } .WSTATUS =0 end
 
 fun: .WIFSIGNALED { wstat -- yes  }
   wstat .WSTATUS 0o177 <> { val }
   wstat .WSTATUS <>0
-  val .and
+  val .bit_and
 end
 
 fun: .WIFSTOPPED { wstat -- yes }
   wstat .WSTATUS 0o177 = { val }
   wstat .WSTOPSIG SIGCONT <>
-  val .and
+  val .bit_and
 end
 
 fun: .WIFCONTINUED { wstat -- yes }
   wstat .WSTATUS 0o177 = { val }
   wstat .WSTOPSIG SIGCONT =
-  val .and
+  val .bit_and
 end
 
 1 1 extern: .wait        wait        ( wstat                 -- pid|-1      :Cint )

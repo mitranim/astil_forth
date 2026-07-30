@@ -11,7 +11,7 @@ use' ./lang.af
 \ when mapping it for your context. The OS lazily allocates real memory
 \ in page-sized chunks, on demand via page faults.
 
-1 22 .lsl let: ARENA_PAGE_MIN
+1 22 .bit_lsl let: ARENA_PAGE_MIN
 4096      let: ARENA_PAGES
 
 struct: Arena

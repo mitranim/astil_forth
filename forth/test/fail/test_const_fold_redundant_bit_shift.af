@@ -1,0 +1,2 @@
+use' ../../lang.af
+fun: .test_const_fold_redundant_bit_shift { val -- out } val 0 .bit_lsl end

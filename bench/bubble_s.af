@@ -6,7 +6,7 @@ use' lang_s.af
 
 fun: .list_ceil ( list len -- ceil ) .cells + end
 
-fun: .pseudo_random ( seed -- val ) 1309 * 13849 + 65535 .and end
+fun: .pseudo_random ( seed -- val ) 1309 * 13849 + 65535 .bit_and end
 
 fun: .list_init { list len -- }
   74755 { seed }

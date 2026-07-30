@@ -38,7 +38,7 @@ fun: .test_proc_stdin { argv -- Err }
 end
 
 fun: .test_proc_stdin_early_close { argv -- Err }
-  1 20 .lsl { len }
+  1 20 .bit_lsl { len }
   len 1 .ctx_alloc .try { buf }
   buf len 0x55 .memfill
 

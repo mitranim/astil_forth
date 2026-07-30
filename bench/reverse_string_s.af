@@ -15,7 +15,7 @@ end
 fun: .run
   s" 0123456789abcdef" { str len }
 
-  1 25 .lsl .for
+  1 25 .bit_lsl .for
     str len .reverse
   end
   str len .reverse

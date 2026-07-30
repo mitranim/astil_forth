@@ -758,7 +758,7 @@ end
 .test_catch_1
 
 fun: .test_catch_2_cond ( one two -- three four )
-  .dup2 <>0 .swap <>0 .and .then * .dup .ret end
+  .dup2 <>0 .swap <>0 .bit_and .then * .dup .ret end
   .drop2
   .test_throw
 end

@@ -39,14 +39,14 @@ fun: .scan { buf len dels -- out }
   loop
     buf ceil < .while
     buf @ { val }
-    val         0xff .and dels + @b +
-    val  8 .lsr 0xff .and dels + @b +
-    val 16 .lsr 0xff .and dels + @b +
-    val 24 .lsr 0xff .and dels + @b +
-    val 32 .lsr 0xff .and dels + @b +
-    val 40 .lsr 0xff .and dels + @b +
-    val 48 .lsr 0xff .and dels + @b +
-    val 56 .lsr           dels + @b +
+    val             0xff .bit_and dels + @b +
+    val  8 .bit_lsr 0xff .bit_and dels + @b +
+    val 16 .bit_lsr 0xff .bit_and dels + @b +
+    val 24 .bit_lsr 0xff .bit_and dels + @b +
+    val 32 .bit_lsr 0xff .bit_and dels + @b +
+    val 40 .bit_lsr 0xff .bit_and dels + @b +
+    val 48 .bit_lsr 0xff .bit_and dels + @b +
+    val 56 .bit_lsr               dels + @b +
     +cell: buf
   end
 end

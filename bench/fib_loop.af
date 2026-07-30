@@ -11,7 +11,7 @@ fun: .fib { ind -- out }
 end
 
 fun: .run { -- err }
-  1 22 .lsl { runs }
+  1 22 .bit_lsl { runs }
   0 { out }
   loop
     runs .while

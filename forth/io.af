@@ -155,13 +155,13 @@ end
 0x00020000 let: O_NOCTTY          \ do not acquire controlling terminal
 0x01000000 let: O_CLOEXEC         \ mark as close-on-exec
 
-\ Exactly one of these must be `.or`d into flags in `.open`.
+\ Exactly one of these must be `.bit_or`d into flags in `.open`.
 \ Note that `.fopen` and `.fdopen` take a STRING as mode!
 0                      let: O_RDONLY  \ open for reading only
 1                      let: O_WRONLY  \ open for writing only
 2                      let: O_RDWR    \ open for reading and writing
 0x40000000             let: O_EXEC    \ open file for execute only
-O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
+O_EXEC O_DIRECTORY .bit_or let: O_SEARCH  \ open directory for search only
 
 \ `<fcntl.h>` descriptor and record-lock operations; macOS 15.5 ABI.
 -2     let: AT_FDCWD
@@ -213,13 +213,13 @@ O_EXEC O_DIRECTORY .or let: O_SEARCH  \ open directory for search only
 0o002    let: S_IWOTH
 0o001    let: S_IXOTH
 
-fun: .S_ISFIFO { mode -> bool } S_IFMT .and S_IFIFO  = end
-fun: .S_ISCHR  { mode -> bool } S_IFMT .and S_IFCHR  = end
-fun: .S_ISDIR  { mode -> bool } S_IFMT .and S_IFDIR  = end
-fun: .S_ISBLK  { mode -> bool } S_IFMT .and S_IFBLK  = end
-fun: .S_ISREG  { mode -> bool } S_IFMT .and S_IFREG  = end
-fun: .S_ISLNK  { mode -> bool } S_IFMT .and S_IFLNK  = end
-fun: .S_ISSOCK { mode -> bool } S_IFMT .and S_IFSOCK = end
+fun: .S_ISFIFO { mode -> bool } S_IFMT .bit_and S_IFIFO  = end
+fun: .S_ISCHR  { mode -> bool } S_IFMT .bit_and S_IFCHR  = end
+fun: .S_ISDIR  { mode -> bool } S_IFMT .bit_and S_IFDIR  = end
+fun: .S_ISBLK  { mode -> bool } S_IFMT .bit_and S_IFBLK  = end
+fun: .S_ISREG  { mode -> bool } S_IFMT .bit_and S_IFREG  = end
+fun: .S_ISLNK  { mode -> bool } S_IFMT .bit_and S_IFLNK  = end
+fun: .S_ISSOCK { mode -> bool } S_IFMT .bit_and S_IFSOCK = end
 
 \ `<dirent.h>` entry kinds.
 0  let: DT_UNKNOWN
@@ -555,7 +555,7 @@ end
 \
 \ We're not interested in non-atomic open->`fcntl` fallbacks.
 fun: .fd_pipe { -- fd_read fd_write Err }
-  size' Cint 1 .lsl .alloca { pipes }
+  size' Cint 1 .bit_lsl .alloca { pipes }
 
   pipes .pipe .then
     .errno " unable to create pipe" .os_err { err }
@@ -578,7 +578,7 @@ fun: .fd_pipe { -- fd_read fd_write Err }
 end
 
 fun: .fd_open { path mode -> fdes err }
-  O_CLOEXEC .or .open .cint_to_cell nil { out err }
+  O_CLOEXEC .bit_or .open .cint_to_cell nil { out err }
   out <0 .then .errno " open" path .io_err { err } end
   out err
 end
@@ -651,7 +651,7 @@ fun: .fd_copy_with { src_fd out_fd buf cap -- err }
 end
 
 fun: .fd_copy { src_fd out_fd -- err }
-  1 16 .lsl { cap }
+  1 16 .bit_lsl { cap }
   src_fd out_fd cap .alloca cap .fd_copy_with
 end
 

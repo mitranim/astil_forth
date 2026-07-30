@@ -54,7 +54,7 @@ fun: .run { -- err }
   loop
     depth max_dep <= .while
     0 { count }
-    1 max_dep depth - min_dep + .lsl { iters }
+    1 max_dep depth - min_dep + .bit_lsl { iters }
     iters { runs }
 
     loop

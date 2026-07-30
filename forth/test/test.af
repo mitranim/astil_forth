@@ -465,23 +465,23 @@ fun: .test_control_meta { -- err }
 
   3 CONT_MASK_INP_LEN nil .bit_mask_set { meta }
   0 CONT_MASK_OUT_LEN meta .bit_mask_set
-  CONT_MASK_HAS_OUT .or { meta }
+  CONT_MASK_HAS_OUT .bit_or { meta }
   assert= meta CONT_MASK_INP_LEN .bit_mask_get 3 end
   assert= meta CONT_MASK_OUT_LEN .bit_mask_get 0 end
-  assert meta CONT_MASK_HAS_OUT .and end
+  assert meta CONT_MASK_HAS_OUT .bit_and end
 
   .interp_instrs { instr_adr }
   instr_adr .instr_off meta .cont_meta_instr_off_set { meta }
   assert= meta .cont_meta_instr_adr instr_adr end
 
   assert= CONT_MASK_INSTR_OFF .bit_ctz 32 end
-  assert= CONT_MASK_INSTR_OFF 32 .low_bits .and 0 end
+  assert= CONT_MASK_INSTR_OFF 32 .low_bits .bit_and 0 end
   assert=
     CONT_MASK_INP_LEN
-    CONT_MASK_OUT_LEN .or
-    CONT_MASK_HAS_OUT .or
-    CONT_MASK_BRANCH_TYPE .or
-    CONT_MASK_INSTR_INFO .or
+    CONT_MASK_OUT_LEN .bit_or
+    CONT_MASK_HAS_OUT .bit_or
+    CONT_MASK_BRANCH_TYPE .bit_or
+    CONT_MASK_INSTR_INFO .bit_or
     32 .low_bits
   end
 end
@@ -840,7 +840,7 @@ fun: .test_word_has_branch_cond { XT cond -- bool }
   loop
     ind len < .while
     XT ind .test_actual_instr { instr }
-    instr mask .and match = instr 0xf .and cond = .and .then true .ret end
+    instr mask .bit_and match = instr 0xf .bit_and cond = .bit_and .then true .ret end
     inc: ind
   end
   false
@@ -863,7 +863,7 @@ fun: .test_word_has_cbnz { XT -- bool }
   0 { ind }
   loop
     ind len < .while
-    XT ind .test_actual_instr 24 .lsr 0xff .and 0xb5 = .then
+    XT ind .test_actual_instr 24 .bit_lsr 0xff .bit_and 0xb5 = .then
       true .ret
     end
     inc: ind
@@ -1452,50 +1452,50 @@ fun: .test_asm_csel_order { -- err }
 end
 .test_asm_csel_order
 
-fun: .test_or { -- err }
-  assert= 0b110101 0b001010 .or 0b111111 end
+fun: .test_bit_or { -- err }
+  assert= 0b110101 0b001010 .bit_or 0b111111 end
   0b110101 { val }
-  assert= val 0b001010 .or 0b111111 end
-  assert= 0b001010 val .or 0b111111 end
-  0b001010 or: val
+  assert= val 0b001010 .bit_or 0b111111 end
+  assert= 0b001010 val .bit_or 0b111111 end
+  0b001010 bit_or: val
   assert= val 0b111111 end
 end
-.test_or
+.test_bit_or
 
-fun: .test_and { -- err }
-  assert= 0b110101 0b101010 .and 0b100000 end
+fun: .test_bit_and { -- err }
+  assert= 0b110101 0b101010 .bit_and 0b100000 end
   0b110101 { val }
-  assert= val 0b101010 .and 0b100000 end
-  assert= 0b101010 val .and 0b100000 end
-  0b101010 and: val
+  assert= val 0b101010 .bit_and 0b100000 end
+  assert= 0b101010 val .bit_and 0b100000 end
+  0b101010 bit_and: val
   assert= val 0b100000 end
 end
-.test_and
+.test_bit_and
 
-fun: .test_xor { -- err }
-  assert= 0b110101 0b101010 .xor 0b011111 end
+fun: .test_bit_xor { -- err }
+  assert= 0b110101 0b101010 .bit_xor 0b011111 end
   0b110101 { val }
-  assert= val 0b101010 .xor 0b011111 end
-  assert= 0b101010 val .xor 0b011111 end
-  0b101010 xor: val
+  assert= val 0b101010 .bit_xor 0b011111 end
+  assert= 0b101010 val .bit_xor 0b011111 end
+  0b101010 bit_xor: val
   assert= val 0b011111 end
 end
-.test_xor
+.test_bit_xor
 
-fun: .test_lsl { -- err }
-  assert= 3 4 .lsl 48 end
+fun: .test_bit_lsl { -- err }
+  assert= 3 4 .bit_lsl 48 end
 end
-.test_lsl
+.test_bit_lsl
 
-fun: .test_lsr { -- err }
-  assert= 48 4 .lsr 3 end
+fun: .test_bit_lsr { -- err }
+  assert= 48 4 .bit_lsr 3 end
 end
-.test_lsr
+.test_bit_lsr
 
-fun: .test_asr { -- err }
-  assert= -128 2 .asr -32 end
+fun: .test_bit_asr { -- err }
+  assert= -128 2 .bit_asr -32 end
 end
-.test_asr
+.test_bit_asr
 
 fun: .test_add { -- err }
   assert= 234 123 + 357 end
@@ -2101,14 +2101,14 @@ fun: .test_align_up { -- err }
 end
 .test_align_up
 
-fun: .test_invert { -- err }
-  assert= 0b101010 .invert -43 end
+fun: .test_bit_invert { -- err }
+  assert= 0b101010 .bit_invert -43 end
   0b101010 { val }
-  assert= val .invert -43 end
-  invert: val
+  assert= val .bit_invert -43 end
+  bit_invert: val
   assert= val -43 end
 end
-.test_invert
+.test_bit_invert
 
 fun: .test_low_bits { -- err }
   assert= 5 .low_bits 31 end
@@ -2119,10 +2119,10 @@ fun: .test_low_bits { -- err }
 end
 .test_low_bits
 
-fun: .test_bits_trunc { -- err }
-  assert= 0x1234 8 .bits_trunc 0x34 end
+fun: .test_bit_trunc { -- err }
+  assert= 0x1234 8 .bit_trunc 0x34 end
 end
-.test_bits_trunc
+.test_bit_trunc
 
 fun: .test_bits_clear { -- err }
   assert= 0b1001000110100 0b11110000 .bits_clear 0b1001000000100 end
@@ -3996,12 +3996,12 @@ fun: .main_run { -- err }
   .test_load_store_typed
   .test_load_store_exec
   .test_load_store_pair_swap
-  .test_or
-  .test_and
-  .test_xor
-  .test_lsl
-  .test_lsr
-  .test_asr
+  .test_bit_or
+  .test_bit_and
+  .test_bit_xor
+  .test_bit_lsl
+  .test_bit_lsr
+  .test_bit_asr
   .test_add
   .test_sub
   .test_mul
@@ -4050,9 +4050,9 @@ fun: .main_run { -- err }
   .test_is_aligned_to
   .test_align_down
   .test_align_up
-  .test_invert
+  .test_bit_invert
   .test_low_bits
-  .test_bits_trunc
+  .test_bit_trunc
   .test_bits_clear
   .test_bit_mask_get
   .test_bit_mask_set

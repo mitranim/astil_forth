@@ -32,7 +32,7 @@ fun: .run_loop { _count -- _out }
 end
 
 fun: .run { -- err }
-  1 22 .lsl .run_loop
+  1 22 .bit_lsl .run_loop
   assert= 7540113804746346429 end
 end
 .run

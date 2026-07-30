@@ -25,7 +25,7 @@ fun: .fnv1a64 { hash buf len -- hash }
   hash
   loop
     buf ceil < .while
-    buf @b .xor FNV_PRIME *
+    buf @b .bit_xor FNV_PRIME *
     inc: buf
   end
 end

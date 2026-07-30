@@ -93,7 +93,7 @@ Easy self-assembly (Arm64):
 \ add Xd, Xn, Xm
 fun: .asm_add_reg { Xd Xn Xm -- instr }
   Xd Xn Xm .asm_pattern_arith_reg
-  0b1_0_0_01011_00_0_00000_000000_00000_00000 .or
+  0b1_0_0_01011_00_0_00000_000000_00000_00000 .bit_or
 end
 
 \ add x0, x0, x1

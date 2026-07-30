@@ -61,7 +61,7 @@ fun: .run
   min_dep { depth }
   loop
     depth max_dep <= .while
-    1 max_dep depth - min_dep + .lsl { iters }
+    1 max_dep depth - min_dep + .bit_lsl { iters }
 
     0
     iters .for

@@ -24,7 +24,7 @@ end
 fun: .fnv1a64 { buf len -- hash }
   buf { ptr }
   len .for
-    ptr c@ .xor PRIME *
+    ptr c@ .bit_xor PRIME *
     inc: ptr
   end
 end

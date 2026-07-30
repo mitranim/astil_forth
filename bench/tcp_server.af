@@ -16,7 +16,7 @@ fun: .handle { conn -- out }
   loop
     conn byte 1 MSG_WAITALL .recv 1 <> .then .abort end
     byte @b { input }
-    input DATA <> input CLOSE <> .and .then .abort end
+    input DATA <> input CLOSE <> .bit_and .then .abort end
     conn byte 1 0 .send 1 <> .then .abort end
     input CLOSE = .then leave end
   end

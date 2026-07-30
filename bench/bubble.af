@@ -4,7 +4,7 @@ use' lang.af
 
 fun: .list_ceil { list len -> adr } .cells + end
 
-fun: .pseudo_random { seed -> val } 1309 * 13849 + 65535 .and end
+fun: .pseudo_random { seed -> val } 1309 * 13849 + 65535 .bit_and end
 
 fun: .list_init { list len -> }
   .list_ceil { ceil }

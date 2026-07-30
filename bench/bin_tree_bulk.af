@@ -7,7 +7,7 @@ struct: Node
   Adr 1 field: .Node_right
 end
 
-fun: .node_tree_len { dep -- len } 2 dep .lsl .dec end
+fun: .node_tree_len { dep -- len } 2 dep .bit_lsl .dec end
 
 fun: .node_tree_init { dep -- node err }
   dep .node_tree_len { len }
@@ -20,7 +20,7 @@ fun: .node_tree_init { dep -- node err }
   loop
     ind ceil < .while
     ind size' Node * root + { node }
-    ind 1 .lsl .inc size' Node * root + { next }
+    ind 1 .bit_lsl .inc size' Node * root + { next }
     next node .Node_left  !
     next size' Node + node .Node_right !
     inc: ind
@@ -60,7 +60,7 @@ fun: .run { -- err }
   loop
     depth max_dep <= .while
     0 { count }
-    1 max_dep depth - min_dep + .lsl { iters }
+    1 max_dep depth - min_dep + .bit_lsl { iters }
     iters { runs }
 
     loop

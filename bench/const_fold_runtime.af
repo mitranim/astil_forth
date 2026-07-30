@@ -2,11 +2,11 @@ use' lang.af
 
 \ BOT-GENERATED
 
-1 28 .lsl let: RUNS
+1 28 .bit_lsl let: RUNS
 214 RUNS * let: WANT
 
 fun: .runtime_const { seed -- val }
-  seed seed - 11 + 22 + 333 + 44 - 5 * 6 / 7 .mod 8 .lsl 9 .or 10 .xor 3 .and
+  seed seed - 11 + 22 + 333 + 44 - 5 * 6 / 7 .mod 8 .bit_lsl 9 .bit_or 10 .bit_xor 3 .bit_and
   40 .max 50 .min 4 .cells + 24 /cells + 99 0 .coalesce + 37 8 .align_up +
 end
 

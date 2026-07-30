@@ -18,7 +18,7 @@ fun: .run { -- err }
   str src len .memcpy
   nil str len + !b
 
-  1 25 .lsl { ind }
+  1 25 .bit_lsl { ind }
   loop
     ind .while
     dec: ind
