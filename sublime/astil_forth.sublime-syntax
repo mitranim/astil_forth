@@ -255,6 +255,15 @@ contexts:
   # Convention for word-declaring words.
   # TODO: scope functions / constants / variables / types differently.
   declaring-word-match:
+    - match: '{{word_begin}}(:){{word_end}}\s+({{word}}){{word_end}}'
+      scope: meta.declaration.astil_forth
+      captures:
+        1: keyword.declaration.astil_forth
+        2: variable.declaration.astil_forth
+      push:
+        - include: braces-params-match
+        - include: nonblank-pop
+
     - match: '{{word_begin}}({{mod}})?({{declarator}})(:){{word_end}}\s+({{word}}){{word_end}}'
       scope: meta.declaration.astil_forth
       captures:
