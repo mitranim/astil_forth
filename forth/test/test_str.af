@@ -1,0 +1,34 @@
+use' ../str.af
+
+256 mem: TEST_CHAR_SET_0
+256 mem: TEST_CHAR_SET_1
+
+fun: .test_char_set_standalone { -- err }
+  " aZ0" TEST_CHAR_SET_0 .char_set_add_str
+
+  assert= char' a TEST_CHAR_SET_0 .char_set_has true end
+  assert= char' Z TEST_CHAR_SET_0 .char_set_has true end
+  assert= char' 0 TEST_CHAR_SET_0 .char_set_has true end
+  assert= char' x TEST_CHAR_SET_0 .char_set_has false end
+  assert=       0 TEST_CHAR_SET_0 .char_set_has false end
+end
+
+fun: .test_char_set_merged { -- err }
+  " ab" TEST_CHAR_SET_0 .char_set_add_str
+  " bc" TEST_CHAR_SET_1 .char_set_add_str
+  true 255 TEST_CHAR_SET_0 + !b
+  TEST_CHAR_SET_0 TEST_CHAR_SET_1 .char_set_add_set
+
+  assert= char' a TEST_CHAR_SET_1 .char_set_has true end
+  assert= char' b TEST_CHAR_SET_1 .char_set_has true end
+  assert= char' c TEST_CHAR_SET_1 .char_set_has true end
+  assert= char' d TEST_CHAR_SET_1 .char_set_has false end
+  assert=     255 TEST_CHAR_SET_1 .char_set_has true end
+end
+
+fun: .test_str_all { -- err }
+  .test_char_set_standalone
+  .test_char_set_merged
+end
+
+.test_str_all

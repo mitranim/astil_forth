@@ -4113,6 +4113,7 @@ s" ./test_import_empty.af" .use
 
 use' ./test_const_fold.af
 use' ./test_simd.af
+use' ./test_str.af
 use' ./test_fmt.af
 
 \ For AOT-compiled testing. Must call every runtime test which is also called
@@ -4291,6 +4292,7 @@ fun: .main_run { -- err }
   .test_escaped_literals
   .test_const_fold_all
   .test_simd_asm
+  .test_str_all
   .test_fmt
 end
 

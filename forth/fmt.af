@@ -19,3 +19,28 @@ fun: .bytes_to_hex_str { src len -- tar len err }
   nil cur !b \ null terminator
   tar tar_len
 end
+
+\ See `.url_fmt` for usage example.
+fun: .fmt_field_slice { name str len some file -- some }
+  str .then
+    file
+    some .then "  %s=%.*s" else " %s=%.*s" end
+    name len str .fmtf
+  end
+  some str .coalesce
+end
+
+\ Comptime equivalent of this runtime code:
+\
+\   fun: .bool_str { val -> } .then " true" else " false" end
+\
+\ TODO: get rid of such hacks.
+fun_comp: .bool_str { -- err }
+  xt'' .then .call_xt
+  s" true" .comp_cstr
+  xt'' else .call_xt
+  s" false" .comp_cstr
+  call'' end
+end
+
+fun: .bool_str { val -> str } .bool_str end

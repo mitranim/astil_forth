@@ -1578,6 +1578,14 @@ fun: .init_data_word { name name_len adr -- err }
   [ false .comp_only ]
 end
 
+3 0 extern: .memset memset ( buf char len -- )
+
+fun: .comp_alloc_zero { size align -- adr err }
+  size align .comp_alloc_data { adr }
+  adr nil size .memset
+  adr
+end
+
 \ Similar to standard `variable`, but takes an initial value like `let:`.
 fun: var: { val -- err } ( C: "name" -- ) ( E: -- adr )
   CELL CELL .comp_alloc_data { adr }
@@ -1586,10 +1594,9 @@ fun: var: { val -- err } ( C: "name" -- ) ( E: -- adr )
 end
 
 \ Shortcut for the standard idiom `create <name> N allot`.
-\ Like `buf:` but doesn't return capacity.
-\ Initial memory content is undefined.
+\ Like `buf:` but doesn't return capacity. Memory is zero.
 fun: mem: { cap -- err } ( C: "name" -- ) ( E: -- buf )
-  cap CELL .comp_alloc_data { buf }
+  cap CELL .comp_alloc_zero { buf }
   .read_word buf .init_data_word
 end
 
@@ -1609,9 +1616,7 @@ end
 
 \ Similar to the standard idiom `create <name> N allot`.
 \ Creates a global variable which refers to a buffer of
-\ at least the given size in bytes.
-\
-\ Initial memory content is undefined.
+\ at least the given size in bytes. Zero-inits memory.
 \
 \ The buffer is allocated in the compiler-managed data region,
 \ which is preserved in AOT compilation. Changes to this data
@@ -1623,7 +1628,7 @@ end
 \ stored in another static variable, or used to derive an address
 \ which would be stored in another static variable.
 fun: buf: { len -- err } ( C: "name" -- ) ( E: -- buf len )
-  len CELL .comp_alloc_data { buf }
+  len CELL .comp_alloc_zero { buf }
   .read_word buf len .init_slice_word
   [ false .comp_only ]
 end
@@ -1644,7 +1649,6 @@ end
 1 0 extern: .free           free           ( addr -- )
 2 1 extern: .aligned_alloc  aligned_alloc  ( align size -- addr )
 3 1 extern: .posix_memalign posix_memalign ( out align size -- err  :Cint )
-3 0 extern: .memset         memset         ( buf char len -- )
 3 0 extern: .memcpy         memcpy         ( out src len -- )
 3 0 extern: .memmove        memmove        ( out src len -- )
 3 1 extern: .memcmp         memcmp         ( adr0 adr1 len -- cmp :Cint )

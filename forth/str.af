@@ -1,0 +1,76 @@
+use' ./lang.af
+
+fun: .char_set_has { char set -> bool } + @b end
+
+fun: .char_set_add_str { str set }
+  loop
+    str @b { char }
+    char .while
+    inc: str
+    true char set + !b
+  end
+end
+
+\ Performs bitwise "or" of source charset into target charset.
+\ Both sets must be cell-aligned and exactly 256 bytes wide.
+fun: .char_set_add_set { src tar }
+  256 /cells { ind }
+  loop
+    ind .while
+    dec: ind
+    src @ tar @ .bit_or tar !
+    +cell: src
+    +cell: tar
+  end
+end
+
+256 mem: CHAR_SET_DECIMAL
+" 0123456789" CHAR_SET_DECIMAL .char_set_add_str
+
+256 mem: CHAR_SET_LETTER
+" ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+CHAR_SET_LETTER .char_set_add_str
+
+256 mem: CHAR_SET_ALNUM
+CHAR_SET_DECIMAL CHAR_SET_ALNUM .char_set_add_set
+CHAR_SET_LETTER  CHAR_SET_ALNUM .char_set_add_set
+
+256 mem: CHAR_SET_HEXDIG
+CHAR_SET_DECIMAL CHAR_SET_HEXDIG .char_set_add_set
+" ABCDEFabcdef" CHAR_SET_HEXDIG .char_set_add_str
+
+\ Parsing shortcut for byte spans. Usage:
+\
+\   loop
+\     floor ceil .span_next { char } .while inc: floor
+\   end
+fun: .span_next { floor ceil -- ok char }
+  floor ceil < .then true floor @b else false nil end
+end
+
+\ Parsing shortcut for strings. Usage:
+\
+\   loop
+\     floor ceil .str_next { char } char .while inc: floor
+\   end
+fun: .str_next { floor ceil -- char }
+  floor ceil < .then floor @b else nil end
+end
+
+fun: .scan_until_char { floor ceil delim -- delim top }
+  loop
+    floor ceil .span_next { char } .while
+    char delim = .then char floor .ret end
+    inc: floor
+  end
+  nil floor
+end
+
+fun: .scan_until_any { floor ceil delims -- delim top }
+  loop
+    floor ceil .span_next { char } .while
+    char delims .char_set_has .then char floor .ret end
+    inc: floor
+  end
+  nil floor
+end
