@@ -16,14 +16,21 @@
 !/examples
 
 !/clib
-/clib/*
-!/clib/*.h
-!/clib/*.c
+/clib/**
+!/clib/**/
+!/clib/**/*.h
+!/clib/**/*.c
+
+!/docs
+/docs/**
+!/docs/**/
+!/docs/**/*.md
 
 !/scripts
-/scripts/*
-!/scripts/*.py
-!/scripts/*.md
+/scripts/**
+!/scripts/**/
+!/scripts/**/*.py
+!/scripts/**/*.md
 
 !/bench
 /bench/*
