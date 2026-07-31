@@ -88,3 +88,11 @@ When editing `.af` under either calling convention:
 - Control-only words are plain by design: `else elif end loop leave again assert`.
 - Control words which operate on runtime args use call-like names: `.then .while .try .throw .ret .recur`.
 - Word names may begin with `.`, but no stored name may look like a numeric literal.
+
+## Temp files
+
+Use `.tmp` for transient scratch; it's deleted by `make clean`.
+
+Use `tmp` for slightly more persistent scratch; it's not deleted by `make clean`.
+
+Both are outside VCS.
