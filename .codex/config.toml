@@ -1,5 +1,6 @@
 approval_policy     = "never"
 default_permissions = "custom"
+model_reasoning_summary = "detailed"
 
 [permissions.custom.filesystem]
 ":root"      = "read"
