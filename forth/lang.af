@@ -1311,12 +1311,10 @@ fun: !32 { _val _adr } [
 
 fun_comp: @2 { -- err }
   1 nil .comp_args_min
-  .comp_args_get .dec { adr }
-  adr .inc { val1 }
-  adr  .comp_realloc_reg
-  val1 .comp_realloc_reg
-  adr val1 adr 0 .asm_load_pair_off .comp_instr \ ldp Xt1, Xt2, [Xn]
-  val1 .inc .comp_args_set
+  .comp_alloc_next_reg { val1 }
+  val1 .dec { val0 }
+  val0 .comp_realloc_reg
+  val0 val1 val0 0 .asm_load_pair_off .comp_instr \ ldp Xt1, Xt2, [Xn]
 end
 
 fun: @2 { adr -> val0 val1 } @2 end
@@ -2511,12 +2509,24 @@ struct: Stack
   Cell 1 field: .Stack_bytelen
 end
 
+\ TODO better name. A "span" should be `[floor,ceil)` without a top.
+\ Compare `Slice` representing the common `dat len` storage pattern.
+\
 \ SYNC[span_fields].
 struct: Span
   Adr 1 field: .Span_top
   Adr 1 field: .Span_ceil
   Adr 1 field: .Span_floor
 end
+
+\ In-memory analogue of the in-register `dat len` pattern.
+\ The fields can be loaded with `@2` and stored with `!2`.
+struct: Slice
+  Adr  1 field: .Slice_dat
+  Cell 1 field: .Slice_len
+end
+
+fun: .slice_from_span { floor ceil tar } floor ceil floor - tar !2 end
 
 \ SYNC[set_fields].
 struct: Interp_set
