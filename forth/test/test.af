@@ -1215,6 +1215,18 @@ fun: .test_loop_while { -- err }
 end
 .test_loop_while
 
+fun: .test_loop_while_extra { -- err }
+  assert=
+    10
+    loop
+      20 true .while +
+      40 false .while +
+    end
+    30
+  end
+end
+.test_loop_while_extra
+
 fun: .test_loop_while_leave { -- err }
   assert=
     -1 { val } loop false .while 10 { val } leave end val
@@ -3937,6 +3949,13 @@ fun: .test_comptime_stack_underflow { -- Err }
   .assert_str_has
 end
 .test_comptime_stack_underflow
+
+fun: .test_loop_while_arg_min { -- Err }
+  use' ./fail/test_loop_while_arg_min.af
+  " arguments before `.while`: arity mismatch: required: 2, provided: 1"
+  .assert_str_has
+end
+.test_loop_while_arg_min
 
 fun: .test_cond_arity_bare_then { -- Err }
   use' ./fail/test_cond_arity_bare_then.af

@@ -4221,10 +4221,17 @@ end
 fun_comp: .while { -- err } ( LOOP_AUX: -- meta end_xt )
   .loop_frame_adr @ { meta }
   meta CONT_MASK_INP_LEN .bits_get { len }
-  len .inc " arguments before `.while`" .comp_args_valid
+  len .inc " arguments before `.while`" .comp_args_min
 
   .comp_barrier
-  len .comp_args_set \ Logically consume predicate.
+
+  \ Logically consume predicate.
+  .comp_args_get .dec { len }
+  len .comp_args_set
+
+  \ `.comp_patch_branch_cond` determines predicate register from this.
+  len meta CONT_MASK_INP_LEN .bits_set { meta }
+
   len meta .cond_reserve LOOP_AUX >s
   xt' .while_end LOOP_AUX >s
 end

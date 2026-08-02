@@ -1,0 +1,6 @@
+fun: .test_loop_while_arg_min_fail { val -- out }
+  val
+  loop
+    .while
+  end
+end
