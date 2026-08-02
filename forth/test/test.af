@@ -2298,50 +2298,65 @@ fun: .test_bits_clear { -- err }
 end
 .test_bits_clear
 
-fun: .test_bit_mask_get { -- err }
-  assert= 0b1001000110100 0b111111110000 .bit_mask_get 0b100011 end
+fun: .test_bits_get { -- err }
+  assert= 0b1001000110100 0b111111110000 .bits_get 0b100011 end
 end
-.test_bit_mask_get
+.test_bits_get
 
-fun: .test_bit_mask_set { -- err }
+fun: .test_bits_set { -- err }
   assert=
-    0b10101011 0b111111110000 0b1001000110100 .bit_mask_set
+    0b10101011 0b1001000110100 0b111111110000 .bits_set
     0b1101010110100
   end
   assert=
-    0b0 0b111111110000 0b1001000110100 .bit_mask_set
+    0b0 0b1001000110100 0b111111110000 .bits_set
     0b1000000000100
   end
 
   0b10101011 { val }
   assert=
-    val 0b111111110000 0b1001000110100 .bit_mask_set
+    val 0b1001000110100 0b111111110000 .bits_set
     0b1101010110100
   end
 
-  0b111111110000 { val }
+  0b1001000110100 { src }
   assert=
-    0b10101011 val 0b1001000110100 .bit_mask_set
+    0b10101011 src 0b111111110000 .bits_set
     0b1101010110100
   end
 
-  0b1001000110100 { val }
+  0b111111110000 { mask }
   assert=
-    0b10101011 0b111111110000 val .bit_mask_set
+    0b10101011 0b1001000110100 mask .bits_set
     0b1101010110100
   end
-  0b10101011 0b111111110000 bit_mask_set: val
-  assert= val 0b1101010110100 end
 
   \ The redundant-looking low operand lets us test preservation
   \ of the register stack and avoidance of accidental clobbering.
   99
-  0b10101011 0b111111110000 0b1001000110100 .bit_mask_set
+  0b10101011 0b1001000110100 0b111111110000 .bits_set
   { keep out }
   assert= keep 99 end
   assert= out 0b1101010110100 end
 end
-.test_bit_mask_set
+.test_bits_set
+
+fun: .test_bits_pop { -- err }
+  0b1001000110100 0b111111110000 .bits_pop { out val }
+  assert= out 0b1000000000100 end
+  assert= val 0b100011 end
+
+  0x1234 -1 .bits_pop { out val }
+  assert= out 0 end
+  assert= val 0x1234 end
+
+  0b1001000110100 { src }
+  0b111111110000 { mask }
+  src mask .bits_pop { out val }
+  assert= out 0b1000000000100 end
+  assert= val 0b100011 end
+end
+.test_bits_pop
 
 fun: .test_within { -- err }
   assert= -1 0 10 .within 0 end
@@ -4297,8 +4312,9 @@ fun: .main_run { -- err }
   .test_low_bits
   .test_bit_trunc
   .test_bits_clear
-  .test_bit_mask_get
-  .test_bit_mask_set
+  .test_bits_get
+  .test_bits_set
+  .test_bits_pop
   .test_within
   .test_compare_many
   .test_assert

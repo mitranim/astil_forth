@@ -298,7 +298,7 @@ fun: .const_fold_is_aligned_rhs_imm_fun { val -- out } val 8 .is_aligned_to end
 fun: .const_fold_align_down_rhs_imm_fun { val -- out } val 16 .align_down end
 fun: .const_fold_align_up_rhs_imm_fun { val -- out } val 16 .align_up end
 fun: .const_fold_bit_trunc_rhs_imm_fun { val -- out } val 8 .bit_trunc end
-fun: .const_fold_bit_mask_get_rhs_imm_fun { val -- out } val 0b111111110000 .bit_mask_get end
+fun: .const_fold_bits_get_rhs_imm_fun { val -- out } val 0b111111110000 .bits_get end
 
 fun: .test_const_fold_bit_shift { -- err }
   .const_fold_bit_shift_fun { out0 out1 out2 out3 out4 out5 }
@@ -339,15 +339,15 @@ fun: .test_const_fold_bit_shift { -- err }
   0 0 0xff .asm_and_imm xt' .const_fold_bit_trunc_rhs_imm_fun .cf_want_word1
   0 0 0b111111110000 .asm_and_imm { instr0 }
   0 0 4 .asm_lsr_imm { instr1 }
-  instr0 instr1 xt' .const_fold_bit_mask_get_rhs_imm_fun .cf_want_word2
+  instr0 instr1 xt' .const_fold_bits_get_rhs_imm_fun .cf_want_word2
 end
 .test_const_fold_bit_shift
 
-fun: .test_const_fold_bit_mask_errors { -- Err }
-  use' ./fail/test_const_fold_bit_mask_get_bad.af
+fun: .test_const_fold_bits_errors { -- Err }
+  use' ./fail/test_const_fold_bits_get_bad.af
   " invalid bit mask: expected nonzero contiguous mask" .assert_str_has .try
 end
-.test_const_fold_bit_mask_errors
+.test_const_fold_bits_errors
 
 fun: .test_const_fold_redundant_arith_errors { -- Err }
   use' ./fail/test_const_fold_redundant_bit_logical.af
@@ -434,7 +434,7 @@ fun: .test_const_fold_redundant_arith_errors { -- Err }
   use' ./fail/test_const_fold_redundant_bits_clear.af
   " redundant arithmetic" .assert_str_has .try
 
-  use' ./fail/test_const_fold_redundant_bit_mask_get.af
+  use' ./fail/test_const_fold_redundant_bits_get.af
   " redundant arithmetic" .assert_str_has .try
 end
 .test_const_fold_redundant_arith_errors
@@ -662,8 +662,8 @@ fun: .const_fold_low_bits_fun { -- out } 5 .low_bits end
 fun: .const_fold_bit_trunc_fun { -- out } 0b10110101 4 .bit_trunc end
 fun: .const_fold_bits_clear_fun { -- out } 0b11110011 0b00110000 .bits_clear end
 fun: .const_fold_bits_clear_imm_fun { val -- out } val 0xff .bits_clear end
-fun: .const_fold_bit_mask_get_fun { -- out }
-  0b1001000110100 0b111111110000 .bit_mask_get
+fun: .const_fold_bits_get_fun { -- out }
+  0b1001000110100 0b111111110000 .bits_get
 end
 
 fun: .test_const_fold_bits { -- err }
@@ -672,7 +672,7 @@ fun: .test_const_fold_bits { -- err }
   31 xt' .const_fold_low_bits_fun .cf_want_load_word
   5 xt' .const_fold_bit_trunc_fun .cf_want_load_word
   0b11000011 xt' .const_fold_bits_clear_fun .cf_want_load_word
-  0b100011 xt' .const_fold_bit_mask_get_fun .cf_want_load_word
+  0b100011 xt' .const_fold_bits_get_fun .cf_want_load_word
 
   0 0 0xff .asm_bic_imm xt' .const_fold_bits_clear_imm_fun .cf_want_word1
 end

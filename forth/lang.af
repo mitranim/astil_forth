@@ -1049,57 +1049,68 @@ fun_comp: .bit_trunc { -- err }
 end
 
 fun_comp: .bits_clear { -- err }
-  .comp_args2_regs { imm mask }
-  imm imm mask .asm_bic .comp_instr \ bic Ximm, Ximm, Xmask
+  .comp_args2_regs { src mask }
+  src src mask .asm_bic .comp_instr \ bic Xsrc, Xsrc, Xmask
   mask .comp_args_set
 end
 
-fun: .bits_clear { imm mask -> out } .bits_clear end
+fun: .bits_clear { src mask -> out } .bits_clear end
 
-fun_comp: .bit_mask_get { -- err }
-  .comp_args2_regs { reg0 reg1 }
+fun_comp: .bits_get { -- err }
+  .comp_args2_regs { src mask }
   \ Get bits according to a nonzero contiguous mask and return them in low bits.
-  reg0 reg0 reg1 .asm_and_reg .comp_instr \ and Xd, Xn, Xm
-  reg1 reg1      .asm_rbit    .comp_instr \ rbit Xd, Xn
-  reg1 reg1      .asm_clz     .comp_instr \ clz Xd, Xn
-  reg0 reg0 reg1 .asm_lsr_reg .comp_instr \ lsr Xd, Xn, Xm
-  reg1 .comp_args_set
+  src  src  mask .asm_and_reg .comp_instr \ and Xd, Xn, Xm
+  mask mask      .asm_rbit    .comp_instr \ rbit Xd, Xn
+  mask mask      .asm_clz     .comp_instr \ clz Xd, Xn
+  src  src  mask .asm_lsr_reg .comp_instr \ lsr Xd, Xn, Xm
+  mask .comp_args_set
 end
 
-fun: .bit_mask_get { src mask -> out } .bit_mask_get end
+fun: .bits_get { src mask -> val } .bits_get end
 
 \ Sets bits according to the mask.
 \ The input value must be in low bits.
 \ The mask must be nonzero and contiguous.
-fun: .comp_emit_bit_mask_set { inp src mask -- err }
+fun: .comp_emit_bits_set { val src mask -- err }
   .comp_alloc_next_reg { shift }
   src   src   mask  .asm_bic     .comp_instr \ bic Xd, Xn, Xm
   shift mask        .asm_rbit    .comp_instr \ rbit Xd, Xn
   shift shift       .asm_clz     .comp_instr \ clz Xd, Xn
-  inp   inp   shift .asm_lsl_reg .comp_instr \ lsl Xd, Xn, Xm
-  inp   inp   mask  .asm_and_reg .comp_instr \ and Xd, Xn, Xm
-  inp   inp   src   .asm_orr_reg .comp_instr \ orr Xd, Xn, Xm
+  val   val   shift .asm_lsl_reg .comp_instr \ lsl Xd, Xn, Xm
+  val   val   mask  .asm_and_reg .comp_instr \ and Xd, Xn, Xm
+  val   val   src   .asm_orr_reg .comp_instr \ orr Xd, Xn, Xm
 end
 
-fun_comp: .bit_mask_set { -- err }
+\ No CF for `.bits_set`: requires new ternary CF machinery
+\ and we have no other use cases for that.
+fun_comp: .bits_set { -- err }
   3 nil .comp_args_min
-  .comp_args_get .dec { src }
-  src .dec { mask }
-  mask .dec { inp }
-  inp .comp_realloc_reg
+  .comp_args_get .dec { mask }
+  mask .dec { src }
+  src .dec { val }
+  val .comp_realloc_reg
   src .comp_realloc_reg
   mask .comp_realloc_reg
-  inp src mask .comp_emit_bit_mask_set
-  inp .inc .comp_args_set
+  val src mask .comp_emit_bits_set
+  val .inc .comp_args_set
 end
 
-fun: .bit_mask_set { inp mask src -> out } .bit_mask_set end
+fun: .bits_set { val src mask -> out } .bits_set end
 
-\ No comptime version yet; too few uses.
-fun: .bit_mask_pop { src mask -- out val }
-  src mask .bits_clear
-  src mask .bit_mask_get
+fun_comp: .bits_pop { -- err }
+  .comp_args2_regs     { src mask }
+  .comp_alloc_next_reg { shift }
+
+  shift mask        .asm_rbit    .comp_instr \ rbit Xshift, Xmask
+  shift shift       .asm_clz     .comp_instr \ clz Xshift, Xshift
+  mask  src   mask  .asm_and_reg .comp_instr \ and Xmask, Xsrc, Xmask
+  src   src   mask  .asm_eor_reg .comp_instr \ eor Xsrc, Xsrc, Xmask
+  mask  mask  shift .asm_lsr_reg .comp_instr \ lsr Xmask, Xmask, Xshift
+
+  shift .comp_args_set
 end
+
+fun: .bits_pop { src mask -> out val } .bits_pop end
 
 8 let: CELL
 
@@ -1876,7 +1887,7 @@ fun: .instr_off { adr -- off } .interp_instrs { instrs } adr instrs - end
 \ Instruction offset describes start of some conditional branch or loop.
 \ It's used to compile PC-relative branch instructions at branch points.
 \
-\ Masks must be used via `.bit_mask_get .bit_mask_set`.
+\ Masks must be used via `.bits_clear .bits_get .bits_set .bits_pop`.
 
 0 let: ASM_BRANCH_TYPE_CBZ
 1 let: ASM_BRANCH_TYPE_CBNZ
@@ -1905,17 +1916,17 @@ let: CONT_MASK_INSTR_INFO
 32 .low_bits .bit_invert let: CONT_MASK_INSTR_OFF
 
 fun: .cont_meta_instr_off_set { off meta -- meta }
-  off .instr_off_pack CONT_MASK_INSTR_OFF meta .bit_mask_set
+  off .instr_off_pack meta CONT_MASK_INSTR_OFF .bits_set
 end
 
 fun: .cont_meta_instr_set { off type info meta -- meta }
-  type CONT_MASK_BRANCH_TYPE meta .bit_mask_set { meta }
-  info CONT_MASK_INSTR_INFO meta .bit_mask_set { meta }
+  type meta CONT_MASK_BRANCH_TYPE .bits_set { meta }
+  info meta CONT_MASK_INSTR_INFO .bits_set { meta }
   off meta .cont_meta_instr_off_set
 end
 
 fun: .cont_meta_instr_adr { meta -- adr }
-  meta CONT_MASK_INSTR_OFF .bit_mask_get .instr_off_unpack { off }
+  meta CONT_MASK_INSTR_OFF .bits_get .instr_off_unpack { off }
   .interp_instrs off +
 end
 
@@ -1982,9 +1993,9 @@ end
 
 fun: .comp_patch_branch_cond { meta -- err }
   meta .cont_meta_instr_adr { adr }
-  meta CONT_MASK_INP_LEN .bit_mask_get { reg }
-  meta CONT_MASK_BRANCH_TYPE .bit_mask_get { type }
-  meta CONT_MASK_INSTR_INFO .bit_mask_get { info }
+  meta CONT_MASK_INP_LEN .bits_get { reg }
+  meta CONT_MASK_BRANCH_TYPE .bits_get { type }
+  meta CONT_MASK_INSTR_INFO .bits_get { info }
   .here_write adr - { off }
 
   \ Select between `cbz|cbnz|b.<cond>`. Branchless: don't have `.then` yet.
@@ -2066,7 +2077,7 @@ end
 fun: .then_end { meta -- err } [ .redefine ]
   .comp_barrier
 
-  meta CONT_MASK_INP_LEN .bit_mask_get
+  meta CONT_MASK_INP_LEN .bits_get
   " arguments before ending conditional without `else`"
   .comp_args_valid
 
@@ -2096,24 +2107,24 @@ fun_comp: .then { -- meta end_xt err } ( E: pred -- ) [ .redefine ]
     prev     >ctrl \ Restore prior XT.
     xt' .nop >ctrl \ Chain terminator.
     1 msg .comp_args_min
-    len CONT_MASK_INP_LEN meta .bit_mask_set { meta }
+    len meta CONT_MASK_INP_LEN .bits_set { meta }
   end
 
   new =0 .then
     ctrl> { meta } \ Passed on the control stack by `elif`.
-    meta CONT_MASK_INP_LEN .bit_mask_get .inc msg .comp_args_valid
+    meta CONT_MASK_INP_LEN .bits_get .inc msg .comp_args_valid
   end
 
   .comp_barrier
   len .comp_args_set \ Logically consume predicate.
   len meta .cond_reserve { meta }
-  true CONT_MASK_ENABLE_ELSE meta .bit_mask_set { meta }
+  true meta CONT_MASK_ENABLE_ELSE .bits_set { meta }
   meta xt' .then_end
 end
 
 fun: .else_end { meta -- err }
   .comp_barrier
-  meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
+  meta CONT_MASK_OUT_LEN .bits_get " branch outputs" .comp_args_valid
   meta .comp_patch_branch
   call'' end
 end
@@ -2124,25 +2135,25 @@ fun_comp: else { meta _end_xt -- meta end_xt err } [ .plain_call ]
   \ This is done to avoid programmer mistakes when refactoring between
   \ control structures such as `.then` -> `.and .or`, and accidentally
   \ leaving `else` whose behavior with those words is very unintuitive.
-  meta CONT_MASK_ENABLE_ELSE .bit_mask_pop { meta ok }
+  meta CONT_MASK_ENABLE_ELSE .bits_pop { meta ok }
   ok =0 .then
     " current control structure does not accept `else`" .throw
   end
 
   \ Infer or validate output arity.
-  meta CONT_MASK_HAS_OUT .bit_mask_get { has }
+  meta CONT_MASK_HAS_OUT .bits_get { has }
   has =0 .then
-    .comp_args_get CONT_MASK_OUT_LEN meta .bit_mask_set { meta }
-    true CONT_MASK_HAS_OUT meta .bit_mask_set { meta }
+    .comp_args_get meta CONT_MASK_OUT_LEN .bits_set { meta }
+    true meta CONT_MASK_HAS_OUT .bits_set { meta }
   end
   has .then
-    meta CONT_MASK_OUT_LEN .bit_mask_get " branch outputs" .comp_args_valid
+    meta CONT_MASK_OUT_LEN .bits_get " branch outputs" .comp_args_valid
   end
 
   .comp_barrier
   .reserve_instr { off }
   meta .comp_patch_branch_cond
-  meta CONT_MASK_INP_LEN .bit_mask_get .comp_args_set
+  meta CONT_MASK_INP_LEN .bits_get .comp_args_set
   off meta .cont_meta_instr_off_set xt' .else_end
 end
 
@@ -2156,7 +2167,7 @@ end
 fun: .cond_bool_expr_end { meta -- err }
   .comp_barrier
 
-  meta CONT_MASK_OUT_LEN .bit_mask_get
+  meta CONT_MASK_OUT_LEN .bits_get
   " arguments before ending boolean conditional expression"
   .comp_args_valid
 
@@ -2178,18 +2189,18 @@ fun: .cond_bool_expr_beg { branch_type -- meta end_xt err }
     prev     >ctrl \ Restore prior XT.
     xt' .nop >ctrl \ Chain terminator.
     1 msg .comp_args_min
-    len .dec CONT_MASK_INP_LEN meta .bit_mask_set { meta }
-    len      CONT_MASK_OUT_LEN meta .bit_mask_set { meta }
+    len .dec meta CONT_MASK_INP_LEN .bits_set { meta }
+    len      meta CONT_MASK_OUT_LEN .bits_set { meta }
   else
     ctrl> { meta } meta >ctrl \ Don't have simple "load top val".
     xt' .comp_patch_chain_branch_cond >ctrl \ Replace `.cond_bool_expr_end`.
-    meta CONT_MASK_INP_LEN .bit_mask_get .inc msg .comp_args_valid
+    meta CONT_MASK_INP_LEN .bits_get .inc msg .comp_args_valid
   end
 
   .comp_barrier
   len .dec .comp_args_set \ Logically consume predicate.
   .reserve_instr meta .cont_meta_instr_off_set { meta }
-  branch_type CONT_MASK_BRANCH_TYPE meta .bit_mask_set { meta }
+  branch_type meta CONT_MASK_BRANCH_TYPE .bits_set { meta }
   meta xt' .cond_bool_expr_end
 end
 
@@ -3043,7 +3054,7 @@ fun: .cf_bit_mask_validate { mask -- err }
   " invalid bit mask: expected nonzero contiguous mask" .throw
 end
 
-fun: .cf_bit_mask_get_validate { mask _ -- aux ok Err }
+fun: .cf_bits_get_validate { mask _ -- aux ok Err }
   mask -1 = .then " redundant arithmetic" .throw end
   mask .cf_bit_mask_validate .try
   mask ASM_OP_AND_IMM .asm_logical_imm_mask { instr_mask err }
@@ -3051,7 +3062,7 @@ fun: .cf_bit_mask_get_validate { mask _ -- aux ok Err }
   mask .bit_ctz 32 .bit_lsl instr_mask .bit_or true
 end
 
-fun: .cf_bit_mask_get_emit { out src _mask aux -- err }
+fun: .cf_bits_get_emit { out src _mask aux -- err }
   aux 32 .bit_trunc { instr_mask }
   aux 32 .bit_lsr        { shift      }
   instr_mask src 5 .bit_lsl .bit_or out .bit_or .comp_instr \ and Xd, Xn, #imm
@@ -3769,30 +3780,17 @@ fun_comp: .bits_clear { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: .bit_mask_get { -- err } [ .redefine ]
+fun_comp: .bits_get { -- err } [ .redefine ]
   .cf_args_fold2 { reg reg1 src mask _known consumed }
   consumed 2 = .then
     mask -1 = .then " redundant arithmetic" .throw end
     mask .cf_bit_mask_validate
-    reg src mask .bit_mask_get .cf_fold_done
+    reg src mask .bits_get .cf_fold_done
   else
     reg reg1 mask consumed nil
-    instr' .cf_bit_mask_get_validate instr' .cf_bit_mask_get_emit xt'' .bit_mask_get
+    instr' .cf_bits_get_validate instr' .cf_bits_get_emit xt'' .bits_get
     .cf_fold2_partial_or_fallback
   end
-end
-
-\ Set masked bits in a local: `inp mask bit_mask_set: some_val`.
-\
-\ No CF for `.bit_mask_set`: requires new ternary CF
-\ machinery and we have no other use cases for that.
-fun_comp: bit_mask_set: { -- err } ( C: "name" -- ) ( E: inp mask -- )
-  .comp_args2_regs { inp mask }
-  .read_word .comp_local { loc }
-  loc .comp_push_from_local
-  mask .inc { src }
-  inp src mask .comp_emit_bit_mask_set
-  loc inp .comp_loc_mut_store_realloc
 end
 
 \ ## More memory stuff
@@ -4168,7 +4166,7 @@ end
 fun: .loop_end { prev meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
   .comp_barrier
 
-  meta CONT_MASK_INP_LEN .bit_mask_get
+  meta CONT_MASK_INP_LEN .bits_get
   " arguments before ending `loop`" .comp_args_valid
   meta .loop_back \ b <beg>
 
@@ -4178,7 +4176,7 @@ end
 
 fun_comp: loop { -- prev meta end_xt err } ( C: -- <loop_prev> ) [ .plain_call ]
   .comp_barrier
-  .comp_args_get CONT_MASK_INP_LEN nil .bit_mask_set { meta }
+  .comp_args_get nil CONT_MASK_INP_LEN .bits_set { meta }
   .here_write .instr_off meta .cont_meta_instr_off_set { meta }
 
   LOOP_IND @ { prev }
@@ -4195,7 +4193,7 @@ end
 \ Goes back to loop start.
 fun_comp: again { -- err } ( LOOP_AUX: -- meta end_xt ) [ .plain_call ]
   .loop_frame_adr @ { meta }
-  meta CONT_MASK_INP_LEN .bit_mask_get { len }
+  meta CONT_MASK_INP_LEN .bits_get { len }
   len " arguments before `again`" .comp_args_valid
   .comp_barrier
   meta .loop_back
@@ -4205,7 +4203,7 @@ end
 fun_comp: leave { -- err } ( LOOP_AUX: -- meta end_xt )
   [ .plain_call ]
 
-  .loop_frame_adr @ CONT_MASK_INP_LEN .bit_mask_get
+  .loop_frame_adr @ CONT_MASK_INP_LEN .bits_get
   " arguments before `leave`"
   .comp_args_valid
 
@@ -4222,7 +4220,7 @@ end
 \ Tests a predicate; if predicate is 0, leaves current loop.
 fun_comp: .while { -- err } ( LOOP_AUX: -- meta end_xt )
   .loop_frame_adr @ { meta }
-  meta CONT_MASK_INP_LEN .bit_mask_get { len }
+  meta CONT_MASK_INP_LEN .bits_get { len }
   len .inc " arguments before `.while`" .comp_args_valid
 
   .comp_barrier
