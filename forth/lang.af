@@ -4408,13 +4408,13 @@ end
 \
 \ Also see `./errno.af`.
 
-0 1 extern: .__error  __error
+0 1 extern: .errno_adr __error
 1 1 extern: .strerror strerror
 
 \ We'd prefer `errno` to be a value, like `stdin stdout stderr`. On MacOS it's
 \ only available through a function call, which clobbered `x0 x8 x9` when last
 \ tested; the ABI is subject to change. Therefore `.errno` is a regular call.
-fun: .errno { -- code } .__error @s32 end
+fun: .errno { -- code } .errno_adr @s32 end
 
 \ ## String formatting continued
 
