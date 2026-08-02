@@ -2526,8 +2526,6 @@ struct: Slice
   Cell 1 field: .Slice_len
 end
 
-fun: .slice_from_span { floor ceil tar } floor ceil floor - tar !2 end
-
 \ SYNC[set_fields].
 struct: Interp_set
   U32 1 field: .Interp_set_len
@@ -3936,7 +3934,7 @@ end
 
 fun: .mem_unprot { addr size -> err } PROT_RW .mem_prot end
 
-\ ## Stacks continued
+\ ## Slices / spans / stacks continued
 
 \ Initializes a stack with guards. Note: the memory is acquired from the OS
 \ and is NOT managed by the compiler. When used for global variables, their
@@ -4005,16 +4003,7 @@ fun: .span_trunc { span }
   span .then span .Span_floor @ span .Span_top ! end
 end
 
-fun: .stack_repr { stk }
-  stk =0 .then " [debug] stack is nil" .elog .elf .ret end
-
-  " [debug] stack           " .elog stk .debug_arg
-  " [debug] Stack_top     @ " .elog stk .Stack_top @ .debug_arg
-  " [debug] Stack_ceil    @ " .elog stk .Stack_ceil @ .debug_arg
-  " [debug] Stack_floor   @ " .elog stk .Stack_floor @ .debug_arg
-  " [debug] Stack_cellar  @ " .elog stk .Stack_cellar @ .debug_arg
-  " [debug] Stack_bytelen @ " .elog stk .Stack_bytelen @ .debug_arg
-end
+fun: .range_slice { floor ceil -- dat len } floor ceil floor - end
 
 \ For JIT use only. TODO: AOT compatibility.
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
@@ -4323,14 +4312,14 @@ end
 
 \ ## Assembler continued
 
-fun: .asm_append_instr { instr out -- out } instr out !32 out 4 + end
-fun: .asm_imm16_lane { val hw -- lane } val hw 4 .bit_lsl .bit_lsr 0xffff .bit_and end
+fun: .asm_append { instr buf -> buf } !32 buf ASM_INSTR_SIZE + end
+fun: .asm_imm16_lane { val hw -> lane } 4 .bit_lsl .bit_lsr 0xffff .bit_and end
 fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .bit_and - <>0 end
 
 fun: .asm_append_movk_if_needed { reg neg hw imm out -- out }
   imm hw .asm_imm16_lane { lane }
   neg lane .asm_movk_needed .then
-    reg 0b11 hw lane .asm_mov_wide out .asm_append_instr
+    reg 0b11 hw lane .asm_mov_wide out .asm_append
   else
     out
   end
@@ -4344,7 +4333,7 @@ fun: .asm_append_imm_to_reg { reg imm out -- out }
   imm 0 .asm_imm16_lane { lane }
   lane neg ?bit_invert 0xffff .bit_and { lane }
   neg =0 1 .bit_lsl { opc }
-  reg opc 0 lane .asm_mov_wide out .asm_append_instr { out } \ movn|movz
+  reg opc 0 lane .asm_mov_wide out .asm_append { out } \ movn|movz
 
   reg neg 1 imm out .asm_append_movk_if_needed { out }
   reg neg 2 imm out .asm_append_movk_if_needed { out }
@@ -4857,7 +4846,10 @@ fun: .assert_bin_cond { lhs rhs cond text op -- err }
   " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .errf
 end
 
-fun: .assert_str_eq { act exp -- err }
+\ TODO implement.
+\ fun: .assert_str { act act_len exp exp_len -- err } end
+
+fun: .assert_cstr { act exp -- err }
   exp =0 .then
     act =0 .then .ret end
     " expected string to be nil; got: %s" act .errf .throw
@@ -5080,6 +5072,8 @@ fun: .interp_data_alloc { data len }
   data .Span_top @ len + data .Span_top !
 end
 
+\ Used by escape-enabled variants of `char'` and string-literal words.
+\ Quote escaping is meant for strings, and is unnecessary for `char'`.
 fun: .char_unescape { esc -- char err }
   esc 0x30 = .then 0     .ret end \ \0
   esc 0x65 = .then 0x1b  .ret end \ \e

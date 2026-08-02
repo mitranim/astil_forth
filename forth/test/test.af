@@ -929,13 +929,13 @@ fun: .test_recur_with_err { -- Err }
   assert= out 100 end .try
   assert= err nil end .try
   4 .recur_fun_with_err { -- err }
-  err " some_error" .assert_str_eq .try
+  err " some_error" .assert_cstr .try
 
   2 .recur_manual_fun { out err }
   assert= out 100 end .try
   assert= err nil end .try
   4 .recur_manual_fun { -- err }
-  err " some_error" .assert_str_eq
+  err " some_error" .assert_cstr
 end
 .test_recur_with_err
 
@@ -1568,9 +1568,9 @@ fun: .test_store_cellz { -- err }
   4 .cells .alloca { ptr }
   " one" " two" " three" ptr !cellz
 
-  ptr @ " one" .assert_str_eq
-  ptr +cell @ " two" .assert_str_eq
-  ptr +cell +cell @ " three" .assert_str_eq
+  ptr @ " one" .assert_cstr
+  ptr +cell @ " two" .assert_cstr
+  ptr +cell +cell @ " three" .assert_cstr
   assert= ptr 3 .cells + @ nil end
 end
 .test_store_cellz
@@ -1594,9 +1594,9 @@ fun: .test_cellz_len_copy { -- err }
 
   assert= src .cellz_len 2 end
   assert= tar .cellz_len 3 end
-  tar @ " one" .assert_str_eq
-  tar +cell @ " two" .assert_str_eq
-  tar +cell +cell @ " three" .assert_str_eq
+  tar @ " one" .assert_cstr
+  tar +cell @ " two" .assert_cstr
+  tar +cell +cell @ " three" .assert_cstr
   assert= tar 3 .cells + @ nil end
 end
 .test_cellz_len_copy
@@ -2503,18 +2503,18 @@ fun: .test_asm_new_bits { -- err }
   assert= immr 1 end
   assert= imms 0 end
   0 .asm_logical_imm_enc_err { err }
-  err " unable to encode logical immediate: 0 is reserved" .assert_str_eq
+  err " unable to encode logical immediate: 0 is reserved" .assert_cstr
   -1 .asm_logical_imm_enc_err { err }
-  err " unable to encode logical immediate: all ones is reserved" .assert_str_eq
+  err " unable to encode logical immediate: all ones is reserved" .assert_cstr
   0x1234_5678_9abc_def0 .asm_logical_imm_enc_err { err }
-  err " unable to encode logical immediate: value is not a repeated bitmask" .assert_str_eq
+  err " unable to encode logical immediate: value is not a repeated bitmask" .assert_cstr
   assert= 0 0 1 .asm_and_imm 0b1_00_100100_1_000000_000000_00000_00000 end
   assert= 0 0 1 .asm_orr_imm 0b1_01_100100_1_000000_000000_00000_00000 end
   assert= 0 0 1 .asm_eor_imm 0b1_10_100100_1_000000_000000_00000_00000 end
   0 0 -2 .asm_and_imm { bic_exp }
   assert= 0 0 1 .asm_bic_imm bic_exp end
   0 0 0 .asm_and_imm_err { _instr err }
-  err " unable to encode logical immediate: 0 is reserved" .assert_str_eq
+  err " unable to encode logical immediate: 0 is reserved" .assert_cstr
 end
 .test_asm_new_bits
 
@@ -2640,7 +2640,7 @@ fun: .test_escaped_str_decl { -- err }
 
   TEST_COPIED_STR { copied_str copied_len }
   assert= copied_len 12 end
-  copied_str " copied slice" .assert_str_eq
+  copied_str " copied slice" .assert_cstr
 end
 .test_escaped_str_decl
 
@@ -2845,13 +2845,13 @@ end
 
 fun: .test_errf { -- err }
   " codes: %zd %zd %zd" 10 20 30 .errf { buf0 }
-  buf0 " codes: 10 20 30" .assert_str_eq
+  buf0 " codes: 10 20 30" .assert_cstr
 
   " codes: %zd %zd %zd" 40 50 60 .errf { buf1 }
-  buf1 " codes: 40 50 60" .assert_str_eq
+  buf1 " codes: 40 50 60" .assert_cstr
 
   " codes: %zd %zd %zd" 70 80 90 .errf { buf2 }
-  buf2 " codes: 70 80 90" .assert_str_eq
+  buf2 " codes: 70 80 90" .assert_cstr
 
   assert<> buf0 buf1 end
   assert<> buf0 buf2 end
@@ -2862,7 +2862,7 @@ end
 fun: .test_strf { -- Err }
   " codes: %zd %zd %zd" 10 20 30 .strf { out err }
   assert= err nil end .try
-  out " codes: 10 20 30" .assert_str_eq .try
+  out " codes: 10 20 30" .assert_cstr .try
 
   alloca' Ctx { ctx }
   nil 0 ctx .ctx_init
@@ -2872,7 +2872,7 @@ fun: .test_strf { -- Err }
   end
 
   assert= out nil end .try
-  err " unable to format string" .assert_str_eq
+  err " unable to format string" .assert_cstr
 end
 .test_strf
 
@@ -2890,13 +2890,13 @@ fun: .test_strf_into { -- err }
   buf cap " %zd" 20 .strf_into { buf cap }
   assert= buf out 12 + end
   assert= cap 20 end
-  out " codes: 10 20" .assert_str_eq
+  out " codes: 10 20" .assert_cstr
 
   4 .alloca { trunc }
   trunc 4 " abcdef" .strf_into { buf cap }
   assert= buf trunc 3 + end
   assert= cap 1 end
-  trunc " abc" .assert_str_eq
+  trunc " abc" .assert_cstr
 
   out 0 " ignored" .strf_into { buf cap }
   assert= buf out end
@@ -2904,7 +2904,7 @@ fun: .test_strf_into { -- err }
 
   4 .alloca .strf_into_infallible { buf cap }
   assert= cap 1 end
-  buf 3 - " abc" .assert_str_eq
+  buf 3 - " abc" .assert_cstr
 end
 .test_strf_into
 
@@ -2919,7 +2919,7 @@ fun: .test_errf_exact_fill { -- err }
   end
 
   assert= context prev_ctx end
-  out " A" .assert_str_eq
+  out " A" .assert_cstr
 end
 .test_errf_exact_fill
 
@@ -2931,7 +2931,7 @@ fun: .test_errf_out_of_space { -- err }
     " codes: %zd %zd %zd" 10 20 30 .errf { out }
   end
 
-  out " <unable to format error>" .assert_str_eq
+  out " <unable to format error>" .assert_cstr
 end
 .test_errf_out_of_space
 
@@ -3021,15 +3021,15 @@ fun: .test_errf_wrap { -- err }
   \ err0 .logf " \n" .log
   \ err1 .logf " \n" .log
 
-  err0 " one" .assert_str_eq
-  err1 " two: one" .assert_str_eq
+  err0 " one" .assert_cstr
+  err1 " two: one" .assert_cstr
 
   " three: %s" err1 .errf { err2 }
 
   assert<> err0 err2 end
   assert<> err0 err1 end
 
-  err2 " three: two: one" .assert_str_eq
+  err2 " three: two: one" .assert_cstr
 
   " four: %zd: %s" 123 err2 .errf { err3 }
 
@@ -3037,7 +3037,7 @@ fun: .test_errf_wrap { -- err }
   assert<> err3 err1 end
   assert<> err3 err2 end
 
-  err3 " four: 123: three: two: one" .assert_str_eq
+  err3 " four: 123: three: two: one" .assert_cstr
 end
 .test_errf_wrap
 
@@ -3634,7 +3634,7 @@ fun: .test_explicit_err_0 { -- Err }
   " test_err" { err1 }
 
   assert<> err0 err1 end .try
-  err0 err1 .assert_str_eq
+  err0 err1 .assert_cstr
 end
 .test_explicit_err_0
 
@@ -3655,7 +3655,7 @@ end
 
 fun: .test_explicit_err_1 { -- Err }
   0 .test_explicit_err_1_fun { val err }
-  err " test_err" .assert_str_eq .try
+  err " test_err" .assert_cstr .try
 
   123 .test_explicit_err_1_fun { val err }
   assert= val 246 end .try
@@ -3688,7 +3688,7 @@ end
 
 fun: .test_explicit_err_2 { -- Err }
   0 11 .test_explicit_err_2_fun { val err }
-  err " test_err" .assert_str_eq .try
+  err " test_err" .assert_cstr .try
 
   11 22 .test_explicit_err_2_fun { val err }
   assert= val 33 end .try
@@ -3731,7 +3731,7 @@ end
 fun: .test_explicit_err_3 { -- Err }
   123 234 345 { -- } \ Predictable state of regs x0 x1 x2.
   0 .test_explicit_err_3_fun { one two err }
-  err " test_err" .assert_str_eq .try
+  err " test_err" .assert_cstr .try
 
   123 .test_explicit_err_3_fun { one two err }
   assert= one 246 end .try
@@ -3773,7 +3773,7 @@ end
 
 fun: .test_explicit_err_4 { -- Err }
   0 13 .test_explicit_err_4_fun { one two err }
-  err " test_err" .assert_str_eq .try
+  err " test_err" .assert_cstr .try
 
   13 25 .test_explicit_err_4_fun { one two err }
   assert= one 38 end .try
@@ -3868,7 +3868,7 @@ fun: .test_Err_manual_callee { -- Err } " test_err" end
 
 fun: .test_Err_manual_visible { -- Err }
   .test_Err_manual_callee { err }
-  err " test_err" .assert_str_eq .try
+  err " test_err" .assert_cstr .try
 end
 .test_Err_manual_visible
 
@@ -3882,7 +3882,7 @@ fun: .test_err_no_error_output_reveals_callee_err { -- err_str }
 end
 
 fun: .test_err_no_error_output_reveals { -- err }
-  .test_err_no_error_output_reveals_callee_err " test_err" .assert_str_eq
+  .test_err_no_error_output_reveals_callee_err " test_err" .assert_cstr
 end
 .test_err_no_error_output_reveals
 

@@ -180,6 +180,8 @@ PTHREAD_MUTEX_NORMAL let: PTHREAD_MUTEX_DEFAULT
 1 1 extern: .pthread_rwlock_wrlock    pthread_rwlock_wrlock    ( lock      -- err :Cint )
 1 1 extern: .pthread_rwlock_unlock    pthread_rwlock_unlock    ( lock      -- err :Cint )
 
+\ ## Higher-level wrappers
+
 \ Internal closure used by `.thread_run_with_ctx`.
 struct: Thread_run
   Cell 1 field: .Thread_run_inp
@@ -257,7 +259,7 @@ fun: .thread_spawn_ctx { fun inp ctx -- thread Err }
 
   \ Internal note. Keep the closure allocated on spawn failure for simplicity,
   \ and because of the edge case where parent passes its own context to child.
-  \ If spawning fails, `.thread_spawn` formats error message into memory backed
+  \ When spawn fails, `.thread_spawn` formats error message into memory backed
   \ by parent's context. Rewind could invalidate error before parent reads it.
 end
 
@@ -269,7 +271,7 @@ fun: .thread_attr_init_detached { attr -- Err }
   " unable to init thread attributes" ?posix_err .try
 
   attr PTHREAD_CREATE_DETACHED .pthread_attr_setdetachstate
-  " unable to mark thread as detached" ?posix_err { err }
+  " unable to set detached thread attribute" ?posix_err { err }
 
   err .then attr .pthread_attr_destroy { -- } end
   err

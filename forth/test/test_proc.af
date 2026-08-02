@@ -107,7 +107,7 @@ fun: .test_proc_capture_capacity { argv -- Err }
   argv capture_mem 8 .proc_run_capture_with_mem { buf len exit sig err top }
 
   err " unable to capture subprocess output: context out of space"
-  .assert_str_eq .try
+  .assert_cstr .try
 
   assert= buf capture_mem end .try
   assert= len 7 end .try

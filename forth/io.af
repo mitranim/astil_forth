@@ -361,6 +361,8 @@ POLLOUT let: POLLWRNORM
 3 1 extern: .lchown    lchown    ( path uid gid             -- 0|-1 :Cint )
 2 1 extern: .getcwd    getcwd    ( buf cap                  -- buf|nil    )
 
+\ `.dup` clashes with the classic Forth meaning of the word,
+\ but we've already decided we'll never introduce that word.
 1 1 extern: .dup  dup  ( fdes          -- new_fdes|-1 :Cint )
 2 1 extern: .dup2 dup2 ( fdes new_fdes -- new_fdes|-1 :Cint )
 1 1 extern: .pipe pipe ( pipes         -- 0|-1        :Cint )

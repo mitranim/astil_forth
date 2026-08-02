@@ -5,15 +5,13 @@ use' proc.af
 
 2 0 extern: .clear_cache __clear_cache ( floor ceil )
 
-fun: .instr_push { instr buf -> buf } !32 buf ASM_INSTR_SIZE + end
-
 fun: .run { -- err }
   PAGE_SIZE PROT_RW .mem_map { instrs }
 
   instrs                           { top }
   1 234 top .asm_append_imm_to_reg { top } \ mov x1, 234
-  0 0 1 .asm_mul top .instr_push   { top } \ mul x0, x0, x1
-  ASM_RET        top .instr_push   { top } \ ret
+  0 0 1 .asm_mul top .asm_append   { top } \ mul x0, x0, x1
+  ASM_RET        top .asm_append   { top } \ ret
 
   instrs PAGE_SIZE PROT_RE .mem_prot    \ Make instrs read-execute.
   instrs top               .clear_cache \ Flush CPU instruction cache.

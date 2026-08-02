@@ -84,7 +84,7 @@ fun: .run { -- err }
 64 trees of depth 16; count: 8388544
 16 trees of depth 18; count: 8388592
 long lived tree of depth 18; count: 524287
-" .assert_str_eq
+" .assert_cstr
 end
 .run
 

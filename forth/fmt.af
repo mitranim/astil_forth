@@ -1,4 +1,4 @@
-use' lang.af
+use' ./lang.af
 
 fun: .bytes_to_hex_str { src len -- tar len err }
   len 1 .bit_lsl { tar_len }

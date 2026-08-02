@@ -528,6 +528,9 @@ static Err comp_alloc_data(Comp *comp, Ind size, Ind align, const U8 **out) {
     adr,
     size
   ));
+
+  // May reserve initialized bytes staged at `adr`; callers which require
+  // zeroed memory must clear their allocation.
   return nullptr;
 }
 

@@ -25,7 +25,7 @@ fun: .run { -- err }
     str len .reverse
   end
   str len .reverse
-  str " fedcba9876543210" .assert_str_eq
+  str " fedcba9876543210" .assert_cstr
 end
 .run
 
