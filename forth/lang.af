@@ -1267,10 +1267,6 @@ fun: .within  { num floor ceil -- bool } num floor  >= num ceil  < .bit_and end
 fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .bit_and end
 
 \ ## Memory load / store
-\
-\ Early bootstrap definitions. Comptime definitions
-\ are later replaced with peephole-fusion versions;
-\ runtime definitions remain as-is.
 
 \ Comptime-stack-aware load: replace latest arg, preserving prior args.
 fun: .comp_mem_load { size opc -- err }
@@ -1280,34 +1276,79 @@ fun: .comp_mem_load { size opc -- err }
   reg reg 0 size opc .asm_load_store_off .comp_instr \ ldr<size> <reg>, [<reg>]
 end
 
-fun: @ { _adr -> val } [
-  0 0 0 .asm_load_off .comp_out0 \ ldr x0, [x0]
-] end
+\ Comptime-stack-aware store.
+fun: .comp_mem_store { size -- err }
+  2 nil .comp_args_min
+  .comp_args_get .dec { adr }
+  adr .dec { val }
+  val adr 0 size 0b00 .asm_load_store_off .comp_instr \ str<size> <val>, [<adr>]
+  val .comp_args_set
+end
 
-fun_comp: @ { -- err } 0b11 0b01 .comp_mem_load end
+\ Byte load / store; renamed from standard `c@ c!`.
+fun_comp: @b { -- err } 0b00 0b01 .comp_mem_load end
+fun:      @b { adr -> val } @b end \ ldrb w0, [x0]
 
-fun: ! { _val _adr } [
-  0 1 0 .asm_store_off .comp_instr \ str x0, [x1]
-] end
+fun_comp: !b { -- err } 0b00 .comp_mem_store end
+fun:      !b { val adr -> } !b end \ strb w0, [x1]
 
-\ Byte load/store; renamed from standard `c@` and `c!`.
-fun: @b { _adr -> val } [
-  0 0 0 .asm_load_off_u8 .comp_out0 \ ldrb w0, [x0]
-] end
+fun_comp: @u8 { -- err } 0b00 0b01 .comp_mem_load end
+fun:      @u8 { adr -> val } @u8 end \ ldrb w0, [x0]
 
-fun: !b { _val _adr } [
-  0 1 0 .asm_store_off_u8 .comp_instr \ strb w0, [x1]
-] end
+fun_comp: @s8 { -- err } 0b00 0b10 .comp_mem_load end
+fun:      @s8 { adr -> val } @s8 end \ ldrsb x0, [x0]
 
-fun: @u32 { _adr -> val } [
-  0 0 0 .asm_load_off_u32 .comp_out0 \ ldr w0, [x0]
-] end
+fun_comp: !8 { -- err } 0b00 .comp_mem_store end
+fun:      !8 { val adr -> } !8 end \ strb w0, [x1]
 
 fun_comp: @u32 { -- err } 0b10 0b01 .comp_mem_load end
+fun:      @u32 { adr -> val } @u32 end \ ldr w0, [x0]
 
-fun: !32 { _val _adr } [
-  0 1 0 .asm_store_off_u32 .comp_instr \ str w0, [x1]
-] end
+fun_comp: !32 { -- err } 0b10 .comp_mem_store end
+fun:      !32 { val adr -> } !32 end \ str w0, [x1]
+
+fun_comp: @u16 { -- err } 0b01 0b01 .comp_mem_load end
+fun:      @u16 { adr -> val } @u16 end \ ldrh w0, [x0]
+
+fun_comp: @s16 { -- err } 0b01 0b10 .comp_mem_load end
+fun:      @s16 { adr -> val } @s16 end \ ldrsh x0, [x0]
+
+fun_comp: !16 { -- err } 0b01 .comp_mem_store end
+fun:      !16 { val adr -> } !16 end \ strh w0, [x1]
+
+fun_comp: @s32 { -- err } 0b10 0b10 .comp_mem_load end
+fun:      @s32 { adr -> val } @s32 end \ ldrsw x0, [x0]
+
+fun_comp: @ { -- err } 0b11 0b01 .comp_mem_load end
+fun:      @ { adr -> val } @ end \ ldr x0, [x0]
+
+fun_comp: ! { -- err } 0b11 .comp_mem_store end
+fun:      ! { val adr -> } ! end \ str x0, [x1]
+
+fun_comp: @cint { -- err } 0b10 0b10 .comp_mem_load end
+fun:      @cint { adr -> val } @cint end
+
+fun_comp: !cint { -- err } 0b10 .comp_mem_store end
+fun:      !cint { val adr -> } !cint end
+
+fun_comp: @cuint { -- err } 0b10 0b01 .comp_mem_load end
+fun:      @cuint { adr -> val } @cuint end
+
+fun_comp: !cuint { -- err } 0b10 .comp_mem_store end
+fun:      !cuint { val adr -> } !cuint end
+
+\ Apple ABI: register-sized C "long".
+fun_comp: @clong { -- err } call'' @ end
+fun:      @clong { adr -> val } @ end
+
+fun_comp: !clong { -- err } call'' ! end
+fun:      !clong { val adr -> } ! end
+
+fun_comp: @culong { -- err } call'' @ end
+fun:      @culong { adr -> val } @ end
+
+fun_comp: !culong { -- err } call'' ! end
+fun:      !culong { val adr -> } ! end
 
 fun_comp: @2 { -- err }
   1 nil .comp_args_min
@@ -1317,7 +1358,7 @@ fun_comp: @2 { -- err }
   val0 val1 val0 0 .asm_load_pair_off .comp_instr \ ldp Xt1, Xt2, [Xn]
 end
 
-fun: @2 { adr -> val0 val1 } @2 end
+fun: @2 { adr -> val0 val1 } @2 end \ ldp x0, x1, [x0]
 
 fun_comp: @@2 { -- err }
   .comp_args2_regs2 { reg0 reg1 }
@@ -1369,7 +1410,7 @@ fun: !at { val adr off -> } !at end
 fun: off! { adr } false adr ! end
 fun: on!  { adr } true  adr ! end
 
-\ Shortcut for allocating a cell-sized slot on the system stack via `.alloca`.
+\ Shortcut for allocating a cell-sized slot on the system stack.
 fun_comp: .slot { -- err } ( E: -- adr ) call'' CELL call'' .alloca end
 
 \ Shortcut for stack-allocating a slot and immediately setting a value.
@@ -1875,21 +1916,16 @@ fun: .instr_off { adr -- off } .interp_instrs { instrs } adr instrs - end
 \
 \ Structure:
 \
-\   inp_len     -- input stack length
-\   out_len     -- output stack length
-\   has_out     -- has output arity been inferred yet?
-\   branch_type -- cbz / cbnz / b.<cond>
-\   instr_info  -- asm-specific stuff, like branch condition code
-\   32...63     -- instruction offset from beginning of code heap
+\   inp_len -- input stack length
+\   out_len -- output stack length
+\   has_out -- has output arity been inferred yet?
+\   truthy  -- invert predicate condition
+\   32...63 -- instruction offset from beginning of code heap
 \
 \ Instruction offset describes start of some conditional branch or loop.
 \ It's used to compile PC-relative branch instructions at branch points.
 \
 \ Masks must be used via `.bits_clear .bits_get .bits_set .bits_pop`.
-
-0 let: ASM_BRANCH_TYPE_CBZ
-1 let: ASM_BRANCH_TYPE_CBNZ
-2 let: ASM_BRANCH_TYPE_COND
 
 ASM_ARG_LEN_MAX .bit_len .low_bits let: CONT_MASK_INP_LEN
 
@@ -1903,24 +1939,13 @@ let: CONT_MASK_HAS_OUT
 1 CONT_MASK_HAS_OUT .bit_len .bit_lsl
 let: CONT_MASK_ENABLE_ELSE
 
-ASM_BRANCH_TYPE_COND .bit_len .low_bits
-CONT_MASK_ENABLE_ELSE .bit_len .bit_lsl
-let: CONT_MASK_BRANCH_TYPE
-
-32 .low_bits
-CONT_MASK_BRANCH_TYPE .bit_len .low_bits .bits_clear
-let: CONT_MASK_INSTR_INFO
+1 CONT_MASK_ENABLE_ELSE .bit_len .bit_lsl
+let: CONT_MASK_TRUTHY
 
 32 .low_bits .bit_invert let: CONT_MASK_INSTR_OFF
 
 fun: .cont_meta_instr_off_set { off meta -- meta }
   off .instr_off_pack meta CONT_MASK_INSTR_OFF .bits_set
-end
-
-fun: .cont_meta_instr_set { off type info meta -- meta }
-  type meta CONT_MASK_BRANCH_TYPE .bits_set { meta }
-  info meta CONT_MASK_INSTR_INFO .bits_set { meta }
-  off meta .cont_meta_instr_off_set
 end
 
 fun: .cont_meta_instr_adr { meta -- adr }
@@ -1932,19 +1957,6 @@ fun: .reserve_instr { -- off err }
   .here_write .instr_off { off }
   ASM_PLACEHOLDER .comp_instr
   off
-end
-
-\ Decode `cset`, returning its destination register and asm condition.
-fun: .asm_cset_decode { instr -- reg cond ok }
-  instr 0b11111 .bit_and { reg }
-  instr 12 .bit_lsr 0b1111 .bit_and .asm_cond_invert { cond }
-
-  \ `cset` with `Rd` and `cond` masked out.
-  instr 0b1_1_1_11111111_11111_0000_1_1_11111_00000 .bit_and ASM_OP_CSET =
-  cond ASM_AL <> .bit_and
-  cond ASM_NV <> .bit_and { ok }
-
-  reg cond ok
 end
 
 \ ## Conditionals
@@ -1992,14 +2004,9 @@ end
 fun: .comp_patch_branch_cond { meta -- err }
   meta .cont_meta_instr_adr { adr }
   meta CONT_MASK_INP_LEN .bits_get { reg }
-  meta CONT_MASK_BRANCH_TYPE .bits_get { type }
-  meta CONT_MASK_INSTR_INFO .bits_get { info }
+  meta CONT_MASK_TRUTHY .bits_get { truthy }
   .here_write adr - { off }
-
-  \ Select between `cbz|cbnz|b.<cond>`. Branchless: don't have `.then` yet.
-  reg off type ASM_BRANCH_TYPE_CBNZ = .asm_cmp_branch { cmp }
-  off info .asm_branch_cond type ASM_BRANCH_TYPE_COND = *
-  cmp .coalesce adr !32
+  reg off truthy .asm_cmp_branch adr !32
 end
 
 fun: .comp_patch_chain_branch { meta -> err } .comp_patch_branch call'' end end
@@ -2016,56 +2023,11 @@ fun_comp: .then { -- meta end_xt err } ( E: pred -- )
   .comp_barrier
   1 " arguments before `.then`" .comp_args_valid
   0 .comp_args_set
-  .reserve_instr ASM_BRANCH_TYPE_CBZ nil nil .cont_meta_instr_set
-  xt' .then_end
+  .reserve_instr nil .cont_meta_instr_off_set xt' .then_end
 end
 
 \ Now that we have basic branching, we can define
 \ full-blown arity-aware condition expressions.
-
-\ Conditional-specific version of `.reserve_instr` with limited support
-\ for peephole instruction fusion. Usable by words like `.then .while`,
-\ but not by `.and .or` which must preserve predicate's physical value.
-fun: .cond_reserve { pred_reg meta -- meta err }
-  .here_write ASM_INSTR_SIZE - { prev1 }
-  prev1 ASM_INSTR_SIZE - { prev2 }
-
-  \ Without fusion:
-  \
-  \   cmp  x0, #0
-  \   cset x0, eq    -- <pred> =0
-  \   cbz  x0, <end>
-  \
-  \ With fusion:
-  \
-  \   cbnz x0, <end>
-  pred_reg        .asm_cmp_zero prev2 @u32 = { ok }
-  pred_reg ASM_EQ .asm_cset     prev1 @u32 = ok .bit_and .then
-    .comp_instr_drop \ TODO drop this intrinsic; used only here.
-    ASM_PLACEHOLDER prev2 !32
-    prev2 .instr_off ASM_BRANCH_TYPE_CBNZ nil meta .cont_meta_instr_set .ret
-  end
-
-  \ Without fusion:
-  \
-  \   cmp  <A>, <B>
-  \   cset <A>, <cond>    -- `<pred> 123 <>` and so on
-  \   cbz  <A>, <end>
-  \
-  \ With fusion:
-  \
-  \   cmp      <A>, <B>
-  \   b.<cond> <A>, <end>
-  \
-  \ Very minor but affects a lot of hot loops.
-  prev1 @u32 .asm_cset_decode { reg cond ok }
-  ok reg pred_reg = .bit_and .then
-    cond .asm_cond_invert { cond }
-    prev1 .instr_off ASM_BRANCH_TYPE_COND cond meta .cont_meta_instr_set .ret
-  end
-
-  .reserve_instr ASM_BRANCH_TYPE_CBZ nil meta .cont_meta_instr_set
-end
 
 \ Finalizer for `.then`; invoked exclusively by `end`.
 \ `else` replaces this with its own finalizer.
@@ -2115,8 +2077,10 @@ fun_comp: .then { -- meta end_xt err } ( E: pred -- ) [ .redefine ]
 
   .comp_barrier
   len .comp_args_set \ Logically consume predicate.
-  len meta .cond_reserve { meta }
+
   true meta CONT_MASK_ENABLE_ELSE .bits_set { meta }
+  false meta CONT_MASK_TRUTHY .bits_set { meta }
+  .reserve_instr meta .cont_meta_instr_off_set { meta }
   meta xt' .then_end
 end
 
@@ -2173,7 +2137,7 @@ fun: .cond_bool_expr_end { meta -- err }
   call'' end
 end
 
-fun: .cond_bool_expr_beg { branch_type -- meta end_xt err }
+fun: .cond_bool_expr_beg { truthy -- meta end_xt err }
   \ The internal shape is very similar to `.then`, but with
   \ just enough differences to be not worth deduplicating.
 
@@ -2198,16 +2162,16 @@ fun: .cond_bool_expr_beg { branch_type -- meta end_xt err }
   .comp_barrier
   len .dec .comp_args_set \ Logically consume predicate.
   .reserve_instr meta .cont_meta_instr_off_set { meta }
-  branch_type meta CONT_MASK_BRANCH_TYPE .bits_set { meta }
+  truthy meta CONT_MASK_TRUTHY .bits_set { meta }
   meta xt' .cond_bool_expr_end
 end
 
 fun_comp: .and { -- meta end_xt err }
-  ASM_BRANCH_TYPE_CBZ .cond_bool_expr_beg
+  false .cond_bool_expr_beg
 end
 
 fun_comp: .or { -- meta end_xt err }
-  ASM_BRANCH_TYPE_CBNZ .cond_bool_expr_beg
+  true .cond_bool_expr_beg
 end
 
 \ ## Types
@@ -2835,43 +2799,6 @@ fun: .asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM .asm_logic
 fun: .asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM .asm_logical_imm_instr end
 fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .bit_invert ASM_OP_AND_IMM .asm_logical_imm_instr end
 fun: .asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM .asm_logical_imm_instr end
-
-fun: .asm_add_imm_decode { instr -- Xd Xn imm ok }
-  \ `add Xd, Xn, #imm12` with `Xd`, `Xn`, and `imm12` masked out.
-  \ Not bothering to decode `sub`, shifted immediates, or flags ops.
-  0b1_1_1_111111_1_000000000000_00000_00000 { mask }
-
-  instr 0b11111 .bit_and { Xd }
-  instr 5 .bit_lsr 0b11111 .bit_and { Xn }
-  instr 10 .bit_lsr 0xfff .bit_and { imm }
-
-  instr mask .bit_and ASM_OP_ADD_IMM = { ok }
-  Xd Xn imm ok
-end
-
-fun: .asm_add_imm_decode_at { instr_adr -- Xd Xn imm ok }
-  instr_adr @u32 .asm_add_imm_decode
-end
-
-fun: .asm_load_store_byte_off { Rt Xn off size opc -- instr ok }
-  \ Prefer unsigned scaled addressing: it has much larger range.
-  off >=0 .then
-    1 size .bit_lsl { width }
-    off width .mod =0 .then
-      off width / { imm }
-      imm ASM_MAX_IMM12 <= .then
-        Rt Xn imm size opc .asm_load_store_off true .ret
-      end
-    end
-  end
-
-  \ Fall back to unscaled addressing for small byte-precision offsets.
-  off -256 >= off 255 <= .bit_and .then
-    Rt Xn off size opc .asm_load_store_unscaled_off true .ret
-  end
-
-  0 false
-end
 
 \ ## Constant folding and locals mutation
 \
@@ -3801,104 +3728,6 @@ fun_comp: .bits_get { -- err } [ .redefine ]
   end
 end
 
-\ ## More memory stuff
-
-fun: .comp_mem_try_fold_offset { Rt Xn size opc -- fused err }
-  \ Peephole: replace immediately preceding `add Xn, Xn, #off`
-  \ with a load/store with an inline offset when it fits.
-  .here_write ASM_INSTR_SIZE - { instr_adr }
-  instr_adr .asm_add_imm_decode_at { Xd Xn0 off ok }
-  ok Xd Xn = .bit_and Xn0 Xn = .bit_and { ok }
-  ok =0 .then false .ret end
-
-  Rt Xn off size opc .asm_load_store_byte_off { instr -- ok }
-  ok =0 .then false .ret end
-
-  \ Safe only because this is the most recently emitted instruction.
-  instr instr_adr !32
-  true
-end
-
-fun: .comp_mem_load { size opc -- err } [ .redefine ]
-  1 nil .comp_args_min
-  .comp_args_get .dec { reg }
-  reg .comp_realloc_reg
-
-  reg reg size opc .comp_mem_try_fold_offset .then .ret end
-
-  \ ldr<size> <reg>, [<reg>]
-  reg reg 0 size opc .asm_load_store_off .comp_instr
-end
-
-fun: .comp_mem_store { size -- err }
-  2 nil .comp_args_min
-  .comp_args_get .dec { adr }
-  adr .dec { val }
-
-  val adr size 0b00 .comp_mem_try_fold_offset .then
-    val .comp_args_set
-    .ret
-  end
-
-  \ str<size> <val>, [<adr>]
-  val adr 0 size 0b00 .asm_load_store_off .comp_instr
-  val .comp_args_set
-end
-
-fun_comp: @u8 { -- err } 0b00 0b01 .comp_mem_load end
-fun:      @u8 { adr -> val } @u8 end
-
-fun_comp: @s8 { -- err } 0b00 0b10 .comp_mem_load end
-fun:      @s8 { adr -> val } @s8 end
-
-fun_comp: !8  { -- err } 0b00 .comp_mem_store end
-fun:      !8  { val adr -> } !8 end
-
-fun_comp: @b { -- err } 0b00 0b01 .comp_mem_load end
-fun_comp: !b { -- err } 0b00 .comp_mem_store end
-
-fun_comp: @u16 { -- err } 0b01 0b01 .comp_mem_load end
-fun:      @u16 { adr -> val } @u16 end
-
-fun_comp: @s16 { -- err } 0b01 0b10 .comp_mem_load end
-fun:      @s16 { adr -> val } @s16 end
-
-fun_comp: !16  { -- err } 0b01 .comp_mem_store end
-fun:      !16  { val adr -> } !16 end
-
-fun_comp: @u32 { -- err } [ .redefine ] 0b10 0b01 .comp_mem_load end
-fun_comp: @s32 { -- err } 0b10 0b10 .comp_mem_load end
-fun:      @s32 { adr -> val } @s32 end
-fun_comp: !32  { -- err } 0b10 .comp_mem_store end
-
-fun_comp: @ { -- err } [ .redefine ] 0b11 0b01 .comp_mem_load end
-fun_comp: ! { -- err } 0b11 .comp_mem_store end
-
-fun_comp: @cint { -- err } 0b10 0b10 .comp_mem_load end
-fun:      @cint { adr -> val } @cint end
-
-fun_comp: !cint { -- err } 0b10 .comp_mem_store end
-fun:      !cint { val adr -> } !cint end
-
-fun_comp: @cuint { -- err } 0b10 0b01 .comp_mem_load end
-fun:      @cuint { adr -> val } @cuint end
-
-fun_comp: !cuint { -- err } 0b10 .comp_mem_store end
-fun:      !cuint { val adr -> } !cuint end
-
-\ Apple ABI: register-sized C "long".
-fun_comp: @clong { -- err } call'' @ end
-fun:      @clong { adr -> val } @ end
-
-fun_comp: !clong { -- err } call'' ! end
-fun:      !clong { val adr -> } ! end
-
-fun_comp: @culong { -- err } call'' @ end
-fun:      @culong { adr -> val } @ end
-
-fun_comp: !culong { -- err } call'' ! end
-fun:      !culong { val adr -> } ! end
-
 6 1 extern: .mmap     mmap     ( adr size pflag mflag fdes off -- adr|-1 )
 2 1 extern: .munmap   munmap   ( adr size -- 0|-1 :Cint )
 3 1 extern: .mprotect mprotect ( adr size pflag -- 0|-1 :Cint )
@@ -4160,8 +3989,7 @@ fun: .loop_back { meta -> err }
   adr out - .asm_branch .comp_instr \ b <beg>
 end
 
-\ TODO: store `prev` index in `meta`; rename `instr_info`
-\ to something more generic and use that region.
+\ TODO: store `prev` index in unused `meta` bits.
 fun: .loop_end { prev meta -- err } ( LOOP_AUX: …aux… -- ) ( C: <loop_prev> -- )
   .comp_barrier
 
@@ -4230,8 +4058,8 @@ fun_comp: .while { -- err } ( LOOP_AUX: -- meta end_xt )
 
   \ `.comp_patch_branch_cond` determines predicate register from this.
   len meta CONT_MASK_INP_LEN .bits_set { meta }
-
-  len meta .cond_reserve LOOP_AUX >s
+  false meta CONT_MASK_TRUTHY .bits_set { meta }
+  .reserve_instr meta .cont_meta_instr_off_set LOOP_AUX >s
   xt' .while_end LOOP_AUX >s
 end
 

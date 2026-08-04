@@ -532,22 +532,6 @@ static Err intrin_comp_args_fold(
   );
 }
 
-// Drops one uncommitted tail instruction from the current word.
-static Err intrin_comp_instr_drop(Interp *interp) {
-  Sym *sym;
-  try(interp_require_current_sym(interp, &sym));
-
-  const auto instrs = &interp->comp.code.code_write;
-  if (stack_len_valid(instrs) <= sym->norm.spans.inner) {
-    return err_str(
-      "unable to drop instruction: current word has no body instructions"
-    );
-  }
-
-  instrs->top--;
-  return nullptr;
-}
-
 static Err intrin_comp_barrier(Interp *interp) {
   return comp_forget_regs(&interp->comp, ASM_REGS_VOLATILE);
 }
@@ -828,16 +812,6 @@ static const USED auto INTRIN_COMP_ARGS_FOLD = (Sym){
   .out_len   = 5,
   .has_err   = true,
   .comp_only = true,
-};
-
-static const USED auto INTRIN_COMP_INSTR_DROP = (Sym){
-  .name.buf    = ".comp_instr_drop",
-  .wordlist    = WORDLIST_EXEC,
-  .intrin      = (void *)intrin_comp_instr_drop,
-  .out_len     = 1,
-  .has_err     = true,
-  .comp_only   = true,
-  .interp_only = true,
 };
 
 static const USED auto INTRIN_COMP_BARRIER = (Sym){

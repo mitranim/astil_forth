@@ -302,9 +302,30 @@ fun: .bang_with_more_inputs { val adr _x2 _x3 _x4 } val adr ! end
 
 fun: .bang_with_outputs { val adr next -- x0 x1 x2 } val adr ! next next next end
 
+\ This code shape used to trigger an incorrect peephole instruction rewrite.
+\ In `A .then B end .then C end`, the second `.then` poorly assumed that the
+\ earlier code `B` was from an unconditionally executed predicate expression
+\ and rewrote/backtracked instructions in the first `.then`, breaking logic.
+\ This test is a reminder that peephole fusion requires more care.
+fun: .test_cond_join_cmp { val pred flag -> out }
+  .then <>0 end
+  .then .inc end
+end
+
+\ Same motivation as `.test_cond_join_cmp`.
+fun: .test_cond_join_eq0 { val pred flag -> out }
+  .then else =0 end
+  .then .inc end
+end
+
+fun: .test_cond_join { -- err }
+  assert= 0 false false .test_cond_join_cmp 0 end
+  assert= 0 true true .test_cond_join_eq0 1 end
+end
+.test_cond_join
+
 fun: .test_conditionals { -- err }
-  \ Must fail to compile: conditional without `else`
-  \ can't change stack arity.
+  \ Must fail to compile: conditional without `else` can't change stack arity.
   \ false .then 10 end
 
   assert= false .then 10 else 20 end 20 end
@@ -507,7 +528,7 @@ fun: .test_bool_expr_two_values { -- err }
   assert= 0 -4 .test_bool_expr_or2 -4 end
   assert= TEST_BOOL_EXPR_HITS @ 2 end
 
-  \ Comparison-produced predicates, including fusion-sensitive `=0` shape.
+  \ Comparison-produced predicates.
   assert= 1 0 .test_bool_expr_cmp_and 0 end
   assert= 0 1 .test_bool_expr_cmp_and 99 end
   assert= 0 1 .test_bool_expr_cmp_or 1 end
@@ -999,85 +1020,6 @@ fun: .test_word_instr_count { XT instr -- count }
   count
 end
 
-fun: .test_word_has_branch_cond { XT cond -- bool }
-  \ Matches `b.<cond>` while ignoring the PC-relative offset.
-  0b11111111_0000000000000000000_1_0000 { mask }
-  0b01010100_0000000000000000000_0_0000 { match }
-
-  XT .test_sym_instr_len { len }
-  0 { ind }
-  loop
-    ind len < .while
-    XT ind .test_actual_instr { instr }
-    instr mask .bit_and match = instr 0xf .bit_and cond = .bit_and .then true .ret end
-    inc: ind
-  end
-  false
-end
-
-fun: .test_word_has_cset { XT -- bool }
-  XT .test_sym_instr_len { len }
-  0 { ind }
-  loop
-    ind len < .while
-    XT ind .test_actual_instr .asm_cset_decode { _reg _cond ok }
-    ok .then true .ret end
-    inc: ind
-  end
-  false
-end
-
-fun: .test_word_has_cbnz { XT -- bool }
-  XT .test_sym_instr_len { len }
-  0 { ind }
-  loop
-    ind len < .while
-    XT ind .test_actual_instr 24 .bit_lsr 0xff .bit_and 0xb5 = .then
-      true .ret
-    end
-    inc: ind
-  end
-  false
-end
-
-fun: .test_while_cset_branch_fusion_fun { val -- out }
-  0 { out }
-  loop
-    val 0 >= .while
-    inc: out
-    dec: val
-  end
-  out
-end
-
-fun: .test_while_cset_branch_fusion { -- err }
-  assert= 3 .test_while_cset_branch_fusion_fun 4 end
-  assert= -1 .test_while_cset_branch_fusion_fun 0 end
-  assert xt' .test_while_cset_branch_fusion_fun ASM_LT .test_word_has_branch_cond end
-  assert xt' .test_while_cset_branch_fusion_fun .test_word_has_cset =0 end
-end
-.test_while_cset_branch_fusion
-
-fun: .test_while_eq_zero_fusion_fun { val -- out }
-  0 { out }
-  loop
-    val =0 .while
-    inc: out
-    inc: val
-  end
-  out
-end
-
-fun: .test_while_eq_zero_fusion { -- err }
-  0 .asm_cmp_zero { cmp_zero }
-  assert= 0 .test_while_eq_zero_fusion_fun 1 end
-  assert= 1 .test_while_eq_zero_fusion_fun 0 end
-  assert xt' .test_while_eq_zero_fusion_fun .test_word_has_cbnz end
-  assert xt' .test_while_eq_zero_fusion_fun .test_word_has_cset =0 end
-  assert= xt' .test_while_eq_zero_fusion_fun cmp_zero .test_word_instr_count 0 end
-end
-.test_while_eq_zero_fusion
-
 fun: .test_comp_reg_cmp_keeps_rhs_in_arg_fun { one two -- out }
   one two = two +
 end
@@ -1122,34 +1064,6 @@ fun: .test_ctx_top_codegen { -- err }
   assert= xt' .test_ctx_top_roundtrip_codegen_fun store .test_word_instr_count 1 end
 end
 .test_ctx_top_codegen
-
-fun: .test_then_cmp_zero_fusion_fun { val -- out }
-  0 { out }
-  val 0 = .then 7 { out } end
-  out
-end
-
-fun: .test_then_eq_zero_fusion_fun { val -- out }
-  0 { out }
-  val =0 .then 7 { out } end
-  out
-end
-
-fun: .test_then_zero_fusion { -- err }
-  0 .asm_cmp_zero { cmp_zero }
-  assert= 0 .test_then_cmp_zero_fusion_fun 7 end
-  assert= 1 .test_then_cmp_zero_fusion_fun 0 end
-  assert xt' .test_then_cmp_zero_fusion_fun .test_word_has_cbnz end
-  assert xt' .test_then_cmp_zero_fusion_fun .test_word_has_cset =0 end
-  assert= xt' .test_then_cmp_zero_fusion_fun cmp_zero .test_word_instr_count 0 end
-
-  assert= 0 .test_then_eq_zero_fusion_fun 7 end
-  assert= 1 .test_then_eq_zero_fusion_fun 0 end
-  assert xt' .test_then_eq_zero_fusion_fun .test_word_has_cbnz end
-  assert xt' .test_then_eq_zero_fusion_fun .test_word_has_cset =0 end
-  assert= xt' .test_then_eq_zero_fusion_fun cmp_zero .test_word_instr_count 0 end
-end
-.test_then_zero_fusion
 
 fun: .test_loop_while { -- err }
   assert=
@@ -3232,11 +3146,33 @@ fun: .test_struct_field_comp_arity { val }
   { _val }
 end
 
+123 var: TEST_JOIN_LOAD
+0   var: TEST_JOIN_STORE
+
+\ Similar motivation to `.test_cond_join_cmp`.
+\ Guards against illegal instruction fusion.
+fun: .test_join_load { adr flag -> val }
+  .then CELL + end
+  @
+end
+
+fun: .test_join_store { val adr flag -> }
+  .then CELL + end
+  !
+end
+
+fun: .test_mem_join { -- err }
+  assert= TEST_JOIN_LOAD false .test_join_load 123 end
+  456 TEST_JOIN_STORE false .test_join_store
+  assert= TEST_JOIN_STORE @ 456 end
+end
+.test_mem_join
+
 fun: .test_struct_fields_load_store { -- err }
   allocaz' Typ { ptr }
 
   assert= ptr .Typ_field0 ptr end
-  assert= ptr .Typ_field1 ptr 8 + end
+  assert= ptr .Typ_field1 ptr CELL + end
 
   assert= ptr .Typ_field0 @ 0 end
   10 ptr .Typ_field0 !
@@ -3255,68 +3191,6 @@ fun: .test_struct_fields_load_store { -- err }
   assert= ptr .Typ_field1 @ 40 end
 end
 .test_struct_fields_load_store
-
-struct: Typ_field_peephole
-  U64 1 field: .Typ_field_peephole_0
-  U8  1 field: .Typ_field_peephole_1
-  U64 1 field: .Typ_field_peephole_2
-end
-
-struct: Typ_field_peephole_unscaled
-  U8 1 field: .Typ_field_peephole_unscaled_0
-  U8 1 field: .Typ_field_peephole_unscaled_1
-end
-
-fun: .test_struct_field_load_peephole_fun { ptr -- val }
-  ptr .Typ_field_peephole_2 @
-end
-
-fun: .test_struct_field_store_peephole_fun { val ptr }
-  val ptr .Typ_field_peephole_2 !
-end
-
-fun: .test_struct_field_byte_peephole_fun { ptr -- val }
-  ptr .Typ_field_peephole_1 @b
-end
-
-fun: .test_struct_field_unscaled_peephole_fun { ptr -- val }
-  ptr .Typ_field_peephole_unscaled_1 @
-end
-
-fun: .test_struct_field_peephole_expect_instr { XT ind exp -- err }
-  XT .xt_instr ind 4 * + @u32 { act }
-  exp act <> .then
-    XT .Sym_name .Sym_word_buf { name }
-    XT .Sym_name .Sym_word_len @u32 { name_len }
-    " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
-    name_len name ind exp act .errf .throw
-  end
-end
-
-fun: .test_struct_field_peephole { -- err }
-  .has_interp =0 .then .ret end
-
-  xt' .test_struct_field_load_peephole_fun { load_xt }
-  0 0 2 0b11 0b01 .asm_load_store_off { load_instr }
-  load_xt 0 load_instr .test_struct_field_peephole_expect_instr
-  load_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
-
-  xt' .test_struct_field_store_peephole_fun { store_xt }
-  0 1 2 0b11 0b00 .asm_load_store_off { store_instr }
-  store_xt 0 store_instr .test_struct_field_peephole_expect_instr
-  store_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
-
-  xt' .test_struct_field_byte_peephole_fun { byte_xt }
-  0 0 8 0b00 0b01 .asm_load_store_off { byte_instr }
-  byte_xt 0 byte_instr .test_struct_field_peephole_expect_instr
-  byte_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
-
-  xt' .test_struct_field_unscaled_peephole_fun { unscaled_xt }
-  0 0 1 .asm_load_unscaled_off { unscaled_instr }
-  unscaled_xt 0 unscaled_instr .test_struct_field_peephole_expect_instr
-  unscaled_xt 1 ASM_RET .test_struct_field_peephole_expect_instr
-end
-.test_struct_field_peephole
 
 struct: Typ0 end
 
@@ -4252,6 +4126,7 @@ fun: .main_run { -- err }
   .test_span_consumers
   .test_span_init
   .test_default_cells
+  .test_cond_join
   .test_conditionals
   .test_bool_expr_two_values
   .test_bool_expr_stacked
@@ -4363,8 +4238,8 @@ fun: .main_run { -- err }
   77 32 .test_alloca_dynamic_non_x0
   .test_array_sizes
   .test_struct_fields_basic
+  .test_mem_join
   .test_struct_fields_load_store
-  .test_struct_field_peephole
   .test_struct_0
   .test_struct_1
   .test_struct_2
