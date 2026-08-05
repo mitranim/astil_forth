@@ -105,12 +105,16 @@ class astil_forth_eval_selection(sublime_plugin.WindowCommand):
       self.eval = None
 
 class astil_forth_event_listener(sublime_plugin.EventListener):
-  def on_window_command(self, window, command_name, args):
-    if command_name == "hide_panel" and window.active_panel() == PANEL_NAME:
-      window.run_command("astil_forth_eval_selection", {"cancel": True})
+  def on_post_window_command(self, win, cmd, args):
+    canceling = (
+      cmd == "astil_forth_eval_selection" and
+      args and args.get("cancel")
+    )
+    if not canceling and win.active_panel() != PANEL_NAME:
+      win.run_command("astil_forth_eval_selection", {"cancel": True})
 
-  def on_pre_close_window(self, window):
-    window.run_command("astil_forth_eval_selection", {"cancel": True})
+  def on_pre_close_window(self, win):
+    win.run_command("astil_forth_eval_selection", {"cancel": True})
 
 def guess_cwd(view):
   window = view.window()
