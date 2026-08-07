@@ -3889,25 +3889,22 @@ fun: .stack_init_ctx { size type stk -- ctx Err }
   ctx
 end
 
-\ stp x28, xzr, [sp, #-16]!
-\ mov x28, x0
-fun_comp: .ctx_push { -- err } ( E: ctx -- )
-  1 " context before `.ctx_push`" .comp_args_valid
-  ASM_REG_CTX ASM_REG_ZR ASM_REG_SP 0 FUND_ALIGN - .asm_store_pair_pre .comp_instr
-  ASM_REG_CTX 0 .asm_mov_reg .comp_instr
-  0 .comp_args_set
-end
-
 \ ldp x28, xzr, [sp], #16
-fun_comp: .ctx_pop { -- err } ( E: -- )
+fun_comp: .with_ctx_end { -- err } ( E: -- )
   ASM_REG_CTX ASM_REG_ZR ASM_REG_SP FUND_ALIGN .asm_load_pair_post .comp_instr
 end
 
 \ Runs body with supplied ambient context, restoring prior context at `end`.
 \ Body must reach `end`: no `.ret .try .throw` or local auto-try.
 fun_comp: .with_ctx { -- end_xt err } ( E: ctx -- )
-  call'' .ctx_push
-  xt'' .ctx_pop
+  1 " context before `.ctx_push`" .comp_args_min
+  .comp_args_get .dec { len }
+  len .comp_args_set
+
+  \ stp x28, xzr, [sp, #-16]!
+  ASM_REG_CTX ASM_REG_ZR ASM_REG_SP FUND_ALIGN .negate .asm_store_pair_pre .comp_instr
+  ASM_REG_CTX len .asm_mov_reg .comp_instr \ mov x28, x0
+  xt'' .with_ctx_end
 end
 
 fun: .ctx_top { -- top } context .Ctx_top @ end
@@ -4844,55 +4841,47 @@ end
 
 fun: main_cells { -- adr len } [ .plain_call ] main_cells end
 
-fun: .main_ctx_init { arena arena_len cells cells_len ctx }
-  arena arena_len ctx .Main_ctx_ctx .ctx_init
-  cells cells_len ctx .Main_ctx_cells .span_init
-end
-
-\ ldp x28, xzr, [sp], #16
-\ add sp, sp, #frame
-fun: .with_main_ctx_end { -- err }
-  call'' .ctx_pop
-  ASM_REG_SP ASM_REG_SP size' Main_ctx FUND_ALIGN .align_up .asm_add_imm .comp_instr
-end
-
-\ Recommended wrapper for AOT-compiled programs.
+\ Default context initializer for the entry point of AOT-compiled programs.
+\ Uses "statically" allocated memory regions. Example usage:
 \
-\ Example usage:
-\
-\   fun: .main { -- exit }
-\     .with_main_ctx .run end { err }
+\   fun: .main { argc argv -- exit }
+\     alloca' Main_ctx { ctx }
+\     ctx .main_ctx_init
+\     ctx .with_ctx argc argv .run end { err }
 \     err .then " error: %s" err .elogf .elf 1 else 0 end
 \   end
 \
-\ Runtime effects:
-\ - Inner code sees default / main ambient context.
-\ - The context includes the default cell-stack span.
-\ - Outer code doesn't get its registers clobbered.
-\ - Words like `.errf` can allocate memory for text.
+\ Code inside `.with_ctx … end` must run to completion.
 \
-\ Code inside `.with_main_ctx ... end` must run to completion.
-\ This means no `.ret .try .throw`, and no `-- err` in caller,
-\ meaning no implicit `.try`. Otherwise the SP and the context
-\ register get corrupted, and program crashes in obscure ways.
+\ Programs are free to define their own main context type,
+\ or allocate their own memory for the arena and/or cells,
+\ or skip context usage altogether, when not calling words
+\ which depend on context.
 \
-\ Programs are also free to replace this default with their own context.
-\ Since context memory is caller-owned, all allocated outputs, including
-\ error messages, must be handled / printed before freeing owner memory.
+\ Main arena and cells are allocated as part of the virtual memory layout
+\ declared in the executable. By default, they remain live through entire
+\ program lifetime. Unmapping them involves OS-specific interfaces, which
+\ we don't provide, and some OSes don't allow or support that. In general,
+\ to dynamically unmap memory, dynamically map it first.
+fun: .main_ctx_init { ctx }
+  main_arena ctx .Main_ctx_ctx .ctx_init
+  main_cells ctx .Main_ctx_cells .span_init
+end
+
+\ Shortcut for AOT-compiled programs. Runs body with default main context.
+\ Body must run to completion to avoid clobbering the context register for
+\ outer callers such as CRT `start`. Common use pattern; args are optional:
 \
-\ Does not record how much memory was actually used.
-\ Each invocation restarts at floor of memory arena.
-\
-\ Capture and handle outputs / errors after `end`.
-\ Main arena's memory remains valid after `end`;
-\ we have no way to relinquish it to the OS.
+\   fun: .main { argc argv envp -- exit }
+\     .with_main_ctx argc argv envp .run end { err }
+\     err .then " error: %s\n" err .elogf 1 else 0 end
+\   end
 fun_comp: .with_main_ctx { -- end_xt err }
-  size' Main_ctx FUND_ALIGN .align_up { size }
-  ASM_REG_SP ASM_REG_SP size .asm_sub_imm .comp_instr \ sub sp, sp, #frame
-  call'' main_arena call'' main_cells call'' systack_ptr compile' .main_ctx_init
+  size' Main_ctx .comp_push
+  call'' .alloca
+  compile' .main_ctx_init
   call'' systack_ptr \ mov x0, sp
-  call'' .ctx_push   \ stp x28, xzr, [sp, #-16]! ; mov x28, x0
-  xt' .with_main_ctx_end
+  call'' .with_ctx
 end
 
 \ ## Strings with escape sequences

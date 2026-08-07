@@ -60,9 +60,9 @@ fun: .handle_conn { conn }
 
   ctx .with_ctx
     conn .respond_conn { err }
-    conn .conn_close
-    err .then " [srv] unable to respond; error: %s\n" err .elogf end
   end
+  conn .conn_close
+  err .then " [srv] unable to respond; error: %s\n" err .elogf end
 
   mem .stack_deinit { err }
   err .then
