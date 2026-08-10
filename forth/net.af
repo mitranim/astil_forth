@@ -291,7 +291,6 @@ fun: .net_listen { port backlog -- sock Err }
     next backlog .sock_bind { sock err }
     next .Addrinfo_next @ { next }
     err =0 .then leave end
-    -1 { sock }
   end
 
   ainf .freeaddrinfo
@@ -302,5 +301,6 @@ fun: .net_listen { port backlog -- sock Err }
     " unable to listen on port %s: no sockets available" port .errf { err }
   end
 
+  \ Don't have to close socket on error: `.sock_bind` does that.
   sock err
 end
