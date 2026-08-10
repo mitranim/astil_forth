@@ -105,7 +105,7 @@ fun: .bit_lsr ( i1 bits -- i2 ) [
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8
 ] end
 
-fun: .bit_invert ( i1 -- i2 ) [
+fun: .bit_not ( i1 -- i2 ) [
   .asm_pop_x1                                .comp_instr \ ldr x1, [x27, -8]!
   0b1_01_01010_00_1_00001_000000_11111_00001 .comp_instr \ mvn x1, x1
   .asm_push_x1                               .comp_instr \ str x1, [x27], 8

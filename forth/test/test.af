@@ -2196,14 +2196,14 @@ fun: .test_align_up { -- err }
 end
 .test_align_up
 
-fun: .test_bit_invert { -- err }
-  assert= 0b101010 .bit_invert -43 end
+fun: .test_bit_not { -- err }
+  assert= 0b101010 .bit_not -43 end
   0b101010 { val }
-  assert= val .bit_invert -43 end
-  bit_invert: val
+  assert= val .bit_not -43 end
+  bit_not: val
   assert= val -43 end
 end
-.test_bit_invert
+.test_bit_not
 
 fun: .test_low_bits { -- err }
   assert= 5 .low_bits 31 end
@@ -4203,7 +4203,7 @@ fun: .main_run { -- err }
   .test_is_aligned_to
   .test_align_down
   .test_align_up
-  .test_bit_invert
+  .test_bit_not
   .test_low_bits
   .test_bit_trunc
   .test_bits_clear

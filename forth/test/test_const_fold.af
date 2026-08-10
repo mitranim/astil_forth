@@ -58,7 +58,7 @@ fun: .cf_want_movk_if { reg neg base_hw hw bits }
   bits hw .cf_imm_lane { lane }
   hw base_hw <> .then
     lane .then
-      neg .then lane .bit_invert 0xffff .bit_and else lane end { imm16 }
+      neg .then lane .bit_not 0xffff .bit_and else lane end { imm16 }
       reg 0b11 hw imm16 .asm_mov_wide .cf_want_instr
     end
   end
@@ -66,7 +66,7 @@ end
 
 fun: .cf_want_load { reg imm }
   imm <0 { neg }
-  neg .then imm .bit_invert else imm end { bits }
+  neg .then imm .bit_not else imm end { bits }
   neg .then 0b00 else 0b10 end { opc }
 
   bits .cf_base_hw { hw }
@@ -174,7 +174,7 @@ fun: .const_fold_multi_out_fun { -- out0 out1 out2 out3 out4 out5 out6 }
   41 .inc
   43 .dec
   42 .negate
-  0 .bit_invert
+  0 .bit_not
   -42 .abs
   0 .bit_len
   255 .bit_len

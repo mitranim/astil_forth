@@ -181,7 +181,7 @@ fun: .bit_lsr { i0 bits -> i1 } [
   0b1_0_0_11010110_00001_0010_01_00000_00000 .comp_out0 \ lsr x0, x0, x1
 ] end
 
-fun: .bit_invert { i0 -> i1 } [
+fun: .bit_not { i0 -> i1 } [
   0b1_01_01010_00_1_00000_000000_11111_00000 .comp_out0 \ mvn x0, x0
 ] end
 
@@ -779,7 +779,7 @@ fun_comp: .negate { -- err }
   .comp_args1_reg .asm_neg .comp_instr \ neg Xd, Xn
 end
 
-fun: ?bit_invert { val cond -> out } .negate .bit_xor end
+fun: ?bit_not { val cond -> out } .negate .bit_xor end
 
 fun_comp: .inc { -- err }
   .comp_args1_reg { reg }
@@ -966,7 +966,7 @@ end
 fun: .align_up { len wid -> len } .align_up end
 
 \ Flip all the bits.
-fun_comp: .bit_invert { -- err }
+fun_comp: .bit_not { -- err }
   .comp_args1_reg { reg }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
 end
@@ -1945,7 +1945,7 @@ let: CONT_MASK_ENABLE_ELSE
 1 CONT_MASK_ENABLE_ELSE .bit_len .bit_lsl
 let: CONT_MASK_TRUTHY
 
-32 .low_bits .bit_invert let: CONT_MASK_INSTR_OFF
+32 .low_bits .bit_not let: CONT_MASK_INSTR_OFF
 
 fun: .cont_meta_instr_off_set { off meta -- meta }
   off .instr_off_pack meta CONT_MASK_INSTR_OFF .bits_set
@@ -2759,14 +2759,14 @@ fun: .asm_logical_imm_enc { imm -- N immr imms err }
   imm 0 = .then
     " unable to encode logical immediate: 0 is reserved" .throw
   end
-  imm .bit_invert 0 = .then
+  imm .bit_not 0 = .then
     " unable to encode logical immediate: all ones is reserved" .throw
   end
 
   imm imm .inc .bit_and .bit_ctz { rot }
   imm rot .asm_ror64 { norm }
   norm .bit_clz { zeros }
-  norm .bit_invert .bit_ctz { ones }
+  norm .bit_not .bit_ctz { ones }
   zeros ones + { size }
 
   imm size .asm_ror64 imm <> .then
@@ -2800,7 +2800,7 @@ end
 fun: .asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM .asm_logical_imm_instr end
 fun: .asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM .asm_logical_imm_instr end
 fun: .asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM .asm_logical_imm_instr end
-fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .bit_invert ASM_OP_AND_IMM .asm_logical_imm_instr end
+fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .bit_not ASM_OP_AND_IMM .asm_logical_imm_instr end
 fun: .asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM .asm_logical_imm_instr end
 
 \ ## Constant folding and locals mutation
@@ -2939,7 +2939,7 @@ fun: .cf_bit_logical_validate { imm aux -- aux ok Err }
   aux 1 .bit_and { inv }
   aux inv - { op }
   imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .bit_and .bit_or { edge }
-  imm inv ?bit_invert { imm }
+  imm inv ?bit_not { imm }
   edge .then " redundant arithmetic" .throw end
   imm op .asm_logical_imm_mask =0
 end
@@ -3677,12 +3677,12 @@ fun_comp: .align_up { -- err } [ .redefine ]
   .cf_fold2_partial_or_fallback
 end
 
-fun_comp: .bit_invert { -- err } [ .redefine ]
-  .cf_args_fold1 .then .bit_invert .cf_fold_done else { -- } call'' .bit_invert end
+fun_comp: .bit_not { -- err } [ .redefine ]
+  .cf_args_fold1 .then .bit_not .cf_fold_done else { -- } call'' .bit_not end
 end
 
-\ Invert a local: `bit_invert: some_val`.
-fun_comp: bit_invert: { -- err } ( C: "name" -- ) ( E: -- )
+\ Invert a local: `bit_not: some_val`.
+fun_comp: bit_not: { -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_unary_init { reg loc }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
   loc reg .comp_loc_mut_store_realloc
@@ -3752,7 +3752,7 @@ MAP_PRIVATE MAP_ANON .bit_or let: MAP_DEFAULT
 
 fun: .mem_map { size pflag -- addr err }
   0 size pflag MAP_DEFAULT -1 0 .mmap { addr }
-  addr .bit_invert =0 .then " unable to mmap" .throw end
+  addr .bit_not =0 .then " unable to mmap" .throw end
   addr
 end
 
@@ -4159,7 +4159,7 @@ fun: .asm_append_imm_to_reg { reg imm out -- out }
   imm 0 < { neg }
 
   imm 0 .asm_imm16_lane { lane }
-  lane neg ?bit_invert 0xffff .bit_and { lane }
+  lane neg ?bit_not 0xffff .bit_and { lane }
   neg =0 1 .bit_lsl { opc }
   reg opc 0 lane .asm_mov_wide out .asm_append { out } \ movn|movz
 
