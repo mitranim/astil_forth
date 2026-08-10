@@ -409,15 +409,15 @@ end
 \ Base instruction variant: "immediate, unsigned offset". The Arm field is
 \ scaled by access width: for 64-bit loads, imm12 = 2 means byte offset 16.
 fun: .asm_load_store_off { Rt Xn imm12 size opc -- instr }
-  size 30 .bit_lsl          { size }
+  size 30 .bit_lsl { size }
   opc  22 .bit_lsl size .bit_or { mask }
   Rt Xn imm12 .asm_pattern_arith_imm
   mask .bit_or 0b00_111_0_01_00_000000000000_00000_00000 .bit_or
 end
 
-\ Generic unscaled load/store. Offset is a signed 9-bit byte offset.
+\ Generic unscaled load/store. Offset is a signed 9-bit immediate.
 fun: .asm_load_store_unscaled_off { Rt Xn imm9 size opc -- instr }
-  size 30 .bit_lsl          { size }
+  size 30 .bit_lsl { size }
   opc  22 .bit_lsl size .bit_or { mask }
   Rt Xn imm9 .asm_pattern_load_store
   mask .bit_or 0b00_111_0_00_00_0_000000000_00_00000_00000 .bit_or
@@ -2955,7 +2955,7 @@ end
 
 fun: .cf_align_emit { out adr _size mask -- err }
   mask adr 5 .bit_lsl .bit_or 31 .bit_or .comp_instr \ tst Xn, #imm
-  out ASM_EQ .asm_cset .comp_instr      \ cset Xd, eq
+  out ASM_EQ .asm_cset                   .comp_instr \ cset Xd, eq
 end
 
 fun: .cf_align_down_validate { size _ -- aux ok Err }
@@ -3730,6 +3730,19 @@ fun_comp: .bits_get { -- err } [ .redefine ]
     .cf_fold2_partial_or_fallback
   end
 end
+
+\ Branchlessly zeroes the value, if the predicate is zero.
+\ Same as multiply-by-boolean pattern but slightly faster.
+\ Compiles to `cmp ; csel`. No CF yet: too few callsites.
+fun_comp: .gate { -- err } ( E: val pred -- val|nil )
+  .comp_args2_regs { val pred }
+  val pred ASM_REG_ZR val ASM_REG_ZR ASM_NE .comp_emit_csel_reg
+  pred .comp_args_set
+end
+
+fun: .gate { val pred -> val|nil } .gate end
+
+\ ## Memory mapping
 
 6 1 extern: .mmap     mmap     ( adr size pflag mflag fdes off -- adr|-1 )
 2 1 extern: .munmap   munmap   ( adr size -- 0|-1 :Cint )
@@ -4922,7 +4935,7 @@ fun_comp: char' { -- err } ( C: "str" -- E: char )
   .read_decode_char reg .comp_load
 end
 
-\ Decodes a string literal from `src` to `tar` until the given delimiter,
+\ Decodes a string literal from `src` to `tar` until given delimiter,
 \ advancing both addresses. Supports some backslash escape sequences.
 \
 \ Source begins just after the opening delimiter. On success, returned `src`
@@ -4954,8 +4967,8 @@ fun: .str_until { delim unescape src tar -- src tar err }
   src tar
 end
 
-\ Read string until delimiter; optionally unescape;
-\ stage in compiler-managed data without committing.
+\ Reads string until delimiter; optionally unescapes;
+\ stages in compiler-managed data without committing.
 fun: .read_str_staged { delim unescape -- cstr len err }
   interp .Interp_module @ .Interp_module_reader { read }
   read .Interp_reader_src @ { beg }
@@ -4966,7 +4979,7 @@ fun: .read_str_staged { delim unescape -- cstr len err }
   buf len
 end
 
-\ Read string until delimiter; commit to compiler-managed data region.
+\ Reads string until delimiter; commits to compiler-managed data region.
 fun: .read_str_until { delim unescape -> cstr len err }
   .read_str_staged { buf len }
   .interp_data len .inc .interp_data_alloc

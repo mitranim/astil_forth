@@ -1944,6 +1944,33 @@ fun: .test_fallback { -- err }
 end
 .test_fallback
 
+fun: .gate_fun { val pred -> out } .gate end
+fun: .gate_high_regs_fun { keep val pred -> keep out } .gate end
+
+fun: .test_gate { -- err }
+  assert= 123  0 .gate_fun 0 end
+  assert= 123  1 .gate_fun 123 end
+  assert= 123 -7 .gate_fun 123 end
+  assert=   0 42 .gate_fun 0 end
+
+  99 123 0 .gate_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 0 end
+
+  99 123 -7 .gate_high_regs_fun { keep out }
+  assert= keep 99 end
+  assert= out 123 end
+end
+.test_gate
+
+fun: .test_gate_codegen { -- err }
+  assert= xt' .gate_high_regs_fun .test_sym_instr_len 3 end
+  assert= xt' .gate_high_regs_fun 0 .test_actual_instr 0xeb1f005f end \ cmp x2, xzr
+  assert= xt' .gate_high_regs_fun 1 .test_actual_instr 0x9a9f1021 end \ csel x1, x1, xzr, ne
+  assert= xt' .gate_high_regs_fun 2 .test_actual_instr ASM_RET end
+end
+.test_gate_codegen
+
 fun: .int32_negative { -- val } [
   0b0_00_100101_00_0000000000000000_00000 .comp_instr \ mov w0, -1
   1 .comp_args_set
@@ -4178,6 +4205,7 @@ fun: .main_run { -- err }
   .test_umax
   .test_coalesce
   .test_fallback
+  .test_gate
   .test_cint_to_cell
   .test_eq_zero
   .test_ne_zero
