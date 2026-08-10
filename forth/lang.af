@@ -1808,7 +1808,6 @@ end
 1 let: STDOUT
 2 let: STDERR
 
-0x07 let: BELL
 0x08 let: BACKSPACE
 0x09 let: TAB
 0x0a let: LF
