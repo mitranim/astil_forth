@@ -2326,51 +2326,17 @@ fun: .test_within { -- err }
 end
 .test_within
 
-fun: .test_compare_many { -- err }
-  \ Keep these direct. The multi-check words below lower directly to compare
-  \ and conditional-compare instructions; binding their outputs through locals
-  \ would add local read/write behavior to the assertion path.
+fun: .test_multi_cmp { -- err }
   assert= 10 10 20 =any true end
   assert= 10 20 10 =any true end
+  assert= 10 20 30 10 =any true end
   assert= 10 11 20 =any false end
   assert= 10 11 20 =none true end
   assert= 10 10 20 =none false end
-
-  assert= -5 -4 -3 <any true end
-  assert= -5 -6 -7 <any false end
-  assert= -5 -6 -7 >=any true end
-  assert= -5 -4 -3 >=any false end
-  assert= 5 4 3 >any true end
-  assert= 5 6 7 >any false end
-  assert= 5 6 7 <=any true end
-  assert= 5 4 3 <=any false end
-  assert= -5 -6 -7 <none true end
-  assert= -5 -4 -7 <none false end
-  assert= -5 -4 -3 >=none true end
-  assert= -5 -6 -3 >=none false end
-  assert= 5 6 7 >none true end
-  assert= 5 4 7 >none false end
-  assert= 5 4 3 <=none true end
-  assert= 5 6 3 <=none false end
-
-  assert= 0 -1 1 u<any true end
-  assert= -1 0 1 u<any false end
-  assert= -1 0 1 u>=any true end
-  assert= 0 -1 1 u>=any false end
-  assert= -1 0 1 u>any true end
-  assert= 0 -1 1 u>any false end
-  assert= 0 -1 1 u<=any true end
-  assert= -1 0 1 u<=any false end
-  assert= -1 0 1 u<none true end
-  assert= 0 -1 1 u<none false end
-  assert= 0 -1 1 u>=none true end
-  assert= -1 0 1 u>=none false end
-  assert= 0 -1 1 u>none true end
-  assert= -1 0 1 u>none false end
-  assert= -1 0 1 u<=none true end
-  assert= 0 -1 1 u<=none false end
+  assert= 10 20 10 =none false end
+  assert= 10 20 30 10 =none false end
 end
-.test_compare_many
+.test_multi_cmp
 
 fun: .assert_fail { -- err } assert 123 456 = end end
 
@@ -4245,7 +4211,7 @@ fun: .main_run { -- err }
   .test_bits_set
   .test_bits_pop
   .test_within
-  .test_compare_many
+  .test_multi_cmp
   .test_assert
   .test_asm_cmp_branch
   .test_asm_append_imm_to_reg

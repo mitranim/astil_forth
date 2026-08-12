@@ -100,19 +100,22 @@ end
 1 let: WORDLIST_EXEC
 2 let: WORDLIST_COMP
 
+16384 let: PAGE_SIZE
+
 \ ## Assembler and bitwise ops
 \
 \ We interleave definitions of assembler words with definitions
 \ of various arithmetic words used by the assembler.
 
-4      let: ASM_INSTR_SIZE
-8      let: ASM_PARAM_LEN_MAX
-18     let: ASM_ARG_LEN_MAX
-29     let: ASM_REG_FP
-30     let: ASM_REG_LR
-31     let: ASM_REG_SP
-31     let: ASM_REG_ZR
-4095   let: ASM_MAX_IMM12 \ Shared by many instructions.
+4    let: ASM_INSTR_SIZE
+8    let: ASM_PARAM_LEN_MAX
+18   let: ASM_ARG_LEN_MAX
+29   let: ASM_REG_FP
+30   let: ASM_REG_LR
+31   let: ASM_REG_SP
+31   let: ASM_REG_ZR
+4095 let: ASM_MAX_IMM12 \ Shared by many instructions.
+
 0b0000 let: ASM_EQ
 0b0001 let: ASM_NE
 0b0010 let: ASM_CS
@@ -131,9 +134,13 @@ end
 0b1101 let: ASM_LE
 0b1110 let: ASM_AL \ "always"
 0b1111 let: ASM_NV \ Also "always"; equivalent to `ASM_AL`.
-666    let: ASM_PLACEHOLDER
 
-16384 let: PAGE_SIZE
+0b1000 let: ASM_NZCV_N
+0b0100 let: ASM_NZCV_Z
+0b0010 let: ASM_NZCV_C
+0b0001 let: ASM_NZCV_V
+
+666 let: ASM_PLACEHOLDER
 
 \ SYNC[asm_reg_ctx].
 fun: ASM_REG_CTX { -- reg } [ .plain_call ] 28 end
@@ -241,7 +248,8 @@ end
 fun: .asm_ccmp_reg { Xn Xm nzcv cond -- instr }
   Xm   16 .bit_lsl { Xm }
   cond 12 .bit_lsl { cond }
-  Xn 5 .bit_lsl Xm .bit_or cond .bit_or nzcv .bit_or 0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 .bit_or
+  Xn 5 .bit_lsl Xm .bit_or cond .bit_or nzcv .bit_or
+  0b1_1_1_11010010_00000_0000_0_0_00000_0_0000 .bit_or
 end
 
 \ brk #imm16
@@ -1226,18 +1234,18 @@ fun_comp: =   {       -- err  } ASM_EQ .asm_comp_cset_reg  end
 fun:      =   { i0 i1 -> bool } =                          end
 fun_comp: <>  {       -- err  } ASM_NE .asm_comp_cset_reg  end
 fun:      <>  { i0 i1 -> bool } <>                         end
-fun_comp: >   {       -- err  } ASM_GT .asm_comp_cset_reg  end
-fun:      >   { i0 i1 -> bool } >                          end
 fun_comp: <   {       -- err  } ASM_LT .asm_comp_cset_reg  end
 fun:      <   { i0 i1 -> bool } <                          end
+fun_comp: >   {       -- err  } ASM_GT .asm_comp_cset_reg  end
+fun:      >   { i0 i1 -> bool } >                          end
 fun_comp: <=  {       -- err  } ASM_LE .asm_comp_cset_reg  end
 fun:      <=  { i0 i1 -> bool } <=                         end
 fun_comp: >=  {       -- err  } ASM_GE .asm_comp_cset_reg  end
 fun:      >=  { i0 i1 -> bool } >=                         end
-fun_comp: u>  {       -- err  } ASM_HI .asm_comp_cset_reg  end
-fun:      u>  { i0 i1 -> bool } u>                         end
 fun_comp: u<  {       -- err  } ASM_LO .asm_comp_cset_reg  end
 fun:      u<  { i0 i1 -> bool } u<                         end
+fun_comp: u>  {       -- err  } ASM_HI .asm_comp_cset_reg  end
+fun:      u>  { i0 i1 -> bool } u>                         end
 fun_comp: u<= {       -- err  } ASM_LS .asm_comp_cset_reg  end
 fun:      u<= { i0 i1 -> bool } u<=                        end
 fun_comp: u>= {       -- err  } ASM_HS .asm_comp_cset_reg  end
@@ -1260,10 +1268,10 @@ fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .bit_and end
 fun_comp: .is_pow2 { -- err }
   .comp_args1_reg { val }
   .comp_alloc_next_reg { tmp }
-  tmp val 1 .asm_sub_imm .comp_instr                     \ sub Xt, Xn, #1
-  val tmp .asm_tst .comp_instr                           \ tst Xn, Xt
-  val ASM_REG_ZR 0b0100 ASM_EQ .asm_ccmp_reg .comp_instr \ ccmp Xn, xzr, #0b0100, eq
-  val ASM_NE .asm_cset .comp_instr                       \ cset Xd, ne
+  tmp val 1 .asm_sub_imm .comp_instr \ sub Xt, Xn, #1
+  val tmp .asm_tst .comp_instr       \ tst Xn, Xt
+  val ASM_REG_ZR ASM_NZCV_Z ASM_EQ .asm_ccmp_reg .comp_instr \ ccmp Xn, xzr, #0b0100, eq
+  val ASM_NE .asm_cset .comp_instr   \ cset Xd, ne
   tmp .comp_args_set
 end
 
@@ -3287,15 +3295,6 @@ fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
   loc .comp_pop_into_local
 end
 
-fun_comp: > { -- err } [ .redefine ]
-  .comp_pop2 .then > .comp_push .ret else { -- } end
-  .comp_pop1 .then { imm }
-    imm ASM_GT .comp_cmp_imm .then .ret end
-    imm .comp_push
-  else { -- } end
-  call'' >
-end
-
 fun_comp: < { -- err } [ .redefine ]
   .comp_pop2 .then < .comp_push .ret else { -- } end
   .comp_pop1 .then { imm }
@@ -3303,6 +3302,15 @@ fun_comp: < { -- err } [ .redefine ]
     imm .comp_push
   else { -- } end
   call'' <
+end
+
+fun_comp: > { -- err } [ .redefine ]
+  .comp_pop2 .then > .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_GT .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' >
 end
 
 fun_comp: <= { -- err } [ .redefine ]
@@ -3323,15 +3331,6 @@ fun_comp: >= { -- err } [ .redefine ]
   call'' >=
 end
 
-fun_comp: u> { -- err } [ .redefine ]
-  .comp_pop2 .then u> .comp_push .ret else { -- } end
-  .comp_pop1 .then { imm }
-    imm ASM_HI .comp_cmp_imm .then .ret end
-    imm .comp_push
-  else { -- } end
-  call'' u>
-end
-
 fun_comp: u< { -- err } [ .redefine ]
   .comp_pop2 .then u< .comp_push .ret else { -- } end
   .comp_pop1 .then { imm }
@@ -3339,6 +3338,15 @@ fun_comp: u< { -- err } [ .redefine ]
     imm .comp_push
   else { -- } end
   call'' u<
+end
+
+fun_comp: u> { -- err } [ .redefine ]
+  .comp_pop2 .then u> .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_HI .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' u>
 end
 
 fun_comp: u<= { -- err } [ .redefine ]
@@ -4376,18 +4384,13 @@ end
 \ Comptime analogue of top-level import.
 fun_comp: use' { -- err } .read_word .comp_str compile' .use end
 
-\ ## Multi-comparisons
+\ ## Multi-equality
 
-\ For internal use below. Each `ccmp` runs only if previous test didn't pass;
-\ otherwise it sets condition flags to our `nzcv` fallback. The final `cset`
-\ sets the final bool based on resulting flags.
-fun: .comp_cmp_many { name cond_each nzcv cond_end -- err }
-  ( E: val …preds… -- bool )
-
+fun: .comp_multi_cmp { name cond -- err } ( E: val …preds… -- bool )
   .comp_args_get { len }
 
   len 3 < .then
-    " `%s` requires at least 3 inputs: value to test, and predicates" name .errf .throw
+    " `%s` requires 3+ inputs: tested value and 2+ predicates" name .errf .throw
   end
 
   0 1 .asm_cmp_reg .comp_instr \ cmp x0, x1
@@ -4395,49 +4398,17 @@ fun: .comp_cmp_many { name cond_each nzcv cond_end -- err }
   2 { pred }
   loop
     pred len < .while
-    \ ccmp x0, xN, <nzcv>, <cond>
-    0 pred nzcv cond_each .asm_ccmp_reg .comp_instr
+    0 pred ASM_NZCV_Z ASM_NE .asm_ccmp_reg .comp_instr \ ccmp x0, xN, #0b0100, ne
     inc: pred
   end
 
   0 .comp_realloc_reg
-  0 cond_end .asm_cset .comp_instr \ cset x0, <cond>
+  0 cond .asm_cset .comp_instr \ cset x0, <cond>
   1 .comp_args_set
 end
 
-0b1000 let: ASM_NZCV_N
-0b0100 let: ASM_NZCV_Z
-0b0010 let: ASM_NZCV_C
-0b0001 let: ASM_NZCV_V
-0b0100 let: ASM_NZCV_EQ_OK \ Z=1
-0b0000 let: ASM_NZCV_NE_OK \ Z=0
-0b0000 let: ASM_NZCV_LO_OK \ C=0
-0b0010 let: ASM_NZCV_HS_OK \ C=1
-0b0010 let: ASM_NZCV_HI_OK \ C=1 Z=0
-0b0000 let: ASM_NZCV_LS_OK \ C=0 -> LS true
-0b1000 let: ASM_NZCV_LT_OK \ N=1 V=0
-0b0000 let: ASM_NZCV_GE_OK \ N=0 V=0
-0b0000 let: ASM_NZCV_GT_OK \ Z=0 N=V=0
-0b0100 let: ASM_NZCV_LE_OK \ Z=1
-
-fun_comp: =any    { -- err } " =any"    ASM_NE ASM_NZCV_EQ_OK ASM_EQ .comp_cmp_many end
-fun_comp: =none   { -- err } " =none"   ASM_NE ASM_NZCV_EQ_OK ASM_NE .comp_cmp_many end
-fun_comp: u<any   { -- err } " u<any"   ASM_HS ASM_NZCV_LO_OK ASM_LO .comp_cmp_many end
-fun_comp: u>=any  { -- err } " u>=any"  ASM_LO ASM_NZCV_HS_OK ASM_HS .comp_cmp_many end
-fun_comp: u>any   { -- err } " u>any"   ASM_LS ASM_NZCV_HI_OK ASM_HI .comp_cmp_many end
-fun_comp: u<=any  { -- err } " u<=any"  ASM_HI ASM_NZCV_LS_OK ASM_LS .comp_cmp_many end
-fun_comp: u<none  { -- err } " u<none"  ASM_HS ASM_NZCV_LO_OK ASM_HS .comp_cmp_many end
-fun_comp: u>=none { -- err } " u>=none" ASM_LO ASM_NZCV_HS_OK ASM_LO .comp_cmp_many end
-fun_comp: u>none  { -- err } " u>none"  ASM_LS ASM_NZCV_HI_OK ASM_LS .comp_cmp_many end
-fun_comp: u<=none { -- err } " u<=none" ASM_HI ASM_NZCV_LS_OK ASM_HI .comp_cmp_many end
-fun_comp: <any    { -- err } " <any"    ASM_GE ASM_NZCV_LT_OK ASM_LT .comp_cmp_many end
-fun_comp: >=any   { -- err } " >=any"   ASM_LT ASM_NZCV_GE_OK ASM_GE .comp_cmp_many end
-fun_comp: >any    { -- err } " >any"    ASM_LE ASM_NZCV_GT_OK ASM_GT .comp_cmp_many end
-fun_comp: <=any   { -- err } " <=any"   ASM_GT ASM_NZCV_LE_OK ASM_LE .comp_cmp_many end
-fun_comp: <none   { -- err } " <none"   ASM_GE ASM_NZCV_LT_OK ASM_GE .comp_cmp_many end
-fun_comp: >=none  { -- err } " >=none"  ASM_LT ASM_NZCV_GE_OK ASM_LT .comp_cmp_many end
-fun_comp: >none   { -- err } " >none"   ASM_LE ASM_NZCV_GT_OK ASM_LE .comp_cmp_many end
-fun_comp: <=none  { -- err } " <=none"  ASM_GT ASM_NZCV_LE_OK ASM_GT .comp_cmp_many end
+fun_comp: =any  { -- err } " =any"  ASM_EQ .comp_multi_cmp end
+fun_comp: =none { -- err } " =none" ASM_NE .comp_multi_cmp end
 
 \ ## Reader tools
 \
