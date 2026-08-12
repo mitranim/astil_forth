@@ -1594,6 +1594,8 @@ end
 
 fun: .test_add { -- err }
   assert= 234 123 + 357 end
+  1 { min_val }
+  assert= min_val 0x8000000000000000 + 0x8000000000000001 end
   234 { val }
   assert= val 123 + 357 end
   assert= 123 val + 357 end
@@ -2388,10 +2390,7 @@ fun: .assert_bin_fail    { lhs rhs -- err } assert=  lhs rhs end end
 fun: .assert_bin_lt_fail { lhs rhs -- err } assert<  lhs rhs end end
 fun: .assert_bin_eq_ok   { lhs rhs -- err } assert=  lhs rhs end end
 fun: .assert_bin_ne_ok   { lhs rhs -- err } assert<> lhs rhs end end
-fun: .asm_logical_imm_enc_err { val -- err_str }
-  val .asm_logical_imm_enc { _N _immr _imms err_str }
-  err_str
-end
+
 fun: .asm_and_imm_err { out inp imm -- instr err_str }
   out inp imm .asm_and_imm
 end
@@ -2422,42 +2421,48 @@ fun: .test_assert { -- err }
 end
 .test_assert
 
-fun: .test_asm_new_bits { -- err }
+fun: .test_asm_bitwise_logical_imm { -- err }
   assert= 2 3 4 .asm_bic 0b10001010001001000000000001100010 end
   assert= 2 3 .asm_rbit 0b11011010110000000000000001100010 end
   assert= 2 3 .asm_clz 0b11011010110000000001000001100010 end
   assert= 2 3 .asm_ctz 0b11011010110000000001100001100010 end
-  1 .asm_logical_imm_enc { N immr imms }
-  assert= N 1 end
-  assert= immr 0 end
-  assert= imms 0 end
-  0xff .asm_logical_imm_enc { N immr imms }
-  assert= N 1 end
-  assert= immr 0 end
-  assert= imms 7 end
-  0x00ff_00ff_00ff_00ff .asm_logical_imm_enc { N immr imms }
-  assert= N 0 end
-  assert= immr 0 end
-  assert= imms 39 end
-  0x8000_0000_0000_0000 .asm_logical_imm_enc { N immr imms }
-  assert= N 1 end
-  assert= immr 1 end
-  assert= imms 0 end
-  0 .asm_logical_imm_enc_err { err }
-  err " unable to encode logical immediate: 0 is reserved" .assert_cstr
-  -1 .asm_logical_imm_enc_err { err }
-  err " unable to encode logical immediate: all ones is reserved" .assert_cstr
-  0x1234_5678_9abc_def0 .asm_logical_imm_enc_err { err }
-  err " unable to encode logical immediate: value is not a repeated bitmask" .assert_cstr
+
+  1 .asm_bitwise_logical_imm_mask { mask ok }
+  assert ok end
+  assert= mask 0b1_000000_000000_00000_00000 end
+
+  0xff .asm_bitwise_logical_imm_mask { mask ok }
+  assert ok end
+  assert= mask 0b1_000000_000111_00000_00000 end
+
+  0x00ff_00ff_00ff_00ff .asm_bitwise_logical_imm_mask { mask ok }
+  assert ok end
+  assert= mask 0b0_000000_100111_00000_00000 end
+
+  0x8000_0000_0000_0000 .asm_bitwise_logical_imm_mask { mask ok }
+  assert ok end
+  assert= mask 0b1_000001_000000_00000_00000 end
+
+  0 .asm_bitwise_logical_imm_mask { _mask ok }
+  assert= ok false end
+
+  -1 .asm_bitwise_logical_imm_mask { _mask ok }
+  assert= ok false end
+
+  0x1234_5678_9abc_def0 .asm_bitwise_logical_imm_mask { _mask ok }
+  assert= ok false end
+
   assert= 0 0 1 .asm_and_imm 0b1_00_100100_1_000000_000000_00000_00000 end
   assert= 0 0 1 .asm_orr_imm 0b1_01_100100_1_000000_000000_00000_00000 end
   assert= 0 0 1 .asm_eor_imm 0b1_10_100100_1_000000_000000_00000_00000 end
+
   0 0 -2 .asm_and_imm { bic_exp }
   assert= 0 0 1 .asm_bic_imm bic_exp end
+
   0 0 0 .asm_and_imm_err { _instr err }
-  err " unable to encode logical immediate: 0 is reserved" .assert_cstr
+  err " unable to encode logical immediate" .assert_cstr
 end
-.test_asm_new_bits
+.test_asm_bitwise_logical_imm
 
 fun: .test_asm_cmp_branch { -- err }
   assert= 1 8 0 .asm_cmp_branch 0b10110100000000000000000001000001 end
@@ -4203,6 +4208,7 @@ fun: .main_run { -- err }
   .test_umin
   .test_max
   .test_umax
+  .test_asm_bitwise_logical_imm
   .test_coalesce
   .test_fallback
   .test_gate
@@ -4241,7 +4247,6 @@ fun: .main_run { -- err }
   .test_within
   .test_compare_many
   .test_assert
-  .test_asm_new_bits
   .test_asm_cmp_branch
   .test_asm_append_imm_to_reg
   .test_cstr_eq

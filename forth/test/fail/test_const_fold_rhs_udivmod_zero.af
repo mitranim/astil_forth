@@ -1,2 +1,0 @@
-use' ../../lang.af
-fun: .test_const_fold_rhs_udivmod_zero { val -- rem quo } val 0 u/mod end

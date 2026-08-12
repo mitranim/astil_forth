@@ -163,84 +163,6 @@ static bool comp_local_has_arg(const Comp_ctx *ctx, const Local *loc) {
   return false;
 }
 
-static Err comp_args_fold(
-  Comp *comp,
-  Uint  argc,
-  Sint *imm0,
-  Sint *imm1,
-  Sint *known_count,
-  Sint *consumed_count
-) {
-  if (argc < 1 || argc > 2) {
-    return errf("invalid fold arg count: " FMT_UINT, argc);
-  }
-
-  const auto ctx = &comp->ctx;
-  if (ctx->arg_len < argc) return errf("not enough fold args");
-
-  const U8 reg0 = (U8)(ctx->arg_len - argc);
-  auto     arg0 = &ctx->args[reg0];
-  auto     arg1 = argc == 2 ? &ctx->args[reg0 + 1] : nullptr;
-
-  Comp_arg_imm src0  = {};
-  Comp_arg_imm src1  = {};
-  bool         has0  = false;
-  bool         has1  = false;
-  Uint         known = 0;
-
-  if (arg0->type == COMP_ARG_IMM) {
-    src0 = arg0->imm;
-    has0 = true;
-  }
-
-  if (arg1) {
-    if (arg1->type == COMP_ARG_IMM) {
-      src1 = arg1->imm;
-      has1 = true;
-    }
-  }
-
-  if (argc == 1) {
-    if (has0) known = 1;
-  }
-  else {
-    if (has1) {
-      known = 1;
-      if (has0) known = 2;
-    }
-  }
-
-  const auto instrs   = &comp->code.code_write;
-  Uint       consumed = 0;
-
-  if (argc == 1) {
-    if (has0 && stack_len_valid(instrs) == src0.ceil) {
-      stack_trunc_to(instrs, src0.floor);
-      *arg0    = comp_arg_unknown();
-      consumed = 1;
-    }
-  }
-  else {
-    if (has1 && stack_len_valid(instrs) == src1.ceil) {
-      stack_trunc_to(instrs, src1.floor);
-      *arg1    = comp_arg_unknown();
-      consumed = 1;
-
-      if (has0 && stack_len_valid(instrs) == src0.ceil) {
-        stack_trunc_to(instrs, src0.floor);
-        *arg0    = comp_arg_unknown();
-        consumed = 2;
-      }
-    }
-  }
-
-  if (imm0) *imm0 = has0 ? src0.num : 0;
-  if (imm1) *imm1 = has1 ? src1.num : 0;
-  if (known_count) *known_count = (Sint)known;
-  if (consumed_count) *consumed_count = (Sint)consumed;
-  return nullptr;
-}
-
 static Err err_args_arity(
   const Sym *sym, const char *action, Sint min, Sint max, Sint ava
 ) {
@@ -265,6 +187,17 @@ static Err err_args_arity(
     min,
     max,
     ava
+  );
+}
+
+static Err comp_validate_args_min(Comp *comp, const char *action, Sint required) {
+  const auto available = comp->ctx.arg_len;
+  if (available >= required) return nullptr;
+
+  Sym *sym;
+  try(comp_require_current_sym(comp, &sym));
+  return err_args_arity(
+    sym, action ? action : "invalid argument count", required, required, available
   );
 }
 
@@ -858,7 +791,7 @@ static Err comp_alloca(Comp *comp) {
   if (arg->type == COMP_ARG_IMM) {
     const auto imm = arg->imm;
     asm_backtrack_instrs_opt(comp, imm.floor, imm.ceil);
-    try(comp_forget_reg(comp, reg));
+    *arg = comp_arg_unknown();
     try(comp_alloca_const(comp, imm.num, reg));
   }
   else {
@@ -866,6 +799,43 @@ static Err comp_alloca(Comp *comp) {
   }
 
   sym->norm.has_alloca = true;
+  return nullptr;
+}
+
+static Err comp_pop1(Comp *comp, Sint *imm, Sint *ok) {
+  try(comp_validate_args_min(comp, nullptr, 1));
+
+  const auto ctx = &comp->ctx;
+  const auto arg = &ctx->args[ctx->arg_len - 1];
+
+  if (!(*ok = (arg->type == COMP_ARG_IMM))) return nullptr;
+
+  *imm = arg->imm.num;
+  asm_backtrack_instrs_opt(comp, arg->imm.floor, arg->imm.ceil);
+  *arg = comp_arg_unknown();
+  ctx->arg_len--;
+  return nullptr;
+}
+
+static Err comp_pop2(Comp *comp, Sint *imm_lef, Sint *imm_rig, Sint *ok) {
+  try(comp_validate_args_min(comp, nullptr, 2));
+
+  const auto ctx     = &comp->ctx;
+  const auto arg_lef = &ctx->args[ctx->arg_len - 2];
+  const auto arg_rig = &ctx->args[ctx->arg_len - 1];
+
+  if (!(*ok = (arg_lef->type == COMP_ARG_IMM))) return nullptr;
+  if (!(*ok = (arg_rig->type == COMP_ARG_IMM))) return nullptr;
+
+  *imm_lef = arg_lef->imm.num;
+  *imm_rig = arg_rig->imm.num;
+
+  asm_backtrack_instrs_opt(comp, arg_rig->imm.floor, arg_rig->imm.ceil);
+  asm_backtrack_instrs_opt(comp, arg_lef->imm.floor, arg_lef->imm.ceil);
+
+  *arg_lef = comp_arg_unknown();
+  *arg_rig = comp_arg_unknown();
+  ctx->arg_len -= 2;
   return nullptr;
 }
 

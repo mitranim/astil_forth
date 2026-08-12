@@ -468,7 +468,9 @@ fun: .asm_neg { Xd -> instr }
 end
 
 \ add Xd, Xn, #imm12
-0b1_0_0_100010_0_000000000000_00000_00000 let: ASM_OP_ADD_IMM
+fun: .asm_add_imm { Xd Xn imm12 -> instr }
+  .asm_pattern_arith_imm 0b1_0_0_100010_0_000000000000_00000_00000 .bit_or
+end
 
 \ add Xd, Xn, Xm
 0b1_0_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_ADD_REG
@@ -487,16 +489,9 @@ fun: .asm_adc_reg { Xd Xn Xm -> instr }
 end
 
 \ sub Xd, Xn, #imm12
-0b1_1_0_100010_0_000000000000_00000_00000 let: ASM_OP_SUB_IMM
-fun: .asm_addsub_imm { Xd Xn imm12 imm add -- instr }
-  \ Select `add` when `(imm >= 0) == add`, else `sub`.
-  imm 63 .bit_lsr add .bit_xor .negate { sel }
-  ASM_OP_ADD_IMM ASM_OP_SUB_IMM .bit_xor sel .bit_and ASM_OP_SUB_IMM .bit_xor { op }
-  Xd Xn imm12 .asm_pattern_arith_imm op .bit_or
+fun: .asm_sub_imm { Xd Xn imm12 -> instr }
+  .asm_pattern_arith_imm 0b1_1_0_100010_0_000000000000_00000_00000 .bit_or
 end
-
-fun: .asm_add_imm { Xd Xn imm12 -> instr } imm12 true  .asm_addsub_imm end
-fun: .asm_sub_imm { Xd Xn imm12 -> instr } imm12 false .asm_addsub_imm end
 
 \ sub Xd, Xn, Xm
 0b1_1_0_01011_00_0_00000_000000_00000_00000 let: ASM_OP_SUB_REG
@@ -765,10 +760,9 @@ end
 \ Comptime arithmetic words which respect the comptime register stack,
 \ plus runtime versions which haven't been defined earlier.
 \
-\ These comptime words are also used internally in `## Constant folding`,
-\ both inline in full folding, and indirectly via `xt''` as fallbacks.
+\ These words are also used by their redefinitions in `## Constant folding`.
 
-fun_comp: .bit_or { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
+fun_comp: .bit_or  { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
 fun_comp: .bit_and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
 fun_comp: .bit_xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
 fun_comp: .bit_lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
@@ -1071,18 +1065,6 @@ fun: .bits_get { src mask -> val } .bits_get end
 \ Sets bits according to the mask.
 \ The input value must be in low bits.
 \ The mask must be nonzero and contiguous.
-fun: .comp_emit_bits_set { val src mask -- err }
-  .comp_alloc_next_reg { shift }
-  src   src   mask  .asm_bic     .comp_instr \ bic Xd, Xn, Xm
-  shift mask        .asm_rbit    .comp_instr \ rbit Xd, Xn
-  shift shift       .asm_clz     .comp_instr \ clz Xd, Xn
-  val   val   shift .asm_lsl_reg .comp_instr \ lsl Xd, Xn, Xm
-  val   val   mask  .asm_and_reg .comp_instr \ and Xd, Xn, Xm
-  val   val   src   .asm_orr_reg .comp_instr \ orr Xd, Xn, Xm
-end
-
-\ No CF for `.bits_set`: requires new ternary CF machinery
-\ and we have no other use cases for that.
 fun_comp: .bits_set { -- err }
   3 nil .comp_args_min
   .comp_args_get .dec { mask }
@@ -1090,8 +1072,15 @@ fun_comp: .bits_set { -- err }
   src .dec { val }
   val .comp_realloc_reg
   src .comp_realloc_reg
-  mask .comp_realloc_reg
-  val src mask .comp_emit_bits_set
+  .comp_alloc_next_reg { shift }
+
+  src   src   mask  .asm_bic     .comp_instr \ bic Xd, Xn, Xm
+  shift mask        .asm_rbit    .comp_instr \ rbit Xd, Xn
+  shift shift       .asm_clz     .comp_instr \ clz Xd, Xn
+  val   val   shift .asm_lsl_reg .comp_instr \ lsl Xd, Xn, Xm
+  val   val   mask  .asm_and_reg .comp_instr \ and Xd, Xn, Xm
+  val   val   src   .asm_orr_reg .comp_instr \ orr Xd, Xn, Xm
+
   val .inc .comp_args_set
 end
 
@@ -1265,6 +1254,20 @@ fun:      >=0 { num   -> bool } >=0                        end
 \ Non-standard and sane: no wraparound semantics.
 fun: .within  { num floor ceil -- bool } num floor  >= num ceil  < .bit_and end
 fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .bit_and end
+
+\ True if input has exactly one bit set. Nil input = nil output.
+\ Equivalent to the C idiom `val && !(val & (val - 1))`.
+fun_comp: .is_pow2 { -- err }
+  .comp_args1_reg { val }
+  .comp_alloc_next_reg { tmp }
+  tmp val 1 .asm_sub_imm .comp_instr                     \ sub Xt, Xn, #1
+  val tmp .asm_tst .comp_instr                           \ tst Xn, Xt
+  val ASM_REG_ZR 0b0100 ASM_EQ .asm_ccmp_reg .comp_instr \ ccmp Xn, xzr, #0b0100, eq
+  val ASM_NE .asm_cset .comp_instr                       \ cset Xd, ne
+  tmp .comp_args_set
+end
+
+fun: .is_pow2 { val -> bool } .is_pow2 end
 
 \ ## Memory load / store
 
@@ -2733,7 +2736,7 @@ fun_comp: .call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
   \ Emit frame record as workaround for leaf callers without their own.
   \ Current word may become non-leaf later, but we don't know it yet.
   interp .Interp_comp .Interp_comp_ctx .Interp_comp_ctx_sym @ { sym }
-  sym .Sym_callees .Interp_set_len @u32 0 = { leaf }
+  sym .Sym_callees .Interp_set_len @u32 =0 { leaf }
 
   leaf .then
     ASM_REG_FP ASM_REG_LR ASM_REG_SP -16 .asm_store_pair_pre .comp_instr \ stp x29, x30, [sp, #-16]!
@@ -2755,13 +2758,9 @@ fun: .asm_ror64 { val rot -- out }
   .bit_or
 end
 
-fun: .asm_logical_imm_enc { imm -- N immr imms err }
-  imm 0 = .then
-    " unable to encode logical immediate: 0 is reserved" .throw
-  end
-  imm .bit_not 0 = .then
-    " unable to encode logical immediate: all ones is reserved" .throw
-  end
+\ Used internally for `and|orr|eor`.
+fun: .asm_bitwise_logical_imm_mask { imm -- instr_mask ok }
+  imm =0 imm -1 = .bit_or .then nil false .ret end
 
   imm imm .inc .bit_and .bit_ctz { rot }
   imm rot .asm_ror64 { norm }
@@ -2769,27 +2768,22 @@ fun: .asm_logical_imm_enc { imm -- N immr imms err }
   norm .bit_not .bit_ctz { ones }
   zeros ones + { size }
 
-  imm size .asm_ror64 imm <> .then
-    " unable to encode logical immediate: value is not a repeated bitmask" .throw
-  end
+  imm size .asm_ror64 imm <> .then nil false .ret end
 
-  size 6 .bit_lsr
-  rot .negate size .dec .bit_and
-  size 1 .bit_lsl .negate ones .dec .bit_or 0x3f .bit_and
-end
+  size 6 .bit_lsr { N }
+  rot .negate size .dec .bit_and { immr }
+  size 1 .bit_lsl .negate ones .dec .bit_or 6 .bit_trunc { imms }
 
-fun: .asm_logical_imm_mask { imm op -- mask err }
-  imm .asm_logical_imm_enc { N immr imms }
-  op
-  N    22 .bit_lsl .bit_or
+  N    22 .bit_lsl
   immr 16 .bit_lsl .bit_or
   imms 10 .bit_lsl .bit_or
+  true
 end
 
-fun: .asm_logical_imm_instr { Xd Xn imm op -- instr err }
-  imm op .asm_logical_imm_mask
-  Xn 5 .bit_lsl .bit_or
-  Xd .bit_or
+fun: .asm_bitwise_logical_imm_instr { Xd Xn imm op -- instr err }
+  imm .asm_bitwise_logical_imm_mask { mask ok }
+  ok =0 .then " unable to encode logical immediate" .throw end
+  mask Xn 5 .bit_lsl .bit_or Xd .bit_or op .bit_or
 end
 
 0b1_00_100100_0_000000_000000_00000_00000 let: ASM_OP_AND_IMM
@@ -2797,943 +2791,719 @@ end
 0b1_10_100100_0_000000_000000_00000_00000 let: ASM_OP_EOR_IMM
 0b1_11_100100_0_000000_000000_00000_00000 let: ASM_OP_ANDS_IMM
 
-fun: .asm_and_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_AND_IMM .asm_logical_imm_instr end
-fun: .asm_orr_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_ORR_IMM .asm_logical_imm_instr end
-fun: .asm_eor_imm { Xd Xn imm -- instr err } Xd Xn imm ASM_OP_EOR_IMM .asm_logical_imm_instr end
-fun: .asm_bic_imm { Xd Xn imm -- instr err } Xd Xn imm .bit_not ASM_OP_AND_IMM .asm_logical_imm_instr end
-fun: .asm_tst_imm { Xn imm -- instr err } 31 Xn imm ASM_OP_ANDS_IMM .asm_logical_imm_instr end
+fun: .asm_and_imm { Xd Xn imm -- instr err }
+  Xd Xn imm ASM_OP_AND_IMM .asm_bitwise_logical_imm_instr
+end
 
-\ ## Constant folding and locals mutation
+fun: .asm_orr_imm { Xd Xn imm -- instr err }
+  Xd Xn imm ASM_OP_ORR_IMM .asm_bitwise_logical_imm_instr
+end
+
+fun: .asm_eor_imm { Xd Xn imm -- instr err }
+  Xd Xn imm ASM_OP_EOR_IMM .asm_bitwise_logical_imm_instr
+end
+
+fun: .asm_bic_imm { Xd Xn imm -- instr err }
+  Xd Xn imm .bit_not ASM_OP_AND_IMM .asm_bitwise_logical_imm_instr
+end
+
+fun: .asm_tst_imm { Xn imm -- instr err }
+  31 Xn imm ASM_OP_ANDS_IMM .asm_bitwise_logical_imm_instr
+end
+
+fun: .comp_push2 { val0 val1 -- err } val0 .comp_push val1 .comp_push end
+
+\ ## Constant folding and local mutation
 \
-\ The outer compiler associates comptime constants with argument registers.
-\ Some associations support backtracking previously-emitted instructions.
-\ We use this to fold constants in full and partial modes.
+\ We redefine arithmetic words to consume comptime constants
+\ and inline them into instructions where possible and easy.
 \
-\ After defining the CF support code, we simply redefine our arithmetic words,
-\ wrapping them into new versions which grab comptime constants, backtracking
-\ the instructions whenever possible, and fold them at comptime, avoiding new
-\ runtime arithmetic. When not possible, they fallback at runtime operations.
+\ For simplicity, constant folding uses stack semantics: pop/push only.
+\ This means `runtime const +` is folded, but `const runtime +` is not.
+\
+\ Local-mutator words are shorcuts for the following:
+\
+\   A B .op { B }  <->  A op: B
+\
+\ Local mutators have a small advantage over the non-mutator form:
+\ they can fold LHS constants. This makes them the preferred style
+\ in hot code. Example:
+\
+\   loop
+\     floor ceil < .while
+\     +cell: floor
+\   end
+\
+\ For simplicity, we don't support constant-result partial-folding.
+\ Examples include `val 0 *` which always produces zero but remains
+\ a runtime operation. Our compiler internals don't make it easy to
+\ backtrack a read/load of a local; also the programmer is expected
+\ to avoid redundant arithmetic in the first place.
 
-fun: .cf_imm_u12 { imm -- ok }
-  imm 0 >= imm ASM_MAX_IMM12 <= .bit_and
+\ Begins a non-commutative local mutator. TODO more general name if applicable.
+fun: .comp_loc_mut_beg { -- loc err } ( C: "name" -- )
+  .read_word .comp_local { loc }
+  loc .comp_push_from_local
+  loc
 end
 
-fun: .cf_emit_cmp_imm_cset { reg0 reg1 imm cond -- err }
-  reg1 imm  .asm_cmp_imm .comp_instr \ cmp Xn, #imm12
-  reg0 cond .asm_cset    .comp_instr \ cset Xd, cond
+\ Begins a commutative local mutator.
+fun: .comp_loc_mut_comm_beg { -- loc err } ( C: "name" -- ) ( E: val -- )
+  .comp_pop1 { imm popped }
+  .read_word .comp_local { loc }
+  loc .comp_push_from_local
+  popped .then imm .comp_push end
+  loc
 end
 
-fun: .cf_cmp_validate { imm cond -- aux ok err }
-  imm .cf_imm_u12 { ok }
-  cond ok
-end
-
-fun: .cf_args_fold1 { -- reg imm consumed err }
-  1 nil .comp_args_min
-  .comp_args_get .dec { reg }
-  1 .comp_args_fold { imm _imm1 _known consumed }
-  reg imm consumed
-end
-
-fun: .cf_args_fold2 { -- reg0 reg1 imm0 imm1 known consumed err }
-  2 nil .comp_args_min
-  .comp_args_get .dec { reg1 }
-  reg1 .dec { reg0 }
-  2 .comp_args_fold { imm0 imm1 known consumed }
-  reg0 reg1 imm0 imm1 known consumed
-end
-
-fun: .cf_fold_cleared2 { -- reg imm0 imm1 ok err }
-  .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
-  consumed 2 <> .then
-    consumed 1 = .then imm1 reg1 .comp_load end
-    0 0 0 false .ret
-  end
-  reg0 imm0 imm1 true
-end
-
-fun: .cf_fold_done { reg imm -- err }
-  imm reg .comp_load
-  reg .inc .comp_args_set
-end
-
-fun: .cf_fold_done2 { reg0 reg1 imm0 imm1 -- err }
-  imm0 reg0 .comp_load
-  imm1 reg1 .comp_load
-  reg1 .inc .comp_args_set
-end
-
-fun: .cf_restore_rhs { reg1 imm1 consumed -- err }
-  consumed 1 = .then imm1 reg1 .comp_load end
-end
-
-fun: .cf_fold2_valid { lhs bad0 msg0 bad1 msg1 -- reg0 reg1 imm0 imm1 consumed ok err }
-  .cf_args_fold2 { reg0 reg1 imm0 imm1 known consumed }
-
-  known .then
-    imm1 bad0 = .then msg0 .throw end
-    msg1 .then imm1 bad1 = .then msg1 .throw end end
-  end
-
-  consumed 2 <> .then reg0 reg1 imm0 imm1 consumed false .ret end
-
-  imm1 bad0 = lhs imm0 bad0 = .bit_and .bit_or .then msg0 .throw end
-
-  msg1 .then
-    imm1 bad1 = lhs imm0 bad1 = .bit_and .bit_or .then msg1 .throw end
-  end
-  reg0 reg1 imm0 imm1 consumed
+fun: .comp_bitwise_logical_imm { imm op -- ok err }
+  imm .asm_bitwise_logical_imm_mask { mask ok }
+  ok =0 .then false .ret end
+  .comp_args1_reg { reg }
+  mask reg 5 .bit_lsl .bit_or reg .bit_or op .bit_or .comp_instr \ and|orr|eor Xd, Xn, #imm
   true
 end
 
-\ Fits the unsigned immediate accepted by our `add/sub #imm12` utils.
-fun: .cf_addsub_imm12_mag { imm -- mag ok }
-  imm >=0 .then imm imm ASM_MAX_IMM12 <= .ret end
-  imm ASM_MAX_IMM12 .negate >= .then imm .negate true .ret end
-  0 false
+fun_comp: .bit_or { -- err } [ .redefine ]
+  .comp_pop2 .then .bit_or .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_OP_ORR_IMM .comp_bitwise_logical_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bit_or
 end
 
-fun: .cf_validate { imm validate_inp validate -> aux ok err }
-  .call [ 3 .comp_args_set ]
-end
-
-fun: .cf_fold2_partial_or_fallback { reg0 reg1 imm1 consumed validate_inp validate emit fallback -- err }
-  consumed 1 >= .then
-    \ RHS constant: `num 10 +`.
-    imm1 validate_inp validate .cf_validate { aux ok }
-    reg1 .inc .comp_args_set
-    ok .then
-      reg0 .comp_realloc_reg
-      reg0 reg0 imm1 aux emit .call [ 1 .comp_args_set ] .try
-      reg0 .inc .comp_args_set
-      .ret
-    end
-  end
-
-  reg1 imm1 consumed .cf_restore_rhs
-  fallback .call_xt
-end
-
-fun: .cf_bit_shift_validate { imm reg_op -- aux ok err }
-  imm =0 .then " redundant arithmetic" .throw end
-  reg_op imm 0 >= imm 63 <= .bit_and
-end
-
-fun: .cf_bit_shift_emit { reg0 reg1 imm reg_op -- err }
-  reg_op ASM_OP_LSL_REG = .then
-    64 imm - 6 .bit_trunc { immr }
-    63 imm - 6 .bit_trunc { imms }
-    reg0 reg1 immr imms ASM_OP_UBFM .asm_bitfield .comp_instr \ lsl Xd, Xn, #imm6
-    .ret
-  end
-
-  imm 6 .bit_trunc { immr }
-
-  ASM_OP_SBFM ASM_OP_UBFM ASM_OP_SBFM .bit_xor
-  reg_op ASM_OP_LSR_REG = .negate .bit_and .bit_xor { bit_op }
-
-  reg0 reg1 immr 63 bit_op .asm_bitfield .comp_instr \ lsr|asr Xd, Xn, #imm6
-end
-
-fun: .cf_bit_logical_validate { imm aux -- aux ok Err }
-  aux 1 .bit_and { inv }
-  aux inv - { op }
-  imm 0 = imm -1 = op ASM_OP_EOR_IMM <> .bit_and .bit_or { edge }
-  imm inv ?bit_not { imm }
-  edge .then " redundant arithmetic" .throw end
-  imm op .asm_logical_imm_mask =0
-end
-
-fun: .cf_bit_logical_emit { reg0 reg1 _imm mask -- err }
-  mask reg1 5 .bit_lsl .bit_or reg0 .bit_or .comp_instr \ and|orr|eor Xd, Xn, #imm
-end
-
-fun: .cf_align_validate { size _ -- aux ok Err }
-  size 1 = .then " redundant arithmetic" .throw end
-  size .dec ASM_OP_ANDS_IMM .asm_logical_imm_mask =0
-end
-
-fun: .cf_align_emit { out adr _size mask -- err }
-  mask adr 5 .bit_lsl .bit_or 31 .bit_or .comp_instr \ tst Xn, #imm
-  out ASM_EQ .asm_cset                   .comp_instr \ cset Xd, eq
-end
-
-fun: .cf_align_down_validate { size _ -- aux ok Err }
-  size 1 = .then " redundant arithmetic" .throw end
-  size .negate ASM_OP_AND_IMM .asm_logical_imm_mask =0
-end
-
-fun: .cf_align_down_emit { out len _size mask -- err }
-  mask len 5 .bit_lsl .bit_or out .bit_or .comp_instr \ and Xd, Xn, #imm
-end
-
-fun: .cf_align_up_validate { size _ -- aux ok Err }
-  size 1 = .then " redundant arithmetic" .throw end
-  size .dec .cf_imm_u12 { add_ok }
-  size .negate ASM_OP_AND_IMM .asm_logical_imm_mask { mask mask_err }
-  mask add_ok mask_err =0 .bit_and
-end
-
-fun: .cf_align_up_emit { out len size mask -- err }
-  out len size .dec .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
-  mask out 5 .bit_lsl .bit_or out .bit_or .comp_instr  \ and Xd, Xn, #imm
-end
-
-fun: .cf_bit_trunc_validate { len _ -- aux ok Err }
-  len 0 <= len 64 >= .bit_or .then " redundant arithmetic" .throw end
-  len .low_bits ASM_OP_AND_IMM .asm_logical_imm_mask =0
-end
-
-fun: .cf_bit_mask_validate { mask -- err }
-  mask .then
-    mask mask .bit_ctz .bit_lsr { packed }
-    packed packed .inc .bit_and =0 .then .ret end
-  end
-  " invalid bit mask: expected nonzero contiguous mask" .throw
-end
-
-fun: .cf_bits_get_validate { mask _ -- aux ok Err }
-  mask -1 = .then " redundant arithmetic" .throw end
-  mask .cf_bit_mask_validate .try
-  mask ASM_OP_AND_IMM .asm_logical_imm_mask { instr_mask err }
-  err .then nil false .ret end
-  mask .bit_ctz 32 .bit_lsl instr_mask .bit_or true
-end
-
-fun: .cf_bits_get_emit { out src _mask aux -- err }
-  aux 32 .bit_trunc { instr_mask }
-  aux 32 .bit_lsr        { shift      }
-  instr_mask src 5 .bit_lsl .bit_or out .bit_or .comp_instr \ and Xd, Xn, #imm
-  out out shift .asm_lsr_imm .comp_instr      \ lsr Xd, Xn, #imm6
-end
-
-fun: .cf_addsub_validate { imm add -- aux ok err }
-  imm =0 .then " redundant arithmetic" .throw end
-  imm .cf_addsub_imm12_mag { -- ok }
-  add ok
-end
-
-fun: .cf_addsub_emit { reg0 reg1 imm add -- err }
-  imm .cf_addsub_imm12_mag { mag -- }
-  reg0 reg1 mag imm add .asm_addsub_imm .comp_instr \ add|sub Xd, Xn, #imm12
-end
-
-fun: .cf_pow2_validate { imm flags -- aux ok err }
-  " redundant arithmetic" { err }
-  imm =0 .then
-    flags 1 .bit_and .then err .throw end
-    nil false .ret
-  end
-  imm 1 = .then err .throw end
-  imm <0 { neg }
-  neg .then
-    flags 1 .bit_and =0 .then nil false .ret end
-    imm .negate { imm }
-  end
-  imm imm .dec .bit_and .then nil false .ret end
-  imm .bit_ctz neg 6 .bit_lsl .bit_or { aux }
-  aux true
-end
-
-fun: .cf_pow2_validate_reject_1 { imm msg -- aux ok err }
-  imm 1 = .then msg .throw end
-  imm nil .cf_pow2_validate
-end
-
-fun: .cf_udiv_pow2_emit { reg0 reg1 _imm aux -- err }
-  aux 0x3f .bit_and { shift }
-  reg0 reg1 shift .asm_lsr_imm .comp_instr \ lsr Xd, Xn, #imm6
-end
-
-fun: .cf_umod_pow2_emit { reg0 reg1 _imm aux -- err }
-  aux 0x3f .bit_and .low_bits { mask }
-  reg0 reg1 mask .asm_and_imm .comp_instr \ and Xd, Xn, #imm
-end
-
-fun: .cf_mul_pow2_emit { reg0 reg1 _imm aux -- err }
-  aux 0x3f .bit_and { shift }
-  reg0 reg1 shift .asm_lsl_imm .comp_instr \ lsl Xd, Xn, #imm6
-  aux 0x40 .bit_and .then
-    reg0 .asm_neg .comp_instr \ neg Xd, Xn
-  end
-end
-
-fun: .comp_loc_mut_arg_prepare { -- reg loc imm consumed err }
-  \ For words like `imm +: loc`: capture RHS arg and target local.
-  .cf_args_fold1 { reg imm consumed }
-  .read_word .comp_local { loc }
-  reg loc imm consumed
-end
-
-fun: .comp_loc_mut_store_prepared { loc reg -- err }
-  \ `reg` metadata already invalidated by allocator/fold backtracking.
-  reg .inc .comp_args_set
+fun_comp: bit_or: { -- err } ( C: "name" -- ) ( E: mask -- )
+  .comp_loc_mut_comm_beg { loc }
+  call'' .bit_or
   loc .comp_pop_into_local
 end
 
-fun: .comp_loc_mut_store_realloc { loc reg -- err }
-  \ Hand-emitted op changed `reg`; discard stale arg metadata before storing.
-  reg .comp_realloc_reg
-  loc reg .comp_loc_mut_store_prepared
-end
-
-fun: .comp_loc_mut_fold_imm { reg loc imm aux emit -- err }
-  \ Emit immediate-form mutation of `loc`; RHS was already backtracked.
-  reg .comp_args_set
-  loc .comp_push_from_local
-  .comp_args_get .dec { loc_reg }
-  loc_reg .comp_realloc_reg
-  loc_reg loc_reg imm aux emit .call [ 1 .comp_args_set ] .try
-  loc loc_reg .comp_loc_mut_store_prepared
-end
-
-fun: .comp_loc_mut_imm { reg_op validate_inp validate emit -- err }
-  ( C: "name" -- ) ( E: imm -- )
-  \ Try immediate-form local mutation; otherwise emit regular reg-reg op.
-
-  .comp_loc_mut_arg_prepare { reg loc imm consumed }
-
-  consumed .then
-    imm validate_inp validate .cf_validate { aux ok }
-    ok .then reg loc imm aux emit .comp_loc_mut_fold_imm .ret end
-    imm reg .comp_load
-  end
-
-  .comp_args1_reg { rhs_reg }
-  loc .comp_push_from_local
-  rhs_reg rhs_reg .inc rhs_reg .asm_pattern_arith_reg reg_op .bit_or .comp_instr \ <op> Xd, Xn, Xm
-  loc rhs_reg .comp_loc_mut_store_prepared
-end
-
-fun: .comp_loc_unary_init { -- reg loc err } ( C: "name" -- ) ( E: -- )
-  .read_word .comp_local { loc }
-  loc .comp_push_from_local
-  .comp_args_get .dec loc
-end
-
-fun: .comp_loc_mut_fixed { imm aux emit -- err } ( C: "name" -- ) ( E: -- )
-  \ Mutate local with fixed immediate, e.g. `inc:` / `+cell:`.
-  .comp_loc_unary_init { reg loc }
-  reg reg imm aux emit .call [ 1 .comp_args_set ] .try
-  loc reg .comp_loc_mut_store_realloc
-end
-
-fun: .comp_loc_mut_csel { local_first zero cond -- err }
-  ( C: "name" -- ) ( E: candidate -- )
-  .comp_args1_reg { candidate }
-  .read_word .comp_local { loc }
-  loc .comp_push_from_local
-  candidate .inc { cur }
-
-  zero .then
-    local_first .then
-      candidate cur candidate cond .comp_emit_csel_nonzero
-    else
-      candidate candidate cur cond .comp_emit_csel_nonzero
-    end
-  else
-    candidate cur candidate cur candidate cond .comp_emit_csel_reg
-  end
-
-  loc candidate .comp_loc_mut_store_prepared
-end
-
-fun: .comp_loc_mut_cset_zero { cond -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg cond .comp_emit_cset_zero
-  loc reg .comp_loc_mut_store_realloc
-end
-
-fun: .comp_loc_mut_cmp_imm { cond validate emit -- err } ( C: "name" -- ) ( E: rhs -- )
-  .comp_loc_mut_arg_prepare { reg loc imm consumed }
-
-  consumed .then
-    imm cond validate .cf_validate { aux ok }
-    ok .then reg loc imm aux emit .comp_loc_mut_fold_imm .ret end
-    imm reg .comp_load
-  end
-
-  loc .comp_push_from_local
-  reg reg .inc reg cond .comp_emit_cmp_cset_reg
-  loc reg .comp_loc_mut_store_realloc
-end
-
-fun_comp: .bit_or { -- err } [ .redefine ]
-  " redundant arithmetic" { err }
-  true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_or .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_ORR_IMM
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bit_or
-  .cf_fold2_partial_or_fallback
-end
-
-\ Bitwise `.bit_or` into a local: `mask bit_or: some_val`.
-fun_comp: bit_or: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_ORR_REG ASM_OP_ORR_IMM
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit
-  .comp_loc_mut_imm
-end
-
 fun_comp: .bit_and { -- err } [ .redefine ]
-  " redundant arithmetic" { err }
-  true 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_and .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_AND_IMM
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bit_and
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bit_and .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_OP_AND_IMM .comp_bitwise_logical_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bit_and
 end
 
-\ Bitwise `.bit_and` into a local: `mask bit_and: some_val`.
 fun_comp: bit_and: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_AND_REG ASM_OP_AND_IMM
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit
-  .comp_loc_mut_imm
+  .comp_loc_mut_comm_beg { loc }
+  call'' .bit_and
+  loc .comp_pop_into_local
 end
 
 fun_comp: .bit_xor { -- err } [ .redefine ]
-  true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_xor .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_EOR_IMM
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bit_xor
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bit_xor .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_OP_EOR_IMM .comp_bitwise_logical_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bit_xor
 end
 
-\ Bitwise `.bit_xor` into a local: `mask bit_xor: some_val`.
 fun_comp: bit_xor: { -- err } ( C: "name" -- ) ( E: mask -- )
-  ASM_OP_EOR_REG ASM_OP_EOR_IMM
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit
-  .comp_loc_mut_imm
+  .comp_loc_mut_comm_beg { loc }
+  call'' .bit_xor
+  loc .comp_pop_into_local
+end
+
+fun: .comp_shift_imm { imm op -- ok err }
+  imm 0 >= imm 63 <= .bit_and =0 .then false .ret end
+  .comp_args1_reg { reg }
+  op ASM_OP_LSL_REG = .then reg reg imm .asm_lsl_imm
+  elif op ASM_OP_LSR_REG = .then reg reg imm .asm_lsr_imm
+  else reg reg imm .asm_asr_imm end
+  .comp_instr \ lsl|lsr|asr Xd, Xn, #imm6
+  true
 end
 
 fun_comp: .bit_lsl { -- err } [ .redefine ]
-  false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_lsl .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_LSL_REG
-  instr' .cf_bit_shift_validate instr' .cf_bit_shift_emit xt'' .bit_lsl
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bit_lsl .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_OP_LSL_REG .comp_shift_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bit_lsl
 end
 
 fun_comp: .bit_lsr { -- err } [ .redefine ]
-  false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_lsr .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_LSR_REG
-  instr' .cf_bit_shift_validate instr' .cf_bit_shift_emit xt'' .bit_lsr
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bit_lsr .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_OP_LSR_REG .comp_shift_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bit_lsr
 end
 
 fun_comp: .bit_asr { -- err } [ .redefine ]
-  false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_asr .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_ASR_REG
-  instr' .cf_bit_shift_validate instr' .cf_bit_shift_emit xt'' .bit_asr
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bit_asr .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_OP_ASR_REG .comp_shift_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bit_asr
+end
+
+fun: .comp_addsub_imm { imm add -- ok err }
+  imm >=0 .then imm else imm .negate end { mag }
+  mag 0 >= mag ASM_MAX_IMM12 <= .bit_and =0 .then false .ret end
+  .comp_args1_reg { reg }
+  reg reg mag imm >=0 add = .then .asm_add_imm else .asm_sub_imm end
+  .comp_instr \ add|sub Xd, Xn, #imm12
+  true
 end
 
 fun_comp: + { -- err } [ .redefine ]
-  true 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 + .cf_fold_done .ret end
-  reg reg1 imm1 consumed true
-  instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' +
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then + .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm true .comp_addsub_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' +
 end
 
-\ Add a value to a local: `val +: some_val`.
-fun_comp: +: { -- err } ( C: "name" -- ) ( E: imm -- )
-  ASM_OP_ADD_REG true
-  instr' .cf_addsub_validate instr' .cf_addsub_emit
-  .comp_loc_mut_imm
+fun_comp: +: { -- err } ( C: "name" -- ) ( E: val -- )
+  .comp_loc_mut_comm_beg { loc }
+  call'' +
+  loc .comp_pop_into_local
 end
 
 fun_comp: - { -- err } [ .redefine ]
-  false 0 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 - .cf_fold_done .ret end
-  reg reg1 imm1 consumed false
-  instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' -
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then - .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm false .comp_addsub_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' -
 end
 
 fun_comp: * { -- err } [ .redefine ]
-  " redundant arithmetic" { err }
-  true 0 err 1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 * .cf_fold_done .ret end
-  reg reg1 imm1 consumed true
-  instr' .cf_pow2_validate instr' .cf_mul_pow2_emit xt'' *
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then * .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    \ Multiplication by constant 2-pow: replace with left-shift.
+    \ Multiplication by constant zero: skip; not worth the code.
+    imm <0 { neg }
+    neg .then imm .negate else imm end { mag }
+    mag .is_pow2 .then
+      mag .bit_ctz { shift }
+      .comp_args1_reg { reg }
+      reg reg shift .asm_lsl_imm .comp_instr \ lsl Xd, Xn, #imm6
+      neg .then reg .asm_neg .comp_instr end \ neg Xd, Xn
+      .ret
+    end
+    imm .comp_push
+  else { -- } end
+  call'' *
 end
 
-\ Multiply a local: `factor *: some_val`.
-fun_comp: *: { -- err } ( C: "name" -- ) ( E: factor -- )
-  ASM_OP_MUL_REG true
-  instr' .cf_pow2_validate instr' .cf_mul_pow2_emit
-  .comp_loc_mut_imm
+fun_comp: *: { -- err } ( C: "name" -- ) ( E: val -- )
+  .comp_loc_mut_comm_beg { loc }
+  call'' *
+  loc .comp_pop_into_local
 end
 
-\ No partial CF: signed pow2 division needs several biasing instructions,
-\ because `.bit_asr` rounds negative values down, while signed division rounds
-\ toward zero. Not worth the code size for now.
+\ Signed power-of-two division needs biasing to preserve truncation toward zero.
 fun_comp: / { -- err } [ .redefine ]
-  " redundant arithmetic: division by 0 -> 0" { err0 }
-  " redundant arithmetic: division by 1" { err1 }
-  false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 / .cf_fold_done .ret end
-  reg1 imm1 consumed .cf_restore_rhs call'' /
+  .comp_pop2 .then / .comp_push else { -- } call'' / end
 end
 
 fun_comp: u/ { -- err } [ .redefine ]
-  " redundant arithmetic: division by 0 -> 0" { err0 }
-  " redundant arithmetic: division by 1" { err1 }
-  false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 u/ .cf_fold_done .ret end
-  reg reg1 imm1 consumed err1
-  instr' .cf_pow2_validate_reject_1 instr' .cf_udiv_pow2_emit xt'' u/
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then u/ .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm .is_pow2 .then
+      imm .bit_ctz { shift }
+      .comp_args1_reg { reg }
+      reg reg shift .asm_lsr_imm .comp_instr \ lsr Xd, Xn, #imm6
+      .ret
+    end
+    imm .comp_push
+  else { -- } end
+  call'' u/
 end
 
 fun_comp: .mod { -- err } [ .redefine ]
-  " redundant arithmetic: modulo by 0 -> dividend" { err0 }
-  " redundant arithmetic: modulo by 1" { err1 }
-  false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .mod .cf_fold_done .ret end
-  reg1 imm1 consumed .cf_restore_rhs call'' .mod
+  .comp_pop2 .then .mod .comp_push else { -- } call'' .mod end
 end
 
 fun_comp: .umod { -- err } [ .redefine ]
-  " redundant arithmetic: modulo by 0 -> dividend" { err0 }
-  " redundant arithmetic: modulo by 1" { err1 }
-  false 0 err0 1 err1 .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .umod .cf_fold_done .ret end
-  reg reg1 imm1 consumed err1
-  instr' .cf_pow2_validate_reject_1 instr' .cf_umod_pow2_emit xt'' .umod
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .umod .comp_push else { -- } call'' .umod end
 end
 
 fun_comp: /mod { -- err } [ .redefine ]
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" { err0 }
-  " redundant arithmetic: division by 1" { err1 }
-  false 0 err0 1 err1 .cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
-  ok .then reg0 reg1 imm0 imm1 /mod .cf_fold_done2 .ret end
-  reg1 imm1 consumed .cf_restore_rhs call'' /mod
+  .comp_pop2 .then /mod .comp_push2 else { -- } call'' /mod end
 end
 
 fun_comp: u/mod { -- err } [ .redefine ]
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" { err0 }
-  " redundant arithmetic: division by 1" { err1 }
-  false 0 err0 1 err1 .cf_fold2_valid { reg0 reg1 imm0 imm1 consumed ok }
-  ok .then reg0 reg1 imm0 imm1 u/mod .cf_fold_done2 .ret end
-  reg1 imm1 consumed .cf_restore_rhs call'' u/mod
+  .comp_pop2 .then u/mod .comp_push2 else { -- } call'' u/mod end
 end
 
 fun_comp: .inc { -- err } [ .redefine ]
-  .cf_args_fold1 .then .inc .cf_fold_done else { -- } call'' .inc end
+  .comp_pop1 .then .inc .comp_push else { -- } call'' .inc end
 end
 
-\ Increment a local: `inc: some_val`.
 fun_comp: inc: { -- err } ( C: "name" -- ) ( E: -- )
-  1 true instr' .cf_addsub_emit .comp_loc_mut_fixed
+  .comp_loc_mut_beg { loc }
+  call'' .inc
+  loc .comp_pop_into_local
 end
 
 fun_comp: .dec { -- err } [ .redefine ]
-  .cf_args_fold1 .then .dec .cf_fold_done else { -- } call'' .dec end
+  .comp_pop1 .then .dec .comp_push else { -- } call'' .dec end
 end
 
-\ Decrement a local: `dec: some_val`.
 fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
-  1 false instr' .cf_addsub_emit .comp_loc_mut_fixed
+  .comp_loc_mut_beg { loc }
+  call'' .dec
+  loc .comp_pop_into_local
 end
 
 fun_comp: .negate { -- err } [ .redefine ]
-  .cf_args_fold1 .then .negate .cf_fold_done else { -- } call'' .negate end
+  .comp_pop1 .then .negate .comp_push else { -- } call'' .negate end
 end
 
-\ Negate a local: `negate: some_val`.
 fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg .asm_neg .comp_instr \ neg Xd, Xn
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .negate
+  loc .comp_pop_into_local
 end
 
 fun_comp: .abs { -- err } [ .redefine ]
-  .cf_args_fold1 .then .abs .cf_fold_done else { -- } call'' .abs end
+  .comp_pop1 .then .abs .comp_push else { -- } call'' .abs end
 end
 
-\ Absolute-value a local: `abs: some_val`.
 fun_comp: abs: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg .comp_emit_abs
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .abs
+  loc .comp_pop_into_local
 end
 
 fun_comp: .bit_clz { -- err } [ .redefine ]
-  .cf_args_fold1 .then .bit_clz .cf_fold_done else { -- } call'' .bit_clz end
+  .comp_pop1 .then .bit_clz .comp_push else { -- } call'' .bit_clz end
 end
 
-\ Count leading zeros in a local: `bit_clz: some_val`.
 fun_comp: bit_clz: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg reg .asm_clz .comp_instr \ clz Xd, Xn
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .bit_clz
+  loc .comp_pop_into_local
 end
 
 fun_comp: .bit_ctz { -- err } [ .redefine ]
-  .cf_args_fold1 .then .bit_ctz .cf_fold_done else { -- } call'' .bit_ctz end
+  .comp_pop1 .then .bit_ctz .comp_push else { -- } call'' .bit_ctz end
 end
 
-\ Count trailing zeros in a local: `bit_ctz: some_val`.
 fun_comp: bit_ctz: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg .comp_emit_bit_ctz
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .bit_ctz
+  loc .comp_pop_into_local
 end
 
 fun_comp: .bit_len { -- err } [ .redefine ]
-  .cf_args_fold1 .then .bit_len .cf_fold_done else { -- } call'' .bit_len end
+  .comp_pop1 .then .bit_len .comp_push else { -- } call'' .bit_len end
 end
 
-\ Compute bit length into a local: `bit_len: some_val`.
 fun_comp: bit_len: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  .comp_alloc_next_reg { tmp }
-  reg tmp .comp_emit_bit_len
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .bit_len
+  loc .comp_pop_into_local
 end
 
 fun_comp: .pow2_ceil { -- err } [ .redefine ]
-  .cf_args_fold1 .then .pow2_ceil .cf_fold_done else { -- } call'' .pow2_ceil end
+  .comp_pop1 .then .pow2_ceil .comp_push else { -- } call'' .pow2_ceil end
 end
 
-\ Round-up a local to a power of two: `pow2_ceil: some_val`.
 fun_comp: pow2_ceil: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  .comp_alloc_next_reg { tmp }
-  reg tmp .comp_emit_pow2_ceil
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .pow2_ceil
+  loc .comp_pop_into_local
 end
 
-\ No partial CF: `csel` needs both values in regs; constants still cost `mov`.
 fun_comp: .min { -- err } [ .redefine ]
-  .cf_fold_cleared2 .then .min .cf_fold_done else { -- } call'' .min end
+  .comp_pop2 .then .min .comp_push else { -- } call'' .min end
 end
 
-\ Minimum into a local: `candidate min: some_val`.
 fun_comp: min: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false false ASM_LT .comp_loc_mut_csel
+  .comp_loc_mut_comm_beg { loc }
+  call'' .min
+  loc .comp_pop_into_local
 end
 
 fun_comp: .umin { -- err } [ .redefine ]
-  .cf_fold_cleared2 .then .umin .cf_fold_done else { -- } call'' .umin end
+  .comp_pop2 .then .umin .comp_push else { -- } call'' .umin end
 end
 
-\ Unsigned minimum into a local: `candidate umin: some_val`.
 fun_comp: umin: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false false ASM_LO .comp_loc_mut_csel
+  .comp_loc_mut_comm_beg { loc }
+  call'' .umin
+  loc .comp_pop_into_local
 end
 
 fun_comp: .max { -- err } [ .redefine ]
-  .cf_fold_cleared2 .then .max .cf_fold_done else { -- } call'' .max end
+  .comp_pop2 .then .max .comp_push else { -- } call'' .max end
 end
 
-\ Maximum into a local: `candidate max: some_val`.
 fun_comp: max: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false false ASM_GT .comp_loc_mut_csel
+  .comp_loc_mut_comm_beg { loc }
+  call'' .max
+  loc .comp_pop_into_local
 end
 
 fun_comp: .umax { -- err } [ .redefine ]
-  .cf_fold_cleared2 .then .umax .cf_fold_done else { -- } call'' .umax end
+  .comp_pop2 .then .umax .comp_push else { -- } call'' .umax end
 end
 
-\ Unsigned maximum into a local: `candidate umax: some_val`.
 fun_comp: umax: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false false ASM_HI .comp_loc_mut_csel
+  .comp_loc_mut_comm_beg { loc }
+  call'' .umax
+  loc .comp_pop_into_local
 end
 
-\ No partial CF: adopted child of the min/max family.
 fun_comp: .coalesce { -- err } [ .redefine ]
-  .cf_fold_cleared2 .then .coalesce .cf_fold_done
-  else { -- } call'' .coalesce end
+  .comp_pop2 .then .coalesce .comp_push else { -- } call'' .coalesce end
 end
 
-\ Coalesce into a local: `candidate coalesce: some_val`.
 fun_comp: coalesce: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  false true ASM_NE .comp_loc_mut_csel
+  .comp_loc_mut_beg { loc }
+  call'' .coalesce
+  loc .comp_pop_into_local
 end
 
-\ No partial CF: adopted child of the min/max family.
 fun_comp: .fallback { -- err } [ .redefine ]
-  .cf_fold_cleared2 .then .fallback .cf_fold_done
-  else { -- } call'' .fallback end
+  .comp_pop2 .then .fallback .comp_push else { -- } call'' .fallback end
 end
 
-\ `candidate fallback: some_val` is `candidate some_val .fallback { some_val }`.
 fun_comp: fallback: { -- err } ( C: "name" -- ) ( E: candidate -- )
-  true true ASM_NE .comp_loc_mut_csel
+  .comp_loc_mut_beg { loc }
+  call'' .fallback
+  loc .comp_pop_into_local
 end
 
 fun_comp: .cint_to_cell { -- err } [ .redefine ]
-  .cf_args_fold1 .then .cint_to_cell .cf_fold_done
-  else { -- } call'' .cint_to_cell end
+  .comp_pop1 .then .cint_to_cell .comp_push else { -- } call'' .cint_to_cell end
 end
 
-\ Sign-extend a local from int32 to cell: `cint_to_cell: some_val`.
 fun_comp: cint_to_cell: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg reg .asm_sign_extend_32 .comp_instr \ sxtw Xd, Wn
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .cint_to_cell
+  loc .comp_pop_into_local
 end
 
 fun_comp: =0 { -- err } [ .redefine ]
-  .cf_args_fold1 .then =0 .cf_fold_done else { -- } call'' =0 end
+  .comp_pop1 .then =0 .comp_push else { -- } call'' =0 end
 end
 
-\ In-place local test: `=0: some_val`.
 fun_comp: =0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_EQ .comp_loc_mut_cset_zero
+  .comp_loc_mut_beg { loc }
+  call'' =0
+  loc .comp_pop_into_local
 end
 
 fun_comp: <>0 { -- err } [ .redefine ]
-  .cf_args_fold1 .then <>0 .cf_fold_done else { -- } call'' <>0 end
+  .comp_pop1 .then <>0 .comp_push else { -- } call'' <>0 end
 end
 
-\ In-place local test: `<>0: some_val`.
 fun_comp: <>0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_NE .comp_loc_mut_cset_zero
+  .comp_loc_mut_beg { loc }
+  call'' <>0
+  loc .comp_pop_into_local
 end
 
 fun_comp: <0 { -- err } [ .redefine ]
-  .cf_args_fold1 .then <0 .cf_fold_done else { -- } call'' <0 end
+  .comp_pop1 .then <0 .comp_push else { -- } call'' <0 end
 end
 
-\ In-place local test: `<0: some_val`.
 fun_comp: <0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_LT .comp_loc_mut_cset_zero
+  .comp_loc_mut_beg { loc }
+  call'' <0
+  loc .comp_pop_into_local
 end
 
 fun_comp: >0 { -- err } [ .redefine ]
-  .cf_args_fold1 .then >0 .cf_fold_done else { -- } call'' >0 end
+  .comp_pop1 .then >0 .comp_push else { -- } call'' >0 end
 end
 
-\ In-place local test: `>0: some_val`.
 fun_comp: >0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_GT .comp_loc_mut_cset_zero
+  .comp_loc_mut_beg { loc }
+  call'' >0
+  loc .comp_pop_into_local
 end
 
 fun_comp: <=0 { -- err } [ .redefine ]
-  .cf_args_fold1 .then <=0 .cf_fold_done else { -- } call'' <=0 end
+  .comp_pop1 .then <=0 .comp_push else { -- } call'' <=0 end
 end
 
-\ In-place local test: `<=0: some_val`.
 fun_comp: <=0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_LE .comp_loc_mut_cset_zero
+  .comp_loc_mut_beg { loc }
+  call'' <=0
+  loc .comp_pop_into_local
 end
 
 fun_comp: >=0 { -- err } [ .redefine ]
-  .cf_args_fold1 .then >=0 .cf_fold_done else { -- } call'' >=0 end
+  .comp_pop1 .then >=0 .comp_push else { -- } call'' >=0 end
 end
 
-\ In-place local test: `>=0: some_val`.
 fun_comp: >=0: { -- err } ( C: "name" -- ) ( E: -- )
-  ASM_GE .comp_loc_mut_cset_zero
+  .comp_loc_mut_beg { loc }
+  call'' >=0
+  loc .comp_pop_into_local
 end
 
-fun: .cf_cmp_fold2_or_call { raw_xt fallback rhs_cond -- err }
-  .cf_args_fold2 { reg0 reg1 imm0 imm1 _known consumed }
-
-  consumed 2 = .then
-    imm0 imm1 raw_xt .xt_instr .call [ 1 .comp_args_set ] { bool }
-    reg0 bool .cf_fold_done .ret
-  end
-
-  reg0 reg1 imm1 consumed rhs_cond
-  instr' .cf_cmp_validate instr' .cf_emit_cmp_imm_cset fallback
-  .cf_fold2_partial_or_fallback
+fun: .comp_cmp_imm { imm cond -- ok err }
+  imm 0 >= imm ASM_MAX_IMM12 <= .bit_and =0 .then false .ret end
+  .comp_args1_reg { reg }
+  reg imm  .asm_cmp_imm .comp_instr \ cmp Xn, #imm12
+  reg cond .asm_cset    .comp_instr \ cset Xd, cond
+  true
 end
 
 fun_comp: = { -- err } [ .redefine ]
-  xt' = xt'' = ASM_EQ .cf_cmp_fold2_or_call
+  .comp_pop2 .then = .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_EQ .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' =
 end
 
-\ In-place local test: `rhs =: some_val`.
 fun_comp: =: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  ASM_EQ instr' .cf_cmp_validate instr' .cf_emit_cmp_imm_cset
-  .comp_loc_mut_cmp_imm
+  .comp_loc_mut_comm_beg { loc }
+  call'' =
+  loc .comp_pop_into_local
 end
 
 fun_comp: <> { -- err } [ .redefine ]
-  xt' <> xt'' <> ASM_NE .cf_cmp_fold2_or_call
+  .comp_pop2 .then <> .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_NE .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' <>
 end
 
-\ In-place local test: `rhs <>: some_val`.
 fun_comp: <>: { -- err } ( C: "name" -- ) ( E: rhs -- )
-  ASM_NE instr' .cf_cmp_validate instr' .cf_emit_cmp_imm_cset
-  .comp_loc_mut_cmp_imm
+  .comp_loc_mut_comm_beg { loc }
+  call'' <>
+  loc .comp_pop_into_local
 end
 
 fun_comp: > { -- err } [ .redefine ]
-  xt' > xt'' > ASM_GT .cf_cmp_fold2_or_call
+  .comp_pop2 .then > .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_GT .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' >
 end
 
 fun_comp: < { -- err } [ .redefine ]
-  xt' < xt'' < ASM_LT .cf_cmp_fold2_or_call
+  .comp_pop2 .then < .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_LT .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' <
 end
 
 fun_comp: <= { -- err } [ .redefine ]
-  xt' <= xt'' <= ASM_LE .cf_cmp_fold2_or_call
+  .comp_pop2 .then <= .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_LE .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' <=
 end
 
 fun_comp: >= { -- err } [ .redefine ]
-  xt' >= xt'' >= ASM_GE .cf_cmp_fold2_or_call
+  .comp_pop2 .then >= .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_GE .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' >=
 end
 
 fun_comp: u> { -- err } [ .redefine ]
-  xt' u> xt'' u> ASM_HI .cf_cmp_fold2_or_call
+  .comp_pop2 .then u> .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_HI .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' u>
 end
 
 fun_comp: u< { -- err } [ .redefine ]
-  xt' u< xt'' u< ASM_LO .cf_cmp_fold2_or_call
+  .comp_pop2 .then u< .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_LO .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' u<
 end
 
 fun_comp: u<= { -- err } [ .redefine ]
-  xt' u<= xt'' u<= ASM_LS .cf_cmp_fold2_or_call
+  .comp_pop2 .then u<= .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_LS .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' u<=
 end
 
 fun_comp: u>= { -- err } [ .redefine ]
-  xt' u>= xt'' u>= ASM_HS .cf_cmp_fold2_or_call
+  .comp_pop2 .then u>= .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm ASM_HS .comp_cmp_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' u>=
 end
 
 fun_comp: .cells { -- err } [ .redefine ]
-  .cf_args_fold1 .then .cells .cf_fold_done else { -- } call'' .cells end
+  .comp_pop1 .then .cells .comp_push else { -- } call'' .cells end
 end
 
-\ Scale a local by cell size: `cells: some_val`.
 fun_comp: cells: { -- err } ( C: "name" -- ) ( E: -- )
-  3 ASM_OP_LSL_REG instr' .cf_bit_shift_emit .comp_loc_mut_fixed
+  .comp_loc_mut_beg { loc }
+  call'' .cells
+  loc .comp_pop_into_local
 end
 
 fun_comp: /cells { -- err } [ .redefine ]
-  .cf_args_fold1 .then /cells .cf_fold_done else { -- } call'' /cells end
+  .comp_pop1 .then /cells .comp_push else { -- } call'' /cells end
 end
 
-\ Divide a local by cell size: `/cells: some_val`.
 fun_comp: /cells: { -- err } ( C: "name" -- ) ( E: -- )
-  3 ASM_OP_ASR_REG instr' .cf_bit_shift_emit .comp_loc_mut_fixed
+  .comp_loc_mut_beg { loc }
+  call'' /cells
+  loc .comp_pop_into_local
 end
 
 fun_comp: +cell { -- err } [ .redefine ]
-  .cf_args_fold1 .then +cell .cf_fold_done else { -- } call'' +cell end
+  .comp_pop1 .then +cell .comp_push else { -- } call'' +cell end
 end
 
-\ Add one cell to a local: `+cell: some_val`.
 fun_comp: +cell: { -- err } ( C: "name" -- ) ( E: -- )
-  CELL true instr' .cf_addsub_emit .comp_loc_mut_fixed
+  .comp_loc_mut_beg { loc }
+  call'' +cell
+  loc .comp_pop_into_local
 end
 
 fun_comp: -cell { -- err } [ .redefine ]
-  .cf_args_fold1 .then -cell .cf_fold_done else { -- } call'' -cell end
+  .comp_pop1 .then -cell .comp_push else { -- } call'' -cell end
 end
 
-\ Subtract one cell from a local: `-cell: some_val`.
 fun_comp: -cell: { -- err } ( C: "name" -- ) ( E: -- )
-  CELL false instr' .cf_addsub_emit .comp_loc_mut_fixed
+  .comp_loc_mut_beg { loc }
+  call'' -cell
+  loc .comp_pop_into_local
 end
 
-fun_comp: .odd { -- err }
-  .cf_args_fold1 .then 1 .bit_and .cf_fold_done
-  else
-    { -- }
-    .comp_args1_reg { reg }
-    reg reg 1 .asm_and_imm .comp_instr \ and Xd, Xd, #1
-  end
-end
-
+fun_comp: .odd { -- err } 1 .comp_push call'' .bit_and end
 fun: .odd { val -> bool } .odd end
 
-\ In-place local test: `odd: some_val`.
 fun_comp: odd: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg reg 1 .asm_and_imm .comp_instr \ and Xd, Xd, #1
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .odd
+  loc .comp_pop_into_local
 end
 
 fun_comp: .is_aligned_to { -- err } [ .redefine ]
-  false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .is_aligned_to .cf_fold_done .ret end
-  reg reg1 imm1 consumed nil
-  instr' .cf_align_validate instr' .cf_align_emit xt'' .is_aligned_to
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .is_aligned_to .comp_push .ret else { -- } end
+  .comp_pop1 .then { size }
+    size .dec .asm_bitwise_logical_imm_mask .then { mask }
+      .comp_args1_reg { reg }
+      mask reg 5 .bit_lsl .bit_or 31 .bit_or ASM_OP_ANDS_IMM .bit_or .comp_instr \ tst Xn, #imm
+      reg ASM_EQ .asm_cset .comp_instr                                           \ cset Xd, eq
+      .ret
+    else { -- } end
+    size .comp_push
+  else { -- } end
+  call'' .is_aligned_to
 end
 
 fun_comp: .align_down { -- err } [ .redefine ]
-  false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .align_down .cf_fold_done .ret end
-  reg reg1 imm1 consumed nil
-  instr' .cf_align_down_validate instr' .cf_align_down_emit xt'' .align_down
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .align_down .comp_push .ret else { -- } end
+  .comp_pop1 .then { size }
+    size .negate ASM_OP_AND_IMM .comp_bitwise_logical_imm .then .ret end
+    size .comp_push
+  else { -- } end
+  call'' .align_down
 end
 
 fun_comp: .align_up { -- err } [ .redefine ]
-  false 1 " redundant arithmetic" 0 nil .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .align_up .cf_fold_done .ret end
-  reg reg1 imm1 consumed nil
-  instr' .cf_align_up_validate instr' .cf_align_up_emit xt'' .align_up
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .align_up .comp_push .ret else { -- } end
+  .comp_pop1 .then { size }
+    size .dec { off }
+    off 0 >= off ASM_MAX_IMM12 <= .bit_and .then
+      size .negate .asm_bitwise_logical_imm_mask
+      .then { mask }
+        .comp_args1_reg { reg }
+        reg reg off .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
+        mask reg 5 .bit_lsl .bit_or reg .bit_or ASM_OP_AND_IMM .bit_or .comp_instr \ and Xd, Xn, #imm
+        .ret
+      else { -- } end
+    end
+    size .comp_push
+  else { -- } end
+  call'' .align_up
 end
 
 fun_comp: .bit_not { -- err } [ .redefine ]
-  .cf_args_fold1 .then .bit_not .cf_fold_done else { -- } call'' .bit_not end
+  .comp_pop1 .then .bit_not .comp_push else { -- } call'' .bit_not end
 end
 
-\ Invert a local: `bit_not: some_val`.
 fun_comp: bit_not: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .bit_not
+  loc .comp_pop_into_local
 end
 
 fun_comp: .low_bits { -- err } [ .redefine ]
-  .cf_args_fold1 .then .low_bits .cf_fold_done else { -- } call'' .low_bits end
+  .comp_pop1 .then .low_bits .comp_push else { -- } call'' .low_bits end
 end
 
-\ Set a local to a mask of its low bit count: `low_bits: some_val`.
 fun_comp: low_bits: { -- err } ( C: "name" -- ) ( E: -- )
-  .comp_loc_unary_init { reg loc }
-  .comp_alloc_next_reg { tmp }
-  reg tmp .comp_emit_low_bits
-  loc reg .comp_loc_mut_store_realloc
+  .comp_loc_mut_beg { loc }
+  call'' .low_bits
+  loc .comp_pop_into_local
 end
 
 fun_comp: .bit_trunc { -- err } [ .redefine ]
-  " redundant arithmetic" { err }
-  false 0 err 64 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bit_trunc .cf_fold_done .ret end
-  reg reg1 imm1 consumed nil
-  instr' .cf_bit_trunc_validate instr' .cf_bit_logical_emit xt'' .bit_trunc
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bit_trunc .comp_push .ret else { -- } end
+  .comp_pop1 .then { len }
+    len .low_bits ASM_OP_AND_IMM .comp_bitwise_logical_imm .then .ret end
+    len .comp_push
+  else { -- } end
+  call'' .bit_trunc
 end
 
 fun_comp: .bits_clear { -- err } [ .redefine ]
-  " redundant arithmetic" { err }
-  false 0 err -1 err .cf_fold2_valid { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 .bits_clear .cf_fold_done .ret end
-  reg reg1 imm1 consumed ASM_OP_AND_IMM 1 .bit_or
-  instr' .cf_bit_logical_validate instr' .cf_bit_logical_emit xt'' .bits_clear
-  .cf_fold2_partial_or_fallback
+  .comp_pop2 .then .bits_clear .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm .bit_not ASM_OP_AND_IMM .comp_bitwise_logical_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+  call'' .bits_clear
 end
 
 fun_comp: .bits_get { -- err } [ .redefine ]
-  .cf_args_fold2 { reg reg1 src mask _known consumed }
-  consumed 2 = .then
-    mask -1 = .then " redundant arithmetic" .throw end
-    mask .cf_bit_mask_validate
-    reg src mask .bits_get .cf_fold_done
-  else
-    reg reg1 mask consumed nil
-    instr' .cf_bits_get_validate instr' .cf_bits_get_emit xt'' .bits_get
-    .cf_fold2_partial_or_fallback
-  end
+  .comp_pop2 .then .bits_get .comp_push .ret else { -- } end
+  .comp_pop1 .then { imm }
+    imm .asm_bitwise_logical_imm_mask .then { mask }
+      .comp_args1_reg { reg }
+      mask reg 5 .bit_lsl .bit_or reg .bit_or ASM_OP_AND_IMM .bit_or .comp_instr \ and Xd, Xn, #imm
+      reg reg imm .bit_ctz .asm_lsr_imm .comp_instr                              \ lsr Xd, Xn, #imm6
+      .ret
+    else { -- } end
+    imm .comp_push
+  else { -- } end
+  call'' .bits_get
 end
 
 \ Branchlessly zeroes the value, if the predicate is zero.
 \ Same as multiply-by-boolean pattern but slightly faster.
-\ Compiles to `cmp ; csel`. No CF yet: too few callsites.
+\ Should compile to `cmp; csel`. No CF: too few callsites.
 fun_comp: .gate { -- err } ( E: val pred -- val|nil )
   .comp_args2_regs { val pred }
   val pred ASM_REG_ZR val ASM_REG_ZR ASM_NE .comp_emit_csel_reg
@@ -4769,22 +4539,19 @@ fun: .assert_bin_end { beg cond cmp_xt -- err }
   2 " when compiling binary assert" .comp_args_valid
   cmp_xt .Sym_name .Sym_word_buf { op }
   cmp_xt .Sym_name .Sym_word_len @u32 { op_len }
-  .cf_args_fold2 { reg0 fold_reg1 lhs rhs known consumed }
-  known 2 = { static }
 
-  static .then
-    reg0 .comp_args_set
-    lhs rhs cmp_xt .xt_instr .call [ 1 .comp_args_set ] { bool }
+  .comp_pop2 .then { val0 val1 }
+    val0 val1 cmp_xt .xt_instr .call [ 1 .comp_args_set ] { bool }
     bool =0 .then
       beg .assert_body { text text_len }
       " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"
-      text_len text op_len op lhs rhs op_len op .errf .ret
+      text_len text op_len op val0 val1 op_len op .errf .ret
     end
     .ret
-  end
+  else { -- } end
 
+  .comp_args_get 2 - { reg0 }
   reg0 .inc { reg1 }
-  fold_reg1 rhs consumed .cf_restore_rhs
   reg0 .comp_realloc_reg
   .comp_alloc_next_reg reg0 reg1 cond .comp_emit_cmp_cset_reg
   beg .assert_body .comp_cstr

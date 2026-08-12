@@ -13,7 +13,8 @@ static const USED Sym INTRIN[] = {
   INTRIN_COMP_ARGS_MIN,              // .comp_args_min
   INTRIN_COMP_ARGS_GET,              // .comp_args_get
   INTRIN_COMP_ARGS_SET,              // .comp_args_set
-  INTRIN_COMP_ARGS_FOLD,             // .comp_args_fold
+  INTRIN_COMP_POP1,                  // .comp_pop1
+  INTRIN_COMP_POP2,                  // .comp_pop2
   INTRIN_COMP_ALLOC_NEXT_REG,        // .comp_alloc_next_reg
   INTRIN_COMP_REALLOC_REG,           // .comp_realloc_reg
   INTRIN_COMP_BARRIER,               // .comp_barrier

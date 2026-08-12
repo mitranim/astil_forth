@@ -1,2 +1,0 @@
-use' ../../lang.af
-fun: .test_const_fold_rhs_div_zero { val -- out } val 0 / end

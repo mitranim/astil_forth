@@ -1,2 +1,0 @@
-use' ../../lang.af
-fun: .test_const_fold_umod_zero { -- out } 29 0 .umod end

@@ -23,7 +23,7 @@ fun: .cf_want_word { XT -- err }
   exp_len act_len <> .then
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
-    " [test] `%.*s` instruction length mismatch: expected %zd, actual %zd"
+    " `%.*s` instruction length mismatch: expected %zd, actual %zd"
     name_len name exp_len act_len .errf .throw
   end
 
@@ -35,7 +35,7 @@ fun: .cf_want_word { XT -- err }
     exp act <> .then
       XT .Sym_name .Sym_word_buf { name }
       XT .Sym_name .Sym_word_len @u32 { name_len }
-      " [test] `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
+      " `%.*s` instruction mismatch at %zd: expected 0x%zx, actual 0x%zx"
       name_len name ind exp act .errf .throw
     end
     inc: ind
@@ -299,6 +299,10 @@ fun: .const_fold_align_down_rhs_imm_fun { val -- out } val 16 .align_down end
 fun: .const_fold_align_up_rhs_imm_fun { val -- out } val 16 .align_up end
 fun: .const_fold_bit_trunc_rhs_imm_fun { val -- out } val 8 .bit_trunc end
 fun: .const_fold_bits_get_rhs_imm_fun { val -- out } val 0b111111110000 .bits_get end
+fun: .const_fold_bits_get_sparse_fun { -- out } 0b1111 0b1010 .bits_get end
+fun: .const_fold_loc_add_imm_fun { val -- out } 8 +: val val end
+fun: .const_fold_loc_mul_imm_fun { val -- out } 8 *: val val end
+fun: .const_fold_loc_eq_imm_fun { val -- out } 20 =: val val end
 
 fun: .test_const_fold_bit_shift { -- err }
   .const_fold_bit_shift_fun { out0 out1 out2 out3 out4 out5 }
@@ -343,108 +347,23 @@ fun: .test_const_fold_bit_shift { -- err }
 end
 .test_const_fold_bit_shift
 
-fun: .test_const_fold_bits_errors { -- Err }
-  use' ./fail/test_const_fold_bits_get_bad.af
-  " invalid bit mask: expected nonzero contiguous mask" .assert_str_has .try
+fun: .test_const_fold_loc_mut { -- err }
+  0 0 8 .asm_add_imm { add_instr }
+  assert= xt' .const_fold_loc_add_imm_fun add_instr .test_word_instr_count 1 end
+
+  0 0 3 .asm_lsl_imm { lsl_instr }
+  assert= xt' .const_fold_loc_mul_imm_fun lsl_instr .test_word_instr_count 1 end
+
+  0 20 .asm_cmp_imm { instr0 }
+  0 ASM_EQ .asm_cset { instr1 }
+  assert= xt' .const_fold_loc_eq_imm_fun instr0 .test_word_instr_count 1 end
+  assert= xt' .const_fold_loc_eq_imm_fun instr1 .test_word_instr_count 1 end
 end
-.test_const_fold_bits_errors
-
-fun: .test_const_fold_redundant_arith_errors { -- Err }
-  use' ./fail/test_const_fold_redundant_bit_logical.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_addsub.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_bit_shift.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_const_bit_shift.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_mul_zero.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_div_one.af
-  " redundant arithmetic: division by 1" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_udiv_one.af
-  " redundant arithmetic: division by 1" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_mod_one.af
-  " redundant arithmetic: modulo by 1" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_umod_one.af
-  " redundant arithmetic: modulo by 1" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_divmod_one.af
-  " redundant arithmetic: division by 1" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_udivmod_one.af
-  " redundant arithmetic: division by 1" .assert_str_has .try
-
-  use' ./fail/test_const_fold_div_zero.af
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
-
-  use' ./fail/test_const_fold_udiv_zero.af
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
-
-  use' ./fail/test_const_fold_mod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_umod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_divmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_udivmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_rhs_div_zero.af
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
-
-  use' ./fail/test_const_fold_rhs_udiv_zero.af
-  " redundant arithmetic: division by 0 -> 0" .assert_str_has .try
-
-  use' ./fail/test_const_fold_rhs_mod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_rhs_umod_zero.af
-  " redundant arithmetic: modulo by 0 -> dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_rhs_divmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_rhs_udivmod_zero.af
-  " redundant arithmetic: div by 0 -> quo 0, rem dividend" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_align_down.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_align_up.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_is_aligned.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_bit_trunc.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_bits_clear.af
-  " redundant arithmetic" .assert_str_has .try
-
-  use' ./fail/test_const_fold_redundant_bits_get.af
-  " redundant arithmetic" .assert_str_has .try
-end
-.test_const_fold_redundant_arith_errors
+.test_const_fold_loc_mut
 
 fun: .test_const_fold_assert_static_errors { -- Err }
   use' ./fail/test_assert_static_fail.af
   " assertion failed: 10 20 =" .assert_str_has .try
-
-  use' ./fail/test_assert_static_fail_after_drop_with_err.af
-  " assertion failed: 123 234 =" .assert_str_has .try
 end
 .test_const_fold_assert_static_errors
 
@@ -461,9 +380,9 @@ fun: .const_fold_udiv_mod_fun { -- out0 out1 out2 out3 }
   -1 -2 u/mod
 end
 
-fun: .const_fold_mul_pow2_rhs_imm_fun { val -- out } val -8 * end
-fun: .const_fold_udiv_pow2_rhs_imm_fun { val -- out } val 8 u/ end
-fun: .const_fold_umod_pow2_rhs_imm_fun { val -- out } val 8 .umod end
+fun: .const_fold_mul_pow2_rhs_imm_fun { val -> out } -8 * end
+fun: .const_fold_udiv_pow2_rhs_imm_fun { val -> out } 8 u/ end
+fun: .const_fold_udiv_high_pow2_rhs_imm_fun { val -> out } 0x8000000000000000 u/ end
 
 fun: .test_const_fold_div_mod { -- err }
   .const_fold_div_mod_fun { out0 out1 out2 out3 out4 }
@@ -502,7 +421,7 @@ fun: .test_const_fold_div_mod { -- err }
   instr0 instr1 xt' .const_fold_mul_pow2_rhs_imm_fun .cf_want_word2
 
   0 0 3 .asm_lsr_imm xt' .const_fold_udiv_pow2_rhs_imm_fun .cf_want_word1
-  0 0 7 .asm_and_imm xt' .const_fold_umod_pow2_rhs_imm_fun .cf_want_word1
+  0 0 63 .asm_lsr_imm xt' .const_fold_udiv_high_pow2_rhs_imm_fun .cf_want_word1
 end
 .test_const_fold_div_mod
 
@@ -668,12 +587,11 @@ end
 
 fun: .test_const_fold_bits { -- err }
   .has_interp =0 .then .ret end
-
   31 xt' .const_fold_low_bits_fun .cf_want_load_word
   5 xt' .const_fold_bit_trunc_fun .cf_want_load_word
   0b11000011 xt' .const_fold_bits_clear_fun .cf_want_load_word
   0b100011 xt' .const_fold_bits_get_fun .cf_want_load_word
-
+  5 xt' .const_fold_bits_get_sparse_fun .cf_want_load_word
   0 0 0xff .asm_bic_imm xt' .const_fold_bits_clear_imm_fun .cf_want_word1
 end
 .test_const_fold_bits
@@ -708,6 +626,7 @@ fun: .test_const_fold_all { -- err }
   .test_const_fold_bit_count
   .test_const_fold_zero_cmp
   .test_const_fold_bit_shift
+  \ .test_const_fold_loc_mut \ interp-only
   .test_const_fold_div_mod
   .test_const_fold_compare2
   .test_const_fold_assert_static_pass

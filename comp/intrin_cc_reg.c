@@ -496,18 +496,8 @@ static Err intrin_comp_args_valid(Sint args, Sint action, Interp *interp) {
 }
 
 static Err intrin_comp_args_min(Sint args, Sint action, Interp *interp) {
-  Sym *sym;
-  try(comp_require_current_sym(&interp->comp, &sym));
   if (action) try(interp_validate_data_ptr(action));
-
-  const auto ctx     = &interp->comp.ctx;
-  const auto arg_len = ctx->arg_len;
-  const auto msg     = action ? (const char *)action : "invalid argument count";
-
-  if (arg_len < args) {
-    return err_args_arity(sym, msg, args, args, arg_len);
-  }
-  return nullptr;
+  return comp_validate_args_min(&interp->comp, (const char *)action, args);
 }
 
 static Err intrin_comp_args_get(Interp *interp, Sint *arg_len) {
@@ -519,17 +509,12 @@ static Err intrin_comp_args_set(Sint len, Interp *interp) {
   return comp_args_set(&interp->comp, len);
 }
 
-static Err intrin_comp_args_fold(
-  Uint    argc,
-  Interp *interp,
-  Sint   *imm0,
-  Sint   *imm1,
-  Sint   *known_count,
-  Sint   *consumed_count
-) {
-  return comp_args_fold(
-    &interp->comp, argc, imm0, imm1, known_count, consumed_count
-  );
+static Err intrin_comp_pop1(Interp *interp, Sint *imm, Sint *ok) {
+  return comp_pop1(&interp->comp, imm, ok);
+}
+
+static Err intrin_comp_pop2(Interp *interp, Sint *lhs, Sint *rhs, Sint *ok) {
+  return comp_pop2(&interp->comp, lhs, rhs, ok);
 }
 
 static Err intrin_comp_barrier(Interp *interp) {
@@ -804,12 +789,20 @@ static const USED auto INTRIN_COMP_ARGS_SET = (Sym){
   .comp_only = true,
 };
 
-static const USED auto INTRIN_COMP_ARGS_FOLD = (Sym){
-  .name.buf  = ".comp_args_fold",
+static const USED auto INTRIN_COMP_POP1 = (Sym){
+  .name.buf  = ".comp_pop1",
   .wordlist  = WORDLIST_EXEC,
-  .intrin    = (void *)intrin_comp_args_fold,
-  .inp_len   = 1,
-  .out_len   = 5,
+  .intrin    = (void *)intrin_comp_pop1,
+  .out_len   = 3,
+  .has_err   = true,
+  .comp_only = true,
+};
+
+static const USED auto INTRIN_COMP_POP2 = (Sym){
+  .name.buf  = ".comp_pop2",
+  .wordlist  = WORDLIST_EXEC,
+  .intrin    = (void *)intrin_comp_pop2,
+  .out_len   = 4,
   .has_err   = true,
   .comp_only = true,
 };

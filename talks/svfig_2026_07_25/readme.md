@@ -320,24 +320,24 @@ We do this by redefining comptime words to make them even smarter:
 \ Full constant fold, or fallback.
 
 fun_comp: + { -- err } [ .redefine ]
-  .cf_args_fold2 .then + .cf_fold_done \ fully folded
-  else { -- } call'' + end             \ fallback
+  .comp_pop2 .then + .comp_push \ fully folded
+  else { -- } call'' + end      \ fallback
 end
 
 
 \ Full or partial constant fold, or fallback.
 
 fun_comp: + { -- err } [ .redefine ]
-  true 0 " redundant arithmetic" 0 nil .cf_fold2_valid
-
   \ Full fold.
-  { reg reg1 imm0 imm1 consumed ok }
-  ok .then reg imm0 imm1 + .cf_fold_done .ret end
+  .comp_pop2 .then + .comp_push .ret else { -- } end
 
   \ Partial fold or fallback.
-  reg reg1 imm1 consumed true
-  instr' .cf_addsub_validate instr' .cf_addsub_emit xt'' +
-  .cf_fold2_partial_or_fallback
+  .comp_pop1 .then { imm }
+    imm true .comp_addsub_imm .then .ret end
+    imm .comp_push
+  else { -- } end
+
+  call'' +
 end
 ```
 

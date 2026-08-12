@@ -118,11 +118,9 @@ typedef struct {
 typedef stack_of(Loc_fixup) Loc_fixups;
 
 /*
-We track comptime constants, and the `[floor,ceil)` ranges
-for the instructions generated for placing them into regs.
-Some parts of the system, such as our constant folding and
-`alloca`, detect and "consume" constants, backtracking the
-instructions. Assembler always encodes immediates inline.
+We track comptime constants and the `[floor,ceil)` ranges of instructions
+which place constants into registers. Some operations, such as `.alloca`,
+are able to detect and consume constants, backtracking such instructions.
 */
 typedef struct {
   Sint num;
