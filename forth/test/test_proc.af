@@ -1,21 +1,20 @@
 use' ../proc.af
 
-fun: .proc_run_capture_with_mem { argv mem cap -- buf len exit sig err top }
+fun: .proc_run_capture_into { argv mem cap -- buf len exit sig err top }
   alloca' Ctx { ctx }
   mem cap ctx .ctx_init
   ctx .with_ctx argv .proc_run_capture end
   ctx .Ctx_top @
 end
 
-fun: .test_proc_wait { argv -- Err }
+fun: .test_proc_wait { -- Err }
+  3 .cells .alloca { argv }
   " false" argv !cellz
-  argv nil .proc_spawn .try { pid }
-  pid .pid_wait .try { exit sig }
+  argv nil .proc_spawn .try .pid_wait .try { exit sig }
   assert= exit 1 end .try
   assert= sig 0 end .try
 
-  argv nil .proc_spawn .try { pid }
-  pid .pid_wait_ok { err }
+  argv nil .proc_spawn .try .pid_wait_ok { err }
   err " exited with code 1" .assert_str_has .try
 
   " sleep" " 10" argv !cellz
@@ -25,8 +24,10 @@ fun: .test_proc_wait { argv -- Err }
   assert= exit 0 end .try
   assert= sig SIGTERM end .try
 end
+.test_proc_wait
 
-fun: .test_proc_stdin { argv -- Err }
+fun: .test_proc_stdin { -- Err }
+  4 .cells .alloca { argv }
   " grep" " -qx" " hello" argv !cellz
   argv .proc_spawn_stdin .try { pid fd_write }
 
@@ -36,19 +37,23 @@ fun: .test_proc_stdin { argv -- Err }
 
   write_err wait_err .coalesce .try
 end
+.test_proc_stdin
 
-fun: .test_proc_stdin_early_close { argv -- Err }
+fun: .test_proc_stdin_early_close { -- Err }
   1 20 .bit_lsl { len }
   len 1 .ctx_alloc .try { buf }
   buf len 0x55 .memfill
 
+  2 .cells .alloca { argv }
   " false" argv !cellz
   argv buf len .proc_run_with_stdin_ok { err }
   EPIPE .strerror { exp }
   err exp .assert_str_has
 end
+.test_proc_stdin_early_close
 
-fun: .test_proc_capture { argv -- Err }
+fun: .test_proc_capture { -- Err }
+  3 .cells .alloca { argv }
   " echo" " out" argv !cellz
   argv .proc_run_capture .try { buf len exit sig }
   assert buf len s" out\n" str= end .try
@@ -73,52 +78,55 @@ fun: .test_proc_capture { argv -- Err }
   assert= sig 0 end .try
   err " unable to spawn" .assert_str_has .try
 end
+.test_proc_capture
 
-fun: .test_proc_capture_capacity { argv -- Err }
-  8 .alloca { capture_mem }
+fun: .test_proc_capture_capacity { -- Err }
+  3 .cells .alloca { argv }
+  8 .alloca { mem }
 
   " false" argv !cellz
-  capture_mem 8 0x55 .memfill
-  argv capture_mem 8 .proc_run_capture_with_mem { buf len exit sig err top }
+  mem 8 0x55 .memfill
+  argv mem 8 .proc_run_capture_into { buf len exit sig err top }
   err .try
 
-  assert= buf capture_mem end .try
+  assert= buf mem end .try
   assert= len 0 end .try
   assert= buf @b 0 end .try
-  assert= top capture_mem 1 + end .try
+  assert= top mem 1 + end .try
   assert= exit 1 end .try
   assert= sig 0 end .try
 
   " echo" " 012345" argv !cellz
-  capture_mem 8 0x55 .memfill
-  argv capture_mem 8 .proc_run_capture_with_mem { buf len exit sig err top }
+  mem 8 0x55 .memfill
+  argv mem 8 .proc_run_capture_into { buf len exit sig err top }
   err .try
 
-  assert= buf capture_mem end .try
+  assert= buf mem end .try
   assert= len 7 end .try
   assert buf len s" 012345\n" str= end .try
   assert= buf len + @b 0 end .try
-  assert= top capture_mem 8 + end .try
+  assert= top mem 8 + end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
 
   " echo" " 0123456789abcdef" argv !cellz
-  capture_mem 8 0x55 .memfill
-  argv capture_mem 8 .proc_run_capture_with_mem { buf len exit sig err top }
+  mem 8 0x55 .memfill
+  argv mem 8 .proc_run_capture_into { buf len exit sig err top }
 
   err " unable to capture subprocess output: context out of space"
   .assert_cstr .try
 
-  assert= buf capture_mem end .try
+  assert= buf mem end .try
   assert= len 7 end .try
   assert buf len s" 0123456" str= end .try
   assert= buf len + @b 0 end .try
-  assert= top capture_mem 8 + end .try
+  assert= top mem 8 + end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
 end
+.test_proc_capture_capacity
 
-fun: .test_proc_closes_unselected_fdes { argv -- Err }
+fun: .test_proc_closes_unselected_fdes { -- Err }
   .fd_pipe .try { fd_read fd_write }
 
   \ `.fd_pipe` leaves its endpoints inheritable on Darwin. Spawn policy, not a
@@ -129,6 +137,8 @@ fun: .test_proc_closes_unselected_fdes { argv -- Err }
 
   32 .alloca { path }
   path 32 " /dev/fd/%zd" fd_read .str_prnf .try { _ }
+
+  3 .cells .alloca { argv }
   " cat" path argv !cellz
 
   argv .proc_run_capture { _buf _len exit sig err }
@@ -137,23 +147,21 @@ fun: .test_proc_closes_unselected_fdes { argv -- Err }
   assert exit <>0 end .try
   assert= sig 0 end .try
 end
+.test_proc_closes_unselected_fdes
 
+\ For AOT testing.
 fun: .test_proc { -- err }
-  4 .cells .alloca { argv }
-  argv .test_proc_wait
-  argv .test_proc_stdin
-  argv .test_proc_stdin_early_close
-  argv .test_proc_capture
-  argv .test_proc_capture_capacity
-  argv .test_proc_closes_unselected_fdes
+  .test_proc_wait
+  .test_proc_stdin
+  .test_proc_stdin_early_close
+  .test_proc_capture
+  .test_proc_capture_capacity
+  .test_proc_closes_unselected_fdes
 end
 
 fun: .main { -- exit }
   .with_main_ctx .test_proc end { err }
   err .then " [test] [proc] [aot] error: %s\n" err .elogf 1 else 0 end
 end
-
-\ Run once in interpreter/JIT mode; `.main` covers AOT executable.
-.test_proc
 
 " [test] [proc] [jit] ok\n" .elog
