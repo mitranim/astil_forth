@@ -14,7 +14,7 @@ fun: .init { buf cap }
   0 { ind }
   loop
     buf ceil < .while
-    src ind len .mod + @b buf !b
+    src ind len .mod + @u8 buf !8
     inc: buf
     inc: ind
   end
@@ -25,7 +25,7 @@ fun: .fnv1a64 { hash buf len -- hash }
   hash
   loop
     buf ceil < .while
-    buf @b .bit_xor FNV_PRIME *
+    buf @u8 .bit_xor FNV_PRIME *
     inc: buf
   end
 end

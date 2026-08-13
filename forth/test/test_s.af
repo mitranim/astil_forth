@@ -422,6 +422,29 @@ T{ VAR @ <T> 234 }T
 T{ 345 VAR ! <T> }T
 T{ VAR @ <T> 345 }T
 
+fun: .test_load_store_typed
+  0 VAR !
+  0x1234 VAR !8
+  T{ VAR @u8 <T> 0x34 }T
+  T{ VAR @s8 <T> 0x34 }T
+
+  0 VAR !
+  0xff VAR !8
+  T{ VAR @u8 <T> 0xff }T
+  T{ VAR @s8 <T> -1 }T
+
+  0 VAR !
+  0x123456789 VAR !32
+  T{ VAR @u32 <T> 0x23456789 }T
+  T{ VAR @s32 <T> 0x23456789 }T
+
+  0 VAR !
+  0x80000001 VAR !32
+  T{ VAR @u32 <T> 0x80000001 }T
+  T{ VAR @s32 <T> -2147483647 }T
+end
+.test_load_store_typed
+
 T{ 0 .negate <T> 0 }T
 T{ 123 .negate <T> -123 }T
 T{ -123 .negate <T> 123 }T

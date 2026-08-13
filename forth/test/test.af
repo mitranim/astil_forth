@@ -806,7 +806,7 @@ fun: .test_indirect_forward_caller { src -- char err }
 end
 
 fun: .test_indirect_forward_target { src -- char err } [ .redefine ]
-  src @b
+  src @u8
 end
 
 TEST_INDIRECT_FORWARD indirect_to' .test_indirect_forward_target
@@ -1423,8 +1423,8 @@ fun: .test_load_store_exec { -- err }
   assert= ptr call' @ 0x123456789abcdef0 end
 
   0 ptr call' !
-  0x1234 ptr call' !b
-  assert= ptr call' @b 0x34 end
+  0x1234 ptr call' !8
+  assert= ptr call' @u8 0x34 end
 
   0 ptr call' !
   0xff ptr call' !8
@@ -2538,17 +2538,17 @@ r" xcopied slice" .inc 12 str: TEST_COPIED_STR
 fun: .test_escaped_str_decl { -- err }
   TEST_ESCAPED_STR { str len }
   assert= len 10 end
-  assert= str @b 0 end
-  assert= str 1 + @b 27 end
-  assert= str 2 + @b LF end
-  assert= str 3 + @b CR end
-  assert= str 4 + @b TAB end
-  assert= str 5 + @b VTAB end
-  assert= str 6 + @b SPACE end
-  assert= str 7 + @b 92 end
-  assert= str 8 + @b 34 end
-  assert= str 9 + @b 96 end
-  assert= str 10 + @b 0 end
+  assert= str @u8 0 end
+  assert= str 1 + @u8 27 end
+  assert= str 2 + @u8 LF end
+  assert= str 3 + @u8 CR end
+  assert= str 4 + @u8 TAB end
+  assert= str 5 + @u8 VTAB end
+  assert= str 6 + @u8 SPACE end
+  assert= str 7 + @u8 92 end
+  assert= str 8 + @u8 34 end
+  assert= str 9 + @u8 96 end
+  assert= str 10 + @u8 0 end
 
   TEST_COPIED_STR { copied_str copied_len }
   assert= copied_len 12 end
@@ -2559,33 +2559,33 @@ end
 fun: .test_escaped_literals { -- err }
   s" one\ntwo" { str len }
   assert= len 7 end
-  assert= str 3 + @b LF end
-  assert= str len + @b 0 end
+  assert= str 3 + @u8 LF end
+  assert= str len + @u8 0 end
 
   " tab\there" { cstr }
   assert= cstr .strlen 8 end
-  assert= cstr 3 + @b TAB end
+  assert= cstr 3 + @u8 TAB end
 
   s` one\`two\"three` { tick_str tick_len }
   assert= tick_len 13 end
-  assert= tick_str 3 + @b 96 end
-  assert= tick_str 7 + @b 34 end
+  assert= tick_str 3 + @u8 96 end
+  assert= tick_str 7 + @u8 34 end
 
   rs" one\ntwo" { raw_str raw_len }
   assert= raw_len 8 end
-  assert= raw_str 3 + @b 92 end
-  assert= raw_str 4 + @b char' n end
+  assert= raw_str 3 + @u8 92 end
+  assert= raw_str 4 + @u8 char' n end
 
   r` tab\there` { raw_cstr }
   assert= raw_cstr .strlen 9 end
-  assert= raw_cstr 3 + @b 92 end
+  assert= raw_cstr 3 + @u8 92 end
 
   ` line\nbreak` { tick_cstr }
-  assert= tick_cstr 4 + @b LF end
+  assert= tick_cstr 4 + @u8 LF end
 
   rs` raw\ntext` { raw_tick_str raw_tick_len }
   assert= raw_tick_len 9 end
-  assert= raw_tick_str 3 + @b 92 end
+  assert= raw_tick_str 3 + @u8 92 end
 end
 .test_escaped_literals
 
@@ -3401,8 +3401,8 @@ fun: .test_union_named_basic { -- err }
   allocaz' Typ_union { ptr }
   123 ptr .Typ_union_cell !
   assert= ptr .Typ_union_cell @ 123 end
-  45 ptr .Typ_union_byte !b
-  assert= ptr .Typ_union_byte @b 45 end
+  45 ptr .Typ_union_byte !8
+  assert= ptr .Typ_union_byte @u8 45 end
 end
 .test_union_named_basic
 
@@ -3731,8 +3731,8 @@ end
 fun: .test_signature_err_auto_callee { -- err } end
 
 fun: .test_signature_err_auto { -- err }
-  assert= xt' .test_signature_err_auto_callee .Sym_has_err @b true end
-  assert= xt' .test_signature_err_auto_callee .Sym_out_len @b 1 end
+  assert= xt' .test_signature_err_auto_callee .Sym_has_err @u8 true end
+  assert= xt' .test_signature_err_auto_callee .Sym_out_len @u8 1 end
 end
 .test_signature_err_auto
 
@@ -3765,9 +3765,9 @@ fun: .test_has_err_not_auto_marked_caller { -- err_str }
 end
 
 fun: .test_has_err_not_auto_marked { -- err }
-  assert= xt' .test_has_err_not_auto_marked_callee .Sym_has_err @b true end
+  assert= xt' .test_has_err_not_auto_marked_callee .Sym_has_err @u8 true end
   assert=
-    xt' .test_has_err_not_auto_marked_caller .Sym_has_err @b
+    xt' .test_has_err_not_auto_marked_caller .Sym_has_err @u8
     false
   end
 end

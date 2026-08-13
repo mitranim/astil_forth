@@ -15,7 +15,7 @@ fun: .init
   0 { ind }
   loop
     ptr BUF CAP + < .while
-    chunk ind len .mod + c@ ptr c!
+    chunk ind len .mod + @u8 ptr !8
     inc: ptr
     inc: ind
   end
@@ -24,7 +24,7 @@ end
 fun: .fnv1a64 { buf len -- hash }
   buf { ptr }
   len .for
-    ptr c@ .bit_xor PRIME *
+    ptr @u8 .bit_xor PRIME *
     inc: ptr
   end
 end

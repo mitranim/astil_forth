@@ -186,7 +186,7 @@ fun: .proc_run_capture { argv -- buf len exit sig Err }
   err .then buf len 0 0 err .ret end
 
   1 .ctx_avail { _ cap }
-  nil buf !b
+  nil buf !8
 
   .fd_pipe { fd_read fd_write err }
   err .then buf len 0 0 err .ret end
@@ -239,13 +239,13 @@ fun: .proc_run_capture { argv -- buf len exit sig Err }
     got =0 .then leave end
 
     len cap = .then
-      nil buf len + !b \ Overflow probe replaced the terminator.
+      nil buf len + !8 \ Overflow probe replaced the terminator.
       " unable to capture subprocess output: context out of space" { err }
       leave
     end
 
     got +: len
-    nil buf len + !b
+    nil buf len + !8
     buf len .inc + .ctx_top_set
   end
 

@@ -12,10 +12,10 @@ fun: .find_prime { flags len -- num }
   0 3 ( num step )
 
   flags len + flags +for: ptr0
-    ptr0 c@ .then
+    ptr0 @u8 .then
       .dup ptr0 +
       .dup flags len + < .then
-        flags len + .swap 2 .pick +loop: ptr1 0 ptr1 c! end
+        flags len + .swap 2 .pick +loop: ptr1 0 ptr1 !8 end
       else
         .drop
       end
@@ -44,11 +44,11 @@ fun: .find_prime
   0 3 { num step }
 
   EFLAG FLAGS +for: ptr0
-    ptr0 c@ .then
+    ptr0 @u8 .then
       ptr0 step + { ptr1 }
 
       EFLAG ptr0 step +loop: ptr1
-        0 ptr1 c!
+        0 ptr1 !8
       end
 
       num .inc { num }

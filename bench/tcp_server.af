@@ -11,11 +11,11 @@ char' Q let: CLOSE
 
 fun: .handle { conn -- out }
   1 .alloca { byte }
-  READY byte !b
+  READY byte !8
   conn byte 1 0 .send 1 <> .then .abort end
   loop
     conn byte 1 MSG_WAITALL .recv 1 <> .then .abort end
-    byte @b { input }
+    byte @u8 { input }
     input DATA <> input CLOSE <> .bit_and .then .abort end
     conn byte 1 0 .send 1 <> .then .abort end
     input CLOSE = .then leave end

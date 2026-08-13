@@ -17,7 +17,7 @@ end
 fun: .test_char_set_merged { -- err }
   " ab" TEST_CHAR_SET_0 .char_set_add_str
   " bc" TEST_CHAR_SET_1 .char_set_add_str
-  true 255 TEST_CHAR_SET_0 + !b
+  true 255 TEST_CHAR_SET_0 + !8
   TEST_CHAR_SET_0 TEST_CHAR_SET_1 .char_set_add_set
 
   assert= char' a TEST_CHAR_SET_1 .char_set_has true end

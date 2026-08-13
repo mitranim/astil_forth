@@ -42,7 +42,7 @@ fun: .str_append { buf cap str -- buf cap }
   str .strlen { len }
   len cap .dec 0 .max .min { len }
   buf str len .memcpy
-  cap .then nil buf len + c! end
+  cap .then nil buf len + !8 end
   buf len +
   cap len -
 end

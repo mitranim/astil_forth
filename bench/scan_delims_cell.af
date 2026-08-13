@@ -11,15 +11,15 @@ s" {a,b:c[d]e} \n\tfg" str: SRC
 256 mem: DELS
 DELS 256 .memzero
 
-1 char' {  DELS + !b
-1 char' }  DELS + !b
-1 char' [  DELS + !b
-1 char' ]  DELS + !b
-1 char' :  DELS + !b
-1 char' ,  DELS + !b
-1 char' \s DELS + !b
-1 char' \n DELS + !b
-1 char' \t DELS + !b
+1 char' {  DELS + !8
+1 char' }  DELS + !8
+1 char' [  DELS + !8
+1 char' ]  DELS + !8
+1 char' :  DELS + !8
+1 char' ,  DELS + !8
+1 char' \s DELS + !8
+1 char' \n DELS + !8
+1 char' \t DELS + !8
 
 fun: .init { buf len }
   buf len + { ceil }
@@ -27,7 +27,7 @@ fun: .init { buf len }
   0 { ind }
   loop
     buf ceil < .while
-    ind len .mod src + @b buf !b
+    ind len .mod src + @u8 buf !8
     inc: buf
     inc: ind
   end
@@ -39,14 +39,14 @@ fun: .scan { buf len dels -- out }
   loop
     buf ceil < .while
     buf @ { val }
-    val             0xff .bit_and dels + @b +
-    val  8 .bit_lsr 0xff .bit_and dels + @b +
-    val 16 .bit_lsr 0xff .bit_and dels + @b +
-    val 24 .bit_lsr 0xff .bit_and dels + @b +
-    val 32 .bit_lsr 0xff .bit_and dels + @b +
-    val 40 .bit_lsr 0xff .bit_and dels + @b +
-    val 48 .bit_lsr 0xff .bit_and dels + @b +
-    val 56 .bit_lsr               dels + @b +
+    val             0xff .bit_and dels + @u8 +
+    val  8 .bit_lsr 0xff .bit_and dels + @u8 +
+    val 16 .bit_lsr 0xff .bit_and dels + @u8 +
+    val 24 .bit_lsr 0xff .bit_and dels + @u8 +
+    val 32 .bit_lsr 0xff .bit_and dels + @u8 +
+    val 40 .bit_lsr 0xff .bit_and dels + @u8 +
+    val 48 .bit_lsr 0xff .bit_and dels + @u8 +
+    val 56 .bit_lsr               dels + @u8 +
     +cell: buf
   end
 end

@@ -6,7 +6,7 @@ fun: .reverse { str len -- }
 
   loop
     low high < .while
-    low c@ high c@ low c! high c!
+    low @u8 high @u8 low !8 high !8
     inc: low
     dec: high
   end

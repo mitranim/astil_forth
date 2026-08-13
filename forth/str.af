@@ -1,13 +1,13 @@
 use' ./lang.af
 
-fun: .char_set_has { char set -> bool } + @b end
+fun: .char_set_has { char set -> bool } + @u8 end
 
 fun: .char_set_add_str { str set }
   loop
-    str @b { char }
+    str @u8 { char }
     char .while
     inc: str
-    true char set + !b
+    true char set + !8
   end
 end
 
@@ -45,7 +45,7 @@ CHAR_SET_DECIMAL CHAR_SET_HEXDIG .char_set_add_set
 \     floor ceil .span_next { char } .while inc: floor
 \   end
 fun: .span_next { floor ceil -- ok char }
-  floor ceil < .then true floor @b else false nil end
+  floor ceil < .then true floor @u8 else false nil end
 end
 
 \ Parsing shortcut for strings. Usage:
@@ -54,7 +54,7 @@ end
 \     floor ceil .str_next { char } char .while inc: floor
 \   end
 fun: .str_next { floor ceil -- char }
-  floor ceil < .then floor @b else nil end
+  floor ceil < .then floor @u8 else nil end
 end
 
 fun: .scan_until_char { floor ceil delim -- delim top }

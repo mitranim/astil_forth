@@ -82,7 +82,7 @@ When editing `.af` under either calling convention:
 - Ident-like callable names get call-like spelling by storing a leading dot.
 - Lookup is exact; `.logf` looks up the symbol named `.logf`.
 - Regular functions, intrinsics, and externs follow the same call-like rule.
-- Non-ident callable names are already call-like; do not add dot to `+`, `!b`, `u/mod`, `fun:`, or `xt'`.
+- Non-ident callable names are already call-like; do not add dot to `+`, `!8`, `u/mod`, `fun:`, or `xt'`.
 - Control-only words are plain by design: `else elif end loop leave again assert`.
 - Control words which operate on runtime args use call-like names: `.then .while .try .throw .ret .recur`.
 - Word names may begin with `.`, but no stored name may look like a numeric literal.

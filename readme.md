@@ -559,7 +559,7 @@ fun: .some_fun
 end
 ```
 
-Calls use call-like spelling. Names such as `+`, `!b`, `u/mod`, `fun:`, and `xt'` are already call-like. A leading dot makes an otherwise ident-like name call-like, and is stored as part of the name: `.logf` looks up the symbol named `.logf`.
+Calls use call-like spelling. Names such as `+`, `!8`, `u/mod`, `fun:`, and `xt'` are already call-like. A leading dot makes an otherwise ident-like name call-like, and is stored as part of the name: `.logf` looks up the symbol named `.logf`.
 
 ```forth
 fun: .log_num { val }

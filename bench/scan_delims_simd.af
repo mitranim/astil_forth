@@ -15,7 +15,7 @@ fun: .init { buf len }
   0 { ind }
   loop
     buf ceil < .while
-    ind len .mod src + @b buf !b
+    ind len .mod src + @u8 buf !8
     inc: buf
     inc: ind
   end

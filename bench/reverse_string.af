@@ -6,7 +6,7 @@ fun: .reverse { str len }
 
   loop
     low high < .while
-    low @b high @b low !b high !b
+    low @u8 high @u8 low !8 high !8
     inc: low
     dec: high
   end
@@ -16,7 +16,7 @@ fun: .run { -- err }
   s" 0123456789abcdef" { src len }
   len .inc .alloca { str }
   str src len .memcpy
-  nil str len + !b
+  nil str len + !8
 
   1 25 .bit_lsl { ind }
   loop

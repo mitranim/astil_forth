@@ -11,15 +11,15 @@ s" {a,b:c[d]e} \n\tfg" str: SRC
 256 mem: DELS
 DELS 256 .memzero
 
-1 char' {  DELS + !b
-1 char' }  DELS + !b
-1 char' [  DELS + !b
-1 char' ]  DELS + !b
-1 char' :  DELS + !b
-1 char' ,  DELS + !b
-1 char' \s DELS + !b
-1 char' \n DELS + !b
-1 char' \t DELS + !b
+1 char' {  DELS + !8
+1 char' }  DELS + !8
+1 char' [  DELS + !8
+1 char' ]  DELS + !8
+1 char' :  DELS + !8
+1 char' ,  DELS + !8
+1 char' \s DELS + !8
+1 char' \n DELS + !8
+1 char' \t DELS + !8
 
 fun: .init { buf len }
   buf len + { ceil }
@@ -27,7 +27,7 @@ fun: .init { buf len }
   0 { ind }
   loop
     buf ceil < .while
-    ind len .mod src + @b buf !b
+    ind len .mod src + @u8 buf !8
     inc: buf
     inc: ind
   end
@@ -38,7 +38,7 @@ fun: .scan { buf len dels -- out }
   0
   loop
     buf ceil < .while
-    buf @b dels + @b +
+    buf @u8 dels + @u8 +
     inc: buf
   end
 end

@@ -9,14 +9,14 @@ fun: .bytes_to_hex_str { src len -- tar len err }
 
   loop
     src ceil < .while
-    src @b { byte }
-    byte 4 .bit_lsr 0b1111 .bit_and digs + @b cur      !b \ high bits digit
-    byte            0b1111 .bit_and digs + @b cur .inc !b \ low  bits digit
+    src @u8 { byte }
+    byte 4 .bit_lsr 0b1111 .bit_and digs + @u8 cur      !8 \ high bits digit
+    byte            0b1111 .bit_and digs + @u8 cur .inc !8 \ low  bits digit
     inc: src
     2 +: cur
   end
 
-  nil cur !b \ null terminator
+  nil cur !8 \ null terminator
   tar tar_len
 end
 

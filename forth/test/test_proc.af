@@ -82,7 +82,7 @@ fun: .test_proc_run_capture { -- Err }
   " /definitely/missing/astil-test-command" argv !cellz
   argv .proc_run_capture { buf len exit sig err }
   assert= len 0 end .try
-  assert= buf @b 0 end .try
+  assert= buf @u8 0 end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
   err " unable to spawn" .assert_str_has .try
@@ -101,7 +101,7 @@ fun: .test_proc_run_capture_capacity { -- Err }
 
   assert= buf mem end .try
   assert= len 0 end .try
-  assert= buf @b 0 end .try
+  assert= buf @u8 0 end .try
   assert= top mem 1 + end .try
   assert= exit 1 end .try
   assert= sig 0 end .try
@@ -114,7 +114,7 @@ fun: .test_proc_run_capture_capacity { -- Err }
   assert= buf mem end .try
   assert= len 7 end .try
   assert buf len s" 012345\n" str= end .try \ TODO `.assert_str`.
-  assert= buf len + @b 0 end .try
+  assert= buf len + @u8 0 end .try
   assert= top mem 8 + end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
@@ -129,7 +129,7 @@ fun: .test_proc_run_capture_capacity { -- Err }
   assert= buf mem end .try
   assert= len 7 end .try
   assert buf len s" 0123456" str= end .try \ TODO `.assert_str`.
-  assert= buf len + @b 0 end .try
+  assert= buf len + @u8 0 end .try
   assert= top mem 8 + end .try
   assert= exit 0 end .try
   assert= sig 0 end .try

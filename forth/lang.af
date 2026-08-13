@@ -1296,13 +1296,6 @@ fun: .comp_mem_store { size -- err }
   val .comp_args_set
 end
 
-\ Byte load / store; renamed from standard `c@ c!`.
-fun_comp: @b { -- err } 0b00 0b01 .comp_mem_load end
-fun:      @b { adr -> val } @b end \ ldrb w0, [x0]
-
-fun_comp: !b { -- err } 0b00 .comp_mem_store end
-fun:      !b { val adr -> } !b end \ strb w0, [x1]
-
 fun_comp: @u8 { -- err } 0b00 0b01 .comp_mem_load end
 fun:      @u8 { adr -> val } @u8 end \ ldrb w0, [x0]
 
@@ -1707,7 +1700,7 @@ fun: .comp_alloc_cstr { src len -- cstr err }
   len .inc { cap }
   cap 1 .comp_alloc_data { tar }
   tar src len .memmove \ `src tar` may overlap.
-  nil tar len + !b
+  nil tar len + !8
   tar
 end
 
@@ -1797,8 +1790,8 @@ end
 0x20 let: SPACE
 
 3 mem: CRLF     \ \r\n\0
-CR CRLF      !b \ \r
-LF CRLF .inc !b \ \n
+CR CRLF      !8 \ \r
+LF CRLF .inc !8 \ \n
 
 fun: stdin  { -- adr } [ .plain_call ] extern_adr' __stdinp  @ end
 fun: stdout { -- adr } [ .plain_call ] extern_adr' __stdoutp @ end
@@ -2324,8 +2317,8 @@ end
 \ offset from an address. To get an offset from zero, provide zero.
 \
 \ Note that load / store is type-specific. Fields which aren't cell-sized
-\ must be loaded and stored using dedicated typed operators. For example,
-\ a C `int` must be loaded with `@cint`; a byte must be loaded with `@b`.
+\ must be loaded and stored using dedicated typed operators. For example:
+\ C `int` must be loaded with `@cint`, while a byte is loaded with `@u8`.
 
 0 let: AGG_STRUCT
 1 let: AGG_UNION
@@ -2396,7 +2389,7 @@ fun: .define_agg_field
   \ We still need more comprehensive tests.
   \ SYNC[type_fields].
   type @ len * { size }
-  name @b 0x5f <> { named } \ `_` prefix skips field word definition.
+  name @u8 0x5f <> { named } \ `_` prefix skips symbol definition.
 
   mode AGG_UNION = .then
     named .then name name_len 0 .define_field_word end
@@ -4026,7 +4019,7 @@ fun: .comp_args_prepend { pre_len -- err } ( …pre… -- )
     reg .comp_args_set
 
     ctrl> { XT }
-    XT .Sym_wordlist @b { wlist }
+    XT .Sym_wordlist @u8 { wlist }
 
     wlist WORDLIST_EXEC = .then
       XT .comp_call
@@ -4112,7 +4105,7 @@ end
 fun: .strf_into { buf cap fmt vlist -- buf cap }
   buf cap fmt vlist .vsnprintf .cint_to_cell { len }
   len <0 .then
-    cap .then nil buf !b end
+    cap .then nil buf !8 end
     buf cap .ret
   end
   len cap .dec 0 .max .min { len }
@@ -4284,9 +4277,9 @@ end
 fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
   size' Indir_decl CELL .comp_alloc_data { decl }
 
-  inp     decl .Indir_decl_inp     !b
-  out     decl .Indir_decl_out     !b
-  has_err decl .Indir_decl_has_err !b
+  inp     decl .Indir_decl_inp     !8
+  out     decl .Indir_decl_out     !8
+  has_err decl .Indir_decl_has_err !8
 
   .read_word { str len }
   str len decl .init_data_word
@@ -4316,8 +4309,8 @@ end
 
 \ This would be a 1-liner without signature checks and error messages.
 fun: .indirect_to { decl xt_to -- err }
-  decl .Indir_decl_inp @b       { decl_inp }
-  xt_to .Sym_inp_len   @b       { sym_inp }
+  decl .Indir_decl_inp @u8      { decl_inp }
+  xt_to .Sym_inp_len   @u8      { sym_inp }
   xt_to .Sym_name .Sym_word_buf { name }
 
   decl_inp sym_inp <> .then
@@ -4325,16 +4318,16 @@ fun: .indirect_to { decl xt_to -- err }
     name decl_inp sym_inp .errf .throw
   end
 
-  decl .Indir_decl_out @b { decl_out }
-  xt_to .Sym_out_len   @b { sym_out }
+  decl .Indir_decl_out @u8 { decl_out }
+  xt_to .Sym_out_len   @u8 { sym_out }
 
   decl_out sym_out <> .then
     " unable to indirect to `%s`: output count: %zd <> %zd"
     name decl_out sym_out .errf .throw
   end
 
-  decl .Indir_decl_has_err @b { decl_has_err }
-  xt_to .Sym_has_err       @b { sym_has_err }
+  decl .Indir_decl_has_err @u8 { decl_has_err }
+  xt_to .Sym_has_err       @u8 { sym_has_err }
 
   decl_has_err sym_has_err <> .then
     " unable to indirect to `%s`: has_err: %zd <> %zd"
@@ -4449,15 +4442,15 @@ fun: .assert_body { beg -- str len err }
   read .Interp_reader_src @ read .Interp_reader_pos @u32 + { ceil }
 
   ceil 3 - { ceil }
-  ceil .dec @b .is_char_whitespace =0 { fail }
+  ceil .dec @u8 .is_char_whitespace =0 { fail }
   " end" 3 ceil 3 str<> fail .bit_or { fail }
 
   fail .then
     " invalid assertion shape: must be terminated with `end`" .throw
   end
 
-  loop beg  @b .is_char_whitespace .while inc: beg  end
-  loop ceil @b .is_char_whitespace .while dec: ceil end
+  loop beg  @u8 .is_char_whitespace .while inc: beg  end
+  loop ceil @u8 .is_char_whitespace .while dec: ceil end
 
   ceil beg - { len }
   beg len
@@ -4629,9 +4622,9 @@ end
 
 fun: .read_decode_char { -- char err }
   .read_word { buf len }
-  buf @b { char }
+  buf @u8 { char }
   len 1 = char 0x5c <> .bit_and .then char .ret end
-  len 2 = char 0x5c = .bit_and .then buf .inc @b .char_unescape .ret end
+  len 2 = char 0x5c = .bit_and .then buf .inc @u8 .char_unescape .ret end
   nil " invalid character literal: expected one non-backslash byte or one escape"
 end
 
@@ -4649,7 +4642,7 @@ end
 \ follows the closing delimiter, and returned `tar` points at trailing null.
 fun: .str_until { delim unescape src tar -- src tar err }
   loop
-    src @b { char }
+    src @u8 { char }
     inc: src
     char delim = .then leave end
 
@@ -4658,19 +4651,19 @@ fun: .str_until { delim unescape src tar -- src tar err }
     end
 
     char char' \\ = unescape .bit_and .then
-      src @b .char_unescape { char }
+      src @u8 .char_unescape { char }
       inc: src
     end
 
-    char tar !b
+    char tar !8
     inc: tar
   end
 
-  src @b 0 255 LF CR TAB VTAB SPACE =none .then
+  src @u8 0 255 LF CR TAB VTAB SPACE =none .then
     " closing delimiter must be followed by whitespace or EOF" .throw
   end
 
-  nil tar !b
+  nil tar !8
   src tar
 end
 
@@ -4724,7 +4717,7 @@ fun: str: { buf len -- err } ( E: -- cstr len )
   .interp_data { data }
 
   data .Span_top @ buf = .then
-    nil buf len + !b
+    nil buf len + !8
     data len .inc .interp_data_alloc
     buf
   else
@@ -4741,7 +4734,7 @@ fun_comp: \ [ .redefine ]
   read .Interp_reader_src @ { floor }
   floor read .Interp_reader_pos @u32 + { cur }
   loop
-    cur @b 0 255 char' \n =none .while
+    cur @u8 0 255 char' \n =none .while
     inc: cur
   end
   cur floor - read .Interp_reader_pos !32
