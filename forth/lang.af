@@ -4392,13 +4392,22 @@ fun: .assert_bin_cond { lhs rhs cond text op -- err }
   " assertion failed: %s%s (0x%zx 0x%zx %s)" text op lhs rhs op .errf
 end
 
-\ TODO implement.
-\ fun: .assert_str { act act_len exp exp_len -- err } end
+fun: .assert_str { act act_len exp exp_len -- err }
+  act act_len exp exp_len str= .then .ret end
+
+  " expected string:
+
+> %.*s
+
+actual string:
+
+> %.*s" exp_len exp act_len act .errf
+end
 
 fun: .assert_cstr { act exp -- err }
   exp =0 .then
     act =0 .then .ret end
-    " expected string to be nil; got: %s" act .errf .throw
+    " expected nil string; got: %s" act .errf .throw
   end
 
   act =0 .then

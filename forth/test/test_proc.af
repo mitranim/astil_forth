@@ -65,7 +65,7 @@ fun: .test_proc_run_capture { -- Err }
   3 .cells .alloca { argv }
   " echo" " out" argv !cellz
   argv .proc_run_capture .try { buf len exit sig }
-  assert buf len s" out\n" str= end .try \ TODO `.assert_str`.
+  buf len s" out\n" .assert_str .try
   assert= exit 0 end .try
   assert= sig 0 end .try
 
@@ -113,7 +113,7 @@ fun: .test_proc_run_capture_capacity { -- Err }
 
   assert= buf mem end .try
   assert= len 7 end .try
-  assert buf len s" 012345\n" str= end .try \ TODO `.assert_str`.
+  buf len s" 012345\n" .assert_str .try
   assert= buf len + @u8 0 end .try
   assert= top mem 8 + end .try
   assert= exit 0 end .try
@@ -128,7 +128,7 @@ fun: .test_proc_run_capture_capacity { -- Err }
 
   assert= buf mem end .try
   assert= len 7 end .try
-  assert buf len s" 0123456" str= end .try \ TODO `.assert_str`.
+  buf len s" 0123456" .assert_str .try
   assert= buf len + @u8 0 end .try
   assert= top mem 8 + end .try
   assert= exit 0 end .try
