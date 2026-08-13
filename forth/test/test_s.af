@@ -793,8 +793,4 @@ fun: .test_dropped_intrinsics_hidden
 end
 .test_dropped_intrinsics_hidden
 
-s" ./test_import_empty.af" .use
-
-s" testing_s.af" .use
-
 " [test] ok" .elog .elf

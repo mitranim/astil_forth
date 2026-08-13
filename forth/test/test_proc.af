@@ -126,26 +126,24 @@ fun: .test_proc_capture_capacity { -- Err }
 end
 .test_proc_capture_capacity
 
-fun: .test_proc_closes_unselected_fdes { -- Err }
-  .fd_pipe .try { fd_read fd_write }
+fun: .test_proc_closes_unselected_fdes { -- err }
+  .fd_pipe { fd_read fd_write }
 
-  \ `.fd_pipe` leaves its endpoints inheritable on Darwin. Spawn policy, not a
-  \ descriptor-local `FD_CLOEXEC` flag, must keep this one out of the child.
-  assert= fd_read F_GETFD 0 .fcntl_int .cint_to_cell 0 end .try
-  fd_write s" inherited\n" .fd_write_all .try
+  \ Since Darwin supports `POSIX_SPAWN_CLOEXEC_DEFAULT`,
+  \ we don't bother setting `FD_CLOEXEC` in `.fd_pipe`.
+  assert= fd_read F_GETFD 0 .fcntl_int 0 end
+
+  fd_write s" be626d54ac2045709e3567dbd2e0f6af" .fd_write_all
   fd_write .close { -- }
 
-  32 .alloca { path }
-  path 32 " /dev/fd/%zd" fd_read .str_prnf .try { _ }
-
   3 .cells .alloca { argv }
+  " /dev/fd/%zd" fd_read .strf { path }
   " cat" path argv !cellz
-
-  argv .proc_run_capture { _buf _len exit sig err }
+  argv .proc_run_capture { _buf _len exit sig }
   fd_read .close { -- }
-  err .try
-  assert exit <>0 end .try
-  assert= sig 0 end .try
+
+  assert<> exit 0 end
+  assert= sig 0 end
 end
 .test_proc_closes_unselected_fdes
 

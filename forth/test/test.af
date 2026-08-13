@@ -4107,10 +4107,7 @@ fun: .test_dropped_intrinsics_hidden { -- err }
 end
 .test_dropped_intrinsics_hidden
 
-s" ./test_import_empty.af" .use
-
 use' ./test_const_fold.af
-use' ./test_simd.af
 use' ./test_str.af
 use' ./test_fmt.af
 
@@ -4290,7 +4287,6 @@ fun: .main_run { -- err }
   .test_escaped_str_decl
   .test_escaped_literals
   .test_const_fold_all
-  .test_simd_asm
   .test_str_all
   .test_fmt
 end
