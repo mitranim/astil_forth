@@ -89,7 +89,7 @@ end
 \ Closed parent stdio remains closed in the child; adding an inherit action
 \ for a closed descriptor would instead make `posix_spawn` fail with `EBADF`.
 fun: .proc_actions_inherit_if_open { actions fdes -- Err }
-  fdes F_GETFD 0 .fcntl_int .cint_to_cell <0 .then
+  fdes F_GETFD 0 .fcntl_int <0 .then
     .errno { code }
     code EBADF = .then .ret end
     code " unable to inspect inherited descriptor" .os_err .throw
