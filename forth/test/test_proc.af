@@ -15,7 +15,7 @@ fun: .test_proc_wait { -- Err }
   assert= sig 0 end .try
 
   argv nil .proc_spawn .try .pid_wait_ok { err }
-  err " exited with code 1" .assert_str_has .try
+  err " exited with code 1" .assert_cstr_has .try
 
   " sleep" " 10" argv !cellz
   argv nil .proc_spawn .try { pid }
@@ -55,7 +55,7 @@ fun: .test_proc_with_stdin_early_close { -- Err }
   \ how much the kernel is willing to buffer in the pipe.
   EPIPE .strerror { exp }
   argv buf len .proc_run_with_stdin_ok { err }
-  err exp .assert_str_has .try
+  err exp .assert_cstr_has .try
 
   top .ctx_top_set
 end
@@ -71,13 +71,13 @@ fun: .test_proc_run_capture { -- Err }
 
   " cat" " /definitely/missing/astil-test-file" argv !cellz
   argv .proc_run_capture .try { buf _len exit sig }
-  buf " /definitely/missing/astil-test-file" .assert_str_has .try
+  buf " /definitely/missing/astil-test-file" .assert_cstr_has .try
   assert<> exit 0 end .try
   assert= sig 0 end .try
 
   argv .proc_run_capture_ok { buf _len err }
-  buf " /definitely/missing/astil-test-file" .assert_str_has .try
-  err " exited with code" .assert_str_has .try
+  buf " /definitely/missing/astil-test-file" .assert_cstr_has .try
+  err " exited with code" .assert_cstr_has .try
 
   " /definitely/missing/astil-test-command" argv !cellz
   argv .proc_run_capture { buf len exit sig err }
@@ -85,7 +85,7 @@ fun: .test_proc_run_capture { -- Err }
   assert= buf @u8 0 end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
-  err " unable to spawn" .assert_str_has .try
+  err " unable to spawn" .assert_cstr_has .try
 end
 .test_proc_run_capture
 

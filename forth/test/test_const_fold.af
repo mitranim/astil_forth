@@ -363,7 +363,7 @@ end
 
 fun: .test_const_fold_assert_static_errors { -- Err }
   use' ./fail/test_assert_static_fail.af
-  " assertion failed: 10 20 =" .assert_str_has .try
+  " assertion failed: 10 20 =" .assert_cstr_has .try
 end
 .test_const_fold_assert_static_errors
 

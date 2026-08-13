@@ -1324,7 +1324,7 @@ end
 
 fun: .test_cont_meta_loop_arity_bad { -- Err }
   use' ./fail/test_cont_meta_loop_arity_bad.af
-  " loop" .assert_str_has
+  " loop" .assert_cstr_has
 end
 .test_cont_meta_loop_arity_bad
 
@@ -1506,11 +1506,11 @@ end
 fun: .test_load_store_arg_min { -- Err }
   use' ./fail/test_load_arg_min.af
   " arity mismatch: required: 1, provided: 0"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_store_arg_min.af
   " arity mismatch: required: 2, provided: 1"
-  .assert_str_has .try
+  .assert_cstr_has .try
 end
 .test_load_store_arg_min
 
@@ -2347,10 +2347,10 @@ end
 
 fun: .test_assert_bin_runtime_errors { -- Err }
   123 456 .assert_bin_fail { err }
-  err " assertion failed: lhs rhs = (0x7b 0x1c8 =)" .assert_str_has .try
+  err " assertion failed: lhs rhs = (0x7b 0x1c8 =)" .assert_cstr_has .try
 
   456 123 .assert_bin_lt_fail { err }
-  err " assertion failed: lhs rhs < (0x1c8 0x7b <)" .assert_str_has
+  err " assertion failed: lhs rhs < (0x1c8 0x7b <)" .assert_cstr_has
 end
 
 fun: .test_assert_fail_err { -- err_str } .assert_fail end
@@ -2362,7 +2362,7 @@ fun: .test_assert { -- err }
   .test_assert_try_manual
   .test_assert_bin_runtime_errors
   .test_assert_fail_err { err }
-  err " assertion failed: 123 456 =" .assert_str_has
+  err " assertion failed: 123 456 =" .assert_cstr_has
 end
 .test_assert
 
@@ -2592,75 +2592,75 @@ end
 fun: .test_call_name_failures { -- Err }
   use' ./fail/test_call_missing_dot_extern.af
   " undefined word `strlen`: use `.strlen`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_call_missing_dot_comp.af
   " undefined word `logf`: use `.logf`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_call_extra_dot_local.af
   " undefined word `.val`: use `val`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_local_name_leading_dot.af
   " invalid local name `.val`: local names must be ident-like"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_local_assignment_leading_dot.af
   " invalid local name `.tmp`: local names must be ident-like"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_local_name_numeric.af
   " invalid local name `1val`: local names must be ident-like"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_local_assignment_numeric.af
   " invalid local name `1tmp`: local names must be ident-like"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_local_name_non_ident.af
   " invalid local name `val-name`: local names must be ident-like"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_local_assignment_non_ident.af
   " invalid local name `tmp.name`: local names must be ident-like"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_call_extra_dot_value.af
   " undefined word `.TEST_VALUE`: use `TEST_VALUE`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_call_missing_dot_control.af
   " undefined word `try`: use `.try`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_call_extra_dot.af
   " undefined word `.u/`: use `u/`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_value_name_non_ident.af
   " invalid declaration `BAD-VALUE`; use an ident-like name or remove `.plain_call`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_call_undefined.af
   " undefined word `.MISSING_WORD`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_declaration_ident.af
   " invalid declaration `bad_name`; use `.bad_name`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_declaration_numeric.af
   " invalid declaration `1bad_name`; use `.1bad_name`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_declaration_signed_numeric.af
   " invalid declaration `+1bad_name`; use `.+1bad_name`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
   use' ./fail/test_extern_declaration_precedes_redefinition.af
   " invalid declaration `bad_name`; use `.bad_name`"
-  .assert_str_has .try
+  .assert_cstr_has .try
 
 end
 .test_call_name_failures
@@ -3437,21 +3437,21 @@ fun: .test_throw { -- err } " test_err" .throw end
 fun: .test_unused_local_error { -- Err }
   use' ./fail/test_unused_local.af
   " unused local"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_unused_local_error
 
 fun: .test_discard_param_read { -- Err }
   use' ./fail/test_discard_param_read.af
   " undefined word"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_discard_param_read
 
 fun: .test_unnamed_field_read { -- Err }
   use' ./fail/test_unnamed_field_read.af
   " undefined word"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_unnamed_field_read
 
@@ -3462,21 +3462,21 @@ fun: .test_discard_param_push { -- Err }
 
   use' ./fail/test_discard_param_push.af
   " unable to use non-trailing discard parameter with `->`"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_discard_param_push
 
 fun: .test_discard_assign_read { -- Err }
   use' ./fail/test_discard_assign_read.af
   " undefined word"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_discard_assign_read
 
 fun: .test_redundant_discard { -- Err }
   use' ./fail/test_redundant_discard.af
   " redundant discard"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_redundant_discard
 
@@ -3682,28 +3682,28 @@ end
 fun: .test_redefine_missing_marker { -- Err }
   use' ./fail/test_redefine_missing_marker.af
   " hint: use `[ .redefine ]` to replace it"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_redefine_missing_marker
 
 fun: .test_numeric_literal_not_terminated { -- Err }
   use' ./fail/test_numeric_literal_not_terminated.af
   " numeric literal must be terminated with whitespace: digit 10 from character `a` is outside radix 10"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_numeric_literal_not_terminated
 
 fun: .test_numeric_prefix_no_digit { -- Err }
   use' ./fail/test_numeric_prefix_no_digit.af
   " unexpected bare `0x_`; requires at least one digit"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_numeric_prefix_no_digit
 
 fun: .test_numeric_minus_unsigned { -- Err }
   use' ./fail/test_numeric_minus_unsigned.af
   " unsupported minus sign in `-0x`; only decimals may be signed"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_numeric_minus_unsigned
 
@@ -3755,184 +3755,184 @@ end
 fun: .test_throw_requires_err { -- Err }
   use' ./fail/test_throw_requires_err.af
   " unable to `.throw`: current word has no error output"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_throw_requires_err
 
 fun: .test_too_many_input_regs { -- Err }
   use' ./fail/test_too_many_input_regs.af
   " too many input parameters: 8 registers available, 9 parameters requested"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_too_many_input_regs
 
 fun: .test_too_many_output_regs { -- Err }
   use' ./fail/test_too_many_output_regs.af
   " too many output parameters: 8 registers available, 9 parameters requested"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_too_many_output_regs
 
 fun: .test_too_many_output_regs_with_err { -- Err }
   use' ./fail/test_too_many_output_regs_with_err.af
   " too many output parameters: 8 registers available, 9 parameters requested"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_too_many_output_regs_with_err
 
 fun: .test_too_many_comptime_arg_regs { -- Err }
   use' ./fail/test_too_many_comptime_arg_regs.af
   " too many arguments: 18 registers available, 19 arguments provided"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_too_many_comptime_arg_regs
 
 fun: .test_too_many_call_args { -- Err }
   use' ./fail/test_too_many_call_args.af
   " unable to compile `.call`: 8 param registers available, 9 arguments provided"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_too_many_call_args
 
 fun: .test_comptime_stack_underflow { -- Err }
   use' ./fail/test_comptime_stack_underflow.af
   " in `.some_word` (WORDLIST_EXEC): invalid argument count: arity mismatch: required: 2, provided: 0"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_comptime_stack_underflow
 
 fun: .test_loop_while_arg_min { -- Err }
   use' ./fail/test_loop_while_arg_min.af
   " arguments before `.while`: arity mismatch: required: 2, provided: 1"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_loop_while_arg_min
 
 fun: .test_cond_arity_bare_then { -- Err }
   use' ./fail/test_cond_arity_bare_then.af
   " arguments before ending conditional without `else`: arity mismatch: required: 0, provided: 1"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_bare_then
 
 fun: .test_cond_arity_else_mismatch { -- Err }
   use' ./fail/test_cond_arity_else_mismatch.af
   " in `.test_cond_arity_else_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 2, provided: 1"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_else_mismatch
 
 fun: .test_cond_arity_elif_mismatch { -- Err }
   use' ./fail/test_cond_arity_elif_mismatch.af
   " in `.test_cond_arity_elif_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_elif_mismatch
 
 fun: .test_cond_arity_elif_inverted_mismatch { -- Err }
   use' ./fail/test_cond_arity_elif_inverted_mismatch.af
   " in `.test_cond_arity_elif_inverted_mismatch_fail` (WORDLIST_EXEC): branch outputs: arity mismatch: required: 1, provided: 2"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_elif_inverted_mismatch
 
 fun: .test_cond_elif_missing_pred { -- Err }
   use' ./fail/test_cond_elif_missing_pred.af
   " unexpected end after `elif`; expected `elif <predicate> .then`"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_elif_missing_pred
 
 fun: .test_cond_arity_no_else { -- Err }
   use' ./fail/test_cond_arity_no_else.af
   " arguments before ending conditional without `else`: arity mismatch"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_no_else
 
 fun: .test_cond_arity_no_else_less { -- Err }
   use' ./fail/test_cond_arity_no_else_less.af
   " arguments before ending conditional without `else`: arity mismatch"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_no_else_less
 
 fun: .test_cond_arity_no_else_more { -- Err }
   use' ./fail/test_cond_arity_no_else_more.af
   " arguments before ending conditional without `else`: arity mismatch"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_cond_arity_no_else_more
 
 fun: .test_bool_expr_missing_and { -- Err }
   use' ./fail/test_bool_expr_missing_and.af
   " arguments before boolean conditional expression: arity mismatch: required: 1, provided: 0"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_bool_expr_missing_and
 
 fun: .test_bool_expr_missing_or { -- Err }
   use' ./fail/test_bool_expr_missing_or.af
   " arguments before boolean conditional expression: arity mismatch: required: 1, provided: 0"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_bool_expr_missing_or
 
 fun: .test_bool_expr_else_and { -- Err }
   use' ./fail/test_bool_expr_else_and.af
-  " current control structure does not accept `else`" .assert_str_has
+  " current control structure does not accept `else`" .assert_cstr_has
 end
 .test_bool_expr_else_and
 
 fun: .test_bool_expr_else_or { -- Err }
   use' ./fail/test_bool_expr_else_or.af
-  " current control structure does not accept `else`" .assert_str_has
+  " current control structure does not accept `else`" .assert_cstr_has
 end
 .test_bool_expr_else_or
 
 fun: .test_bool_expr_elif { -- Err }
   use' ./fail/test_bool_expr_elif.af
-  " current control structure does not accept `else`" .assert_str_has
+  " current control structure does not accept `else`" .assert_cstr_has
 end
 .test_bool_expr_elif
 
 fun: .test_bool_expr_nested_else { -- Err }
   use' ./fail/test_bool_expr_nested_else.af
-  " current control structure does not accept `else`" .assert_str_has
+  " current control structure does not accept `else`" .assert_cstr_has
 end
 .test_bool_expr_nested_else
 
 fun: .test_cond_double_else { -- Err }
   use' ./fail/test_cond_double_else.af
-  " current control structure does not accept `else`" .assert_str_has
+  " current control structure does not accept `else`" .assert_cstr_has
 end
 .test_cond_double_else
 
 fun: .test_bool_expr_final_less { -- Err }
   use' ./fail/test_bool_expr_final_less.af
   " arguments before ending boolean conditional expression: arity mismatch: required: 2, provided: 1"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_bool_expr_final_less
 
 fun: .test_bool_expr_final_more { -- Err }
   use' ./fail/test_bool_expr_final_more.af
   " arguments before ending boolean conditional expression: arity mismatch: required: 2, provided: 3"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_bool_expr_final_more
 
 fun: .test_bool_expr_intermediate_less { -- Err }
   use' ./fail/test_bool_expr_intermediate_less.af
   " arguments before boolean conditional expression: arity mismatch: required: 2, provided: 1"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_bool_expr_intermediate_less
 
 fun: .test_bool_expr_intermediate_more { -- Err }
   use' ./fail/test_bool_expr_intermediate_more.af
   " arguments before boolean conditional expression: arity mismatch: required: 2, provided: 3"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_bool_expr_intermediate_more
 
@@ -4022,7 +4022,7 @@ fun: .test_arena_deinit { -- err }
 
   adr1 .test_arena_unprot_err { err }
   assert err <>0 end
-  err " unable to mprotect" .assert_str_has
+  err " unable to mprotect" .assert_cstr_has
 end
 .test_arena_deinit
 
@@ -4032,7 +4032,7 @@ fun: .test_arena_errors { -- err }
 
   0 arn .arena_alloc_err { _adr err }
   assert err <>0 end
-  err " unable to allocate: size is zero" .assert_str_has
+  err " unable to allocate: size is zero" .assert_cstr_has
 
   nil .arena_trunc
   nil .arena_deinit
@@ -4042,47 +4042,47 @@ end
 
 fun: .test_word_len_over { -- err }
   s" ./fail/test_word_len_over.af" .use_err { err }
-  err " word length 128 exceeds max word length 127" .assert_str_has
+  err " word length 128 exceeds max word length 127" .assert_cstr_has
 end
 .test_word_len_over
 
 fun: .test_escaped_literal_errors { -- err }
   s" ./fail/test_escape_unknown.af" .use_err { unknown }
-  unknown " unsupported escape" .assert_str_has
+  unknown " unsupported escape" .assert_cstr_has
 
   s" ./fail/test_escape_unterminated.af" .use_err { unterminated }
-  unterminated " unexpected EOF while looking for delimiter" .assert_str_has
+  unterminated " unexpected EOF while looking for delimiter" .assert_cstr_has
 
   s" ./fail/test_escape_bad_delim_follower.af" .use_err { follower }
   follower " closing delimiter must be followed by whitespace or EOF"
-  .assert_str_has
+  .assert_cstr_has
 end
 .test_escaped_literal_errors
 
 fun: .test_char_literal_errors { -- err }
   s" ./fail/test_char_raw_long.af" .use_err { raw_long }
-  raw_long " invalid character literal" .assert_str_has
+  raw_long " invalid character literal" .assert_cstr_has
 
   s" ./fail/test_char_escape_long.af" .use_err { escape_long }
-  escape_long " invalid character literal" .assert_str_has
+  escape_long " invalid character literal" .assert_cstr_has
 
   s" ./fail/test_char_escape_unknown.af" .use_err { unknown }
-  unknown " unsupported escape" .assert_str_has
+  unknown " unsupported escape" .assert_cstr_has
 
   s" ./fail/test_char_escape_missing.af" .use_err { missing }
-  missing " invalid character literal" .assert_str_has
+  missing " invalid character literal" .assert_cstr_has
 end
 .test_char_literal_errors
 
 fun: .test_dropped_intrinsics_hidden { -- err }
   s" :" WORDLIST_EXEC .find_word_err { _xt err }
-  err " undefined word" .assert_str_has
+  err " undefined word" .assert_cstr_has
   s" ::" WORDLIST_EXEC .find_word_err { _xt err }
-  err " undefined word" .assert_str_has
+  err " undefined word" .assert_cstr_has
   s" ;" WORDLIST_COMP .find_word_err { _xt err }
-  err " undefined word" .assert_str_has
+  err " undefined word" .assert_cstr_has
   s" .ret" WORDLIST_EXEC .find_word_err { _xt err }
-  err " undefined word" .assert_str_has
+  err " undefined word" .assert_cstr_has
 end
 .test_dropped_intrinsics_hidden
 

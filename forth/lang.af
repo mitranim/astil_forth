@@ -4425,7 +4425,7 @@ actual string:
 > %s" exp act .errf
 end
 
-fun: .assert_str_has { act exp -- err }
+fun: .assert_cstr_has { act exp -- err }
   act =0 .then
     " missing string; expected string to have: %s"
     exp .errf .throw
