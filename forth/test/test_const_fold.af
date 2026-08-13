@@ -1,4 +1,5 @@
 use' ../lang.af
+use' ./codegen.af
 
 \ This file should contain tests for CF-specific optimizations.
 \ It shouldn't bother testing semantic-only arithmetic results;
@@ -18,8 +19,7 @@ end
 
 fun: .cf_want_word { XT -- err }
   CF_WANT_LEN @ { exp_len }
-  XT .Sym_union .Sym_norm_spans { spans }
-  spans .Sym_instrs_ret @u32 .inc spans .Sym_instrs_prologue @u32 - { act_len }
+  XT .test_sym_instr_len { act_len }
   exp_len act_len <> .then
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
@@ -31,7 +31,7 @@ fun: .cf_want_word { XT -- err }
   loop
     ind exp_len < .while
     CF_WANT_INSTRS ind 4 * + @u32 { exp }
-    XT .xt_instr ind 4 * + @u32 { act }
+    XT ind .test_actual_instr { act }
     exp act <> .then
       XT .Sym_name .Sym_word_buf { name }
       XT .Sym_name .Sym_word_len @u32 { name_len }

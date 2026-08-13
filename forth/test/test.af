@@ -2,6 +2,7 @@ use' ../lang.af
 use' ../arena.af
 use' ../time.af
 use' ../pthread.af
+use' ./codegen.af
 
 \ We test both JIT-compiled and AOT-compiled modes.
 \ For AOT, every test must be called in `.main_run`.
@@ -997,28 +998,6 @@ fun: .test_loop_nested { -- err }
   assert= three 30 end
 end
 .test_loop_nested
-
-fun: .test_sym_instr_len { XT -- len }
-  XT .Sym_union .Sym_norm_spans { spans }
-  spans .Sym_instrs_ret @u32 .inc
-  spans .Sym_instrs_prologue @u32 -
-end
-
-fun: .test_actual_instr { XT ind -- instr }
-  XT .xt_instr ind 4 * + @u32
-end
-
-fun: .test_word_instr_count { XT instr -- count }
-  XT .test_sym_instr_len { len }
-  0 { count }
-  0 { ind }
-  loop
-    ind len < .while
-    XT ind .test_actual_instr instr = .then inc: count end
-    inc: ind
-  end
-  count
-end
 
 fun: .test_comp_reg_cmp_keeps_rhs_in_arg_fun { one two -- out }
   one two = two +
