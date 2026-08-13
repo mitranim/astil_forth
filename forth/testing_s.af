@@ -15,8 +15,8 @@ use' ./lang_s.af
 
 fun: .T_reset
   T_LEN_0 @ .stack_set_len
-  T_LEN_0 off!
-  T_LEN_1 off!
+  false T_LEN_0 !
+  false T_LEN_1 !
 end
 
 fun: .T_stack_eq ( len0 len1 len -- equal )

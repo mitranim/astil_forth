@@ -1371,14 +1371,6 @@ end
 
 fun: @2 { adr -> val0 val1 } @2 end \ ldp x0, x1, [x0]
 
-fun_comp: @@2 { -- err }
-  .comp_args2_regs2 { reg0 reg1 }
-  reg0 reg0 0 .asm_load_off .comp_instr \ ldr Xt, [Xn]
-  reg1 reg1 0 .asm_load_off .comp_instr \ ldr Xt, [Xn]
-end
-
-fun: @@2 { adr0 adr1 -> val0 val1 } @@2 end
-
 fun_comp: !2 { -- err }
   .comp_args_get .dec { adr }
   adr .dec { val1 }
@@ -1398,28 +1390,6 @@ fun_comp: !swap { -- err }
 end
 
 fun: !swap { val0 val1 adr -> } !swap end
-
-fun_comp: @at { -- err }
-  .comp_args_get .dec { off }
-  off .dec { adr }
-  adr adr off 0 .asm_load_with_register_off .comp_instr \ ldr Xt, [Xn, Xm]
-  off .comp_args_set
-end
-
-fun: @at { adr off -> val } @at end
-
-fun_comp: !at { -- err }
-  .comp_args_get .dec { off }
-  off .dec { adr }
-  adr .dec { val }
-  val adr off 0 .asm_store_with_register_off .comp_instr \ str Xt, [Xn, Xm]
-  val .comp_args_set
-end
-
-fun: !at { val adr off -> } !at end
-
-fun: off! { adr } false adr ! end
-fun: on!  { adr } true  adr ! end
 
 \ Shortcut for allocating a cell-sized slot on the system stack.
 fun_comp: .slot { -- err } ( E: -- adr ) call'' CELL call'' .alloca end

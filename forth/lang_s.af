@@ -888,9 +888,6 @@ fun: !32 ( val adr -- ) [
   1 2 0 .asm_store_off_32 .comp_instr \ str w1, x2
 ] end
 
-fun: off! ( adr -- ) 0 .swap ! end
-fun: on!  ( adr -- ) 1 .swap ! end
-
 \ ## Stack introspection and manipulation
 
 \ Floor of data stack.
