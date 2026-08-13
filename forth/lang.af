@@ -1014,7 +1014,7 @@ fun_comp: .bit_clz { -- err }
   reg reg .asm_clz .comp_instr \ clz Xd, Xn
 end
 
-fun: .bit_clz { num -> bool } .bit_clz end
+fun: .bit_clz { num -> len } .bit_clz end
 
 \ "count trailing zeros" (in low bits)
 \
@@ -1025,7 +1025,7 @@ fun: .comp_emit_bit_ctz { reg -- err }
 end
 
 fun_comp: .bit_ctz { -- err } .comp_args1_reg .comp_emit_bit_ctz end
-fun: .bit_ctz { num -> bool } .bit_ctz end
+fun: .bit_ctz { num -> len } .bit_ctz end
 
 fun: .comp_emit_low_bits { reg tmp -- err }
   1 tmp .comp_load
