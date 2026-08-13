@@ -177,11 +177,9 @@ fun: .proc_spawn { argv actions -- pid Err }
   argv nil >slot actions .proc_spawn_env
 end
 
-\ Runs `argv` with `/dev/null` as stdin and an empty environment.
-\ Captures stdout and stderr, merged in their pipe-write order,
-\ allocating in current memory context. `buf len` outputs are
-\ always defined, so callers can report diagnostics. If context
-\ was OOM, `buf` is nil. Otherwise, `buf` is null-terminated.
+\ Runs `argv`, capturing merged stdout and stderr into current `context`.
+\ Outputs are always defined; inspecting `buf len` is safe even on error.
+\ If context was OOM, `buf` is `nil`; otherwise `buf` is null-terminated.
 fun: .proc_run_capture { argv -- buf len exit sig Err }
   0 { len }
   1 1 .ctx_alloc { buf err }
@@ -235,6 +233,7 @@ fun: .proc_run_capture { argv -- buf len exit sig Err }
     buf len + { tar }
     1 max: rem \ Use terminator byte as overflow probe when payload is full.
 
+    \ TODO wrap with a descriptive message if there's space.
     fd_read tar rem .fd_read { got read_err }
     read_err .then read_err { err } leave end
     got =0 .then leave end

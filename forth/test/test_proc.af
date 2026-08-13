@@ -22,48 +22,57 @@ fun: .test_proc_wait { -- Err }
   assert= pid SIGTERM .kill .cint_to_cell 0 end .try
   pid .pid_wait .try { exit sig }
   assert= exit 0 end .try
-  assert= sig SIGTERM end .try
+  assert= sig SIGTERM end
 end
 .test_proc_wait
 
-fun: .test_proc_stdin { -- Err }
+fun: .test_proc_with_stdin { -- err }
   4 .cells .alloca { argv }
   " grep" " -qx" " hello" argv !cellz
-  argv .proc_spawn_stdin .try { pid fd_write }
+  argv .proc_spawn_stdin { pid fd_write }
 
-  fd_write s" hello\n" .fd_write_all { write_err }
+  fd_write s" hello\n" .fd_write_all
   fd_write .close { -- }
-  pid .pid_wait_ok { wait_err }
-
-  write_err wait_err .coalesce .try
+  pid .pid_wait_ok
 end
-.test_proc_stdin
+.test_proc_with_stdin
 
-fun: .test_proc_stdin_early_close { -- Err }
+fun: .test_proc_with_stdin_early_close { -- Err }
+  .ctx_top { top }
   1 20 .bit_lsl { len }
   len 1 .ctx_alloc .try { buf }
   buf len 0x55 .memfill
 
   2 .cells .alloca { argv }
   " false" argv !cellz
-  argv buf len .proc_run_with_stdin_ok { err }
-  EPIPE .strerror { exp }
-  err exp .assert_str_has
-end
-.test_proc_stdin_early_close
 
-fun: .test_proc_capture { -- Err }
+  \ Expectation:
+  \ - Parent doesn't hang when writing.
+  \ - Parent doesn't get killed with SIGPIPE.
+  \ - Broken pipe error overrides exit 1 error.
+  \
+  \ Broken pipe is expected because this input buffer exceeds
+  \ how much the kernel is willing to buffer in the pipe.
+  EPIPE .strerror { exp }
+  argv buf len .proc_run_with_stdin_ok { err }
+  err exp .assert_str_has .try
+
+  top .ctx_top_set
+end
+.test_proc_with_stdin_early_close
+
+fun: .test_proc_run_capture { -- Err }
   3 .cells .alloca { argv }
   " echo" " out" argv !cellz
   argv .proc_run_capture .try { buf len exit sig }
-  assert buf len s" out\n" str= end .try
+  assert buf len s" out\n" str= end .try \ TODO `.assert_str`.
   assert= exit 0 end .try
   assert= sig 0 end .try
 
   " cat" " /definitely/missing/astil-test-file" argv !cellz
   argv .proc_run_capture .try { buf _len exit sig }
   buf " /definitely/missing/astil-test-file" .assert_str_has .try
-  assert exit <>0 end .try
+  assert<> exit 0 end .try
   assert= sig 0 end .try
 
   argv .proc_run_capture_ok { buf _len err }
@@ -78,15 +87,16 @@ fun: .test_proc_capture { -- Err }
   assert= sig 0 end .try
   err " unable to spawn" .assert_str_has .try
 end
-.test_proc_capture
+.test_proc_run_capture
 
-fun: .test_proc_capture_capacity { -- Err }
+fun: .test_proc_run_capture_capacity { -- Err }
   3 .cells .alloca { argv }
-  8 .alloca { mem }
+  8 { cap }
+  cap .alloca { mem }
 
   " false" argv !cellz
-  mem 8 0x55 .memfill
-  argv mem 8 .proc_run_capture_into { buf len exit sig err top }
+  mem cap 0x55 .memfill
+  argv mem cap .proc_run_capture_into { buf len exit sig err top }
   err .try
 
   assert= buf mem end .try
@@ -97,36 +107,36 @@ fun: .test_proc_capture_capacity { -- Err }
   assert= sig 0 end .try
 
   " echo" " 012345" argv !cellz
-  mem 8 0x55 .memfill
-  argv mem 8 .proc_run_capture_into { buf len exit sig err top }
+  mem cap 0x55 .memfill
+  argv mem cap .proc_run_capture_into { buf len exit sig err top }
   err .try
 
   assert= buf mem end .try
   assert= len 7 end .try
-  assert buf len s" 012345\n" str= end .try
+  assert buf len s" 012345\n" str= end .try \ TODO `.assert_str`.
   assert= buf len + @b 0 end .try
   assert= top mem 8 + end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
 
   " echo" " 0123456789abcdef" argv !cellz
-  mem 8 0x55 .memfill
-  argv mem 8 .proc_run_capture_into { buf len exit sig err top }
+  mem cap 0x55 .memfill
+  argv mem cap .proc_run_capture_into { buf len exit sig err top }
 
   err " unable to capture subprocess output: context out of space"
   .assert_cstr .try
 
   assert= buf mem end .try
   assert= len 7 end .try
-  assert buf len s" 0123456" str= end .try
+  assert buf len s" 0123456" str= end .try \ TODO `.assert_str`.
   assert= buf len + @b 0 end .try
   assert= top mem 8 + end .try
   assert= exit 0 end .try
   assert= sig 0 end .try
 end
-.test_proc_capture_capacity
+.test_proc_run_capture_capacity
 
-fun: .test_proc_closes_unselected_fdes { -- err }
+fun: .test_proc_run_capture_closes_unselected_fdes { -- err }
   .fd_pipe { fd_read fd_write }
 
   \ Since Darwin supports `POSIX_SPAWN_CLOEXEC_DEFAULT`,
@@ -145,16 +155,16 @@ fun: .test_proc_closes_unselected_fdes { -- err }
   assert<> exit 0 end
   assert= sig 0 end
 end
-.test_proc_closes_unselected_fdes
+.test_proc_run_capture_closes_unselected_fdes
 
 \ For AOT testing.
 fun: .test_proc { -- err }
   .test_proc_wait
-  .test_proc_stdin
-  .test_proc_stdin_early_close
-  .test_proc_capture
-  .test_proc_capture_capacity
-  .test_proc_closes_unselected_fdes
+  .test_proc_with_stdin
+  .test_proc_with_stdin_early_close
+  .test_proc_run_capture
+  .test_proc_run_capture_capacity
+  .test_proc_run_capture_closes_unselected_fdes
 end
 
 fun: .main { -- exit }
