@@ -3541,21 +3541,20 @@ MAP_ANON                     let: MAP_ANONYMOUS
 MAP_PRIVATE MAP_ANON .bit_or let: MAP_DEFAULT
 -1                           let: MAP_FAILED
 
-fun: .mem_map { size pflag -- addr err }
-  0 size pflag MAP_DEFAULT -1 0 .mmap { addr }
-  addr .bit_not =0 .then " unable to mmap" .throw end
-  addr
+fun: .mem_map { size pflag -- adr err }
+  0 size pflag MAP_DEFAULT -1 0 .mmap { adr }
+  adr MAP_FAILED = .then nil " unable to mmap" else adr nil end
 end
 
-fun: .mem_unmap { addr size -> err }
-  .munmap .then " unable to munmap" .throw end
+fun: .mem_unmap { adr size -> err }
+  .munmap .and " unable to munmap" end
 end
 
-fun: .mem_prot { addr size pflag -> err }
-  .mprotect .then " unable to mprotect" .throw end
+fun: .mem_prot { adr size pflag -> err }
+  .mprotect .and " unable to mprotect" end
 end
 
-fun: .mem_unprot { addr size -> err } PROT_RW .mem_prot end
+fun: .mem_unprot { adr size -> err } PROT_RW .mem_prot end
 
 \ ## Slices / spans / stacks continued
 
