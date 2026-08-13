@@ -545,7 +545,7 @@ Longer version:
 
 Source code consists of whitespace-separated words. Aside from numeric literals, source words have two spelling classes:
 
-- Value-like spelling: `[A-Za-z_][A-Za-z0-9_]*`.
+- Value-like spelling: C-style identifier: `[A-Za-z_][A-Za-z0-9_]*`.
 - Call-like spelling: every other non-numeric word.
 
 Locals and global values use value-like spelling:
@@ -559,7 +559,7 @@ fun: .some_fun
 end
 ```
 
-Calls use call-like spelling. Names such as `+`, `!8`, `u/mod`, `fun:`, and `xt'` are already call-like. A leading dot makes an otherwise ident-like name call-like, and is stored as part of the name: `.logf` looks up the symbol named `.logf`.
+Non-identifier names such as `+ @ ! u/mod fun: xt'` are automatically call-like. By convention, identifier names become call-like by prepending a leading dot:
 
 ```forth
 fun: .log_num { val }
@@ -581,10 +581,6 @@ err .throw
 val .ret
 .recur
 ```
-
-Control-only words include `elif else loop leave again assert end`. In reg-CC, `leave` and `again` validate loop arity, but stay plain.
-
-These name rules apply to both calling conventions.
 
 ## Non-standard
 
