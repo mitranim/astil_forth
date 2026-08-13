@@ -557,7 +557,7 @@ fun: WORDLIST_COMP [ .plain_call ] 2 end
 
 \ Non-immediate replacement for standard `literal`.
 fun: .comp_push ( C: num -- ) ( E: -- num )
-  1            .comp_load  \ ldr x1, <num>
+  1 .swap      .comp_load  \ ldr x1, <num>
   .asm_push_x1 .comp_instr \ str x1, [x27], 8
 end
 
@@ -1112,7 +1112,7 @@ end
 fun: .comp_str ( C: buf len -- ) ( E: -- str len )
   .tuck                              ( len buf len )
   .comp_alloc_cstr 1 .comp_page_addr \ `adrp x1, <page>` & `add x1, x1, <pageoff>`
-  2                  .comp_load      \ ldr x2, <len>
+  2 .swap            .comp_load      \ ldr x2, <len>
   .asm_push_x1_x2    .comp_instr     \ stp x1, x2, [x27], 16
 end
 
@@ -1865,7 +1865,7 @@ end
 fun: cells_guard: ( C: len "name" -- ) ( E: -- addr )
   .read_word .define_fun .plain_call .swap
     .cells .mem_alloc .drop
-    1            .comp_load  \ ldr x1, <addr>
+    1 .swap      .comp_load  \ ldr x1, <addr>
     1 .asm_push1 .comp_instr \ str x2, [x27], 8
   call'' end
   [ false .comp_only ]

@@ -823,7 +823,7 @@ end
 
 fun: .test_indirect_clobber_target { arg -- out } [ .redefine ]
   \ Simulate an unknown target implementation clobbering a non-ABI arg reg.
-  [ 444 4 .comp_load ]
+  [ 4 444 .comp_load ]
   arg
 end
 
@@ -2708,7 +2708,7 @@ end
 .test_assign_all_arg_regs
 
 fun: .test_call_clobber_high_arg_regs_target
-  [ 444 16 .comp_load 555 17 .comp_load ]
+  [ 16 444 .comp_load 17 555 .comp_load ]
 end
 
 fun: .test_call_clobber_high_arg_regs_fun { -- val }

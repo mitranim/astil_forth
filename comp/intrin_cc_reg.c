@@ -322,7 +322,7 @@ static Err intrin_comp_instr(Instr instr, Interp *interp) {
 }
 
 // SYNC[comp_constant].
-static Err intrin_comp_load(Sint imm, Sint reg, Interp *interp) {
+static Err intrin_comp_load(Sint reg, Sint imm, Interp *interp) {
   try(interp_require_current_sym(interp, nullptr));
   try(asm_validate_reg(reg));
 

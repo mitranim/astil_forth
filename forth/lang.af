@@ -39,7 +39,7 @@ end
 \ Non-immediate replacement for standard `literal`.
 fun: .comp_push { val -- err } ( E: -- val )
   .comp_alloc_next_reg { reg }
-  val reg .comp_load
+  reg val .comp_load
 end
 
 fun: .next_word { wlist -- XT err } ( "word" -- XT )
@@ -976,7 +976,7 @@ end
 \ 1-based index of the highest bit.
 fun: .comp_emit_bit_len { reg tmp -- err }
   reg reg     .asm_clz     .comp_instr \ clz Xd, Xn
-  64  tmp                  .comp_load  \ mov Xd, #imm
+  tmp 64                   .comp_load  \ mov Xd, #imm
   reg tmp reg .asm_sub_reg .comp_instr \ sub Xd, Xn, Xm
 end
 
@@ -990,7 +990,7 @@ end
 fun: .bit_len { val -> len } .bit_len end
 
 fun: .comp_emit_pow2_ceil { reg tmp -- err }
-  1 tmp .comp_load
+  tmp 1 .comp_load
   reg reg tmp reg tmp ASM_HI .comp_emit_csel_reg \ csel Xd, Xn, Xm, hi
   reg reg 1 .asm_sub_imm     .comp_instr         \ sub Xd, Xn, #1
   reg reg .asm_clz           .comp_instr         \ clz Xd, Xn
@@ -1028,7 +1028,7 @@ fun_comp: .bit_ctz { -- err } .comp_args1_reg .comp_emit_bit_ctz end
 fun: .bit_ctz { num -> len } .bit_ctz end
 
 fun: .comp_emit_low_bits { reg tmp -- err }
-  1 tmp .comp_load
+  tmp 1 .comp_load
   tmp tmp reg .asm_lsl_reg .comp_instr \ lsl Xt, Xt, Xn
   reg tmp 1 .asm_sub_imm .comp_instr   \ sub Xn, Xt, #1
 end
@@ -1043,7 +1043,7 @@ end
 fun_comp: .bit_trunc { -- err }
   .comp_args2_regs     { imm len }
   .comp_alloc_next_reg { tmp }
-  1 tmp .comp_load
+  tmp 1 .comp_load
   tmp tmp len .asm_lsl_reg .comp_instr \ lsl Xt, Xt, Xlen
   tmp tmp 1   .asm_sub_imm .comp_instr \ sub Xt, Xt, #1
   imm imm tmp .asm_and_reg .comp_instr \ and Xd, Xn, Xm
@@ -1533,7 +1533,7 @@ fun: .comp_slice { buf len -- err } ( E: -- buf len )
   .comp_alloc_next_reg { RB }
   .comp_alloc_next_reg { RL }
   buf RB .comp_page_addr \ adrp RB, buf@page ; add RB, RB, buf@pageoff
-  len RL .comp_load      \ mov RL, #len
+  RL len .comp_load      \ mov RL, #len
 end
 
 \ The address should be in the program image (`Comp_heap`).
@@ -2353,7 +2353,7 @@ fun: .comp_struct_field { off -- err }
     adr_reg adr_reg off .asm_add_imm .comp_instr \ add <adr>, <adr>, <off>
   else
     .comp_alloc_next_reg { off_reg }
-    off off_reg .comp_load \ mov <reg>, <imm> | ldr <reg>, <some_off>
+    off_reg off .comp_load \ mov <reg>, <imm> | ldr <reg>, <some_off>
     adr_reg adr_reg off_reg .asm_add_reg .comp_instr \ add <adr>, <adr>, <off>
     len .comp_args_set
   end
@@ -4631,8 +4631,8 @@ end
 fun: char' { -- char err } ( E: "str" -- char ) .read_decode_char end
 
 fun_comp: char' { -- err } ( C: "str" -- E: char )
-  .comp_alloc_next_reg { reg }
-  .read_decode_char reg .comp_load
+  .read_decode_char { char }
+  .comp_alloc_next_reg char .comp_load
 end
 
 \ Decodes a string literal from `src` to `tar` until given delimiter,

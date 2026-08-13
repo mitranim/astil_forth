@@ -235,8 +235,8 @@ static Err intrin_comp_load(Interp *interp) {
 
   Sint imm;
   U8   reg;
-  try(interp_pop_reg(interp, &reg));
   try(cell_stack_pop(&interp->cells, &imm));
+  try(interp_pop_reg(interp, &reg));
 
   asm_append_imm_to_reg(&interp->comp, (U8)reg, imm);
   return nullptr;
