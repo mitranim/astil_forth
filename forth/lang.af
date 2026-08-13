@@ -1529,6 +1529,8 @@ fun: .comp_next_page_addr { adr -- err } ( E: -- adr )
   adr reg .comp_page_addr
 end
 
+\ TODO consider more general naming; this function takes
+\ `adr imm` and doesn't care about their interpretation.
 fun: .comp_slice { buf len -- err } ( E: -- buf len )
   .comp_alloc_next_reg { RB }
   .comp_alloc_next_reg { RL }
