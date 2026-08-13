@@ -54,23 +54,24 @@ class Eval(threading.Thread):
       if self.canceled:
         self.kill()
 
-      decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+      dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
       for chunk in iter(lambda: self.proc.stdout.read1(READ_SIZE), b""):
         if self.canceled: break
-        self.append(decoder.decode(chunk))
+        self.append(dec.decode(chunk))
       if not self.canceled or self.announce:
-        self.append(decoder.decode(b"", final=True))
+        self.append(dec.decode(b"", final=True))
+      self.append("[ok]")
     except OSError as err:
       self.kill()
       if not self.canceled:
-        self.append(f"{err}\n")
+        self.append(f"{err}")
     finally:
       failed = False
       if self.proc:
         failed = self.proc.wait() != 0
         self.proc = None
       if self.announce:
-        self.append("[canceled]\n")
+        self.append("[canceled]")
       if not self.canceled:
         sublime.status_message("Eval failed" if failed else "Eval finished")
 
