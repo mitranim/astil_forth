@@ -1,7 +1,8 @@
 # BOT-GENERATED
 
-import unittest
+import io
 import tempfile
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -19,7 +20,7 @@ def sample(wall: float, cpu: float) -> catalog.Sample:
 
 
 class RunPolicyTest(unittest.TestCase):
-    def test_cat_group_gets_unmeasured_warmup_without_validation(self) -> None:
+    def test_run_section_validates_cat_before_warmup(self) -> None:
         item = catalog.Bench(
             "S",
             "cat",
@@ -27,15 +28,28 @@ class RunPolicyTest(unittest.TestCase):
             ("cat",),
             cat=catalog.CatIO(1, (catalog.cat_bench.STDIN,)),
         )
-        with (
-            mock.patch.object(driver, "measure", return_value=sample(0.1, 0.05))
-            as measure,
-            mock.patch.object(catalog, "validate") as validate,
-        ):
-            driver.warmup(item)
+        events = []
 
-        measure.assert_called_once_with(item)
-        validate.assert_not_called()
+        def validate(items):
+            self.assertEqual(items, [item])
+            events.append("validate")
+
+        def measure(_item):
+            events.append("measure")
+            return sample(0.1, 0.05)
+
+        with (
+            mock.patch.object(catalog, "validate", side_effect=validate),
+            mock.patch.object(driver, "measure", side_effect=measure),
+            mock.patch.object(catalog, "progress"),
+        ):
+            driver.run_section(
+                io.StringIO(),
+                catalog.Section("S"),
+                [item],
+            )
+
+        self.assertEqual(events, ["validate"] + ["measure"] * 6)
 
     def test_timed_out_run_fails_with_benchmark_context(self) -> None:
         item = bench("slow")
@@ -49,12 +63,15 @@ class RunPolicyTest(unittest.TestCase):
         ):
             driver.measure(item)
 
-    def test_validation_immediately_precedes_each_group(self) -> None:
+    def test_validation_and_warmup_immediately_precede_each_group(self) -> None:
         items = [bench("one"), bench("two")]
         events = []
 
         def validate(item):
             events.append(f"validate {item.name}")
+
+        def progress(message):
+            events.append(message)
 
         def measure(item):
             events.append(f"measure {item.name}")
@@ -64,16 +81,23 @@ class RunPolicyTest(unittest.TestCase):
             driver.SectionPlan("S", runner=driver.grouped),
             items,
             measure,
+            progress=progress,
             validate=validate,
         )
 
-        self.assertEqual(
-            events,
-            ["validate one"]
-            + ["measure one"] * 5
-            + ["validate two"]
-            + ["measure two"] * 5,
-        )
+        expected = []
+        for item in items:
+            expected.extend((
+                f"validate {item.name}",
+                f"[{item.name}] warmup",
+                f"measure {item.name}",
+            ))
+            for run in range(1, driver.RUNS + 1):
+                expected.extend((
+                    f"[{item.name}] run {run}/{driver.RUNS}",
+                    f"measure {item.name}",
+                ))
+        self.assertEqual(events, expected)
 
     def test_grouped_runner_keeps_each_benchmark_contiguous(self) -> None:
         items = [bench("one"), bench("two")]
@@ -118,17 +142,21 @@ class RunPolicyTest(unittest.TestCase):
 
         def custom_measure(item):
             custom_calls.append(item.name)
-            return sample(0.2, 0.1)
+            return sample(float(len(custom_calls)), 0.1)
 
         results = driver.collect(
             driver.SectionPlan("S", measure=custom_measure),
             [item],
             default_measure,
+            validate=lambda _item: None,
         )
 
         self.assertEqual(default_calls, [])
-        self.assertEqual(custom_calls, ["one"] * 5)
-        self.assertEqual(results[0].samples[0].wall_seconds, 0.2)
+        self.assertEqual(custom_calls, ["one"] * 6)
+        self.assertEqual(
+            [sample.wall_seconds for sample in results[0].samples],
+            [2.0, 3.0, 4.0, 5.0, 6.0],
+        )
 
     def test_tcp_policy_changes_without_changing_cpu_policy(self) -> None:
         tcp_section = next(
@@ -296,15 +324,23 @@ class CliTest(unittest.TestCase):
             self.assertEqual(output.read_text(encoding="utf-8"), "keep")
 
     def test_smoke_validates_without_creating_report(self) -> None:
+        selected = catalog.selected_benches(["baseline_python"])
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "missing" / "bench.md"
-            code = driver.main_for([
-                "--smoke",
-                "--output",
-                str(output),
-                "baseline_python",
-            ])
+            with (
+                mock.patch.object(catalog, "validate") as validate,
+                mock.patch.object(driver, "measure") as measure,
+            ):
+                code = driver.main_for([
+                    "--smoke",
+                    "--output",
+                    str(output),
+                    "baseline_python",
+                ])
+
             self.assertEqual(code, 0)
+            validate.assert_called_once_with(selected)
+            measure.assert_not_called()
             self.assertFalse(output.parent.exists())
 
 

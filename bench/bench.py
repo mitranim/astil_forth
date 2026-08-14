@@ -17,9 +17,9 @@ Timing policy is deliberately fixed and boring:
 * Run each benchmark five times. No adaptive stopping or partial runs.
 * Keep a benchmark's runs contiguous. Interleaving languages made CPU and
   memory results less repeatable by perturbing macOS CPU power/scheduler state.
-* Run one unmeasured validation immediately before that benchmark's measured
-  group. Besides checking correctness, this avoids measuring an idle/cold CPU
-  state. Moving all validations before all measurements loses that benefit.
+* Immediately before each measured group, validate the benchmark once, then
+  run one discarded warmup through the measurement path. This checks results
+  while keeping the five recorded runs out of an idle/cold CPU state.
 * Each individual subprocess gets a hard one-minute timeout. Let a run finish
   normally before applying any suite-level policy.
 * Complete all compilation/setup before timing.
@@ -97,11 +97,13 @@ def collect(
     measure_one = plan.measure or measure
 
     def measured(item):
-        # Validation is a complete unmeasured run. Keep it immediately beside
-        # the first measured run: a separate validation pass let CPU power
-        # state cool before later groups and measurably increased variance.
+        # Keep validation and measurement-path warmup beside the recorded
+        # group. A separate pass lets CPU power state cool before later groups.
         if counts[item] == 0 and validate is not None:
             validate(item)
+            if progress is not None:
+                progress(f"[{item.name}] warmup")
+            measure_one(item)
         counts[item] += 1
         if progress is not None:
             progress(f"[{item.name}] run {counts[item]}/{RUNS}")
@@ -248,14 +250,6 @@ def measure(item: catalog.Bench) -> catalog.Sample:
         ) from None
 
 
-def warmup(item: catalog.Bench) -> None:
-    if item.cat is None:
-        catalog.validate([item])
-        return
-    catalog.progress(f"[{item.name}] warmup")
-    measure(item)
-
-
 def run_section(out, section, items) -> None:
     if not items:
         return
@@ -265,7 +259,7 @@ def run_section(out, section, items) -> None:
         items,
         measure,
         catalog.progress,
-        warmup,
+        lambda item: catalog.validate([item]),
     )
     for result in results:
         print(catalog.format_done(result), file=sys.stderr, flush=True)
