@@ -59,6 +59,19 @@ static Err interp_valid_name(Interp *interp, Word_str *out) {
   return nullptr;
 }
 
+static Err intrin_call_xt(Interp *interp) {
+  if (!stack_len(&interp->cells)) {
+    return err_str("unexpected `end`: no structure to close");
+  }
+
+  Sint ptr;
+  Sym *sym;
+  try(cell_stack_pop(&interp->cells, &ptr));
+  try(interp_sym_by_ptr(interp, ptr, &sym));
+  try(interp_call_sym(interp, sym));
+  return nullptr;
+}
+
 static Err interp_fun_begin(Interp *interp, Wordlist list, Word_str name) {
   try(interp_begin_definition(interp));
   try(interp_word_begin(interp, list, name));
@@ -69,7 +82,8 @@ static Err interp_fun(Interp *interp, Wordlist list) {
   Word_str name;
   try(interp_read_word(interp, &name));
   try(interp_fun_begin(interp, list, name));
-  return interp_semicolon_push(interp);
+  const auto sym = interp_semicolon_sym(interp);
+  return cell_stack_push(&interp->cells, (Sint)sym);
 }
 
 static Err intrin_fun(Interp *interp) {
@@ -84,14 +98,16 @@ static Err intrin_define_fun(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
   try(interp_fun_begin(interp, WORDLIST_EXEC, name));
-  return interp_semicolon_push(interp);
+  const auto sym = interp_semicolon_sym(interp);
+  return cell_stack_push(&interp->cells, (Sint)sym);
 }
 
 static Err intrin_define_fun_comp(Interp *interp) {
   Word_str name;
   try(interp_valid_name(interp, &name));
   try(interp_fun_begin(interp, WORDLIST_COMP, name));
-  return interp_semicolon_push(interp);
+  const auto sym = interp_semicolon_sym(interp);
+  return cell_stack_push(&interp->cells, (Sint)sym);
 }
 
 static Err intrin_ret(Interp *interp) { return comp_append_ret(&interp->comp); }
@@ -394,8 +410,6 @@ static Err intrin_inline_word(Interp *interp) {
   try(comp_inline_sym(&interp->comp, caller, callee, catch));
   return nullptr;
 }
-
-static Err intrin_call_xt(Interp *interp) { return intrin_end(interp); }
 
 static Err intrin_comp_local(Interp *interp) {
   const auto cells = &interp->cells;

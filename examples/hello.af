@@ -20,10 +20,10 @@ fun: .sys_write { _fdes _str _len } [
 STDOUT s" hello world! (using syscall)" .sys_write
 STDOUT CRLF 2 .sys_write
 
-fun: .bool_str { val -- str } val .then " true" else " false" end end
+fun: .bool_cstr { val -- str } val .then " true" else " false" end end
 
-" bool_str(false): " .log false .bool_str .log " \n" .log
-" bool_str(true):  " .log true  .bool_str .log " \n" .log
+" false .bool_cstr: " .log false .bool_cstr .log " \n" .log
+" true  .bool_cstr: " .log true  .bool_cstr .log " \n" .log
 
 char' @ .logc
 char' A .logc

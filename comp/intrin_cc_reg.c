@@ -192,6 +192,13 @@ static Err interp_valid_name(Sint buf, Sint len, Word_str *out) {
   return nullptr;
 }
 
+static Err intrin_call_xt(Sint ptr, Interp *interp) {
+  Sym *sym;
+  try(interp_sym_by_ptr(interp, ptr, &sym));
+  try(interp_call_sym(interp, sym));
+  return nullptr;
+}
+
 static Err interp_fun_begin_raw(Interp *interp, Wordlist wordlist, Word_str name) {
   try(interp_begin_definition(interp));
   try(interp_word_begin(interp, wordlist, name));
@@ -221,18 +228,22 @@ static Err intrin_fun_comp(Interp *interp, Sint *out) {
   return intrin_fun_with(interp, WORDLIST_COMP, out);
 }
 
-static Err intrin_define_fun(Sint buf, Sint len, Interp *interp) {
+static Err intrin_define_fun(Sint buf, Sint len, Interp *interp, Sint *out) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin_raw(interp, WORDLIST_EXEC, name));
-  return interp_semicolon_push(interp);
+  const auto sym = interp_semicolon_sym(interp);
+  *out           = (Sint)sym;
+  return nullptr;
 }
 
-static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp) {
+static Err intrin_define_fun_comp(Sint buf, Sint len, Interp *interp, Sint *out) {
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_fun_begin_raw(interp, WORDLIST_COMP, name));
-  return interp_semicolon_push(interp);
+  const auto sym = interp_semicolon_sym(interp);
+  *out           = (Sint)sym;
+  return nullptr;
 }
 
 static Err intrin_ret(Interp *interp) {
@@ -440,13 +451,6 @@ static Err intrin_find_word(
   Word_str name;
   try(interp_valid_name(buf, len, &name));
   try(interp_find_word(interp, name.buf, wordlist, sym));
-  return nullptr;
-}
-
-static Err intrin_call_xt(Sint ptr, Interp *interp) {
-  Sym *sym;
-  try(interp_sym_by_ptr(interp, ptr, &sym));
-  try(interp_call_sym(interp, sym));
   return nullptr;
 }
 

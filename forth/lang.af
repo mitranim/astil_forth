@@ -79,16 +79,18 @@ fun: let: { val -- err } ( C: "name" -- ) ( E: -- val )
   .read_word { str len }
 
   \ Execution-time semantics.
-  str len .define_fun .plain_call
+  str len .define_fun { end_xt }
+    .plain_call
     0 1 0 .comp_signature_set ( -- val )
     val .comp_push
-  call'' end
+  end_xt .call_xt
 
   \ Compile-time semantics.
-  str len .define_fun_comp .plain_call
+  str len .define_fun_comp { end_xt }
+    .plain_call
     0 1 1 .comp_signature_set ( -- err )
     val .comp_push compile' .comp_push
-  call'' end
+  end_xt .call_xt
 
   [ 0 .comp_only ]
 end
@@ -1540,16 +1542,17 @@ end
 
 \ The address should be in the program image (`Comp_heap`).
 fun: .init_data_word { name name_len adr -- err }
-  name name_len .define_fun .plain_call
+  name name_len .define_fun { end_xt }
+    .plain_call
     0 1 false .comp_signature_set ( E: -- adr )
     adr .comp_next_page_addr
-  call'' end
+  end_xt .call_xt
 
-  name name_len .define_fun_comp
+  name name_len .define_fun_comp { end_xt }
     .plain_call
     0 1 true .comp_signature_set
     adr .comp_next_page_addr compile' .comp_next_page_addr
-  call'' end
+  end_xt .call_xt
 
   [ false .comp_only ]
 end
@@ -1578,16 +1581,17 @@ end
 
 \ TODO maybe dedup patterns with `.init_data_word`.
 fun: .init_slice_word { name name_len buf len -- err }
-  name name_len .define_fun .plain_call
+  name name_len .define_fun { end_xt }
+    .plain_call
     0 2 false .comp_signature_set ( E: -- buf len )
     buf len .comp_slice
-  call'' end
+  end_xt .call_xt
 
-  name name_len .define_fun_comp
+  name name_len .define_fun_comp { end_xt }
     .plain_call
     0 1 true .comp_signature_set
     buf .comp_next_page_addr len .comp_push compile' .comp_slice
-  call'' end
+  end_xt .call_xt
 end
 
 \ Similar to the standard idiom `create <name> N allot`.
@@ -1988,8 +1992,15 @@ fun: .comp_patch_branch_cond { meta -- err }
   reg off truthy .asm_cmp_branch adr !32
 end
 
-fun: .comp_patch_chain_branch { meta -> err } .comp_patch_branch call'' end end
-fun: .comp_patch_chain_branch_cond { meta -> err } .comp_patch_branch_cond call'' end end
+fun: .comp_patch_chain_branch { prev_xt meta -- err }
+  meta .comp_patch_branch
+  prev_xt .call_xt
+end
+
+fun: .comp_patch_chain_branch_cond { prev_xt meta -- err }
+  meta .comp_patch_branch_cond
+  prev_xt .call_xt
+end
 
 fun: .then_end { meta -- err }
   .comp_barrier
@@ -2013,7 +2024,7 @@ end
 \
 \    …                .then … end
 \    … .then … elif … .then … end
-fun: .then_end { meta -- err } [ .redefine ]
+fun: .then_end { prev_xt meta -- err } [ .redefine ]
   .comp_barrier
 
   meta CONT_MASK_INP_LEN .bits_get
@@ -2021,7 +2032,7 @@ fun: .then_end { meta -- err } [ .redefine ]
   .comp_args_valid
 
   meta .comp_patch_branch_cond
-  call'' end
+  prev_xt .call_xt
 end
 
 fun: .elif_invalid_end { _meta -- err }
@@ -2063,11 +2074,11 @@ fun_comp: .then { -- meta end_xt err } ( E: pred -- ) [ .redefine ]
   meta xt' .then_end
 end
 
-fun: .else_end { meta -- err }
+fun: .else_end { prev_xt meta -- err }
   .comp_barrier
   meta CONT_MASK_OUT_LEN .bits_get " branch outputs" .comp_args_valid
   meta .comp_patch_branch
-  call'' end
+  prev_xt .call_xt
 end
 
 \ The end XT we discard is usually `.then_end`.
@@ -2105,7 +2116,7 @@ fun_comp: elif { meta end_xt -> elif_meta elif_patch_xt meta end_xt err }
   meta xt' .elif_invalid_end
 end
 
-fun: .cond_bool_expr_end { meta -- err }
+fun: .cond_bool_expr_end { prev_xt meta -- err }
   .comp_barrier
 
   meta CONT_MASK_OUT_LEN .bits_get
@@ -2113,7 +2124,7 @@ fun: .cond_bool_expr_end { meta -- err }
   .comp_args_valid
 
   meta .comp_patch_branch_cond
-  call'' end
+  prev_xt .call_xt
 end
 
 fun: .cond_bool_expr_beg { truthy -- meta end_xt err }
@@ -2366,17 +2377,17 @@ fun: .define_field_word { name name_len off -- err }
   ( E: struct_adr -- field_adr )
 
   \ Execution-time semantics.
-  name name_len .define_fun
+  name name_len .define_fun { end_xt }
     1 1 false .comp_signature_set ( E: struct_adr -- field_adr )
     1 .comp_args_set
     off .then off .comp_push compile' + end
-  call'' end
+  end_xt .call_xt
 
   \ Compile-time semantics.
-  name name_len .define_fun_comp
+  name name_len .define_fun_comp { end_xt }
     0 1 true .comp_signature_set
     off .comp_push compile' .comp_struct_field
-  call'' end
+  end_xt .call_xt
 
   [ false .comp_only ]
 end
@@ -4286,7 +4297,7 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
   .read_word { str len }
   str len decl .init_data_word
 
-  .read_word .define_fun
+  .read_word .define_fun { end_xt }
     inp out has_err .comp_signature_set
     .comp_realloc_regs
 
@@ -4304,7 +4315,7 @@ fun: indirect: { inp out has_err -- err } ( C: "var_name" "fun_name" -- )
     123 .asm_brk .comp_instr \ brk 123 -- unreachable
 
     out .comp_args_set
-  call'' end
+  end_xt .call_xt
 
   [ false .comp_only ]
 end

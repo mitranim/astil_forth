@@ -107,24 +107,6 @@ static Err intrin_semicolon(Interp *interp) {
 
 static Sym *interp_semicolon_sym(Interp *interp) { return interp->syms.floor; }
 
-static Err interp_semicolon_push(Interp *interp) {
-  const auto sym = interp_semicolon_sym(interp);
-  return cell_stack_push(&interp->cells, (Sint)sym);
-}
-
-static Err intrin_end(Interp *interp) {
-  if (!stack_len(&interp->cells)) {
-    return err_str("unexpected `end`: no structure to close");
-  }
-
-  Sint ptr;
-  Sym *sym;
-  try(cell_stack_pop(&interp->cells, &ptr));
-  try(interp_sym_by_ptr(interp, ptr, &sym));
-  try(interp_call_sym(interp, sym));
-  return nullptr;
-}
-
 static void intrin_bracket_beg(Interp *interp) {
   interp->comp.ctx.compiling = false;
 }
@@ -476,7 +458,8 @@ Some fields are used only in the register-based callvention:
 static const USED auto INTRIN_END = (Sym){
   .name.buf   = "end",
   .wordlist   = WORDLIST_COMP,
-  .intrin     = (void *)intrin_end,
+  .intrin     = (void *)intrin_call_xt,
+  .inp_len    = 1,
   .out_len    = 1,
   .has_err    = true,
   .plain_call = true,
@@ -503,7 +486,7 @@ static const USED auto INTRIN_DEFINE_FUN = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_define_fun,
   .inp_len  = 2,
-  .out_len  = 1,
+  .out_len  = 2,
   .has_err  = true,
 };
 
@@ -512,7 +495,7 @@ static const USED auto INTRIN_DEFINE_FUN_COMP = (Sym){
   .wordlist = WORDLIST_EXEC,
   .intrin   = (void *)intrin_define_fun_comp,
   .inp_len  = 2,
-  .out_len  = 1,
+  .out_len  = 2,
   .has_err  = true,
 };
 
