@@ -5,6 +5,7 @@ import signal
 import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -519,6 +520,28 @@ console.log(JSON.stringify({ bytes, ended }))
 
 
 class ValidationTest(unittest.TestCase):
+    def test_erlang_cat_preserves_bytes_with_unicode_standard_io(self) -> None:
+        item = bench.selected_benches(["cat_erlang_loop_small"])[0]
+        cat_bench.prepare_inputs([item])
+        compiled = subprocess.run(
+            item.setup[0],
+            cwd=bench.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+
+        extra = item.cmd.index("-extra")
+        command = (
+            *bench.ERLANG_SERIAL,
+            "-eval",
+            "ok = io:setopts(group_leader(), [{encoding, unicode}]), "
+            "cat_loop:main(), halt().",
+            *item.cmd[extra:],
+        )
+
+        bench.validate([replace(item, cmd=command)])
+
     def test_expected_cat_output_is_cached_by_workload(self) -> None:
         expected_output = cat_bench.expected_output
         self.assertTrue(

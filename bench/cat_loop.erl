@@ -3,13 +3,13 @@
 -module(cat_loop).
 -export([main/0]).
 
-% Kept: 1 MiB raw reads and file:write; fastest exact byte stream.
-% Rejected: file:copy, io:put_chars, smaller buffers, and runtime flags.
+% Kept: 1 MiB raw reads and direct fd-port writes; exact and fastest measured.
+% Rejected: group-leader output, file:copy, io:put_chars, and smaller buffers.
 
 copy(Input, Output) ->
   case file:read(Input, 1024 * 1024) of
     {ok, Data} ->
-      ok = file:write(Output, Data),
+      true = port_command(Output, Data),
       copy(Input, Output);
     eof -> ok
   end.
@@ -23,14 +23,18 @@ copy_name(Name, _Stdin, Stdout) ->
 
 main() ->
   {ok, Stdin} = file:open("/dev/stdin", [read, raw, binary]),
-  Stdout = group_leader(),
   try
-    Args = init:get_plain_arguments(),
-    Names = case Args of [] -> ["-"]; _ -> Args end,
-    ok = lists:foreach(
-      fun(Name) -> ok = copy_name(Name, Stdin, Stdout) end,
-      Names
-    )
+    Stdout = open_port({fd, 0, 1}, [out, binary]),
+    try
+      Args = init:get_plain_arguments(),
+      Names = case Args of [] -> ["-"]; _ -> Args end,
+      ok = lists:foreach(
+        fun(Name) -> ok = copy_name(Name, Stdin, Stdout) end,
+        Names
+      )
+    after
+      port_close(Stdout)
+    end
   after
-    ok = file:close(Stdin)
+    file:close(Stdin)
   end.
