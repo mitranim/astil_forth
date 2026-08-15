@@ -243,6 +243,14 @@ end
 \
 \ See directory `examples` for usage.
 fun: .thread_spawn_ctx { fun inp ctx -- thread Err }
+  \ TODO: this code wants to use something like `new' / .ctx_alloc`,
+  \ but allocating in the specific given context and with insurance
+  \ that an error is either static or allocated in CURRENT context.
+  \ Our current abstractions fail to make this use case convenient.
+  \ Our callsite should look along the lines of:
+  \
+  \   ctx ctx_new' Thread_run { run }
+
   ctx .Ctx_top @ align' Thread_run .align_up { run }
   run size' Thread_run +                     { top }
 
