@@ -191,7 +191,7 @@ class MetricTest(unittest.TestCase):
         section = next(
             section
             for section in catalog.SECTIONS
-            if section.title == "CAT SMALL"
+            if section.title == "CAT"
         )
         plan = driver.plan_for(section)
         wall_fast = catalog.Result(

@@ -5,7 +5,6 @@ import signal
 import subprocess
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -30,20 +29,20 @@ class PlanningTest(unittest.TestCase):
             "C and Astil use `uint128`. Other languages use actual bigints.",
         )
 
-    def test_cat_sections_immediately_precede_tcp(self) -> None:
+    def test_cat_section_immediately_precedes_tcp(self) -> None:
         titles = [section.title for section in bench.SECTIONS]
         tcp_index = titles.index("TCP CONNECTIONS")
         self.assertEqual(
-            titles[tcp_index - 2 : tcp_index + 1],
-            ["CAT SMALL", "CAT LARGE", "TCP CONNECTIONS"],
+            titles[tcp_index - 1 : tcp_index + 1],
+            ["CAT", "TCP CONNECTIONS"],
         )
 
     def test_cat_implementations_follow_language_order(self) -> None:
         self.assertEqual(
             [
-                item.name.removeprefix("cat_").removesuffix("_small")
+                item.name.removeprefix("cat_")
                 for item in bench.BENCHES
-                if item.section == "CAT SMALL"
+                if item.section == "CAT"
             ],
             [
                 "global",
@@ -60,20 +59,6 @@ class PlanningTest(unittest.TestCase):
                 "cl_sbcl",
                 "pypy",
                 "python",
-            ],
-        )
-
-    def test_astil_cat_aot_setup_does_not_wait_for_stdin(self) -> None:
-        item = bench.selected_benches(["cat_astil_aot_small"])[0]
-        self.assertEqual(item.setup[-1][-2:], ("--", bench.os.devnull))
-
-    def test_zig_cat_uses_one_source_for_both_sizes(self) -> None:
-        items = bench.selected_benches(["cat_zig"])
-        self.assertEqual(
-            [(item.name, item.file) for item in items],
-            [
-                ("cat_zig_small", "bench/cat.zig"),
-                ("cat_zig_large", "bench/cat.zig"),
             ],
         )
 
@@ -520,28 +505,6 @@ console.log(JSON.stringify({ bytes, ended }))
 
 
 class ValidationTest(unittest.TestCase):
-    def test_erlang_cat_preserves_bytes_with_unicode_standard_io(self) -> None:
-        item = bench.selected_benches(["cat_erlang_loop_small"])[0]
-        cat_bench.prepare_inputs([item])
-        compiled = subprocess.run(
-            item.setup[0],
-            cwd=bench.ROOT,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(compiled.returncode, 0, compiled.stderr)
-
-        extra = item.cmd.index("-extra")
-        command = (
-            *bench.ERLANG_SERIAL,
-            "-eval",
-            "ok = io:setopts(group_leader(), [{encoding, unicode}]), "
-            "cat_loop:main(), halt().",
-            *item.cmd[extra:],
-        )
-
-        bench.validate([replace(item, cmd=command)])
-
     def test_expected_cat_output_is_cached_by_workload(self) -> None:
         expected_output = cat_bench.expected_output
         self.assertTrue(
@@ -640,6 +603,13 @@ class ValidationTest(unittest.TestCase):
         progress.assert_called_once_with("[working] validation")
 
 class SmokeTest(unittest.TestCase):
+    def test_run_times_out(self) -> None:
+        with (
+            mock.patch.object(bench, "RUN_TIMEOUT_SECONDS", 0.01),
+            self.assertRaises(subprocess.TimeoutExpired),
+        ):
+            bench.run(("python3", "-c", "import time; time.sleep(0.1)"))
+
     def test_make_clean_removes_project_temp_directory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

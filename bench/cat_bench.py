@@ -85,33 +85,6 @@ def expected_output(cat: CatIO) -> tuple[int, str]:
     return cat.input_bytes * len(cat.sources), digest.hexdigest()
 
 
-def declare_section(
-    add_section: Callable[..., None],
-    add_benchmark: Callable[..., None],
-    root: Path,
-    implementations: Iterable[Implementation],
-    title: str,
-    suffix: str,
-    cat: CatIO,
-    args: tuple[str, ...],
-    note: str,
-) -> None:
-    add_section(title, note=note)
-    input_arg = str(input_path(cat, FILE).relative_to(root))
-    for implementation in implementations:
-        command_args = tuple(
-            input_arg if arg == "{}" else arg for arg in args
-        )
-        add_benchmark(
-            f"cat_{implementation.name}_{suffix}",
-            implementation.file,
-            (*implementation.cmd, *command_args),
-            setup=implementation.setup,
-            tools=implementation.tools,
-            cat=cat,
-        )
-
-
 def validate(
     item: CatItem,
     timeout_seconds: float,

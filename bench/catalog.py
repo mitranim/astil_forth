@@ -955,34 +955,26 @@ CAT_IMPLEMENTATIONS = [
     ),
 ]
 
-cat_bench.declare_section(
-    section,
-    bench,
-    ROOT,
-    CAT_IMPLEMENTATIONS,
-    "CAT SMALL",
-    "small",
-    CatIO(
-        4 * 1024,
-        (cat_bench.FILE, cat_bench.STDIN, cat_bench.FILE),
-    ),
-    ("{}", "-", "{}"),
-    "Copies a 4 KiB file, 4 KiB stdin, then the file again (12 KiB total).",
+CAT_IO = CatIO(
+    512 * 1024**2,
+    (cat_bench.FILE, cat_bench.STDIN),
 )
-cat_bench.declare_section(
-    section,
-    bench,
-    ROOT,
-    CAT_IMPLEMENTATIONS,
-    "CAT LARGE",
-    "large",
-    CatIO(
-        512 * 1024**2,
-        (cat_bench.FILE, cat_bench.STDIN),
-    ),
-    ("{}", "-"),
-    "Copies a warmed 512 MiB file and 512 MiB stdin (1 GiB total).",
+section(
+    "CAT",
+    note="Copies a warmed 512 MiB file and 512 MiB stdin (1 GiB total).",
 )
+CAT_FILE_ARG = str(
+    cat_bench.input_path(CAT_IO, cat_bench.FILE).relative_to(ROOT)
+)
+for cat_implementation in CAT_IMPLEMENTATIONS:
+    bench(
+        f"cat_{cat_implementation.name}",
+        cat_implementation.file,
+        (*cat_implementation.cmd, CAT_FILE_ARG, "-"),
+        setup=cat_implementation.setup,
+        tools=cat_implementation.tools,
+        cat=CAT_IO,
+    )
 
 TCP_NOTE = f"""
 Measures {tcp_conn.CONNECTIONS} concurrent connections with {tcp_conn.EXCHANGES} one-byte request/echo exchanges per connection.
@@ -1040,6 +1032,7 @@ def run(cmd: tuple[str, ...], *, capture: bool = False) -> subprocess.CompletedP
             cwd=ROOT,
             check=True,
             text=True,
+            timeout=RUN_TIMEOUT_SECONDS,
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.STDOUT if capture else None,
         )

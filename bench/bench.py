@@ -196,7 +196,7 @@ def render_section(
 
 
 TCP_TITLE = "TCP CONNECTIONS"
-CAT_TITLES = ("CAT SMALL", "CAT LARGE")
+CAT_TITLE = "CAT"
 TCP_SECTION = next(
     section
     for section in catalog.SECTIONS
@@ -222,7 +222,7 @@ SECTION_PLANS = {
 def plan_for(section: catalog.Section) -> SectionPlan:
     if section.title in SECTION_PLANS:
         return SECTION_PLANS[section.title]
-    if section.title in CAT_TITLES:
+    if section.title == CAT_TITLE:
         return SectionPlan(
             section.title,
             note=section.note,
