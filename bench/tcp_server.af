@@ -23,19 +23,19 @@ fun: .handle { conn }
   conn .close { -- }
 end
 
-fun: .serve { attr -- err }
-  " 19777" { port }
-  port SOMAXCONN .net_listen { listener }
-  loop
-    listener nil nil .sock_accept { conn }
-    instr' .handle conn attr .thread_spawn_attr { -- }
-  end
-end
-
 fun: .run { -- Err }
   alloca' Pthread_attr { attr }
   attr .thread_attr_init_detached .try
-  attr .serve { err }
+  " 19777" SOMAXCONN .net_listen { lis err }
+
+  err =0 .then
+    loop
+      lis nil nil .sock_accept { conn err }
+      err =0 .while
+      instr' .handle conn attr .thread_spawn_attr { -- }
+    end
+  end
+
   attr .pthread_attr_destroy { -- }
   err
 end

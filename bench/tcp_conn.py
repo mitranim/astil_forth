@@ -5,6 +5,7 @@
 import resource
 import socket
 import time
+from collections.abc import Callable
 
 
 READY = b"R"
@@ -35,7 +36,7 @@ def recv_byte(sock: socket.socket) -> bytes:
     return data
 
 
-def drive() -> None:
+def drive(check_server: Callable[[], None]) -> None:
     if EXCHANGES < 1:
         raise ValueError("TCP benchmark needs at least one exchange")
     clients: list[socket.socket] = []
@@ -51,6 +52,7 @@ def drive() -> None:
                     client.close()
                     if index:
                         raise
+                    check_server()
                     time.sleep(0.001)
                 except BaseException:
                     client.close()

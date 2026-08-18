@@ -150,32 +150,31 @@ def alarm(seconds: float):
         signal.signal(signal.SIGALRM, previous)
 
 
-def terminate_and_reap(pid: int) -> None:
+def waitpid_nointr(pid: int, options: int) -> tuple[int, int]:
+    while True:
+        try:
+            return os.waitpid(pid, options)
+        except InterruptedError:
+            continue
+
+
+def terminate_and_reap(pid: int) -> int | None:
     # Probe ownership before signaling: wait4 may already have reaped the child.
     try:
-        while True:
-            try:
-                waited, _ = os.waitpid(pid, os.WNOHANG)
-                break
-            except InterruptedError:
-                continue
+        waited, status = waitpid_nointr(pid, os.WNOHANG)
     except OSError:
-        return
+        return None
     if waited:
-        return
+        return status
     try:
         os.kill(pid, signal.SIGKILL)
     except OSError:
         pass
     try:
-        while True:
-            try:
-                os.waitpid(pid, 0)
-                break
-            except InterruptedError:
-                continue
+        waitpid_nointr(pid, 0)
     except OSError:
         pass
+    return None
 
 
 def wait4_owned(
@@ -208,6 +207,16 @@ def wait4_owned(
         ) from err
 
 
+def tcp_exit_error(
+    item: Bench, cmd: tuple[str, ...], status: int
+) -> RuntimeError:
+    exit_code = os.waitstatus_to_exitcode(status)
+    return RuntimeError(
+        f"benchmark {item.name!r} command exited before driver kill "
+        f"with exit status {exit_code}: {cmd!r}"
+    )
+
+
 def measure_tcp_conn(
     item: Bench, timeout_seconds: float | None
 ) -> Sample:
@@ -236,25 +245,30 @@ def measure_tcp_conn(
     if timeout_seconds <= 0:
         terminate_and_reap(pid)
         raise MeasurementDeadline
+
+    def check_server() -> None:
+        waited, status = waitpid_nointr(pid, os.WNOHANG)
+        if waited:
+            raise tcp_exit_error(item, cmd, status)
+
     try:
         with alarm(timeout_seconds):
-            tcp_conn.drive()
+            tcp_conn.drive(check_server)
             try:
                 os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             _, status, usage = wait4_owned(item, pid, cmd, None)
-    except BaseException:
-        terminate_and_reap(pid)
+    except BaseException as err:
+        status = terminate_and_reap(pid)
+        if status is not None and isinstance(err, Exception):
+            raise tcp_exit_error(item, cmd, status) from err
         raise
 
     wall_seconds = (time.perf_counter_ns() - started) / 1_000_000_000
     exit_code = os.waitstatus_to_exitcode(status)
     if exit_code != -signal.SIGKILL:
-        raise RuntimeError(
-            f"benchmark {item.name!r} command exited before driver kill "
-            f"with exit status {exit_code}: {cmd!r}"
-        )
+        raise tcp_exit_error(item, cmd, status)
     return Sample(
         wall_seconds,
         usage.ru_utime,

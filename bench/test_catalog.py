@@ -220,6 +220,58 @@ class MeasurementTest(unittest.TestCase):
         self.assertIn(repr(item.cmd), message)
         self.assertIn("exit status 7", message)
 
+    def test_tcp_driver_error_reports_exited_server(self) -> None:
+        item = bench.Bench(
+            "TEST",
+            "crashed_tcp_server",
+            "python3",
+            ("python3", "server.py"),
+            tcp=True,
+        )
+        driver_error = RuntimeError("short TCP read")
+        with (
+            mock.patch.object(bench.os, "posix_spawnp", return_value=1234),
+            mock.patch.object(
+                bench.tcp_conn,
+                "drive",
+                side_effect=driver_error,
+            ),
+            mock.patch.object(
+                bench.os,
+                "waitpid",
+                return_value=(1234, signal.SIGABRT),
+            ),
+            self.assertRaises(RuntimeError) as caught,
+        ):
+            bench.measure_tcp_conn(item, 1)
+
+        message = str(caught.exception)
+        self.assertIn("crashed_tcp_server", message)
+        self.assertIn(repr(item.cmd), message)
+        self.assertIn("exit status -6", message)
+        self.assertIs(caught.exception.__cause__, driver_error)
+
+    def test_tcp_server_exit_before_listen_is_reported(self) -> None:
+        item = bench.Bench(
+            "TEST",
+            "early_tcp_exit",
+            "python3",
+            ("python3", "-c", "raise SystemExit(7)"),
+            tcp=True,
+        )
+        try:
+            bench.measure_tcp_conn(item, 0.05)
+        except bench.MeasurementDeadline:
+            self.fail("TCP driver ignored server exit before listen")
+        except RuntimeError as caught:
+            message = str(caught)
+        else:
+            self.fail("TCP driver accepted server exit before listen")
+
+        self.assertIn("early_tcp_exit", message)
+        self.assertIn(repr(item.cmd), message)
+        self.assertIn("exit status 7", message)
+
     def test_measure_spawn_error_reports_benchmark_and_command(self) -> None:
         item = bench.Bench(
             "TEST",
@@ -438,7 +490,7 @@ class TcpServerTest(unittest.TestCase):
             mock.patch.object(bench.tcp_conn, "EXCHANGES", 3),
             mock.patch.object(bench.tcp_conn.socket, "socket", Client),
         ):
-            bench.tcp_conn.drive()
+            bench.tcp_conn.drive(lambda: None)
 
         self.assertEqual(len(clients), 2)
         for client in clients:
