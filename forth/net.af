@@ -290,7 +290,7 @@ fun: .net_listen { port backlog -- sock Err }
     next .while
     next backlog .sock_bind { sock err }
     next .Addrinfo_next @ { next }
-    err =0 .then leave end
+    err .while
   end
 
   ainf .freeaddrinfo

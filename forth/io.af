@@ -589,7 +589,7 @@ end
 fun: .fd_read { fdes buf cap -- len err }
   loop
     fdes buf cap .read { len }
-    len >=0 .then leave end
+    len <0 .while
     .errno { code }
     code EINTR = .then again end
     code " unable to read" .os_err .throw
@@ -601,7 +601,7 @@ end
 fun: .fd_write { fdes buf cap -- len err }
   loop
     fdes buf cap .write { len }
-    len >=0 .then leave end
+    len <0 .while
     .errno { code }
     code EINTR = .then again end
     code " unable to write" .os_err .throw
@@ -647,7 +647,7 @@ fun: .fd_write_eol { fdes -- err } fdes CRLF 2 .fd_write_all end
 fun: .fd_copy_with { src_fd out_fd buf cap -- err }
   loop
     src_fd buf cap .fd_read { len }
-    len =0 .then leave end
+    len .while
     out_fd buf len .fd_write_all
   end
 end

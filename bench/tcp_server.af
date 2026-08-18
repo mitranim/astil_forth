@@ -9,19 +9,18 @@ char' R let: READY
 char' D let: DATA
 char' Q let: CLOSE
 
-fun: .handle { conn -- out }
+fun: .handle { conn }
   1 .alloca { byte }
   READY byte !8
   conn byte 1 0 .send 1 <> .then .abort end
   loop
     conn byte 1 MSG_WAITALL .recv 1 <> .then .abort end
     byte @u8 { input }
-    input DATA <> input CLOSE <> .bit_and .then .abort end
+    input DATA CLOSE =none .then .abort end
     conn byte 1 0 .send 1 <> .then .abort end
-    input CLOSE = .then leave end
+    input CLOSE <> .while
   end
   conn .close { -- }
-  nil
 end
 
 fun: .serve { attr -- err }

@@ -234,9 +234,9 @@ fun: .proc_run_capture { argv -- buf len exit sig Err }
     1 max: rem \ Use terminator byte as overflow probe when payload is full.
 
     \ TODO wrap with a descriptive message if there's space.
-    fd_read tar rem .fd_read { got read_err }
-    read_err .then read_err { err } leave end
-    got =0 .then leave end
+    fd_read tar rem .fd_read { got err }
+    err =0 .while
+    got .while
 
     len cap = .then
       nil buf len + !8 \ Overflow probe replaced the terminator.

@@ -4666,7 +4666,7 @@ fun: .str_until { delim unescape src tar -- src tar err }
   loop
     src @u8 { char }
     inc: src
-    char delim = .then leave end
+    char delim <> .while
 
     char 0 255 =any .then
       " unexpected EOF while looking for delimiter" .throw
