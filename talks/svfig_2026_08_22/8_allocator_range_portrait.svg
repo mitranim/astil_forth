@@ -1,0 +1,157 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Powerful allocator interface: [top,ceil)</title>
+  <desc>
+    A contiguous memory arena shows prior objects, temporary objects between a
+    saved_top and the current top, and the entire remaining capacity through
+    ceil. Three operations follow directly from exposing the two addresses:
+    bump top to allocate, subtract top from ceil to query capacity, and restore
+    a saved top to bulk-rewind. A contrast shows malloc and free demanding size
+    upfront, hiding remaining capacity, and freeing objects individually.
+  </desc>
+
+  <defs>
+    <linearGradient id="panel-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".012"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="64" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="32" font-weight="700">Powerful allocator interface: <tspan fill="#A8A8F0" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">[top,ceil)</tspan></text>
+  <text x="44" y="97" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">BUMP · CAPACITY · REWIND</text>
+
+  <!-- Contiguous arena with visible boundaries. -->
+  <rect x="44" y="126" width="712" height="310" rx="15"
+        fill="url(#panel-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="68" y="160" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">CONTIGUOUS MEMORY ARENA</text>
+
+  <g font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+     font-size="15" font-weight="700">
+    <text x="70" y="198" fill="#C3C3B6">base</text>
+    <text x="240" y="198" fill="#A8A8F0" text-anchor="middle">saved_top</text>
+    <text x="470" y="198" fill="#66FFE6" text-anchor="middle">top</text>
+    <text x="730" y="198" fill="#A3F5A3" text-anchor="end">ceil</text>
+  </g>
+  <text x="730" y="216" fill="#C3C3B6" text-anchor="end"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="12">explicit budget</text>
+
+  <g stroke-width="2">
+    <path d="M70 204V226" stroke="#4D4D4D"/>
+    <path d="M240 204V226" stroke="#A8A8F0"/>
+    <path d="M470 204V226" stroke="#66FFE6"/>
+    <path d="M730 204V226" stroke="#A3F5A3"/>
+  </g>
+
+  <rect x="70" y="226" width="170" height="92"
+        fill="#FFFFFF" fill-opacity=".035" stroke="#4D4D4D" stroke-width="2"/>
+  <rect x="240" y="226" width="230" height="92"
+        fill="#A8A8F0" fill-opacity=".12" stroke="#A8A8F0" stroke-width="2"/>
+  <rect x="470" y="226" width="260" height="92"
+        fill="#A3F5A3" fill-opacity=".10" stroke="#A3F5A3" stroke-width="2"/>
+
+  <g text-anchor="middle"
+     font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <text x="155" y="267" fill="#FFFFFF" font-size="17" font-weight="700">Prior</text>
+    <text x="155" y="292" fill="#C3C3B6" font-size="14">objects</text>
+    <text x="355" y="267" fill="#A8A8F0" font-size="17" font-weight="700">Temporary</text>
+    <text x="355" y="292" fill="#FFFFFF" font-size="14">objects</text>
+    <text x="600" y="267" fill="#A3F5A3" font-size="17" font-weight="700">Remaining</text>
+    <text x="600" y="292" fill="#FFFFFF" font-size="14">capacity</text>
+  </g>
+
+  <path d="M470 342V354M470 348H730M730 342V354"
+        fill="none" stroke="#A3F5A3" stroke-width="2"/>
+  <text x="600" y="382" fill="#A3F5A3" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">ceil - top</text>
+  <text x="600" y="408" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">entire remaining capacity</text>
+
+  <!-- Three powers derived from the visible range. -->
+  <rect x="44" y="466" width="220" height="208" rx="10"
+        fill="#181A1B" stroke="#66FFE6" stroke-width="2"/>
+  <text x="66" y="500" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">BUMP ALLOCATE</text>
+  <foreignObject x="66" y="524" width="176" height="66">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 18px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">obj <span style="color:#A3F5A3">=</span> top
+top <span style="color:#A3F5A3">+=</span> size</pre>
+    </div>
+  </foreignObject>
+  <text x="154" y="615" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700">Claim addresses directly</text>
+  <text x="154" y="644" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">No object metadata</text>
+
+  <rect x="290" y="466" width="220" height="208" rx="10"
+        fill="#181A1B" stroke="#A3F5A3" stroke-width="2"/>
+  <text x="312" y="500" fill="#A3F5A3"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">ASK CAPACITY</text>
+  <foreignObject x="312" y="533" width="176" height="38">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 17px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">cap <span style="color:#A3F5A3">=</span> ceil <span style="color:#A3F5A3">-</span> top</pre>
+    </div>
+  </foreignObject>
+  <text x="400" y="615" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17" font-weight="700">Use whole remainder</text>
+  <text x="400" y="644" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">No size declared upfront</text>
+
+  <rect x="536" y="466" width="220" height="208" rx="10"
+        fill="#181A1B" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="558" y="500" fill="#A8A8F0"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">BULK REWIND</text>
+  <foreignObject x="558" y="533" width="176" height="38">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 17px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">top <span style="color:#A3F5A3">=</span> saved_top</pre>
+    </div>
+  </foreignObject>
+  <text x="646" y="615" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17" font-weight="700">Discard temp objects</text>
+  <text x="646" y="644" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">No per-object free</text>
+
+  <!-- Adversarial comparison with supposedly general-purpose allocation. -->
+  <rect x="44" y="714" width="712" height="150" rx="15"
+        fill="#FF3333" fill-opacity=".04" stroke="#FF6666" stroke-width="2"/>
+  <text x="68" y="749" fill="#FF6666"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">CRITIQUE · MALLOC / FREE HIDES THE ALLOCATOR</text>
+  <line x1="274" y1="770" x2="274" y2="838" stroke="#4D4D4D" stroke-width="2"/>
+  <line x1="526" y1="770" x2="526" y2="838" stroke="#4D4D4D" stroke-width="2"/>
+  <g fill="#FFFFFF" text-anchor="middle"
+     font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+     font-size="17" font-weight="700">
+    <text x="159" y="797">Size demanded</text>
+    <text x="159" y="825">upfront</text>
+    <text x="400" y="797">Remaining capacity</text>
+    <text x="400" y="825">hidden</text>
+    <text x="641" y="797">Objects freed</text>
+    <text x="641" y="825">individually</text>
+  </g>
+
+  <rect x="44" y="902" width="712" height="58" rx="15"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="400" y="939" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Less abstraction · more visible power</text>
+</svg>

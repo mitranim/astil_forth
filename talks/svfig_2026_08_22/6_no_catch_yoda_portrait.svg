@@ -1,0 +1,81 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>No catch; simply skip try</title>
+  <desc>
+    A clickable video-card interlude. Trying forwards an error locally; skipping
+    try handles it locally, so catch is unnecessary. A large Yoda song thumbnail
+    carries a play button. The closing message says that seeing one error means
+    seeing all errors.
+  </desc>
+
+  <defs>
+    <clipPath id="thumbnail-clip">
+      <rect x="44" y="274" width="712" height="400" rx="14"/>
+    </clipPath>
+    <filter id="play-shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dy="4" result="offset"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope=".7"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <a href="https://www.youtube.com/watch?v=6n915Y2E8UA" target="_blank">
+    <rect width="800" height="1000" fill="#181A1B"/>
+
+    <text x="44" y="64" fill="#FFFFFF"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="32" font-weight="700">No catch; simply skip try</text>
+
+    <!-- One local choice, not a second handling mechanism. -->
+    <rect x="44" y="105" width="712" height="139" rx="14"
+          fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+    <path d="M400 105V244" stroke="#4D4D4D" stroke-width="2"/>
+
+    <text x="222" y="151" fill="#A3F5A3" text-anchor="middle"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="22" font-weight="700">try</text>
+    <text x="222" y="199" fill="#FFFFFF" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="22" font-weight="700">forward locally</text>
+
+    <text x="578" y="151" fill="#A3F5A3" text-anchor="middle"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="22" font-weight="700">skip try</text>
+    <text x="578" y="199" fill="#FFFFFF" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="22" font-weight="700">handle locally</text>
+
+    <!-- Existing YouTube thumbnail, framed as the main interaction. -->
+    <rect x="44" y="274" width="712" height="400" rx="14" fill="#000000"/>
+    <image href="yoda_there_is_no_try.jpg" x="44" y="274"
+           width="712" height="400" preserveAspectRatio="xMidYMid meet"
+           clip-path="url(#thumbnail-clip)"/>
+    <rect x="44" y="274" width="712" height="400" rx="14"
+          fill="none" stroke="#4D4D4D" stroke-width="2"/>
+
+    <!-- Familiar play affordance; the entire SVG is a link. -->
+    <g filter="url(#play-shadow)">
+      <rect x="266" y="434" width="116" height="80" rx="22"
+            fill="#FF0033"/>
+      <path d="M311 451L311 497L348 474Z" fill="#FFFFFF"/>
+    </g>
+
+    <rect x="44" y="714" width="712" height="205" rx="16"
+          fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+    <text x="400" y="758" fill="#C3C3B6" text-anchor="middle"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="14" font-weight="700">LOCAL CONFIDENCE</text>
+    <text x="400" y="816" fill="#FFFFFF" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="27" font-weight="700">One error visible</text>
+    <text x="400" y="861" fill="#A8A8F0" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="25" font-weight="700">= all errors visible</text>
+  </a>
+</svg>

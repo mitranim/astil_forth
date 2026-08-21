@@ -1,0 +1,107 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Error handling design: pick all</title>
+  <desc>
+    An outro graphic presents four compatible error-handling properties:
+    simplicity through plain outputs, ergonomics through a short happy path,
+    an interoperable ABI through ordinary calls without an unwinder or forced
+    abort, and local granularity through handle, try, and auto-try. A smaller
+    comparison shows awkward handling making fatal behavior conventional while
+    easy handling keeps recovery viable. Allocation failure is one example.
+  </desc>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="64" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="32" font-weight="700">Error handling design: pick all</text>
+
+  <!-- Four properties which coexist. -->
+  <rect x="44" y="105" width="712" height="400" rx="15"
+        fill="#181A1B" stroke="#4D4D4D" stroke-width="2"/>
+  <path d="M400 105V505M44 305H756" fill="none"
+        stroke="#4D4D4D" stroke-width="2"/>
+
+  <text x="222" y="147" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">SIMPLICITY</text>
+  <text x="222" y="219" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="27" font-weight="700">Plain outputs</text>
+
+  <text x="578" y="147" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">ERGONOMICS</text>
+  <text x="578" y="219" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="27" font-weight="700">Short happy path</text>
+
+  <text x="222" y="347" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">INTEROPERABLE ABI</text>
+  <text x="222" y="405" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25" font-weight="700">Ordinary calls</text>
+  <text x="222" y="444" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">No unwinder · no forced abort</text>
+
+  <text x="578" y="347" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">LOCAL GRANULARITY</text>
+  <text x="578" y="419" fill="#FFFFFF" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="20" font-weight="700">handle · try · auto-try</text>
+
+  <!-- The center plus makes the grid additive, not a menu of tradeoffs. -->
+  <circle cx="400" cy="305" r="23" fill="#181A1B"
+          stroke="#A3F5A3" stroke-width="2"/>
+  <text x="400" y="314" fill="#A3F5A3" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="27" font-weight="700">+</text>
+
+  <!-- Secondary consequence: ergonomics alter the policies programs adopt. -->
+  <text x="400" y="552" fill="#C3C3B6" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">ERGONOMICS SHAPE PROGRAM SEMANTICS</text>
+
+  <rect x="44" y="575" width="712" height="184" rx="14"
+        fill="#181A1B" stroke="#4D4D4D" stroke-width="2"/>
+  <path d="M400 575V759" stroke="#4D4D4D" stroke-width="2"/>
+
+  <text x="222" y="620" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">Awkward handling</text>
+  <text x="222" y="666" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25">↓</text>
+  <text x="222" y="712" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">fatal by convention</text>
+  <text x="370" y="714" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22" font-weight="700">−</text>
+
+  <text x="578" y="620" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">Easy handling</text>
+  <text x="578" y="666" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25">↓</text>
+  <text x="578" y="712" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">recovery stays viable</text>
+  <text x="726" y="714" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="22" font-weight="700">+</text>
+
+  <text x="400" y="796" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">Allocation failure is one example</text>
+
+  <rect x="44" y="837" width="712" height="119" rx="16"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="400" y="908" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="27" font-weight="700">The tradeoffs are not inevitable</text>
+</svg>

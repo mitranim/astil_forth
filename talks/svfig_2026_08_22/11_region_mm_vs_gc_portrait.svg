@@ -1,0 +1,198 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Region MM vs GC: same ease, less machinery</title>
+  <desc>
+    Side-by-side editor-styled Astil Forth and Java snippets show similarly easy
+    object allocation. A shared band says that both avoid per-object free and
+    allow static and dynamic objects to interchange. Six comparison rows cover
+    simplicity, throughput, reclamation, lifetime, buffer resizing, and memory
+    budgets. A final note says an arena may simply be unmapped.
+  </desc>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="61" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="30" font-weight="700">Region MM vs GC: same ease, less machinery</text>
+
+  <!-- Allocation ergonomics: paired editor-rendered code. -->
+  <rect x="44" y="91" width="344" height="201" rx="13"
+        fill="#181A1B" stroke="#66FFE6" stroke-width="2"/>
+  <text x="64" y="121" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">REGION MM · ASTIL FORTH</text>
+  <foreignObject x="64" y="143" width="304" height="138">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:15px/27px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#A3F5A3">.ctx_top</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">top</span><span style="color:#C3C3B6"> }</span>
+<span style="color:#A3F5A3">new&apos;</span> <span style="color:#A8A8F0">Obj</span> <span style="color:#A3F5A3">.obj_init</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">obj0</span><span style="color:#C3C3B6"> }</span>
+<span style="color:#A3F5A3">new&apos;</span> <span style="color:#A8A8F0">Obj</span> <span style="color:#A3F5A3">.obj_init</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">obj1</span><span style="color:#C3C3B6"> }</span>
+obj0 obj1 <span style="color:#A3F5A3">.work</span>
+top <span style="color:#A3F5A3">.ctx_top_set</span></pre>
+    </div>
+  </foreignObject>
+
+  <rect x="412" y="91" width="344" height="201" rx="13"
+        fill="#181A1B" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="432" y="121" fill="#A8A8F0"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">GC · JAVA</text>
+  <foreignObject x="432" y="169" width="304" height="94">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:15px/28px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#A3F5A3">var</span> <span style="color:#D2DFF9;font-style:italic">obj0</span> <span style="color:#A3F5A3">= new</span> <span style="color:#A8A8F0">Obj</span><span style="color:#C3C3B6">();</span>
+<span style="color:#A3F5A3">var</span> <span style="color:#D2DFF9;font-style:italic">obj1</span> <span style="color:#A3F5A3">= new</span> <span style="color:#A8A8F0">Obj</span><span style="color:#C3C3B6">();</span>
+<span style="color:#A3F5A3">work</span><span style="color:#C3C3B6">(</span>obj0<span style="color:#C3C3B6">,</span> obj1<span style="color:#C3C3B6">);</span></pre>
+    </div>
+  </foreignObject>
+
+  <!-- One matrix: shared properties span both columns. -->
+  <rect x="44" y="310" width="712" height="574" rx="11"
+        fill="#181A1B" stroke="#4D4D4D" stroke-width="2"/>
+  <rect x="44" y="354" width="712" height="55" fill="#FFFFFF" fill-opacity=".018"/>
+  <rect x="44" y="464" width="712" height="70" fill="#FFFFFF" fill-opacity=".015"/>
+  <rect x="44" y="604" width="712" height="70" fill="#FFFFFF" fill-opacity=".015"/>
+  <rect x="44" y="744" width="712" height="70" fill="#FFFFFF" fill-opacity=".015"/>
+  <path d="M44 354H756M44 409H756M44 464H756M44 534H756M44 604H756M44 674H756M44 744H756M44 814H756M400 310V354M400 464V884"
+        fill="none" stroke="#4D4D4D" stroke-width="1.5"/>
+
+  <text x="222" y="339" fill="#66FFE6" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">REGION MM</text>
+  <text x="578" y="339" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">GC</text>
+
+  <!-- Shared rows. -->
+  <text x="732" y="389" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＝</text>
+  <text x="400" y="389" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Easy allocation · no per-object <tspan font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">free</tspan></text>
+  <text x="732" y="444" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＝</text>
+  <text x="400" y="444" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Static + dynamic objects are interchangeable</text>
+
+  <!-- 1: simplicity. -->
+  <text x="376" y="495" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＋</text>
+  <text x="222" y="491" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Extreme simplicity</text>
+  <text x="222" y="519" fill="#C3C3B6" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="16" font-weight="700">[top,ceil)</text>
+  <text x="732" y="495" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">−</text>
+  <text x="578" y="491" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Extreme complexity*</text>
+  <text x="578" y="519" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">endlessly reinvented</text>
+
+  <!-- 2: throughput. -->
+  <text x="376" y="576" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＋</text>
+  <text x="222" y="576" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">High throughput</text>
+  <text x="732" y="568" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＋</text>
+  <text x="578" y="561" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Comparable throughput</text>
+  <text x="578" y="588" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">in major engines</text>
+
+  <!-- 3: reclamation. -->
+  <text x="376" y="645" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＋</text>
+  <text x="222" y="631" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Manual bulk rewind</text>
+  <text x="222" y="659" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">constant-time</text>
+  <text x="732" y="645" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">−</text>
+  <text x="578" y="631" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Engine magic</text>
+  <text x="578" y="659" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">collection work · GC pauses</text>
+
+  <!-- 4: lifetime tradeoffs. -->
+  <text x="376" y="715" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">±</text>
+  <text x="222" y="701" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Exact grouped lifetime</text>
+  <text x="222" y="729" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">objects leave together</text>
+  <text x="732" y="715" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">±</text>
+  <text x="578" y="701" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Arbitrary object lifetime</text>
+  <text x="578" y="729" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15">runtime controls reclamation</text>
+
+  <!-- 5: object and buffer growth. -->
+  <text x="376" y="785" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">−</text>
+  <text x="222" y="771" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Resizing buffers: harder</text>
+  <text x="222" y="799" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">old storage waits for rewind</text>
+  <text x="732" y="785" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＋</text>
+  <text x="578" y="771" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Resizing buffers: easy</text>
+  <text x="578" y="799" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">old storage becomes garbage</text>
+
+  <!-- 6: budgets. -->
+  <text x="376" y="857" fill="#A8A8F0" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">＋</text>
+  <text x="222" y="857" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Per-context hard budget</text>
+  <text x="732" y="857" fill="#FF6666" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">−</text>
+  <text x="578" y="857" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Shared heap budget</text>
+
+  <!-- One footer, two related qualifications. -->
+  <rect x="44" y="905" width="712" height="79" rx="14"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="400" y="937" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Bulk release may also simply unmap the arena</text>
+  <text x="400" y="968" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="13">* Production runtimes pursuing competitive throughput, latency, and memory efficiency</text>
+</svg>

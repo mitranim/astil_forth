@@ -38,8 +38,7 @@ end
 
 \ Non-immediate replacement for standard `literal`.
 fun: .comp_push { val -- err } ( E: -- val )
-  .comp_alloc_next_reg { reg }
-  reg val .comp_load
+  .comp_alloc_next_reg val .comp_load
 end
 
 fun: .next_word { wlist -- XT err } ( "word" -- XT )
@@ -4615,10 +4614,12 @@ end
 
 \ Shortcut for AOT-compiled programs. Runs body with default main context.
 \ Body must run to completion to avoid clobbering the context register for
-\ outer callers such as CRT `start`. Common use pattern; args are optional:
+\ outer callers such as CRT `start`. Common use pattern:
 \
-\   fun: .main { argc argv envp -- exit }
-\     .with_main_ctx argc argv envp .run end { err }
+\   fun: .main { -- exit }
+\     .with_main_ctx
+\       .run
+\     end { err }
 \     err .then " error: %s\n" err .elogf 1 else 0 end
 \   end
 fun_comp: .with_main_ctx { -- end_xt err }

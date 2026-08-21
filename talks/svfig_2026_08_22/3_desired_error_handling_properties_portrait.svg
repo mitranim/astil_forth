@@ -1,0 +1,149 @@
+<svg width="100%" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Desired error-handling properties</title>
+  <desc>
+    Desired error handling has a plain interoperable contract, local ergonomics,
+    and low overhead without exception machinery. Error values should fit in a
+    register, be cheaply testable, and carry a diagnostic message. Static and
+    dynamically allocated messages share one error channel, creating a lifetime
+    mismatch: callees want allocation while callers cannot safely free.
+  </desc>
+
+  <defs>
+    <linearGradient id="plain-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="local-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="cheap-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="memory-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".015"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#C3C3B6"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="800" height="1000" fill="#181A1B"/>
+
+  <text x="44" y="66" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="36" font-weight="700">Desired error-handling properties</text>
+  <text x="44" y="98" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">CONTRACT · ERGONOMICS · COST · LIFETIME</text>
+
+  <!-- Plain contract. -->
+  <rect x="44" y="126" width="712" height="136" rx="15"
+        fill="url(#plain-fill)" stroke="#66FFE6" stroke-width="2"/>
+  <text x="70" y="161" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">PLAIN CONTRACT</text>
+  <text x="70" y="190" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Declared in signatures</text>
+  <text x="70" y="219" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Returned alongside regular outputs</text>
+  <text x="70" y="248" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Simple interoperable ABI</text>
+
+  <!-- Local ergonomics. -->
+  <rect x="44" y="278" width="712" height="176" rx="15"
+        fill="url(#local-fill)" stroke="#A3F5A3" stroke-width="2"/>
+  <text x="70" y="313" fill="#A3F5A3"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">LOCAL ERGONOMICS</text>
+  <text x="70" y="356" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="23" font-weight="700">Visible by default</text>
+  <path d="M274 348H342" fill="none" stroke="#A3F5A3" stroke-width="2"
+        marker-end="url(#arrow)"/>
+  <text x="366" y="356" fill="#A3F5A3"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="23" font-weight="700">Almost invisible in happy path</text>
+  <text x="70" y="414" fill="#A3F5A3"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="20" font-weight="700">throw · try</text>
+  <text x="366" y="414" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Caller retains total local control</text>
+  <text x="70" y="439" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">Local return · local forwarding</text>
+
+  <!-- Cheap and general. -->
+  <rect x="44" y="478" width="712" height="124" rx="15"
+        fill="url(#cheap-fill)" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="70" y="513" fill="#A8A8F0"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">CHEAP AND GENERAL</text>
+  <text x="70" y="556" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">No unwinder · no stack gotchas · any error type</text>
+  <text x="70" y="584" fill="#A8A8F0"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Zero overhead infallible · low overhead fallible</text>
+
+  <!-- Error-value properties and lifetime mismatch. -->
+  <rect x="44" y="626" width="712" height="302" rx="15"
+        fill="url(#memory-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="70" y="661" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">ERROR VALUE → MEMORY LIFETIME</text>
+  <text x="70" y="698" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Register-sized · zero-testable · diagnostic message</text>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <rect x="70" y="730" width="190" height="62" rx="10"
+          fill="#A8A8F0" fill-opacity=".09" stroke="#A8A8F0"/>
+    <text x="165" y="768" fill="#A8A8F0" text-anchor="middle"
+          font-size="19" font-weight="700">STATIC MESSAGE</text>
+
+    <rect x="70" y="814" width="190" height="62" rx="10"
+          fill="#A8A8F0" fill-opacity=".09" stroke="#A8A8F0"/>
+    <text x="165" y="852" fill="#A8A8F0" text-anchor="middle"
+          font-size="19" font-weight="700">DYNAMIC MESSAGE</text>
+
+    <path d="M260 761H292V791H316M260 845H292V815H316"
+          fill="none" stroke="#C3C3B6" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <rect x="327" y="760" width="164" height="76" rx="11"
+          fill="#66FFE6" fill-opacity=".09" stroke="#66FFE6" stroke-width="2"/>
+    <text x="409" y="792" fill="#C3C3B6" text-anchor="middle"
+          font-size="14" font-weight="700">SAME CHANNEL</text>
+    <text x="409" y="820" fill="#66FFE6" text-anchor="middle"
+          font-size="20" font-weight="700">ERROR VALUE</text>
+
+    <path d="M491 798H544" fill="none" stroke="#C3C3B6" stroke-width="2.5"
+          marker-end="url(#arrow)"/>
+
+    <rect x="555" y="760" width="175" height="76" rx="11"
+          fill="#FF6666" fill-opacity=".06" stroke="#FF6666" stroke-width="2"/>
+    <text x="642.5" y="792" fill="#FFFFFF" text-anchor="middle"
+          font-size="18" font-weight="700">CALLER</text>
+    <text x="642.5" y="820" fill="#FF6666" text-anchor="middle"
+          font-size="16" font-weight="700">ownership unknown</text>
+
+    <text x="70" y="907" fill="#A8A8F0" font-size="17" font-weight="700">
+      Callee wants allocation
+    </text>
+    <text x="730" y="907" fill="#FF6666" text-anchor="end"
+          font-size="17" font-weight="700">Caller cannot safely free</text>
+  </g>
+
+  <text x="400" y="972" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Callee wants mixed allocation; caller wants no per-object free</text>
+</svg>
