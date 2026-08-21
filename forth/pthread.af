@@ -225,20 +225,16 @@ end
 
 \ Spawns joinable thread with parent-created memory context.
 \
-\ Structure referenced by `ctx` must be allocated in its own
-\ backing memory. Most parents should use `.stack_init_ctx`.
+\ The `ctx` object must be allocated in its own backing memory.
+\ Most parents should initialize it with `.ctx_mem_map`.
 \
-\ Backing memory is parent-owned and should outlive the child
-\ in case of successful join, but must not be stack-allocated
-\ in parent memory, because when join fails, the child memory
-\ might still be in use when the parent terminates.
+\ Context memory is parent-owned, but usage rights are exclusive.
+\ Between spawn and join, only the child is allowed to access it.
+\ Successful join returns usage rights back from child to parent.
+\ On unsuccessful join, child retains exclusive usage rights, and
+\ memory should stay mapped. Reuse might cause memory corruption.
 \
-\ Memory usage rights are exclusive: either child or parent.
-\ After spawn, only child uses the backing memory. Only join
-\ allows parent to access that memory. Join failure requires
-\ parent to leak memory; reuse might cause memory corruption.
-\
-\ If the input is a memory address, the memory it references
+\ If `inp` is a memory address, the memory it references
 \ must survive for at least as long as the child thread.
 \
 \ See directory `examples` for usage.

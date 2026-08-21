@@ -10,14 +10,13 @@ fun: .child { msg -- str }
 end
 
 fun: .parent { -- Err }
-  alloca' Stack { mem } \ Child thread memory.
   instr' .child { fun } \ Child thread function.
   " parent msg" { inp } \ Child thread input.
   nil           { out } \ Child thread output.
 
-  CTX_CAP Ctx mem .stack_init_ctx { ctx err }
+  CTX_CAP Ctx .ctx_mem_map { ctx err }
   err .then
-    " [parent] unable to init child thread memory: %s" err .errf .throw
+    " [parent] unable to init child thread memory: %s" err .errf .ret
   end
 
   " [parent] spawning...\n" .log
@@ -25,14 +24,8 @@ fun: .parent { -- Err }
 
   err .then
     " [parent] spawn error: %s" err .errf { err }
-
-    mem .stack_deinit { ctx_err }
-
-    ctx_err .then
-      " [parent] unable to deinit child thread memory: %s\n" ctx_err .logf
-    end
-
-    err .throw
+    ctx .ctx_mem_unmap { -- }
+    err .ret
   end
 
   " [parent] joining...\n" .log
@@ -40,14 +33,14 @@ fun: .parent { -- Err }
 
   \ If join fails, child thread might still be running and using memory.
   \ Grudgingly leak the mapping instead of unmapping it under the child.
-  err .then " [parent] join error: %s" err .errf .throw end
+  err .then " [parent] join error: %s" err .errf .ret end
 
   \ Output needs to be used before deiniting child memory.
   " [parent] output: %s\n" out .logf
 
-  mem .stack_deinit { err }
-  err .then
-    " [parent] unable to deinit child thread memory: %s" err .errf .throw
+  ctx .ctx_mem_unmap { err }
+  err .and
+    " [parent] unable to deinit child thread memory: %s" err .errf
   end
 end
 .parent

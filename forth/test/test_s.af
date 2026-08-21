@@ -632,7 +632,7 @@ fun: .test_ctx_alloc_out_of_space
   1 .ctx_avail { buf cap }
   buf .drop
   cap .inc 1 catch' .ctx_alloc { err }
-  err " unable to allocate context memory: out of space" .T_str_eq
+  err " unable to allocate memory: context out of space" .T_str_eq
 end
 .test_ctx_alloc_out_of_space
 

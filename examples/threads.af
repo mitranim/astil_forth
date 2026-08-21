@@ -21,8 +21,8 @@ fun: .child { inout -- Err }
   err
 end
 
-fun: .cleanup { id mem }
-  mem .stack_deinit { err }
+fun: .cleanup { id ctx }
+  ctx .ctx_mem_unmap { err }
   err .then
     " [parent] unable to deinit memory for child thread %zd: %s\n" id err .logf
   end
@@ -33,18 +33,18 @@ struct: Child_ctx
   Cell 1 field: .Child_ctx_inout
 end
 
-fun: .child_spawn { id inp mem -- thread inout ok }
+fun: .child_spawn { id inp -- ctx thread inout ok }
   " [parent] spawning thread %zd...\n" id .logf
 
-  CTX_CAP Child_ctx mem .stack_init_ctx { ctx err }
+  CTX_CAP Child_ctx .ctx_mem_map { ctx err }
 
   err .then
     " [parent] unable to init memory for child thread %zd: %s\n" id err .logf
-    nil nil false .ret
+    nil nil nil false .ret
   end
 
-  \ Child-reachable mutable state must outlive unsuccessful join.
-  \ Store in child memory rather than parent thread system stack.
+  \ Use child memory for input/output.
+  \ Child-reachable state must outlive unsuccessful join.
   ctx .Child_ctx_inout { inout }
   inp inout !
 
@@ -52,11 +52,11 @@ fun: .child_spawn { id inp mem -- thread inout ok }
 
   err .then
     " [parent] unable to spawn thread %zd: %s\n" id err .logf
-    id mem .cleanup
-    nil nil false .ret
+    id ctx .cleanup
+    nil nil nil false .ret
   end
 
-  thread inout true
+  ctx thread inout true
 end
 
 fun: .child_wait { id path out thread -- ok }
@@ -80,23 +80,21 @@ end
 fun: .parent
   " missing/none"  { path0 } \ Input for `thread0`: missing file.
   " forth/lang.af" { path1 } \ Input for `thread1`: existing file.
-  alloca' Stack    { mem0  } \ Backing memory of `thread0`.
-  alloca' Stack    { mem1  } \ Backing memory of `thread1`.
 
-  0 path0 mem0 .child_spawn { thread0 val0 ok0 }
-  1 path1 mem1 .child_spawn { thread1 val1 ok1 }
+  0 path0 .child_spawn { ctx0 thread0 out0 ok0 }
+  1 path1 .child_spawn { ctx1 thread1 out1 ok1 }
 
   \ After spawning a thread, we must either join or detach it.
 
-  ok0 .then 0 path0 val0 thread0 .child_wait { ok0 } end
-  ok1 .then 1 path1 val1 thread1 .child_wait { ok1 } end
+  ok0 .then 0 path0 out0 thread0 .child_wait { ok0 } end
+  ok1 .then 1 path1 out1 thread1 .child_wait { ok1 } end
 
   \ Unmap child thread memory on join success.
   \
   \ On join failure, thread might still be running and using memory.
   \ In those cases, we leak child thread memory to avoid corruption.
 
-  ok0 .then 0 mem0 .cleanup end
-  ok1 .then 1 mem1 .cleanup end
+  ok0 .then 0 ctx0 .cleanup end
+  ok1 .then 1 ctx1 .cleanup end
 end
 .parent

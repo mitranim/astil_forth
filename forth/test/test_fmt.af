@@ -23,7 +23,7 @@ fun: .test_fmt { -- err }
   buf cap 0xff .memfill
   s" ab" buf 4 .bytes_to_hex_str_into { out len err top }
 
-  err " unable to allocate context memory: out of space" .assert_cstr
+  err " unable to allocate memory: context out of space" .assert_cstr
   assert= top buf end
   assert= buf 4 + @u8 0xff end
 end

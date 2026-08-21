@@ -3532,29 +3532,39 @@ end
 
 fun: .mem_unprot { adr size -> err } PROT_RW .mem_prot end
 
-\ ## Slices / spans / stacks continued
-
-\ Initializes a stack with guards. Note: the memory is acquired from the OS
-\ and is NOT managed by the compiler. When used for global variables, their
-\ state is not preserved in AOT compilation.
+\ Maps a memory region sandwiched between two `PAGE_SIZE`-sized guards,
+\ returning address of the first guard and total mapped size, suitable
+\ for passing to `.mem_unmap`. Usable memory range:
+\
+\    mem       PAGE_SIZE + { floor }
+\    mem len + PAGE_SIZE - { ceil }
 \
 \ This is the preferred way to acquire memory pages from the OS.
-\ Size is counted in bytes; to allocate cells, use `size cells`.
+fun: .mem_guarded { size -- mem len Err }
+  size PAGE_SIZE .align_up         { size }
+  PAGE_SIZE 1 .bit_lsl size +      { len } \ + 2 guards
+  len PROT_NONE .mem_map .try      { mem }
+  mem PAGE_SIZE + size .mem_unprot { err }
+
+  err .then
+    mem len .mem_unmap { -- }
+    err .throw
+  end
+
+  mem len
+end
+
+\ ## Slices / spans / stacks continued
+
+\ Initializes a stack with guards.
+\
+\ Size is counted in bytes; to allocate cells, use `size .cells`.
 fun: .stack_init { size stk -- Err }
   stk size' Stack .memzero \ Ensure deinit-safe.
 
-  size PAGE_SIZE .align_up        { size }
-  PAGE_SIZE 1 .bit_lsl size +     { bytelen } \ + space for 2 guards
-  bytelen PROT_NONE .mem_map .try { cellar }
-  cellar PAGE_SIZE +              { floor }
-  floor size +                    { ceil }
-
-  floor size .mem_unprot { err }
-
-  err .then
-    cellar bytelen .mem_unmap { -- }
-    err .ret
-  end
+  size .mem_guarded .try       { cellar bytelen }
+  cellar           PAGE_SIZE + { floor }
+  cellar bytelen + PAGE_SIZE - { ceil }
 
   floor   stk .Stack_top !
   ceil    stk .Stack_ceil !
@@ -3633,26 +3643,27 @@ fun: .ctx_init { buf len ctx }
   buf len + ctx .Ctx_ceil !
 end
 
-\ Shortcut which combines `.stack_init` with context header allocation.
-\ Size + align of context `type` is included into total mapped `size`.
-\
-\ Type must begin with `Ctx`; otherwise undefined behavior.
-fun: .stack_init_ctx { size type stk -- ctx Err }
-  size stk .stack_init .try
+\ Shortcut which allocates context memory surrounded by 2 guards,
+\ returning address of context structure allocated at the bottom
+\ of its own memory. In resulting context, `.Ctx_self` points at
+\ the address of a prepended header used by `.ctx_mem_unmap` and
+\ must not be modified.
+fun: .ctx_mem_map { size type -- ctx Err }
+  size .mem_guarded .try { mem len }
+  mem       PAGE_SIZE +  { head } \ Header for `.ctx_mem_unmap`.
+  mem len + PAGE_SIZE -  { ceil }
 
-  stk .Stack_floor @ { ctx }
-  type .Type_size @ { size } \ SYNC[type_fields].
-  ctx size + { top }
-  stk .Stack_ceil @ { ceil }
+  mem len head !2
+  2 .cells head + type .Type_align @ .align_up { ctx }
+  type .Type_size @ ctx + { top }
 
-  top ceil > .then
-    stk .stack_deinit { -- }
-    " unable to initialize context: out of space" .throw
-  end
-
-  top ceil top - ctx .ctx_init
+  head ctx .Ctx_self !
+  top  ctx .Ctx_top  !
+  ceil ctx .Ctx_ceil !
   ctx
 end
+
+fun: .ctx_mem_unmap { ctx -> err } .Ctx_self @ @2 .mem_unmap end
 
 \ ldp x28, xzr, [sp], #16
 fun_comp: .with_ctx_end { -- err } ( E: -- )
@@ -3693,7 +3704,7 @@ fun: .ctx_alloc { size align -- adr err }
   ctx .Ctx_top @ align .align_up { adr }
   adr size + { top }
   top ctx .Ctx_ceil @ > .then
-    nil " unable to allocate context memory: out of space" .ret
+    nil " unable to allocate memory: context out of space" .ret
   end
   top ctx .Ctx_top !
   adr

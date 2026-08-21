@@ -1627,7 +1627,7 @@ fun: .ctx_alloc { size align -- adr }
   ctx .Ctx_top @ align .align_up { adr }
   adr size + { top }
   top ctx .Ctx_ceil @ > .then
-    " unable to allocate context memory: out of space" .throw
+    " unable to allocate memory: context out of space" .throw
   end
   top ctx .Ctx_top !
   adr

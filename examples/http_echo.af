@@ -49,8 +49,7 @@ fun: .respond_conn { conn -- err }
 end
 
 fun: .handle_conn { conn }
-  alloca' Stack { mem }
-  CTX_CAP Ctx mem .stack_init_ctx { ctx err }
+  CTX_CAP Ctx .ctx_mem_map { ctx err }
 
   err .then
     " [srv] unable to init connection handler memory: %s\n" err .elogf
@@ -58,13 +57,13 @@ fun: .handle_conn { conn }
     .ret
   end
 
-  ctx .with_ctx
-    conn .respond_conn { err }
-  end
+  ctx .with_ctx conn .respond_conn end { err }
   conn .conn_close
-  err .then " [srv] unable to respond; error: %s\n" err .elogf end
+  err .then
+    " [srv] unable to respond; error: %s\n" err .elogf
+  end
 
-  mem .stack_deinit { err }
+  ctx .ctx_mem_unmap { err }
   err .then
     " [srv] unable to deinit connection handler memory: %s\n" err .elogf
   end

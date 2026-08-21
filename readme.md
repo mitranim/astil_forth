@@ -415,26 +415,21 @@ end
 The main arena can't be freed, but may be rewound by saving `.ctx_top` and restoring it via `.ctx_top_set`. Other arenas are caller-owned; callees may allocate, or restore a prior top; caller frees the whole thing:
 
 ```forth
-fun: .callee { -- str } " code: %zd" 123 .errf end
+fun: .inner { -- str } " code: %zd" 123 .errf end
 
-fun: .caller { -- Err }
-  alloca' Stack { mem } \ Locally-owned scratch memory.
-
-  CTX_CAP Ctx mem .stack_init_ctx .try { ctx }
-
-  ctx .with_ctx         \ x28 = inner scratch context.
-    .callee .log .lf    \ Use scratch memory before freeing.
-  end                   \ x28 = outer context.
-
-  mem .stack_deinit     \ Unmap scratch memory.
+fun: .outer { -- Err }
+  CTX_CAP Ctx .ctx_mem_map .try { ctx }
+  ctx .with_ctx .inner end { err }
+  " error: %s\n" err .elogf \ Use memory BEFORE freeing.
+  ctx .ctx_mem_unmap
 end
 ```
 
-`.with_ctx` is structural, not unwind-safe. Its body must reach `end`; don't use `.ret`, `.try`, `.throw`, or local auto-try inside it. Call an inner function and capture its outputs outside the scope when early return is possible.
+The body of `.with_ctx` must reach `end`; avoid `.ret .try .throw` or local auto-try. Call an inner function and capture its outputs outside.
 
 Every context object begins with `Ctx`, and may contain arbitrary extra fields. In JIT mode, the default ambient context is `Interp*`, which begins with the default `Ctx`. User code may define its own context types.
 
-The shortcut `.stack_init_ctx` maps a guarded `Stack`, allocates an arbitrarily-sized context struct at its floor, initializes its `Ctx` header, and returns its address. The context struct is owned by its own backing memory and shares the same lifetime.
+The shortcut `.ctx_mem_map` allocates memory sandwiched between two guards, initializes a `Ctx` header near the bottom of the inner memory region, and returns its address.
 
 When passing AF callbacks to foreign code, mind the context:
 

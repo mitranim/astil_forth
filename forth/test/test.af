@@ -2826,27 +2826,31 @@ fun: .test_errf_out_of_space { -- err }
 end
 .test_errf_out_of_space
 
-struct: Test_req_ctx
-  Ctx  1 field: .Test_req_ctx_ctx
-  Cell 1 field: .Test_req_ctx_val
+struct: Test_ctx
+  Ctx  1 field: _
+  Cell 1 field: .Test_ctx_val
 end
 
-fun: .test_stack_init_ctx { -- err }
-  alloca' Stack { mem }
+fun: .test_ctx_mem_map { -- err }
+  PAGE_SIZE Test_ctx .ctx_mem_map { ctx }
 
-  PAGE_SIZE Test_req_ctx mem .stack_init_ctx { ctx }
+  ctx .Ctx_self @ { base }
+  ctx .Ctx_top  @ { top }
+  ctx .Ctx_ceil @ { ceil }
+  base @2         { mem len }
 
-  assert= ctx mem .Stack_floor @ end
-  assert= ctx .Ctx_top @ ctx size' Test_req_ctx + end
-  assert= ctx .Ctx_ceil @ mem .Stack_ceil @ end
-  assert= ctx .Test_req_ctx_val @ 0 end
+  assert= 2 .cells base + ctx end
+  assert= size' Test_ctx ctx + top end
+  assert= base PAGE_SIZE + ceil end
+  assert= mem PAGE_SIZE + base end
+  assert= len PAGE_SIZE 3 * end
+  assert= ctx .Test_ctx_val @ nil end
 
-  mem .stack_deinit
+  ctx .ctx_mem_unmap
 end
-.test_stack_init_ctx
 
 fun: .test_thread_custom_ctx_child { _ -- val }
-  context .Test_req_ctx_val @
+  context .Test_ctx_val @
 end
 
 fun: .test_thread_attr_child { inp -- out } inp end
@@ -2864,16 +2868,14 @@ end
 .test_thread_attr
 
 fun: .test_thread_custom_ctx { -- err }
-  alloca' Stack { mem }
-
-  PAGE_SIZE Test_req_ctx mem .stack_init_ctx { ctx }
-  123 ctx .Test_req_ctx_val !
+  PAGE_SIZE Test_ctx .ctx_mem_map { ctx }
+  123 ctx .Test_ctx_val !
 
   instr' .test_thread_custom_ctx_child nil ctx .thread_spawn_ctx { thread }
   thread .thread_join { out }
 
   assert= out 123 end
-  mem .stack_deinit
+  ctx .ctx_mem_unmap
 end
 .test_thread_custom_ctx
 
@@ -4203,7 +4205,7 @@ fun: .main_run { -- err }
   .test_strf_into
   .test_errf_exact_fill
   .test_errf_out_of_space
-  .test_stack_init_ctx
+  .test_ctx_mem_map
   .test_thread_custom_ctx
   .test_errf_wrap
   .test_alloca_cell
