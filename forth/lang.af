@@ -3603,7 +3603,7 @@ end
 
 fun: .range_slice { floor ceil -- dat len } floor ceil floor - end
 
-\ For JIT use only. TODO: AOT compatibility.
+\ For JIT use only. Using this in AOT-compiled programs is invalid.
 fun: stack: { size -- err } ( C: "name" -- ) ( E: -- stack )
   shape' Stack .comp_alloc_data { adr }
   size adr .stack_init

@@ -44,6 +44,7 @@ class Eval(threading.Thread):
       if self.canceled: return
 
       self.proc = sub.Popen(
+        # TODO move default args to `.sublime-commands`.
         args=["astil", "lang.af", "--eval=" + self.src],
         stdout=sub.PIPE,
         stderr=sub.STDOUT,

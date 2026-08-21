@@ -12,7 +12,7 @@ use' ./lang.af
 \ in page-sized chunks, on demand via page faults.
 
 1 22 .bit_lsl let: ARENA_PAGE_MIN
-4096      let: ARENA_PAGES
+4096          let: ARENA_PAGES
 
 struct: Arena
   Stack 1 field: .Arena_pages \ `stack_of(Stack)`
@@ -58,7 +58,7 @@ fun: .arena_trunc { arn }
 end
 
 fun: .arena_alloc { size arn -- adr err }
-  size =0 .then " unable to allocate: size is zero" .throw end
+  size =0 .then nil " unable to allocate: size is zero" .ret end
 
   arn .Arena_low @ { low }
   arn .Stack_top @ { ceil }
