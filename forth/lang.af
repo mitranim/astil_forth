@@ -4732,21 +4732,29 @@ fun_comp: r`  { -- err } char' ` false .read_str_until { _ } .comp_next_page_add
 fun_comp: rs" { -- err } char' " false .read_str_until .comp_slice end
 fun_comp: rs` { -- err } char' ` false .read_str_until .comp_slice end
 
-\ Captures and names a memory slice, making it safe to use in future code.
-\ Slices staged at the top of the compiler-managed data region are promoted
-\ in-place; other slices are copied into it. Also ensures null-termination.
-fun: str: { buf len -- err } ( E: -- cstr len )
+fun: .comp_promote_or_alloc_cstr { buf len -- buf err }
   .interp_data { data }
-
   data .Span_top @ buf = .then
-    nil buf len + !8
     data len .inc .interp_data_alloc
     buf
   else
     buf len .comp_alloc_cstr
-  end { buf }
+  end
+end
 
+\ Captures and names a memory slice, making it safe to use in future code.
+\ Slices staged at the top of the compiler-managed data region are promoted
+\ in-place; other slices are copied into it. Also ensures null-termination.
+fun: str: { buf len -- err } ( E: -- cstr len )
+  buf len .comp_promote_or_alloc_cstr { buf }
   .read_word buf len .init_slice_word
+  [ false .comp_only ]
+end
+
+fun: cstr: { buf -- err } ( E: -- cstr )
+  buf .strlen { len }
+  buf len .comp_promote_or_alloc_cstr { buf }
+  .read_word buf .init_data_word
   [ false .comp_only ]
 end
 
