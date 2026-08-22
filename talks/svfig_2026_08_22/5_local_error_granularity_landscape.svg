@@ -1,0 +1,89 @@
+<svg width="100%" viewBox="0 0 1280 576" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Each function chooses its error granularity</title>
+  <desc>
+    Three editor-styled Astil Forth examples show local error-handling
+    granularity: fully explicit handling, explicit try through trailing Err,
+    and compiler-inserted try through trailing lowercase err.
+  </desc>
+
+  <rect width="1280" height="576" fill="#181A1B"/>
+
+  <text x="64" y="58" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="38" font-weight="700">Each function chooses its error granularity</text>
+  <text x="64" y="91" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">SAME FALLIBLE CALL · THREE LOCAL CHOICES</text>
+
+  <!-- Fully explicit handling. -->
+  <rect x="64" y="120" width="480" height="350" rx="15"
+        fill="#181A1B" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="90" y="154" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">EXPLICIT HANDLING</text>
+  <text x="90" y="196" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="26" font-weight="700">Total visibility · total control</text>
+
+  <foreignObject x="90" y="226" width="428" height="210">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:17px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#A3F5A3">fun</span><span style="color:#A8A8F0">:</span> <span style="color:#D2DFF9;font-style:italic">.total_handler</span> <span style="color:#C3C3B6">{ -- </span><span style="color:#D2DFF9;font-style:italic">val</span><span style="color:#C3C3B6"> }</span>
+  <span style="color:#A3F5A3">.partial_fail</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">val err</span><span style="color:#C3C3B6"> }</span>
+  err <span style="color:#A3F5A3">.then</span>
+    <span style="color:#F9F9E5;background:rgba(255,255,255,.06)">&quot; [debug] error: %s\n&quot;</span> err <span style="color:#A3F5A3">.elogf</span>
+  <span style="color:#A3F5A3">end</span>
+  val
+<span style="color:#A3F5A3">end</span></pre>
+    </div>
+  </foreignObject>
+
+  <!-- Explicit local shortcut. -->
+  <rect x="568" y="120" width="312" height="350" rx="15"
+        fill="#181A1B" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="594" y="154" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">LOCAL SHORTCUT · TRAILING <tspan fill="#D2DFF9" font-style="italic">Err</tspan></text>
+  <text x="594" y="196" fill="#A8A8F0"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25" font-weight="700">Explicit try</text>
+
+  <foreignObject x="592" y="226" width="266" height="180">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:15px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#A3F5A3">fun</span><span style="color:#A8A8F0">:</span> <span style="color:#D2DFF9;font-style:italic">.unhappy</span> <span style="color:#C3C3B6">{ -- </span><span style="color:#D2DFF9;font-style:italic">val</span> <span style="color:#A8A8F0;font-style:italic">Err</span><span style="color:#C3C3B6"> }</span>
+  <span style="color:#A3F5A3">.partial_fail .try</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">val</span><span style="color:#C3C3B6"> }</span>
+  <span style="color:#A3F5A3">.partial_fail .try</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">val</span><span style="color:#C3C3B6"> }</span>
+  val
+<span style="color:#A3F5A3">end</span></pre>
+    </div>
+  </foreignObject>
+
+  <!-- Opt-in auto-try. Phantom try occupies the same visual position. -->
+  <rect x="904" y="120" width="312" height="350" rx="15"
+        fill="#181A1B" stroke="#A3F5A3" stroke-width="2"/>
+  <text x="930" y="154" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">AUTO-TRY · TRAILING <tspan fill="#D2DFF9" font-style="italic">err</tspan></text>
+  <text x="930" y="196" fill="#A3F5A3"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25" font-weight="700">Implicit try</text>
+
+  <foreignObject x="928" y="226" width="266" height="180">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:15px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#A3F5A3">fun</span><span style="color:#A8A8F0">:</span> <span style="color:#D2DFF9;font-style:italic">.happy</span> <span style="color:#C3C3B6">{ -- </span><span style="color:#D2DFF9;font-style:italic">val</span> <span style="color:#A8A8F0;font-style:italic">err</span><span style="color:#C3C3B6"> }</span>
+  <span style="color:#A3F5A3">.partial_fail</span> <span style="color:#C3C3B6;opacity:.38">.try</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">val</span><span style="color:#C3C3B6"> }</span>
+  <span style="color:#A3F5A3">.partial_fail</span> <span style="color:#C3C3B6;opacity:.38">.try</span> <span style="color:#C3C3B6">{ </span><span style="color:#D2DFF9;font-style:italic">val</span><span style="color:#C3C3B6"> }</span>
+  val
+<span style="color:#A3F5A3">end</span></pre>
+    </div>
+  </foreignObject>
+  <text x="930" y="451" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">FADED try = COMPILER-INSERTED</text>
+
+  <rect x="64" y="493" width="1152" height="55" rx="14"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="640" y="527" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Visible by default · shortcuts local · automation opt-in</text>
+</svg>

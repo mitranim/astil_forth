@@ -1,0 +1,119 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Error handling design; memory-management corollaries</title>
+  <desc>
+    High-level talk overview arranged as a four-stage path: learn from prior
+    language designs, extract desired properties, build an alternative error
+    design, then follow its consequences into memory management.
+  </desc>
+
+  <defs>
+    <linearGradient id="error-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="survey-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="memory-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".025"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#C3C3B6"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <text x="64" y="70" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="38" font-weight="700">Error handling design; memory-management corollaries</text>
+  <text x="64" y="106" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">EXPLORE → EXTRACT → REBUILD</text>
+
+  <!-- 01 / Prior language designs -->
+  <rect x="64" y="145" width="548" height="214" rx="16"
+        fill="url(#survey-fill)" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="96" y="184" fill="#A8A8F0"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">01 / PRIOR LANGUAGE DESIGNS</text>
+  <text x="96" y="233" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">Learn from prior successes</text>
+  <text x="96" y="269" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">and mistakes</text>
+  <text x="96" y="312" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19">Error returns · exceptions · hybrids</text>
+  <text x="580" y="337" fill="#FF6666" text-anchor="end"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">WHAT TO AVOID 😛</text>
+
+  <path d="M620 252H656" fill="none" stroke="#A8A8F0"
+        stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- 02 / Desired properties -->
+  <rect x="668" y="145" width="548" height="214" rx="16"
+        fill="#FFFFFF" fill-opacity=".03" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="700" y="184" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">02 / DESIRED PROPERTIES</text>
+  <text x="700" y="233" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">Rethink error handling</text>
+  <text x="700" y="269" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">from first principles</text>
+  <text x="700" y="312" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19">Simple · ergonomic · interoperable</text>
+
+  <path d="M942 367V397" fill="none" stroke="#A3F5A3"
+        stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- 03 / Alternative design -->
+  <rect x="668" y="409" width="548" height="214" rx="16"
+        fill="url(#error-fill)" stroke="#A3F5A3" stroke-width="2"/>
+  <text x="700" y="448" fill="#A3F5A3"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">03 / ALTERNATIVE DESIGN</text>
+  <text x="700" y="497" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">Plain error outputs</text>
+  <text x="700" y="533" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">with local shortcuts</text>
+  <text x="700" y="581" fill="#A3F5A3"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">INTEROPERABLE ABI · LOCAL GRANULARITY</text>
+
+  <path d="M660 516H624" fill="none" stroke="#66FFE6"
+        stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- 04 / Memory-management corollaries -->
+  <rect x="64" y="409" width="548" height="214" rx="16"
+        fill="url(#memory-fill)" stroke="#66FFE6" stroke-width="2"/>
+  <text x="96" y="448" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">04 / MEMORY-MANAGEMENT COROLLARIES</text>
+  <text x="96" y="497" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">Ambient allocators;</text>
+  <text x="96" y="533" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="29" font-weight="700">powers of region-MM</text>
+  <text x="96" y="581" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18">Dynamic/static values · lifetime · bulk rewind · threads</text>
+
+  <line x1="64" y1="653" x2="1216" y2="653" stroke="#333333" stroke-width="2"/>
+  <text x="640" y="690" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17">Error handling design influences entire language and MM</text>
+</svg>

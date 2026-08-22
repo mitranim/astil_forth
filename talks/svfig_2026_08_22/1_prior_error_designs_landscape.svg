@@ -1,0 +1,145 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Error designs fail differently</title>
+  <desc>
+    Comparison of prior error designs. C and Zig use error-return designs.
+    Swift and Go are hybrids. Exceptions hide errors, make control flow
+    untrustworthy, let Java declarations lie, and create Forth stack gotchas.
+  </desc>
+
+  <defs>
+    <linearGradient id="panel-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".015"/>
+    </linearGradient>
+    <linearGradient id="go-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <text x="64" y="68" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="38" font-weight="700">Error designs fail differently</text>
+  <text x="64" y="103" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">ERROR CHANNELS · ABI · CONTROL FLOW</text>
+
+  <!-- Error-return designs. -->
+  <text x="64" y="143" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">ERROR RETURNS</text>
+
+  <rect x="64" y="158" width="364" height="190" rx="15"
+        fill="url(#panel-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="88" y="189" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">C / UNIX</text>
+  <text x="88" y="225" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="24" font-weight="700">Status + errno</text>
+  <text x="88" y="256" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17">Error state in a side channel</text>
+  <text x="88" y="294" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Inconsistent -1 ABI</text>
+  <text x="88" y="321" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">Integers; no message</text>
+
+  <rect x="452" y="158" width="364" height="190" rx="15"
+        fill="url(#panel-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="476" y="189" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">ZIG</text>
+  <foreignObject x="476" y="202" width="230" height="39">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;color:#FFFFFF;font:23px/31px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#A8A8F0">error</span><span style="color:#FFFFFF">!</span><span style="color:#D2DFF9;font-style:italic">value</span></pre>
+    </div>
+  </foreignObject>
+  <text x="476" y="259" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17">Internal error-value union</text>
+  <text x="476" y="295" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">No public ABI</text>
+  <text x="476" y="321" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">Non-extensible</text>
+
+  <!-- Hybrid designs. -->
+  <text x="64" y="383" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">HYBRIDS</text>
+
+  <rect x="64" y="398" width="364" height="190" rx="15"
+        fill="url(#panel-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="88" y="429" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">SWIFT</text>
+  <text x="88" y="466" fill="#A8A8F0"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17" font-weight="700">Errors in signatures; passed locally</text>
+  <text x="88" y="493" fill="#A8A8F0"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17" font-weight="700">No stack unwinder</text>
+  <text x="88" y="530" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17" font-weight="700">Dedicated error ABI</text>
+  <text x="88" y="557" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="17" font-weight="700">Keyword soup; neither advantage</text>
+
+  <rect x="452" y="398" width="364" height="190" rx="15"
+        fill="url(#go-fill)" stroke="#66FFE6" stroke-width="2"/>
+  <text x="476" y="429" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">GO</text>
+  <text x="476" y="471" fill="#A8A8F0"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Pretends to pass errors as values</text>
+  <text x="476" y="520" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">Actually has exceptions</text>
+
+  <!-- Exception designs. -->
+  <text x="852" y="143" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">EXCEPTIONS</text>
+  <rect x="852" y="158" width="364" height="430" rx="15"
+        fill="url(#panel-fill)" stroke="#4D4D4D" stroke-width="2"/>
+
+  <text x="880" y="207" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25" font-weight="700">Errors invisible</text>
+  <text x="880" y="240" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="25" font-weight="700">in happy path</text>
+  <text x="880" y="286" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="21" font-weight="700">All code untrustworthy</text>
+
+  <line x1="880" y1="319" x2="1188" y2="319" stroke="#4D4D4D" stroke-width="2"/>
+
+  <text x="880" y="360" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Java declarations lie</text>
+  <text x="880" y="387" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">Omission · wrong type</text>
+
+  <text x="880" y="442" fill="#FF6666"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Forth stack gotchas</text>
+  <text x="880" y="469" fill="#C3C3B6"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">Declared outputs may not exist</text>
+
+  <line x1="64" y1="628" x2="1216" y2="628" stroke="#333333" stroke-width="2"/>
+  <text x="640" y="677" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">All code needs a trustworthy error contract</text>
+</svg>

@@ -11,7 +11,7 @@ Error handling and memory management are closely related. I ended up adding stru
 
 All illustrations except Yoda are bot-generated.
 
-![Error handling design; memory-management corollaries.](0_error_handling_mm_overview_portrait.svg)
+![Error handling design; memory-management corollaries.](0_error_handling_mm_overview_landscape.svg)
 
 
 
@@ -51,7 +51,7 @@ Languages can do better; below, we're going to demonstrate [how](#astil-forth-so
 
 ## Error handling in prior languages
 
-![Prior error designs fail differently.](1_prior_error_designs_portrait.svg)
+![Prior error designs fail differently.](1_prior_error_designs_landscape.svg)
 
 C/Unix is still dominated by the worst error pattern I've ever seen:
 
@@ -209,7 +209,7 @@ In my opinion, all of these are fatally flawed.
 
 ## More problems with exceptions
 
-![Exceptions have to be fought.](2_exceptions_have_to_be_fought_portrait.svg)
+![Exceptions have to be fought.](2_exceptions_have_to_be_fought_landscape.svg)
 
 Exceptions make errors 100% invisible in the happy path. The higher-level your code, the better this gets. In lower-level or mission-critical code, this is bad.
 
@@ -285,7 +285,7 @@ Important nuance: there are also hardware/OS exceptions, like trying to load/sto
 
 ## Desired properties
 
-![Desired error-handling properties.](3_desired_error_handling_properties_portrait.svg)
+![Desired error-handling properties.](3_desired_error_handling_properties_landscape.svg)
 
 Desired properties of error handling:
 - Errors are declared in function signatures, and returned _alongside_ regular outputs.
@@ -350,7 +350,7 @@ Having looked at all that, here's what I suggest:
 - Opt-in local auto-"try".
 - `nil` error return is implicit.
 
-![Plain return; granular handling.](4_plain_return_granular_handling_portrait.svg)
+![Plain return; granular handling.](4_plain_return_granular_handling_landscape.svg)
 
 ```forth
 fun: .partial_fail { -- val err }
@@ -391,7 +391,7 @@ With this design, errors remain plain outputs, always in signatures and with a s
 
 This has _local granularity_. Code can _locally_ choose how much it cares about errors.
 
-![Each function chooses its error granularity.](5_local_error_granularity_portrait.svg)
+![Each function chooses its error granularity.](5_local_error_granularity_landscape.svg)
 
 
 
@@ -417,7 +417,7 @@ Note again how we avoid opting-in then opting-out. Simply don't opt-in.
 
 _Do try_ the song:
 
-[![No catch; simply skip try.](6_no_catch_yoda_portrait.svg)](https://www.youtube.com/watch?v=6n915Y2E8UA)
+[![No catch; simply skip try.](6_no_catch_yoda_landscape.svg)](https://www.youtube.com/watch?v=6n915Y2E8UA)
 
 
 
@@ -504,7 +504,7 @@ fun: .outer
 end
 ```
 
-![Static and dynamic errors share one channel.](7_static_dynamic_errors_portrait.svg)
+![Static and dynamic errors share one channel.](7_static_dynamic_errors_landscape.svg)
 
 
 
@@ -530,7 +530,7 @@ In other words, we don't need a "resizable arena" abstraction on modern systems,
 
 This also naturally restricts child threads to fixed memory budgets, which can be bad or good, depending on use case. For example, in servers, limited per-request memory budgets can be good. Note how auto-resizing allocators simply don't have this power; "unlimited" memory is a premature abstraction.
 
-![Powerful allocator interface: `[top,ceil)`.](8_allocator_range_portrait.svg)
+![Powerful allocator interface: `[top,ceil)`.](8_allocator_range_landscape.svg)
 
 
 
@@ -589,7 +589,7 @@ The resulting solution has significant similarities with traditional task-local 
 
 
 
-![Each thread carries an ambient program context.](9_ambient_thread_context_portrait.svg)
+![Each thread carries an ambient program context.](9_ambient_thread_context_landscape.svg)
 
 
 
@@ -671,7 +671,7 @@ Memory lifetime and usage rights can be a little tricky. By default, only one th
 - Child memory survives death of child thread.
 - Successful join returns usage rights back to parent.
 
-![Spawn transfers arena usage; join returns it.](10_thread_memory_lifetime_portrait.svg)
+![Spawn transfers arena usage; join returns it.](10_thread_memory_lifetime_landscape.svg)
 
 ```forth
 use' lang.af
@@ -711,7 +711,7 @@ Depending on the program, this allocator style can be almost as easy as programm
 
 Meanwhile, for many types of programs, all we really needed was `[top,ceil)` and we're done. I think that's worth a lot.
 
-![Region MM vs GC: same ease, less machinery.](11_region_mm_vs_gc_portrait.svg)
+![Region MM vs GC: same ease, less machinery.](11_region_mm_vs_gc_landscape.svg)
 
 
 
@@ -757,7 +757,7 @@ Too much talk about memory. TLDR and takeaway:
 - Error handling design can be _significantly_ improved over the status quo.
 - It ends up influencing the rest of the language and program semantics in unexpected ways.
 
-![Error handling design: pick all.](12_error_handling_pick_all_portrait.svg)
+![Error handling design: pick all.](12_error_handling_pick_all_landscape.svg)
 
 
 

@@ -1,0 +1,185 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Plain return; granular handling</title>
+  <desc>
+    One ordinary trailing error output maps directly to an Arm64 register.
+    Each function chooses fully explicit handling, local try and throw
+    shortcuts, or automatic forwarding. All choices keep the same API and ABI.
+  </desc>
+
+  <defs>
+    <linearGradient id="rail-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="explicit-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".055"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".015"/>
+    </linearGradient>
+    <linearGradient id="shortcut-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="auto-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".025"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#C3C3B6"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <text x="64" y="68" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="38" font-weight="700">Plain return; granular handling</text>
+  <text x="64" y="103" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">ONE RETURN SHAPE · THREE LOCAL GRANULARITIES</text>
+
+  <!-- Shared return contract. -->
+  <rect x="64" y="127" width="1152" height="112" rx="15"
+        fill="url(#rail-fill)" stroke="#66FFE6" stroke-width="2"/>
+  <text x="90" y="162" fill="#66FFE6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">FUNCTION OUTPUTS · ERROR IS LAST</text>
+  <foreignObject x="405" y="143" width="480" height="44">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#C3C3B6;font:700 25px/34px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span>{ </span><span style="color:#D2DFF9;font-style:italic">inp</span><span> … -- </span><span style="color:#D2DFF9;font-style:italic">out0</span><span> </span><span style="color:#D2DFF9;font-style:italic">out1</span><span> </span><span style="color:#A8A8F0;font-style:italic">err</span><span> }</span></pre>
+    </div>
+  </foreignObject>
+  <g stroke="#4D4D4D" stroke-width="1.5">
+    <path d="M483 187V200"/>
+    <path d="M642 187V200"/>
+    <path d="M716 187V200"/>
+    <path d="M780 187V200"/>
+  </g>
+  <text x="90" y="221" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">ARM64 REGISTERS</text>
+  <g fill="#FFFFFF" text-anchor="middle"
+     font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+     font-size="15" font-weight="700">
+    <text x="483" y="221">x0</text>
+    <text x="642" y="221">x0</text>
+    <text x="716" y="221">x1</text>
+    <text x="780" y="221" fill="#66FFE6">x2</text>
+  </g>
+
+  <!-- Three symmetric local choices. -->
+  <text x="64" y="271" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">EACH FUNCTION CHOOSES</text>
+
+  <rect x="64" y="286" width="360" height="218" rx="15"
+        fill="url(#explicit-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="90" y="322" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">EXPLICIT HANDLING</text>
+  <text x="90" y="366" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="23" font-weight="700">Total visibility</text>
+  <line x1="90" y1="389" x2="398" y2="389" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="90" y="425" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Bind error</text>
+  <text x="90" y="456" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Ordinary flow</text>
+  <text x="90" y="487" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Total local control</text>
+
+  <rect x="448" y="286" width="360" height="218" rx="15"
+        fill="url(#shortcut-fill)" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="474" y="322" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">TRAILING <tspan fill="#D2DFF9" font-style="italic">Err</tspan></text>
+  <text x="474" y="366" fill="#A8A8F0"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="23" font-weight="700">Local shortcuts</text>
+  <line x1="474" y1="389" x2="782" y2="389" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="474" y="429" fill="#A3F5A3"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="21" font-weight="700">try · throw</text>
+  <text x="474" y="462" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Explicit forwarding</text>
+  <text x="474" y="490" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700">Happy path stays short</text>
+
+  <rect x="832" y="286" width="384" height="218" rx="15"
+        fill="url(#auto-fill)" stroke="#A3F5A3" stroke-width="2"/>
+  <text x="858" y="322" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">TRAILING <tspan fill="#D2DFF9" font-style="italic">err</tspan></text>
+  <text x="858" y="366" fill="#A3F5A3"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="23" font-weight="700">Opt-in auto-try</text>
+  <line x1="858" y1="389" x2="1190" y2="389" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="858" y="425" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Auto-forwarding</text>
+  <text x="858" y="456" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="18" font-weight="700">Errors stay declared</text>
+  <text x="858" y="487" fill="#A3F5A3"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="19" font-weight="700">Noise disappears</text>
+
+  <!-- Granularity progression. -->
+  <text x="244" y="536" fill="#C3C3B6" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">FULLY EXPLICIT</text>
+  <path d="M340 530H532" fill="none" stroke="#C3C3B6" stroke-width="2"
+        marker-end="url(#arrow)"/>
+  <text x="628" y="536" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">LOCALLY SHORTENED</text>
+  <path d="M728 530H916" fill="none" stroke="#C3C3B6" stroke-width="2"
+        marker-end="url(#arrow)"/>
+  <text x="1024" y="536" fill="#A3F5A3" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">LOCALLY AUTOMATIC</text>
+
+  <!-- Removed noise and machinery. -->
+  <rect x="64" y="558" width="760" height="94" rx="14"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="90" y="584" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="13" font-weight="700">LESS NOISE · LESS MACHINERY</text>
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <line x1="300" y1="594" x2="300" y2="640" stroke="#4D4D4D" stroke-width="2"/>
+    <line x1="555" y1="594" x2="555" y2="640" stroke="#4D4D4D" stroke-width="2"/>
+
+    <text x="90" y="616" fill="#FFFFFF" font-size="17" font-weight="700">Success</text>
+    <text x="90" y="641" fill="#FFFFFF" font-size="16" font-weight="700">No <tspan fill="#66FFE6" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">nil</tspan> needed</text>
+
+    <text x="326" y="616" fill="#A3F5A3"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="17" font-weight="700">throw</text>
+    <text x="326" y="641" fill="#FFFFFF" font-size="15" font-weight="700">Local return · no unwinder</text>
+
+    <text x="580" y="616" fill="#FFFFFF" font-size="17" font-weight="700">No <tspan fill="#A3F5A3" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">catch</tspan> needed</text>
+    <text x="580" y="641" fill="#FFFFFF" font-size="15" font-weight="700">Simply skip <tspan fill="#A3F5A3" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">try</tspan></text>
+  </g>
+
+  <!-- Inside / outside distinction. -->
+  <rect x="848" y="558" width="368" height="94" rx="14"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="1032" y="601" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700"><tspan fill="#D2DFF9" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace" font-style="italic">Err</tspan><tspan fill="#C3C3B6" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">|</tspan><tspan fill="#D2DFF9" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace" font-style="italic">err</tspan><tspan>: identical external API + ABI</tspan></text>
+  <text x="1032" y="633" fill="#A3F5A3" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">Lowercase <tspan fill="#D2DFF9" font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace" font-style="italic">err</tspan>: auto-<tspan font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace">try</tspan> only inside function</text>
+
+  <line x1="64" y1="669" x2="1216" y2="669" stroke="#333333" stroke-width="2"/>
+  <text x="640" y="704" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16">Errors remain ordinary outputs at every granularity</text>
+</svg>

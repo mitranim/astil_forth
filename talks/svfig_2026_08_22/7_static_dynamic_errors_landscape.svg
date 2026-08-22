@@ -1,0 +1,171 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Static and dynamic errors share one channel</title>
+  <desc>
+    Wide static and dynamic error sources converge into one ordinary C-string
+    output. Since callers cannot know the allocation source, per-object free
+    creates an impossible choice. An ambient parent-owned region removes it.
+  </desc>
+
+  <defs>
+    <linearGradient id="channel-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="solution-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A3F5A3" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#A3F5A3" stop-opacity=".02"/>
+    </linearGradient>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#A3F5A3"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <text x="64" y="66" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="38" font-weight="700">Static and dynamic errors share one channel</text>
+  <text x="64" y="101" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="15" font-weight="700">ONE ABI · TWO ALLOCATION STRATEGIES</text>
+
+  <!-- Wide source pair. -->
+  <g id="source-static">
+    <rect x="64" y="132" width="552" height="148" rx="15"
+          fill="#181A1B" stroke="#66FFE6" stroke-width="2"/>
+    <text x="88" y="166" fill="#66FFE6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="14" font-weight="700">STATIC ERROR</text>
+    <foreignObject x="88" y="191" width="280" height="42">
+      <div xmlns="http://www.w3.org/1999/xhtml">
+        <pre style="margin:0;color:#FFFFFF;font:20px/31px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#F9F9E5;background:rgba(255,255,255,.06)">&quot; missing path&quot;</span></pre>
+      </div>
+    </foreignObject>
+    <text x="592" y="254" fill="#FFFFFF" text-anchor="end"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="21" font-weight="700">No allocation</text>
+  </g>
+
+  <g id="source-dynamic">
+    <rect x="664" y="132" width="552" height="148" rx="15"
+          fill="#181A1B" stroke="#A8A8F0" stroke-width="2"/>
+    <text x="688" y="166" fill="#A8A8F0"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="14" font-weight="700">DYNAMIC ERROR</text>
+    <foreignObject x="688" y="188" width="280" height="68">
+      <div xmlns="http://www.w3.org/1999/xhtml">
+        <pre style="margin:0;color:#FFFFFF;font:17px/29px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace"><span style="color:#F9F9E5;background:rgba(255,255,255,.06)">&quot; unable to open `%s`&quot;</span>
+path <span style="color:#A3F5A3">.errf</span></pre>
+      </div>
+    </foreignObject>
+    <text x="1192" y="254" fill="#FFFFFF" text-anchor="end"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="21" font-weight="700">Contextual message</text>
+  </g>
+
+  <!-- Sources converge into one wide channel. -->
+  <path d="M340 280V304H640" fill="none" stroke="#C3C3B6" stroke-width="2"/>
+  <path d="M940 280V304H640" fill="none" stroke="#C3C3B6" stroke-width="2"/>
+  <path d="M640 304V312" fill="none" stroke="#C3C3B6" stroke-width="2"/>
+  <path id="vertical-arrowhead-top" d="M632 312H648L640 319Z" fill="#C3C3B6"/>
+
+  <g id="shared-channel">
+    <rect x="240" y="320" width="800" height="104" rx="15"
+          fill="url(#channel-fill)" stroke="#66FFE6" stroke-width="2"/>
+    <text x="276" y="353" fill="#C3C3B6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">ONE ERROR OUTPUT</text>
+    <text x="276" y="394" fill="#FFFFFF"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="24" font-weight="700">ordinary err</text>
+    <text x="470" y="394" fill="#66FFE6"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" font-weight="700">Same C-string ABI</text>
+    <path d="M640 338V406" stroke="#4D4D4D" stroke-width="2"/>
+    <text x="680" y="365" fill="#FFFFFF"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="22" font-weight="700">Caller cannot know</text>
+    <text x="680" y="397" fill="#C3C3B6"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18">how error was allocated</text>
+  </g>
+
+  <!-- Channel leads to the ownership dilemma. -->
+  <path d="M640 424V442H340V446" fill="none" stroke="#C3C3B6" stroke-width="2"/>
+  <path id="vertical-arrowhead-bottom" d="M332 446H348L340 455Z" fill="#C3C3B6"/>
+
+  <g id="dilemma">
+    <rect x="64" y="458" width="552" height="190" rx="15"
+          fill="#FF3333" fill-opacity=".035" stroke="#FF6666" stroke-width="2"/>
+    <text x="88" y="492" fill="#C3C3B6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">PER-OBJECT CHOICE</text>
+    <path d="M340 510V625" stroke="#4D4D4D" stroke-width="2"/>
+
+    <text x="88" y="536" fill="#C3C3B6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">FREE IT</text>
+    <text x="88" y="574" fill="#FFFFFF"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="21"><tspan>err </tspan><tspan fill="#A3F5A3">.free</tspan></text>
+    <text x="88" y="615" fill="#FF6666"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" font-weight="700">Invalid for static memory</text>
+
+    <text x="368" y="536" fill="#C3C3B6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">DON'T FREE IT</text>
+    <text x="368" y="574" fill="#FFFFFF"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="21"><tspan>no </tspan><tspan fill="#A3F5A3">.free</tspan></text>
+    <text x="368" y="615" fill="#FF6666"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="18" font-weight="700">Leaks dynamic memory</text>
+  </g>
+
+  <path d="M616 553H656" fill="none" stroke="#A3F5A3" stroke-width="2"
+        marker-end="url(#arrow-green)"/>
+
+  <g id="solution">
+    <rect x="664" y="458" width="552" height="190" rx="15"
+          fill="url(#solution-fill)" stroke="#A3F5A3" stroke-width="2"/>
+    <text x="688" y="492" fill="#A3F5A3"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">AMBIENT PARENT-OWNED REGION</text>
+    <text x="688" y="532" fill="#FFFFFF"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="23" font-weight="700">No per-object free</text>
+
+    <text x="688" y="568" fill="#66FFE6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">STATIC</text>
+    <text x="688" y="594" fill="#FFFFFF"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="17">no allocation</text>
+
+    <text x="842" y="568" fill="#A8A8F0"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">DYNAMIC</text>
+    <text x="842" y="594" fill="#FFFFFF"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="17">[top, ceil)</text>
+
+    <text x="1010" y="568" fill="#C3C3B6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="13" font-weight="700">CALLER</text>
+    <text x="1010" y="594" fill="#FFFFFF"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="17">only uses <tspan font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace" font-weight="700">err</tspan></text>
+
+    <text x="1192" y="628" fill="#FFFFFF" text-anchor="end"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="16" font-weight="700">Parent bulk rewind · static unaffected</text>
+  </g>
+
+  <text x="640" y="690" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">One error channel · no ownership bit · no per-object decision</text>
+</svg>

@@ -1,0 +1,201 @@
+<svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
+     role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
+  <title>Spawn transfers arena usage; join returns it</title>
+  <desc>
+    Time runs left to right across parent-thread, child-memory-arena, and
+    child-thread lanes. The parent maps child memory, spawn transfers exclusive
+    usage to the child, and the child allocates. The child exits while memory
+    remains at the same addresses with the same data. Join returns usage rights
+    and output to the parent, which uses the output and unmaps the whole arena.
+  </desc>
+
+  <defs>
+    <linearGradient id="panel-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".012"/>
+    </linearGradient>
+    <linearGradient id="arena-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66FFE6" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#66FFE6" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="child-fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A8A8F0" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#A8A8F0" stop-opacity=".025"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1L9 5L1 9Z" fill="#C3C3B6"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M1 1L9 5L1 9Z" fill="#A3F5A3"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" fill="#181A1B"/>
+
+  <text x="44" y="55" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="34" font-weight="700">Spawn transfers arena usage; join returns it</text>
+  <text x="44" y="87" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="18" font-weight="700">THREAD LIFETIME ≠ MEMORY LIFETIME</text>
+
+  <rect x="44" y="110" width="1192" height="492" rx="14"
+        fill="url(#panel-fill)" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="68" y="142" fill="#C3C3B6"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="14" font-weight="700">TIME →</text>
+
+  <!-- Lane labels. Parent's own context exists separately and is not lent here. -->
+  <g text-anchor="end">
+    <text x="210" y="205" fill="#FFFFFF"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="14" font-weight="700">PARENT THREAD</text>
+    <text x="210" y="225" fill="#C3C3B6"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="12">own context not shown</text>
+
+    <text x="210" y="331" fill="#66FFE6"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="14" font-weight="700">CHILD MEMORY ARENA</text>
+    <text x="210" y="353" fill="#C3C3B6"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="12">parent-provided</text>
+    <text x="210" y="370" fill="#C3C3B6"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+          font-size="12">usually mapped</text>
+
+    <text x="210" y="516" fill="#A8A8F0"
+          font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+          font-size="14" font-weight="700">CHILD THREAD</text>
+  </g>
+
+  <!-- Horizontal lifetime lanes. -->
+  <path d="M220 210H1210" stroke="#FFFFFF" stroke-opacity=".5" stroke-width="3"/>
+  <path d="M220 520H440M780 520H1210" stroke="#A8A8F0" stroke-opacity=".2"
+        stroke-width="3" stroke-dasharray="7 9"/>
+  <path d="M440 520H780" stroke="#A8A8F0" stroke-width="3"/>
+
+  <!-- Parent maps a distinct child arena. -->
+  <text x="270" y="176" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">Map child arena</text>
+  <circle cx="270" cy="210" r="6" fill="#FFFFFF"/>
+  <path d="M270 216V319" fill="none" stroke="#C3C3B6" stroke-width="2"
+        marker-end="url(#arrow)"/>
+
+  <!-- Usage-right ownership is the arena's mechanically visible state. -->
+  <text x="685" y="306" fill="#C3C3B6" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="12" font-weight="700">PARENT: CHILD ARENA OFF-LIMITS</text>
+  <rect x="270" y="320" width="170" height="56"
+        fill="url(#arena-fill)" stroke="#66FFE6" stroke-width="2"/>
+  <foreignObject x="280" y="335" width="150" height="30">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 15px/25px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">user <span style="color:#A3F5A3">=</span> parent</pre>
+    </div>
+  </foreignObject>
+
+  <rect x="440" y="320" width="490" height="56"
+        fill="url(#child-fill)" stroke="#A8A8F0" stroke-width="2"/>
+  <foreignObject x="450" y="335" width="470" height="30">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 16px/25px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">user <span style="color:#A3F5A3">=</span> child</pre>
+    </div>
+  </foreignObject>
+
+  <rect x="930" y="320" width="230" height="56"
+        fill="url(#arena-fill)" stroke="#66FFE6" stroke-width="2"/>
+  <foreignObject x="940" y="335" width="210" height="30">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 15px/25px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">user <span style="color:#A3F5A3">=</span> parent</pre>
+    </div>
+  </foreignObject>
+
+  <!-- Spawn creates child lifetime and transfers exclusive arena usage. -->
+  <circle cx="440" cy="210" r="7" fill="#A3F5A3"/>
+  <circle cx="440" cy="520" r="7" fill="#A8A8F0"/>
+  <path d="M440 217V512" fill="none" stroke="#A3F5A3" stroke-width="2.5"
+        marker-end="url(#arrow-green)"/>
+  <text x="458" y="251" fill="#A3F5A3"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700">Spawn</text>
+  <text x="458" y="274" fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">transfer usage rights</text>
+
+  <!-- Child allocation mutates contents, not arena address or lifetime. -->
+  <path d="M620 520V494" fill="none" stroke="#A8A8F0" stroke-width="2"/>
+  <rect x="520" y="400" width="200" height="94" rx="11"
+        fill="#181A1B" stroke="#A8A8F0" stroke-width="2"/>
+  <text x="620" y="425" fill="#A8A8F0" text-anchor="middle"
+        font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
+        font-size="12" font-weight="700">CHILD ALLOCATES</text>
+  <foreignObject x="540" y="437" width="160" height="30">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <pre style="margin:0;text-align:center;color:#FFFFFF;font:700 16px/25px SFMono-Regular,'SF Mono',Menlo,Monaco,Consolas,monospace">top <span style="color:#A3F5A3">+=</span> size</pre>
+    </div>
+  </foreignObject>
+  <text x="620" y="480" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="13" font-weight="700">objects · strings · output</text>
+  <path d="M620 400V377" fill="none" stroke="#A8A8F0" stroke-width="2"
+        marker-end="url(#arrow)"/>
+
+  <!-- Child lifetime ends while its memory lane continues. -->
+  <circle cx="780" cy="520" r="10" fill="#181A1B" stroke="#C3C3B6" stroke-width="2"/>
+  <path d="M774 514L786 526M786 514L774 526" stroke="#C3C3B6" stroke-width="2"/>
+  <text x="780" y="552" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700">Child exits</text>
+
+  <path d="M820 376V400" fill="none" stroke="#66FFE6" stroke-width="2"/>
+  <rect x="730" y="400" width="190" height="94" rx="11"
+        fill="#181A1B" stroke="#66FFE6" stroke-width="2"/>
+  <text x="825" y="426" fill="#66FFE6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700">Memory remains</text>
+  <text x="825" y="455" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">same addresses</text>
+  <text x="825" y="479" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">same data</text>
+
+  <!-- Join returns usage rights and output to the parent. -->
+  <circle cx="930" cy="210" r="7" fill="#A3F5A3"/>
+  <path d="M930 320V218" fill="none" stroke="#A3F5A3" stroke-width="2.5"
+        marker-end="url(#arrow-green)"/>
+  <text x="912" y="252" fill="#A3F5A3" text-anchor="end"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="16" font-weight="700">Successful join</text>
+  <text x="912" y="275" fill="#FFFFFF" text-anchor="end"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">usage rights + output</text>
+
+  <circle cx="1040" cy="210" r="6" fill="#FFFFFF"/>
+  <text x="1040" y="176" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">Use output</text>
+
+  <!-- Arena lifetime ends before parent lifetime. -->
+  <circle cx="1172" cy="210" r="6" fill="#FFFFFF"/>
+  <text x="1172" y="176" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="15" font-weight="700">Unmap arena</text>
+  <path d="M1172 216V335" fill="none" stroke="#C3C3B6" stroke-width="2"
+        marker-end="url(#arrow)"/>
+  <rect x="1160" y="336" width="24" height="24" fill="#181A1B"
+        stroke="#FF6666" stroke-width="2"/>
+  <path d="M1164 340L1180 356M1180 340L1164 356" stroke="#FF6666" stroke-width="2"/>
+
+  <rect x="44" y="618" width="1192" height="90" rx="14"
+        fill="#FFFFFF" fill-opacity=".025" stroke="#4D4D4D" stroke-width="2"/>
+  <text x="640" y="654" fill="#FFFFFF" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="20" font-weight="700">One active user · memory outlives the child</text>
+  <text x="640" y="684" fill="#C3C3B6" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+        font-size="14">Usually a fresh child mapping · an existing context may be lent instead</text>
+</svg>
