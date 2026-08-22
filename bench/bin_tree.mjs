@@ -9,10 +9,7 @@ class Node {
   }
 
   count() {
-    // If added: ≈2.5 times faster.
-    // if (!this.left) return 1
-
-    return 1 + (this.left && this.left.count()) + (this.right && this.right.count())
+    return 1 + (this.left?.count() ?? 0) + (this.right?.count() ?? 0)
   }
 
   static make(depth) {

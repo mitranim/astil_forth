@@ -836,7 +836,6 @@ bench("bin_tree_zig", "bench/bin_tree.zig", ("bench/bin_tree_zig.exe",), setup=z
 bench("bin_tree_go", "bench/bin_tree.go", ("bench/bin_tree_go.exe",), setup=go_exe("bench/bin_tree.go", "bench/bin_tree_go.exe"), tools=("go",))
 bench("bin_tree_luajit", "bench/bin_tree.lua", ("luajit", "bench/bin_tree.lua"), tools=("luajit",))
 bench("bin_tree_js_bun", "bench/bin_tree.mjs", ("bun", "run", "bench/bin_tree.mjs"), tools=("bun",))
-bench("bin_tree_js_bun_lucky", "bench/bin_tree_lucky.mjs", ("bun", "run", "bench/bin_tree_lucky.mjs"), tools=("bun",))
 bench("bin_tree_java", "bench/bin_tree.java", ("java", "-cp", "bench", "bin_tree"), setup=java_class("bench/bin_tree.java"), tools=("java",))
 bench("bin_tree_cl_sbcl", "bench/bin_tree.lisp", ("sbcl", "--script", "bench/bin_tree.lisp"), tools=("sbcl",))
 bench("bin_tree_pypy", "bench/bin_tree.py", ("pypy3", "bench/bin_tree.py"), tools=("pypy3",))
