@@ -7,6 +7,7 @@ import os
 import signal
 import subprocess as sub
 import threading
+import time
 
 PLUGIN_NAME = "astil_forth"
 PANEL_NAME = "output." + PLUGIN_NAME # Prefix is required by API.
@@ -40,6 +41,8 @@ class Eval(threading.Thread):
       self.panel.run_command("append", {"characters": text})
 
   def run(self):
+    start_time = time.perf_counter()
+
     try:
       if self.canceled: return
 
@@ -61,20 +64,36 @@ class Eval(threading.Thread):
         self.append(dec.decode(chunk))
       if not self.canceled or self.announce:
         self.append(dec.decode(b"", final=True))
-      self.append("[ok]")
+
+      code = self.proc.wait()
+      self.proc = None
+      if self.canceled: return
+
+      elapsed = time_fmt(time.perf_counter() - start_time)
+      if code:
+        self.append(f"[exit {code} in {elapsed}]")
+      else:
+        self.append(f"[{elapsed}]")
+      sublime.status_message("Eval failed" if code else "Eval finished")
+
     except OSError as err:
       self.kill()
       if not self.canceled:
         self.append(f"{err}")
+        sublime.status_message("Eval failed")
+
     finally:
-      failed = False
       if self.proc:
-        failed = self.proc.wait() != 0
+        self.proc.wait()
         self.proc = None
       if self.announce:
-        self.append("[canceled]")
-      if not self.canceled:
-        sublime.status_message("Eval failed" if failed else "Eval finished")
+        elapsed = time_fmt(time.perf_counter() - start_time)
+        self.append(f"[canceled after {elapsed}]")
+
+def time_fmt(val):
+  if val < 1:
+    return f"{val * 1000:.0f}ms"
+  return f"{val:.1f}s"
 
 class astil_forth_eval_selection(sublime_plugin.WindowCommand):
   eval = None
