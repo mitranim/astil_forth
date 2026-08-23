@@ -1678,7 +1678,8 @@ end
 1 0 extern: .srand    srand    ( seed                  --           )
 1 1 extern: .rand_r   rand_r   ( seed_adr              -- val :Cint )
 
-\ Byte-oriented `<ctype.h>` surface. Arguments must be `EOF` or unsigned byte.
+\ Byte-oriented `<ctype.h>` interfaces.
+\ Input must be `EOF` or unsigned byte.
 1 1 extern: .isalnum  isalnum  ( char -- bool :Cint )
 1 1 extern: .isalpha  isalpha  ( char -- bool :Cint )
 1 1 extern: .isblank  isblank  ( char -- bool :Cint )
@@ -1702,8 +1703,7 @@ fun: .memzero { buf len ->   } 0 .memfill end
 
 \ Copies a string to compiler-managed memory and appends a null byte.
 fun: .comp_alloc_cstr { src len -- cstr err }
-  len .inc { cap }
-  cap 1 .comp_alloc_data { tar }
+  len .inc 1 .comp_alloc_data { tar }
   tar src len .memmove \ `src tar` may overlap.
   nil tar len + !8
   tar
@@ -4506,13 +4506,11 @@ fun: .assert_bin_end { beg cond cmp_xt -- err }
   cmp_xt .Sym_name .Sym_word_len @u32 { op_len }
 
   .comp_pop2 .then { val0 val1 }
-    val0 val1 cmp_xt .xt_instr .call [ 1 .comp_args_set ] { bool }
-    bool =0 .then
-      beg .assert_body { text text_len }
-      " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"
-      text_len text op_len op val0 val1 op_len op .errf .ret
-    end
-    .ret
+    val0 val1 cmp_xt .xt_instr .call [ 1 .comp_args_set ] .then .ret end
+    beg .assert_body { text text_len }
+    " assertion failed: %.*s%.*s (0x%zx 0x%zx %.*s)"
+    text_len text op_len op val0 val1 op_len op
+    .errf .ret
   else { -- } end
 
   .comp_args_get 2 - { reg0 }
