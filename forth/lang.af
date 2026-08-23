@@ -3947,9 +3947,8 @@ end
 \ ## String comparison continued
 
 fun: .compare { str0 len0 str1 len1 -- cmp }
-  0 { cmp }
   len0 len1 .min { len }
-  len .then str0 str1 len .memcmp .cint_to_cell { cmp } end
+  len .and str0 str1 len .memcmp .cint_to_cell end { cmp }
   cmp len0 len1 - .coalesce
 end
 
@@ -4742,28 +4741,21 @@ fun_comp: r`  { -- err } char' ` false .read_str_until { _ } .comp_next_page_add
 fun_comp: rs" { -- err } char' " false .read_str_until .comp_slice end
 fun_comp: rs` { -- err } char' ` false .read_str_until .comp_slice end
 
-fun: .comp_promote_or_alloc_cstr { buf len -- buf err }
-  .interp_data { data }
-  data .Span_top @ buf = .then
-    data len .inc .interp_data_alloc
-    buf
-  else
-    buf len .comp_alloc_cstr
-  end
-end
-
-\ Captures and names a memory slice, making it safe to use in future code.
-\ Slices staged at the top of the compiler-managed data region are promoted
-\ in-place; other slices are copied into it. Also ensures null-termination.
+\ Captures and names a memory slice, making it safe to use in later code.
+\ Usage example:
+\
+\   s" some_str" str: SOME_STR
+\   fun: .fun0 { -- str len } SOME_STR end
+\   fun: .fun1 { -- str len } SOME_STR end
 fun: str: { buf len -- err } ( E: -- cstr len )
-  buf len .comp_promote_or_alloc_cstr { buf }
+  buf len .comp_alloc_cstr { buf }
   .read_word buf len .init_slice_word
   [ false .comp_only ]
 end
 
 fun: cstr: { buf -- err } ( E: -- cstr )
   buf .strlen { len }
-  buf len .comp_promote_or_alloc_cstr { buf }
+  buf len .comp_alloc_cstr { buf }
   .read_word buf .init_data_word
   [ false .comp_only ]
 end
