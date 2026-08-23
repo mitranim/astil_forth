@@ -66,20 +66,20 @@ IO and conditionals:
 use' lang.af
 
 fun: .run
-  " hello world!" .log .lf
+  " hello world!\n" .log
 
   10 .then
-    " branch 0" .log .lf
+    " branch 0\n" .log
   elif 20 .then
-    " branch 1" .log .lf
+    " branch 1\n" .log
   else
-    " branch 2" .log .lf
+    " branch 2\n" .log
   end
 
   0 { ind }
   loop
     ind 12 < .while
-    " current number: %zd" ind .logf .lf
+    " current number: %zd\n" ind .logf
     inc: ind
   end
 end
@@ -117,17 +117,17 @@ Easy AOT compilation; can be used from inside a program, or via CLI flags:
 
 ```forth
 fun: .run { -- exit }
-  " hello world!" .log .lf
+  " hello world!\n" .log
   0
 end
 
 fun: .main { -- exit } .with_main_ctx .run end end
 
-xt' .main           \ Reference to the entry point.
-" out.exe"         \ Where to put the executable.
+xt' .main           \ Entry point reference.
+" out.exe"          \ Where to put executable.
 .compile_executable
 
-\ Run `./out.exe` in your shell to print the message.
+\ Run `./out.exe` to print message.
 ```
 
 ## Why
@@ -156,7 +156,7 @@ Most languages lock into one execution model: either interpretation/JIT, or AOT 
 
 Astil Forth _proves_ that combining interpretation/JIT and AOT compilation in one language is easy, practical, and useful. We could end the "language split".
 
-In development, Astil is a scripting language with instant startup and feedback. For "production", it builds a standalone executable, deployable as-is, and without any interpreter inside.
+In development, Astil is a scripting language with instant startup and feedback. For "production", it builds a standalone executable, deployable as-is, and without any interpreter inside, simply by snapshotting the current program's JIT-compiled code.
 
 Some other scripting languages offer "compilation", but it's almost never the real deal. Some examples:
 - Gforth builds a VM image file, which requires the interpreter.
@@ -390,9 +390,7 @@ AF simplifies MM in two ways:
 - Caller-owned arenas.
 - Ambient memory context.
 
-AF dedicates one register (`x28`) to the ambient context, available anywhere via the word `context`. See the type `Ctx` for the structure's definition.
-
-The context acts as a bump-allocator over borrowed caller-owned memory. It's used by words like `.errf`, which need thread-specific scratch memory.
+AF dedicates one register (`x28`) to the ambient context, available anywhere via the word `context`. See the type `Ctx` for the structure's definition. It contains a bump-allocator interface: memory range `[top,ceil)`, which is used by words like `new'` and `.errf` which need thread-specific dynamic memory.
 
 The outer compiler automatically sets up the main arena. In JIT, it also sets up the main context. In AOT, the main arena is memory-mapped automatically, but the context requires extra setup. General AOT pattern:
 
@@ -427,7 +425,7 @@ end
 
 The body of `.with_ctx` must reach `end`; avoid `.ret .try .throw` or local auto-try. Call an inner function and capture its outputs outside.
 
-Every context object begins with `Ctx`, and may contain arbitrary extra fields. In JIT mode, the default ambient context is `Interp*`, which begins with the default `Ctx`. User code may define its own context types.
+Every context object begins with `Ctx`, and may contain arbitrary extra fields. User code may define its own context types. In JIT mode, the default ambient context is `Interp*`, which begins with the `Ctx` header.
 
 The shortcut `.ctx_mem_map` allocates memory sandwiched between two guards, initializes a `Ctx` header near the bottom of the inner memory region, and returns its address.
 
@@ -439,13 +437,13 @@ Callbacks which use context require additional setup:
 - Either receive memory from parent, or map/unmap it locally.
 - Run the inner callback inside `.with_ctx ... end`.
 
-Joinable child threads require parent-owned memory for their context. Our [`forth/pthread.af`](./forth/pthread.af) provides the shortcut `.thread_spawn_ctx` for joinable threads, and shows the needed closure + trampoline pattern for context setup.
+Joinable child threads want parent-owned contextual memory. Our [`forth/pthread.af`](./forth/pthread.af) provides the shortcut `.thread_spawn_ctx` for joinable threads. It also shows the needed closure + trampoline pattern for more custom context setup.
 
-Thread memory use is exclusive: while a child is running, parent is not allowed to use or unmap its memory.
+By default, usage rights for contextual thread memory should be exclusive: while child thread runs, parent thread doesn't use its arena.
 
 Detached child threads set up the context internally. Our [`examples/http_echo.af`](examples/http_echo.af) shows the needed pattern for internal context setup; see `.handle_conn`.
 
-We currently don't support thread-local storage. Ambient contexts provide a similar-enough solution, designed for parent-owned memory which outlives the child. The differences between our approach and TLS are mostly in the implementation; the current solution is simpler and requires less OS-specific machinery. We may bridge this gap in the future.
+AF currently doesn't support thread-local storage. Ambient contexts are similar enough. The differences with TLS are mostly in the implementation; the current solution is simpler and requires less OS-specific machinery.
 
 ## Structure
 
@@ -558,7 +556,7 @@ Non-identifier names such as `+ @ ! u/mod fun: xt'` are automatically call-like.
 
 ```forth
 fun: .log_num { val }
-  " %zd" val .logf .lf
+  " %zd\n" val .logf
 end
 
 1 0 extern: .exit exit
