@@ -1,22 +1,22 @@
 use' ../lang.af
 
-fun: .test_sym_instr_len { XT -- len }
+fun: .xt_instr_len { XT -- len }
   XT .Sym_union .Sym_norm_spans { spans }
   spans .Sym_instrs_ret @u32 .inc
   spans .Sym_instrs_prologue @u32 -
 end
 
-fun: .test_actual_instr { XT ind -- instr }
-  XT .xt_instr ind 4 * + @u32
+fun: .xt_instr_at { XT ind -- instr }
+  XT .xt_instr ind ASM_INSTR_SIZE * + @u32
 end
 
-fun: .test_word_instr_count { XT instr -- count }
-  XT .test_sym_instr_len { len }
+fun: .xt_instr_count { XT instr -- count }
+  XT .xt_instr_len { len }
   0 { count }
   0 { ind }
   loop
     ind len < .while
-    XT ind .test_actual_instr instr = .then inc: count end
+    XT ind .xt_instr_at instr = .then inc: count end
     inc: ind
   end
   count

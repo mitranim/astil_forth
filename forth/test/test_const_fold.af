@@ -19,7 +19,7 @@ end
 
 fun: .cf_want_word { XT -- err }
   CF_WANT_LEN @ { exp_len }
-  XT .test_sym_instr_len { act_len }
+  XT .xt_instr_len { act_len }
   exp_len act_len <> .then
     XT .Sym_name .Sym_word_buf { name }
     XT .Sym_name .Sym_word_len @u32 { name_len }
@@ -31,7 +31,7 @@ fun: .cf_want_word { XT -- err }
   loop
     ind exp_len < .while
     CF_WANT_INSTRS ind 4 * + @u32 { exp }
-    XT ind .test_actual_instr { act }
+    XT ind .xt_instr_at { act }
     exp act <> .then
       XT .Sym_name .Sym_word_buf { name }
       XT .Sym_name .Sym_word_len @u32 { name_len }
@@ -349,15 +349,15 @@ end
 
 fun: .test_const_fold_loc_mut { -- err }
   0 0 8 .asm_add_imm { add_instr }
-  assert= xt' .const_fold_loc_add_imm_fun add_instr .test_word_instr_count 1 end
+  assert= xt' .const_fold_loc_add_imm_fun add_instr .xt_instr_count 1 end
 
   0 0 3 .asm_lsl_imm { lsl_instr }
-  assert= xt' .const_fold_loc_mul_imm_fun lsl_instr .test_word_instr_count 1 end
+  assert= xt' .const_fold_loc_mul_imm_fun lsl_instr .xt_instr_count 1 end
 
   0 20 .asm_cmp_imm { instr0 }
   0 ASM_EQ .asm_cset { instr1 }
-  assert= xt' .const_fold_loc_eq_imm_fun instr0 .test_word_instr_count 1 end
-  assert= xt' .const_fold_loc_eq_imm_fun instr1 .test_word_instr_count 1 end
+  assert= xt' .const_fold_loc_eq_imm_fun instr0 .xt_instr_count 1 end
+  assert= xt' .const_fold_loc_eq_imm_fun instr1 .xt_instr_count 1 end
 end
 .test_const_fold_loc_mut
 

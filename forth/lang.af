@@ -162,13 +162,6 @@ fun: .comp_out0 { instr -- err }
   1 .comp_args_set
 end
 
-fun: .comp_out0_2 { instr0 instr1 -- err }
-  0 .comp_realloc_reg
-  instr0 .comp_instr
-  instr1 .comp_instr
-  1 .comp_args_set
-end
-
 fun: .bit_or { i0 i1 -> i2 } [
   0b1_01_01010_00_0_00001_000000_00000_00000 .comp_out0 \ orr x0, x0, x1
 ] end
@@ -261,11 +254,17 @@ end
 \ ## Early booleans
 
 fun: <>0 { int -> bool } [
-  0 .asm_cmp_zero 0 ASM_NE .asm_cset .comp_out0_2 \ cmp x0, 0; cset x0, ne
+  0                      .comp_realloc_reg
+  0        .asm_cmp_zero .comp_instr \ cmp x0, 0
+  0 ASM_NE .asm_cset     .comp_instr \ cset x0, ne
+  1                      .comp_args_set
 ] end
 
 fun: =0 { int -> bool } [
-  0 .asm_cmp_zero 0 ASM_EQ .asm_cset .comp_out0_2 \ cmp x0, 0; cset x0, eq
+  0                      .comp_realloc_reg
+  0        .asm_cmp_zero .comp_instr \ cmp x0, 0
+  0 ASM_EQ .asm_cset     .comp_instr \ cset x0, eq
+  1                      .comp_args_set
 ] end
 
 \ ## Assembler: instruction patterns
@@ -3963,8 +3962,8 @@ end
 
 fun: .compare { str0 len0 str1 len1 -- cmp }
   len0 len1 .min { len }
-  len .and str0 str1 len .memcmp .cint_to_cell end { cmp }
-  cmp len0 len1 - .coalesce
+  len .and str0 str1 len .memcmp .cint_to_cell end
+  len0 len1 - .coalesce
 end
 
 \ `.strcmp` doesn't like null string pointers.
