@@ -1711,16 +1711,16 @@ fun: .test_dec { -- err }
 end
 .test_dec
 
-fun: .test_negate { -- err }
-  assert= 0 .negate 0 end
-  assert= 123 .negate -123 end
-  assert= -123 .negate 123 end
+fun: .test_neg { -- err }
+  assert= 0 .neg 0 end
+  assert= 123 .neg -123 end
+  assert= -123 .neg 123 end
   123 { val }
-  assert= val .negate -123 end
-  negate: val
+  assert= val .neg -123 end
+  neg: val
   assert= val -123 end
 end
-.test_negate
+.test_neg
 
 fun: .test_abs { -- err }
   assert= 0 .abs 0 end
@@ -3562,7 +3562,7 @@ end
 fun: .test_explicit_err_3_fun { one -- two three err }
   one =0 .then .test_throw end
   one 2 * { two }
-  one .negate { three }
+  one .neg { three }
   two three
 end
 
@@ -3570,7 +3570,7 @@ end
 fun: .test_explicit_err_3_fun_throwing { -- err }
   \ 0 test_explicit_err_3_fun { -- } \ Must .throw.
 
-  assert= 123 .negate -123 end
+  assert= 123 .neg -123 end
 
   123 .test_explicit_err_3_fun { one two }
   assert= one 246 end
@@ -4142,7 +4142,7 @@ fun: .main_run { -- err }
   .test_udiv_mod
   .test_inc
   .test_dec
-  .test_negate
+  .test_neg
   .test_abs
   .test_bit_clz
   .test_bit_ctz

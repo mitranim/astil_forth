@@ -193,7 +193,7 @@ fun: .bit_not { i0 -> i1 } [
   0b1_01_01010_00_1_00000_000000_11111_00000 .comp_out0 \ mvn x0, x0
 ] end
 
-fun: .negate { i0 -> i1 } [
+fun: .neg { i0 -> i1 } [
   0b1_1_0_01011_00_0_00000_000000_11111_00000 .comp_out0 \ neg x0, x0
 ] end
 
@@ -783,11 +783,11 @@ fun_comp: .bit_lsl { -- err } ASM_OP_LSL_REG .comp_reg2_arith end
 fun_comp: .bit_lsr { -- err } ASM_OP_LSR_REG .comp_reg2_arith end
 fun_comp: .bit_asr { -- err } ASM_OP_ASR_REG .comp_reg2_arith end
 
-fun_comp: .negate { -- err }
+fun_comp: .neg { -- err }
   .comp_realloc1 .asm_neg .comp_instr \ neg Xd, Xn
 end
 
-fun: ?bit_not { val cond -> out } .negate .bit_xor end
+fun: ?bit_not { val cond -> out } .neg .bit_xor end
 
 fun_comp: .inc { -- err }
   .comp_realloc1 { reg }
@@ -2763,8 +2763,8 @@ fun: .asm_bitwise_logical_imm_mask { imm -- instr_mask ok }
   imm size .asm_ror64 imm <> .then nil false .ret end
 
   size 6 .bit_lsr { N }
-  rot .negate size .dec .bit_and { immr }
-  size 1 .bit_lsl .negate ones .dec .bit_or 6 .bit_trunc { imms }
+  rot .neg size .dec .bit_and { immr }
+  size 1 .bit_lsl .neg ones .dec .bit_or 6 .bit_trunc { imms }
 
   N    22 .bit_lsl
   immr 16 .bit_lsl .bit_or
@@ -2944,7 +2944,7 @@ fun_comp: .bit_asr { -- err } [ .redefine ]
 end
 
 fun: .comp_addsub_imm { imm add -- ok err }
-  imm >=0 .then imm else imm .negate end { mag }
+  imm >=0 .then imm else imm .neg end { mag }
   mag 0 >= mag ASM_MAX_IMM12 <= .bit_and =0 .then false .ret end
   .comp_realloc1 { reg }
   reg reg mag imm >=0 add = .then .asm_add_imm else .asm_sub_imm end
@@ -2982,7 +2982,7 @@ fun_comp: * { -- err } [ .redefine ]
     \ Multiplication by constant 2-pow: replace with left-shift.
     \ Multiplication by constant zero: skip; not worth the code.
     imm <0 { neg }
-    neg .then imm .negate else imm end { mag }
+    neg .then imm .neg else imm end { mag }
     mag .is_pow2 .then
       mag .bit_ctz { shift }
       .comp_realloc1 { reg }
@@ -3056,13 +3056,13 @@ fun_comp: dec: { -- err } ( C: "name" -- ) ( E: -- )
   loc .comp_pop_into_local
 end
 
-fun_comp: .negate { -- err } [ .redefine ]
-  .comp_pop1 .then .negate .comp_push else { -- } call'' .negate end
+fun_comp: .neg { -- err } [ .redefine ]
+  .comp_pop1 .then .neg .comp_push else { -- } call'' .neg end
 end
 
-fun_comp: negate: { -- err } ( C: "name" -- ) ( E: -- )
+fun_comp: neg: { -- err } ( C: "name" -- ) ( E: -- )
   .comp_loc_mut_beg { loc }
-  call'' .negate
+  call'' .neg
   loc .comp_pop_into_local
 end
 
@@ -3422,7 +3422,7 @@ end
 fun_comp: .align_down { -- err } [ .redefine ]
   .comp_pop2 .then .align_down .comp_push .ret else { -- } end
   .comp_pop1 .then { size }
-    size .negate ASM_OP_AND_IMM .comp_bitwise_logical_imm .then .ret end
+    size .neg ASM_OP_AND_IMM .comp_bitwise_logical_imm .then .ret end
     size .comp_push
   else { -- } end
   call'' .align_down
@@ -3433,7 +3433,7 @@ fun_comp: .align_up { -- err } [ .redefine ]
   .comp_pop1 .then { size }
     size .dec { off }
     off 0 >= off ASM_MAX_IMM12 <= .bit_and .then
-      size .negate .asm_bitwise_logical_imm_mask
+      size .neg .asm_bitwise_logical_imm_mask
       .then { mask }
         .comp_realloc1 { reg }
         reg reg off .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
@@ -3692,7 +3692,7 @@ fun_comp: .with_ctx { -- end_xt err } ( E: ctx -- )
   len .comp_args_set
 
   \ stp x28, xzr, [sp, #-16]!
-  ASM_REG_CTX ASM_REG_ZR ASM_REG_SP FUND_ALIGN .negate .asm_store_pair_pre .comp_instr
+  ASM_REG_CTX ASM_REG_ZR ASM_REG_SP FUND_ALIGN .neg .asm_store_pair_pre .comp_instr
   ASM_REG_CTX len .asm_mov_reg .comp_instr \ mov x28, x0
   xt'' .with_ctx_end
 end
@@ -3933,7 +3933,7 @@ end
 
 fun: .asm_append { instr buf -> buf } !32 buf ASM_INSTR_SIZE + end
 fun: .asm_imm16_lane { val hw -> lane } 4 .bit_lsl .bit_lsr 0xffff .bit_and end
-fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .negate .bit_and - <>0 end
+fun: .asm_movk_needed { neg lane -- bool } lane 0xffff neg .neg .bit_and - <>0 end
 
 fun: .asm_append_movk_if_needed { reg neg hw imm out -- out }
   imm hw .asm_imm16_lane { lane }

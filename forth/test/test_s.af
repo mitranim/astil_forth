@@ -445,9 +445,9 @@ fun: .test_load_store_typed
 end
 .test_load_store_typed
 
-T{ 0 .negate <T> 0 }T
-T{ 123 .negate <T> -123 }T
-T{ -123 .negate <T> 123 }T
+T{ 0 .neg <T> 0 }T
+T{ 123 .neg <T> -123 }T
+T{ -123 .neg <T> 123 }T
 
 \ `=` is used by the testing tools, so this test is almost meaningless.
 T{ 0 0 = <T> 1 }T

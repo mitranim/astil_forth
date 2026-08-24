@@ -173,7 +173,7 @@ end
 fun: .const_fold_multi_out_fun { -- out0 out1 out2 out3 out4 out5 out6 }
   41 .inc
   43 .dec
-  42 .negate
+  42 .neg
   0 .bit_not
   -42 .abs
   0 .bit_len

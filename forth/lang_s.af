@@ -700,7 +700,7 @@ fun: .flip ( i1 i2 i3 -- i3 i2 i1 ) [
 
 \ ## Arithmetic
 
-fun: .negate ( i1 -- i2 ) [
+fun: .neg ( i1 -- i2 ) [
     .asm_pop_x1  .comp_instr \ ldr x1, [x27, -8]!
   1 .asm_neg     .comp_instr \ neg x1, x1
     .asm_push_x1 .comp_instr \ str x1, [x27], 8
@@ -791,11 +791,11 @@ fun: -cell  ( adr  -- adr  ) CELL - end
 
 \ lsl Xd, Xn, <imm>
 fun: .asm_lsl_imm ( Xd Xn imm6 -- instr )
-  .dup .negate 64 .mod 6 .bit_trunc 16 .bit_lsl         \ immr
-  63 .rot -            6 .bit_trunc 10 .bit_lsl .bit_or \ imms
-  .swap                              5 .bit_lsl .bit_or \ Xn
-                                                .bit_or \ Xd
-  0b1_10_100110_1_000000_000000_00000_00000     .bit_or
+  .dup .neg 64 .mod 6 .bit_trunc 16 .bit_lsl         \ immr
+  63 .rot -         6 .bit_trunc 10 .bit_lsl .bit_or \ imms
+  .swap                           5 .bit_lsl .bit_or \ Xn
+                                             .bit_or \ Xd
+  0b1_10_100110_1_000000_000000_00000_00000  .bit_or
 end
 
 \ tbz Xt, <bit>, <imm>
@@ -1592,7 +1592,7 @@ end
 \ Non-standard and sane: no wraparound semantics.
 fun: .within { num floor ceil -- bool } num floor >= num ceil < .bit_and end
 
-fun: .align_down ( size width -- size ) .negate .bit_and end
+fun: .align_down ( size width -- size ) .neg .bit_and end
 fun: .align_up   { size width -- size } width .dec size + width .align_down end
 
 \ ## Locals mutation
