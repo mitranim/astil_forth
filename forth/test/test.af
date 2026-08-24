@@ -2347,10 +2347,10 @@ end
 
 fun: .test_assert_bin_runtime_errors { -- Err }
   123 456 .assert_bin_fail { err }
-  err " assertion failed: lhs rhs = (0x7b 0x1c8 =)" .assert_cstr_has .try
+  err " assertion failed: assert=  lhs rhs end (0x7b 0x1c8)" .assert_cstr_has .try
 
   456 123 .assert_bin_lt_fail { err }
-  err " assertion failed: lhs rhs < (0x1c8 0x7b <)" .assert_cstr_has
+  err " assertion failed: assert<  lhs rhs end (0x1c8 0x7b)" .assert_cstr_has
 end
 
 fun: .test_assert_fail_err { -- err_str } .assert_fail end
@@ -2362,7 +2362,7 @@ fun: .test_assert { -- err }
   .test_assert_try_manual
   .test_assert_bin_runtime_errors
   .test_assert_fail_err { err }
-  err " assertion failed: 123 456 =" .assert_cstr_has
+  err " assertion failed: assert 123 456 = end" .assert_cstr_has
 end
 .test_assert
 
