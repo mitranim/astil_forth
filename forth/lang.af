@@ -208,6 +208,7 @@ fun: - { i0 i1 -> i2 } [
   0b1_1_0_01011_00_0_00001_000000_00000_00000 .comp_out0 \ sub x0, x0, x1
 ] end
 
+\ Early internal definitions which assume less than 64 bits.
 fun: .low_bits  { len     -- bits } 1 len .bit_lsl .dec end
 fun: .bit_trunc { imm len -- imm  } len .low_bits imm .bit_and end
 
@@ -236,6 +237,12 @@ fun: .asm_cmp_zero { Xn -> instr } 0 .asm_cmp_imm end
 fun: .asm_cset { Xd cond -- instr }
   cond .asm_cond_invert 12 .bit_lsl { cond }
   Xd cond .bit_or ASM_OP_CSET .bit_or
+end
+
+0b1_1_0_11010100_11111_0000_0_0_11111_00000 let: ASM_OP_CSETM
+
+fun: .asm_csetm { Xd cond -- instr }
+  cond .asm_cond_invert 12 .bit_lsl Xd .bit_or ASM_OP_CSETM .bit_or
 end
 
 \ ccmp Xd, Xm, <nzcv>, <cond>
@@ -607,6 +614,12 @@ end
 
 \ Arithmetic (sign-preserving) right shift.
 fun: .bit_asr { i0 bits -> i1 } [ 0 0 1 .asm_asr_reg .comp_out0 ] end \ asr x0, x0, x1
+
+\ ror Xd, Xn, Xm
+0b1_0_0_11010110_00000_0010_11_00000_00000 let: ASM_OP_ROR_REG
+fun: .asm_ror_reg { Xd Xn Xm -> instr }
+  .asm_pattern_arith_reg ASM_OP_ROR_REG .bit_or
+end
 
 \ lsl Xd, Xn, Xm
 0b1_0_0_11010110_00000_0010_00_00000_00000 let: ASM_OP_LSL_REG
@@ -996,18 +1009,14 @@ end
 
 fun: .bit_len { val -> len } .bit_len end
 
-\ Round up to nearest pow2. Unsigned.
-\ If top bit is nonzero, output is 1.
+\ Round up to nearest pow2. Unsigned. Input top bit needs to be unset.
 fun_comp: .pow2_ceil { -- err }
   .comp_realloc1 { reg }
   .comp_alloc_next_reg { tmp }
-  tmp 1                      .comp_load          \ mov Xd, #1
-  reg reg tmp reg tmp ASM_HI .comp_emit_csel_reg \ csel Xd, Xn, Xm, hi
-  reg reg 1 .asm_sub_imm     .comp_instr         \ sub Xd, Xn, #1
-  reg reg .asm_clz           .comp_instr         \ clz Xd, Xn
-  reg .asm_neg               .comp_instr         \ neg Xd, Xn
-  reg reg 64 .asm_add_imm    .comp_instr         \ add Xd, Xn, #64
-  reg tmp reg .asm_lsl_reg   .comp_instr         \ lsl Xd, Xn, Xm
+  reg reg 1   .asm_sub_imm .comp_instr \ sub Xd, Xn, #1
+  reg reg     .asm_clz     .comp_instr \ clz Xd, Xn
+  tmp 1                    .comp_load  \ mov Xt, #1
+  reg tmp reg .asm_ror_reg .comp_instr \ ror Xd, Xt, Xd
   reg .inc .comp_args_set
 end
 
@@ -1032,22 +1041,23 @@ end
 
 fun: .bit_ctz { num -> len } .bit_ctz end
 
+fun: .comp_emit_low_bits { out len tmp -- err }
+  len ASM_REG_ZR len .asm_subs_reg .comp_instr \ negs Xlen, Xlen
+  tmp ASM_NE         .asm_csetm    .comp_instr \ csetm Xtmp, ne
+  out tmp len        .asm_lsr_reg  .comp_instr \ lsr Xout, Xtmp, Xlen
+end
+
 fun_comp: .low_bits { -- err }
   .comp_realloc1 { reg }
   .comp_alloc_next_reg { tmp }
-  tmp 1                    .comp_load  \ mov x1, #1
-  tmp tmp reg .asm_lsl_reg .comp_instr \ lsl x1, x1, x0
-  reg tmp 1   .asm_sub_imm .comp_instr \ sub x0, x1, #1
+  reg reg tmp .comp_emit_low_bits
   reg .inc .comp_args_set
 end
 
 fun_comp: .bit_trunc { -- err }
-  .comp_reg2 { imm len }
+  .comp_realloc2 { imm len }
   .comp_alloc_next_reg { tmp }
-  imm .comp_realloc_reg
-  tmp 1 .comp_load
-  tmp tmp len .asm_lsl_reg .comp_instr \ lsl Xt, Xt, Xlen
-  tmp tmp 1   .asm_sub_imm .comp_instr \ sub Xt, Xt, #1
+  tmp len tmp .comp_emit_low_bits
   imm imm tmp .asm_and_reg .comp_instr \ and Xd, Xn, Xm
   len .comp_args_set
 end

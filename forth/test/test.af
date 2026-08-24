@@ -1777,6 +1777,16 @@ fun: .test_bit_len { -- err }
 end
 .test_bit_len
 
+fun: .test_pow2_ceil_codegen { -- err }
+  assert= xt' .pow2_ceil .xt_instr_len 5 end
+  assert= xt' .pow2_ceil 0 .xt_instr_at 0b1_1_0_100010_0_000000000001_00000_00000  end \ sub x0, x0, #1
+  assert= xt' .pow2_ceil 1 .xt_instr_at 0b1_1_0_11010110_00000_00010_0_00000_00000 end \ clz x0, x0
+  assert= xt' .pow2_ceil 2 .xt_instr_at 0b1_10_100101_00_0000000000000001_00001    end \ mov x1, #1
+  assert= xt' .pow2_ceil 3 .xt_instr_at 0b1_0_0_11010110_00000_0010_11_00001_00000 end \ ror x0, x1, x0
+  assert= xt' .pow2_ceil 4 .xt_instr_at ASM_RET end
+end
+.test_pow2_ceil_codegen
+
 fun: .test_pow2_ceil { -- err }
   assert= 0 .pow2_ceil 1 end
   assert= 1 .pow2_ceil 1 end
@@ -1786,6 +1796,10 @@ fun: .test_pow2_ceil { -- err }
   assert= 4095 .pow2_ceil 4096 end
   assert= 4096 .pow2_ceil 4096 end
   assert= 4097 .pow2_ceil 8192 end
+  assert= 0x8000000000000000 .pow2_ceil 0x8000000000000000 end
+  assert= 0xf000000000000000 .pow2_ceil 1 end
+  assert= 0xf000000000000001 .pow2_ceil 1 end
+  assert= 0xffffffffffffffff .pow2_ceil 1 end
   4097 { val }
   assert= val .pow2_ceil 8192 end
   pow2_ceil: val
@@ -2214,16 +2228,21 @@ end
 .test_bit_not
 
 fun: .test_low_bits { -- err }
+  assert= 0 .low_bits 0 end
   assert= 5 .low_bits 31 end
-  5 { val }
-  assert= val .low_bits 31 end
+  assert= 64 .low_bits -1 end
+  64 { val }
+  assert= val .low_bits -1 end
   low_bits: val
-  assert= val 31 end
+  assert= val -1 end
 end
 .test_low_bits
 
 fun: .test_bit_trunc { -- err }
   assert= 0x1234 8 .bit_trunc 0x34 end
+  assert= 0x1234 64 .bit_trunc 0x1234 end
+  64 { len }
+  assert= 0x1234 len .bit_trunc 0x1234 end
 end
 .test_bit_trunc
 

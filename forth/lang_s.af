@@ -130,7 +130,14 @@ fun: .swap ( i1 i2 -- i2 i1 ) [
   0b10_101_0_001_0_0000010_00001_11011_00010 .comp_instr \ stp x2, x1, [x27], 16
 ] end
 
-fun: .low_bits ( bit_len -- bits ) 1 .swap .bit_lsl .dec end
+fun: .low_bits ( bit_len -- bits ) [
+  .asm_pop_x1  .comp_instr \ ldr x1, [x27, -8]!
+  0b1_1_1_01011_00_0_00001_000000_11111_00001 .comp_instr \ negs x1, x1
+  0b1_1_0_11010100_11111_0000_0_0_11111_00010 .comp_instr \ csetm x2, ne
+  0b1_0_0_11010110_00001_0010_01_00010_00001  .comp_instr \ lsr x1, x2, x1
+  .asm_push_x1 .comp_instr \ str x1, [x27], 8
+] end
+
 fun: .bit_trunc ( imm bit_len -- imm ) .low_bits .bit_and end
 
 \ cmp Xn, <imm>

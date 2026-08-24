@@ -563,6 +563,11 @@ T{ 10 0 .fallback <T> 10 }T
 T{ 10 20 .fallback <T> 20 }T
 T{ 20 10 .fallback <T> 10 }T
 
+T{ 0 .low_bits <T> 0 }T
+T{ 64 .low_bits <T> -1 }T
+
+T{ 0x1234 64 .bit_trunc <T> 0x1234 }T
+
 T{ 10 20 30 .swap_over <T> 20 10 30 }T
 
 T{ 0xffffffff .cint_to_cell <T> -1 }T
