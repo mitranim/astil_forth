@@ -737,31 +737,36 @@ end
 
 \ ## Assembler: register selection
 
-fun: .comp_args1_reg { -- reg err }
+fun: .comp_reg1 { -- reg err }
   1 nil .comp_args_min
-  .comp_args_get .dec { reg }
+  .comp_args_get .dec
+end
+
+fun: .comp_reg2 { -- reg0 reg1 err }
+  2 nil .comp_args_min
+  .comp_args_get .dec { reg1 }
+  reg1 .dec { reg0 }
+  reg0 reg1
+end
+
+fun: .comp_realloc1 { -- reg err }
+  .comp_reg1 { reg }
   reg .comp_realloc_reg
   reg
 end
 
-fun: .comp_args2_regs { -- reg0 reg1 err }
-  2 nil .comp_args_min
-  .comp_args_get .dec { reg1 }
-  reg1 .dec { reg0 }
+fun: .comp_realloc2 { -- reg0 reg1 err }
+  .comp_reg2 { reg0 reg1 }
   reg0 .comp_realloc_reg
-  reg0 reg1
-end
-
-fun: .comp_args2_arith_reg { op -- err }
-  .comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 .asm_pattern_arith_reg op .bit_or .comp_instr \ <op> Xd, Xn, Xm
-  reg1 .comp_args_set
-end
-
-fun: .comp_args2_regs2 { -- reg0 reg1 err }
-  .comp_args2_regs { reg0 reg1 }
   reg1 .comp_realloc_reg
   reg0 reg1
+end
+
+fun: .comp_reg2_arith { op -- err }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
+  reg0 reg0 reg1 .asm_pattern_arith_reg op .bit_or .comp_instr \ <op> Xd, Xn, Xm
+  reg1 .comp_args_set
 end
 
 \ ## Arithmetic continued
@@ -771,26 +776,26 @@ end
 \
 \ These words are also used by their redefinitions in `## Constant folding`.
 
-fun_comp: .bit_or  { -- err } ASM_OP_ORR_REG .comp_args2_arith_reg end
-fun_comp: .bit_and { -- err } ASM_OP_AND_REG .comp_args2_arith_reg end
-fun_comp: .bit_xor { -- err } ASM_OP_EOR_REG .comp_args2_arith_reg end
-fun_comp: .bit_lsl { -- err } ASM_OP_LSL_REG .comp_args2_arith_reg end
-fun_comp: .bit_lsr { -- err } ASM_OP_LSR_REG .comp_args2_arith_reg end
-fun_comp: .bit_asr { -- err } ASM_OP_ASR_REG .comp_args2_arith_reg end
+fun_comp: .bit_or  { -- err } ASM_OP_ORR_REG .comp_reg2_arith end
+fun_comp: .bit_and { -- err } ASM_OP_AND_REG .comp_reg2_arith end
+fun_comp: .bit_xor { -- err } ASM_OP_EOR_REG .comp_reg2_arith end
+fun_comp: .bit_lsl { -- err } ASM_OP_LSL_REG .comp_reg2_arith end
+fun_comp: .bit_lsr { -- err } ASM_OP_LSR_REG .comp_reg2_arith end
+fun_comp: .bit_asr { -- err } ASM_OP_ASR_REG .comp_reg2_arith end
 
 fun_comp: .negate { -- err }
-  .comp_args1_reg .asm_neg .comp_instr \ neg Xd, Xn
+  .comp_realloc1 .asm_neg .comp_instr \ neg Xd, Xn
 end
 
 fun: ?bit_not { val cond -> out } .negate .bit_xor end
 
 fun_comp: .inc { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg 1 .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
 end
 
 fun_comp: .dec { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg 1 .asm_sub_imm .comp_instr \ sub Xd, Xn, #imm12
 end
 
@@ -810,11 +815,11 @@ fun_comp: d+ { -- err } ( E: lo0 hi0 lo1 hi1 -- lo hi )
   hi0 .inc .comp_args_set
 end
 
-fun_comp: + { -- err } ASM_OP_ADD_REG .comp_args2_arith_reg end
-fun_comp: - { -- err } ASM_OP_SUB_REG .comp_args2_arith_reg end
-fun_comp: * { -- err } ASM_OP_MUL_REG .comp_args2_arith_reg end
-fun_comp: / { -- err } ASM_OP_SDIV_REG .comp_args2_arith_reg end
-fun_comp: u/ { -- err } ASM_OP_UDIV_REG .comp_args2_arith_reg end
+fun_comp: + { -- err } ASM_OP_ADD_REG .comp_reg2_arith end
+fun_comp: - { -- err } ASM_OP_SUB_REG .comp_reg2_arith end
+fun_comp: * { -- err } ASM_OP_MUL_REG .comp_reg2_arith end
+fun_comp: / { -- err } ASM_OP_SDIV_REG .comp_reg2_arith end
+fun_comp: u/ { -- err } ASM_OP_UDIV_REG .comp_reg2_arith end
 
 fun: d+ { lo0 hi0 lo1 hi1 -> lo hi } d+ end
 fun: * { i0 i1 -> i2 } * end
@@ -828,7 +833,8 @@ fun: .comp_emit_mod { out dividend divisor div_op -- err }
 end
 
 fun_comp: .mod { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 ASM_OP_SDIV_REG .comp_emit_mod
   reg1 .comp_args_set
 end
@@ -836,7 +842,8 @@ end
 fun: .mod { i0 i1 -> i2 } .mod end
 
 fun_comp: .umod { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 ASM_OP_UDIV_REG .comp_emit_mod
   reg1 .comp_args_set
 end
@@ -853,25 +860,25 @@ fun: .comp_emit_divmod { reg0 reg1 div_op -- tmp err }
 end
 
 fun_comp: /mod { -- err }
-  .comp_args2_regs2 { rem quo }
+  .comp_realloc2 { rem quo }
   rem quo ASM_OP_SDIV_REG .comp_emit_divmod .comp_args_set
 end
 
 fun: /mod { dividend divisor -> rem quo } /mod end
 
 fun_comp: u/mod { -- err }
-  .comp_args2_regs2 { rem quo }
+  .comp_realloc2 { rem quo }
   rem quo ASM_OP_UDIV_REG .comp_emit_divmod .comp_args_set
 end
 
 fun: u/mod { dividend divisor -> rem quo } u/mod end
 
-fun: .comp_emit_abs { reg -- err }
+fun_comp: .abs { -- err }
+  .comp_realloc1 { reg }
   reg                .asm_cmp_zero .comp_instr \ cmp Xn, #0
   reg reg reg ASM_PL .asm_csneg    .comp_instr \ cneg Xd, Xn, cond
 end
 
-fun_comp: .abs { -- err } .comp_args1_reg .comp_emit_abs end
 fun: .abs { int -> +int } .abs end
 
 fun: .comp_emit_csel_reg { out cmp_lhs cmp_rhs lhs rhs cond -- err }
@@ -885,7 +892,8 @@ fun: .comp_emit_csel_nonzero { out nonzero zero cond -- err }
 end
 
 fun_comp: .min { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 reg0 reg1 ASM_LT .comp_emit_csel_reg
   reg1 .comp_args_set
 end
@@ -893,7 +901,8 @@ end
 fun: .min { i0 i1 -> i0|i1 } .min end
 
 fun_comp: .umin { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 reg0 reg1 ASM_LO .comp_emit_csel_reg
   reg1 .comp_args_set
 end
@@ -901,7 +910,8 @@ end
 fun: .umin { i0 i1 -> i0|i1 } .umin end
 
 fun_comp: .max { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 reg0 reg1 ASM_GT .comp_emit_csel_reg
   reg1 .comp_args_set
 end
@@ -909,7 +919,8 @@ end
 fun: .max { i0 i1 -> i0|i1 } .max end
 
 fun_comp: .umax { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 reg0 reg1 ASM_HI .comp_emit_csel_reg
   reg1 .comp_args_set
 end
@@ -917,7 +928,8 @@ end
 fun: .umax { i0 i1 -> i0|i1 } .umax end
 
 fun_comp: .coalesce { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg0 reg1 ASM_NE .comp_emit_csel_nonzero
   reg1 .comp_args_set
 end
@@ -926,7 +938,8 @@ end
 fun: .coalesce { one two -> out } .coalesce end
 
 fun_comp: .fallback { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg0 reg1 reg0 ASM_NE .comp_emit_csel_nonzero
   reg1 .comp_args_set
 end
@@ -935,7 +948,8 @@ end
 fun: .fallback { one two -> out } .fallback end
 
 fun_comp: .is_aligned_to { -- err }
-  .comp_args2_regs { reg0 reg1 }
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
   reg1 reg1 1 .asm_sub_imm .comp_instr \ sub Xd, Xn, 1
   reg0 reg1   .asm_tst     .comp_instr \ tst Xn, Xm
   reg0 ASM_EQ .asm_cset    .comp_instr \ cset Xd, eq
@@ -944,74 +958,65 @@ end
 
 fun: .is_aligned_to { adr size -> bool } .is_aligned_to end
 
-fun: .comp_emit_align_down { out len wid -- err }
-  wid         .asm_neg     .comp_instr \ neg Xd, Xd
-  out len wid .asm_and_reg .comp_instr \ and Xd, Xn, Xm
-end
-
+\ Assumes pow-2 alignment.
 fun_comp: .align_down { -- err }
-  .comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 .comp_emit_align_down
+  .comp_realloc2 { reg0 reg1 }
+  reg1           .asm_neg     .comp_instr \ neg x1, x1
+  reg0 reg0 reg1 .asm_and_reg .comp_instr \ and x0, x1, x1
   reg1 .comp_args_set
 end
 
-fun: .align_down { len wid -> len } .align_down end
+fun: .align_down { val wid -> val } .align_down end
 
-\ Assumes power of two.
+\ Assumes pow-2 alignment.
 fun_comp: .align_up { -- err }
-  .comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 .asm_add_reg .comp_instr \ add Xd, Xn, Xm
-  reg0 reg0 1    .asm_sub_imm .comp_instr \ sub Xd, Xn, #1
-  reg0 reg0 reg1 .comp_emit_align_down
+  .comp_realloc2 { reg0 reg1 }
+  reg1 reg1 1    .asm_sub_imm .comp_instr \ sub x1, x1, #1
+  reg0 reg0 reg1 .asm_add_reg .comp_instr \ add x0, x0, x1
+  reg0 reg0 reg1 .asm_bic     .comp_instr \ bic x0, x0, x1
   reg1 .comp_args_set
 end
 
-fun: .align_up { len wid -> len } .align_up end
+fun: .align_up { val wid -> val } .align_up end
 
 \ Flip all the bits.
 fun_comp: .bit_not { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg .asm_mvn .comp_instr \ mvn Xd, Xm
 end
 
 \ 1-based index of the highest bit.
-fun: .comp_emit_bit_len { reg tmp -- err }
-  reg reg     .asm_clz     .comp_instr \ clz Xd, Xn
+fun_comp: .bit_len { -- err }
+  .comp_realloc1 { reg }
+  .comp_alloc_next_reg { tmp }
+  reg reg         .asm_clz .comp_instr \ clz Xd, Xn
   tmp 64                   .comp_load  \ mov Xd, #imm
   reg tmp reg .asm_sub_reg .comp_instr \ sub Xd, Xn, Xm
-end
-
-fun_comp: .bit_len { -- err }
-  .comp_args1_reg      { reg }
-  .comp_alloc_next_reg { tmp }
-  reg tmp .comp_emit_bit_len
   tmp .comp_args_set
 end
 
 fun: .bit_len { val -> len } .bit_len end
 
-fun: .comp_emit_pow2_ceil { reg tmp -- err }
-  tmp 1 .comp_load
+\ Round up to nearest pow2. Unsigned.
+\ If top bit is nonzero, output is 1.
+fun_comp: .pow2_ceil { -- err }
+  .comp_realloc1 { reg }
+  .comp_alloc_next_reg { tmp }
+  tmp 1                      .comp_load          \ mov Xd, #1
   reg reg tmp reg tmp ASM_HI .comp_emit_csel_reg \ csel Xd, Xn, Xm, hi
   reg reg 1 .asm_sub_imm     .comp_instr         \ sub Xd, Xn, #1
   reg reg .asm_clz           .comp_instr         \ clz Xd, Xn
   reg .asm_neg               .comp_instr         \ neg Xd, Xn
   reg reg 64 .asm_add_imm    .comp_instr         \ add Xd, Xn, #64
   reg tmp reg .asm_lsl_reg   .comp_instr         \ lsl Xd, Xn, Xm
-end
-
-fun_comp: .pow2_ceil { -- err }
-  .comp_args1_reg      { reg }
-  .comp_alloc_next_reg { tmp }
-  reg tmp .comp_emit_pow2_ceil
   reg .inc .comp_args_set
 end
 
-fun: .pow2_ceil { val -- pow2 } 1 val 1 .umax .dec .bit_len .bit_lsl end
+fun: .pow2_ceil { val -> pow2 } .pow2_ceil end
 
 \ "count leading zeros" (in high bits)
 fun_comp: .bit_clz { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg .asm_clz .comp_instr \ clz Xd, Xn
 end
 
@@ -1019,31 +1024,28 @@ fun: .bit_clz { num -> len } .bit_clz end
 
 \ "count trailing zeros" (in low bits)
 \
-\ Fallback version of `ctz Xd, Xn` for chips without `ctz`.
-fun: .comp_emit_bit_ctz { reg -- err }
+\ Fallback version of `ctz Xd, Xn` for CPUs without `ctz`.
+fun_comp: .bit_ctz { -- err }
+  .comp_realloc1 { reg }
   reg reg .asm_rbit .comp_instr \ rbit Xd, Xn
   reg reg .asm_clz  .comp_instr \ clz Xd, Xd
 end
 
-fun_comp: .bit_ctz { -- err } .comp_args1_reg .comp_emit_bit_ctz end
 fun: .bit_ctz { num -> len } .bit_ctz end
 
-fun: .comp_emit_low_bits { reg tmp -- err }
-  tmp 1 .comp_load
-  tmp tmp reg .asm_lsl_reg .comp_instr \ lsl Xt, Xt, Xn
-  reg tmp 1 .asm_sub_imm .comp_instr   \ sub Xn, Xt, #1
-end
-
 fun_comp: .low_bits { -- err }
-  .comp_args1_reg        { reg }
-  .comp_alloc_next_reg   { tmp }
-  reg tmp .comp_emit_low_bits
+  .comp_realloc1 { reg }
+  .comp_alloc_next_reg { tmp }
+  tmp 1                    .comp_load  \ mov x1, #1
+  tmp tmp reg .asm_lsl_reg .comp_instr \ lsl x1, x1, x0
+  reg tmp 1   .asm_sub_imm .comp_instr \ sub x0, x1, #1
   reg .inc .comp_args_set
 end
 
 fun_comp: .bit_trunc { -- err }
-  .comp_args2_regs     { imm len }
+  .comp_reg2 { imm len }
   .comp_alloc_next_reg { tmp }
+  imm .comp_realloc_reg
   tmp 1 .comp_load
   tmp tmp len .asm_lsl_reg .comp_instr \ lsl Xt, Xt, Xlen
   tmp tmp 1   .asm_sub_imm .comp_instr \ sub Xt, Xt, #1
@@ -1052,16 +1054,19 @@ fun_comp: .bit_trunc { -- err }
 end
 
 fun_comp: .bits_clear { -- err }
-  .comp_args2_regs { src mask }
+  .comp_reg2 { src mask }
+  src .comp_realloc_reg
   src src mask .asm_bic .comp_instr \ bic Xsrc, Xsrc, Xmask
   mask .comp_args_set
 end
 
 fun: .bits_clear { src mask -> out } .bits_clear end
 
+\ Unmask bits and return them in low bits.
+\ The mask must be nonzero and contiguous.
 fun_comp: .bits_get { -- err }
-  .comp_args2_regs { src mask }
-  \ Get bits according to a nonzero contiguous mask and return them in low bits.
+  .comp_reg2 { src mask }
+  src .comp_realloc_reg
   src  src  mask .asm_and_reg .comp_instr \ and Xd, Xn, Xm
   mask mask      .asm_rbit    .comp_instr \ rbit Xd, Xn
   mask mask      .asm_clz     .comp_instr \ clz Xd, Xn
@@ -1096,8 +1101,9 @@ end
 fun: .bits_set { val src mask -> out } .bits_set end
 
 fun_comp: .bits_pop { -- err }
-  .comp_args2_regs     { src mask }
+  .comp_reg2 { src mask }
   .comp_alloc_next_reg { shift }
+  src .comp_realloc_reg
 
   shift mask        .asm_rbit    .comp_instr \ rbit Xshift, Xmask
   shift shift       .asm_clz     .comp_instr \ clz Xshift, Xshift
@@ -1113,28 +1119,28 @@ fun: .bits_pop { src mask -> out val } .bits_pop end
 8 let: CELL
 
 fun_comp: .cells { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg 3 .asm_lsl_imm .comp_instr \ lsl Xd, Xd, #shift
 end
 
 fun: .cells { len -> size } .cells end
 
 fun_comp: /cells { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg 3 .asm_asr_imm .comp_instr \ asr Xd, Xd, #shift
 end
 
 fun: /cells { size -> len } /cells end
 
 fun_comp: +cell { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg CELL .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
 end
 
 fun: +cell { adr -> adr } +cell end
 
 fun_comp: -cell { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg CELL .asm_sub_imm .comp_instr \ sub Xd, Xn, #imm12
 end
 
@@ -1184,24 +1190,18 @@ fun: .asm_orr_bit { Xd Xn bit -- instr }
   0b1_01_100100_1_000000_000000_00000_00000 .bit_or
 end
 
-fun: .comp_emit_cmp_cset_reg { out lhs rhs cond -- err }
-  lhs rhs  .asm_cmp_reg .comp_instr \ cmp Xn, Xm
-  out cond .asm_cset    .comp_instr \ cset Xd, cond
-end
-
-fun: .comp_emit_cset_zero { reg cond -- err }
-  reg      .asm_cmp_zero .comp_instr \ cmp Xn, #0
-  reg cond .asm_cset     .comp_instr \ cset Xd, cond
-end
-
 fun: .asm_comp_cset_reg { cond -- err } ( E: i0 i1 -- bool )
-  .comp_args2_regs { reg0 reg1 }
-  reg0 reg0 reg1 cond .comp_emit_cmp_cset_reg
+  .comp_reg2 { reg0 reg1 }
+  reg0 .comp_realloc_reg
+  reg0 reg1 .asm_cmp_reg .comp_instr \ cmp Xn, Xm
+  reg0 cond .asm_cset    .comp_instr \ cset Xd, cond
   reg1 .comp_args_set
 end
 
 fun: .asm_comp_cset_zero { cond -- err } ( E: num -- bool )
-  .comp_args1_reg cond .comp_emit_cset_zero
+  .comp_realloc1 { reg }
+  reg      .asm_cmp_zero .comp_instr \ cmp Xn, #0
+  reg cond .asm_cset     .comp_instr \ cset Xd, cond
 end
 
 \ sbfm Xd, Xn, immr, imms
@@ -1218,7 +1218,7 @@ fun: .asm_sign_extend_32 { Xd Xn -> instr } 0 31 .asm_bitfield_move end
 \ done manually, particularly when dealing with C words
 \ which return `(int)-1` which ends up being 0xffffffff.
 fun_comp: .cint_to_cell { -- err }
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg .asm_sign_extend_32 .comp_instr \ sxtw Xd, Wn
 end
 
@@ -1267,7 +1267,7 @@ fun: .uwithin { num floor ceil -- bool } num floor u>= num ceil u< .bit_and end
 \ True if input has exactly one bit set. Nil input = nil output.
 \ Equivalent to the C idiom `val && !(val & (val - 1))`.
 fun_comp: .is_pow2 { -- err }
-  .comp_args1_reg { val }
+  .comp_realloc1 { val }
   .comp_alloc_next_reg { tmp }
   tmp val 1 .asm_sub_imm .comp_instr \ sub Xt, Xn, #1
   val tmp .asm_tst .comp_instr       \ tst Xn, Xt
@@ -2842,7 +2842,7 @@ end
 fun: .comp_bitwise_logical_imm { imm op -- ok err }
   imm .asm_bitwise_logical_imm_mask { mask ok }
   ok =0 .then false .ret end
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   mask reg 5 .bit_lsl .bit_or reg .bit_or op .bit_or .comp_instr \ and|orr|eor Xd, Xn, #imm
   true
 end
@@ -2894,10 +2894,15 @@ end
 
 fun: .comp_shift_imm { imm op -- ok err }
   imm 0 >= imm 63 <= .bit_and =0 .then false .ret end
-  .comp_args1_reg { reg }
-  op ASM_OP_LSL_REG = .then reg reg imm .asm_lsl_imm
+
+  .comp_realloc1 { reg }
+
+  op ASM_OP_LSL_REG =
+  .then reg reg imm .asm_lsl_imm
   elif op ASM_OP_LSR_REG = .then reg reg imm .asm_lsr_imm
-  else reg reg imm .asm_asr_imm end
+  else reg reg imm .asm_asr_imm
+  end
+
   .comp_instr \ lsl|lsr|asr Xd, Xn, #imm6
   true
 end
@@ -2932,7 +2937,7 @@ end
 fun: .comp_addsub_imm { imm add -- ok err }
   imm >=0 .then imm else imm .negate end { mag }
   mag 0 >= mag ASM_MAX_IMM12 <= .bit_and =0 .then false .ret end
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg reg mag imm >=0 add = .then .asm_add_imm else .asm_sub_imm end
   .comp_instr \ add|sub Xd, Xn, #imm12
   true
@@ -2971,7 +2976,7 @@ fun_comp: * { -- err } [ .redefine ]
     neg .then imm .negate else imm end { mag }
     mag .is_pow2 .then
       mag .bit_ctz { shift }
-      .comp_args1_reg { reg }
+      .comp_realloc1 { reg }
       reg reg shift .asm_lsl_imm .comp_instr \ lsl Xd, Xn, #imm6
       neg .then reg .asm_neg .comp_instr end \ neg Xd, Xn
       .ret
@@ -2997,7 +3002,7 @@ fun_comp: u/ { -- err } [ .redefine ]
   .comp_pop1 .then { imm }
     imm .is_pow2 .then
       imm .bit_ctz { shift }
-      .comp_args1_reg { reg }
+      .comp_realloc1 { reg }
       reg reg shift .asm_lsr_imm .comp_instr \ lsr Xd, Xn, #imm6
       .ret
     end
@@ -3234,7 +3239,7 @@ end
 
 fun: .comp_cmp_imm { imm cond -- ok err }
   imm 0 >= imm ASM_MAX_IMM12 <= .bit_and =0 .then false .ret end
-  .comp_args1_reg { reg }
+  .comp_realloc1 { reg }
   reg imm  .asm_cmp_imm .comp_instr \ cmp Xn, #imm12
   reg cond .asm_cset    .comp_instr \ cset Xd, cond
   true
@@ -3395,7 +3400,7 @@ fun_comp: .is_aligned_to { -- err } [ .redefine ]
   .comp_pop2 .then .is_aligned_to .comp_push .ret else { -- } end
   .comp_pop1 .then { size }
     size .dec .asm_bitwise_logical_imm_mask .then { mask }
-      .comp_args1_reg { reg }
+      .comp_realloc1 { reg }
       mask reg 5 .bit_lsl .bit_or 31 .bit_or ASM_OP_ANDS_IMM .bit_or .comp_instr \ tst Xn, #imm
       reg ASM_EQ .asm_cset .comp_instr                                           \ cset Xd, eq
       .ret
@@ -3421,7 +3426,7 @@ fun_comp: .align_up { -- err } [ .redefine ]
     off 0 >= off ASM_MAX_IMM12 <= .bit_and .then
       size .negate .asm_bitwise_logical_imm_mask
       .then { mask }
-        .comp_args1_reg { reg }
+        .comp_realloc1 { reg }
         reg reg off .asm_add_imm .comp_instr \ add Xd, Xn, #imm12
         mask reg 5 .bit_lsl .bit_or reg .bit_or ASM_OP_AND_IMM .bit_or .comp_instr \ and Xd, Xn, #imm
         .ret
@@ -3474,7 +3479,7 @@ fun_comp: .bits_get { -- err } [ .redefine ]
   .comp_pop2 .then .bits_get .comp_push .ret else { -- } end
   .comp_pop1 .then { imm }
     imm .asm_bitwise_logical_imm_mask .then { mask }
-      .comp_args1_reg { reg }
+      .comp_realloc1 { reg }
       mask reg 5 .bit_lsl .bit_or reg .bit_or ASM_OP_AND_IMM .bit_or .comp_instr \ and Xd, Xn, #imm
       reg reg imm .bit_ctz .asm_lsr_imm .comp_instr                              \ lsr Xd, Xn, #imm6
       .ret
@@ -3488,7 +3493,8 @@ end
 \ Same as multiply-by-boolean pattern but slightly faster.
 \ Should compile to `cmp; csel`. No CF: too few callsites.
 fun_comp: .gate { -- err } ( E: val pred -- val|nil )
-  .comp_args2_regs { val pred }
+  .comp_reg2 { val pred }
+  val .comp_realloc_reg
   val pred ASM_REG_ZR val ASM_REG_ZR ASM_NE .comp_emit_csel_reg
   pred .comp_args_set
 end
