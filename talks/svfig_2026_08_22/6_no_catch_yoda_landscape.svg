@@ -50,7 +50,7 @@
           font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
           font-size="22" font-weight="700">forward locally</text>
 
-    <text x="90" y="289" fill="#A3F5A3"
+    <text x="90" y="289" fill="white"
           font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
           font-size="23" font-weight="700">skip try</text>
     <text x="90" y="324" fill="#FFFFFF"
