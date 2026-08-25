@@ -1,6 +1,6 @@
 <svg width="100%" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"
      role="img" style="background:#181A1B" xmlns="http://www.w3.org/2000/svg">
-  <title>Exceptions have to be fought</title>
+  <title>Programs actually fight exceptions</title>
   <desc>
     A resource-management flow. An exception escapes from work and skips
     cleanup. Try and finally restore cleanup by opting out locally. Catch,
@@ -41,7 +41,7 @@
 
   <text x="64" y="68" fill="#FFFFFF"
         font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-        font-size="38" font-weight="700">Exceptions have to be fought</text>
+        font-size="38" font-weight="700">Programs actually fight exceptions</text>
   <text x="64" y="103" fill="#C3C3B6"
         font-family="SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace"
         font-size="15" font-weight="700">RESOURCE LIFETIME · HIDDEN EXIT · LOCAL OPT-OUT</text>
