@@ -54,6 +54,8 @@ I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest 
 - 2026-Jan: intro to the system, self-assembly showcase, demos — https://www.youtube.com/watch?v=_4U1BR1U_oM
 - 2026-Feb: register allocation and proper ABI interop with C — https://www.youtube.com/watch?v=rCF7wAB2wFQ
 - 2026-Apr: turning JIT compilation into AOT compilation — https://www.youtube.com/watch?v=vkJJhURJt78
+- 2026-Jul: redesigning Forth for register-addressing CPUs and for humans — https://www.youtube.com/watch?v=vNX6nzsgeuY
+- 2026-Aug: rethinking error handling; corollaries on memory management — https://www.youtube.com/watch?v=rjTZL9KITEk
 - [`./talks`](./talks) directory: presentation notes with more details.
 
 Unlike other compiler writers, I focused on keeping the system clear and educational as much as I could. Compilers don't have to be full of impenetrable garbage. They can consist of obvious stuff you'd expect, and can learn from.
