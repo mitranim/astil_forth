@@ -618,11 +618,11 @@ def tcp_connection_benches() -> None:
 
 
 section("NONE")
-bench("none_astil_jit", "astil.exe", ("./astil.exe", "--eval="), setup=(BUILD,), tools=("clang",))
+bench("none_astil_reg", "astil.exe", ("./astil.exe", "--eval="), setup=(BUILD,), tools=("clang",))
 bench("none_astil_stack", "astil_s.exe", ("./astil_s.exe", "--eval="), setup=(BUILD,), tools=("clang",))
 
 section("BASELINE")
-bench("baseline_astil_jit", "forth/lang.af", ("./astil.exe", "forth/lang.af"), setup=(BUILD,), tools=("clang",))
+bench("baseline_astil_reg", "forth/lang.af", ("./astil.exe", "forth/lang.af"), setup=(BUILD,), tools=("clang",))
 bench("baseline_astil_stack", "forth/lang_s.af", ("./astil_s.exe", "forth/lang_s.af"), setup=(BUILD,), tools=("clang",))
 bench(
     "baseline_erlang_single",
@@ -993,6 +993,8 @@ TCP_NOTE = f"""
 Measures {tcp_conn.CONNECTIONS} concurrent connections with {tcp_conn.EXCHANGES} one-byte request/echo exchanges per connection.
 
 Wall time includes Python TCP driver work. After every connection closes, the driver kills and reaps the idle server; this work is also included in wall time. CPU time and peak mem/RSS measure only the server subprocess.
+
+Erlang uses `+sbwt none`; it dramatically reduces active-N server CPU without changing the default scheduler count.
 
 This benchmark is noisier than others, especially when using pthreads. Results vary more between reruns.
 

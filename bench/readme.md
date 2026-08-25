@@ -20,16 +20,14 @@ Naming:
 
 Each `_jit` and `_stack` benchmark includes the cost of bootstrapping the entire language first. Reg-CC takes longer to bootstrap because it has more features.
 
+In Erlang: `baseline_erlang_single`, CPU-oriented benchmarks, and "cat" use one BEAM scheduler (`+S 1:1`). TCP benchmark uses default scheduler count.
+
 Notes:
 
 - All measurements were done on M3 Pro.
 - CPU microbenchmarks are sensitive to code layout and instruction selection. Small source changes can shift CPU frontend, cache, and branch-prediction behavior; on M3 Pro, we have seen cosmetic-looking changes move results by up to ≈10% or up to 10ms depending on benchmark runtime. Avoid over-generalizing differences in that range.
-- The suite records wall time, subprocess CPU time, and peak RSS. GC-based engines can spend substantial CPU on background threads.
+- The suite records wall time, total CPU time, and peak memory usage. GC-based engines can spend substantial CPU on background threads.
 - In many benchmarks, _startup time skews the measurement_. Adjust them by the "baseline" metrics when comparing.
-- Serial Erlang CPU and cat rows, plus `baseline_erlang_single`, use one BEAM scheduler (`+S 1:1`). Erlang TCP rows and `baseline_erlang_default` use the default scheduler count.
-- The functional `bubble_erlang_array` candidate is omitted because one fixed-workload validation exceeded the 60-second limit. The mutable `atomics` variant is retained.
-- Dominated Erlang variants were measured then removed: persistent-array sieve, bulk-match delimiter scan, `file:copy/2` cat, and active-once TCP.
-- Erlang TCP rows use `+sbwt none`; it dramatically reduced active-N server CPU without changing the default scheduler count.
 
 ## VERSIONS
 
@@ -65,7 +63,7 @@ Erlang/OTP 28 [erts-16.4] [source] [64-bit] [smp:12:12] [ds:12:12:10] [async-thr
 
 | Command | Wall [ms] ↓ | CPU [µs] | Peak mem [MiB] | Relative |
 | --- | ---: | ---: | ---: | ---: |
-| `none_astil_jit` | 1.176 ± 0.049 | 905.6 ± 47.6 | 1.4 ± 0.0 | 1.00 |
+| `none_astil_reg` | 1.176 ± 0.049 | 905.6 ± 47.6 | 1.4 ± 0.0 | 1.00 |
 | `none_astil_stack` | 3.6 ± 1.4 | 2459.0 ± 653.7 | 1.353 ± 0.021 | 3.09 |
 
 ## BASELINE
@@ -77,7 +75,7 @@ Erlang/OTP 28 [erts-16.4] [source] [64-bit] [smp:12:12] [ds:12:12:10] [async-thr
 | `baseline_astil_stack` | 3.151 ± 0.063 | 2834.8 ± 78.3 | 1.7 ± 0.0 | 1.92 |
 | `baseline_js_bun` | 7.46 ± 0.30 | 6047.0 ± 264.0 | 19.209 ± 0.041 | 4.54 |
 | `baseline_cl_sbcl` | 11.77 ± 0.18 | 10241.4 ± 138.2 | 39.2 ± 0.0 | 7.16 |
-| `baseline_astil_jit` | 13.36 ± 0.74 | 12887.6 ± 724.1 | 2.3 ± 0.0 | 8.12 |
+| `baseline_astil_reg` | 13.36 ± 0.74 | 12887.6 ± 724.1 | 2.3 ± 0.0 | 8.12 |
 | `baseline_pypy` | 14.98 ± 0.23 | 13730.4 ± 291.5 | 27.984 ± 0.094 | 9.11 |
 | `baseline_python` | 15.64 ± 0.29 | 14169.0 ± 138.3 | 11.43 ± 0.15 | 9.51 |
 | `baseline_java` | 39.5 ± 4.1 | 40581.4 ± 1585.2 | 35.13 ± 0.21 | 24.01 |
@@ -294,6 +292,8 @@ Copies a warmed 512 MiB file and 512 MiB stdin (1 GiB total).
 Measures 4096 concurrent connections with 32 one-byte request/echo exchanges per connection.
 
 Wall time includes Python TCP driver work. After every connection closes, the driver kills and reaps the idle server; this work is also included in wall time. CPU time and peak mem/RSS measure only the server subprocess.
+
+Erlang uses `+sbwt none`; it dramatically reduces active-N server CPU without changing the default scheduler count.
 
 This benchmark is noisier than others, especially when using pthreads. Results vary more between reruns.
 
