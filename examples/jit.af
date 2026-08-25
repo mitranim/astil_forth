@@ -1,15 +1,19 @@
 use' lang.af
 use' proc.af
 
-\ Trivial example of your own compilation and execution.
+\ Trivial example of your own native-code compilation and execution.
+\
+\ Assembler functions like `.asm_append_imm_to_reg .asm_append .asm_mul`
+\ come from `../forth/lang.af`. This is part of Astil Forth's bootstrap
+\ process; the language JIT-compiles itself. Your programs can too.
 
 2 0 extern: .clear_cache __clear_cache ( floor ceil )
 
 fun: .run { -- err }
-  PAGE_SIZE PROT_RW .mem_map { instrs }
+  PAGE_SIZE PROT_RW .mem_map { instrs } \ Grab memory for instructions.
 
   instrs                           { top }
-  1 234 top .asm_append_imm_to_reg { top } \ mov x1, 234
+  1 123 top .asm_append_imm_to_reg { top } \ mov x1, 123
   0 0 1 .asm_mul top .asm_append   { top } \ mul x0, x0, x1
   ASM_RET        top .asm_append   { top } \ ret
 
@@ -19,12 +23,16 @@ fun: .run { -- err }
   " disasm:\n" .elog
   instrs top instrs - .print_disasm
 
-  123 instrs .call [ 1 .comp_args_set ] { val } \ 123 234 *
-  " val: %zd\n" val .logf
+  \ Directly call compiled "function" by jumping to first instruction.
+
+  234 instrs .call [ 1 .comp_args_set ] { val } \ 234 123 *
+  " val: %zd\n" val .elogf
   assert= val 28782 end
 
-  345 instrs .call [ 1 .comp_args_set ] { val } \ 345 234 *
-  " val: %zd\n" val .logf
-  assert= val 80730 end
+  345 instrs .call [ 1 .comp_args_set ] { val } \ 345 123 *
+  " val: %zd\n" val .elogf
+  assert= val 42435 end
+
+  instrs PAGE_SIZE .mem_unmap \ Optional: relinquish storage to OS.
 end
 .run
