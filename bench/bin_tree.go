@@ -35,6 +35,7 @@ func (self *Node) count() int {
 }
 
 func main() {
+	// Atomics are used to make these constants opaque to the compiler.
 	minDepth := int(atomic.LoadInt64(&minDepthInput))
 	maxDepth := int(atomic.LoadInt64(&maxDepthInput))
 	stretchDepth := maxDepth + 1

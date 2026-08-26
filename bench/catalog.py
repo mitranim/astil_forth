@@ -743,6 +743,7 @@ bench("fib_loop_big_astil_asm_aot", "bench/fib_loop_big_asm.af", ("bench/fib_loo
 bench("fib_loop_big_astil_asm_jit", "bench/fib_loop_big_asm.af", ("./astil.exe", "bench/fib_loop_big_asm.af"), setup=(BUILD,), tools=("clang",))
 bench("fib_loop_big_astil_aot", "bench/fib_loop_big.af", ("bench/fib_loop_big_astil.exe",), setup=aot("bench/fib_loop_big.af", "bench/fib_loop_big_astil.exe"), tools=("clang",))
 bench("fib_loop_big_astil_jit", "bench/fib_loop_big.af", ("./astil.exe", "bench/fib_loop_big.af"), setup=(BUILD,), tools=("clang",))
+bench("fib_loop_big_go", "bench/fib_loop_big.go", ("bench/fib_loop_big_go.exe",), setup=go_exe("bench/fib_loop_big.go", "bench/fib_loop_big_go.exe"), tools=("go",))
 bench("fib_loop_big_js_bun", "bench/fib_loop_big.mjs", ("bun", "run", "bench/fib_loop_big.mjs"), tools=("bun",))
 bench("fib_loop_big_java", "bench/fib_loop_big.java", ("java", "-cp", "bench", "fib_loop_big"), setup=java_class("bench/fib_loop_big.java"), tools=("java",))
 bench("fib_loop_big_cl_sbcl", "bench/fib_loop_big.lisp", ("sbcl", "--script", "bench/fib_loop_big.lisp"), tools=("sbcl",))

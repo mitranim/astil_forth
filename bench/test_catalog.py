@@ -689,11 +689,11 @@ class SmokeTest(unittest.TestCase):
             item.name: item.cmd
             for item in bench.BENCHES
             if item.name in {
-                "none_astil_jit",
+                "none_astil_reg",
                 "none_astil_stack",
                 "baseline_js_bun",
             }
         }
-        self.assertEqual(commands["none_astil_jit"], ("./astil.exe", "--eval="))
+        self.assertEqual(commands["none_astil_reg"], ("./astil.exe", "--eval="))
         self.assertEqual(commands["none_astil_stack"], ("./astil_s.exe", "--eval="))
         self.assertEqual(commands["baseline_js_bun"], ("bun", "-e", ";"))
