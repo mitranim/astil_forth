@@ -29,13 +29,6 @@ fun: .nop end
 \ one tick seeks in the regular wordlist, and double tick
 \ seeks in the compile-time wordlist.
 
-\ Declares a Forth function with a separate native link name.
-fun: extern: { inp_len out_len -- err } ( C: "name" "link_name" -- ) ( E: …inps -- …outs )
-  .read_word { name name_len }
-  .read_word { link_name link_name_len }
-  name name_len link_name link_name_len inp_len out_len .extern_fun
-end
-
 \ Non-immediate replacement for standard `literal`.
 fun: .comp_push { val -- err } ( E: -- val )
   .comp_alloc_next_reg val .comp_load
@@ -1523,6 +1516,17 @@ fun_comp: sysstack_frame_ptr { -- err } ( E: -- fp ) [ .plain_call ]
 end
 
 fun: sysstack_frame_ptr { -- fp } [ .plain_call ] sysstack_frame_ptr end
+
+\ ## External functions
+\
+\ Declared here because this is needed soon below.
+
+\ Declares a Forth function with a separate native link name.
+fun: extern: { inp_len out_len -- err } ( C: "name" "link_name" -- ) ( E: …inps -- …outs )
+  .read_word { name name_len }
+  .read_word { link_name link_name_len }
+  name name_len link_name link_name_len inp_len out_len .extern_fun
+end
 
 \ ## Global variables and buffers
 
