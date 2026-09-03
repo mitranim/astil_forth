@@ -74,6 +74,10 @@ static Err interp_begin_definition(Interp *interp) {
 
 static void interp_repr_sym(const Interp *, const Sym *);
 
+// The name "semicolon" stuck around from Forth `;` which we no longer have.
+// This function, or rather a hidden `Sym` referring to it, gets returned by
+// word-defining words such as `fun:`. Usually this means it's pushed to the
+// control stack, and eventually popped / executed by `end`.
 static Err intrin_semicolon(Interp *interp) {
   const auto comp  = &interp->comp;
   const auto redef = interp->comp.ctx.redefining; // Snapshot before clearing.

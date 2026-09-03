@@ -414,13 +414,13 @@ static void interp_welcome(Interp *interp) {
   puts("Running Astil Forth REPL.");
 
   if (dict_has(&interp->dict_exec, name) || dict_has(&interp->dict_comp, name)) {
-    printf("Type " FMT_QUOTED " to display available words.\n", name);
+    printf("- show entire existing vocabulary: %s\n", name);
   }
 
   puts(
-    "Type `debug' <word>` to view its details.\n"
-    "Type `dis' <word>` to disassemble a word.\n"
-    "(Only regular words; requires `llvm-mc`.)\n"
+    "- view details of any word: debug' <word>\n"
+    "- disassemble a regular word: dis' <word>\n"
+    "- (requires globally available `llvm-mc`)\n"
   );
 
   interp->welcomed = true;

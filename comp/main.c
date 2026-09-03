@@ -58,7 +58,7 @@ static void print_help() {
     "Hint: paths beginning with `/` or `.` are local.\n"
     "Other import paths search standard library locations:\n"
     "- Directory `forth` relative to the path of the executable.\n"
-    "- Directory `$HOME/.local/share/astil` with `make install`.\n",
+    "- Directory `$HOME/.local/share/astil` from `make install`.\n",
     stderr
   );
 }
