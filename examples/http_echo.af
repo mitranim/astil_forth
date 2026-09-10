@@ -2,8 +2,8 @@ use' lang.af
 use' ./http_util.af
 
 \ Simple example of a single-threaded "HTTP" server which echoes requests
-\ back to clients. HTTP in quotes because it responds with HTTP without
-\ parsing the request; the client can be sending anything it wants.
+\ back to clients. "HTTP" in quotes because it responds with HTTP without
+\ parsing the request; the client may send anything.
 \
 \ Usage:
 \

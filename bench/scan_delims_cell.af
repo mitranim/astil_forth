@@ -9,7 +9,6 @@ use' lang.af
 s" {a,b:c[d]e} \n\tfg" str: SRC
 
 256 mem: DELS
-DELS 256 .memzero
 
 1 char' {  DELS + !8
 1 char' }  DELS + !8

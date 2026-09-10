@@ -73,9 +73,8 @@ Some values, such as file descriptors, require special sentinel like -1.
 
 #ifndef unreachable
 #define unreachable __builtin_unreachable
-#endif // unreachable
+#endif
 
-#define cast(typ, src) (*(typ *)(src))
 #define divisible_by(one, two) (!((one) % (two)))
 
 #define range(type, name, max)  \

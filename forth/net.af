@@ -197,11 +197,11 @@ end
 
 \ Result is `Addrinfo *` and should be freed with `.freeaddrinfo`.
 fun: .net_addr_info { port -- ainf err }
-  alloca' Addrinfo { hint }
+  allocaz' Addrinfo { hint }
   hint size' Addrinfo .memzero
+  AI_PASSIVE  hint .Addrinfo_flags    !
   AF_UNSPEC   hint .Addrinfo_family   !
   SOCK_STREAM hint .Addrinfo_socktype !
-  AI_PASSIVE  hint .Addrinfo_flags    !
 
   .slot { ainf }
   nil port hint ainf .getaddrinfo .cint_to_cell { code }
@@ -211,12 +211,12 @@ fun: .net_addr_info { port -- ainf err }
     " unable to listen on port %s; code: %zd; msg: %s" port code msg .errf .throw
   end
 
-  ainf @ =0 .then
+  ainf @ { ainf }
+  ainf =0 .then
     \ This line should not be reached on Posix-conforming systems.
     " unable to listen on port %s: no addrinfo available" port .errf .throw
   end
-
-  ainf @
+  ainf
 end
 
 \ On Darwin: our subprocess functions use `POSIX_SPAWN_CLOEXEC_DEFAULT`.

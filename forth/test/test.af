@@ -153,9 +153,7 @@ fun: .test_stack_primitives { -- err }
   assert= span .Span_top span end
   assert= stack .Stack_top stack end
 
-  alloca' Stack { stk }
-  stk size' Stack .memzero
-
+  allocaz' Stack { stk }
   assert= stk .test_span_len_cells 0 end
   assert= stk .test_span_cap_cells 0 end
 

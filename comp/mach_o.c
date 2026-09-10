@@ -643,15 +643,12 @@ static Err compile_mach_executable_to(
   deferred(buf_deinit) Buf buf = {};
   try(compile_mach_executable(interp, &buf, main));
 
-  // The following code could have just used deferred deinit,
-  // but clang-analyzer explodes with false positives.
+  int file = open(path, FWRITE | O_CREAT | O_TRUNC, 0o755);
+  if (file < 0) return err_file_unable_to_open(path);
+  defer fd_deinit(&file);
 
-  FILE *file = nullptr;
-  Err   err  = nullptr;
-  if (!err) err = file_open(path, "w", &file);
-  if (!err) err = file_write(file, buf.dat, 1, buf.len);
-  if (!err) err = err_errno(fflush(file));
-  if (!err) err = err_errno(fchmod(fileno(file), 0755));
-  if (file) err = either(err, err_errno(fclose(file)));
-  return err;
+  try(write_all(file, buf.dat, buf.len, nullptr));
+  try_errno(close(file));
+  file = -1;
+  return nullptr;
 }
