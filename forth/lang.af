@@ -2751,6 +2751,12 @@ end
 
 fun: .call { fun -> } .call end \ blr x0
 
+\ Workaround for lack of root-level conditionals.
+\ Allows root-level conditional execution. Usage:
+\
+\   instr' <func0> instr' <func1> <predicate> .choose .call
+fun: .choose { A B pred -- chosen } pred .then A else B end end
+
 \ ## Assembler continued -- logical immediates and other stuff
 
 fun: .asm_ror64 { val rot -- out }
