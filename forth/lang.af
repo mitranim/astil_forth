@@ -2700,9 +2700,6 @@ fun: .comp_realloc_regs { -- err }
   17 .comp_realloc_reg \ x17
 end
 
-\ blr x0
-fun: .call { _fun } [ 0 .asm_branch_link_reg .comp_instr ] end
-
 \ Takes any amount of args where the last arg is assumed to be a raw
 \ instruction address, known in C as "function pointer". Invokes the
 \ function with the preceding args. Assumes no outputs. The caller
@@ -2751,6 +2748,8 @@ fun_comp: .call { -- err } ( C: …args… fun -- ) ( E: …args… fun -- )
     ASM_REG_FP ASM_REG_LR ASM_REG_SP 16 .asm_load_pair_post .comp_instr  \ ldp x29, x30, [sp], #16
   end
 end
+
+fun: .call { fun -> } .call end \ blr x0
 
 \ ## Assembler continued -- logical immediates and other stuff
 
