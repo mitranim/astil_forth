@@ -50,7 +50,7 @@ Non-goals:
 
 No dependencies (other than libc). Uses custom assemblers in both C and Forth code.
 
-I gave talks about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
+I gave [talks](./talks) about Astil Forth in SVFIG meetings (Silicon Valley Forth Interest Group). Currently, that's the closest substitute for documentation, in addition to this readme and [`./examples`](./examples).
 - 2026-Jan: intro to the system, self-assembly showcase, demos — https://www.youtube.com/watch?v=_4U1BR1U_oM
 - 2026-Feb: register allocation and proper ABI interop with C — https://www.youtube.com/watch?v=rCF7wAB2wFQ
 - 2026-Apr: turning JIT compilation into AOT compilation — https://www.youtube.com/watch?v=vkJJhURJt78

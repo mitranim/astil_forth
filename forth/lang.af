@@ -4759,6 +4759,8 @@ fun: main_cells { -- adr len } [ .plain_call ] main_cells end
 \ Default context initializer for the entry point of AOT-compiled programs.
 \ Uses "statically" allocated memory regions. Example usage:
 \
+\   fun: .run { -- err } ... end
+\
 \   fun: .main { argc argv -- exit }
 \     alloca' Main_ctx { ctx }
 \     ctx .main_ctx_init
@@ -4785,7 +4787,9 @@ end
 
 \ Shortcut for AOT-compiled programs. Runs body with default main context.
 \ Body must run to completion to avoid clobbering the context register for
-\ outer callers such as CRT `start`. Common use pattern:
+\ outer callers such as CRT `start`. Common pattern:
+\
+\   fun: .run { -- err } ... end
 \
 \   fun: .main { -- exit }
 \     .with_main_ctx

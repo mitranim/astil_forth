@@ -18,7 +18,7 @@ variable seed ( -- addr )
 : initiate-seed ( -- )  74755 seed ! ;
 : random  ( -- n )  seed @ 1309 * 13849 + 65535 and dup seed ! ;
 
-32768 constant elements ( -- int)
+32768 constant elements ( -- int )
 
 align create ELEMS elements cells allot
 

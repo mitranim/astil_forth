@@ -338,8 +338,7 @@ static Err interp_word(Interp *interp, Word_str word) {
   const auto dict_comp = &interp->dict_comp;
   const auto comp      = &interp->comp;
   const auto ctx       = &comp->ctx;
-
-  const auto name = word.buf;
+  const auto name      = word.buf;
 
   if (ctx->compiling) {
     const auto loc = comp_local_get(comp, name);
