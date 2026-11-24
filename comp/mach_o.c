@@ -182,7 +182,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
   */
 
   // Must match the commands below.
-  constexpr U8 cmd_count = 13;
+  constexpr U8 cmd_count = 14;
 
   // Must match the commands below.
   constexpr U32 cmd_size = 0 +                      //
@@ -197,6 +197,7 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
     sizeof(Mach_cmd_dylib) +                        // MLC_LOAD_DYLIB
     sizeof(Mach_load_cmd_linkedit) +                // MLC_DYLD_CHAINED_FIXUPS
     sizeof(Mach_load_cmd_main) +                    // MLC_MAIN
+    sizeof(Mach_load_cmd_uuid) +                    // MLC_UUID
     sizeof(Mach_load_cmd_bui_ver) +                 // MLC_BUILD_VERSION
     sizeof(Mach_load_cmd_linkedit) +                // MLC_CODE_SIGNATURE
     0;
@@ -558,6 +559,33 @@ static Err compile_mach_executable(Interp *interp, Buf *buf, const Sym *main) {
       }
     );
   }
+
+  buf_append(
+    buf,
+    (Mach_load_cmd_uuid){
+      .head.cmd     = MLC_UUID,
+      .head.cmdsize = sizeof(Mach_load_cmd_uuid),
+      // f9de984d6c2b47dfbb5bb20441933fe3
+      .uuid = {
+        0xF9,
+        0xDE,
+        0x98,
+        0x4D,
+        0x6C,
+        0x2B,
+        0x47,
+        0xDF,
+        0xBB,
+        0x5B,
+        0xB2,
+        0x04,
+        0x41,
+        0x93,
+        0x3F,
+        0xE3,
+      }
+    }
+  );
 
   // Seems optional.
   buf_append(
